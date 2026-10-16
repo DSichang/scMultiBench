@@ -2429,11 +2429,9 @@ and <code>has_lock</code>; all keys are listed in Notes.</p>
 
 <details class="note">
   <summary>Notes</summary>
-  <p><strong>Selecting methods.</strong> <code>status</code> always reports every method and takes
-no method ids: <code>status("Matilda")</code> raises and names
-<code>mtb.env.doctor(methods=["Matilda"])</code>, which reports the envs of a
-selection. On the command line, <code>multibench env status --methods ...</code>
-prints only those methods.</p>
+  <p><strong>Selecting methods.</strong> <code>status</code> reports every method;
+<code>mtb.env.doctor(methods=[...])</code> reports the envs of a selection, and
+<code>multibench env status --methods ...</code> prints only those methods.</p>
 <p><strong>Keys.</strong></p>
 <ul>
 <li><code>method</code> - the method id.</li>
@@ -2443,9 +2441,7 @@ prints only those methods.</p>
 <li><code>own_env</code> - the singleton name <code>scmb_&lt;method&gt;</code> (lower-case); the
   method also counts as installed when this env exists.</li>
 <li><code>exists</code> - <code>env</code> or <code>own_env</code> is installed here.</li>
-<li><code>has_lock</code> - a shipped lockfile can build <code>env</code> (<code>[L]</code> in
-  <code>multibench env status</code> while the env is missing, as in
-  <code>multibench env doctor</code>).</li>
+<li><code>has_lock</code> - a shipped lockfile can build <code>env</code>.</li>
 <li><code>difficulty</code> - a tag for how hard the env is to build (below).</li>
 <li><code>verified_working</code> - the env ran the method end-to-end on its
   reference dataset (the <code>*</code> after the tag in <code>multibench env status</code>).</li>
@@ -2454,9 +2450,8 @@ prints only those methods.</p>
   packed archive, <code>'single'</code> for an env with one archive for <abbr title="Central Processing Unit">CPU</abbr> and
   <abbr title="Graphics Processing Unit">GPU</abbr> hosts, else <code>None</code>.</li>
 </ul>
-<p><strong>Difficulty tags.</strong> They describe how hard the env is to build from its
-recipe, not how well the method works (full text in
-<code>mtb.env.DIFFICULTY</code>):</p>
+<p><strong>Difficulty tags.</strong> How hard the env is to build from its recipe, not
+how well the method works:</p>
 <ul>
 <li><code>easy</code> - modern Python/torch stack; builds from the lockfile.</li>
 <li><code>old-scvi</code> / <code>old-tensorflow</code> - old scvi-tools or TensorFlow pins
@@ -2469,11 +2464,8 @@ recipe, not how well the method works (full text in
   run unmodified from the public checkout.</li>
 <li><code>unknown</code> - no recipe declared.</li>
 </ul>
-<p><strong>What counts as installed.</strong> A prefix <code>&lt;envs_dir&gt;/&lt;env&gt;</code> with a
-<code>bin/</code> directory (<code>envs_dir</code> = <code>mtb.config.Config.envs_dir</code>; no
-conda needed), or an env listed by <code>conda env list</code> of the <code>conda</code>
-given, else of the conda/mamba on PATH. The prefix probe runs whether or
-not <code>conda</code> is given.</p>
+<p><strong>What counts as installed.</strong> What <code>mtb.env.env_prefix</code> finds, asking
+the <code>conda</code> given.</p>
 </details>
 
 <details class="see-also">
@@ -2675,8 +2667,7 @@ match, if any.</p>
 </ul>
 <p><strong>Selection.</strong> <code>methods</code> takes precedence over <code>category</code>.</p>
 <p><strong>Command line.</strong> <code>multibench env plan</code> prints the same rows with each
-archive's download size and unpacked size on disk (the sizes recorded
-for this release; <code>?</code> = not measured) and a total line.</p>
+archive's download and unpacked size (<code>?</code> = not measured) and a total.</p>
 </details>
 
 <details class="see-also">
@@ -3044,43 +3035,21 @@ installed.</p>
 <li><code>'cpu'</code> - the <code>'&lt;env&gt;-cpu'</code> archive (the same env without the CUDA
   libraries, several times smaller) where published; otherwise the
   <code>'&lt;env&gt;'</code> archive and one <code>UserWarning</code>.</li>
-<li><code>'auto'</code> - <code>'cpu'</code> when <code>mtb.env.host_has_gpu()</code> is <code>False</code>
-  (no <code>nvidia-smi -L</code> output and no <code>/proc/driver/nvidia/version</code>),
-  else <code>'gpu'</code>.</li>
+<li><code>'auto'</code> - <code>'cpu'</code> when <code>mtb.env.host_has_gpu()</code> is <code>False</code>,
+  else <code>'gpu'</code>; when it picks the <abbr title="Central Processing Unit">CPU</abbr> builds, one line on stderr says
+  so. Pass <code>flavor='gpu'</code> when the envs serve jobs on <abbr title="Graphics Processing Unit">GPU</abbr> nodes.</li>
 </ul>
-<p>The dry-run sizes and URL follow the flavour: a <abbr title="Central Processing Unit">CPU</abbr> host sees the <abbr title="Central Processing Unit">CPU</abbr>
-archives' download total. The flavour installed is recorded in the env
-prefix and shown by <code>mtb.env.status</code>, <code>mtb.env.doctor</code> and
-<code>mtb.env.plan</code>.</p>
-<p><strong>Installing for other hosts.</strong> <code>'auto'</code> decides by this host. When it
-picks the <abbr title="Central Processing Unit">CPU</abbr> builds, one line on stderr says so; pass <code>flavor='gpu'</code>
-(<code>--flavor gpu</code>) when the envs serve jobs on <abbr title="Graphics Processing Unit">GPU</abbr> nodes.</p>
+<p>The dry-run sizes and URL follow the flavour. The flavour installed is
+shown by <code>mtb.env.status</code>, <code>mtb.env.doctor</code> and <code>mtb.env.plan</code>.</p>
 <p><strong>Order of work</strong> (<code>dry_run=False</code>). With <code>packed</code>, each missing env
-is first tried as an archive (the URL recorded for this release, else
-the default release URL). An HTTP error on
-the download or a failed unpack falls back to the lockfile build; envs
-with no lockfile are reported <code>'NO-LOCK'</code>, not built.</p>
-<p><strong>Where envs go.</strong> Archives unpack into <code>mtb.config.Config.envs_dir</code>
-(or, when <code>conda</code> is given, that tool's envs dir). The runner activates
-the prefix directly, so the packed path works without conda (Colab,
-laptops without conda).</p>
-<p><strong>Errors.</strong> <code>flavor</code> is checked before anything else. With
-<code>dry_run=False</code>:</p>
-<ul>
-<li>Archives and lockfiles are linux-64, so a non-Linux host raises
-  <code>RuntimeError</code> before any download unless <code>force=True</code>.</li>
-<li>Without conda/mamba, a missing env that needs a lockfile build raises
-  <code>RuntimeError</code> before any download. It starts <code>"Conda is not
-  installed on this computer. Environment &lt;env&gt; has a packed archive."</code>
-  when <code>packed=False</code> skipped a published archive, and says <code>"... has
-  no packed archive. Install conda first."</code> otherwise.</li>
-<li>A failed build command raises <code>RuntimeError</code> with its stderr tail.</li>
-</ul>
+is first tried as an archive; an HTTP error or a failed unpack falls back
+to the lockfile build. Archives unpack into <code>mtb.config.Config.envs_dir</code>
+(or, when <code>conda</code> is given, that tool's envs dir) and need no conda.
+Without conda, a missing env that needs a lockfile build raises
+<code>RuntimeError</code> before any download.</p>
 <p><strong>Command line.</strong> <code>multibench env install --methods X --packed --run</code>
 takes the packed path; <code>multibench env install --run</code> builds from
-lockfiles (the CLI's <code>--packed</code> is off by default). The per-env steps
-are <code>mtb.env.install_packed</code> (one archive) and <code>mtb.env.create_all</code>
-(lockfile builds).</p>
+lockfiles.</p>
 </details>
 
 <details class="see-also">
@@ -3308,13 +3277,10 @@ prints per env and <code>multibench env status</code> prints per method.</p>
 <li><code>flavor</code> - <code>'cpu'</code> / <code>'gpu'</code> / <code>'single'</code> when the installed
   env came from a packed archive, else <code>None</code>.</li>
 </ul>
-<p><strong>Next step.</strong> A fresh machine reports <code>exists=False</code> everywhere.
-<code>mtb.env.install(methods, dry_run=False)</code> installs the missing envs,
-packed archives first; on the command line that is
-<code>multibench env install --methods ... --packed --run</code> (the <code># next</code>
-line <code>multibench env doctor</code> prints), while plain
-<code>multibench env install --run</code> builds from lockfiles only. Linux only:
-on macOS and Windows the install is refused unless <code>force=True</code>.</p>
+<p><strong>Next step.</strong> <code>mtb.env.install(methods, dry_run=False)</code> installs the
+missing envs, packed archives first; on the command line that is
+<code>multibench env install --methods ... --packed --run</code>, while plain
+<code>multibench env install --run</code> builds from lockfiles only. Linux only.</p>
 </details>
 
 <details class="see-also">
@@ -3447,10 +3413,9 @@ listed in Notes.</p>
 </ul>
 <p><strong>Command line.</strong> <code>multibench env recipe METHOD</code> prints the recipe as
 conda/pip commands and <code>multibench env yml METHOD</code> as an
-<code>environment.yml</code>; by default both name the env the way <code>mtb.scan</code>
-and <code>mtb.run</code> expect it. The env <code>mtb.run</code> relies on is the lockfile
-or packed-archive build (<code>mtb.env.install</code>); a recipe build can miss
-what <code>mtb.run</code> needs (see <code>caveats</code>).</p>
+<code>environment.yml</code>. <code>mtb.run</code> relies on the lockfile or packed-archive
+build (<code>mtb.env.install</code>); a recipe build can miss what it needs (see
+<code>caveats</code>).</p>
 </details>
 
 <details class="see-also">
@@ -3563,12 +3528,9 @@ what <code>mtb.run</code> needs (see <code>caveats</code>).</p>
 
 <details class="note">
   <summary>Notes</summary>
-  <p><strong>Lookup order.</strong> <code>&lt;mtb.config.DEFAULT.envs_dir&gt;/&lt;env&gt;</code> when that folder
-contains <code>bin/</code> (an unpacked archive or a conda-built env there; no conda
-needed); otherwise, when a conda/mamba binary is found, the prefix
-<code>conda env list</code> reports for that name; otherwise <code>None</code>.</p>
-<p><strong>Where it is used.</strong> This is what "installed" means everywhere
-(<code>mtb.env.doctor</code>, <code>env_ok</code> in <code>mtb.scan</code>) and the prefix the runner
+  <p><code>&lt;mtb.config.DEFAULT.envs_dir&gt;/&lt;env&gt;</code> when it contains <code>bin/</code> (no
+conda needed); else the prefix <code>conda env list</code> reports for that name.
+This is what "installed" means everywhere, and the prefix <code>mtb.run</code>
 activates.</p>
 </details>
 
@@ -3632,8 +3594,6 @@ activates.</p>
 device, or when <code>/proc/driver/nvidia/version</code> exists (driver loaded, tool
 not on <code>PATH</code>). A torch install, <code>CUDA_VISIBLE_DEVICES</code> or a CUDA
 library on disk do not count.</p>
-<p><strong>Where it is used.</strong> <code>mtb.env.install(flavor="auto")</code> picks the <abbr title="Graphics Processing Unit">GPU</abbr> or
-<abbr title="Central Processing Unit">CPU</abbr> archives from it.</p>
 <p><strong>Caching.</strong> The result is cached per process;
 <code>mtb.env.host_has_gpu.cache_clear()</code> probes again.</p>
 </details>

@@ -2362,9 +2362,6 @@ of:</p>
 runner's prefix mode activates. The first read may run <code>conda info
 --json</code> (once per process, not at import); assigning a value skips
 the probe.</p>
-<p><strong>Leiden backends.</strong> <code>"igraph"</code> is scanpy's igraph implementation,
-several times faster; <code>"leidenalg"</code> is the backend both stored
-sources (published and re-run) were computed with.</p>
 <p><strong>Method scripts.</strong> The first run fetches them from GitHub into
 <code>repo_path</code> (<code>multibench fetch --scripts</code> does it ahead). Set
 <code>MULTIBENCH_SCRIPTS_REF</code> to a commit or tag to fetch that version
@@ -2439,23 +2436,14 @@ out the call that selects one variant.</p>
 
 <details class="note">
   <summary>Notes</summary>
-  <p><strong>When it fires.</strong> <code>category=</code> / <code>modalities=</code> leave more than one
-variant - e.g. Matilda has an rna+adt and an rna+atac <code>vertical</code>
-variant, so <code>params_for("Matilda")</code> cannot pick:</p>
-<ul>
-<li><code>mtb.inputs_for</code> (without <code>modalities=</code>) and
-  <code>mtb.params_for(dataset=)</code> (without <code>category=</code> or <code>modalities=</code>)
-  first let the dataset folder decide, and raise only when it settles
-  nothing;</li>
-<li><code>mtb.labels_for</code> never raises it; it falls back to the default label
-  order.</li>
-</ul>
-<p><strong>What to do.</strong> Pass <code>modalities=</code> (and <code>category=</code>) exactly as the
-message shows.</p>
-<p><strong>Catching it.</strong> It is a <code>ValueError</code> and also a <code>KeyError</code>, so
-<code>except KeyError</code> catches it too. The package uses <code>KeyError</code> for
-unknown ids, such as a mistyped method name. <code>str(exc)</code> is the plain
-message, without <code>KeyError</code> quoting.</p>
+  <p><code>mtb.inputs_for</code> (without <code>modalities=</code>) and
+<code>mtb.params_for(dataset=)</code> (without <code>category=</code> or <code>modalities=</code>)
+first let the dataset folder decide, and raise only when it settles
+nothing. <code>mtb.labels_for</code> never raises it; it falls back to the default
+label order.</p>
+<p>It is a <code>ValueError</code> and also a <code>KeyError</code>, so <code>except KeyError</code>
+catches it too. <code>str(exc)</code> is the plain message, without <code>KeyError</code>
+quoting.</p>
 </details>
 
 <details class="see-also">

@@ -2330,7 +2330,8 @@ variant (<code>data_dir</code> for the directory-input methods).</p>
             </td>
             <td class="doc-raises-details">
               <div class="doc-md-description">
-                <p>Unknown method, or no variant matches <code>category</code> and <code>modalities</code>.</p>
+                <p>Unknown method (the message names the closest method id), or no
+variant matches <code>category</code> and <code>modalities</code>.</p>
               </div>
             </td>
           </tr>
@@ -2444,16 +2445,14 @@ variant (<code>data_dir</code> for the directory-input methods).</p>
 exactly one variant. In the second case a representation token must
 match what the method reads (<code>method_info(m)['atac']</code>): SCALEX with
 <code>["rna", "peak"]</code> raises <code>KeyError</code>.</p>
-<p>Without <code>modalities</code>, a category with one variant uses it. With several,
-the dataset folder decides: the variant whose input files are all present
-is used (Matilda on a <code>rna.h5 + adt.h5</code> folder is its rna+adt variant).
-When several qualify and their modality sets are nested, the one with the
-most modalities is used: a folder with <code>rna.h5</code>, <code>adt.h5</code> and
-<code>atac.h5</code> gives scMoMaT's rna+adt+atac variant, not its rna+adt one.
-Pass <code>modalities=</code> for a smaller one. When none qualifies, or several
-that are not nested, <code>mtb.AmbiguousVariantError</code> (a <code>ValueError</code>)
-lists the modality sets and the folder contents and asks for
-<code>modalities=</code>.</p>
+<p>Without <code>modalities</code>, the dataset folder decides between several
+variants: the one whose input files are all present is used (Matilda on
+a <code>rna.h5 + adt.h5</code> folder is its rna+adt variant). Of nested modality
+sets the largest is used: a folder with <code>rna.h5</code>, <code>adt.h5</code> and
+<code>atac.h5</code> gives scMoMaT's rna+adt+atac variant; pass <code>modalities=</code>
+for a smaller one. When none qualifies, or several that are not nested,
+<code>mtb.AmbiguousVariantError</code> lists the modality sets and the folder
+contents.</p>
 <p><strong>Modality tokens.</strong> <code>method_info(m)['supports']</code> lists each variant's
 tokens.</p>
 <ul>
@@ -2464,9 +2463,6 @@ tokens.</p>
   reads; <code>method_info(m)['atac']</code> says which one that is.</li>
 </ul>
 <p>An unknown token raises <code>ValueError</code> naming the vocabulary.</p>
-<p><strong>Validation.</strong> A misspelt method id raises <code>KeyError</code> naming the
-closest method id; an unknown category raises <code>ValueError</code> listing
-the four.</p>
 <p><strong>File resolution.</strong> The dataset tree is flat
 (<code>&lt;data_path&gt;/&lt;dataset&gt;/&lt;file&gt;</code>). Each role resolves to the file present
 in the folder: the role token or a known alias. Label roles look for
@@ -2495,21 +2491,14 @@ another export.</p>
 <code>&lt;dataset&gt;/processed/</code> and the dataset folder that holds a <code>.h5ad</code>
 file; when neither does, to <code>processed/</code> if that folder exists, else to
 the dataset folder itself.</p>
-<p><strong>Absolute paths.</strong> Every returned path is absolute (a relative
-<code>data_path</code> is resolved against the current directory), and a
-<code>data_dir</code> value ends with the path separator. <code>mtb.run</code> executes the
-method with <code>cwd=out_dir</code>, where a relative path would point at the
-wrong place.</p>
-<p><strong>The check argument.</strong></p>
-<ul>
-<li><code>False</code> (default): the best-effort paths, with no warning.</li>
-<li><code>None</code>: the same paths, plus a <code>UserWarning</code> listing the missing ones.</li>
-<li><code>True</code>: <code>FileNotFoundError</code> for a missing input, plus the content
-  checks below.</li>
-</ul>
-<p>The missing-file error or warning names an <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>-family sibling that is
-present, e.g. <code>atac_peak.h5</code> when a vertical variant reads <code>atac.h5</code>,
-and says when the folder holds per-batch files.</p>
+<p><strong>Absolute paths.</strong> A relative <code>data_path</code> is resolved against the
+current directory, and a <code>data_dir</code> value ends with the path
+separator: <code>mtb.run</code> executes the method with <code>cwd=out_dir</code>, where a
+relative path would point at the wrong place.</p>
+<p><strong>Missing files.</strong> The error (<code>check=True</code>) or warning (<code>check=None</code>)
+names an <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>-family sibling that is present, e.g. <code>atac_peak.h5</code> when
+a vertical variant reads <code>atac.h5</code>, and says when the folder holds
+per-batch files.</p>
 <p><strong>Content checks</strong> (<code>check=True</code>). The same checks <code>mtb.scan</code>
 reports per row as <code>files_ok</code> / <code>files_reason</code>:</p>
 <ul>
@@ -2535,11 +2524,6 @@ reports per row as <code>files_ok</code> / <code>files_reason</code>:</p>
   differ only in a <code>-1</code> / <code>-2</code> suffix count as the same cell. The
   same holds per batch for <code>atac_gas&lt;i&gt;.h5</code> and <code>atac_peak&lt;i&gt;.h5</code>.</li>
 </ul>
-<p><strong>Dataset name case.</strong> A spelling that differs from the folder only in
-case (<code>'d52'</code> for <code>D52</code> on a case-insensitive filesystem) is replaced
-by the on-disk spelling, with a <code>UserWarning</code>.</p>
-<p><strong>Argument order.</strong> <code>(dataset, category, method)</code>, the same order
-<code>mtb.scan</code>, <code>mtb.run_all</code> and <code>mtb.labels_for</code> use.</p>
 </details>
 
 <details class="see-also">
@@ -2872,12 +2856,10 @@ not alphabetical:</p>
 <li><code>cty</code> (one file, cells already paired) first;</li>
 <li>numbered <code>cty1, cty2, ..., cty10</code>, in numeric order (batch
    order);</li>
-<li>modality-named files in the canonical modality order <strong>rna, adt, atac</strong>
-   (<code>peak_cty</code> counts as atac) - the diagonal methods other than uniPort
-   and Seurat_v5 emit the <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> cells first, then the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> cells. Diagonal
-   data in several batches follows the same rule, by number within a
-   modality: <code>rna_cty1, rna_cty2, rna_cty3, atac_cty1, atac_cty2,
-   atac_cty3</code>;</li>
+<li>modality-named files in the order <strong>rna, adt, atac</strong> (<code>peak_cty</code>
+   counts as atac), then by number: <code>rna_cty1, rna_cty2, atac_cty1,
+   atac_cty2</code>. The diagonal methods other than uniPort and Seurat_v5
+   emit the <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> cells first;</li>
 <li>any other <code>*cty*</code> file, alphabetically, last.</li>
 </ol>
 <p><strong>Per-method order.</strong> With <code>category</code> and <code>method</code>, each file goes
@@ -2903,9 +2885,8 @@ its order, so <code>mtb.evaluate(labels=...)</code> takes it as is. A copy
 the default order; otherwise name the order with <code>evaluate</code>'s
 <code>label_order=</code>. <code>list(labels_for(ds).values())</code> is the same files as a
 list, in the same order, which <code>evaluate</code> also accepts.</p>
-<p><strong>Validation.</strong> <code>category</code> and <code>method</code> are validated whenever given:
-<code>ValueError</code> listing the four categories on a typo, <code>KeyError</code> with a
-did-you-mean hint for a method. Either one alone changes nothing.</p>
+<p><code>category</code> and <code>method</code> are validated whenever given; either one
+alone changes nothing.</p>
 <p><strong>Per-batch folders.</strong> A folder written with <code>export_dataset(batch=...)</code>
 holds <code>rna1.h5</code>, <code>rna2.h5</code> ... and <code>cty1.csv</code>, <code>cty2.csv</code> ....
 Vertical and diagonal methods read one <code>rna.h5</code> and one label file.
@@ -2921,10 +2902,8 @@ label file is one batch for the batch metrics, as for every list of
 label files: three <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and three <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> files give six batches. Pass
 <code>batch=</code> to <code>mtb.evaluate</code> or <code>mtb.run_all</code> for another grouping,
 such as <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> against <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>.</p>
-<p><strong>Paths and names.</strong> Paths are absolute. A dataset spelling that differs
-from the folder only in case (<code>'d52'</code> for <code>D52</code>) is replaced by the
-on-disk spelling, with a <code>UserWarning</code>. The positional order is
-<code>(dataset, category, method)</code>, like <code>mtb.inputs_for</code>, <code>mtb.scan</code> and
+<p><strong>Paths.</strong> Paths are absolute. The positional order is <code>(dataset,
+category, method)</code>, like <code>mtb.inputs_for</code>, <code>mtb.scan</code> and
 <code>mtb.run_all</code>.</p>
 </details>
 

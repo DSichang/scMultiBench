@@ -2733,7 +2733,8 @@ all 18 columns are listed in Notes. <code>df.attrs</code> holds <code>held</code
             </td>
             <td class="doc-raises-details">
               <div class="doc-md-description">
-                <p>A method in <code>methods</code> has no variant in <code>category</code> or <code>modalities</code>.</p>
+                <p>A method in <code>methods</code> has no variant in <code>category</code> or <code>modalities</code>,
+even when other named methods have one.</p>
               </div>
             </td>
           </tr>
@@ -2832,38 +2833,37 @@ other than <code>"all"</code>.</p>
 
 <details class="note">
   <summary>Notes</summary>
-  <p><strong>Column reference.</strong> The full frame has 18 columns:</p>
+  <p><strong>Columns.</strong></p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>method              method id
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>category            integration category of the variant
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>modalities          '+'-joined string ("rna+adt"); "(data_dir)" for a
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>                    directory-fed variant
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>env                 the conda env the method runs in
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>output_kind         embedding / graph
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>n_tunable           number of command-line hyperparameters
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>runtime_tier        fast / medium / slow / very_slow / unknown
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>observed_worst_sec  the slowest observed run, seconds (None = unmeasured)
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>caveat              what the run needs besides the files, or ""
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>runnable            both checks pass and nothing below blocks it
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>reason              short form of the non-empty reasons, as sentences
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>files_ok            the inputs resolve, are oriented and labelled
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>files_reason        full file-check text, full paths
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>env_ok              the env exists (and a GPU, when the script needs one)
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>env_reason          full env-check text
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>needs_labels        this variant demands a label file as an input
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>atac                ATAC representation the method expects: 'peak' /
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>                    'gene_activity'; None when the variant takes no ATAC
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>command             the shell line the variant would run; "" if the
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>                    inputs do not resolve
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>modalities          '+'-joined roles ("rna+adt"); run_all and inputs_for take
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>                    a list, so split on "+". "(data_dir)" marks a variant
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>                    that reads a whole folder (scBridge): pass no modalities
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>env                 the conda env the method runs in
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>output_kind         embedding / graph
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>n_tunable           number of command-line hyperparameters
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>runtime_tier        fast / medium / slow / very_slow / unknown
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>observed_worst_sec  the slowest observed run, seconds (None = unmeasured)
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>caveat              what the run needs besides the files, or ""
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>runnable            both checks pass and nothing below blocks it
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>reason              short form of the non-empty reasons; "" when runnable
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>files_ok            the inputs resolve, are oriented and labelled
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>files_reason        full file-check text, full paths
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>env_ok              the env exists (and a GPU, when the script needs one)
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>env_reason          full env-check text
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>needs_labels        this variant demands a label file as an input
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>atac                ATAC representation the method expects: 'peak' /
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>                    'gene_activity'; None when the variant takes no ATAC
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>command             the shell line the variant would run; "" if the
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>                    inputs do not resolve
 </span></code></pre></div>
-<p><strong>Listed rows.</strong> By default the frame lists the variants whose
-modalities the folder holds: on a folder with <code>rna.h5</code> and <code>adt.h5</code>
-the variants that read <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> are left out. A variant whose input files
-are all there is always listed, so the rows with <code>files_ok</code> are the
-same as with <code>modalities="all"</code>, which lists every variant. A method
-named in <code>methods</code> keeps its rows when none of them would be listed.
-When the folder holds no <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>, <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> or <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file, or no row would be
-left, every variant is listed. A list of <code>modalities</code> selects as
-before. <code>df.attrs</code> says what was left out:</p>
+<p><strong>Listed rows.</strong> Without <code>modalities</code> the frame lists the variants
+whose modalities the folder holds, and every variant whose input files
+are all there, so the <code>files_ok</code> rows are those of
+<code>modalities="all"</code>. A method named in <code>methods</code> keeps its rows when
+none would be listed. When the folder holds no <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>, <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> or <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file, or
+no row would be left, every variant is listed. <code>df.attrs</code> says what was
+left out:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>held        the modalities the folder holds, e.g. ['rna', 'adt']
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>not_listed  how many variants are not listed
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>not_held    the modalities those variants read and the folder does not
@@ -2871,75 +2871,41 @@ before. <code>df.attrs</code> says what was left out:</p>
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>cells       per_method=True only: {file name: cells} of the matrix
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>            files in the folder; None for a file that cannot be read
 </span></code></pre></div>
-<p>The printed line names them too. With <code>verbose=False</code> these keys are
-the only sign that variants were left out.</p>
-<p><strong>One row per method.</strong> <code>per_method=True</code> answers one question per
-method: can it run on this folder? <code>runnable</code> is <code>True</code> when one of
-the method's listed variants is runnable, which is when <code>run_all</code>
-with the same arguments tries the method. <code>reason</code> is empty for those.
-Otherwise it is the <code>reason</code> of one variant: one whose input files are
-all in the folder, else one that reads the modalities the folder holds,
-else the one that lacks the fewest files. Runnable methods come first,
-then by name. Three things are printed above the
-table: the counts with the modalities and batches the folder holds, the
-cells of each matrix file, and the full reason of each method that
-cannot run. A note on the folder that a method which would run carries
-in <code>caveat</code> (it reads fewer batches than the folder holds) is printed
-too. Leave <code>per_method</code> out for the commands and every column.</p>
-<p><strong>Two checks.</strong> Every row carries two independent checks, each a flag
-plus a reason; <code>runnable</code> needs both:</p>
-<ul>
-<li><code>files_ok</code> / <code>files_reason</code> - the method's script is present, the
-  input files resolve on disk and are oriented features x cells, no
-  matrix file is a 10x Genomics <code>.h5</code> under the name of a dataset file
-  or holds 0 features or 0 cells, every label CSV has one row per cell
-  of the modality it labels, and a <code>data_dir</code> method (scBridge) finds
-  the files it names. Seurat_v5's <code>rna.h5</code> and <code>atac_peak.h5</code> must
-  hold the same cells. A diagonal <code>atac_gas.h5</code> must list the cells of
-  <code>atac_peak.h5</code> in its order.</li>
-<li><code>env_ok</code> / <code>env_reason</code> - the method's conda env exists on this
-  machine; the reason names the env and the one-method install command
-  (<code>multibench env install --methods X --packed --run</code>). On macOS
-  and Windows it says the environment runs only on Linux.</li>
-<li><code>env_ok</code> on a <abbr title="Graphics Processing Unit">GPU</abbr>-only method - when the upstream script calls CUDA
-  unconditionally, <code>env_ok</code> also checks for an NVIDIA <abbr title="Graphics Processing Unit">GPU</abbr>
-  (<code>mtb.env.host_has_gpu()</code>). Without one, <code>env_reason</code> gives the
-  sentence <code>run</code> would raise: <code>"&lt;method&gt; needs an NVIDIA GPU, and
-  this computer has none. See ..."</code>. <code>method_info(m)</code> shows
-  <code>requires_gpu</code> and the code line in <code>gpu_evidence</code>.</li>
-<li><code>assume_gpu=True</code> (<code>multibench scan --assume-gpu</code>) skips that <abbr title="Graphics Processing Unit">GPU</abbr>
-  test, for a check on a login node before a <abbr title="Graphics Processing Unit">GPU</abbr>-node job. The row's
-  <code>caveat</code> then says <code>This check assumes the job runs on a GPU node.</code>,
-  and <code>command</code> leaves out the <abbr title="Central Processing Unit">CPU</abbr> flags.</li>
-</ul>
-<p>The file check runs whether or not any conda env is installed.</p>
-<p><strong>Reason columns.</strong> <code>reason</code> joins the non-empty reasons as sentences
-and is empty only when the row is runnable. It is the short form. A
-missing <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file leads with what the method needs and what the folder
-holds (<code>SCALEX needs gene-activity ATAC (atac_gas.h5), and the folder
-has peaks (atac_peak.h5).</code>). Other missing files read <code>adt.h5 is
-missing.</code></p>
-<p>File names are never cut. <code>files_reason</code> / <code>env_reason</code> keep the
-full text with full paths; read them for a row you are debugging.</p>
-<p><strong>The caveat column.</strong> <code>caveat</code> lists what a row with <code>files_ok</code>
-still needs, or what may go wrong without an error:</p>
-<ul>
-<li>an <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file that holds the other representation (a peak matrix where
-  the method needs gene activity), or peak names the method cannot read;</li>
-<li>an <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>, <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> or peak file whose values are not whole numbers: the
-  methods expect raw counts;</li>
-<li>diagonal: a folder whose only label file is <code>cty.csv</code>; diagonal
-  needs <code>rna_cty.csv</code> and <code>atac_cty.csv</code>;</li>
-<li>a method that reads fewer numbered batches than the folder holds
-  (<code>UINMF reads batches 1-2 of 3. Batch 3 is not used.</code>);</li>
-<li>a step the user must do first, the first sentence of
-  <code>method_info(m)['setup_hint']</code> (GLUE's GENCODE annotation file);</li>
-<li>method scripts that are not on this machine yet: the first real run
-  clones them with <code>git</code>; on a host without network, fetch them first
-  with <code>multibench fetch --scripts</code>;</li>
-<li>a command that reads a file <code>mtb.run</code> writes first (see the command
-  column below).</li>
-</ul>
+<p><strong>One row per method.</strong> With <code>per_method=True</code>, <code>runnable</code> is
+<code>True</code> when one of the method's listed variants is runnable, which is
+when <code>run_all</code> tries the method. Otherwise <code>reason</code> is that of one
+variant: one whose input files are all in the folder, else one that
+reads the modalities the folder holds, else the one that lacks the
+fewest files. Runnable methods come first, then by name. The printout
+adds the cells of each matrix file and the full reason of each method
+that cannot run.</p>
+<p><strong>The two checks.</strong> <code>files_ok</code>: the method's script is present, the
+input files resolve on disk and are oriented features x cells, no
+matrix file is a 10x Genomics <code>.h5</code> under the name of a dataset file
+or holds 0 features or 0 cells, every label CSV has one row per cell of
+the modality it labels, and a <code>data_dir</code> method (scBridge) finds the
+files it names. Seurat_v5's <code>rna.h5</code> and <code>atac_peak.h5</code> must hold
+the same cells; a diagonal <code>atac_gas.h5</code> must list the cells of
+<code>atac_peak.h5</code> in its order. <code>env_ok</code>: the method's conda env exists;
+<code>env_reason</code> names it and the one-method install command (<code>multibench
+env install --methods X --packed --run</code>), or on macOS and Windows says
+it runs only on Linux (<code>multibench env doctor</code> checks every env). For
+a method with <code>requires_gpu</code>, the host also needs an NVIDIA <abbr title="Graphics Processing Unit">GPU</abbr>. Without
+one, <code>env_reason</code> is the sentence <code>run</code> would raise: <code>"&lt;method&gt;
+needs an NVIDIA GPU, and this computer has none. See ..."</code>. With
+<code>assume_gpu=True</code> the row's <code>caveat</code> says <code>This check assumes the
+job runs on a GPU node.</code> and <code>command</code> leaves out the <abbr title="Central Processing Unit">CPU</abbr> flags.</p>
+<p><strong>Caveats.</strong> <code>caveat</code> lists what a row with <code>files_ok</code> still needs,
+or what may go wrong without an error: an <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file that holds the other
+representation, or peak names the method cannot read; values that are
+not whole numbers (the methods expect raw counts); a diagonal folder
+whose only label file is <code>cty.csv</code>; a method that reads fewer
+numbered batches than the folder holds; a step to do first (the first
+sentence of <code>method_info(m)['setup_hint']</code>); method scripts not on
+this machine yet (the first real run clones them with <code>git</code>; on a host
+without network, fetch them first with <code>multibench fetch --scripts</code>); a
+command that reads a file <code>mtb.run</code> writes first, so start that
+method with <code>mtb.run</code>.</p>
 <p>A row given the other <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> representation is not runnable, also when
 <code>methods=</code> names the method, and <code>run_all</code> skips it. So is a GLUE or
 Seurat_v3 row whose peak names are not chr:start-end.
@@ -2947,80 +2913,29 @@ Seurat_v3 row whose peak names are not chr:start-end.
 With <code>MULTIBENCH_SCRIPTS_REF</code> set to another commit than the method
 scripts, or a <code>repo_path</code> that holds other files and no method
 scripts, no row is runnable.</p>
-<p><strong>The command column.</strong></p>
-<ul>
-<li><code>command</code> is <code>run(..., dry_run=True)</code>, <code>shlex</code>-joined, writing
-  under <code>&lt;out_dir&gt;/&lt;method&gt;_&lt;dataset&gt;/</code> exactly like <code>run_all</code> - the
-  literal <code>'&lt;out_dir&gt;'</code> placeholder unless <code>out_dir</code> is given.</li>
-<li>Paths are absolute: a relative <code>out_dir</code>, the placeholder included,
-  is resolved against the working directory.</li>
-<li><code>params</code> are merged in the way <code>run_all(params=)</code> merges them.</li>
-<li>On a <abbr title="Graphics Processing Unit">GPU</abbr>-less host the command already carries each method's
-  <code>cpu_params</code>, the flags that turn CUDA off where a switch exists.</li>
-<li>A row blocked only by <code>env_ok</code> still shows its command. Put it in a
-  job script once the environment is built.</li>
-<li>Some commands read a file that <code>mtb.run</code> writes first under
-  <code>inputs/</code> (Seurat_v3's renamed peak file, a converted input). The
-  <code>caveat</code> names the file; start such a method with <code>mtb.run</code> or
-  <code>multibench run</code> instead of the shell line.</li>
-</ul>
-<p><strong>The modalities column.</strong> <code>modalities</code> is a <code>+</code>-joined string here
-(<code>"rna+adt"</code>); <code>run_all</code> / <code>inputs_for</code> take a list
-(<code>["rna", "adt"]</code>), so split on <code>"+"</code>. The sentinel <code>"(data_dir)"</code>
-marks a method that reads a whole folder rather than named modality
-files (scBridge). For it, pass no <code>modalities</code> at all.</p>
-<p><strong>Sizing a sweep.</strong> <code>runtime_tier</code> / <code>observed_worst_sec</code> (see
-<code>method_info(m)['runtime']</code>) let you size a sweep before launching it.</p>
-<p><strong>Selection and input checks.</strong></p>
-<ul>
-<li><code>category</code> - a typo raises <code>ValueError</code> listing the four valid
-  values.</li>
-<li><code>methods</code> - an unknown id raises <code>KeyError</code> with a did-you-mean
-  hint; blocked rows of the selected methods are kept, with their reason.
-  A named method with no variant under <code>category</code> or <code>modalities</code>
-  raises <code>ValueError</code>, even when other named methods have one.</li>
-<li><code>params</code> - a key no variant of that method accepts raises
-  <code>KeyError</code> naming the accepted keys.</li>
-<li><code>dataset</code> - a spelling that differs from the folder only in case
-  (<code>'d52'</code> on macOS) is replaced by the on-disk spelling, with a
-  <code>UserWarning</code>.</li>
-</ul>
+<p><strong>Commands.</strong> <code>command</code> is <code>run(..., dry_run=True)</code>, <code>shlex</code>-joined,
+writing under <code>&lt;out_dir&gt;/&lt;method&gt;_&lt;dataset&gt;/</code> as <code>run_all</code> does, with
+absolute paths, <code>params</code> merged and, on a host without a <abbr title="Graphics Processing Unit">GPU</abbr>, each
+method's <code>cpu_params</code>. A row blocked only by <code>env_ok</code> still shows its
+command. <code>multibench scan</code> prints compact columns; <code>--columns all</code>
+adds <code>command</code> and the rest.</p>
 <p><strong>Modality tokens.</strong> A list of <code>modalities</code> names one combination, in
 any order. Base tokens keep a row whose modalities are exactly that
-combination. Representation tokens select by what the method reads.
-<code>mtb.find_methods</code> keeps every method that reads at least the named
-modalities, so the two can list different methods.</p>
-<ul>
-<li>a list that spells a row's modalities keeps that row, with one
-  exception: moETM, scMM and iPOLNG read peaks through a role named
-  <code>atac_gas</code>, so <code>atac_peak</code> selects them and <code>atac_gas</code> does not,
-  unless <code>methods=</code> names them;</li>
-<li>a base token (<code>rna</code>, <code>adt</code> or its alias <code>protein</code>, <code>atac</code>)
-  matches every role of that base: <code>atac</code> matches <code>atac</code>,
-  <code>atac_gas</code>, <code>atac_peak</code> and numbered roles such as <code>atac2</code>;</li>
-<li>a representation token (<code>atac_peak</code> / <code>peak</code>, <code>atac_gas</code> /
-  <code>gas</code> / <code>gene_activity</code>) keeps the methods whose
-  <code>method_info(m)['atac']</code> is that representation, like
-  <code>find_methods(atac=...)</code>. <code>atac_peak</code> alone also keeps MultiMAP
-  and Seurat_v3, which read both files;</li>
-<li><code>atac_peak</code> together with <code>atac_gas</code> keeps only those two;</li>
-<li>a numbered token (<code>rna1</code>) matches that role only;</li>
-<li>an unknown token raises <code>ValueError</code> listing the vocabulary.</li>
-</ul>
-<p>A variant that reads a whole folder (scBridge) has no modality roles.
-<code>modalities=[]</code> selects exactly those. Other lists drop them, with a
+combination. They are <code>rna</code>, <code>adt</code> (or <code>protein</code>) and <code>atac</code>,
+which matches every <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> role (<code>atac_gas</code>, <code>atac_peak</code>, <code>atac2</code> ...).
+Representation tokens select by what the method reads: <code>atac_peak</code> /
+<code>peak</code> and <code>atac_gas</code> / <code>gas</code> / <code>gene_activity</code> keep the methods
+whose <code>method_info(m)['atac']</code> is that representation, like
+<code>find_methods(atac=...)</code>. <code>atac_peak</code> alone also keeps MultiMAP and
+Seurat_v3, which read both files; <code>atac_peak</code> together with
+<code>atac_gas</code> keeps only those two. moETM, scMM and iPOLNG read peaks
+through a role named <code>atac_gas</code>, so <code>atac_peak</code> selects them and
+<code>atac_gas</code> does not, unless <code>methods=</code> names them. A numbered token
+(<code>rna1</code>) matches that role only. <code>modalities=[]</code> selects the
+variants that read a folder. Other lists drop them, with a
 <code>UserWarning</code> unless the tokens already exclude their <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>
-representation.</p>
-<p><strong>Choosing a category.</strong> A <abbr title="Cellular Indexing of Transcriptomes and Epitopes by sequencing">CITE-seq</abbr> folder (<code>rna.h5</code> + <code>adt.h5</code> +
-<code>cty.csv</code>) is <code>vertical</code> with modalities <code>["rna", "adt"]</code>; <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and
-<abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> from different cells is <code>diagonal</code>. See <code>mtb.list_categories</code>
-and <code>mtb.describe_layout</code>.</p>
-<p><strong>Environments and CLI.</strong> Each method runs in its own conda environment,
-on Linux. List them with <code>multibench env doctor</code>; install one with
-<code>multibench env install --methods X --packed --run</code>. Off Linux the
-summary line says what this computer can do. <code>multibench scan</code> prints
-a compact view by default; <code>--columns all</code> adds the rest, including
-<code>command</code>.</p>
+representation. <code>mtb.find_methods</code> keeps every method that reads at
+least the named modalities, so the two can list different methods.</p>
 </details>
 
 <details class="see-also">
@@ -3340,6 +3255,18 @@ if it has one, else a clone into the former.</p>
           <tr class="doc-section-item">
             <td>
               <span class="doc-raises-annotation">
+                  <code><span title="ValueError">ValueError</span></code>
+              </span>
+            </td>
+            <td class="doc-raises-details">
+              <div class="doc-md-description">
+                <p><code>MULTIBENCH_RUN_MODE</code> is set to anything but <code>conda</code> or <code>prefix</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+              <span class="doc-raises-annotation">
                   <code><span title="OSError">OSError</span></code>
               </span>
             </td>
@@ -3427,128 +3354,64 @@ if it has one, else a clone into the former.</p>
 
 <details class="note">
   <summary>Notes</summary>
-  <p><strong>Result.</strong> <code>RunResult</code> carries <code>output</code> (the primary output, loaded),
-<code>obs_names</code> (the input barcodes in the output's row order),
-<code>extra</code> (<code>{file: loaded object}</code> for the variant's extra outputs),
-<code>cmd</code> (the argv that ran), <code>stdout</code>, <code>stderr</code>, <code>out_dir</code> (an
-absolute path) and <code>method</code>.</p>
-<p><strong>Dry run.</strong> <code>dry_run=True</code> returns the argv the real run would
-execute. It uses the same variant selection, input plan, command builder
-and env wrap as a real run. It creates nothing: no <code>out_dir</code>, no
-<code>inputs/</code> copies, no env check, no fetch of the method scripts.
-<code>shlex.join</code> it for a shell line.</p>
-<p>The preview names the files the run passes. A canonical <code>.h5</code> passes
-through. An AnnData or any other file becomes
-<code>&lt;out_dir&gt;/inputs/&lt;role&gt;.h5</code>, and a peak role the method renames
-becomes <code>&lt;out_dir&gt;/inputs/&lt;role&gt;_normpeaks.h5</code>. Input-format errors,
-such as an <code>.h5mu</code> file or a matrix with features of several types,
-are raised by the dry run too.</p>
-<p>The dry run prints to stderr what the real run would need first: the
-method's <code>setup_hint</code> (<code>method_info(m)['setup_hint']</code>), a note when
-the method scripts are not on this machine yet or not at
-<code>MULTIBENCH_SCRIPTS_REF</code>, a note when the command reads a file under
-<code>inputs/</code> that the run writes first, and a note for an input path
-that does not exist.</p>
-<p>An <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file that <code>mtb.scan</code> would block gets a note too: it holds the
-other representation, or peak names the method cannot read. The real
-run warns and still runs.</p>
-<p><strong>Variant selection.</strong> Only <code>category</code> and the modality roles of
-<code>inputs</code> select the variant. The modality roles are every key except the
-auxiliary roles (<code>data_dir</code>, <code>source_data</code>, <code>target_data</code>,
-<code>out_dir</code>) and the label roles (any key containing <code>cty</code> or
-<code>label</code>). A <code>data_dir</code> variant declares no modalities, so <code>category</code>
-alone selects it: pass no modality roles with it.</p>
-<p><code>method_info(m)['supports']</code> lists every variant. A misspelt method id
-raises <code>KeyError</code> naming the closest method id; a category and role
-set with no variant raises <code>KeyError</code> listing the declared
-<code>(category, modalities)</code> pairs.</p>
-<p>Auxiliary roles (scBridge's <code>data_dir</code> / <code>source_data</code> /
-<code>target_data</code> / <code>source_cty</code> / <code>target_cty</code>) and label files are
-never converted to the canonical <code>.h5</code>.</p>
-<p><strong>Inputs.</strong> A MuData, in memory or as an <code>.h5mu</code> file, raises
-<code>ValueError</code>: pass one modality per role (<code>mdata.mod["rna"]</code>), or
-write the folder with <code>mtb.io.export_dataset</code>. With <code>convert=False</code>
-every modality input must already be a file path.</p>
-<p><strong>Cell checks.</strong> Before anything runs, the dry run included, canonical
-<code>.h5</code> inputs get the cell checks of <code>mtb.inputs_for(check=True)</code>.
-Seurat_v5's <code>rna</code> and <code>atac_peak</code> must hold the same cells. A
-diagonal <code>atac_gas</code> file must list the cells of its <code>atac_peak</code>
-file, the one given or the one next to it, in the same order.</p>
-<p>UnitedNet's label input is <code>cty</code>. The older key <code>rna_cty</code> still
-works, with a <code>DeprecationWarning</code>.</p>
+  <p><strong>Dry run.</strong> <code>dry_run=True</code> returns the argv the real run would execute
+(<code>shlex.join</code> it for a shell line), from the same variant selection,
+input plan and env wrap. It creates nothing: no <code>out_dir</code>, no
+<code>inputs/</code> copies, no env check, no fetch of the method scripts. It
+raises the same input errors and prints to stderr what the real run needs
+first: the method's <code>setup_hint</code>, method scripts missing here or not at
+<code>MULTIBENCH_SCRIPTS_REF</code>, files under <code>inputs/</code> the run writes first,
+<abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> files <code>mtb.scan</code> would block (the real run warns and still runs),
+and a note for an input path that does not exist.</p>
+<p><strong>Inputs.</strong> Only <code>category</code> and the modality roles of <code>inputs</code> select
+the variant: every key except <code>data_dir</code>, <code>source_data</code>,
+<code>target_data</code>, <code>out_dir</code> and the label keys (containing <code>cty</code> or
+<code>label</code>), which are passed as given. A <code>data_dir</code> variant (scBridge)
+is selected by <code>category</code> alone. A canonical <code>.h5</code> passes through;
+an AnnData or any other file becomes <code>&lt;out_dir&gt;/inputs/&lt;role&gt;.h5</code>, and
+a peak file the method needs renamed <code>&lt;out_dir&gt;/inputs/&lt;role&gt;_normpeaks.h5</code>.
+A MuData raises <code>ValueError</code>: pass one modality per role
+(<code>mdata.mod["rna"]</code>) or write the folder with <code>mtb.io.export_dataset</code>.
+With <code>convert=False</code> every modality input must be a file path.
+Before anything runs, canonical <code>.h5</code> inputs get the cell checks of
+<code>mtb.inputs_for(check=True)</code>: Seurat_v5's <code>rna</code> and <code>atac_peak</code> must
+hold the same cells, and a diagonal <code>atac_gas</code> file must list the cells
+of its <code>atac_peak</code> file (the one given, else the one next to it) in the
+same order.
+Relative paths are made absolute, because the method runs in <code>out_dir</code>
+or in its script's folder.</p>
 <p><strong><abbr title="Graphics Processing Unit">GPU</abbr> and <abbr title="Central Processing Unit">CPU</abbr>.</strong> <code>cpu_params</code> are the flags that turn CUDA off in a
 script that uses it by default (<code>method_info(m)['cpu_params']</code>). On a
-host without an NVIDIA <abbr title="Graphics Processing Unit">GPU</abbr> (<code>mtb.env.host_has_gpu()</code> is False), they
-are merged into <code>params</code> first. A key you pass always wins.</p>
-<p>The dry run shows these flags too; a real run prints <code>[run] no GPU on
-this host: applying &lt;method&gt; cpu_params {...}</code> to stderr.</p>
-<p>A script that calls CUDA unconditionally, with no switch
-(<code>method_info(m)['requires_gpu']</code>), is refused on such a host with
-<code>OSError</code> before anything is written or launched. The message is the
-sentence <code>mtb.scan</code> reports as that row's <code>env_reason</code>. A dry run
-still returns the argv.</p>
+host without an NVIDIA <abbr title="Graphics Processing Unit">GPU</abbr> (<code>mtb.env.host_has_gpu()</code> is False) they are
+merged into <code>params</code>; a key you pass wins, and the run prints them to
+stderr. A method whose script needs
+a <abbr title="Graphics Processing Unit">GPU</abbr> (<code>method_info(m)['requires_gpu']</code>) raises <code>OSError</code> there before
+anything is written; a dry run still returns the argv.</p>
 <p><strong>Environment.</strong> With <code>cmd_template=None</code> the method runs in the env
-<code>mtb.method_info(method)['env']</code> names, entered in one of two modes,
-picked per call:</p>
-<ul>
-<li><code>prefix</code> whenever <code>mtb.env.env_prefix(env)</code> finds the env on disk: a
-  <code>bash -c</code> wrapper sets <code>CONDA_PREFIX</code> / <code>CONDA_DEFAULT_ENV</code>, puts
-  <code>&lt;prefix&gt;/bin</code> first on <code>PATH</code> and sources the env's <code>activate.d</code>
-  scripts. No conda binary is needed.</li>
-<li><code>conda</code> otherwise: <code>conda run -n &lt;env&gt;</code>.</li>
-</ul>
-<p><code>MULTIBENCH_RUN_MODE=conda|prefix</code> forces one mode. <code>prefix</code> with no
-prefix on disk raises <code>OSError</code> naming <code>envs_dir</code> and
-<code>mtb.env.install</code>; any other value raises <code>ValueError</code>.</p>
-<p>The method process gets <code>PYTHONNOUSERSITE=1</code>, so user site-packages
-cannot shadow the env, and <code>MPLBACKEND=Agg</code> unless the method sets its
-own backend.</p>
-<p>Environment variables the method itself needs are set over yours. A
-value made of absolute paths, such as <code>LD_PRELOAD</code>, is applied only
-for the paths that exist on this machine. When none does, the variable
-is left as you set it, or unset, so the tool's default lookup applies.</p>
-<p><strong>Env check.</strong> Before any file is written, the env is looked up with
-the probe <code>mtb.scan</code> uses. If envs are found on this machine and the
-method's env is not among them, <code>EnvironmentError</code> (Python's alias of
-<code>OSError</code>) is raised, naming the install command. On Linux, if the
-probe finds no envs at all, the subprocess reports the failure. A
-<code>cmd_template</code> with <code>{cmd}</code> takes over env control and skips the
-check.</p>
-<p><strong>Other systems.</strong> Method environments are Linux-only. On macOS or
-Windows a missing env always raises <code>OSError</code>, and the message starts
-with that fact: run the call on a Linux machine. <code>dry_run=True</code>
-previews the command here; the command holds this computer's paths.</p>
-<p><strong>Launcher templates.</strong> <code>cmd_template</code> wraps the command in your own
-launcher. <code>{env_cmd}</code> is the command with the env activation above.
-<code>{cmd}</code> is the bare command: the template must then enter an env
-itself, for example <code>"conda run -n myenv {cmd}"</code>.</p>
-<p>A Slurm job step:</p>
+<code>mtb.method_info(method)['env']</code> names: through its prefix when
+<code>mtb.env.env_prefix(env)</code> finds it (no conda needed), else with
+<code>conda run -n &lt;env&gt;</code>. <code>MULTIBENCH_RUN_MODE=conda|prefix</code> forces one.
+Method environments are Linux-only. Before anything is written, a missing
+env raises <code>OSError</code> naming the install command (on Linux only when
+some env is found at all); a <code>{cmd}</code> template skips this check. The
+method gets <code>PYTHONNOUSERSITE=1</code>, and <code>MPLBACKEND=Agg</code> unless it sets
+its own backend; environment variables the method needs are set over yours.
+A variable made of absolute paths, such as <code>LD_PRELOAD</code>, keeps only the
+paths that exist on this machine; when none does, it is left as you set
+it, or unset.</p>
+<p><strong>Launcher templates.</strong> A <code>{cmd}</code> template must enter an env itself,
+for example <code>"conda run -n myenv {cmd}"</code>. A Slurm job step:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">"scMoMaT"</span><span class="p">,</span> <span class="s2">"mosaic"</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">inputs_for</span><span class="p">(</span><span class="s2">"D46"</span><span class="p">,</span> <span class="s2">"mosaic"</span><span class="p">,</span> <span class="s2">"scMoMaT"</span><span class="p">),</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>        <span class="n">out_dir</span><span class="o">=</span><span class="s2">"runs/scMoMaT"</span><span class="p">,</span> <span class="n">cmd_template</span><span class="o">=</span><span class="s2">"srun --gres=gpu:1 </span><span class="si">{env_cmd}</span><span class="s2">"</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Request a <abbr title="Graphics Processing Unit">GPU</abbr> only for a method that uses one;
 <code>mtb.method_info(m)['gpu']</code> says which.</p>
-<p><strong>Paths.</strong> Relative paths in <code>inputs</code> and <code>out_dir</code> are made absolute
-before the argv is built, and <code>data_dir</code> (like any existing directory)
-gets a trailing separator, because the method runs with <code>cwd=out_dir</code>.
-A few variants run in their script's directory instead; the output path
-is passed on the command line either way.</p>
-<p><strong>What out_dir holds.</strong> Besides the method's own files:</p>
-<ul>
-<li>for a method fed modality files, <code>inputs/</code> with their canonical
-  <code>.h5</code> copies (<code>convert=True</code>);</li>
-<li>a <code>data_dir</code> method (scBridge) gets no <code>inputs/</code> at all.</li>
-</ul>
 <p><strong>Failures.</strong> A non-zero exit raises <code>RuntimeError</code> with the tail of the
-method's stdout, then of its stderr (last, so a truncated message keeps
-it). If the call is interrupted - Ctrl-C, or a <code>run_all</code> timeout - the
-method's whole process tree is killed before the exception propagates.</p>
-<p><strong>Method scripts.</strong> The upstream scripts are never modified. A method
-with a package-side driver runs the driver, which loads the unmodified
-script from its own directory. The first run on a machine clones them
-with <code>git</code>. On a host without network, fetch them first with
-<code>multibench fetch --scripts</code>; a failed clone raises <code>RuntimeError</code>
-naming that command.</p>
+method's stdout, then of its stderr. An interrupt, such as Ctrl-C or a
+<code>run_all</code> timeout, kills the method's whole process tree.</p>
+<p><strong>Method scripts.</strong> The upstream scripts are never modified. The first
+run clones them with <code>git</code>; on a host without network, run
+<code>multibench fetch --scripts</code> first.</p>
 </details>
 
 <details class="see-also">
@@ -3979,8 +3842,11 @@ With <code>dry_run=True</code>, the <code>mtb.scan</code> frame.</p>
             </td>
             <td class="doc-raises-details">
               <div class="doc-md-description">
-                <p>Unknown <code>category</code>, no matching variant, nothing runnable, a
-mismatched <code>out_dir</code>, or conflicting arguments (Notes).</p>
+                <p>Unknown <code>category</code>; a named method or a selection with no variant,
+before anything runs, dry run included; nothing runnable (Notes); an
+<code>out_dir</code> that holds a saved result of another dataset or category;
+<code>skip_existing=True</code> with <code>params</code>, or <code>assume_gpu=True</code>, in a
+real run.</p>
               </div>
             </td>
           </tr>
@@ -4017,7 +3883,7 @@ mismatched <code>out_dir</code>, or conflicting arguments (Notes).</p>
             <td class="doc-raises-details">
               <div class="doc-md-description">
                 <p>A real run on a folder whose label files have a cell without a label
-(<strong>Missing labels.</strong>).</p>
+(Notes).</p>
               </div>
             </td>
           </tr>
@@ -4110,143 +3976,89 @@ mismatched <code>out_dir</code>, or conflicting arguments (Notes).</p>
 
 <details class="note">
   <summary>Notes</summary>
-  <p><strong>Dry run.</strong> <code>dry_run=True</code> runs nothing and returns the
-<code>mtb.scan</code> frame for the same selection: blocked rows are kept with
-their <code>reason</code>, and <code>command</code> is rendered for <code>out_dir</code> (or the
-literal <code>'&lt;out_dir&gt;'</code> placeholder). <code>plan[plan.runnable]</code> lists what
-will run. <code>len(plan)</code> also counts blocked rows.
-<code>multibench run-all --dry-run --format csv</code> writes the same frame.
-Like <code>mtb.scan</code>, it lists the combinations whose modalities the folder
-holds, and every combination with <code>modalities="all"</code>. The methods a
-real run tries are the same either way.</p>
-<p><strong>Several rows of one method.</strong> Without <code>modalities</code>, a method whose
-runnable rows are nested runs once, on the row with the most modalities:
-on a folder with <code>rna.h5</code>, <code>adt.h5</code> and <code>atac.h5</code>, scMoMaT runs
-<code>rna+adt+atac</code>, not <code>rna+adt</code> or <code>rna+atac</code>. The log names the rows
-left out, and so does a dry run, whose frame keeps them. Pass
-<code>modalities=</code> to run a smaller combination.</p>
-<p><strong>Before the sweep.</strong> Every attempted row passed both <code>mtb.scan</code> checks
-(input files and conda env, plus a <abbr title="Graphics Processing Unit">GPU</abbr> where the script needs one), so a
-missing env is reported before any method starts (<code>multibench env
-doctor</code>). Methods take minutes to hours each.</p>
-<p><strong>Skipped rows.</strong> A blocked row whose input files are in the folder,
-or a named method with no runnable row, is logged and recorded as
-<code>SKIPPED</code> with its reason. Other blocked rows are only counted.</p>
-<p><strong>Failures are recorded.</strong> In a real run a method that raises is
-recorded as <code>FAIL</code> (with its <code>error</code>), one that exceeds <code>timeout</code>
-as <code>TIMEOUT</code>, and the sweep moves on; a <code>params</code> key the variant does
-not accept is a <code>FAIL</code> too. Check <code>res.failures</code>.</p>
-<p><strong>Timeout.</strong> Without a cap, one method that hangs stops the whole
-sweep. Size it from the
-<code>runtime_tier</code> / <code>observed_worst_sec</code> columns of <code>mtb.scan</code> (or
-<code>method_info(m)['runtime']</code>); the slowest methods take more than 4 h.
-The cap covers the run and its scoring; off the main thread it is
-unavailable, with a warning.</p>
-<p><strong>Saved files.</strong> The result is saved automatically under <code>out_dir</code>
-(<code>summary.csv</code>, <code>failures.csv</code>, <code>batch_result.json</code>, <code>long.csv</code>
-when some method produced metrics); reload it with <code>mtb.load_batch</code>.
-With <code>batch=</code>, the vector is saved as <code>batch_&lt;hash&gt;.csv</code>.</p>
-<p><strong>Several jobs, one folder.</strong> A later run into the same <code>out_dir</code> is
-merged with the records already there: methods it re-ran are replaced,
-the others kept. An <code>out_dir</code> that holds another dataset or category
-raises <code>ValueError</code> before any method runs. Jobs running at the same
-time should use one <code>out_dir</code> each; combine them with
-<code>multibench plot --input dir1 --input dir2</code>.</p>
+  <p><strong>Dry run.</strong> <code>dry_run=True</code> runs nothing and returns the <code>mtb.scan</code>
+frame for the same selection: blocked rows are kept with their
+<code>reason</code>, and <code>command</code> is rendered for <code>out_dir</code> (or the literal
+<code>'&lt;out_dir&gt;'</code> placeholder). <code>plan[plan.runnable]</code> lists what will
+run. Like <code>mtb.scan</code>, it lists the combinations whose modalities the
+folder holds, and every combination with <code>modalities="all"</code>; the
+methods a real run tries are the same either way. <code>multibench run-all
+--dry-run --format csv</code> writes the same frame.</p>
+<p><strong>What runs.</strong> Only the rows <code>mtb.scan</code> marks runnable: input files,
+conda env, and a <abbr title="Graphics Processing Unit">GPU</abbr> where the script needs one. Without
+<code>modalities</code>, a method whose runnable rows are nested runs once, on
+the row with the most modalities: on a folder with <code>rna.h5</code>,
+<code>adt.h5</code> and <code>atac.h5</code>, scMoMaT runs <code>rna+adt+atac</code>. Pass
+<code>modalities=</code> to run a smaller combination; it selects as in
+<code>mtb.scan</code>. A blocked row whose input files are in the folder, or a
+named method with no runnable row, is logged and recorded as
+<code>SKIPPED</code> with its reason; other blocked rows are only counted. Each
+method reads one <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> representation (<code>mtb.describe_layout</code>), and
+<code>run_all</code> skips a method given the other representation, also when
+<code>methods=</code> names it. With <code>allow_atac_mismatch=True</code> the method runs
+without an error and gives a wrong embedding.</p>
+<p><strong>Failures.</strong> A method that raises is recorded as <code>FAIL</code> (with its
+<code>error</code>), one that exceeds <code>timeout</code> as <code>TIMEOUT</code>, and the sweep
+moves on; a <code>params</code> key the variant does not accept is a <code>FAIL</code>
+too. Check <code>res.failures</code>. Without a timeout, one method that hangs
+stops the sweep: size it from the <code>runtime_tier</code> /
+<code>observed_worst_sec</code> columns of <code>mtb.scan</code>; the slowest methods take
+more than 4 h. The timeout covers the run and its scoring; off the main
+thread it is unavailable, with a warning.</p>
+<p>Nothing runnable: <code>ValueError</code>. Its first line is <code>No method can run
+on D11 (vertical).</code> With <code>methods=</code>, it starts <code>None of the
+requested methods (Matilda, totalVI) can run on D11 (vertical).</code> and
+lists every requested variant. Without <code>methods</code>, it gives the first 3
+of N. It never lists the reasons of methods you did not ask for. On
+macOS or Windows, its second line says that methods run only on Linux,
+and it lists only the rows something else also blocks. Its last line
+names the <code>mtb.scan</code> call that shows the rows. When combinations are
+not listed because the folder does not hold their modalities, the line
+before says so.</p>
+<p><strong>Saved files.</strong> The result is saved under <code>out_dir</code> as
+<code>BatchResult.save</code> writes it; reload it with <code>mtb.load_batch</code>. With
+<code>batch=</code>, the vector is saved as <code>batch_&lt;hash&gt;.csv</code>. A later run
+into the same <code>out_dir</code> is merged with the records already there:
+methods it re-ran are replaced, the others kept. Jobs running at the
+same time should use one <code>out_dir</code> each.</p>
 <p><strong>Resuming.</strong> <code>skip_existing=True</code> reuses each method's existing
-output. Reuse only checks that the output file exists, not
-that it is complete: a method killed mid-write leaves a truncated file
-that would be reused as if it had succeeded. After a hard kill, delete
-that method's sub-directory before resuming.</p>
-<p>A reused output's record copies <code>scripts_commit</code>, <code>env_flavor</code> and
-<code>hostname</code> from the method's earlier record in <code>out_dir</code>. Without an
-earlier record they are <code>None</code>, <code>'unknown'</code> and <code>''</code>.</p>
-<p><strong>Tuning.</strong> <code>skip_existing=True</code> together with <code>params=...</code> raises
-<code>ValueError</code> on a real run: reuse is keyed on the output file, not on
-<code>params</code>, so it would return results computed with the old parameters.
-Give each setting a fresh <code>out_dir</code> (or leave <code>skip_existing</code> False),
-as <code>mtb.sweep</code> does:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">run_all</span><span class="p">(</span><span class="s2">"D11"</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="n">out_dir</span><span class="o">=</span><span class="s2">"out/lr"</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s2">"Multigrate"</span><span class="p">],</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>            <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">"Multigrate"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"lr"</span><span class="p">:</span> <span class="mf">1e-3</span><span class="p">}})</span>
-</span></code></pre></div>
+output. Reuse only checks that the output file exists, not that it is
+complete: after a hard kill, delete that method's sub-directory before
+resuming. A reused output's record copies <code>scripts_commit</code>,
+<code>env_flavor</code> and <code>hostname</code> from the method's earlier record in
+<code>out_dir</code>; without one they are <code>None</code>, <code>'unknown'</code> and <code>''</code>.
+Reuse is keyed on the output file, not on <code>params</code>, so the two
+together raise <code>ValueError</code>: give each setting a fresh <code>out_dir</code>, as
+<code>mtb.sweep</code> does.</p>
 <p><strong>Missing labels.</strong> A missing label is not a cell type. A real run
 stops with <code>ValueError</code> before its first method when a label file of
 the folder has a cell without a label: NaN, blank text, or text that a
 label file reads as missing, such as <code>NA</code> or <code>None</code>. Write the
 folder again with a label for every cell. <code>evaluate=False</code> runs the
 methods without scores, unless one of them reads the label file as an
-input (Matilda does): that method would train on the missing label, so
-the run stops as well. A dry run prints the same fact and raises
-nothing. <code>mtb.evaluate(missing_labels="drop")</code> scores one embedding
-on its labelled cells only; <code>run_all</code> and <code>rescore</code> have no such
-option.</p>
+input (Matilda does). A dry run prints the same fact and raises nothing.
+<code>mtb.evaluate(missing_labels="drop")</code> scores one embedding on its
+labelled cells only.</p>
 <p><strong>Batch vector.</strong> By default the batch metrics use the label file each
 cell came from (<code>cty1.csv</code> -&gt; 1 ...); <code>batch=</code> replaces that rule and
 is recorded as <code>batch_source='user'</code>. With two or more batches outside
-<code>vertical</code>, the classification metrics are scored too, as
-<code>mtb.evaluate</code> scores them by default.</p>
+<code>vertical</code>, the classification metrics are scored too. <code>run_all</code>
+puts the vector in each method's cell order, as it does the labels, and
+keeps only the cells of the batches a method reads. A vector as long as
+one method's output is used as given; any other length marks that
+method <code>RUN_OK_EVAL_FAILED</code>, which the dry run says first.</p>
+<p>A Series or one-column DataFrame indexed by cell id is aligned to the
+barcodes of the dataset's files. So is a CSV whose first column holds
+them, as <code>obs[["sample"]].to_csv(path)</code> writes it. Without usable
+barcodes, or with a first column of text that holds none of them, the
+match is by position, with a <code>UserWarning</code>; R's row numbers there give
+no warning.</p>
 <p><code>"obs:&lt;column&gt;"</code> and <code>"&lt;column&gt;"</code> name a column of the object you
 pass. <code>export_dataset</code> and <code>evaluate</code> take both. <code>run_all</code> and
 <code>rescore</code> are given a folder, not the object, so they take the column
 itself, for example <code>batch=adata.obs["donor"]</code>. A cell without a batch
-(NaN, blank text, or text such as <code>NA</code>) raises <code>ValueError</code>, in a
-dry run too.</p>
-<p>Give <code>batch</code> in the cell order of <code>mtb.labels_for(dataset)</code>.
-<code>run_all</code> puts it in each method's cell order, as it does the labels,
-and keeps only the cells of the batches a method reads. A vector as long
-as one method's output is used as given.</p>
-<p>A Series or one-column DataFrame indexed by cell id is aligned to the
-barcodes of the dataset's files. So is a CSV whose first column holds
-them, as <code>obs[["sample"]].to_csv(path)</code> writes it. Ids that are not
-cells of the dataset raise <code>ValueError</code> before any method runs.</p>
-<p>Files without usable barcodes give a match by position, with a
-<code>UserWarning</code>. So does a CSV whose first column holds text but none of
-the barcodes. R's row numbers in that column give no warning.</p>
-<p>Any other length marks that method <code>RUN_OK_EVAL_FAILED</code> (<code>batch has N
-entries, embedding has M cells</code>); the dry run says so first. Re-score a
-finished sweep with <code>BatchResult.rescore</code>.</p>
-<p><strong><abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> files.</strong> Vertical reads <code>atac.h5</code>; <code>method_info(m)["atac"]</code>
-says whether it must hold peaks or gene activity. Diagonal reads
-<code>atac_peak.h5</code> (peaks) and <code>atac_gas.h5</code> (gene activity). Mosaic
-reads <code>atac&lt;i&gt;.h5</code> (peaks). <code>peak.h5</code>, and <code>atac.h5</code> for gene
-activity, are accepted as older names.</p>
-<p><code>run_all</code> skips a method given the other representation, also when
-<code>methods=</code> names it. With <code>allow_atac_mismatch=True</code> the method runs
-without an error and gives a wrong embedding.</p>
-<p><strong>Modality tokens.</strong> <code>modalities</code> follows the rule of <code>mtb.scan</code>.
-Base tokens keep a row whose modalities are exactly that combination;
-<code>atac</code> matches every <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> role. Representation tokens select by what
-the method reads: <code>atac_peak</code> / <code>atac_gas</code> keep the methods that
-need that representation. moETM, scMM and iPOLNG read
-peaks through a role named <code>atac_gas</code>, so <code>atac_peak</code> selects them
-and <code>atac_gas</code> does not, unless <code>methods=</code> names them.</p>
-<p><strong>Errors raised.</strong></p>
-<ul>
-<li>An unknown <code>category</code>: <code>ValueError</code> listing the four.</li>
-<li>An unknown id in <code>methods</code> or <code>params</code>: <code>KeyError</code> with a
-  did-you-mean hint, before anything runs.</li>
-<li>A named method or a selection with no variant: <code>ValueError</code> before
-  anything runs, dry run included, such as "Matilda does not run on
-  cross data."</li>
-<li>A dry run with a <code>params</code> key no planned variant of that method
-  accepts: <code>KeyError</code> naming the accepted keys.</li>
-<li>Nothing runnable: <code>ValueError</code>. Its first line is
-  <code>No method can run on D11 (vertical).</code> With <code>methods=</code>, it starts
-  <code>None of the requested methods (Matilda, totalVI) can run on D11 (vertical).</code>
-  and lists every requested variant. Without <code>methods</code>, it gives the
-  first 3 of N. It never lists the reasons of methods you did not ask
-  for. On macOS or Windows, its second line says that methods run only
-  on Linux, and it lists only the rows something else also blocks. Its
-  last line names the <code>mtb.scan</code> call that shows the rows. When
-  combinations are not listed because the folder does not hold their
-  modalities, the line before says so.</li>
-<li>An <code>out_dir</code> that holds a saved result of another dataset or
-  category: <code>ValueError</code>, before any method runs.</li>
-<li><code>skip_existing=True</code> with <code>params</code>, or <code>assume_gpu=True</code> in a
-  real run: <code>ValueError</code>; a real run checks this host's <abbr title="Graphics Processing Unit">GPU</abbr>.</li>
-</ul>
-<p><strong>Dataset spelling.</strong> A <code>dataset</code> that differs from the folder only in
-case (<code>'d52'</code>) is replaced by the on-disk spelling, with a
-<code>UserWarning</code>, before anything is named after it.</p>
+(NaN, blank text, or text such as <code>NA</code>) raises <code>ValueError</code>, in a dry
+run too.</p>
 </details>
 
 <details class="see-also">
@@ -4545,31 +4357,21 @@ first (column named <code>param</code>). A long table for plotting is in
 
 <details class="note">
   <summary>Notes</summary>
-  <p><strong>Folder names.</strong> Each setting's folder is <code>&lt;param&gt;_&lt;value&gt;</code> with
-<code>.</code> -&gt; <code>p</code> and <code>-</code> -&gt; <code>m</code> (<code>lr=0.001</code> runs under
-<code>&lt;out_dir&gt;/lr_0p001/</code>).</p>
-<p><strong>The long table.</strong> <code>df.attrs["long"]</code> makes each setting a separate
-series (<code>"Multigrate (lr=0.001)"</code>), so it can go straight into
-<code>mtb.plot.bubble</code>; <code>.long</code> keys rows by method, so without it every
-setting would collapse onto one row. <code>DataFrame.attrs</code> does not
-survive <code>to_csv</code>, so the frame is also written to
-<code>&lt;out_dir&gt;/sweep_long.csv</code> (path in <code>df.attrs["long_path"]</code>) when any
-setting produced metrics.</p>
-<p><strong>Failed settings.</strong> A setting that fails is not fatal: <code>run_all</code>
-records it, so that value's row appears with <code>status</code> <code>FAIL</code> (or
-<code>TIMEOUT</code>) and empty metrics rather than aborting the sweep. Check the
-<code>status</code> column before reading the curve.</p>
-<p><strong>Untunable methods.</strong> Check <code>mtb.params_for</code> first: a method whose
-<code>tunable</code> is empty hardcodes its hyperparameters upstream and cannot be
-swept. <code>sweep</code> does not reject it up front; every setting is recorded
-as <code>FAIL</code>.</p>
-<p><strong>Errors.</strong> An unknown <code>method</code> raises <code>KeyError</code> with a did-you-mean
-hint; the <code>KeyError</code> for an unknown <code>param</code> lists the keys the
-variant accepts. The <code>param</code> check needs one variant: with
-<code>modalities=None</code> and several variants in <code>category</code> (Matilda under
-<code>vertical</code>), an unknown <code>param</code> is recorded as <code>FAIL</code> for every
-setting instead - pass <code>modalities</code> to get the <code>KeyError</code>. Errors of
-<code>mtb.run_all</code> (e.g. no method can run) propagate.</p>
+  <p>Each setting's folder is <code>&lt;param&gt;_&lt;value&gt;</code> with <code>.</code> -&gt; <code>p</code> and
+<code>-</code> -&gt; <code>m</code> (<code>lr=0.001</code> runs under <code>&lt;out_dir&gt;/lr_0p001/</code>).</p>
+<p><code>df.attrs["long"]</code> names each setting as its own series
+(<code>"Multigrate (lr=0.001)"</code>), so <code>mtb.plot.bubble</code> draws one row per
+setting. It is also written to <code>&lt;out_dir&gt;/sweep_long.csv</code> (path in
+<code>df.attrs["long_path"]</code>) when any setting produced metrics, since
+<code>DataFrame.attrs</code> does not survive <code>to_csv</code>.</p>
+<p>A setting that fails is recorded by <code>run_all</code>: its row has <code>status</code>
+<code>FAIL</code> or <code>TIMEOUT</code> and empty metrics. Check the <code>status</code> column
+before reading the curve. A method whose <code>tunable</code> is empty cannot be
+swept; every setting is then a <code>FAIL</code>. The <code>param</code> check needs one
+variant: with <code>modalities=None</code> and several variants in <code>category</code>
+(Matilda under <code>vertical</code>), an unknown <code>param</code> is a <code>FAIL</code> for
+every setting; pass <code>modalities</code> to get the <code>KeyError</code>. Errors of
+<code>mtb.run_all</code> (no method can run) propagate.</p>
 </details>
 
 <details class="see-also">
@@ -4751,18 +4553,14 @@ argument writes back to the same folder.</p>
 
 <details class="note">
   <summary>Notes</summary>
-  <p><strong>Files read.</strong> <code>batch_result.json</code> holds the per-method records.
-<code>long.csv</code>, written when the run produced metrics, restores each
-method's unrounded long table; without it <code>BatchResult.long</code> is rebuilt
-from the records' rounded <code>metrics</code>.</p>
-<p><strong>Record order.</strong> <code>methods=</code> only filters: the kept records stay in the
-order the tree ran them, not the order of <code>methods</code>.</p>
-<p><strong>Moved folders.</strong> A record whose <code>out_dir</code> does not exist is pointed
-at the folder of the same name next to <code>batch_result.json</code>. The
-dataset folder is looked up under <code>data_path=</code>, the recorded
-<code>data_path</code> and then <code>data_root</code>, and the one found is recorded as
-an absolute path. So a <code>fetch_outputs</code> tree or a copied <code>run_all</code>
-folder can be re-scored.</p>
+  <p><code>long.csv</code> restores each method's unrounded long table; without it
+<code>BatchResult.long</code> is rebuilt from the records' rounded <code>metrics</code>.
+<code>methods=</code> only filters: records keep the order the tree ran them.</p>
+<p>A record whose <code>out_dir</code> does not exist is pointed at the folder of the
+same name next to <code>batch_result.json</code>. The dataset folder is looked up
+under <code>data_path=</code>, the recorded <code>data_path</code> and then <code>data_root</code>,
+and the one found is recorded as an absolute path. So a <code>fetch_outputs</code>
+tree or a copied <code>run_all</code> folder can be re-scored.</p>
 </details>
 
 <details class="see-also">
@@ -4889,7 +4687,7 @@ method, which <code>rescore</code> and <code>plot</code> read.</p>
             <td><code><span title="multibench.workflow.BatchResult.records">records</span></code></td>
             <td class="doc-attribute-details">
               <div class="doc-md-description">
-                <p>The raw per-method records (the same list <code>results</code> returns).</p>
+                <p>The per-method records (the same list <code>results</code> returns).</p>
               </div>
               <p>
                   <span class="doc-attribute-annotation">
@@ -4941,84 +4739,6 @@ method, which <code>rescore</code> and <code>plot</code> read.</p>
               </p>
             </td>
           </tr>
-          <tr class="doc-section-item">
-            <td><code><a class="autorefs autorefs-internal" title="            summary
-
-
-  
-      property
-   (multibench.workflow.BatchResult.summary)" href="#multibench.workflow.BatchResult.summary">summary</a></code></td>
-            <td class="doc-attribute-details">
-              <div class="doc-md-description">
-                <p>One row per method with its status, timing and metrics (property).</p>
-              </div>
-              <p>
-                  <span class="doc-attribute-annotation">
-                    <b>type</b>
-                      <code><span title="pandas.DataFrame">DataFrame</span></code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td><code><a class="autorefs autorefs-internal" title="            long
-
-
-  
-      property
-   (multibench.workflow.BatchResult.long)" href="#multibench.workflow.BatchResult.long">long</a></code></td>
-            <td class="doc-attribute-details">
-              <div class="doc-md-description">
-                <p>Long table <code>metric, value, method, dataset, category, ...</code> for
-plotting (property).</p>
-              </div>
-              <p>
-                  <span class="doc-attribute-annotation">
-                    <b>type</b>
-                      <code><span title="pandas.DataFrame">DataFrame</span></code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td><code><a class="autorefs autorefs-internal" title="            results
-
-
-  
-      property
-   (multibench.workflow.BatchResult.results)" href="#multibench.workflow.BatchResult.results">results</a></code></td>
-            <td class="doc-attribute-details">
-              <div class="doc-md-description">
-                <p>The raw records, including every label ordering tried (property).</p>
-              </div>
-              <p>
-                  <span class="doc-attribute-annotation">
-                    <b>type</b>
-                      <code><span title="list">list</span>[<span title="dict">dict</span>]</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td><code><a class="autorefs autorefs-internal" title="            failures
-
-
-  
-      property
-   (multibench.workflow.BatchResult.failures)" href="#multibench.workflow.BatchResult.failures">failures</a></code></td>
-            <td class="doc-attribute-details">
-              <div class="doc-md-description">
-                <p>Methods that failed, timed out or could not be scored:
-<code>method, status, error</code> (property).</p>
-              </div>
-              <p>
-                  <span class="doc-attribute-annotation">
-                    <b>type</b>
-                      <code><span title="pandas.DataFrame">DataFrame</span></code>
-                  </span>
-              </p>
-            </td>
-          </tr>
       </tbody>
     </table>
 
@@ -5035,9 +4755,7 @@ plotting (property).</p>
 
 <details class="note">
   <summary>Notes</summary>
-  <p><strong>Size and repr.</strong> <code>len(res)</code> is the number of method records. The
-repr counts the methods with metrics, those that ran but could not be
-scored, the skipped ones and the failures.</p>
+  <p><code>len(res)</code> is the number of method records.</p>
 </details>
 
 <details class="see-also">
@@ -5145,44 +4863,31 @@ columns below except the metrics:</p>
 <li><code>CHAIN_OK</code> - ran and scored.</li>
 <li><code>CHAIN_OK_GRAPH_METHOD</code> - a graph method, scored via a secondary
   embedding.</li>
-<li><code>RUN_OK_NO_EMBEDDING</code> - ran, but the method emits only a graph,
-  so clustering metrics do not apply.</li>
-<li><code>RUN_OK_EVAL_FAILED</code> - the method ran and produced an embedding,
-  but scoring it failed; see <code>error</code> in <code>failures</code>.</li>
+<li><code>RUN_OK_NO_EMBEDDING</code> - ran; the method emits only a graph.</li>
+<li><code>RUN_OK_EVAL_FAILED</code> - ran, but scoring the embedding failed.</li>
 <li><code>RUN_OK_NO_LABEL_MATCH</code> - ran, but no label file matches the
   embedding's cell count.</li>
 <li><code>RUN_OK</code> - ran with <code>evaluate=False</code>.</li>
 <li><code>TIMEOUT</code> - exceeded <code>run_all(timeout=...)</code>.</li>
-<li><code>FAIL</code> - the method itself errored; see <code>error</code> in <code>failures</code>.</li>
+<li><code>FAIL</code> - the method itself errored.</li>
 <li><code>SKIPPED</code> - blocked before the run, with the reason in the
-  <code>reason</code> column; in <code>failures</code> only when <code>methods=</code> named the
-  method.</li>
+  <code>reason</code> column.</li>
 </ul>
-<p><code>FAIL</code>, <code>TIMEOUT</code>, <code>RUN_OK_EVAL_FAILED</code> and
-<code>RUN_OK_NO_LABEL_MATCH</code> also appear in <code>failures</code>.</p>
 <p><strong>Graph methods.</strong> scMoMaT also writes a <abbr title="Uniform Manifold Approximation and Projection">UMAP</abbr>, which is scored:
 <code>CHAIN_OK_GRAPH_METHOD</code>. Seurat_WNN writes only a neighbour graph:
 <code>RUN_OK_NO_EMBEDDING</code>, and its <code>emb_shape</code> is <code>None</code>. Neither
 has classification metrics, which need the method's own embedding.</p>
-<p><strong>Batch columns.</strong> <code>batch_source</code> / <code>n_batches</code> say which batch
-vector the batch metrics (ASW_batch, GC, iLISI ...) were computed
-against, and how many distinct values it has (1 = none):</p>
-<ul>
-<li><code>'file_of_origin'</code> - each cell's label file (<code>cty1.csv</code> -&gt; 1,
-  <code>cty2.csv</code> -&gt; 2 ...), the rule for multi-batch datasets.</li>
-<li><code>'user'</code> - the vector passed as <code>run_all(batch=)</code> /
-  <code>rescore(batch=)</code>.</li>
-<li><code>None</code> - a single label file, so no batch structure and
-  clustering metrics only.</li>
-</ul>
-<p><strong>Label order.</strong> <code>label_order</code> is which label file(s), in which
-order, the metrics were computed against (e.g.
-<code>rna_cty.csv+atac_cty.csv</code>). For diagonal data the embedding stacks
-two disjoint cell sets in a method-specific order.</p>
-<p><strong>Label-order confidence.</strong> <code>label_order_confidence</code> is
-<code>(best - max(runner_up, 0)) / best</code> over the ARI of the candidate
-label orders, from 0 to 1. Near 1, one order clearly fits. Below about 0.5,
-two orders scored alike; check that row's label order.</p>
+<p><strong>Batch columns.</strong> The batch vector the batch metrics used, and its
+number of distinct values (1 = none). <code>batch_source</code> is
+<code>'file_of_origin'</code> (each cell's label file: <code>cty1.csv</code> -&gt; 1 ...),
+<code>'user'</code> (<code>run_all(batch=)</code> / <code>rescore(batch=)</code>) or <code>None</code> (a
+single label file: clustering metrics only).</p>
+<p><strong>Label-order confidence.</strong> <code>label_order</code> names the label file(s),
+in order, the metrics used (<code>rna_cty.csv+atac_cty.csv</code>).
+<code>label_order_confidence</code> is <code>(best - max(runner_up, 0)) / best</code>
+over the ARI of the candidate label orders, from 0 to 1. Near 1, one
+order clearly fits. Below about 0.5, two orders scored alike; check
+that row's label order.</p>
 <p><strong>Optimistic bias.</strong> When more than one ordering is possible, the
 reported metrics are those of the ordering with the highest ARI. So
 they are slightly optimistic. <code>label_order_confidence</code> shows how far
@@ -5191,10 +4896,9 @@ ahead the chosen order was.</p>
 So <code>&gt; 0.5</code> is <code>False</code> for it and <code>.isna()</code> finds it. It is blank
 in three cases, named by <code>label_order_note</code>:</p>
 <ul>
-<li><code>"single ordering"</code> - only one ordering was possible (normal for a
-  paired/vertical dataset with a single <code>cty.csv</code>).</li>
-<li><code>"winner at chance"</code> - the winning ordering itself scored
-  ARI &lt; 0.05, so the ratio would compare two noise values.</li>
+<li><code>"single ordering"</code> - only one ordering was possible (a vertical
+  dataset with one <code>cty.csv</code>).</li>
+<li><code>"winner at chance"</code> - the winning ordering scored ARI &lt; 0.05.</li>
 <li><code>"not scored"</code> - the row has no metrics.</li>
 </ul>
 </details>
@@ -5301,7 +5005,6 @@ downloads carry <code>scored_with</code>.</p>
     <div class="doc doc-contents ">
 
         <p>The raw per-method records: status, out_dir, metrics and the orderings tried.</p>
-<p>Each record keeps the method's <code>out_dir</code>, which <code>rescore</code> reads.</p>
 
 
 <table>
@@ -5357,18 +5060,12 @@ downloads carry <code>scored_with</code>.</p>
 </span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>caveat                      that row's caveat, or ""
 </span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>data_path, multibench_version, started_at   provenance of the run
 </span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>data_root                   data_path as an absolute path
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>scripts_commit, env_flavor, hostname        the scripts, env build and computer
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>_long                       internal; read BatchResult.long instead
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>scripts_commit, env_flavor, hostname        the scripts, env build and
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>                            computer of the run that made the output
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>_long                       internal; read BatchResult.long instead
 </span></code></pre></div>
-<p><strong>Reused outputs.</strong> A record with <code>reused</code> True copies
-<code>scripts_commit</code>, <code>env_flavor</code> and <code>hostname</code> from the method's
-earlier record in <code>out_dir</code>: the values of the run that made the
-output. Without an earlier record they are <code>None</code>, <code>'unknown'</code> and
-<code>''</code>.</p>
-<p><strong>Label-order evidence.</strong> <code>label_order_candidates</code> holds every
-ordering tried and its ARI. <code>summary</code>'s <code>label_order_confidence</code>
-is computed from them. It is present only when more than one ordering
-was possible.</p>
+<p><code>label_order_candidates</code> holds every ordering tried and its ARI.
+<code>summary</code>'s <code>label_order_confidence</code> is computed from them.</p>
 </details>
 
 <details class="see-also">
@@ -5800,48 +5497,37 @@ or a cell has no batch.</p>
 
 <details class="note">
   <summary>Notes</summary>
-  <p><strong>Arguments.</strong> A <code>labels</code> array, list or plain CSV follows the
-embedding rows. Without <code>labels=</code>, a <code>batch</code> array follows the
-order of <code>mtb.labels_for(dataset)</code>. With a <code>labels</code> array in
-embedding row order, the <code>batch</code> array follows the embedding rows
-too. A CSV path is read like a label file. The batch is recorded as
+  <p><strong>Order.</strong> A <code>labels</code> array, list or plain CSV follows the embedding
+rows. Without <code>labels=</code>, a <code>batch</code> array follows the order of
+<code>mtb.labels_for(dataset)</code>. With a <code>labels</code> array, the <code>batch</code>
+array follows the embedding rows too. A CSV path is read like a label
+file. A Series or one-column DataFrame with a non-default index, or a
+CSV whose first column holds barcodes, is aligned to the dataset's
+cells as in <code>run_all(batch=)</code>, with the same errors and warnings.
+Aligned labels go into the label-order search; labels matched by
+position read <code>(user labels)</code>. The batch is recorded as
 <code>batch_source='user'</code>.</p>
-<p><strong>Aligned by barcode.</strong> A Series or one-column DataFrame with a
-non-default index, or a CSV whose first column holds barcodes, is
-aligned to the dataset's cells as in <code>run_all(batch=)</code>, with the
-same errors and warnings. Aligned labels go into each record's
-label-order search, so <code>label_order</code> names the file order chosen.
-Labels matched by position read <code>(user labels)</code>.</p>
 <p><strong>Label order.</strong> With <code>labels=None</code> and several label files,
 <code>rescore</code> ranks the file orders by ARI, which needs one Leiden sweep.
 It keeps the stored order and skips the sweep when <code>metrics=</code> has no
 ARI, NMI or iF1.</p>
 <p><strong>Labels without batch.</strong> Given <code>labels</code> and no <code>batch</code>, the batch
-that <code>run_all(batch=)</code> saved is reused. Without a saved batch, every
-cell is in one batch (<code>batch_source</code> <code>None</code>, <code>n_batches</code> 1), so
-only clustering metrics are computed. Pass <code>batch</code> as well to get the
-batch metrics.</p>
-<p><strong>Record status.</strong> A method that emits no embedding (graph-only) is
-marked <code>RUN_OK_NO_EMBEDDING</code> with a <code>note</code>. <code>SKIPPED</code>, <code>FAIL</code>
-and <code>TIMEOUT</code> records are kept as they are. A record whose output
-file is gone becomes <code>RUN_OK_EVAL_FAILED</code>, with the reason in
-<code>error</code>. So does a record whose new scoring fails, for example on a
-<code>batch</code> of the wrong length (<code>batch has N entries, embedding has M
-cells</code>).</p>
-<p><strong>Missing labels.</strong> A missing label is not a cell type. A record
-whose labels have a cell without one (NaN, blank text, or text that
-a label file reads as missing, such as <code>NA</code>) is not scored: it
-becomes <code>RUN_OK_EVAL_FAILED</code>, and its <code>error</code> counts the missing
-labels and names the files. This holds for the label files of the
-folder and for <code>labels=</code>. Give every cell a label, then score
-again.</p>
+that <code>run_all(batch=)</code> saved is reused; without one, every cell is
+in one batch, so only clustering metrics are computed. Pass <code>batch</code>
+as well for the batch metrics.</p>
+<p><strong>Record status.</strong> A graph-only method is marked
+<code>RUN_OK_NO_EMBEDDING</code>. <code>SKIPPED</code>, <code>FAIL</code> and <code>TIMEOUT</code> records
+are kept as they are. A record whose output file is gone, or whose new
+scoring fails (a <code>batch</code> of the wrong length), becomes
+<code>RUN_OK_EVAL_FAILED</code> with the reason in <code>error</code>. So does a record
+whose labels, from the folder or <code>labels=</code>, have a cell without one
+(NaN, blank text, or text such as <code>NA</code>): a missing label is not a
+cell type.</p>
 <p><strong>Other hosts.</strong> When the dataset folder has moved, pass the folder
 that now holds it as <code>mtb.load_batch(data_path=)</code>. When the dataset
 folder is not found, <code>labels=None</code> gives <code>RUN_OK_NO_LABEL_MATCH</code>
-with a <code>note</code>. A Series or CSV is then matched by position, with a warning,
-and the saved batch is not used.</p>
-<p><strong>Persisting.</strong> <code>mtb.load_batch</code> keeps returning the original result
-until the new one is saved.</p>
+with a <code>note</code>; a Series or CSV is matched by position, with a
+warning, and the saved batch is not used.</p>
 </details>
 
 <details class="see-also">
@@ -5969,21 +5655,15 @@ until the new one is saved.</p>
 <li><code>batch_result.json</code> - dataset, category and the per-method records.</li>
 <li><code>batch_&lt;hash&gt;.csv</code> - a batch vector the records were scored with.</li>
 </ul>
-<p>Reload it with <code>mtb.load_batch</code>.</p>
 <p><strong>Saving into a folder that has a result.</strong> When the folder already
 holds <code>batch_result.json</code> for the same dataset and category, the
 records are merged. A method in this result replaces its earlier
 record, unless it is <code>SKIPPED</code> and the earlier one is not; the other
-earlier records are kept, and every file in the list above is
-rewritten from the merged set. This result object is not changed.</p>
-<p>A line <code># Merged with 1 earlier record in &lt;folder&gt; (StabMap).</code>
-names the kept methods.</p>
-<p><strong>Jobs in parallel.</strong> Jobs running at the same time should use one
-<code>out_dir</code> each; combine them with
-<code>multibench plot --input dir1 --input dir2</code>.</p>
-<p><strong>Blank confidence on disk.</strong> In <code>summary.csv</code> the
-<code>label_order_note</code> column says why <code>label_order_confidence</code> is
-empty on a row: "single ordering", "winner at chance" or "not scored".</p>
+earlier records are kept, every file in the list above is rewritten
+from the merged set, and a line <code># Merged with 1 earlier record in &lt;folder&gt;
+(StabMap).</code> names them. This result object is not changed. Jobs
+running at the same time should use one <code>out_dir</code> each; combine
+them with <code>multibench plot --input dir1 --input dir2</code>.</p>
 </details>
 
 <details class="see-also">

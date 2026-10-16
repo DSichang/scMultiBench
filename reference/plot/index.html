@@ -2613,9 +2613,8 @@ stay silent, or raise.</p>
 
 <details class="note">
   <summary>Notes</summary>
-  <p><code>bubble</code> draws the table that <code>mtb.plot.build_table</code> computes. The
-Notes of <code>build_table</code> give the Overall formulas, missing cells, row
-order, input columns, name matching, errors and warnings.</p>
+  <p>The Notes of <code>build_table</code> give the Overall formulas, missing cells,
+row order, input columns and name matching.</p>
 <p><strong>Reading the figure.</strong> What each mark encodes:</p>
 <ul>
 <li>Metric circle (<code>aggregate="dataset"</code>): radius = within-column rank,
@@ -2630,7 +2629,6 @@ order, input columns, name matching, errors and warnings.</p>
 <li>Family <em>Overall</em> bar: length = the family score min-max scaled across
   the rows; fill = the score itself (the two differ only under
   <code>overall="mean_overall"</code>).</li>
-<li>Rows: best mean Overall first; <code>order</code> moves rows only.</li>
 <li><em>Rank</em> legend: 1 = best, whereas <code>BubbleTable.ranks</code> /
   <code>FamilyBlock.ranks</code> store max-ranks (<code>n</code> = best).</li>
 <li>Grey fill: every row of that column holds the same value, or the
@@ -2918,7 +2916,8 @@ dataset = rank 0); <code>"mean_overall"</code> averages per-dataset Overalls
             </td>
             <td class="doc-raises-details">
               <div class="doc-md-description">
-                <p><code>long_df</code> is empty or lacks <code>method</code> / <code>metric</code> / <code>value</code>.</p>
+                <p><code>long_df</code> lacks <code>method</code> / <code>metric</code> / <code>value</code>, or is empty
+(<code>mtb.load_results</code> may have returned nothing; see its warning).</p>
               </div>
             </td>
           </tr>
@@ -2930,7 +2929,8 @@ dataset = rank 0); <code>"mean_overall"</code> averages per-dataset Overalls
             </td>
             <td class="doc-raises-details">
               <div class="doc-md-description">
-                <p>Unknown <code>metrics</code> code, or an invalid <code>group</code> / <code>overall</code>.</p>
+                <p>Unknown <code>metrics</code> code (the error suggests a close match and lists
+the metrics present), or an invalid <code>group</code> / <code>overall</code>.</p>
               </div>
             </td>
           </tr>
@@ -2942,7 +2942,9 @@ dataset = rank 0); <code>"mean_overall"</code> averages per-dataset Overalls
             </td>
             <td class="doc-raises-details">
               <div class="doc-md-description">
-                <p><code>group</code> names a family with no metric in the frame.</p>
+                <p><code>group</code> names a family with no metric in the frame: batch metrics
+need a multi-batch dataset, and the stored tables have no
+classification scores.</p>
               </div>
             </td>
           </tr>
@@ -3036,13 +3038,6 @@ frame for your own runs. <code>metrics</code> is case- and alias-tolerant
 <code>mtb.plot.bubble</code> and the warnings are those of
 <code>mtb.plot.build_table</code> with <code>aggregate="summary"</code>; its Notes give
 them.</p>
-<p><strong>Errors.</strong> An unknown <code>metrics</code> code gets a did-you-mean hint and the
-list of metrics present. Batch metrics need a multi-batch dataset: a
-single-batch design has none to compute, which is what the
-<code>group="batch"</code> error says. The stored tables have no classification
-scores, which is what the <code>group="classification"</code> error says. An
-empty frame's error points at <code>mtb.load_results</code>, which may have
-returned nothing (see its <code>UserWarning</code>).</p>
 </details>
 
 <details class="see-also">
@@ -3573,8 +3568,10 @@ mtb.plot.BubbleTable : what is returned, field by field.</p>
             <td><code><span title="multibench.plot.bubble.BubbleTable.blocks">blocks</span></code></td>
             <td class="doc-attribute-details">
               <div class="doc-md-description">
-                <p>One block per metric family present, in paper order, each with its
-own <code>raw</code>, <code>norm</code>, <code>ranks</code> and <code>overall</code>.</p>
+                <p>One block per metric family present, in paper order: DR and
+clustering (blues), batch correction (greens), classification
+(pinks), then "Other" (purples) for metrics outside the three. Each
+has its own <code>raw</code>, <code>norm</code>, <code>ranks</code> and <code>overall</code>.</p>
               </div>
               <p>
                   <span class="doc-attribute-annotation">
@@ -3736,19 +3733,14 @@ method under <code>"summary"</code>).</p>
   <p><strong>Ranks.</strong> <code>ranks</code> and <code>FamilyBlock.ranks</code> hold per-column
 max-ranks: <code>n</code> = best, ties share the higher number (R's
 <code>ties.method="max"</code>). A method with no value in a column is NaN there,
-and the column's <code>n</code> counts only the scored methods. The figure's
-<em>Rank</em> legend counts 1 = best instead.</p>
+and the column's <code>n</code> counts only the scored methods.</p>
 <p><strong>Ties.</strong> Values that agree to 9 decimal places count as equal in
 <code>ranks</code>, <code>norm</code> and the Overall scores. An iLISI of <code>2.2e-16</code>
 therefore ties with <code>0.0</code>.</p>
 <p><strong>Scaled values.</strong> <code>matrix</code> and <code>norm</code> are per-column min-max values
 in [0, 1]; a constant (or all-NaN) column is all ones, as in the R code.
 The figure draws a column whose rows all hold one value in grey, not at
-the <code>High</code> end of the Score legend. Every column of a one-method
-figure is grey.</p>
-<p><strong>Blocks.</strong> Paper order: DR and clustering (blues), batch correction
-(greens), classification (pinks), then "Other" (purples) for any metric
-outside the three.</p>
+the <code>High</code> end of the Score legend.</p>
 </details>
 
 <details class="see-also">

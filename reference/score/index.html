@@ -2230,7 +2230,9 @@ result with <code>mtb.to_long</code> to plot it or combine it with
               <div class="doc-md-description">
                 <p>Embedding, cells x dims: array, DataFrame, sparse matrix, AnnData or
 MuData (<code>.obsm[obsm]</code>; <code>labels</code>/<code>batch</code> may name <code>.obs</code>
-columns), or file path (Notes).</p>
+columns), or a file: <code>.h5</code> (dataset <code>data</code>, the benchmark's
+<code>embedding.h5</code>), <code>.h5ad</code>, <code>.npy</code>, <code>.csv</code> / <code>.tsv</code>. A dims x
+cells array is transposed against the label count, with a warning.</p>
               </div>
               <p>
               </p>
@@ -2441,8 +2443,9 @@ scores the labelled cells only and warns how many (Notes).</p>
             <td class="doc-returns-details">
               <div class="doc-md-description">
                 <p>One row per metric, indexed by the canonical metric name (<code>ARI</code>,
-<code>NMI</code>, ...), with one column <code>Value</code>. <code>attrs</code> records how the
-scores were computed (Notes).</p>
+<code>NMI</code>, ...), with one column <code>Value</code>, never empty. <code>attrs</code>
+records how the scores were computed (Notes). <code>mtb.to_long</code> makes
+the long frame (lowercase <code>value</code>) that <code>load_results</code> returns.</p>
               </div>
             </td>
           </tr>
@@ -2469,7 +2472,11 @@ scores were computed (Notes).</p>
                 <p>Missing or misaligned labels, an unknown category or metric, or batch
 or classification metrics without batch labels. A cell without a label (unless
 <code>missing_labels="drop"</code>), no cell with a label, or a cell without a
-batch in <code>batch</code>.</p>
+batch in <code>batch</code>. Also a count that differs from the embedding's
+cells, a <code>missing_labels</code> other than <code>"error"</code> / <code>"drop"</code>,
+ambiguous label files, a labels dict out of order without
+<code>label_order</code>, unknown, repeated or no keys in <code>label_order</code>, and
+an <code>.h5</code> output without dataset <code>data</code>.</p>
               </div>
             </td>
           </tr>
@@ -2481,8 +2488,9 @@ batch in <code>batch</code>.</p>
             </td>
             <td class="doc-raises-details">
               <div class="doc-md-description">
-                <p>An <code>output</code> or label path does not exist, or a column is named
-for an <code>output</code> that has no <code>.obs</code>.</p>
+                <p>An <code>output</code> or label path does not exist (the message names it and
+the working directory), or a column is named for an <code>output</code> that
+has no <code>.obs</code>.</p>
               </div>
             </td>
           </tr>
@@ -2494,7 +2502,8 @@ for an <code>output</code> that has no <code>.obs</code>.</p>
             </td>
             <td class="doc-raises-details">
               <div class="doc-md-description">
-                <p>An unsupported input type, or a retired keyword (Notes).</p>
+                <p>An unsupported input type, <code>label_order</code> with labels that are not
+a dict, or a retired keyword (Notes).</p>
               </div>
             </td>
           </tr>
@@ -2641,12 +2650,10 @@ B batches.</p>
 <p>The re-run tables were scored by multibench 0.2.1's <code>evaluate</code> with
 these definitions and the leidenalg backend. The published tables were
 computed by the benchmark; see the paper's Methods.</p>
-<p><strong>Batch.</strong> The batch family (<code>ASW_batch, GC, iLISI, kBET</code>) needs batch
-labels. When <code>labels</code> is a list (or dict) of two or more files and
-<code>batch</code> is omitted, the file of origin (1, 2, ...) serves as the
-batch, the same rule <code>mtb.run_all</code> applies. <code>batch=</code> given with a
-<code>metrics</code> selection that has no batch metric changes nothing, and a
-<code>UserWarning</code> says so.</p>
+<p><strong>Batch.</strong> When <code>labels</code> lists two or more files (or a dict of them)
+and <code>batch</code> is omitted, the file of origin (1, 2, ...) serves as the
+batch, as in <code>mtb.run_all</code>. <code>batch=</code> with a selection that has no
+batch metric changes nothing, and a <code>UserWarning</code> says so.</p>
 <p><strong>Classification.</strong> The five values are the <code>mean</code> row of
 <code>mtb.classification_metrics(mtb.classify(...))</code> with seed 0: each batch
 in turn is the reference. They need an embedding and two or more
@@ -2657,37 +2664,26 @@ scMoMaT writes) has none. When they cannot be computed,
 <code>UserWarning</code>. <code>Spec</code> is NaN, with a <code>UserWarning</code>, when the cells
 a reference batch predicts are all of one cell type.</p>
 <p><strong>Cell order.</strong> Arrays, lists and label files without a cell-id column
-are matched by position to the rows of <code>output</code>. A <code>Series</code> /
-<code>DataFrame</code> with a non-default index is aligned by cell id when
-<code>output</code> carries ids (an AnnData, a DataFrame with a non-default
-index, or a <code>.csv</code> / <code>.tsv</code> file whose first column holds the
-barcodes): rows are reindexed to the output's order, and a missing or
-extra id raises <code>ValueError</code> naming the first ones.</p>
-<p>A CSV whose first column holds the output's cell ids, as
-<code>obs[["batch"]].to_csv(path)</code> writes it, is aligned by that column in
-the same way, and so is a list of such files. A first column where only
-some values are cell ids raises <code>ValueError</code>.</p>
-<p>A first column of text that holds none of the cell ids is matched by
-position, with a <code>UserWarning</code>. Numbers there, such as R's row
+are matched by position to the rows of <code>output</code>. When <code>output</code>
+carries cell ids (an AnnData, a DataFrame with a non-default index, or a
+<code>.csv</code> / <code>.tsv</code> file whose first column holds text, the barcodes),
+a <code>Series</code> / <code>DataFrame</code> with a non-default index is aligned by id,
+and so is a CSV whose first column holds cell ids (as
+<code>obs[["batch"]].to_csv(path)</code> writes it), or a list of such files. A
+missing or extra id raises <code>ValueError</code> naming the first ones (for a
+<code>.csv</code> / <code>.tsv</code> output, their number and one of them), and so does a
+first column where only some values are cell ids.</p>
+<p>A file, or a Series against a <code>.csv</code> / <code>.tsv</code> output, whose ids name
+none of the cells is matched by position with a <code>UserWarning</code>; such a
+Series raises for an AnnData. Numbers in a first column, such as R's row
 numbers, are matched by position unless they are exactly the output's
-cell ids.</p>
-<p>When <code>output</code> is a bare array there is nothing to align against: the
-Series, or a CSV with text in its first column, is matched positionally
-and a <code>UserWarning</code> says so.</p>
-<p>The first column of a <code>.csv</code> / <code>.tsv</code> output holds the barcodes when
-it holds text, that is, when at least one of its values is not a
-number. Labels, batches and clusters with cell ids are then matched as
-they are for an AnnData. Another row order is matched by barcode, and a
-line on stderr says so unless <code>verbose=False</code>. Ids of which none is
-a cell of the output are matched by position, with a <code>UserWarning</code>;
-this holds for a Series too, which raises for an AnnData. Ids of which
-only some are cells of the output raise <code>ValueError</code> with the number
-of cells that are missing and one of them. A first column of numbers
-without a header (row numbers) is left out and gives no ids, and one
-with a header is a column of the embedding.</p>
-<p><strong>Result shape.</strong> The frame has the <code>metric.csv</code> shape: index =
-metric, one column <code>Value</code>, never empty. <code>mtb.to_long</code> makes the
-long frame (lowercase <code>value</code>) that <code>load_results</code> returns.</p>
+cell ids. A bare-array <code>output</code> has nothing to align against: the
+Series, or a CSV with text in its first column, is matched by position
+with a <code>UserWarning</code>.</p>
+<p>A <code>.csv</code> / <code>.tsv</code> output in another row order is matched by barcode,
+and a line on stderr says so unless <code>verbose=False</code>. Its first column
+of numbers is left out without a header (row numbers, no ids) and is a
+column of the embedding with one.</p>
 <p><strong>Provenance.</strong> <code>attrs</code> records how the scores were computed:</p>
 <ul>
 <li><code>leiden_flavor</code> - the backend of the Leiden sweep; <code>None</code> when no
@@ -2700,33 +2696,6 @@ long frame (lowercase <code>value</code>) that <code>load_results</code> returns
 When <code>missing_labels="drop"</code> left cells out, <code>attrs</code> also holds
 <code>cells_scored</code> and <code>cells_total</code>, and <code>scored_with</code> ends with
 them (<code>.../270 of 300 cells</code>).</p>
-<p><strong>Output formats.</strong> A file path may be <code>.h5</code> (dataset <code>data</code>, the
-benchmark's <code>embedding.h5</code>), <code>.h5ad</code> (read as an AnnData),
-<code>.npy</code>, or <code>.csv</code> / <code>.tsv</code>. A dims x cells array is transposed
-against the label count, with a warning.</p>
-<p><strong>Errors.</strong> <code>ValueError</code> covers:</p>
-<ul>
-<li>missing labels, or a batch or classification metric requested
-  without batch labels; classification requested where it cannot be
-  computed (<strong>Classification.</strong>);</li>
-<li>a cell without a label, or without a batch in <code>batch</code>
-  (<strong>Missing labels.</strong>), and a <code>missing_labels</code> that is neither
-  <code>"error"</code> nor <code>"drop"</code>;</li>
-<li>an unknown category, <code>metrics</code> token or code;</li>
-<li>a count that differs from the embedding's cells (<code>'labels has M
-  entries for N cells in the embedding.'</code>), and cell-id mismatches when
-  aligning;</li>
-<li>ambiguous label files, and a multi-entry labels dict (other than an
-  unchanged <code>labels_for</code> one) out of the default order without
-  <code>label_order</code>;</li>
-<li>unknown, repeated or no keys in <code>label_order</code>;</li>
-<li>an <code>.h5</code> output without dataset <code>data</code>.</li>
-</ul>
-<p><code>FileNotFoundError</code> names the missing path and the working directory.
-A column name passed with an array or DataFrame <code>output</code> raises it
-too: there is no <code>.obs</code> to look the column up in.
-<code>TypeError</code> covers unsupported input types (non-array <code>labels</code>,
-<code>label_order</code> with non-dict <code>labels</code>, ...).</p>
 <p><strong>Retired keywords.</strong> <code>task=</code>, <code>family=</code> and <code>only=</code> still work
 as spellings of <code>metrics=</code>, with a <code>DeprecationWarning</code>;
 <code>slow_metrics=</code>, <code>column=</code> and <code>metric_set=</code> raise <code>TypeError</code>
@@ -2839,7 +2808,8 @@ the stored tables.</p>
             <td class="doc-param-details">
               <div class="doc-md-description">
                 <p>Integration category written into every row; <code>None</code> writes
-<code>"user"</code>.</p>
+<code>"user"</code>, the value <code>load_results</code> gives a user file without a
+category column.</p>
               </div>
               <p>
                   <span class="doc-param-annotation">
@@ -2859,7 +2829,8 @@ the stored tables.</p>
             </td>
             <td class="doc-param-details">
               <div class="doc-md-description">
-                <p>Value of the <code>clustering</code> column.</p>
+                <p>Value of the <code>clustering</code> column. The published tables use
+<code>"louvain"</code> / <code>"kmeans"</code> for their variants.</p>
               </div>
               <p>
                   <span class="doc-param-annotation">
@@ -2940,8 +2911,11 @@ is <code>"unknown"</code> for a frame not from <code>mtb.evaluate</code>.</p>
             </td>
             <td class="doc-raises-details">
               <div class="doc-md-description">
-                <p><code>value_df</code> is already long, lacks <code>Value</code> or string metric names,
-or repeats a name.</p>
+                <p><code>value_df</code> is already long (pass it to the plot / <code>load_results</code>
+consumers directly), lacks <code>Value</code> (for a wide one-row frame the
+message gives the <code>df.T.set_axis(['Value'], axis=1)</code> fix) or string
+metric names, has only blank names, or names one metric twice
+(<code>ari</code> and <code>ARI</code>).</p>
               </div>
             </td>
           </tr>
@@ -2997,10 +2971,6 @@ are exactly <code>Unnamed: 0, Value</code>, it holds strings and the index none.
 So does a <code>metric</code> column (<code>wide.to_csv(path, index_label="metric")</code>).
 Metric names that are not strings, like row numbers <code>0, 1, ...</code>, raise
 instead of being scored.</p>
-<p><strong>Column values.</strong> <code>dataset=None</code> writes <code>"all"</code>. <code>category=None</code>
-writes <code>"user"</code>, the value <code>load_results</code> gives a user file without a
-category column. The published tables use
-<code>clustering</code> values <code>"louvain"</code> / <code>"kmeans"</code> for their variants.</p>
 <p><strong>Provenance.</strong> The <code>scored_with</code> column of a frame from
 <code>mtb.evaluate</code> reads like <code>"leidenalg/sweep/0.3.2"</code>: the Leiden
 backend, where the clusters came from (<code>sweep</code> or <code>user</code>) and the
@@ -3009,28 +2979,14 @@ three values and <code>scib_version</code> are in <code>attrs</code>.</p>
 <p>Scores of the labelled cells only (<code>missing_labels="drop"</code> left cells
 out) have a fourth part, such as <code>"igraph/sweep/0.3.5/270 of 300
 cells"</code>, and <code>cells_scored</code> and <code>cells_total</code> in <code>attrs</code>.</p>
-<p>Any other frame, such as a hand-made one or a wide CSV read back, has no
-such record. Its rows get <code>scored_with = "unknown"</code> and a
-<code>UserWarning</code>. To keep the record, save the long table:
-<code>mtb.to_long(...).to_csv(path, index=False)</code>.</p>
+<p>Any other frame, such as a hand-made one or a wide CSV read back, gets
+<code>scored_with = "unknown"</code> and a <code>UserWarning</code>. To keep the record,
+save the long table: <code>mtb.to_long(...).to_csv(path, index=False)</code>.</p>
 <p>The stored tables have no <code>scored_with</code> column, so it is NaN for their
 rows after <code>pd.concat</code>. <code>load_results(result_path=...)</code> keeps the
 column when it reads the CSV back.</p>
 <p><strong>Plot chips.</strong> The bubble figure shows <code>?</code> for a name the package
 does not know, such as your own or a renamed re-run.</p>
-<p><strong>Errors.</strong> All are <code>ValueError</code>:</p>
-<ul>
-<li>an already long frame (columns <code>metric, value, method</code>) - pass it to
-  the plot / <code>load_results</code> consumers directly;</li>
-<li>no <code>Value</code> column - the message names the expected shape and, for a
-  wide one-row frame, the <code>df.T.set_axis(['Value'], axis=1)</code> fix;</li>
-<li>a metric name that is not a string (row numbers from a plain
-  <code>pd.read_csv</code> of another shape) - the message names
-  <code>pd.read_csv(path, index_col=0)</code>;</li>
-<li>every metric name blank;</li>
-<li>two names that collapse onto one canonical metric (<code>ari</code> and
-  <code>ARI</code>).</li>
-</ul>
 </details>
 
 <details class="see-also">

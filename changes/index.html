@@ -1982,6 +1982,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#new-in-039" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New in 0.3.9
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#new-in-038" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2339,6 +2350,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#new-in-039" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New in 0.3.9
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#new-in-038" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2687,6 +2709,31 @@
 <p>What each release adds and changes, newest first. A script that uses anything
 listed under <a href="#new-in-032">New in 0.3.2</a> needs <code>multibench-sc&gt;=0.3.2</code>.
 <code>multibench --version</code> prints the version you have.</p>
+<h2 id="new-in-039">New in 0.3.9<a class="headerlink" href="#new-in-039" title="Anchor link to this section">&para;</a></h2>
+<ul>
+<li>The code is simpler inside and about 14% shorter. The functions, their
+  arguments, the messages and the results are those of 0.3.8, except for
+  the changes below.</li>
+<li><code>mtb.io.export_dataset</code> and <code>multibench convert</code> stop when labels or a
+  batch column come from cells whose names repeat, in another order than
+  the exported <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> cells. Before, they were written in their own order, so
+  a row could label another <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> cell. The error reads, for example: <code>The
+  cell names of mdata['atac'].obs are not unique, so its labels cannot be
+  matched to the cells. Give each cell a unique name, the same in every
+  modality, first.</code></li>
+<li><code>multibench convert</code> in dataset mode (<code>--rna</code>, <code>--adt</code>, <code>--atac</code>,
+  <code>--atac-from</code>, <code>--labels</code>, ...) says when a file it reads is already a
+  canonical <code>.h5</code> file. Before, it said the file had no dataset
+  <code>matrix/data</code>. When copying the file is the whole export, the message
+  gives the command that copies it into the folder. Otherwise it says:
+  <code>Pass the .h5ad or .h5mu it came from.</code></li>
+<li>The error of <code>mtb.sweep</code> for a parameter the method does not have no
+  longer ends with a sentence about an empty set.</li>
+<li>When the bubble figure finds repeated rows, it counts a row as stored
+  only when its <code>source</code> is <code>published</code> or <code>rerun</code>, as everywhere else.
+  Before, a source such as <code>rerun_mine</code> also counted.</li>
+<li>The install cell of the tutorials asks for <code>multibench-sc&gt;=0.3.9</code>.</li>
+</ul>
 <h2 id="new-in-038">New in 0.3.8<a class="headerlink" href="#new-in-038" title="Anchor link to this section">&para;</a></h2>
 <ul>
 <li>Classification is added. <code>mtb.classify</code> predicts the cell type of each

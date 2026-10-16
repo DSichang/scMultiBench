@@ -2656,9 +2656,9 @@ Files of a higher batch number in <code>dataset_dir</code> are refused.</p>
 <li>a DataFrame (index = cell barcodes, columns = features);</li>
 <li>a 2-D array or sparse matrix already in the master cell order.</li>
 </ul>
-<p>An <code>obsm</code> selector takes its feature names from <code>adt_names</code> (<abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr>
-only), else the columns of a DataFrame-valued entry, else
-<code>adata.uns['&lt;key&gt;_names']</code> (order in <code>mtb.io.to_canonical</code>).</p>
+<p>An <code>obsm</code> matrix takes its feature names as <code>mtb.io.to_canonical</code>
+does; for the <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr>, <code>adt_names</code> comes first (it applies to no other
+modality).</p>
 <p>All matrices are cells x features and are written transposed. With
 <code>data=None</code> the default <code>rna='X'</code> means "no <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>": pass
 <code>rna=&lt;AnnData&gt;</code>. Separate objects are paired by barcode:</p>
@@ -2674,12 +2674,10 @@ and peaks in one <code>X</code>:</p>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>                      <span class="n">atac</span><span class="o">=</span><span class="s2">"X[feature_types=Peaks]"</span><span class="p">,</span> <span class="n">atac_kind</span><span class="o">=</span><span class="s2">"peak"</span><span class="p">,</span>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>                      <span class="n">labels</span><span class="o">=</span><span class="s2">"obs:celltype"</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">)</span>
 </span></code></pre></div>
-<p>Without a filter on such data, <code>export_dataset</code> raises <code>ValueError</code>.</p>
-<p><strong>Raw counts.</strong> Methods normalise the data themselves; give raw counts. A
-<code>UserWarning</code> says when sampled <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>, <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> or peak values are not whole
-numbers (log-normalised data). <code>rna='layer:counts'</code> usually selects the
-counts. A selector reads <code>data</code>: for a modality passed as its own
-object, put the counts into its <code>X</code> first
+<p><strong>Raw counts.</strong> Methods normalise the data themselves. <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>, <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> and peak
+values that are not whole numbers warn; <code>rna='layer:counts'</code> usually
+selects the counts. A selector reads <code>data</code>: for a modality passed as
+its own object, put the counts into its <code>X</code> first
 (<code>adt.X = adt.layers["counts"]</code>). Gene-activity scores are not checked.</p>
 <p><strong>MuData.</strong> A bare modality name selects <code>mdata.mod[name].X</code>
 (<code>rna='rna'</code>); a full <code>'mod:&lt;name&gt;'</code> selector works too. The default
@@ -2697,20 +2695,17 @@ order: <code>data.obs_names</code>, or the first modality's <code>obs_names</cod
 object takes its cells from the index of the <code>labels</code> / <code>batch</code>
 Series. An index of numbers that names no cell of the folder is taken
 as row numbers: the values are written row by row, as a list is.</p>
-<ul>
-<li>the same barcodes in another order are reordered;</li>
-<li>a barcode set that differs raises <code>ValueError</code> naming the strays;</li>
-<li>non-unique barcodes cannot be matched by name, so the cells are paired
-  positionally with a <code>UserWarning</code> (a different cell count still
-  raises).</li>
-</ul>
-<p>A bare array has no barcodes, so the order cannot be checked. Pass a
-DataFrame or AnnData when you are not sure of the order.</p>
-<p><strong>Labels.</strong> <code>cty.csv</code> is the single-column CSV the benchmark reads
-(header <code>x</code>, one label per line); <code>mtb.labels_for</code> finds these files
-again. A <code>labels</code> / <code>batch</code> Series is aligned by index to the master
-barcodes; a plain <code>RangeIndex</code> of the right length is taken
-positionally.</p>
+<p>The same barcodes in another order are reordered. Non-unique barcodes
+cannot be matched by name, so the cells are paired by position (a
+different cell count still raises). A bare
+array has no barcodes, so the order cannot be checked: pass a DataFrame
+or AnnData when you are not sure of the order.</p>
+<p><strong>Labels.</strong> <code>cty.csv</code> holds a header <code>x</code> and one label per line;
+<code>mtb.labels_for</code> finds these files again. A <code>labels</code> / <code>batch</code>
+Series is aligned by index to the master barcodes; a plain
+<code>RangeIndex</code> of the right length is taken positionally. A column of an
+<code>obs</code> whose cell names repeat is taken positionally only when its
+cells are in the master order; in another order it raises.</p>
 <p><strong>Diagonal.</strong> <code>category='diagonal'</code> pairs no barcodes: <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> may
 come from different cells. <code>rna</code> is written as <code>rna.h5</code> and <code>atac</code>
 as <code>atac_peak.h5</code> or <code>atac_gas.h5</code>. <code>labels</code> is read from each
@@ -2749,12 +2744,8 @@ delivery of one file per batch (the D46 pattern: <abbr title="Cellular Indexing 
 read. <code>n_batches=3</code> in these calls says that the data has three
 batches: a file of batch 4 in the folder is then refused (<em>Existing
 files</em>).</p>
-<p><strong><abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> filenames.</strong> Vertical methods read <code>atac.h5</code>;
-<code>method_info(m)['atac']</code> says whether it must hold peaks or gene
-activity. Diagonal methods read <code>atac_peak.h5</code> (peaks) and
-<code>atac_gas.h5</code> (gene activity). Mosaic methods read <code>atac&lt;i&gt;.h5</code>
-(peaks). <code>peak.h5</code>, and <code>atac.h5</code> for gene activity, are accepted as
-older names. By <code>category</code>:</p>
+<p><strong><abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> filenames.</strong> By <code>category</code> (<code>mtb.describe_layout</code> lists what
+each category reads):</p>
 <ul>
 <li><code>'vertical'</code>: <code>atac.h5</code> for both kinds;</li>
 <li><code>'diagonal'</code>: <code>atac_peak.h5</code> or <code>atac_gas.h5</code>;</li>
@@ -2763,7 +2754,7 @@ older names. By <code>category</code>:</p>
   copy when the file system refuses links), or <code>atac_gas.h5</code> only.
   Editing a hard-linked file edits both.</li>
 </ul>
-<p>The representation is not recorded on disk. Check that
+<p>The representation is not recorded on disk: check that
 <code>method_info(m)['atac']</code> is the kind exported. <code>mtb.scan</code> and
 <code>run_all</code> skip a method whose file holds the other representation,
 unless <code>allow_atac_mismatch=True</code>. <code>mtb.run</code> only warns, and the
@@ -3270,18 +3261,9 @@ columns; the way to name a bare <code>obsm</code> array.</p>
 
 <details class="note">
   <summary>Notes</summary>
-  <p><strong>Output location.</strong></p>
-<ul>
-<li><code>out</code> a file path: written there; <code>category</code> does not rename it;</li>
-<li><code>out</code> a directory and <code>modality</code> given: the modality's canonical
-  filename is appended (<code>rna.h5</code>, <code>adt.h5</code>, ...);</li>
-<li><code>out=None</code> and <code>modality</code> given: that filename in the current
-  directory; <code>out=None</code> without <code>modality</code> raises <code>ValueError</code>.</li>
-</ul>
-<p><strong>Modality aliases and checks.</strong> <code>'protein'</code> -&gt; <code>'adt'</code>,
+  <p><strong>Modality aliases and checks.</strong> <code>'protein'</code> -&gt; <code>'adt'</code>,
 <code>'peak'</code> -&gt; <code>'atac_peak'</code>, <code>'gas'</code> / <code>'gene_activity'</code> -&gt;
-<code>'atac_gas'</code>. The <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> check is the <code>obsm=</code> rule under <em><abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr>
-matrices</em>. <code>'atac_peak'</code> warns when fewer than half of the feature
+<code>'atac_gas'</code>. <code>'atac_peak'</code> warns when fewer than half of the feature
 names look like peaks (<code>chr1:100-200</code>, <code>chr1_100_200</code>,
 <code>chr1-100-200</code>), <code>'atac_gas'</code> when more than half do; plain
 <code>'atac'</code> is not checked.</p>
@@ -3289,8 +3271,7 @@ names look like peaks (<code>chr1:100-200</code>, <code>chr1_100_200</code>,
 <code>obsm</code> keys, <code>obsm=</code> or <code>layer=</code> must say where the protein matrix
 is; otherwise <code>adata.X</code> (usually the <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>) would be written as
 <code>adt.h5</code>, so it raises. Keys that start with <code>X_</code> (<code>X_pca</code>,
-<code>X_umap</code>) hold embeddings and do not count. <code>layer</code> and <code>obsm</code> are
-mutually exclusive.
+<code>X_umap</code>) hold embeddings and do not count.
 The feature names of an <code>obsm</code> matrix come from the first of:</p>
 <ol>
 <li><code>feature_names</code>;</li>
@@ -3299,22 +3280,17 @@ The feature names of an <code>obsm</code> matrix come from the first of:</p>
 <li><code>feature_0..</code>, with a <code>UserWarning</code>: pass <code>feature_names</code> to
    keep the protein names.</li>
 </ol>
-<p><strong><abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> filenames.</strong> Vertical methods read <code>atac.h5</code>;
-<code>method_info(m)['atac']</code> says whether it must hold peaks or gene
-activity. Diagonal methods read <code>atac_peak.h5</code> (peaks) and
-<code>atac_gas.h5</code> (gene activity). Mosaic methods read <code>atac&lt;i&gt;.h5</code>
-(peaks). <code>peak.h5</code>, and <code>atac.h5</code> for gene activity, are accepted as
-older names.</p>
-<p>With <code>out</code> a directory, <code>category='vertical'</code> writes <code>atac.h5</code> for
-either representation. Any other <code>category</code>, or none, names the file
-after the representation: <code>atac_peak.h5</code>, <code>atac_gas.h5</code>, or
-<code>atac.h5</code> for the plain <code>'atac'</code> role. For a mosaic batch, pass the
-numbered file as <code>out</code> (<code>'data/MYMOSAIC/atac2.h5'</code>).</p>
-<p><strong>Check the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> kind.</strong> Without <code>category='vertical'</code>,
-<code>to_canonical(atac, d, modality='peak')</code> writes <code>atac_peak.h5</code>, and
-<code>mtb.scan(d, 'vertical')</code> finds no <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> method runnable. The
-representation is not recorded on disk: <code>method_info(m)['atac']</code> says
-which kind a method expects.</p>
+<p><strong><abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> filenames.</strong> With <code>out</code> a directory, <code>category='vertical'</code>
+writes <code>atac.h5</code> for either representation, the file vertical methods
+read. Any other <code>category</code>, or none, names the file after the
+representation: <code>atac_peak.h5</code>, <code>atac_gas.h5</code>, or <code>atac.h5</code> for
+the plain <code>'atac'</code> role. So <code>to_canonical(atac, d, modality='peak')</code>
+without <code>category='vertical'</code> writes <code>atac_peak.h5</code>, and
+<code>mtb.scan(d, 'vertical')</code> then finds no <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> method runnable. A file
+path given as <code>out</code> is not renamed; for a mosaic batch, pass the
+numbered file (<code>'data/MYMOSAIC/atac2.h5'</code>).
+The representation is not recorded on disk: <code>method_info(m)['atac']</code>
+says which kind a method expects.</p>
 <p><strong>Gene activity next to peaks.</strong> With <code>modality='gas'</code> (no
 <code>category</code>, or <code>'diagonal'</code>) and an <code>atac_peak.h5</code> in the output
 folder, the rows are written in that file's cell order, because
@@ -3333,17 +3309,14 @@ Genomics file read with <code>gex_only=False</code>, <code>X</code> or a layer w
 written with genes and peaks together, so it raises. Pass the features
 of one type, or use <code>mtb.io.export_dataset</code>, whose selectors take a
 filter.</p>
-<p><strong>Streaming.</strong> Sparse matrices (CSR/CSC, in memory or inside an
-<code>.h5ad</code>/<code>.h5mu</code>) are converted to CSC and written <code>block</code> features
-at a time, without densifying the whole matrix. The defaults (gzip,
-<code>'float64'</code>) match the shipped benchmark files; any compression
-enables chunking. A <code>.csv</code> / <code>.tsv</code> is read as cells x features, and
+<p><strong>Storage.</strong> Sparse matrices (in memory or inside an <code>.h5ad</code> /
+<code>.h5mu</code>) are written <code>block</code> features at a time, without densifying
+the whole matrix. <code>matrix/data</code> is stored dense (features x cells x
+itemsize): gzip shrinks the file, but every reader densifies it.
+<code>dtype='float32'</code> halves it, and h5py, rhdf5 and hdf5r read it (as
+double in R). The defaults (gzip, <code>'float64'</code>) match the shipped
+benchmark files. A <code>.csv</code> / <code>.tsv</code> is read as cells x features, and
 a non-numeric first column is used as the cell barcodes.</p>
-<p><strong>Size on disk.</strong> <code>matrix/data</code> is stored dense (features x cells x
-itemsize): gzip shrinks the file, but every reader densifies it. A
-<code>UserWarning</code> states the size when it exceeds 1 GB and suggests
-filtering features or <code>dtype='float32'</code>, which h5py / rhdf5 / hdf5r
-read (as double in R).</p>
 <p><strong>Errors.</strong> <code>ValueError</code> is raised for:</p>
 <ul>
 <li><code>out=None</code> without <code>modality</code>;</li>
@@ -3516,19 +3489,15 @@ has them.</p>
 
 <details class="note">
   <summary>Notes</summary>
-  <p><strong>Where the demo data is.</strong> <code>mtb.data.fetch("D11")</code> downloads a demo
-dataset into <code>mtb.config.DEFAULT.data_path</code>, not into the current
-directory.</p>
-<p><strong>Memory.</strong> The whole matrix is read densely and transposed before the
-sparsity decision, so memory peaks at the dense size (features x cells
-x 8 bytes) even when the result is CSR. It is meant for the shipped
-benchmark inputs and for what <code>to_canonical</code> writes, not for a
-100k-cell peak matrix.</p>
-<p><strong>Other files.</strong> A 10x Genomics <code>.h5</code> file (a sparse matrix, with
-<code>matrix/indptr</code>) raises <code>ValueError</code>: read it with scanpy. Nothing
-else is checked. A file without <code>matrix/data</code> raises h5py's
-<code>KeyError</code>. <code>matrix/features</code> and <code>matrix/barcodes</code> are optional;
-without them AnnData's default names (<code>'0'</code>, <code>'1'</code>, ...) are kept.</p>
+  <p><code>mtb.data.fetch("D11")</code> downloads a demo dataset into
+<code>mtb.config.DEFAULT.data_path</code>, not into the current directory.</p>
+<p>The whole matrix is read densely, so memory peaks at the dense size
+(features x cells x 8 bytes) even when the result is CSR: it is meant
+for the shipped benchmark inputs and for what <code>to_canonical</code> writes,
+not for a 100k-cell peak matrix.</p>
+<p>A file without <code>matrix/data</code> raises h5py's <code>KeyError</code>.
+<code>matrix/features</code> and <code>matrix/barcodes</code> are optional; without them
+AnnData's default names (<code>'0'</code>, <code>'1'</code>, ...) are kept.</p>
 </details>
 
 <details class="see-also">
@@ -3635,15 +3604,11 @@ never modified.</p>
 
 <details class="note">
   <summary>Notes</summary>
-  <p><strong>Recognised peaks.</strong> Peak ids come as <code>chr_start_end</code>,
-<code>chr-start-end</code> or <code>chr:start-end</code>. A feature counts as a peak when
-it reads <code>&lt;chr&gt;&lt;sep&gt;&lt;start&gt;&lt;sep&gt;&lt;end&gt;</code> with two integers, the first
-separator one of <code>_</code>, <code>-</code>, <code>:</code> and the second <code>_</code> or <code>-</code>; it
-is rewritten as <code>&lt;chr&gt;:&lt;start&gt;-&lt;end&gt;</code>.</p>
-<p><strong>Everything else is kept.</strong> Other features (gene symbols, ids without
-two numbers) pass through unchanged. <code>matrix/data</code> and
-<code>matrix/barcodes</code> are copied as they are; only <code>matrix/features</code> is
-replaced.</p>
+  <p><strong>Recognised peaks.</strong> A feature reading <code>&lt;chr&gt;&lt;sep&gt;&lt;start&gt;&lt;sep&gt;&lt;end&gt;</code>
+with two integers, the first separator one of <code>_</code>, <code>-</code>, <code>:</code> and the
+second <code>_</code> or <code>-</code>, is rewritten as <code>&lt;chr&gt;:&lt;start&gt;-&lt;end&gt;</code>. Other
+features (gene symbols) pass through unchanged, and only
+<code>matrix/features</code> is replaced.</p>
 <p><strong>Inside <code>mtb.run</code>.</strong> <code>mtb.run</code> applies this itself for GLUE and
 Seurat_v3, writing a per-run <code>&lt;role&gt;_normpeaks.h5</code> copy next to the
 converted inputs. Call it by hand only to prepare a file for a script

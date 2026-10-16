@@ -2384,7 +2384,8 @@ offline.</p>
             </td>
             <td class="doc-raises-details">
               <div class="doc-md-description">
-                <p>A keyword other than <code>category</code>; see <strong>Other keywords</strong> in Notes.</p>
+                <p>A keyword other than <code>category</code>. For a <code>find_methods</code> filter such as
+<code>task=</code> the message names the call to use: <code>find_methods(category, task=...)</code>.</p>
               </div>
             </td>
           </tr>
@@ -2401,13 +2402,9 @@ offline.</p>
 
 <details class="note">
   <summary>Notes</summary>
-  <p><strong>Category membership.</strong> A method is listed under a category when it has
-a variant for that category - the same set <code>scan</code>, <code>run_all</code>
-and <code>find_methods(category=)</code> dispatch.</p>
-<p><strong>Other keywords.</strong> A <code>find_methods</code> filter such as <code>task=</code> or
-<code>runnable=</code> raises a <code>TypeError</code> that names the call to use
-instead: <code>find_methods(category, task=...)</code>. Any other keyword raises
-Python's own <code>unexpected keyword argument</code> message.</p>
+  <p>A method is listed under a category when it has a variant for that
+category - the same set <code>scan</code>, <code>run_all</code> and
+<code>find_methods(category=)</code> dispatch.</p>
 </details>
 
 <details class="see-also">
@@ -2715,8 +2712,7 @@ peaks only in its mosaic rna+atac variant, so
 <code>find_methods('vertical', atac='peak')</code> omits it. Accepted spellings:
 <code>peak</code> / <code>peaks</code> and <code>gene_activity</code> / <code>gene-activity</code> / <code>gas</code>,
 in any case.</p>
-<p><strong>Labels.</strong> <code>needs_labels</code> here is per variant.
-<code>method_info(m)['needs_labels']</code> is the method-level flag (any variant
+<p><strong>Labels.</strong> <code>method_info(m)['needs_labels']</code> is the method-level flag (any variant
 needs labels); the per-variant answer is
 <code>method_info(m)['supports'][i]['needs_labels']</code>.</p>
 <p><strong>Stubs.</strong> A declared stub (a method with no variant) is dropped by any
@@ -3354,28 +3350,23 @@ and the full file table.</p>
 
 <details class="note">
   <summary>Notes</summary>
-  <p><strong>What the text covers.</strong> For one category: the files its methods read,
-one name per file, as <code>mtb.io.export_dataset</code> writes them. It also
-gives the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> representation each method needs, the <code>.h5</code> and label
-formats, and the install command. For mosaic and cross it lists each
-batch pattern the methods accept. <code>multibench layout</code> prints the same
-text, with <code>multibench</code> commands in place of the Python calls.</p>
-<p><strong>One rule for <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> files.</strong> Vertical reads <code>atac.h5</code>;
-<code>method_info(m)["atac"]</code> says whether it must hold peaks or gene
-activity. Diagonal reads <code>atac_peak.h5</code> (peaks) and <code>atac_gas.h5</code>
-(gene activity). Mosaic reads <code>atac&lt;i&gt;.h5</code> (peaks). <code>peak.h5</code>, and
-<code>atac.h5</code> for gene activity, are accepted as older names.</p>
-<p><strong>Several batches.</strong> Mosaic and cross use one numbered file per batch in
-the same folder, not sub-folders and not one concatenated matrix. The
-file number is the batch; there is no batch column:</p>
+  <p>For one category the text gives the files its methods read, as
+<code>mtb.io.export_dataset</code> writes them, the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> representation each
+method needs, the <code>.h5</code> and label formats, the install command and, for
+mosaic and cross, each batch pattern the methods accept. The lists are
+read from the method registry at call time. <code>multibench layout</code> prints
+the same text with <code>multibench</code> commands.</p>
+<p>Vertical reads <code>atac.h5</code>; <code>method_info(m)["atac"]</code> says whether it
+must hold peaks or gene activity. Diagonal reads <code>atac_peak.h5</code> (peaks)
+and <code>atac_gas.h5</code> (gene activity). Mosaic reads <code>atac&lt;i&gt;.h5</code> (peaks).
+<code>peak.h5</code>, and <code>atac.h5</code> for gene activity, are accepted as older names.</p>
+<p>Mosaic and cross use one numbered file per batch in one folder, not
+sub-folders or one concatenated matrix. The file number is the batch:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>&lt;data_path&gt;/COREBATCH/
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    rna1.h5   adt1.h5   cty1.csv     # batch 1
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    rna2.h5   adt2.h5   cty2.csv     # batch 2
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    rna3.h5   adt3.h5   cty3.csv     # batch 3
 </span></code></pre></div>
-<p><strong>Source of the lists.</strong> The methods per <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> representation and the
-batch patterns are read from the package's method list at call time, so they
-agree with <code>method_info</code> and <code>mtb.find_methods</code>.</p>
 </details>
 
 <details class="see-also">

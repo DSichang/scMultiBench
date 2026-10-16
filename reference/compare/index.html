@@ -2541,17 +2541,13 @@ metric names read from the published tables or a file are canonical
 have tables and the <code>result_path=</code> hint. Ids are case-sensitive; with
 a <code>category</code>, an id that differs from a stored one only in case
 (<code>"d52"</code>) is replaced by the stored spelling, with a <code>UserWarning</code>.</p>
-<p><strong>Metric selection.</strong> Uses the vocabulary of <code>mtb.evaluate</code>:</p>
-<ul>
-<li><code>"clustering"</code> - <code>mtb.plot.CLUSTERING_METRICS</code> (ARI, NMI, ASW,
-  iASW, iF1, cLISI);</li>
-<li><code>"batch"</code> - <code>mtb.plot.BATCH_METRICS</code> (ASW_batch, GC, iLISI, kBET);</li>
-<li><code>"classification"</code> - <code>mtb.plot.CLASSIFICATION_METRICS</code> (OCA, ACA,
-  Spec, Sens, F1). The stored tables have none, so the frame is empty,
-  as for <code>"batch"</code> on a single-batch dataset; a long CSV of your own
-  (<code>result_path=</code>) can hold them;</li>
-<li>a list - exactly those codes (alias tolerant, <code>["ari"]</code> -&gt; ARI).</li>
-</ul>
+<p><strong>Metric selection.</strong> The vocabulary of <code>mtb.evaluate</code>: the families
+are <code>mtb.plot.CLUSTERING_METRICS</code>, <code>BATCH_METRICS</code> and
+<code>CLASSIFICATION_METRICS</code>, and a list selects exactly those codes
+(alias tolerant, <code>["ari"]</code> -&gt; ARI). The stored tables have no
+classification scores, so <code>"classification"</code> gives an empty frame, as
+<code>"batch"</code> does on a single-batch dataset; a long CSV of your own
+(<code>result_path=</code>) can hold them.</p>
 <p>Every code must be one of <code>mtb.catalog.known_metrics()</code> or present in
 the frame: <code>["ZZZ"]</code> raises <code>ValueError</code> listing both. An unknown
 token raises too (<code>"dimension_reduction"</code> is a <code>list_tasks</code> token,
@@ -3218,8 +3214,13 @@ columns and <code>attrs</code> are in Notes.</p>
             </td>
             <td class="doc-raises-details">
               <div class="doc-md-description">
-                <p>Nothing left to rank (Notes lists the cases), or an unknown
-<code>metrics</code> value.</p>
+                <p>Nothing left to rank: no dataset holds <code>min_methods</code> methods (the
+message names the other stored source when it holds more), the
+frame has none of the requested metrics, every row belongs to a
+method the package does not run for the category, or <code>methods=</code>,
+<code>modalities=</code> or <code>atac=</code> leaves no scored method. Also an
+unknown <code>metrics</code> value, modality token or <code>atac</code> value, or a
+representation token that contradicts <code>atac</code>.</p>
               </div>
             </td>
           </tr>
@@ -3348,32 +3349,16 @@ made under:</p>
   run by this package for the category.</li>
 </ul>
 <p><strong>Selections.</strong> <code>metrics="batch"</code> scores ASW_batch, GC, iLISI, kBET;
-<code>"all"</code> every metric present; a list exactly those codes (alias
-tolerant). <code>methods</code> is resolved as in <code>mtb.load_results</code>
-(<code>"mofa+"</code> -&gt; MOFA2, <code>"totalvi"</code> -&gt; totalVI), and the unscored line
-of the warning is restricted to the same set, so a requested method
-without rows is still reported as such. <code>modalities</code> and <code>atac</code>
-select methods with <code>mtb.find_methods</code>, under the same token rule.</p>
+<code>"all"</code> every metric present. The unscored line of the warning is
+restricted to <code>methods</code>, so a requested method without rows is still
+reported. <code>modalities</code> and <code>atac</code> select methods with
+<code>mtb.find_methods</code>, under the same token rule.</p>
 <p><strong>Warning.</strong> One <code>UserWarning</code> with one line per finding summarises
 a requested modality the datasets did not measure, dropped methods and
 datasets, partial coverage and the unscored methods. The stored tables
 were clustered with leidenalg. A line also names the <code>long_df</code> methods
 clustered with igraph when ARI, NMI or iF1 ranks them against stored
 rows of their dataset.</p>
-<p><strong>Errors.</strong> <code>ValueError</code> is raised when:</p>
-<ul>
-<li>no dataset holds <code>min_methods</code> methods (when the other stored source
-  holds more methods for the category the message says so - cross/D52:
-  <code>pass source='rerun'</code>);</li>
-<li>the frame has none of the requested metrics (the message lists the
-  metrics it does have);</li>
-<li>every row belongs to a method the package does not run for the
-  category;</li>
-<li><code>methods=</code>, <code>modalities=</code> or <code>atac=</code> leaves no scored method;</li>
-<li>an unknown modality token or <code>atac</code> value, or a representation
-  token that contradicts <code>atac</code> (the rule of <code>mtb.find_methods</code>);</li>
-<li>a <code>metrics</code> token or code is unknown.</li>
-</ul>
 <p><strong>Retired keywords.</strong> <code>task=</code> / <code>family=</code> still work as
 <code>metrics=&lt;token&gt;</code>, with a <code>DeprecationWarning</code>.</p>
 </details>
