@@ -71,13 +71,11 @@ def details(*paras, label="Details"):
     return f"<details>\n<summary>{label}</summary>\n\n{body}\n\n</details>"
 
 
-def stored_method_counts(cat, dataset):
-    """``(n_published, n_rerun)``: methods each stored source holds for the
-    dataset, counted from ``results_coverage`` at generation time."""
+def stored_method_count(cat, dataset):
+    """The methods the stored tables hold for the dataset, counted from
+    ``results_coverage`` at generation time."""
     cov = mtb.results_coverage(cat)
-    cov = cov[cov.dataset == dataset]
-    return (cov[cov.source == "published"].method.nunique(),
-            cov[cov.source.str.startswith("rerun")].method.nunique())
+    return cov[cov.dataset == dataset].method.nunique()
 
 
 def stored_on_fewer_batches(dataset):
@@ -478,9 +476,9 @@ FOLDER_NOTE = ("`NAME` is the dataset name for `scan` and `run_all`, and `mydata
                "folder that holds it (`data_path`). With a new value of `NAME`, the folder "
                "holds the files of your data only.")
 CHECK_NOTE = ("The check lists the methods you name. Without `methods=`, it lists every "
-              "method that reads the modalities in the folder. Without `per_method=True`, it "
-              "has one row per method variant and every column, such as the command of each "
-              "method.")
+              "method that reads the modalities in the folder. `mtb.run_all(..., "
+              "dry_run=True)` has one row per method variant and every column, such as the "
+              "command of each method.")
 LEFTOVER = ("`export_dataset` raises `FileExistsError` when the folder holds files of other "
             "cells that the call does not write. `overwrite=True` does not remove them. Give "
             "`NAME` a new value.")
@@ -964,7 +962,8 @@ def check_own(key):
                 exec(compile(own["export"], f"tutorial_{key}: export cell", "exec"), ns)
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                frame = mtb.scan(own["name"], t["cat"], data_path="mydata", verbose=False)
+                frame = mtb.run_all(own["name"], t["cat"], data_path="mydata",
+                                    dry_run=True, verbose=False)
         finally:
             os.chdir(here)
     warned = [str(w.message) for w in seen if issubclass(w.category, UserWarning)]
@@ -1064,8 +1063,7 @@ def own_cells(key):
         ("markdown", write),
         ("code", export),
         ("markdown", check),
-        ("code", f'mtb.scan(NAME, "{cat}", methods=METHODS, data_path="mydata",\n'
-                 f'         per_method=True)'),
+        ("code", f'mtb.scan(NAME, "{cat}", methods=METHODS, data_path="mydata")'),
         ("markdown", f"Run {same} on the folder:"),
         ("code", f'mine = mtb.run_all(NAME, "{cat}", methods=METHODS, data_path="mydata",\n'
                  f'                   out_dir="out/" + NAME)\n'
@@ -1161,8 +1159,8 @@ def build_tutorial(key):
         "nothing and returns the plan with its sizes.",
         "Environments go to `mtb.config.DEFAULT.envs_dir`. To use another disk, set it "
         "before this cell.",
-        f"From a terminal, `multibench env install --methods {','.join(methods)} --packed "
-        f"--run` does the same."))
+        f"From a terminal, `multibench env install --methods {','.join(methods)} --run` "
+        f"does the same."))
     code(f'''import pandas as pd
 import multibench as mtb
 
@@ -1208,7 +1206,7 @@ res.summary''')
     section = 6
     stored_ds = t.get("stored_ds")
     if stored_ds:
-        n_pub, n_rerun = stored_method_counts(cat, stored_ds)
+        n_stored = stored_method_count(cat, stored_ds)
         stored_notes = []
         if stored_ds != ds and stored_ds in ds:
             stored_notes.append(f"The stored scores are for the full `{stored_ds}`, the benchmark "
@@ -1216,13 +1214,7 @@ res.summary''')
         elif stored_ds != ds:
             stored_notes.append(f"There are no stored scores for `{ds}`. `{stored_ds}` is another "
                                 f"benchmark dataset of the same task.")
-        stored_notes.append(
-            f"`source=\"rerun\"` reads the package's own runs of the methods. "
-            + (f"`source=\"published\"`, the default, reads the published scIB tables, which "
-               f"hold {n_pub} method{'s' if n_pub != 1 else ''} for `{stored_ds}`."
-               if n_pub else
-               f"There is no published scIB table for {cat}, so `source=\"published\"`, "
-               f"the default, raises `FileNotFoundError`."))
+        stored_notes.append("The stored scores are the package's own runs of the methods.")
         fewer, n_few, n_all = stored_on_fewer_batches(stored_ds)
         if fewer:
             if fewer != ["UINMF"] or (n_few, n_all) != (2, 3) or len(labels_for_ds(key)) != 3:
@@ -1233,16 +1225,14 @@ res.summary''')
                 f"batches 1 and 2 of `{stored_ds}`. `run_all` on `{ds}` runs its three-batch "
                 f"variant.")
         stored_notes.append(
-            "The stored scores used the `leidenalg` backend for Leiden clustering, and "
-            "`run_all` uses `igraph` by default. The two backends can move ARI by up to "
-            "about 0.1. To compare your runs with these scores, set "
-            "`mtb.config.DEFAULT.leiden_flavor = \"leidenalg\"` before `run_all`.")
+            "Scores of your runs can differ from the stored ones by up to about 0.1: the "
+            "Leiden clustering behind ARI and NMI depends on the backend.")
         md(f"""## {section}. Stored scores
 
-The package ships stored scores for {n_rerun} methods on `{stored_ds}`. `load_results` reads them and `mtb.plot.bubble` draws them, without running anything.
+The package ships stored scores for {n_stored} methods on `{stored_ds}`. `load_results` reads them and `mtb.plot.bubble` draws them, without running anything.
 
 """ + details(*stored_notes))
-        code(f'''long = mtb.load_results("{cat}", dataset="{stored_ds}", source="rerun")
+        code(f'''long = mtb.load_results("{cat}", dataset="{stored_ds}")
 mtb.plot.bubble(long)''')
         section += 1
 
@@ -1267,11 +1257,11 @@ To run them all, set `METHODS` to these names in section 2 and run the notebook 
 |---|---|
 | `env.install` refuses on macOS or Windows | methods run only on Linux: use Colab or a Linux machine |
 | a method needs an NVIDIA GPU | choose a GPU runtime on Colab, or a machine with a GPU |
-| a method fails on a small dataset | `mtb.scan` without `per_method=True` names what the method needs from the data's size in its `caveat` column |
+| a method fails on a small dataset | `mtb.run_all(..., dry_run=True)` names what the method needs from the data's size in its `caveat` column |
 | a warning that values are not whole numbers | export raw counts, for example with `rna="layer:counts"` |
 | `... matrix/data as cells x features` | the matrix is transposed: export it again with `mtb.io.export_dataset` |
 | a method times out | raise `timeout=` in `run_all` |
-| low `label_order_confidence` | several label files fit the cell count: check `label_order_candidates` in `res.results` |
+| low `label_order_confidence` | several label files fit the cell count: check `label_order_candidates` in `res.records` |
 | batch metrics use the wrong batches | `res.rescore(batch=my_vector)` scores again without running the methods |"""))
 
     md(f"""## Next steps
@@ -1376,8 +1366,8 @@ This notebook installs `multibench-sc`, looks up methods and draws the stored be
     code(INSTALL_CELL)
     code("""import multibench as mtb
 
-print(len(mtb.list_methods()), "methods in the package")
-mtb.list_methods(category="vertical")""")
+print(len(mtb.find_methods()), "methods in the package")
+mtb.find_methods(category="vertical")""")
     md("""## Inspect a method
 
 `method_info` returns what the package knows about a method. `find_methods` filters methods by what your data has, and `cite` returns the citations.
@@ -1394,20 +1384,19 @@ keys = ("id", "language", "env", "needs_labels", "notes", "repo_url", "reference
         "supports")
 {k: info[k] for k in keys}""")
     code("""mtb.find_methods(category="vertical", modalities=["rna", "adt"], needs_labels=False)""")
-    code("""print(mtb.cite(["Matilda"]))   # fmt="bibtex" for BibTeX entries""")
+    code("""print(mtb.cite(["Matilda"]))   # format="bibtex" for BibTeX entries""")
     md("""## Draw the stored results
 
 The package ships stored results, so these figures draw without running anything.
 
 """ + details(
-        "`source=\"published\"`, the default, reads the published scIB tables. "
-        "`source=\"rerun\"` reads the package's own runs of the methods.",
+        "The stored results are the package's own runs of the methods.",
         "`aggregate=\"summary\"` ranks the methods over both datasets. `D28s` is a "
         "random 60% subsample of `D28`'s cells. `require_complete=True` keeps only "
         "the methods with results on both."))
-    code("""long = mtb.load_results("vertical", dataset="D11", source="rerun")
+    code("""long = mtb.load_results("vertical", dataset="D11")
 mtb.plot.bubble(long)""")
-    code("""pair = mtb.load_results("diagonal", dataset=["D28", "D28s"], source="rerun")
+    code("""pair = mtb.load_results("diagonal", dataset=["D28", "D28s"])
 mtb.plot.bubble(pair, aggregate="summary", require_complete=True,
                 title="Summary of 2 diagonal datasets")""")
     md("## Next steps\n\n- The integration tutorials install the environments, run methods "
