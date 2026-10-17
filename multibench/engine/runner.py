@@ -854,9 +854,11 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
             have = envs.installed_envs()
         other = envs.other_env_prefix(env_name) if env_name not in have else None
         if other is not None:
-            raise EnvironmentError(
-                f"{envs.other_env_text(env_name, other)} Rename or remove it, then "
-                f"run multibench env install --methods {method} --packed --run.")
+            raise EnvironmentError(envs.other_env_text(
+                env_name, other,
+                config.hint(f"call mtb.env.install([{method!r}], dry_run=False).",
+                            f"run multibench env install --methods {method} --packed "
+                            f"--run.")))
         if have and env_name not in have:
             py = f" In Python, call mtb.env.install([{method!r}], dry_run=False)."
             raise EnvironmentError(

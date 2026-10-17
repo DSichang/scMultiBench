@@ -168,7 +168,7 @@ _sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 # ---- host-agnostic conda envs -----------------------------------------------
 # An env multibench did not install is reported by name and path ("Environment
-# matilda at ... was not installed by multibench"). A developer's own conda can
+# matilda at ... was not installed by this version of multibench"). A developer's own conda can
 # hold such an env (a `matilda` env made by hand), which would change the
 # messages the tests assert. Pin "no such env" everywhere except in the tests of
 # env identity, which build their own conda root.

@@ -575,12 +575,15 @@ def _cmd_convert(args) -> int:
             role = {"rna": "rna", "adt": "adt", "atac": atac_role}[matrices[0]]
         _refuse_canonical(args, args.src, f"--{reads[0]}" if reads else "the dataset mode",
                           role, category)
+        data = ingest._to_anndata(args.src)
         if args.rna is None and args.adt is None and args.atac is None \
                 and args.atac_from is None and not any(Path(args.out).glob("*.h5")):
             # a folder of labels alone; adding them to a folder with matrices is fine
-            _usage_error(args, "--labels alone writes only the label file. Add --rna X "
-                         "to export the matrix too.")
-        data = ingest._to_anndata(args.src)
+            mods = getattr(data, "mod", None)
+            sel = ("X" if not isinstance(mods, dict)
+                   else "mod:rna" if "rna" in mods else "mod:<name>")
+            _usage_error(args, f"--labels alone writes only the label file. Add --rna "
+                         f"{sel} to export the matrix too.")
         before = _folder_state(args.out)
         p = ingest.export_dataset(data, args.out, rna=args.rna, adt=args.adt,
                                   atac=atac, atac_kind=args.atac_kind,
@@ -976,6 +979,16 @@ def _cmd_run(args) -> int:
     params = _parse_params(args.param, args, default_method=args.method)
     inputs = _parse_inputs(args.input, args)
     if args.dry_run:
+        # a rejected --param is an error, not a dry run: before the header
+        from .engine import runner as _runner
+        try:
+            variant = registry.get(args.method).select(
+                args.category,
+                _runner._modality_roles(_runner._rename_old_roles(args.method, inputs)))
+        except (KeyError, ValueError):
+            variant = None                 # run says what is wrong, after the header
+        if variant is not None:
+            _runner.check_params(args.method, variant, params.get(args.method))
         # the header first, then run's notes, then the command
         print("# Dry run. Nothing was executed.", file=sys.stderr, flush=True)
         argv = multibench.run(args.method, args.category, inputs=inputs,
@@ -1586,8 +1599,7 @@ def _cmd_env(args) -> int:
             print(f"[{mark}] {r['env']:18} ({len(r['methods']):2}) <- {', '.join(r['methods'])}"
                   f"{_flavor_token(r.get('flavor'), r['env'])}")
             if r.get("other_env"):
-                print(f"#   {envs.other_env_text(r['env'], r['other_env'])} Rename or "
-                      f"remove it, then install.")
+                print(f"#   {envs.other_env_text(r['env'], r['other_env'], 'install.')}")
         missing = [r for r in rows if not r["exists"]]
         nolock = [r["env"] for r in missing if not r["has_lock"]]
         print(f"# {len(rows)} envs needed, {len(missing)} missing"
@@ -1615,12 +1627,19 @@ def _cmd_env(args) -> int:
             elif r["state"] in ("have", "PACKED"):
                 extra = _flavor_token(r.get("flavor"), r["env"])
             print(f"{r['env']:18} [{r['state']:{width}}] <- {', '.join(r['methods'])}{extra}")
-        if not args.run:
+        taken = [r["env"] for r in rows if r["state"] == "name taken"]
+        if taken:
+            print(f"# name taken: {', '.join(taken)} - rename or remove "
+                  f"{'that env' if len(taken) == 1 else 'those envs'} first "
+                  "(multibench env doctor shows where)", file=sys.stderr)
+        if not args.run and any(not r["exists"] and r["state"] != "name taken"
+                                for r in rows):
             print("# dry-run - add --run to create the missing envs"
                   + (" (packed archives first, lockfile build otherwise)"
                      if packed else " from their lockfiles"), file=sys.stderr)
             if packed:
-                todo = [r for r in rows if not r["exists"] and r.get("packed_url")]
+                todo = [r for r in rows if not r["exists"] and r.get("packed_url")
+                        and r["state"] != "name taken"]
                 # mtb.env.install printed why 'auto' took the CPU builds; the
                 # total then names the builds without repeating the reason
                 said = envs.auto_flavor_note(flavor) is not None

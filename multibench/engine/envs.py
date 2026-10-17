@@ -745,7 +745,8 @@ def _creation_command(prefix: Path) -> str:
 def _lockfile_build_record(prefix: Path, env: str) -> bool:
     """Was ``prefix`` created by a lockfile build of an earlier multibench?
 
-    Those builds ran ``<conda> env create -n <env> -f <file>`` with ``<file>``
+    Those builds ran ``<conda> env create -n <env> -f <file>`` (older conda:
+    ``conda-env create ...``) with ``<file>``
     one of ``.../multibench_envbuild/<env>/conda.yml`` (installed package),
     ``.../env_locks/.build/<env>/conda.yml`` (source checkout), or, before
     0.2, ``.../env_locks/<env>.yml``; conda keeps that command as the first
@@ -755,7 +756,8 @@ def _lockfile_build_record(prefix: Path, env: str) -> bool:
     if not cmd:
         return False
     e = re.escape(env)
-    if not re.search(r"(?:^|\s)env\s+create\s", cmd):
+    # `conda env create`, `mamba env create`, or conda's older `conda-env create`
+    if not re.search(r"(?:^|\s|/)(?:conda-env|env)\s+create\s", cmd):
         return False
     if not re.search(rf"\s(?:-n|--name)(?:\s+|=){e}(?:\s|$)", cmd):
         return False
@@ -800,11 +802,13 @@ def other_env_prefix(env: str, conda: str | None = None) -> Path | None:
     return None
 
 
-def other_env_text(env: str, prefix) -> str:
-    """``"Environment matilda at /x/envs/matilda was not installed by multibench,
-    so it is not used."``"""
-    return (f"Environment {env} at {prefix} was not installed by multibench, so it "
-            f"is not used.")
+def other_env_text(env: str, prefix, then: str) -> str:
+    """``"Environment matilda was not installed by this version of multibench, so
+    it is not used. Rename or remove /x/envs/matilda, then <then>"``: true also
+    for an env of an older version that :func:`made_by_multibench` cannot
+    recognise. The action comes before the path, so a clipped line keeps it."""
+    return (f"Environment {env} was not installed by this version of multibench, so "
+            f"it is not used. Rename or remove {prefix}, then {then}")
 
 
 def _refuse_other_env(env: str, conda: str | None = None) -> None:
@@ -812,8 +816,7 @@ def _refuse_other_env(env: str, conda: str | None = None) -> None:
     multibench did not install."""
     other = other_env_prefix(env, conda)
     if other is not None:
-        raise RuntimeError(f"{other_env_text(env, other)} Rename or remove it, "
-                           f"then install again.")
+        raise RuntimeError(other_env_text(env, other, "install again."))
 
 
 def _mark_built(env: str, conda: str | None, how: str, before: set) -> None:
@@ -1048,8 +1051,7 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
     if dest.exists():
         if made_by_multibench(dest, env):
             return True
-        raise RuntimeError(f"{other_env_text(env, dest)} Rename or remove it, "
-                           f"then install again.")
+        raise RuntimeError(other_env_text(env, dest, "install again."))
     manifest, sizes = packed_manifest(), packed_sizes()
     key, installed = archive_for(env, flavor, manifest=manifest, sizes=sizes)
     if resolve_flavor(flavor) == "cpu" and installed == "gpu":
@@ -1606,8 +1608,8 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
                    if not r["exists"]]
         for r in missing:          # before any download or build
             if r.get("other_env"):
-                raise RuntimeError(f"{other_env_text(r['env'], r['other_env'])} Rename "
-                                   f"or remove it, then install again.")
+                raise RuntimeError(other_env_text(r["env"], r["other_env"],
+                                                  "install again."))
         if (conda or _find_conda()) is None:
             # only the packed path works: refuse before any download
             for r in missing:

@@ -109,6 +109,8 @@ def test_a_lockfile_build_of_an_earlier_version_is_the_method_env(fake_root):
     "/opt/conda/bin/mamba env create -y -n scmb_r -f /x/env_locks/.build/scmb_r/conda.yml",
     "/opt/conda/bin/conda env create -n scmb_r -f /x/multibench/engine/env_locks/scmb_r.yml",
     "/opt/conda/bin/conda env create -n scmb_r -f /tmp/multibench_envbuild/scmb_r/conda.yml",
+    # older conda records its env subcommand as conda-env
+    "/opt/conda/bin/conda-env create -n scmb_r -f /tmp/multibench_envbuild/scmb_r/conda.yml",
 ])
 def test_the_three_lockfile_build_commands_of_earlier_versions_count(tmp_path, cmd):
     p = _env(tmp_path, "scmb_r", history=cmd)
@@ -138,8 +140,8 @@ def test_scan_reports_the_users_env_and_does_not_run_it(fake_root):
     row = mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False).iloc[0]
     assert not row.env_ok and not row.runnable
     assert row.env_reason == (
-        f"Environment matilda at {fake_root / 'envs' / 'matilda'} was not installed by "
-        f"multibench, so it is not used. Rename or remove it, then run multibench env "
+        f"Environment matilda was not installed by this version of multibench, so it is "
+        f"not used. Rename or remove {fake_root / 'envs' / 'matilda'}, then run multibench env "
         f"install --methods Matilda --packed --run.")
 
 
@@ -155,8 +157,9 @@ def test_cli_doctor_prints_the_users_env(fake_root, capsys):
     cli.main(["env", "doctor", "--methods", "Matilda"])
     out = capsys.readouterr().out
     assert out.splitlines()[0].startswith("[L] matilda")
-    assert (f"#   Environment matilda at {fake_root / 'envs' / 'matilda'} was not installed "
-            f"by multibench, so it is not used. Rename or remove it, then install.") in out
+    assert (f"#   Environment matilda was not installed by this version of multibench, so "
+            f"it is not used. Rename or remove {fake_root / 'envs' / 'matilda'}, then "
+            f"install.") in out
 
 
 def test_install_does_not_take_the_users_env_as_installed(fake_root, monkeypatch):
@@ -167,13 +170,13 @@ def test_install_does_not_take_the_users_env_as_installed(fake_root, monkeypatch
     with pytest.raises(RuntimeError) as e:
         mtb.env.install(["Matilda"], dry_run=False)
     assert str(e.value) == (
-        f"Environment matilda at {fake_root / 'envs' / 'matilda'} was not installed by "
-        f"multibench, so it is not used. Rename or remove it, then install again.")
+        f"Environment matilda was not installed by this version of multibench, so it is "
+        f"not used. Rename or remove {fake_root / 'envs' / 'matilda'}, then install again.")
     assert not (fake_root / "envs" / "matilda" / envs.FLAVOR_FILE).exists()
 
 
 def test_install_packed_refuses_a_users_env_at_its_target(fake_root):
-    with pytest.raises(RuntimeError, match="not installed by multibench"):
+    with pytest.raises(RuntimeError, match="not installed by this version of multibench"):
         envs.install_packed("matilda", envs_dir=fake_root / "envs")
 
 
@@ -181,10 +184,42 @@ def test_run_refuses_the_users_env_on_linux(fake_root, tmp_path):
     inputs = mtb.inputs_for("D11", "vertical", "Matilda")
     with pytest.raises(OSError) as e:
         mtb.run("Matilda", "vertical", inputs=inputs, out_dir=str(tmp_path / "out"))
-    assert str(e.value).startswith(
-        f"Environment matilda at {fake_root / 'envs' / 'matilda'} was not installed by "
-        f"multibench")
+    assert str(e.value) == (
+        f"Environment matilda was not installed by this version of multibench, so it is "
+        f"not used. Rename or remove {fake_root / 'envs' / 'matilda'}, then call "
+        f"mtb.env.install(['Matilda'], dry_run=False).")
     assert not (tmp_path / "out").exists()
+
+
+# --- the same user env, seen from run_all and the command line (no pin) -----
+def test_run_all_and_the_cli_refuse_the_users_env(fake_root, tmp_path, capsys):
+    from multibench import cli
+    with pytest.raises(ValueError) as e:
+        mtb.run_all("D11", "vertical", methods=["Matilda"], modalities=["rna", "adt"],
+                    out_dir=tmp_path / "ra", verbose=False)
+    assert "was not installed by this version of multibench" in str(e.value)
+    assert cli.main(["scan", "D11", "--category", "vertical", "--methods", "Matilda"]) == 0
+    assert "Environment matilda was not installed by this version of multibench" in \
+        capsys.readouterr().out
+    inputs = mtb.inputs_for("D11", "vertical", "Matilda", modalities=["rna", "adt"])
+    argv = ["run", "--method", "Matilda", "--category", "vertical",
+            "--out-dir", str(tmp_path / "cli")]
+    for role, path in inputs.items():
+        argv += ["--input", f"{role}={path}"]
+    assert cli.main(argv) == 1
+    err = capsys.readouterr().err
+    assert (f"so it is not used. Rename or remove {fake_root / 'envs' / 'matilda'}, then "
+            f"run multibench env install --methods Matilda --packed --run.") in err
+    assert not (tmp_path / "cli").exists()
+
+
+def test_cli_install_dry_run_leaves_a_name_taken_env_out(fake_root, capsys):
+    from multibench import cli
+    assert cli.main(["env", "install", "--methods", "Matilda", "--packed"]) == 0
+    out, err = capsys.readouterr()
+    assert "[name taken" in out
+    assert "# name taken: matilda - rename or remove that env first" in err
+    assert "add --run" not in err and "to download" not in err
 
 
 def test_run_refuses_off_linux_also_when_the_env_is_installed(fake_root, tmp_path,
@@ -206,7 +241,7 @@ def test_a_lockfile_build_marks_its_env_and_refuses_a_users_env(fake_root):
     assert (fake_root / "envs" / "glue" / envs.FLAVOR_FILE).read_text() == "build\n"
     assert envs.env_prefix("glue") == fake_root / "envs" / "glue"
     assert envs.installed_flavor("glue") is None          # not a packed install
-    with pytest.raises(RuntimeError, match="matilda at .* was not installed by multibench"):
+    with pytest.raises(RuntimeError, match="matilda was not installed by this version of multibench"):
         envs.create_env("matilda", conda=conda, dry_run=False, force=True)
 
 
