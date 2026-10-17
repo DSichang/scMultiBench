@@ -141,9 +141,15 @@ def test_cli_scan_without_category_scans_every_category(capsys):
     out = capsys.readouterr().out
     assert rc == 0
     df = pd.read_csv(io.StringIO(out))
-    assert set(df["category"]) == set(full_scan("D28")["category"])
+    assert set(df["category"]) == {"diagonal"}
+    assert len(df) == len(full_scan("D28", "diagonal", verbose=False))
+    own = tmp_path / "MINE"
+    shutil.copytree(multibench.config.DEFAULT.data_path / "D28", own)
+    assert cli.main(["scan", str(own), "--format", "csv"]) == 0
+    df = pd.read_csv(io.StringIO(capsys.readouterr().out))
+    assert set(df["category"]) == set(full_scan("MINE", data_path=tmp_path,
+                                                verbose=False)["category"])
     assert len(set(df["category"])) > 1
-    assert len(df) == len(full_scan("D28"))
 
 
 def test_cli_layout(capsys, monkeypatch):
@@ -368,7 +374,8 @@ def test_cli_plot_source_and_methods_forwarded(tmp_path, monkeypatch):
                        "--methods", "A,B", "--require-complete",
                        "--aggregate", "summary", "--out", str(tmp_path / "x.png")])
     assert rc == 0
-    assert calls["load"] == {"category": "vertical", "dataset": ["D1"], "source": "rerun",
+    # source=None: the re-run tables, or every row of a --result-path long CSV
+    assert calls["load"] == {"category": "vertical", "dataset": ["D1"], "source": None,
                              "result_path": None}
     assert calls["bubble"]["methods"] == ["A", "B"]
     assert calls["bubble"]["require_complete"] is True

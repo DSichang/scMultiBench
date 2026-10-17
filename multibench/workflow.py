@@ -1121,7 +1121,8 @@ def _scan_note(df: "pd.DataFrame", dataset: str, data_path=None,
     return _not_listed_note(df, dataset, base / dataset, category)
 
 
-@_compat.keywords("scan", out_dir=None)
+@_compat.keywords("scan", private="_scan_methods", dropped=("out_dir",),
+                  kept={"per_method": _compat.use("run_all(..., dry_run=True)")})
 def scan(dataset: str, category: str | None = None, *,
          methods: list[str] | None = None,
          modalities: list[str] | str | None = None,
@@ -1129,8 +1130,7 @@ def scan(dataset: str, category: str | None = None, *,
          params: dict | None = None,
          verbose: bool = True,
          assume_gpu: bool = False,
-         allow_atac_mismatch: bool = False,
-         per_method=None) -> pd.DataFrame:
+         allow_atac_mismatch: bool = False) -> pd.DataFrame:
     """Report which methods can run on a dataset, and why the rest cannot.
 
     Nothing is executed. Call it first on a new dataset. It prints what the
@@ -1196,13 +1196,20 @@ def scan(dataset: str, category: str | None = None, *,
     mtb.describe_layout : how to lay out a dataset folder.
     mtb.env.doctor : the environment check on its own.
     """
-    if per_method is not None:
-        _compat.deprecated("scan(per_method=)", "scan(); run_all(dry_run=True) "
-                                                "returns one row per variant", stacklevel=4)
+    return _scan_methods(dataset, category, methods=methods, modalities=modalities,
+                         data_path=data_path, params=params, verbose=verbose,
+                         assume_gpu=assume_gpu, allow_atac_mismatch=allow_atac_mismatch)
+
+
+def _scan_methods(dataset, category=None, *, methods=None, modalities=None, data_path=None,
+                  params=None, verbose=True, assume_gpu=False, allow_atac_mismatch=False,
+                  per_method=True) -> pd.DataFrame:
+    """:func:`scan`, with the deprecated ``per_method``: ``False`` returns the full
+    plan of ``run_all(dry_run=True)``."""
     df, private = _scan(dataset, category, methods=methods, modalities=modalities,
                         data_path=data_path, params=params,
                         verbose=verbose and per_method is False, assume_gpu=assume_gpu,
-                        allow_atac_mismatch=allow_atac_mismatch, stacklevel=4)
+                        allow_atac_mismatch=allow_atac_mismatch)
     if per_method is False:
         return df
     return _per_method(df, private, data_path=data_path, verbose=verbose,
@@ -1212,8 +1219,7 @@ def scan(dataset: str, category: str | None = None, *,
 def _scan(dataset: str, category: str | None = None, *, methods=None, modalities=None,
           data_path=None, out_dir="<out_dir>", params: dict | None = None,
           verbose: bool = True, assume_gpu: bool = False,
-          allow_atac_mismatch: bool = False,
-          stacklevel: int = 2) -> "tuple[pd.DataFrame, pd.DataFrame]":
+          allow_atac_mismatch: bool = False) -> "tuple[pd.DataFrame, pd.DataFrame]":
     """The full plan (every column of :data:`SCAN_COLUMNS`), and a second frame
     aligned with it: ``_other`` (the
     reason without the off-Linux sentence), ``_label_inputs`` and ``_folder_caveat``."""
@@ -1229,7 +1235,7 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
     params = {registry.check_method(m): v for m, v in (params or {}).items()}
     wanted = _modality_matcher(modalities, methods) if modalities is not None else None
     base = Path(data_path) if data_path is not None else config.DEFAULT.data_path
-    dataset = _resolve.canonical_dataset(base, dataset, stacklevel=stacklevel + 1)
+    dataset = _resolve.canonical_dataset(base, dataset)
     ds_dir = base / dataset
     if not ds_dir.is_dir():
         raise FileNotFoundError(_resolve.missing_dataset_message(base, dataset))
@@ -1342,8 +1348,8 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
     if params:
         _check_param_keys(df, params)
     if dropped_dirs and modalities:
-        warnings.warn(_dropped_dirs_message(modalities, dropped_dirs),
-                      UserWarning, stacklevel=stacklevel)
+        _compat.warn(_dropped_dirs_message(modalities, dropped_dirs),
+                     UserWarning)
     # last, so every check above saw every variant
     held = _held_families(ds_dir, category)
     need = [_row_families(m) for m in df["modalities"]]
@@ -1511,8 +1517,8 @@ def _arm_deadline(seconds):
 
     if threading.current_thread() is not threading.main_thread():
         # signal.signal raises off the main thread
-        warnings.warn("timeout= is unavailable off the main thread; "
-                      "running without a deadline")
+        _compat.warn("timeout= is unavailable off the main thread; "
+                     "running without a deadline")
         return _NOT_ARMED
 
     def _fire(signum, frame):
@@ -1813,13 +1819,13 @@ def _warn_unsaved_batch(records, result) -> None:
             and result._batch_text(r.get("batch_file")) is None
             and (r.get("batch_file") or r.get("batch_source") == "user")]
     if old:
-        warnings.warn("This result was scored with your batch vector, which older "
-                      "versions did not save. Pass batch= again to keep the batch "
-                      "metrics.", UserWarning, stacklevel=3)
+        _compat.warn("This result was scored with your batch vector, which older "
+                     "versions did not save. Pass batch= again to keep the batch "
+                     "metrics.", UserWarning)
     elif lost:
-        warnings.warn("This result was scored with your batch vector, which is not "
-                      "saved with it. Pass batch= again to keep the batch metrics.",
-                      UserWarning, stacklevel=3)
+        _compat.warn("This result was scored with your batch vector, which is not "
+                     "saved with it. Pass batch= again to keep the batch metrics.",
+                     UserWarning)
 
 
 class BatchResult:
@@ -2024,10 +2030,12 @@ class BatchResult:
             return pd.DataFrame(columns=_LONG_COLUMNS)
         return pd.concat(frames, ignore_index=True)
 
-    @property
-    def results(self) -> list:
-        _compat.deprecated("BatchResult.results", "BatchResult.records")
-        return self.records
+    def __getattr__(self, name):
+        # the deprecated ``results`` (not a property: dir() leaves it out)
+        if name == "results":
+            _compat.deprecated("BatchResult.results", _compat.use("BatchResult.records"))
+            return self.records
+        raise AttributeError(f"{type(self).__name__!r} object has no attribute {name!r}")
 
     @property
     def failures(self) -> pd.DataFrame:
@@ -2085,7 +2093,7 @@ class BatchResult:
         ----------
         **kw
             Keyword arguments of ``mtb.plot.bubble``: ``metrics=``,
-            ``methods=``, ``order=``, ``title=``, ``cmap=``, ``save=`` ...
+            ``methods=``, ``order=``, ``title=``, ``save=`` ...
 
         Returns
         -------
@@ -2198,14 +2206,14 @@ class BatchResult:
             if labels is not None:
                 # as written: a record names the word for a missing label
                 labels_at[root] = _cell_vector(labels, self.dataset, root, what="labels",
-                                               order=_ROWS, stacklevel=4, moved=True,
+                                               order=_ROWS, moved=True,
                                                tried=tried[root], as_written=True)
             # a batch vector follows labels given in embedding row order
             rows = labels is not None and not labels_at[root][1]
             if batch is not None:
                 vec, by_cell = _cell_vector(batch, self.dataset, root, what="batch",
                                             order=_ROWS if rows else None,
-                                            stacklevel=4, moved=True, tried=tried[root],
+                                            moved=True, tried=tried[root],
                                             as_written=True)
                 _check_batch(vec, self.dataset)
                 # saved with the result, unless it follows the embedding rows
@@ -2750,10 +2758,10 @@ _ROWS = "the embedding rows"
 
 
 def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | None = None,
-                 stacklevel: int = 5, moved: bool = False,
+                 moved: bool = False,
                  tried=None, as_written: bool = False) -> tuple[np.ndarray, bool]:
     """``(x per cell, aligned by id)``: an id-carrying Series, DataFrame or CSV in
-    ``labels_for`` order. ``stacklevel`` is the CSV warning's; the Series one is 1 less."""
+    ``labels_for`` order."""
     from .eval.pipeline import _carries_ids, _pick
     if not config._CLI and _eio._names_no_file(x):
         # the name of a column: the command line says so before it reads --batch
@@ -2776,19 +2784,17 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
             return np.asarray(vals), False
         return _eio.by_id_column(
             vals, first, _dataset_cell_ids(dataset, data_path), what=what,
-            name=Path(x).name, target=dataset, order=order, no_ids=no_ids,
-            stacklevel=stacklevel)
+            name=Path(x).name, target=dataset, order=order, no_ids=no_ids)
     vals = _eio.as_vector(x, what=what)
     if not _carries_ids(x):
         if what == "batch" and isinstance(x, pd.Series) \
                 and _eio._numbers_rows(x, _dataset_cell_ids(dataset, data_path)):
-            warnings.warn(_eio._by_position(what), UserWarning,
-                          stacklevel=stacklevel - 1)
+            _compat.warn(_eio._by_position(what), UserWarning)
         return vals, False
     ids = _dataset_cell_ids(dataset, data_path)
     if ids is None:
-        warnings.warn(f"The {what} {type(x).__name__} is matched by position, because "
-                      f"{why}. {fix}", UserWarning, stacklevel=stacklevel - 1)
+        _compat.warn(f"The {what} {type(x).__name__} is matched by position, because "
+                     f"{why}. {fix}", UserWarning)
         return vals, False
     index = pd.Index([str(i) for i in x.index])
     if list(index) == ids:
@@ -2849,7 +2855,7 @@ def _check_batch(vec, dataset: str) -> None:
 
 def _batch_vector(batch, dataset, data_path) -> np.ndarray:
     """``batch`` as one id per cell (:func:`_cell_vector`), checked for gaps."""
-    vec = _cell_vector(batch, dataset, data_path, what="batch", stacklevel=5,
+    vec = _cell_vector(batch, dataset, data_path, what="batch",
                        as_written=True)[0]
     _check_batch(vec, dataset)
     return vec

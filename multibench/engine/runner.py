@@ -7,7 +7,6 @@ import shlex
 import signal
 import subprocess
 import sys
-import warnings
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -200,22 +199,16 @@ def _modality_roles(inputs: dict) -> set[str]:
     return {k for k in inputs if _is_modality_role(k)}
 
 
-#: input keys a variant renamed, ``{method: {old key: new key}}``
-_RENAMED_ROLES = {"UnitedNet": {"rna_cty": "cty"}}
+#: input keys a variant renamed and 0.4 removed, ``{method: {old key: new key}}``
+_REMOVED_ROLES = {"UnitedNet": {"rna_cty": "cty"}}
 
 
-def _rename_old_roles(method: str, inputs: dict) -> dict:
-    """``inputs`` with an old key of :data:`_RENAMED_ROLES` renamed, with a
-    ``DeprecationWarning``; unchanged when the new key is there."""
-    renamed = _RENAMED_ROLES.get(method) or {}
-    old = [k for k in inputs if k in renamed and renamed[k] not in inputs]
-    if not old:
-        return inputs
-    for k in old:
-        warnings.warn(f"inputs key {k!r} of {method} is deprecated and will be removed "
-                      f"in 0.4; use {renamed[k]!r} (the same file)",
-                      DeprecationWarning, stacklevel=3)
-    return {renamed.get(k, k) if k in old else k: v for k, v in inputs.items()}
+def _check_removed_roles(method: str, inputs: dict) -> None:
+    """``ValueError`` for an input key of :data:`_REMOVED_ROLES`, naming the new key."""
+    for old, new in (_REMOVED_ROLES.get(method) or {}).items():
+        if old in inputs:
+            raise ValueError(_compat.removed_text(f"The inputs key {old!r} of {method}",
+                                                  "0.4", _compat.use(repr(new))))
 
 
 def _check_input_cells(method: str, category: str, inputs: dict) -> None:
@@ -533,9 +526,9 @@ def _obs_names(method: str, variant, values: dict, output) -> list[str] | None:
                    f"{shape}")
     if why is None:
         return names
-    warnings.warn(f"{method}: RunResult.obs_names is None ({why}); the rows follow "
-                  f"the order of mtb.labels_for(dataset, category, {method!r})",
-                  UserWarning, stacklevel=3)
+    _compat.warn(f"{method}: RunResult.obs_names is None ({why}); the rows follow "
+                 f"the order of mtb.labels_for(dataset, category, {method!r})",
+                 UserWarning)
     return None
 
 
@@ -642,10 +635,12 @@ def check_gpu_requirement(spec) -> None:
         raise OSError(spec.requires_gpu_reason)
 
 
-@_compat.keywords("run", task=None)
+@_compat.keywords("run", private="_run", dropped=("task",), kept={
+    "convert": _compat.note("run converts the inputs it needs itself"),
+    "repo_path": _compat.use("config.DEFAULT.repo_path")})
 def run(method: str, category: str, *, inputs: dict, out_dir: str,
         params: dict | None = None, cmd_template: str | None = None,
-        dry_run: bool = False, convert=None, repo_path=None):
+        dry_run: bool = False):
     """Run one method on explicit inputs and load its output.
 
     For files outside a dataset folder, or a run on a compute node;
@@ -703,8 +698,6 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
         The input barcodes do not match the output's cells; ``obs_names`` is ``None``.
     UserWarning
         An ATAC input holds the other representation or peak names the method cannot read.
-    DeprecationWarning
-        UnitedNet's labels passed under the old key ``rna_cty``; the key is ``cty``.
 
     Examples
     --------
@@ -719,15 +712,19 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     mtb.run_all : every runnable method on a dataset, scored, with failures recorded.
     mtb.params_for : the hyperparameters ``params`` takes.
     """
-    if convert is not None:
-        _compat.deprecated("run(convert=)", "canonical .h5 inputs, which run passes "
-                                            "through unchanged", stacklevel=4)
-    if repo_path is not None:
-        _compat.deprecated("run(repo_path=)", "config.DEFAULT.repo_path", stacklevel=4)
+    return _run(method, category, inputs=inputs, out_dir=out_dir, params=params,
+                cmd_template=cmd_template, dry_run=dry_run)
+
+
+def _run(method: str, category: str, *, inputs: dict, out_dir: str,
+         params: dict | None = None, cmd_template: str | None = None,
+         dry_run: bool = False, convert: bool = True, repo_path=None):
+    """:func:`run`, with the deprecated ``convert`` (``False``: the inputs must
+    be canonical ``.h5`` files) and ``repo_path``."""
     convert = convert is not False
     _check_template(cmd_template)
     method = registry.check_method(method)
-    inputs = _rename_old_roles(method, inputs)
+    _check_removed_roles(method, inputs)
     check_params(method, registry.get(method).select(category, _modality_roles(inputs)),
                  params)
     _check_input_cells(method, category, inputs)
@@ -743,8 +740,8 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
         return argv
     if mismatch:
         # one sentence per file: the peak-name caveat already ends with its fix
-        warnings.warn(" ".join(m if m.endswith(".") else m + "." for m in mismatch),
-                      UserWarning, stacklevel=2)
+        _compat.warn(" ".join(m if m.endswith(".") else m + "." for m in mismatch),
+                     UserWarning)
 
     spec = registry.get(method)
     variant = spec.select(category, _modality_roles(inputs))

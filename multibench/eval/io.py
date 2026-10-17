@@ -23,12 +23,13 @@ from __future__ import annotations
 import io as _io
 import json
 import os
-import warnings
 from pathlib import Path
 
 import h5py
 import numpy as np
 import pandas as pd
+
+from .. import _compat
 
 #: suffixes of a CSV-like label file; evaluate() reads a clusters= path with
 #: another suffix as an h5, and as_vector() takes other strings as label values
@@ -378,7 +379,7 @@ def _looks_like_ids(col: pd.Series) -> bool:
 
 
 def by_id_column(values, first, ids, *, what: str, name: str, target: str,
-                 order: str, no_ids: str, stacklevel: int = 3, n_files: int = 1,
+                 order: str, no_ids: str, n_files: int = 1,
                  drop: bool = False):
     """Put a per-cell file in the order of ``ids`` by its first column.
 
@@ -417,9 +418,8 @@ def by_id_column(values, first, ids, *, what: str, name: str, target: str,
                    f"{order}")
     if ids is None:
         if text and first.is_unique:
-            warnings.warn(f"The first column of {name} looks like cell ids, but "
-                          f"{no_ids}. {by_position}.", UserWarning,
-                          stacklevel=stacklevel)
+            _compat.warn(f"The first column of {name} looks like cell ids, but "
+                         f"{no_ids}. {by_position}.", UserWarning)
         return vals, False
     keys = pd.Index([str(v) for v in first])
     ids = pd.Index([str(i) for i in ids])
@@ -430,10 +430,9 @@ def by_id_column(values, first, ids, *, what: str, name: str, target: str,
         return vals, False
     if not known.any():
         if first.is_unique:
-            warnings.warn(f"The first column of {name} looks like cell ids, but none "
-                          f"is a cell of {target}. {by_position}, or use the barcodes "
-                          f"of {target} in that column.", UserWarning,
-                          stacklevel=stacklevel)
+            _compat.warn(f"The first column of {name} looks like cell ids, but none "
+                         f"is a cell of {target}. {by_position}, or use the barcodes "
+                         f"of {target} in that column.", UserWarning)
         return vals, False
     if not known.all():
         other = keys[~known]

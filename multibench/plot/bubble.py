@@ -315,7 +315,6 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     mtb.plot.bubble : builds the table and draws the figure in one call.
     mtb.plot.BubbleTable : what is returned, field by field.
     """
-    import warnings
     from ..data import catalog
 
     need = {"method", "metric", "value"}
@@ -387,7 +386,7 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
                     lacks = tuple(ds for ds, mat in parts.items() if m not in mat.index)
                     groups.setdefault(lacks, []).append(str(m))
                 n_dropped = len(dropped)
-                warnings.warn(
+                _compat.warn(
                     _config.hint("require_complete=True", "--require-complete")
                     + f" dropped {n_dropped} method{'' if n_dropped == 1 else 's'}: "
                     + " ".join(f"{_and_distinct(ms)} lack{'s' if len(ms) == 1 else ''} "
@@ -395,7 +394,7 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
                     + " " + _config.hint("Pass require_complete=False",
                                          "Leave out --require-complete")
                     + " to keep them.",
-                    UserWarning, stacklevel=2)
+                    UserWarning)
                 df = df[df["method"].isin(keep)]
                 parts = style.per_dataset_ranks(df)
                 datasets_per_method = style.coverage(parts)
@@ -407,7 +406,7 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
                     "Pass --require-complete to keep only the methods scored on "
                     "every dataset."),
                 stored=stored):
-            warnings.warn(msg, UserWarning, stacklevel=2)
+            _compat.warn(msg, UserWarning)
         raw_all = style.mean_rank_matrix(parts)
     else:
         if len(datasets) > 1:
@@ -415,12 +414,12 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
             # datasets share methods; the figure itself shows raw values
             for msg in style.dataset_mode_warnings(style.per_dataset_ranks(df),
                                                    stored=stored):
-                warnings.warn(msg, UserWarning, stacklevel=2)
+                _compat.warn(msg, UserWarning)
         raw_all = df.pivot_table(index="method", columns="metric", values="value",
                                  aggfunc="mean")
     backend = style.backend_warning(df)
     if backend:
-        warnings.warn(backend, UserWarning, stacklevel=2)
+        _compat.warn(backend, UserWarning)
 
     def _block(label, cmap, raw):
         if aggregate == "summary" and overall == "mean_overall":
@@ -479,13 +478,13 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
         msg = _na_message(_na_missing(blocks, parts, aggregate), df, aggregate, na)
         if na == "raise":
             raise ValueError(msg)
-        warnings.warn(msg, UserWarning, stacklevel=2)
+        _compat.warn(msg, UserWarning)
 
     drawn = pd.concat([b.raw for b in blocks], axis=1)
     msg = _no_comparison_message(rows, style.constant_columns(drawn), aggregate,
                                  partial=set(drawn.columns[drawn.isna().any()]))
     if msg:
-        warnings.warn(msg, UserWarning, stacklevel=2)
+        _compat.warn(msg, UserWarning)
 
     return BubbleTable(
         methods=rows, blocks=blocks,
@@ -986,7 +985,7 @@ def _fit_width(fig, ax, pad_pt=3.0, rounds=4):
         fig.tight_layout()
 
 
-@_compat.keywords("plot.bubble", na=None, cmap=None, show_language=None)
+@_compat.keywords("plot.bubble", dropped=("na", "cmap", "show_language"))
 def bubble(long_df, *, metrics=None, methods=None, order=None,
            aggregate="dataset", title=None, save=None, require_complete=False,
            overall="rank"):
@@ -1061,13 +1060,8 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
                       aggregate=aggregate, require_complete=require_complete,
                       overall=overall)
     if len(tbl.methods) == 2:
-        import warnings
-        warnings.warn(style.TWO_METHODS, UserWarning, stacklevel=2)
+        _compat.warn(style.TWO_METHODS, UserWarning)
     fig = render(tbl, title=title)
     if save is not None:
         fig.savefig(save, bbox_inches="tight")
     return fig
-
-
-#: deprecated 0.2.x name of :func:`bubble` (DeprecationWarning; removed in 0.4)
-plot_bubble = _compat.deprecated_alias("mtb.plot.plot_bubble", "mtb.plot.bubble", bubble)

@@ -13,9 +13,9 @@ __all__ = ["methods", "datasets", "metrics"]
 
 
 def __dir__() -> list[str]:
-    """``dir(mtb.catalog)`` lists the public API and the underscore names, not
-    the module's imports (PEP 562)."""
-    return sorted(n for n in globals() if n in __all__ or n.startswith("_"))
+    """``dir(mtb.catalog)`` lists the public API and the dunders only (PEP 562);
+    the other names stay reachable."""
+    return sorted(set(__all__) | {n for n in globals() if n.startswith("__")})
 
 #: display and result-folder spellings -> method id
 _ALIASES = {
@@ -415,11 +415,10 @@ def metrics(files_dir: Path | str | None = None) -> pd.DataFrame:
     return raw
 
 
-__getattr__ = _compat.module_getattr(__name__, "catalog", {
-    "canonical_id": (_canonical_id, "the name as written; every function accepts "
-                                    "any spelling"),
-    "canonical_metric": (_canonical_metric, "the name as written; every function "
-                                            "accepts any spelling"),
-    "known_metrics": (_known_metrics, "catalog.metrics()"),
-    "PAPER_COLUMNS": (_PAPER_COLUMNS, None),
+_ANY_SPELLING = _compat.note("every function accepts any spelling of a name")
+__getattr__ = _compat.module_getattr(__name__, "catalog", old={
+    "canonical_id": (_canonical_id, _ANY_SPELLING),
+    "canonical_metric": (_canonical_metric, _ANY_SPELLING),
+    "known_metrics": (_known_metrics, _compat.use("catalog.metrics()")),
+    "PAPER_COLUMNS": (_PAPER_COLUMNS, _compat.NO_EFFECT),
 })

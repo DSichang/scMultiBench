@@ -79,7 +79,7 @@ def rel(cite, tmp_path, monkeypatch):
 
 def test_run_all_records_the_absolute_data_root(rel):
     res, root = rel
-    rec = res.results[0]
+    rec = res.records[0]
     assert rec["data_path"] == "data"
     assert Path(rec["data_root"]).is_absolute()
     assert Path(rec["data_root"]).samefile(root / "data")
@@ -94,7 +94,7 @@ def test_rescore_from_another_directory_aligns_the_labels_by_barcode(rel, monkey
     assert _ari(at_root) == _ari(res) > 0.3
     monkeypatch.chdir(root / "nb")
     back = mtb.load_batch("../out")
-    assert Path(back.results[0]["data_path"]).samefile(root / "data")
+    assert Path(back.records[0]["data_path"]).samefile(root / "data")
     new, caught = _rescore(back, labels=_shuffled_labels())
     assert not _by_position(caught), caught
     assert new.summary.iloc[0]["label_order"] == "cty.csv"
@@ -121,8 +121,8 @@ def test_a_copied_result_is_pointed_at_its_data_with_data_path(rel, monkeypatch)
     # the data moved too: only the argument finds it
     shutil.move(str(root / "data"), str(root / "moved"))
     back = mtb.load_batch(copy, data_path=root / "moved")
-    assert back.results[0]["data_path"] == str(root / "moved")
-    assert back.results[0]["out_dir"] == str(copy / "Matilda_MYCITE")
+    assert back.records[0]["data_path"] == str(root / "moved")
+    assert back.records[0]["out_dir"] == str(copy / "Matilda_MYCITE")
     new, caught = _rescore(back, labels=_shuffled_labels())
     assert not _by_position(caught), caught
     assert new.summary.iloc[0]["label_order"] == "cty.csv" and _ari(new) == _ari(res)
@@ -134,9 +134,9 @@ def test_a_folder_that_is_not_found_is_named(rel, monkeypatch):
     shutil.move(str(root / "data"), str(root / "moved"))
     monkeypatch.chdir(root / "nb")
     back = mtb.load_batch("../out")
-    assert back.results[0]["data_path"] == "data"         # left as recorded
+    assert back.records[0]["data_path"] == "data"         # left as recorded
     # the roots tried: the recorded data_path from here, then data_root
-    where = f"{Path.cwd() / 'data'} or {back.results[0]['data_root']}"
+    where = f"{Path.cwd() / 'data'} or {back.records[0]['data_root']}"
     with pytest.warns(UserWarning, match=re.escape(
             f"The labels Series is matched by position, because the dataset folder "
             f"MYCITE is not found in {where}. {MOVED}")):
@@ -149,7 +149,7 @@ def test_a_folder_that_is_not_found_is_named(rel, monkeypatch):
             f"is matched by position.")):
         back.rescore(labels=csv)
     new = _quiet(back.rescore, metrics=["ARI"])
-    rec = new.results[0]
+    rec = new.records[0]
     assert rec["status"] == "RUN_OK_NO_LABEL_MATCH"
     assert rec["note"] == f"The dataset folder MYCITE is not found in {where}. {MOVED}"
     for k in ("metrics", "batch_source", "n_batches", "labels_used"):
@@ -173,7 +173,7 @@ def test_rescore_from_the_run_folder_and_of_a_fetched_tree_is_unchanged(rel, mon
     res, root = rel
     again = _quiet(mtb.load_batch("out").rescore)
     # the folder found, as an absolute path (review of round 6)
-    assert again.results[0]["data_path"] == again.results[0]["data_root"] == \
+    assert again.records[0]["data_path"] == again.records[0]["data_root"] == \
         str((root / "data").resolve())
     assert again.summary.iloc[0]["label_order"] == "cty.csv" and _ari(again) == _ari(res)
     # a fetch_outputs tree: data_path None (config's), out_dir from another host
@@ -188,9 +188,9 @@ def test_rescore_from_the_run_folder_and_of_a_fetched_tree_is_unchanged(rel, mon
     monkeypatch.setattr(config.DEFAULT, "data_path", root / "data")
     monkeypatch.chdir(root / "nb")
     back = mtb.load_batch(tree)
-    assert back.results[0]["data_path"] is None
+    assert back.records[0]["data_path"] is None
     new = _quiet(back.rescore)
-    assert new.results[0]["data_path"] is None
+    assert new.records[0]["data_path"] is None
     assert new.summary.iloc[0]["label_order"] == "cty.csv" and _ari(new) == _ari(res)
 
 
@@ -206,7 +206,7 @@ def batched(cite, tmp_path):
 
 def test_run_all_saves_the_batch_it_scored_with(batched):
     res, batch, tmp = batched
-    rec = res.results[0]
+    rec = res.records[0]
     assert rec["batch_source"] == "user" and rec["n_batches"] == 2
     name = rec["batch_file"]
     assert re.fullmatch(r"batch_[0-9a-f]{8}\.csv", name)
@@ -224,21 +224,21 @@ def test_rescore_reuses_the_saved_batch(batched):
     back = mtb.load_batch(tmp / "out")
     for kw in ({}, {"labels": _shuffled_labels(2)}):
         new, caught = _rescore(back, **kw)
-        rec = new.results[0]
+        rec = new.records[0]
         assert (rec["batch_source"], rec["n_batches"]) == ("user", 2), kw
         assert _batch_metrics(new) == before, kw
         assert not [m for m in caught if "batch vector" in m], caught
     # the reference example: the re-scored result keeps the batch on disk
     _quiet(back.rescore, labels=_shuffled_labels(2)).save(tmp / "rescored")
-    assert (tmp / "rescored" / res.results[0]["batch_file"]).is_file()
+    assert (tmp / "rescored" / res.records[0]["batch_file"]).is_file()
     again = _quiet(mtb.load_batch(tmp / "rescored").rescore)
     assert _batch_metrics(again) == before
     # a batch that is given wins, and is saved in its turn
     ones = _quiet(back.rescore, batch=np.ones(N, dtype=int))
-    assert ones.results[0]["n_batches"] == 1
-    assert ones.results[0]["batch_file"] != res.results[0]["batch_file"]
+    assert ones.records[0]["n_batches"] == 1
+    assert ones.records[0]["batch_file"] != res.records[0]["batch_file"]
     ones.save(tmp / "ones")
-    assert _quiet(mtb.load_batch(tmp / "ones").rescore).results[0]["n_batches"] == 1
+    assert _quiet(mtb.load_batch(tmp / "ones").rescore).records[0]["n_batches"] == 1
 
 
 def test_a_folder_without_the_saved_batch_warns_once(batched):
@@ -253,10 +253,10 @@ def test_a_folder_without_the_saved_batch_warns_once(batched):
             "not save. Pass batch= again to keep the batch metrics.")
     new, caught = _rescore(old)
     assert caught.count(text) == 1, caught
-    assert new.results[0]["n_batches"] == 1
+    assert new.records[0]["n_batches"] == 1
     failed, caught = _rescore(old, metrics="all")
     assert caught.count(text) == 1, caught
-    rec = failed.results[0]
+    rec = failed.records[0]
     assert rec["status"] == "RUN_OK_EVAL_FAILED"
     assert ("metrics='all' needs batch labels for ASW_batch, ARI_batch, NMI_batch, GC and iLISI. "
             "Pass batch=<vector>, or metrics='clustering'.") in rec["error"]
@@ -356,14 +356,14 @@ def _count_sweeps(monkeypatch, fail=False):
 def test_rescore_without_clustering_metrics_keeps_the_stored_order(cross, tmp_path,
                                                                     monkeypatch):
     res = _cross_run(cross, tmp_path, "totalVI")
-    rec = res.results[0]
+    rec = res.records[0]
     assert rec["labels_used"] == ["cty1.csv", "cty2.csv", "cty3.csv"]
     assert len(rec["label_order_candidates"]) == 6
     back = mtb.load_batch(tmp_path / "totalVI")
     calls = _count_sweeps(monkeypatch, fail=True)
     new = back.rescore(metrics=["ASW"])
     assert calls == []
-    out = new.results[0]
+    out = new.records[0]
     assert out["status"] == "CHAIN_OK"
     assert out["metrics"]["ASW"] == rec["metrics"]["ASW"]
     assert out["labels_used"] == rec["labels_used"]
@@ -379,7 +379,7 @@ def test_rescore_with_a_clustering_metric_ranks_with_one_sweep(cross, tmp_path,
     calls = _count_sweeps(monkeypatch)
     new = _quiet(back.rescore, metrics=["ARI"], verbose=True)
     assert len(calls) == 1
-    assert len(new.results[0]["label_order_candidates"]) == 6
+    assert len(new.records[0]["label_order_candidates"]) == 6
     lines = capsys.readouterr().out.splitlines()
     assert lines[0] == ("[rescore] totalVI: ranking 6 label orders on 150 cells with "
                         "one Leiden clustering ...")
@@ -395,18 +395,18 @@ def test_a_stored_order_that_no_longer_fits_is_ranked_again(cross, tmp_path, mon
     calls = _count_sweeps(monkeypatch)
     new = _quiet(mtb.load_batch(tmp_path / "totalVI").rescore, metrics=["ASW"])
     assert len(calls) == 1
-    assert new.results[0]["labels_used"] == ["cty1.csv", "cty2.csv", "cty3.csv"]
+    assert new.records[0]["labels_used"] == ["cty1.csv", "cty2.csv", "cty3.csv"]
 
 
 def test_rescore_does_not_warn_about_its_own_file_of_origin_batch(cross, tmp_path):
     # UINMF's two-batch variant: a run that reads two of the folder's three batches
     res = _cross_run(cross, tmp_path, "UINMF", modalities=["rna1", "rna2", "adt1", "adt2"])
-    rec = res.results[0]
+    rec = res.records[0]
     assert len(rec["label_order_candidates"]) == 2 and rec["n_batches"] == 2
     with warnings.catch_warnings():
         warnings.simplefilter("error", UserWarning)
         new = res.rescore(metrics=["ARI", "NMI"])
-    out = new.results[0]
+    out = new.records[0]
     assert out["metrics"]["ARI"] == rec["metrics"]["ARI"]
     assert (out["batch_source"], out["n_batches"]) == ("file_of_origin", 2)
     # a batch the caller gives still warns, in short sentences

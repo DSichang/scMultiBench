@@ -262,7 +262,7 @@ def test_the_na_hint_uses_the_spelling_of_the_caller(tmp_path, capsys):
     err = capsys.readouterr().err
     assert "hide this message" not in err and "na='skip'" not in err
     assert cli.main(args + ["--na", "skip"]) == 0
-    assert ("warning: --na is deprecated and will be removed in 0.5. It has no effect."
+    assert ("warning: --na is deprecated and will be removed in 0.5; it has no effect."
             in capsys.readouterr().err)
     with warnings.catch_warnings(record=True) as rec:
         warnings.simplefilter("always")

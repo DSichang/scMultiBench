@@ -77,44 +77,17 @@ def test_plot_all_is_exactly_the_contract():
 
 
 # ------------------------------------------------------------------ deprecated aliases
-def _one_deprecation(fn, *args, **kw):
-    with warnings.catch_warnings(record=True) as rec:
-        warnings.simplefilter("always")
-        out = fn(*args, **kw)
-    deps = [w for w in rec if issubclass(w.category, DeprecationWarning)]
-    assert len(deps) == 1, [str(w.message) for w in rec]
-    return out, str(deps[0].message)
-
-
-def test_plan_is_a_deprecated_alias_of_scan():
-    import pandas as pd
-    ref = mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False)
-    got, msg = _one_deprecation(mtb.plan, "D11", "vertical", methods=["Matilda"], verbose=False)
-    pd.testing.assert_frame_equal(got, ref)
-    assert "plan is deprecated since 0.3.0" in msg and "use scan" in msg
-    assert "plan" not in mtb.__all__ and "plan" not in dir(mtb)
-
-
-def test_plan_commands_is_a_deprecated_alias_of_scan():
-    import pandas as pd
-    ref = mtb.scan("D11", "vertical", methods=["Matilda"], out_dir="runs", verbose=False)
-    got, msg = _one_deprecation(mtb.plan_commands, "D11", "vertical", methods=["Matilda"],
-                                out_dir="runs", verbose=False)
-    pd.testing.assert_frame_equal(got, ref)
-    assert "plan_commands is deprecated since 0.3.0" in msg and "use scan" in msg
-    assert "plan_commands" not in dir(mtb)
-
-
-def test_runtime_hint_is_a_deprecated_alias_of_method_info_runtime():
-    ref = mtb.method_info("SCALEX")["runtime"]
-    got, msg = _one_deprecation(mtb.runtime_hint, "SCALEX")
-    assert got == ref and set(got) == {"tier", "worst_sec", "observed", "host", "note"}
-    assert "runtime_hint is deprecated since 0.3.0" in msg
-    assert "use method_info(m)['runtime']" in msg
-    assert "runtime_hint" not in dir(mtb)
-    with pytest.raises(KeyError, match="Did you mean StabMap"), warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        mtb.runtime_hint("StabMapp")
+@pytest.mark.parametrize("name, new", [
+    ("plan", "mtb.run_all(..., dry_run=True)"),
+    ("plan_commands", "mtb.run_all(..., dry_run=True)"),
+    ("runtime_hint", "mtb.method_info(method)['runtime']"),
+])
+def test_the_02_names_are_removed_naming_the_replacement(name, new):
+    """0.4 removes them, as their 0.3 warnings said; the error names what replaces them."""
+    with pytest.raises(AttributeError) as e:
+        getattr(mtb, name)
+    assert str(e.value) == f"mtb.{name} was removed in 0.4. Use {new}."
+    assert name not in mtb.__all__ and name not in dir(mtb)
 
 
 # ------------------------------------------------------------------ removed names / kwargs

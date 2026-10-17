@@ -154,7 +154,7 @@ def test_na_raise_cli_spelling(tmp_path, capsys):
                    "--out", str(tmp_path / "f.png")])
     err = capsys.readouterr().err
     assert rc == 0
-    assert ("warning: --na is deprecated and will be removed in 0.5. It has no effect."
+    assert ("warning: --na is deprecated and will be removed in 0.5; it has no effect."
             in err)
     assert "Its Overall uses the metrics it has." in err
     assert "hide this message" not in err

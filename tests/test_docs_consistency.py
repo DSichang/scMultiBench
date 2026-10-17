@@ -1254,9 +1254,12 @@ def test_changes_page_lists_0_3_5():
                  '`"obs:<column>"` or `"<column>"`', "`multibench-sc>=0.3.5`"):
         assert name in new, name
     assert callable(mtb.data.write_example)
-    for fn, keyword in ((mtb.scan, "per_method"), (mtb.evaluate, "missing_labels"),
+    for fn, keyword in ((mtb.evaluate, "missing_labels"),
                         (mtb.io.export_dataset, "n_batches")):
         assert keyword in inspect.signature(fn).parameters, keyword
+    # deprecated in 0.4: out of the signature, still taken
+    with pytest.warns(FutureWarning, match=r"scan\(per_method=\) is deprecated"):
+        mtb.scan("D11", "vertical", per_method=True, verbose=False)
     parser = cli.build_parser()
     for argv in (["scan", "D11", "--modalities", "all"],
                  ["run-all", "D11", "--category", "vertical", "--modalities", "all", "--dry-run"],

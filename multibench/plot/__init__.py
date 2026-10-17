@@ -6,31 +6,25 @@
 :class:`BubbleTable`) so the ranks can be audited before drawing.
 ``help(mtb.plot.bubble)`` documents every parameter and the visual encoding.
 The figure half, ``render``, and the per-family block ``FamilyBlock`` stay
-importable but are not part of the public listing; ``plot_bubble`` is the
-deprecated 0.2.x name of ``bubble``.
+importable but are not part of the public listing.
 """
-from . import bubble as _bubble_module
 from . import style
 from .. import _compat
-from .bubble import (bubble, plot_bubble, build_table, render, BubbleTable,
-                     FamilyBlock, FAMILIES as _FAMILIES)
+from .bubble import (bubble, build_table, render, BubbleTable, FamilyBlock,
+                     FAMILIES as _FAMILIES)
 from .bar import bar, CLUSTERING_METRICS, BATCH_METRICS, CLASSIFICATION_METRICS
 
-# the 0.2.x attribute paths (``mtb.plot.bubble.build_table`` ...) until 0.4
-for _n in ("build_table", "render", "plot_bubble", "BubbleTable", "FamilyBlock",
-           "FAMILIES", "NA_MARK", "_resolve"):
-    setattr(bubble, _n, getattr(_bubble_module, _n))
-bubble.style = style
-bubble.__module__ = "multibench.plot"
-del _n
-
 __all__ = ["bubble", "bar", "build_table", "BubbleTable"]
+bubble.__module__ = "multibench.plot"       # the name it is reached by
 
-__getattr__ = _compat.module_getattr(__name__, "plot", {
-    "FAMILIES": (_FAMILIES, "catalog.metrics()"),
-    "CLUSTERING_METRICS": (CLUSTERING_METRICS, "catalog.metrics()"),
-    "BATCH_METRICS": (BATCH_METRICS, "catalog.metrics()"),
-    "CLASSIFICATION_METRICS": (CLASSIFICATION_METRICS, "catalog.metrics()"),
+_METRICS = _compat.use("catalog.metrics()")
+__getattr__ = _compat.module_getattr(__name__, "plot", old={
+    "FAMILIES": (_FAMILIES, _METRICS),
+    "CLUSTERING_METRICS": (CLUSTERING_METRICS, _METRICS),
+    "BATCH_METRICS": (BATCH_METRICS, _METRICS),
+    "CLASSIFICATION_METRICS": (CLASSIFICATION_METRICS, _METRICS),
+}, removed={
+    "plot_bubble": ("0.4", _compat.use("mtb.plot.bubble")),
 })
 del CLUSTERING_METRICS, BATCH_METRICS, CLASSIFICATION_METRICS
 

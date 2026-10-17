@@ -186,4 +186,4 @@ def full_scan(*args, **kwargs):
     column: the frame ``run_all(dry_run=True)`` returns, also without a
     category. ``mtb.scan`` returns one row per method since 0.4."""
     from multibench import workflow
-    return workflow._scan(*args, stacklevel=3, **kwargs)[0]
+    return workflow._scan(*args, **kwargs)[0]

@@ -163,13 +163,14 @@ def test_methods_output_agrees_with_method_info_output_kind(files_dir):
 def test_catalog_dir_lists_public_api_not_leaked_imports():
     """mtb.catalog.annotations() was a TypeError for a re-tester: dir() listed
     the __future__ feature object and the module's imports. Tab completion now
-    shows the documented API (__all__) and underscore names only; every
-    attribute is still there."""
+    shows the documented API (__all__) and the dunders only; every attribute is
+    still there."""
     import multibench as mtb
     listed = dir(mtb.catalog)
     assert set(catalog.__all__) <= set(listed)
     for leaked in ("annotations", "pd", "Path", "re", "config"):
         assert leaked not in listed, leaked
         assert hasattr(mtb.catalog, leaked)          # nothing removed
-    assert "_registry_ids" in listed and "__all__" in listed
+    assert "_registry_ids" not in listed and "__all__" in listed
+    assert [n for n in listed if not n.startswith("__")] == sorted(catalog.__all__)
     assert listed == sorted(listed)

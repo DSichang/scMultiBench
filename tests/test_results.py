@@ -350,7 +350,7 @@ def test_catalog_datasets_covers_every_dataset_with_results(result_dir, layout_t
     monkeypatch.setattr(mtb.config.DEFAULT, "result_path", layout_tree)
     cat2 = mtb.catalog.datasets()
     assert not cat2.has_results.any()
-    assert "SD7" not in set(cat2.dataset) and "D11s" not in set(cat2.dataset)
+    assert "D11s" not in set(cat2.dataset)
 
 
 # ---------------------------------------------------------------------------

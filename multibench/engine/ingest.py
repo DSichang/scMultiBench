@@ -20,7 +20,6 @@ from __future__ import annotations
 import os
 import re
 import shutil
-import warnings
 from pathlib import Path
 
 import h5py
@@ -33,9 +32,9 @@ __all__ = ["export_dataset", "to_canonical", "read_canonical"]
 
 
 def __dir__() -> list[str]:
-    """Tab completion (``dir(mtb.io)``) shows the public API and the
-    underscore names, not the imports this module merely uses (PEP 562)."""
-    return sorted(n for n in globals() if n in __all__ or n.startswith("_"))
+    """``dir(mtb.io)`` lists the public API and the dunders only (PEP 562); the
+    other names stay reachable."""
+    return sorted(set(__all__) | {n for n in globals() if n.startswith("__")})
 
 # peak ids come as chr_start_end, chr-start-end or chr:start-end; Signac needs the last
 _PEAK_RE = re.compile(r"^(.+?)[-_:](\d+)[-_](\d+)$")
@@ -92,17 +91,17 @@ def _matrix_has_fraction(X) -> bool | None:
         return None
 
 
-def _warn_not_counts(X, name: str, hint: str, *, stacklevel: int,
+def _warn_not_counts(X, name: str, hint: str, *,
                      how: str | None = None) -> None:
     """``UserWarning`` when ``X`` holds non-integer values, which look
     log-normalised; ``hint`` is the selector of the raw counts. ``how``
     replaces the sentence that names it, for a matrix no selector reads."""
     if _matrix_has_fraction(X):
-        warnings.warn(
+        _compat.warn(
             f"The {name} values are not whole numbers, so they look log-normalised. "
             + (how or f"The methods normalise raw counts themselves. Export raw counts, "
                       f"for example with {hint}."),
-            UserWarning, stacklevel=stacklevel + 1)
+            UserWarning)
 
 
 def _counts_of_object_advice(what: str, spec) -> str | None:
@@ -244,10 +243,10 @@ def _follow_peak_order(out: Path, X, bars):
               f"{peak}, which atac_cty.csv follows", file=sys.stderr, flush=True)
     elif kind == "other":
         shared = len(set(bars) & set(ref))
-        warnings.warn(
+        _compat.warn(
             f"{Path(out).name} holds different cells than {peak} ({len(bars):,} and "
             f"{len(ref):,}, {shared:,} shared). Diagonal methods need gene activity for "
-            f"the ATAC cells of atac_peak.h5.", UserWarning, stacklevel=3)
+            f"the ATAC cells of atac_peak.h5.", UserWarning)
     return X, bars
 
 
@@ -514,8 +513,8 @@ def _pick_matrix(adata, *, layer=None, obsm=None, feature_names=None, what=None,
             fix = (f"Pass {names_arg}=, {store}." if names_arg and not config._CLI
                    else f"{store[:1].upper()}{store[1:]}.")
             if n_feat:                  # 0 features have no names, and are refused
-                warnings.warn(_no_names_message(what or "obsm", slot, n_feat, fix),
-                              UserWarning, stacklevel=3)
+                _compat.warn(_no_names_message(what or "obsm", slot, n_feat, fix),
+                             UserWarning)
         return X, names
     _check_one_feature_type(adata, arg=arg, spec=spec, role=role or what)
     if layer is not None:
@@ -601,13 +600,13 @@ def _warn_dense_size(out: Path, n_feat: int, n_cell: int, dtype) -> None:
     itemsize = int(np.dtype(dtype).itemsize)
     size = int(n_feat) * int(n_cell) * itemsize
     if size > DENSE_WARN_BYTES:
-        warnings.warn(
+        _compat.warn(
             f"{out.name}: matrix/data is stored dense (features x cells): "
             f"{n_feat} x {n_cell} x {itemsize} B = {size / 1e9:.1f} GB uncompressed "
             f"on disk (limit for this warning: {DENSE_WARN_BYTES / 1e9:.0f} GB); "
             f"filter to highly-variable genes / informative peaks before export, "
             f"or pass dtype='float32' to halve it",
-            UserWarning, stacklevel=3)
+            UserWarning)
 
 
 def _peak_fraction(feats) -> float:
@@ -630,10 +629,10 @@ def _check_peak_names(modality, feats, *, rna_feats=None, kind_arg=False):
         as_peak = config.hint("modality='atac_peak'", "--modality atac_peak")
         as_gas = config.hint("modality='atac_gas'", "--modality atac_gas")
     if modality == "atac_gas" and frac > 0.5:
-        warnings.warn(
+        _compat.warn(
             f"{frac:.0%} of the ATAC feature names look like peaks such as "
             f"chr1:100-200, not genes. If the matrix holds peaks, pass {as_peak}.",
-            UserWarning, stacklevel=3)
+            UserWarning)
     elif modality == "atac_peak" and frac < 0.5:
         head = (f"Only {frac:.0%} of the ATAC feature names look like peaks such as "
                 "chr1:100-200")
@@ -649,7 +648,7 @@ def _check_peak_names(modality, feats, *, rna_feats=None, kind_arg=False):
             text = head + f", and {share:.0%} are RNA gene names." + gas
         else:
             text = head + rename
-        warnings.warn(text, UserWarning, stacklevel=3)
+        _compat.warn(text, UserWarning)
 
 
 #: the ATAC role of each ``atac_kind=``
@@ -838,7 +837,7 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     _check_peak_names(modality, feats)
     if modality in _COUNT_ROLES:
         hint, how = _raw_count_hint(modality, obsm, to_canonical=True)
-        _warn_not_counts(X, modality, hint, stacklevel=2, how=how)
+        _warn_not_counts(X, modality, hint, how=how)
     if modality == "atac_gas" and category in (None, "diagonal"):
         X, bars = _follow_peak_order(out, X, bars)
     if getattr(X, "ndim", 0) == 2:      # X=None: _write_canonical raises
@@ -1150,8 +1149,8 @@ def _as_modality(data, spec, *, what, master, feature_names=None):
             fix = (f"Pass adt_names=, or {named}." if what == "adt"
                    else f"{named[:1].upper()}{named[1:]}.")
             if n_feat:                  # 0 features have no names, and are refused
-                warnings.warn(_no_names_message(what, "array", n_feat, fix),
-                              UserWarning, stacklevel=3)
+                _compat.warn(_no_names_message(what, "array", n_feat, fix),
+                             UserWarning)
             feature_names = [f"feature_{i}" for i in range(n_feat)]
         a.var_names = [str(x) for x in feature_names]
         return a, {}
@@ -1199,9 +1198,9 @@ def _align_cells(a, *, master, master_name, role):
         raise ValueError(
             f"{role} has {len(names):,} cells and {master_name} has {len(master):,}. "
             f"All modalities of one dataset must hold the same cells.")
-    warnings.warn(
+    _compat.warn(
         f"{role}: obs_names are not unique, so the cells cannot be matched to "
-        f"{master_name} by barcode; pairing them positionally", UserWarning, stacklevel=4)
+        f"{master_name} by barcode; pairing them positionally", UserWarning)
     return a
 
 
@@ -1241,8 +1240,8 @@ def _as_obs_vector(data, spec, *, what, master):
             if what == "batch":
                 # a filtered or sorted column would go to other cells
                 from ..eval import io as eio
-                warnings.warn(eio._by_position(what),
-                              UserWarning, stacklevel=3)
+                _compat.warn(eio._by_position(what),
+                             UserWarning)
             return np.asarray(spec)
         lack = [x for x in m if x not in set(idx)]
         raise ValueError(
@@ -1257,6 +1256,8 @@ def _as_obs_vector(data, spec, *, what, master):
     return vals
 
 
+@_compat.keywords("io.export_dataset", private="_export_dataset",
+                  kept={"compression": _compat.note("leave it out for gzip")})
 def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                    adt=None, atac=None,
                    atac_kind: str | None = None, labels=None,
@@ -1265,8 +1266,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                    adt_names: list | None = None,
                    batch_index: int | None = None,
                    overwrite: bool = False,
-                   n_batches: int | None = None,
-                   compression="gzip") -> Path:
+                   n_batches: int | None = None) -> Path:
     """Write an AnnData / MuData (or loose objects) as a canonical dataset folder.
 
     Produces the layout ``mtb.describe_layout`` documents (``rna.h5``,
@@ -1357,8 +1357,23 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     mtb.describe_layout : the layout being produced and the role -> filename mapping.
     mtb.scan : confirm the folder is found and which methods can run on it.
     """
-    if compression != "gzip":
-        _compat.deprecated("io.export_dataset(compression=)", "the default, gzip")
+    return _export_dataset(data, dataset_dir, rna=rna, adt=adt, atac=atac,
+                           atac_kind=atac_kind, labels=labels, batch=batch, dtype=dtype,
+                           category=category, adt_names=adt_names, batch_index=batch_index,
+                           overwrite=overwrite, n_batches=n_batches)
+
+
+def _export_dataset(data, dataset_dir: Path | str, *, rna="X",
+                    adt=None, atac=None,
+                    atac_kind: str | None = None, labels=None,
+                    batch=None, dtype: str = "float64",
+                    category: str | None = None,
+                    adt_names: list | None = None,
+                    batch_index: int | None = None,
+                    overwrite: bool = False,
+                    n_batches: int | None = None,
+                    compression="gzip") -> Path:
+    """:func:`export_dataset`, with the deprecated ``compression``."""
     out = Path(dataset_dir)
     category = _check_category(category)
     if data is None and isinstance(rna, str) and rna == "X":
@@ -1391,9 +1406,9 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
             "category='diagonal' names the label file after the modality it labels "
             "(rna_cty.csv, atac_cty.csv): pass rna= or atac= together with labels=")
     if category in ("mosaic", "cross") and batch is None and batch_index is None:
-        warnings.warn(f"category={category!r} methods read numbered files (rna1.h5, "
-                      f"cty1.csv, ...): pass batch_index= (this object is one batch) "
-                      f"or batch= (a column that splits it)", UserWarning, stacklevel=2)
+        _compat.warn(f"category={category!r} methods read numbered files (rna1.h5, "
+                     f"cty1.csv, ...): pass batch_index= (this object is one batch) "
+                     f"or batch= (a column that splits it)", UserWarning)
 
     # --- the modality matrices, each re-indexed to its side's cell order.
     # Paired categories have one side; diagonal keeps the ATAC cells apart.
@@ -1492,7 +1507,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                     feats, arg=what, spec=given[what], role=role, obsm=kw.get("obsm"),
                     mudata=_is_mudata(data))
                 if repeated:
-                    warnings.warn(repeated, UserWarning, stacklevel=2)
+                    _compat.warn(repeated, UserWarning)
             if what == "atac":
                 # the RNA is prepared first (side 'rna', then the ATAC)
                 rna_feats = next((f for _, r, _, f, _, _ in prepared if r == "rna"), None)
@@ -1500,19 +1515,19 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                     role = _atac_role(feats, rna_feats)
                 _check_peak_names(role, feats, rna_feats=rna_feats, kind_arg=True)
                 if category == "mosaic" and role == "atac_gas":
-                    warnings.warn("Every mosaic method reads peak ATAC. " + config.hint(
+                    _compat.warn("Every mosaic method reads peak ATAC. " + config.hint(
                         "Export the ATAC as peaks (atac_kind='peak'), or pass "
                         "allow_atac_mismatch=True to scan and run_all.",
                         "Convert the ATAC as peaks (--atac-kind peak), or pass "
                         "--allow-atac-mismatch to scan and run-all."),
-                        UserWarning, stacklevel=2)
+                        UserWarning)
             if role in _COUNT_ROLES:
                 # the command line's --atac-from hands over an object and its selector
                 selector = {"rna": rna, "adt": adt, "atac": atac}[what]
                 if not isinstance(selector, str) and config._CLI:
                     selector = getattr(selector, "_selector", None)
                 hint, how = _raw_count_hint(what, selector)
-                _warn_not_counts(X, what, hint, stacklevel=2,
+                _warn_not_counts(X, what, hint,
                                  how=_counts_of_object_advice(what, given[what]) or how)
             prepared.append((side, role, X, feats, [str(x) for x in a.obs_names], what))
 
@@ -1889,10 +1904,10 @@ def _check_batch_args(batch, batch_index, category, *, adt, atac, n_batches=None
             + _one_file_advice(category, has_adt=adt is not None and atac is None))
     if batch is not None and category is None and atac is not None:
         from .resolve import _batch_column_advice
-        warnings.warn(
+        _compat.warn(
             "batch= with atac=: only mosaic methods read numbered ATAC files. For mosaic "
             "pass category='mosaic'; otherwise " + _batch_column_advice(),
-            UserWarning, stacklevel=3)
+            UserWarning)
 
 
 def _names_of(spec):
@@ -2150,6 +2165,6 @@ def _select_object(obj, spec: str, *, what: str):
     return a
 
 
-__getattr__ = _compat.module_getattr(__name__, "io", {
-    "normalize_peak_names": (_normalize_peak_names, "run, which renames the peaks itself"),
+__getattr__ = _compat.module_getattr(__name__, "io", old={
+    "normalize_peak_names": (_normalize_peak_names, _compat.note("run renames the peaks itself")),
 })

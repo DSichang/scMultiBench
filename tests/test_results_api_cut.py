@@ -1,8 +1,9 @@
-"""0.3.0 public-surface cut, compare side: ``load_results`` / ``recommend``
-share ``evaluate``'s ``metrics=`` vocabulary; ``method=`` / ``metric=`` /
-``task=`` / ``family=`` are deprecated aliases that warn and map;
-``metric_set`` is gone (TypeError); ``available_datasets`` lost ``metric_set``
-and ``clustering``. One test per alias, one per removed keyword.
+"""The compare side's public surface: ``load_results`` / ``recommend`` share
+``evaluate``'s ``metrics=`` vocabulary; ``method=`` / ``metric=`` / ``task=`` /
+``family=`` (0.4) and ``metric_set`` (0.3.0) are removed, with a TypeError
+naming the replacement; ``available_datasets`` lost ``metric_set`` and
+``clustering``. The 0.4 deprecated keywords (``source``, ``result_path``,
+``clustering``) leave the signatures and keep working.
 """
 import inspect
 import warnings
@@ -26,16 +27,15 @@ def _quiet(fn, *a, **k):
 # ---------------------------------------------------------------- signatures
 def test_compare_signatures_are_the_contract():
     lr = inspect.signature(results.load_results).parameters
-    assert list(lr) == ["category", "dataset", "methods", "metrics", "clustering",
-                        "source", "result_path"]
+    assert list(lr) == ["category", "dataset", "methods", "metrics"]
     assert all(lr[n].kind is inspect.Parameter.KEYWORD_ONLY for n in list(lr)[1:])
     ad = inspect.signature(results.available_datasets).parameters
     assert list(ad) == ["category", "source", "result_path"]
     rc = inspect.signature(results.results_coverage).parameters
-    assert list(rc) == ["category", "source", "result_path"]
+    assert list(rc) == ["category"]
     re_ = inspect.signature(results.recommend).parameters
     assert list(re_) == ["category", "modalities", "atac", "methods", "metrics", "long_df",
-                         "min_methods", "source", "result_path"]
+                         "min_methods"]
     assert all(re_[n].kind is inspect.Parameter.KEYWORD_ONLY for n in list(re_)[1:])
     assert "Parameters" in results.load_results.__doc__
     assert "Parameters" in results.recommend.__doc__
@@ -77,75 +77,24 @@ def test_load_results_and_evaluate_share_the_vocabulary(result_dir):
         results.recommend("vertical", long_df=long, metrics=["Nope"])
 
 
-# ---------------------------------------------------------------- deprecated aliases
-def test_deprecated_method_maps_to_methods(result_dir):
-    new = results.load_results("diagonal", dataset="D28", methods=["scBridge"])
-    with pytest.warns(DeprecationWarning, match=r"load_results\(method=\.\.\.\) is deprecated since 0.3.0.*use methods="):
-        old = results.load_results("diagonal", dataset="D28", method="scBridge")
-    pd.testing.assert_frame_equal(old, new)
-    with pytest.raises(ValueError, match="either method= or methods="):
-        _quiet(results.load_results, "diagonal", dataset="D28", method="scBridge",
-               methods=["scBridge"])
-
-
-def test_deprecated_metric_maps_to_metrics(result_dir):
-    new = results.load_results("diagonal", dataset="D28", metrics=["ARI", "NMI"])
-    with pytest.warns(DeprecationWarning, match=r"load_results\(metric=\.\.\.\) is deprecated.*use metrics=\['ARI', 'NMI'\]"):
-        old = results.load_results("diagonal", dataset="D28", metric=["ARI", "NMI"])
-    pd.testing.assert_frame_equal(old, new)
-    # a scalar was accepted too
-    with pytest.warns(DeprecationWarning):
-        one = results.load_results("diagonal", dataset="D28", metric="ari")
-    assert set(one.metric) == {"ARI"}
-
-
-def test_deprecated_load_results_task_maps_to_metrics_token(result_dir):
-    new = results.load_results("diagonal", dataset="D28", metrics="batch")
-    with pytest.warns(DeprecationWarning, match=r"load_results\(task=\.\.\.\) is deprecated.*use metrics='batch'"):
-        old = results.load_results("diagonal", dataset="D28", task="batch")
-    pd.testing.assert_frame_equal(old, new)
-    with pytest.raises(ValueError, match="pass either family= or task="):
-        _quiet(results.load_results, "diagonal", dataset="D28", task="batch",
-               family="clustering")
-    with pytest.raises(TypeError, match="metrics= together with the deprecated"):
-        _quiet(results.load_results, "diagonal", dataset="D28", task="batch",
-               metrics="batch")
-
-
-def test_deprecated_load_results_family_maps_to_metrics_token(result_dir):
-    new = results.load_results("diagonal", dataset="D28", metrics="clustering")
-    with pytest.warns(DeprecationWarning, match=r"load_results\(family=\.\.\.\) is deprecated.*use metrics='clustering'"):
-        old = results.load_results("diagonal", dataset="D28", family="clustering")
-    pd.testing.assert_frame_equal(old, new)
-
-
-def test_deprecated_recommend_task_maps_to_metrics_token(result_dir):
-    new = _quiet(results.recommend, "diagonal", metrics="batch")
-    with pytest.warns(DeprecationWarning, match=r"recommend\(task=\.\.\.\) is deprecated.*use metrics='batch'"):
-        old = _quiet(results.recommend, "diagonal", task="batch")
-    pd.testing.assert_frame_equal(old, new)
-    # task=None meant "every metric"
-    every = _quiet(results.recommend, "diagonal", metrics="all")
-    with pytest.warns(DeprecationWarning, match="use metrics='all'"):
-        old_none = _quiet(results.recommend, "diagonal", task=None)
-    pd.testing.assert_frame_equal(old_none, every)
-
-
-def test_deprecated_recommend_family_maps_to_metrics_token(result_dir):
-    new = _quiet(results.recommend, "diagonal", metrics="batch")
-    with pytest.warns(DeprecationWarning, match=r"recommend\(family=\.\.\.\) is deprecated.*use metrics='batch'"):
-        old = _quiet(results.recommend, "diagonal", family="batch")
-    pd.testing.assert_frame_equal(old, new)
-    # family won over task in 0.2.x; both warn
-    with pytest.warns(DeprecationWarning):
-        both = _quiet(results.recommend, "diagonal", task="clustering", family="batch")
-    pd.testing.assert_frame_equal(both, new)
-
-
 # ---------------------------------------------------------------- removed keywords
-def test_removed_load_results_metric_set_is_a_type_error(result_dir):
-    with pytest.raises(TypeError, match="metric_set=, removed in 0.3.0: only the scIB metric set exists"):
-        results.load_results("diagonal", metric_set="scib")
+@pytest.mark.parametrize("fn, name, value, message", [
+    ("load_results", "method", "scBridge", "load_results(method=) was removed in 0.4. "
+                                           "Use methods=."),
+    ("load_results", "metric", ["ARI"], "load_results(metric=) was removed in 0.4. "
+                                        "Use metrics=."),
+    ("load_results", "task", "batch", "load_results(task=) was removed in 0.4. Use metrics=."),
+    ("load_results", "family", "batch", "load_results(family=) was removed in 0.4. "
+                                        "Use metrics=."),
+    ("load_results", "metric_set", "scib", "load_results(metric_set=) was removed in 0.3.0; "
+                                           "only the scIB metric set exists, so drop it."),
+    ("recommend", "task", "batch", "recommend(task=) was removed in 0.4. Use metrics=."),
+    ("recommend", "family", "batch", "recommend(family=) was removed in 0.4. Use metrics=."),
+])
+def test_a_removed_keyword_is_a_type_error_naming_the_replacement(fn, name, value, message):
+    with pytest.raises(TypeError) as e:
+        getattr(results, fn)("diagonal", **{name: value})
+    assert str(e.value) == message
 
 
 def test_removed_available_datasets_metric_set_and_clustering_are_type_errors(result_dir):

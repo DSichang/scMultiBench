@@ -175,7 +175,7 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     out["scored_with"] = UNKNOWN_SCORING if stamp is None else stamp
     out = out[LONG_COLUMNS + ["scored_with"]].reset_index(drop=True)
     if stamp is None:
-        warnings.warn(NO_SCORING_RECORD, UserWarning, stacklevel=2)
+        _compat.warn(NO_SCORING_RECORD, UserWarning)
     else:
         out.attrs = {k: value_df.attrs.get(k) for k in PROVENANCE_ATTRS}
         for k in ("scib_version",) + DROP_ATTRS:
@@ -350,7 +350,7 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
         return io.by_id_column(
             vals, first, ids if unique else None, what=what, name=name,
             target="the output", order="the rows of the output",
-            no_ids=_no_ids(ids), stacklevel=5, drop=what == "labels")[0]
+            no_ids=_no_ids(ids), drop=what == "labels")[0]
     if _carries_ids(x):
         other = table is not None and _shares_no_id(x.index, ids)
         if ids is not None and not other:
@@ -360,17 +360,17 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
                                     fix=f"Pass {what} for the cells of {table.name}."):
                 table.moved.append(name)
             return io._align_vector(x, ids, what=what, column=column, cells=cells)
-        warnings.warn(
+        _compat.warn(
             f"The {what} {type(x).__name__} is matched by position, because "
             + (f"none of its ids is a cell of {table.name}. Check that it follows the "
                f"rows of {table.name}." if other else
                "the embedding has no cell ids. Check that it follows the embedding rows, "
                "or pass an AnnData whose obs_names are the barcodes."),
             # _obs_or_vector <- evaluate <- its keyword wrapper <- the caller
-            UserWarning, stacklevel=4)
+            UserWarning)
     if what == "batch" and io._numbers_rows(x, ids):
-        warnings.warn(io._by_position(what),
-                      UserWarning, stacklevel=4)
+        _compat.warn(io._by_position(what),
+                     UserWarning)
     return io.as_vector(x, what=what, column=column, as_written=as_written)
 
 
@@ -431,11 +431,11 @@ def _stack_label_files(files, ids, as_written=False, table=None):
         pos, _ = io.by_id_column(np.arange(len(vals)), pd.concat(
             [first for _, first in read], ignore_index=True), ids if unique else None,
             what="labels", name=name, target="the output", order=order,
-            no_ids=_no_ids(ids), stacklevel=5, n_files=len(names), drop=True)
+            no_ids=_no_ids(ids), n_files=len(names), drop=True)
         return vals[pos], origin[pos]
     for (v, first), name in zip(read, names):
         io.by_id_column(v, first, None, what="labels", name=name, target="the output",
-                        order=order, stacklevel=5, no_ids=(
+                        order=order, no_ids=(
                             "the other label files have none" if unique
                             else _no_ids(ids)))
     return vals, origin
@@ -747,14 +747,14 @@ def _plan_metrics(metrics, *, has_batch: bool, batch_given: bool):
     if want_cls and want_cls[0] == "explicit" and not has_batch:
         raise ValueError(_classification_error(metrics, "no batch"))
     if group == "clustering" and batch_given and not want_cls:
-        warnings.warn(
+        _compat.warn(
             config.hint("batch= changes nothing here, because ",
                         "--batch changes nothing here, because ")
             + f"{_metrics_spelling(metrics)} has no batch metric. Add "
             + _and_list(family_bat, "or")
             + config.hint(", or pass metrics='all'.",
                           " to --metrics, or pass --metrics all."),
-            UserWarning, stacklevel=4)
+            UserWarning)
     return group, only, slow, want_cls
 
 
@@ -824,22 +824,22 @@ def _classification_scores(request, emb, ct, cb, *, category, not_embedding, gra
         if "mean" in table.index:
             mean = table.loc["mean"]
             for w in caught:      # a skipped reference batch: said once, as classify says it
-                warnings.warn(w.message, w.category, stacklevel=4)
+                _compat.warn(w.message, w.category)
             one_type = [str(r) for r in table.index[:-1] if np.isnan(table.loc[r, "Spec"])]
             if "Spec" in codes and one_type:
                 # specificity needs cells of a second true cell type
-                warnings.warn(
+                _compat.warn(
                     f"Spec is NaN: when batch {_and_list(one_type, 'or')} is the reference, "
                     f"the cells it predicts are all of one cell type. Compare methods on "
-                    f"the other metrics.", UserWarning, stacklevel=4)
+                    f"the other metrics.", UserWarning)
         else:
             why = "none scored"
     if why is not None:
         if how == "explicit":
             raise ValueError(_classification_error(metrics, why, what))
         # evaluate <- its keyword wrapper <- the caller
-        warnings.warn(_classification_warning(why, what),
-                      UserWarning, stacklevel=4)
+        _compat.warn(_classification_warning(why, what),
+                     UserWarning)
         return {c: float("nan") for c in codes}
     return {c: float(mean[c]) for c in codes}
 
@@ -862,64 +862,18 @@ def _metrics_spelling(metrics) -> str:
     return config.hint(f"metrics={metrics!r}", f"--metrics {metrics}")
 
 
-def _legacy_evaluate_kwargs(kw: dict) -> dict:
-    """Retired keywords of :func:`evaluate`: ``output=`` and ``clustering=`` (0.4)
-    become ``embedding=`` and ``clusters=`` with a ``FutureWarning``; ``task=`` /
-    ``family=`` / ``only=`` (0.2.x) become ``metrics=`` with a
-    ``DeprecationWarning``; the removed ones raise."""
-    removed = {
-        "slow_metrics": "pass metrics=[...] without cLISI/iLISI (kBET is computed "
-                        "only when it is named in that list)",
-        "column": "pass the Series/column itself as labels= / batch= / clusters=",
-        "metric_set": "only the scIB metric set exists - drop the argument",
-    }
-    for name, fix in removed.items():
-        if name in kw:
-            raise TypeError(f"evaluate() got {name}=, removed in 0.3.0: {fix}")
-    for old, new in (("output", "embedding"), ("clustering", "clusters")):
-        if old in kw:
-            _compat.deprecated(f"evaluate({old}=)", f"{new}=", stacklevel=4)
-            kw[new] = kw.pop(old)
-    legacy = {n: kw.pop(n) for n in ("task", "family", "only") if n in kw}
-    if not legacy:
-        return kw
-    if "metrics" in kw:
-        raise TypeError(
-            f"evaluate() got metrics= together with the deprecated "
-            f"{sorted(legacy)}; pass metrics= only")
-    token = legacy.get("family", legacy.get("task"))
-    if "family" in legacy and "task" in legacy and legacy["family"] != legacy["task"]:
-        token = legacy["family"]          # family won over task in 0.2.x
-    if token == "dimension_reduction":
-        token = "clustering"              # one metric group in the paper
-    for name in ("task", "family"):
-        if name in legacy:
-            _compat.warn(f"evaluate({name}=...)", f"metrics={token!r}", stacklevel=4)
-    if "only" in legacy:
-        only = legacy["only"]
-        if isinstance(only, str):
-            raise TypeError(
-                f"only= must be a collection of metric names, e.g. only={{{only!r}}}; "
-                f"got the string {only!r} (and only= is deprecated: pass metrics=[...])")
-        codes = [catalog._canonical_metric(m) or m for m in only]
-        if isinstance(only, (set, frozenset)):
-            codes = sorted(codes)          # a set has no order to preserve
-        _compat.warn("evaluate(only=...)", f"metrics={codes!r}", stacklevel=4)
-        if token not in (None, "all"):
-            clu, bat, cls = _metric_families()
-            fam = {"clustering": clu, "batch": bat, "classification": cls}.get(token, [])
-            bad = [c for c in codes if c in (clu + bat + cls) and c not in fam]
-            if bad:
-                raise ValueError(
-                    f"{', '.join(bad)} not in the {token!r} family: pass "
-                    f"metrics={codes!r} alone (the family token is deprecated)")
-        kw["metrics"] = codes
-    else:
-        kw["metrics"] = token
-    return kw
+_METRICS_KEYWORD = ("0.4", _compat.use("metrics="))
 
 
-@_compat.legacy_kwargs(_legacy_evaluate_kwargs)
+@_compat.keywords("evaluate", renamed={"output": "embedding", "clustering": "clusters"},
+                  removed={"task": _METRICS_KEYWORD, "family": _METRICS_KEYWORD,
+                           "only": _METRICS_KEYWORD,
+                           "slow_metrics": ("0.3.0", _compat.note(
+                               "pass metrics=[...] without cLISI and iLISI")),
+                           "column": ("0.3.0", _compat.note(
+                               "pass the column itself as labels=, batch= or clusters=")),
+                           "metric_set": ("0.3.0", _compat.note(
+                               "only the scIB metric set exists, so drop it"))})
 def evaluate(
     embedding,
     labels=None,
@@ -1056,7 +1010,7 @@ def evaluate(
                                     table=table, cells=cells), None
     # many run outputs are dims x cells; the label count says which axis holds the cells
     if emb.ndim == 2 and emb.shape[0] != len(ct) and emb.shape[1] == len(ct):
-        warnings.warn(
+        _compat.warn(
             f"embedding was (dims x cells) {emb.shape}; transposed to (cells x dims)")
         emb = emb.T
     if want_cls and not (graph or not_embedding):
@@ -1129,7 +1083,7 @@ def evaluate(
     odd = io._labels_look_measured(ct)
     if odd:
         # evaluate <- its keyword wrapper <- the caller
-        warnings.warn(_measured_warning(labels, adata, *odd), UserWarning, stacklevel=3)
+        _compat.warn(_measured_warning(labels, adata, *odd), UserWarning)
     if group is None:           # classification only: no scIB metric
         out = pd.DataFrame(columns=["Value"], dtype=float)
         out.attrs = {"leiden_flavor": None, "clustering": None}
@@ -1156,5 +1110,5 @@ def evaluate(
     if dropped:
         out.attrs.update(zip(DROP_ATTRS, dropped[:2]))
         # evaluate <- its keyword wrapper <- the caller
-        warnings.warn(_dropped_warning(*dropped), UserWarning, stacklevel=3)
+        _compat.warn(_dropped_warning(*dropped), UserWarning)
     return out

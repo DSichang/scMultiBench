@@ -435,7 +435,7 @@ def test_run_all_records_the_provenance(tmp_path, monkeypatch):
     monkeypatch.setattr(W, "_run", lambda **kw: _Res())
     res = mtb.run_all("D11", "vertical", methods=["Matilda"], out_dir=str(tmp_path),
                       evaluate=False, verbose=False)
-    rec = res.results[0]
+    rec = res.records[0]
     assert rec["scripts_commit"] == "e" * 40
     assert rec["env_flavor"] == "unknown"
     assert rec["hostname"]

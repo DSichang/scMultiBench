@@ -958,7 +958,6 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
     import tarfile
     import urllib.error
     import urllib.request
-    import warnings
 
     check_flavor(flavor)                  # a typo fails before the platform check
     _require_linux(force)                 # fail closed before any bytes land
@@ -976,8 +975,7 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
     manifest, sizes = packed_manifest(), packed_sizes()
     key, installed = archive_for(env, flavor, manifest=manifest, sizes=sizes)
     if resolve_flavor(flavor) == "cpu" and installed == "gpu":
-        warnings.warn(_cpu_fallback_warning(env, manifest, sizes), UserWarning,
-                      stacklevel=2)
+        _compat.warn(_cpu_fallback_warning(env, manifest, sizes), UserWarning)
     urls = archive_urls(key, manifest)
     build = "single" if _single_build(env, manifest=manifest) else installed
     envs_root.mkdir(parents=True, exist_ok=True)
@@ -1375,6 +1373,9 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
     mtb.env.doctor : which of those envs exist here.
     """
     check_flavor(flavor)
+    if isinstance(methods, str) and methods in config._CATEGORY_FOLDERS:
+        raise TypeError(f"methods must be a list of ids, got the category {methods!r} - "
+                        f"did you mean category={methods!r}?")
     methods = _check_methods(methods)
     manifest = packed_manifest() if packed else {}
     sizes = packed_sizes() if packed else {}
@@ -1732,4 +1733,15 @@ def _run_all(cmds: list[list[str]]) -> None:
 
 
 status = _compat.renamed("env.status", "env.doctor", _status)
-plan = _compat.renamed("env.plan", "env.install", _plan)
+
+
+def plan(category=None, methods=None, **kwargs):
+    """Deprecated: use ``env.install``, whose dry run shows the same plan."""
+    category, methods = _category_or_methods(category, methods, "plan")
+    args = []
+    if methods is not None:
+        args.append(repr(list(methods)))
+    if category is not None:
+        args.append(f"category={category!r}")
+    _compat.deprecated("env.plan", _compat.use(f"env.install({', '.join(args)})"))
+    return _plan(category, methods, **kwargs)

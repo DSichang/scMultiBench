@@ -13,13 +13,14 @@ M22, M13, M28 and the category help: message and help wording.
 M25, M06: docstring wording. M10: the missing-script fix for a folder that is
 not a git checkout. M05, M09, M10, M06, M30: facts on the docs pages.
 """
+import contextlib
 import importlib.util
+import io
 import json
 import os
 import re
 import shutil
 import subprocess
-import sys
 import warnings
 from pathlib import Path
 
@@ -74,39 +75,33 @@ def _old_inputs(d):
             "rna_cty": str(d / "rna_cty.csv")}
 
 
-def test_unitednet_takes_the_old_rna_cty_key_with_a_deprecation_warning(tmp_path):
+def test_unitednet_refuses_the_removed_rna_cty_key_naming_cty(tmp_path):
     d = _old_unitednet_folder(tmp_path)
-    with pytest.warns(DeprecationWarning, match=r"inputs key 'rna_cty' of UnitedNet .* "
-                                                 r"use 'cty'"):
-        argv = mtb.run("UnitedNet", "vertical", inputs=_old_inputs(d),
-                       out_dir=str(tmp_path / "o"), dry_run=True)
+    with pytest.raises(ValueError) as e:
+        mtb.run("UnitedNet", "vertical", inputs=_old_inputs(d),
+                out_dir=str(tmp_path / "o"), dry_run=True)
+    assert str(e.value) == ("The inputs key 'rna_cty' of UnitedNet was removed in 0.4. "
+                            "Use 'cty'.")
+    # the new key: the same file
+    argv = mtb.run("UnitedNet", "vertical",
+                   inputs={**{k: v for k, v in _old_inputs(d).items() if k != "rna_cty"},
+                           "cty": str(d / "rna_cty.csv")},
+                   out_dir=str(tmp_path / "o"), dry_run=True)
     i = argv.index("--train_cty_path")
     assert argv[i + 1] == str(d / "rna_cty.csv")
-    # the new key: no warning, the same command
-    with warnings.catch_warnings():
-        warnings.simplefilter("error", DeprecationWarning)
-        new = mtb.run("UnitedNet", "vertical",
-                      inputs={**{k: v for k, v in _old_inputs(d).items() if k != "rna_cty"},
-                              "cty": str(d / "rna_cty.csv")},
-                      out_dir=str(tmp_path / "o"), dry_run=True)
-    assert new == argv
 
 
-def test_cli_run_takes_the_old_rna_cty_key_and_shows_the_warning(tmp_path):
-    """A subprocess, so Python's default warning filters apply, not pytest's."""
+def test_cli_run_refuses_the_removed_rna_cty_key(tmp_path):
     d = _old_unitednet_folder(tmp_path)
-    argv = [sys.executable, "-m", "multibench", "run", "--method", "UnitedNet",
-            "--category", "vertical"]
+    argv = ["run", "--method", "UnitedNet", "--category", "vertical"]
     for k, v in _old_inputs(d).items():
         argv += ["--input", f"{k}={v}"]
     argv += ["--out-dir", str(tmp_path / "o"), "--dry-run"]
-    env = {**os.environ, "PYTHONPATH": str(ROOT)}
-    env.pop("PYTHONWARNINGS", None)
-    proc = subprocess.run(argv, capture_output=True, text=True, env=env, cwd=tmp_path)
-    assert proc.returncode == 0, proc.stderr
-    assert "--train_cty_path" in proc.stdout
-    assert ("warning: inputs key 'rna_cty' of UnitedNet is deprecated and will be "
-            "removed in 0.4; use 'cty' (the same file)") in proc.stderr
+    err = io.StringIO()
+    with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+        assert cli.main(argv) == 1
+    assert ("error: The inputs key 'rna_cty' of UnitedNet was removed in 0.4. Use 'cty'."
+            in err.getvalue())
 
 
 def test_labels_for_gives_an_older_folder_the_cty_key(tmp_path):
@@ -258,7 +253,7 @@ def _reused_matilda(tmp_path, monkeypatch, earlier=None):
             {"dataset": "D11", "category": "vertical", "records": [earlier]}))
     res = mtb.run_all("D11", "vertical", methods=["Matilda"], out_dir=str(tmp_path),
                       skip_existing=True, evaluate=False, verbose=False)
-    return res.results[0]
+    return res.records[0]
 
 
 def test_reused_output_without_an_earlier_record_has_unknown_provenance(tmp_path,

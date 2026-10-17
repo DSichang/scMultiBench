@@ -266,32 +266,53 @@ def _platform_note() -> str | None:
     return problem
 
 
+# ----------------------------------------------------------------- deprecations
+class _Retired(argparse.Action):
+    """A deprecated flag: it parses, ``--help`` leaves it out, and :func:`main`
+    warns with ``tail``. Its value goes to ``dest``: the new flag's for a renamed
+    one."""
+
+    def __init__(self, option_strings, dest, *, tail=_compat.NO_EFFECT, **kwargs):
+        super().__init__(option_strings, dest, help=argparse.SUPPRESS, **kwargs)
+        self.tail = tail
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        setattr(namespace, self.dest, True if self.nargs == 0 else values)
+        tail = self.tail.replace("{value}", str(values))       # "Use --metrics {value}."
+        namespace._retired = [*getattr(namespace, "_retired", ()), (option_string, tail)]
+
+
+def _retired_command(name: str, new: str) -> dict:
+    """``set_defaults`` of a deprecated command: :func:`main` warns that ``new``
+    replaces ``name``."""
+    return {"_retired_command": (f"multibench {name}", _compat.use(f"multibench {new}"))}
+
+
+def _warn_retired(args) -> None:
+    """One ``FutureWarning`` per deprecated command or flag on the command line."""
+    if getattr(args, "_retired_command", None):
+        _compat.deprecated(*args._retired_command)
+    for flag, tail in getattr(args, "_retired", ()):
+        _compat.deprecated(flag, tail)
+
+
 # ----------------------------------------------------------------- commands
-def _retired_find_flags(args) -> None:
-    """The warnings of ``list`` / ``find``'s deprecated ``--task`` and ``--runnable``."""
-    if args.task is not None:
-        _compat.deprecated("--task", "--category")
-    if args.runnable:
-        _compat.deprecated("--runnable")
-
-
 def _cmd_list(args) -> int:
     """``multibench list`` (deprecated): ``multibench find --category``."""
-    _compat.deprecated("multibench list", "multibench find")
-    _retired_find_flags(args)
-    for m in discover._with_task(discover.find_methods(category=args.category), args.task):
+    for m in discover._find_methods(category=args.category, task=args.task,
+                                    runnable=args.runnable or None):
         print(m)
     return _EXIT_OK
 
 
 def _cmd_find(args) -> int:
     """``multibench find``: :func:`multibench.find_methods` with the same filters."""
-    _retired_find_flags(args)
-    ids = discover.find_methods(category=args.category,
-                                needs_labels=_tri_state(args.needs_labels),
-                                atac=args.atac, modalities=_csv_list(args.modalities),
-                                tunable=_tri_state(args.tunable))
-    for m in discover._with_task(ids, args.task):
+    ids = discover._find_methods(category=args.category, task=args.task,
+                                 needs_labels=_tri_state(args.needs_labels),
+                                 atac=args.atac, modalities=_csv_list(args.modalities),
+                                 runnable=args.runnable or None,
+                                 tunable=_tri_state(args.tunable))
+    for m in ids:
         print(m)
     return _EXIT_OK
 
@@ -887,19 +908,12 @@ def _cmd_plot(args) -> int:
     inputs = _csv_list(args.input) or []
     if not inputs and args.category is None:
         _usage_error(args, "need --category (stored results) or --input LONG_CSV")
-    for flag, value, new in (("--source", args.source,
-                              "the default, the package's re-run tables"),
-                             ("--result-path", args.result_path, "--input"),
-                             ("--na", args.na, None), ("--group", args.group, "--metrics")):
-        if value is not None:
-            _compat.deprecated(flag, new)
-    source = args.source or "rerun"
     frames = []
     if args.category is not None:
         from .data.results import _load_results
         try:
             frames.append(_load_results(args.category, dataset=_csv_list(args.dataset),
-                                        source=source, result_path=args.result_path))
+                                        source=args.source, result_path=args.result_path))
         except FileNotFoundError as e:
             if str(e) == _unpublished_msg(args.category):
                 raise FileNotFoundError(_unpublished_plot_msg(args.category, inputs)) from e
@@ -917,7 +931,7 @@ def _cmd_plot(args) -> int:
             own_methods = sorted(set().union(*[set(f["method"].astype(str)) for f in frames[1:]]))
             print(f"# Added your {own_rows} row{'' if own_rows == 1 else 's'} "
                   f"({', '.join(own_methods)}) to the stored {args.category} table, "
-                  f"which has {len(frames[0])} rows (source {source}).",
+                  f"which has {len(frames[0])} rows (source {args.source or 'rerun'}).",
                   file=sys.stderr)
     methods = _csv_list(args.methods)
     if methods and args.kind == "bar":
@@ -939,8 +953,6 @@ def _cmd_plot(args) -> int:
     metrics = _csv_list(args.metrics)
     if metrics is not None and len(metrics) == 1 and metrics[0] in _METRIC_FAMILIES:
         metrics = metrics[0]
-    if args.group is not None:
-        metrics = args.group
     with _quiet_stdout():
         if args.kind == "bubble":
             plot_ns.bubble(df, metrics=metrics, methods=methods, aggregate=args.aggregate,
@@ -968,8 +980,6 @@ def _parse_inputs(pairs, args) -> dict:
 
 def _cmd_run(args) -> int:
     """``multibench run``: :func:`multibench.run` one method on explicit inputs."""
-    if args.task is not None:
-        _compat.deprecated("--task")
     args.method = registry.check_method(args.method)     # any case, or a display name
     params = _parse_params(args.param, args, default_method=args.method)
     inputs = _parse_inputs(args.input, args)
@@ -979,7 +989,7 @@ def _cmd_run(args) -> int:
         try:
             variant = registry.get(args.method).select(
                 args.category,
-                _runner._modality_roles(_runner._rename_old_roles(args.method, inputs)))
+                _runner._modality_roles(inputs))
         except (KeyError, ValueError):
             variant = None                 # run says what is wrong, after the header
         if variant is not None:
@@ -1329,15 +1339,10 @@ def _unknown_method_message(method, name=None, files=()) -> str:
 def _cmd_evaluate(args) -> int:
     """``multibench evaluate``: :func:`multibench.evaluate` on an embedding file; with
     ``--method`` or ``--name``, ``--dataset`` and ``--category`` the long table (``to_long``)."""
-    for flag, value, new in (("--output", args.output, "--embedding"),
-                             ("--clustering", args.clustering, "--clusters"),
-                             ("--cluster", args.cluster, "--clusters")):
-        if value is not None:
-            _compat.deprecated(flag, new)
-    embedding = args.embedding or args.output
+    embedding = args.embedding
     if embedding is None:
         _usage_error(args, "the following arguments are required: --embedding")
-    clusters = args.clusters or args.clustering or args.cluster
+    clusters = args.clusters
     name = args.name
     long_mode = args.method is not None or args.dataset is not None or name is not None
     if long_mode:
@@ -1360,10 +1365,8 @@ def _cmd_evaluate(args) -> int:
     metrics = _csv_list(args.metrics)
     if metrics is not None and len(metrics) == 1 and metrics[0] in _METRIC_FAMILIES:
         metrics = metrics[0]
-    if args.task is not None:                  # an older spelling of --metrics
-        _compat.deprecated("--task", f"--metrics {args.task}")
-        if metrics is None:
-            metrics = args.task
+    if args.task is not None and metrics is None:     # an older spelling of --metrics
+        metrics = args.task
     with contextlib.ExitStack() as stack:
         batch = _batch_arg(args, stack)
         labels = _evaluate_labels(args, stack)
@@ -1534,8 +1537,6 @@ def _flavor_token(flavor, env: str | None = None) -> str:
 def _cmd_env(args) -> int:
     """``multibench env ...``: environment recipes, preflight and installation."""
     cmd = args.env_cmd
-    if cmd in _RETIRED_ENV_COMMANDS:
-        _compat.deprecated(f"multibench env {cmd}", _RETIRED_ENV_COMMANDS[cmd])
     refusing = cmd == "install" and args.run and not args.force
     if cmd in ("status", "plan", "doctor", "install") and not refusing:
         _platform_note()
@@ -1706,6 +1707,17 @@ def _cmd_env(args) -> int:
 
 
 # ----------------------------------------------------------------- parser
+class _Parser(argparse.ArgumentParser):
+    """An unknown command's error lists only the commands ``--help`` lists."""
+
+    def _check_value(self, action, value):
+        if isinstance(action, argparse._SubParsersAction) and value not in action.choices:
+            shown = ", ".join(a.dest for a in action._choices_actions)
+            raise argparse.ArgumentError(action, f"invalid choice: {value!r} "
+                                                 f"(choose from {shown})")
+        super()._check_value(action, value)
+
+
 class _HelpFormatter(argparse.HelpFormatter):
     """argparse's formatter, except that a text holding line breaks (a recipe
     epilog) is printed line by line instead of being re-wrapped."""
@@ -1738,9 +1750,6 @@ _CATEGORY_HELP = ("integration category: vertical (several modalities measured i
                   "same cells, e.g. CITE-seq), diagonal (modalities measured in different "
                   "cells, no pairing), mosaic (several batches, only some share a "
                   "modality) or cross (several batches, each with the same modalities).")
-#: the replacement of each deprecated ``env`` command
-_RETIRED_ENV_COMMANDS = {"status": "multibench env doctor", "groups": "multibench env doctor",
-                         "plan": "multibench env install"}
 _METHODS_HELP = "comma-separated method ids, as printed by multibench find"
 _FLAVOR_HELP = ("which packed archive to take per env: 'cpu' = the '<env>-cpu' archive "
                 "(the same env without the CUDA libraries, 3-4x smaller) where "
@@ -1764,7 +1773,7 @@ _BATCH_COLUMN_HELP = "the column to read in the --batch CSV when it has several 
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the ``multibench`` argument parser (every command and flag has help text)."""
-    p = argparse.ArgumentParser(
+    p = _Parser(
         prog="multibench",
         description="Run, evaluate and plot single-cell multimodal integration "
                     "methods from the scMultiBench benchmark. Each command wraps "
@@ -1784,9 +1793,10 @@ def build_parser() -> argparse.ArgumentParser:
     # ---- list: deprecated, not listed (no help=): multibench find
     pl = sub.add_parser("list", description="Deprecated: use multibench find.")
     pl.add_argument("--category", help=_CATEGORY_HELP)
-    pl.add_argument("--task", help=argparse.SUPPRESS)
-    pl.add_argument("--runnable", action="store_true", help=argparse.SUPPRESS)
-    pl.set_defaults(func=_cmd_list, _parser=pl)
+    pl.add_argument("--task", action=_Retired, tail=_compat.use("--category"))
+    pl.add_argument("--runnable", action=_Retired, nargs=0, default=False,
+                    tail=_compat.use("multibench scan"))
+    pl.set_defaults(func=_cmd_list, _parser=pl, **_retired_command("list", "find"))
 
     # ---- find
     pf = sub.add_parser(
@@ -1794,7 +1804,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Print method ids matching all given filters, one per line. "
                     "Every filter is optional; with none, every method is listed.")
     pf.add_argument("--category", help=_CATEGORY_HELP)
-    pf.add_argument("--task", help=argparse.SUPPRESS)
+    pf.add_argument("--task", action=_Retired, tail=_compat.use("--category"))
     pf.add_argument("--modalities",
                     help="comma-separated modalities the method must consume, e.g. "
                          "rna,adt or rna,atac ('protein' is accepted for adt)")
@@ -1807,7 +1817,8 @@ def build_parser() -> argparse.ArgumentParser:
     pf.add_argument("--atac", choices=["peak", "gene_activity"],
                     help="filter by the ATAC representation the method consumes: "
                          "peak (chr:start-end matrix) or gene_activity (gene scores)")
-    pf.add_argument("--runnable", action="store_true", help=argparse.SUPPRESS)
+    pf.add_argument("--runnable", action=_Retired, nargs=0, default=False,
+                    tail=_compat.use("multibench scan"))
     pf.add_argument("--tunable", nargs="?", const="true", choices=["true", "false"],
                     metavar="{true,false}",
                     help="true (or the bare flag): only methods exposing hyperparameters "
@@ -2058,8 +2069,10 @@ def build_parser() -> argparse.ArgumentParser:
     pp.add_argument("--dataset", help="dataset id(s), comma-separated; with --category "
                                       "selects the stored table(s), with --input "
                                       "filters the frame")
-    pp.add_argument("--source", choices=["published", "rerun"], help=argparse.SUPPRESS)
-    pp.add_argument("--result-path", dest="result_path", help=argparse.SUPPRESS)
+    pp.add_argument("--source", choices=["published", "rerun"], action=_Retired,
+                    tail=_compat.note("leave it out to plot the re-run tables"))
+    pp.add_argument("--result-path", dest="result_path", action=_Retired,
+                    tail=_compat.use("--input"))
     pp.add_argument("--input", action="append", metavar="LONG_CSV_OR_DIR",
                     help="a long results CSV (metric,value,method,dataset,category[,clustering,source]) or "
                          "a run_all output directory; repeatable. Alone: the table to "
@@ -2080,9 +2093,9 @@ def build_parser() -> argparse.ArgumentParser:
     pp.add_argument("--require-complete", dest="require_complete", action="store_true",
                     help="bubble --aggregate summary: keep only methods present in "
                          "every dataset instead of warning")
-    pp.add_argument("--na", choices=["warn", "skip", "raise"], help=argparse.SUPPRESS)
+    pp.add_argument("--na", choices=["warn", "skip", "raise"], action=_Retired)
     pp.add_argument("--group", choices=["clustering", "batch", "classification"],
-                    help=argparse.SUPPRESS)
+                    dest="metrics", action=_Retired, tail=_compat.use("--metrics"))
     pp.add_argument("--top", type=int, help="bar only: keep the N best methods")
     pp.add_argument("--title", help="figure title (default: '<category> <dataset>')")
     pp.add_argument("--out", required=True,
@@ -2101,7 +2114,7 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("--method", required=True, help="method id, as printed by "
                                                     "multibench list")
     pr.add_argument("--category", required=True, help=_CATEGORY_HELP)
-    pr.add_argument("--task", help=argparse.SUPPRESS)
+    pr.add_argument("--task", action=_Retired)
     pr.add_argument("--input", action="append", metavar="ROLE=PATH",
                     help="one input as role=path, repeatable, e.g. --input rna=rna.h5 "
                          "--input adt=adt.h5 --input cty=cty.csv. multibench layout "
@@ -2213,10 +2226,12 @@ def build_parser() -> argparse.ArgumentParser:
                          "the benchmark's embedding.h5), .h5ad (uses --obsm), .npy, "
                          ".csv/.tsv (a first column of barcodes gives the cell ids: "
                          "labels and batches with barcodes are matched by them)")
-    pe.add_argument("--output", help=argparse.SUPPRESS)
+    pe.add_argument("--output", dest="embedding", action=_Retired,
+                    tail=_compat.use("--embedding"))
     pe.add_argument("--category", help=_CATEGORY_HELP + " Required with --method or "
                                                         "--dataset.")
-    pe.add_argument("--task", choices=["clustering", "batch", "all"], help=argparse.SUPPRESS)
+    pe.add_argument("--task", choices=["clustering", "batch", "all"], action=_Retired,
+                    tail=_compat.use("--metrics {value}"))
     pe.add_argument("--labels", action="append", metavar="CSV",
                     help="cell-type labels CSV with a header row, one row per cell "
                          "in the embedding's order. The labels are column x, the only "
@@ -2245,8 +2260,8 @@ def build_parser() -> argparse.ArgumentParser:
                     help="precomputed clusters (CSV, or an .h5 read from "
                          "/obs/cluster_leiden); they replace the Leiden clusters of "
                          "ARI, NMI, ASW, iASW and iF1")
-    pe.add_argument("--clustering", help=argparse.SUPPRESS)
-    pe.add_argument("--cluster", help=argparse.SUPPRESS)
+    pe.add_argument("--clustering", "--cluster", dest="clusters", action=_Retired,
+                    tail=_compat.use("--clusters"))
     pe.add_argument("--metrics", help="what to compute (mtb.evaluate(metrics=)): a family "
                                       "(clustering | batch | classification | all) or a "
                                       "comma-separated list of metric codes (e.g. "
@@ -2297,9 +2312,11 @@ def build_parser() -> argparse.ArgumentParser:
                        epilog=_status_epilog(), formatter_class=_HelpFormatter)
     es.add_argument("--category", help=_CATEGORY_HELP + " Only that category's methods.")
     es.add_argument("--methods", help=_METHODS_HELP + "; only those")
-    es.set_defaults(func=_cmd_env, _parser=es)
+    es.set_defaults(func=_cmd_env, _parser=es,
+                    **_retired_command("env status", "env doctor"))
     egr = ev.add_parser("groups", description="Deprecated: use multibench env doctor.")
-    egr.set_defaults(func=_cmd_env, _parser=egr)
+    egr.set_defaults(func=_cmd_env, _parser=egr,
+                     **_retired_command("env groups", "env doctor"))
     _NAME_HELP = ("environment name. The default is the environment the package "
                   "uses for METHOD, shown in the env column of multibench scan and "
                   "used by run, env doctor and env create. For example, Matilda uses "
@@ -2348,7 +2365,7 @@ def build_parser() -> argparse.ArgumentParser:
     ep.add_argument("--category", help=_CATEGORY_HELP)
     ep.add_argument("--methods", help=_METHODS_HELP + "; only their envs")
     ep.add_argument("--flavor", choices=envs.FLAVORS, default="auto", help=_FLAVOR_HELP)
-    ep.set_defaults(func=_cmd_env, _parser=ep)
+    ep.set_defaults(func=_cmd_env, _parser=ep, **_retired_command("env plan", "env install"))
     eg = ev.add_parser("create-group",
                        description="(Maintainers.) Create the shared conda env GROUP; "
                                    "without --run only the commands are printed.")
@@ -2421,12 +2438,8 @@ def main(argv=None) -> int:
     if not os.environ.get("MULTIBENCH_DEBUG"):
         warnings.showwarning = _show
     try:
-        with warnings.catch_warnings():
-            # a deprecated argument the command passes on (a renamed --input
-            # key) warns at this module's call: show it, as a script would
-            warnings.filterwarnings("default", category=DeprecationWarning,
-                                    module=r"multibench\.cli")
-            return args.func(args)
+        _warn_retired(args)
+        return args.func(args)
     except KeyboardInterrupt:
         print("interrupted", file=sys.stderr)
         return 130

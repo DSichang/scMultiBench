@@ -1,7 +1,6 @@
 """Summary bar chart: one bar per method, aggregated across datasets."""
 from __future__ import annotations
 
-import warnings
 
 import numpy as np
 import pandas as pd
@@ -19,7 +18,8 @@ CLASSIFICATION_METRICS = FAMILY_METRICS["classification"]
 FAMILY_CMAPS = {"clustering": "Blues", "batch": "Greens", "classification": "Pinks"}
 
 
-@_compat.keywords("plot.bar", group="metrics", cmap=None, show_datasets=None)
+@_compat.keywords("plot.bar", renamed={"group": "metrics"},
+                  dropped=("cmap", "show_datasets"))
 def bar(long_df: pd.DataFrame, *, metrics=None, top: int | None = None,
         title: str | None = None, save: str | None = None, overall: str = "rank"):
     """Draw each method's overall score across datasets as a horizontal bar.
@@ -124,13 +124,13 @@ def bar(long_df: pd.DataFrame, *, metrics=None, top: int | None = None,
                 "Filter long_df to the methods scored on every dataset.",
                 "Pass --methods with the methods scored on every dataset."),
             stored=style.stored_datasets(long_df)):
-        warnings.warn(msg, UserWarning, stacklevel=2)
+        _compat.warn(msg, UserWarning)
     shown = long_df if not metrics else long_df[long_df["metric"].isin(metrics)]
     backend = style.backend_warning(shown)
     if backend:
-        warnings.warn(backend, UserWarning, stacklevel=2)
+        _compat.warn(backend, UserWarning)
     if len({m for mat in parts.values() for m in mat.index}) == 2:
-        warnings.warn(style.TWO_METHODS, UserWarning, stacklevel=2)
+        _compat.warn(style.TWO_METHODS, UserWarning)
     per_ds = pd.DataFrame({ds: compute_overall(mat) for ds, mat in parts.items()})
     # best-first with a stable tie-break (same as plot.bubble), then reversed
     # so the best method is drawn on top

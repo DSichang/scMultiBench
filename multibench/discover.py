@@ -68,26 +68,8 @@ def _variant_matches(v, category, want, needs_labels, atac) -> bool:
     return True
 
 
-def _with_task(ids: list[str], task: str | None) -> list[str]:
-    """``ids`` whose method declares ``task`` (the deprecated ``task=`` filter)."""
-    registry.check_task(task)
-    return [m for m in ids if task is None or task in registry.get(m).tasks]
-
-
-def _retired_filters(fn):
-    """``find_methods`` with its deprecated keywords: ``task=`` still filters,
-    ``runnable=`` has no effect."""
-    @functools.wraps(fn)
-    def find(*args, task=None, runnable=None, **kwargs):
-        if task is not None:
-            _compat.deprecated("find_methods(task=)", "category=")
-        if runnable is not None:
-            _compat.deprecated("find_methods(runnable=)")
-        return _with_task(fn(*args, **kwargs), task)
-    return find
-
-
-@_retired_filters
+@_compat.keywords("find_methods", private="_find_methods", kept={
+    "task": _compat.use("category="), "runnable": _compat.use("scan")})
 def find_methods(category: str | None = None, *,
                  needs_labels: bool | None = None,
                  atac: str | None = None,
@@ -142,12 +124,28 @@ def find_methods(category: str | None = None, *,
     mtb.method_info : the per-variant ``supports`` table these filters are read from.
     mtb.scan : which of these methods can actually run on a given dataset.
     """
+    return _find_methods(category, needs_labels=needs_labels, atac=atac,
+                         modalities=modalities, tunable=tunable)
+
+
+def _find_methods(category: str | None = None, *, task: str | None = None,
+                  needs_labels: bool | None = None, atac: str | None = None,
+                  modalities: list[str] | set[str] | None = None,
+                  runnable: bool | None = None, tunable: bool | None = None) -> list[str]:
+    """:func:`find_methods`, with the deprecated ``task`` and ``runnable``:
+    ``task`` keeps the methods that declare it, ``runnable=True`` those with a
+    variant the package runs and ``False`` the declared stubs."""
     registry.check_category(category)
+    registry.check_task(task)
     want, atac = _modality_filter(modalities, atac)
     both = _reads_both_files(modalities)
     out = []
     for s in registry.load():
         if category and category not in s.categories:
+            continue
+        if task and task not in s.tasks:
+            continue
+        if runnable is not None and bool(s.variants) != runnable:
             continue
         if tunable is not None and any(v.tunable for v in s.variants) != tunable:
             continue
@@ -522,7 +520,7 @@ def _format_entry(tag: str, ref: dict, fmt: str) -> str:
     return line
 
 
-@_compat.keywords("cite", fmt="format")
+@_compat.keywords("cite", renamed={"fmt": "format"})
 def cite(*methods, format: str = "text") -> str:
     """Return citation text for the benchmark and, optionally, the methods you ran.
 

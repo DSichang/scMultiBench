@@ -39,7 +39,6 @@ from .discover import list_methods, find_methods, method_info, params_for, cite
 from .workflow import (scan, run_all, BatchResult, list_categories,
                        describe_layout, load_batch, sweep)
 from . import _compat
-from ._compat import deprecated_alias as _deprecated_alias
 
 # `import multibench.io` / `from multibench.env import plan` work as for a real
 # submodule: the three namespaces live elsewhere in the package
@@ -67,18 +66,15 @@ __all__ = [
 ]
 
 
-def _runtime_of(method: str) -> dict:
-    """``method_info(method)["runtime"]`` (target of the deprecated ``runtime_hint``)."""
-    return method_info(method)["runtime"]
-
-
-# deprecated 0.2 spellings: reachable, not in __all__ or dir(mtb)
-plan = _deprecated_alias("plan", "scan", scan)
-plan_commands = _deprecated_alias("plan_commands", "scan", scan)
-runtime_hint = _deprecated_alias("runtime_hint", "method_info(m)['runtime']", _runtime_of)
-
 # deprecated 0.4 names: reachable until 0.5, not in __all__ or dir(mtb)
 list_tasks = _compat.renamed("list_tasks", "category= and metrics=", _registry.list_tasks)
+
+# the 0.2 names, removed in 0.4 as their warnings said
+__getattr__ = _compat.module_getattr(__name__, "", removed={
+    "plan": ("0.4", _compat.use("mtb.run_all(..., dry_run=True)")),
+    "plan_commands": ("0.4", _compat.use("mtb.run_all(..., dry_run=True)")),
+    "runtime_hint": ("0.4", _compat.use("mtb.method_info(method)['runtime']")),
+})
 
 
 def __dir__() -> list[str]:

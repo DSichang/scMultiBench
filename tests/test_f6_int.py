@@ -38,7 +38,7 @@ def test_batch_column_run_saves_the_column_and_rescore_reuses_it(batchy, tmp_pat
                     "--batch-column", "sample") == 0
     assert _run_all(batchy, tmp_path / "o2", "--batch", str(one)) == 0
     capsys.readouterr()
-    a, b = (mtb.load_batch(tmp_path / o).results[0] for o in ("o1", "o2"))
+    a, b = (mtb.load_batch(tmp_path / o).records[0] for o in ("o1", "o2"))
     # the same cells and batch ids: the same saved file
     assert re.fullmatch(r"batch_[0-9a-f]{8}\.csv", a["batch_file"] or "")
     assert a["batch_file"] == b["batch_file"]
@@ -116,14 +116,14 @@ def test_rescore_with_the_saved_batch_and_no_batch_metric_does_not_warn(cite, tm
         # the toy cells give no resolution with one cluster per cell type
         warnings.filterwarnings("ignore", message="No Leiden resolution gave")
         new = back.rescore(metrics=["ARI", "NMI"])
-    rec = new.results[0]
+    rec = new.records[0]
     assert rec["status"] == "CHAIN_OK"
     assert set(rec["metrics"]) == {"ARI", "NMI"}
     assert round(float(new.summary["ARI"].iloc[0]), 4) == round(
         float(res.summary["ARI"].iloc[0]), 4)
     # the record still says which batch it has, and a later batch metric finds it
     assert (rec["batch_source"], rec["n_batches"]) == ("user", 2)
-    assert rec["batch_file"] == res.results[0]["batch_file"]
+    assert rec["batch_file"] == res.records[0]["batch_file"]
     new.save(tmp_path / "ari_only")
     again = _quiet(mtb.load_batch(tmp_path / "ari_only").rescore)
     assert _batch_metrics(again) == _batch_metrics(res)

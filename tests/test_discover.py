@@ -117,12 +117,12 @@ def test_find_methods_modalities_none_unchanged():
 
 
 def test_find_methods_runnable_filter():
-    # runnable= is deprecated in 0.4 and has no effect: every method is wired
+    # runnable= is deprecated in 0.4 and keeps its filter: every method is wired
     from multibench.engine import registry
     all_ids = discover.find_methods()
-    for flag in (True, False):
-        with pytest.warns(FutureWarning, match=r"runnable=\) is deprecated .* It has no effect"):
-            assert discover.find_methods(runnable=flag) == all_ids
+    for flag, want in ((True, all_ids), (False, [])):
+        with pytest.warns(FutureWarning, match=r"runnable=\) is deprecated .* Use scan\."):
+            assert discover.find_methods(runnable=flag) == want
     assert "SCALEX" in all_ids
     # Milestone: every method is now wired -> zero stubs, every id dispatchable.
     # (Guard: adding a new declared-but-unwired method should wire it or update this.)

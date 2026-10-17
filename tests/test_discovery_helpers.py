@@ -91,8 +91,9 @@ def test_inputs_for_default_no_warning_when_present(tmp_path):
 def test_available_datasets_warns_on_missing_root(tmp_path, result_dir):
     with pytest.warns(UserWarning, match="does not exist"):
         assert mtb.available_datasets("vertical", result_path=tmp_path / "nope") == []
-    assert mtb.available_datasets("mosaic") == ["D45", "D45s"]   # the re-run default
-    assert mtb.available_datasets("mosaic", source="published") == []   # published: still none
+    # the deprecated function keeps its 0.3 default, the published tables
+    assert mtb.available_datasets("mosaic") == []
+    assert mtb.available_datasets("mosaic", source="rerun") == ["D45", "D45s"]
     assert "D28" in mtb.available_datasets()
     assert "D28" in mtb.available_datasets("diagonal")
 

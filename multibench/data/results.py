@@ -190,10 +190,10 @@ def _find_metric_file(m_dir: Path, fname: str) -> Path | None:
     if not nested:
         return None
     if len(nested) > 1:
-        warnings.warn(
+        _compat.warn(
             f"{m_dir}: {len(nested)} nested {fname} tables "
             f"({[q.parent.name for q in nested]}); using {nested[0].parent.name}",
-            UserWarning, stacklevel=3)
+            UserWarning)
     return nested[0]
 
 
@@ -374,10 +374,10 @@ def _canonical_dataset_ids(category, datasets, base, source) -> list:
         s = str(d)
         canon = by_lower.get(s.lower())
         if canon is not None and canon != s and s not in have:
-            warnings.warn(
+            _compat.warn(
                 f"dataset {s!r} is not a stored table id but {canon!r} is - using "
                 f"that spelling (dataset ids are case-sensitive: 'D52', not 'd52')",
-                UserWarning, stacklevel=5)
+                UserWarning)
             out.append(canon)
         else:
             out.append(s)
@@ -432,7 +432,7 @@ def _degenerate_rerun_rows(out: pd.DataFrame, base: Path) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=cols)
 
 
-def _warn_degenerate(out: pd.DataFrame, base: Path, stacklevel: int = 5,
+def _warn_degenerate(out: pd.DataFrame, base: Path,
                      rerun_version=None) -> None:
     """:class:`DegenerateRerunWarning` for the rows :func:`_degenerate_rerun_rows`
     finds; ``rerun_version`` puts the stamp's version in the message."""
@@ -452,88 +452,39 @@ def _warn_degenerate(out: pd.DataFrame, base: Path, stacklevel: int = 5,
     items = ", ".join(f"{r.method}/{r.dataset} ({_stamp(r.source)}, ARI {r.rerun_ARI:.4f})"
                       for r in bad.itertuples())
     head = ("These re-run rows have" if len(bad) > 1 else "This re-run row has")
-    warnings.warn(
+    _compat.warn(
         f"{head} ARI below {_DEGENERATE_RERUN_ARI}, while the published table has "
         f"above {_DEGENERATE_PUBLISHED_ARI} for the same method and dataset: "
         f"{items}. Such a "
         f"row most likely comes from a failed re-run, for example a collapsed "
         f"embedding or a wrong label order, not from the method itself. Drop it "
         f"before ranking: df[df.method != {bad.method.iloc[0]!r}].",
-        DegenerateRerunWarning, stacklevel=stacklevel)
+        DegenerateRerunWarning)
 
 
-#: what replaces each deprecated keyword of the stored-results functions
-_RETIRED_TABLE_KEYWORDS = {
-    "clustering": "the default, the package's re-run tables",
-    "source": "the default, the package's re-run tables",
-    "result_path": "config.DEFAULT.result_path",
-}
+#: the deprecated keywords of the stored-results functions, which keep their effect
+_READ_RERUN = _compat.note("leave it out to read the re-run tables")
+_TABLE_KEYWORDS = {"source": _READ_RERUN,
+                   "result_path": _compat.use("config.DEFAULT.result_path")}
+#: the 0.2 keywords, removed in 0.4
+_REMOVED_METRIC_KEYWORDS = {"task": ("0.4", _compat.use("metrics=")),
+                            "family": ("0.4", _compat.use("metrics="))}
 
 
-def _retired_tables(func: str, stacklevel: int, **values) -> None:
-    """One ``FutureWarning`` per deprecated keyword of ``func`` that was passed."""
-    for name, value in values.items():
-        if value is not None:
-            _compat.deprecated(f"{func}({name}=)", _RETIRED_TABLE_KEYWORDS[name],
-                               stacklevel=stacklevel)
-
-
-def _legacy_load_results_kwargs(kw: dict) -> dict:
-    """0.2.x keywords of :func:`load_results`: ``method=``, ``metric=``,
-    ``task=`` / ``family=`` map with a ``DeprecationWarning``; ``metric_set=``
-    raises."""
-    if "metric_set" in kw:
-        raise TypeError(
-            "load_results() got metric_set=, removed in 0.3.0: only the scIB "
-            "metric set exists - drop the argument")
-    if "method" in kw:
-        if kw.get("methods") is not None:
-            raise ValueError("pass either method= or methods=, not both (method= is "
-                             "deprecated)")
-        kw["methods"] = kw.pop("method")
-        _compat.warn("load_results(method=...)", "methods=", stacklevel=4)
-    legacy = {n: kw.pop(n) for n in ("task", "family", "metric") if n in kw}
-    if not legacy:
-        return kw
-    if kw.get("metrics") is not None:
-        raise TypeError(
-            f"load_results() got metrics= together with the deprecated "
-            f"{sorted(legacy)}; pass metrics= only")
-    token = None
-    if "task" in legacy or "family" in legacy:
-        if ("task" in legacy and "family" in legacy
-                and legacy["task"] is not None and legacy["family"] is not None
-                and legacy["task"] != legacy["family"]):
-            raise ValueError(
-                f"pass either family= or task= (they are the same selector; got "
-                f"family={legacy['family']!r}, task={legacy['task']!r})")
-        token = legacy.get("family") if legacy.get("family") is not None else legacy.get("task")
-        for name in ("task", "family"):
-            if name in legacy:
-                _compat.warn(f"load_results({name}=...)", f"metrics={token!r}", stacklevel=4)
-    if "metric" in legacy and legacy["metric"] is not None:
-        codes = [catalog._canonical_metric(m) or m for m in _as_list(legacy["metric"])]
-        _compat.warn("load_results(metric=...)", f"metrics={codes!r}", stacklevel=4)
-        if token not in (None, "all"):
-            # as 0.2.x: the codes inside the family
-            fam = catalog.metric_selection(token).codes
-            codes = [c for c in codes if c in fam]
-        kw["metrics"] = codes
-    else:
-        kw["metrics"] = token
-    return kw
-
-
-@_compat.legacy_kwargs(_legacy_load_results_kwargs)
+@_compat.keywords("load_results", private="_load_results", kept={
+    **_TABLE_KEYWORDS,
+    "clustering": _compat.note("it picks the clustering variant of the published tables")},
+    removed={**_REMOVED_METRIC_KEYWORDS,
+             "method": ("0.4", _compat.use("methods=")),
+             "metric": ("0.4", _compat.use("metrics=")),
+             "metric_set": ("0.3.0", _compat.note("only the scIB metric set exists, so "
+                                                  "drop it"))})
 def load_results(
     category: str | None = None,
     *,
     dataset: str | list[str] | None = None,
     methods: str | list[str] | None = None,
     metrics=None,
-    clustering=None,
-    source=None,
-    result_path=None,
 ) -> pd.DataFrame:
     """Load the package's stored scores as one long table.
 
@@ -592,11 +543,7 @@ def load_results(
     mtb.to_long : turns ``mtb.evaluate`` scores into this shape.
     mtb.plot.bubble : draws the table.
     """
-    _retired_tables("load_results", 5, clustering=clustering, source=source,
-                    result_path=result_path)
-    return _load_results(category, dataset=dataset, methods=methods, metrics=metrics,
-                         clustering=clustering or "default", source=source,
-                         result_path=result_path)
+    return _load_results(category, dataset=dataset, methods=methods, metrics=metrics)
 
 
 def _load_results(
@@ -605,13 +552,14 @@ def _load_results(
     dataset: str | list[str] | None = None,
     methods: str | list[str] | None = None,
     metrics=None,
-    clustering: str = "default",
+    clustering: str | None = "default",
     source: str | None = None,
     result_path: Path | str | None = None,
 ) -> pd.DataFrame:
     """:func:`load_results` with the deprecated ``clustering=``, ``source=`` and
     ``result_path=``, without their warnings. ``source=None`` reads the re-run
     tables, or every row of a long CSV given as ``result_path``."""
+    clustering = clustering or "default"
     if clustering not in _CLUSTERING_FILES:
         raise ValueError(
             f"unknown clustering {clustering!r}; valid: {sorted(_CLUSTERING_FILES)}"
@@ -646,8 +594,7 @@ def _load_results(
             if not mask.any():
                 raise ValueError(
                     f"source {source!r} not in {base}; present: "
-                    f"{sorted(col.unique())} (pass source='published' or "
-                    f"'both' to keep every row of a file)")
+                    f"{sorted(col.unique())}. Leave the source out to keep every row.")
             out = out[mask]
         if category is not None and (out["category"] == category).any():
             out = out[out["category"] == category]
@@ -710,9 +657,9 @@ def _load_results(
             hint = ""
             if source == "published" and not base.is_file():
                 hint = _other_source_hint(category, datasets, wanted_methods, base)
-            warnings.warn(
+            _compat.warn(
                 f"no {source} rows for method {shown!r} in {where} (available: "
-                f"{avail}){hint}", UserWarning, stacklevel=4)
+                f"{avail}){hint}", UserWarning)
     have_metrics = sorted(out["metric"].unique())
     if sel is None:
         sel = catalog.metric_selection(metrics, extra=have_metrics)
@@ -720,18 +667,18 @@ def _load_results(
         before = len(out)
         out = out[out["metric"].isin(sel.codes)]
         if out.empty and sel.explicit:
-            warnings.warn(
+            _compat.warn(
                 f"metric(s) {sel.codes} not present in {where} "
                 f"({_SOURCE_WORD.get(source, source)} tables; "
-                f"available: {have_metrics})", UserWarning, stacklevel=4)
+                f"available: {have_metrics})", UserWarning)
         elif out.empty and before:
             tables = " ".join(x for x in (_SOURCE_WORD.get(source, source), category,
                                           "tables") if x)
             of = f" of {', '.join(map(str, datasets))}" if datasets else ""
-            warnings.warn(
+            _compat.warn(
                 f"The {tables}{of} have no {sel.family} scores, so no rows are left. "
                 f"Leave out metrics= to get the scores they have "
-                f"({', '.join(have_metrics)}).", UserWarning, stacklevel=4)
+                f"({', '.join(have_metrics)}).", UserWarning)
     out = out[COLUMNS + [c for c in _KEPT_FILE_COLUMNS if c in out.columns]]
     out = out.reset_index(drop=True)
     out.attrs["rerun_version"] = _version_attr(rerun_versions)
@@ -761,7 +708,7 @@ def _other_source_methods(source: str, cats: list, datasets, clustering: str,
 
 
 def _warn_single_method(out: pd.DataFrame, source: str, category, datasets,
-                        clustering: str, base: Path, stacklevel: int = 5) -> None:
+                        clustering: str, base: Path) -> None:
     """One ``UserWarning`` when the selection holds one method while the other
     stored source holds more for it."""
     n = out["method"].nunique()
@@ -778,12 +725,12 @@ def _warn_single_method(out: pd.DataFrame, source: str, category, datasets,
         where += f"/{_and_list(datasets)}"
     names = {"published": "published", "rerun": "re-run"}
     fix = config.hint("Leave out source= to read them.", "Leave out --source to read them.")
-    warnings.warn(
+    _compat.warn(
         f"The {names[source]} table for {where} has one method, "
         f"{out['method'].iloc[0]}. Every rank in it is the same. The {names[other]} "
         f"tables have {len(have)} methods for {where}: "
         f"{', '.join(sorted(have, key=str.lower))}. {fix}",
-        UserWarning, stacklevel=stacklevel)
+        UserWarning)
 
 
 #: how the one-method warning of :func:`_warn_single_method` starts (a filter pattern)
@@ -833,19 +780,19 @@ def _list_datasets(category, base: Path, source: str, clustering: str) -> list[s
 def _available_datasets(
     category: str | None = None,
     *,
-    source: str = "rerun",
+    source: str = "published",
     result_path: Path | str | None = None,
 ) -> list[str]:
     """Sorted dataset ids with stored results for ``source`` (the deprecated
-    ``available_datasets``)."""
+    ``available_datasets``, whose default was the published tables)."""
     if source not in SOURCES:
         raise ValueError(f"unknown source {source!r}; valid: {list(SOURCES)}")
     base = _base_path(result_path)
     if not base.exists():
-        warnings.warn(
+        _compat.warn(
             f"result_path {base} does not exist - nothing can be listed "
             f"(default root: {config.DEFAULT.result_path})",
-            UserWarning, stacklevel=3)
+            UserWarning)
         return []
     if category is not None:
         config.category_folder(category)
@@ -880,8 +827,8 @@ def fetchable() -> list[str]:
     return sorted(AVAILABLE, key=catalog._dataset_sort_key)
 
 
-def results_coverage(category: str | None = None, *, source=None,
-                     result_path=None) -> pd.DataFrame:
+@_compat.keywords("results_coverage", private="_results_coverage", kept=_TABLE_KEYWORDS)
+def results_coverage(category: str | None = None) -> pd.DataFrame:
     """Which (category, dataset, method) combinations have stored scores.
 
     Parameters
@@ -912,13 +859,13 @@ def results_coverage(category: str | None = None, *, source=None,
     mtb.load_results : the scores behind each row.
     mtb.data.fetchable : the datasets ``mtb.data.fetch`` can download.
     """
-    _retired_tables("results_coverage", 4, source=source, result_path=result_path)
-    return _results_coverage(category, source=source or "rerun", result_path=result_path)
+    return _results_coverage(category)
 
 
 def _results_coverage(category: str | None = None, *, source: str = "rerun",
                       result_path: Path | str | None = None) -> pd.DataFrame:
     """:func:`results_coverage` with the deprecated ``source=`` and ``result_path=``."""
+    source = source or "rerun"
     if source not in SOURCES:
         raise ValueError(f"unknown source {source!r}; valid: {list(SOURCES)}")
     cols = ["category", "dataset", "method", "clustering", "source"]
@@ -987,24 +934,8 @@ def _unmeasured_note(category: str, datasets, wanted: set[str], stored: bool) ->
             f"Pass scores on such data as long_df=.")
 
 
-def _legacy_recommend_kwargs(kw: dict) -> dict:
-    """0.2.x keywords of :func:`recommend`: ``task=`` / ``family=`` become
-    ``metrics=<token>`` with a ``DeprecationWarning`` (``family`` wins; an
-    explicit ``metrics=`` wins over both)."""
-    legacy = {n: kw.pop(n) for n in ("task", "family") if n in kw}
-    if not legacy:
-        return kw
-    token = legacy.get("family") if legacy.get("family") is not None else legacy.get("task")
-    token = "all" if token is None else token
-    for name in ("task", "family"):
-        if name in legacy:
-            _compat.warn(f"recommend({name}=...)", f"metrics={token!r}", stacklevel=4)
-    if kw.get("metrics") is None:
-        kw["metrics"] = token
-    return kw
-
-
-@_compat.legacy_kwargs(_legacy_recommend_kwargs)
+@_compat.keywords("recommend", private="_recommend", kept=_TABLE_KEYWORDS,
+                  removed=_REMOVED_METRIC_KEYWORDS)
 def recommend(
     category: str,
     *,
@@ -1014,8 +945,6 @@ def recommend(
     metrics=None,
     long_df: pd.DataFrame | None = None,
     min_methods: int = 2,
-    source=None,
-    result_path=None,
 ) -> pd.DataFrame:
     """Rank the methods of a category from the stored scores.
 
@@ -1077,10 +1006,8 @@ def recommend(
     mtb.load_results : the stored scores it ranks.
     mtb.plot.bar : the same score as bars.
     """
-    _retired_tables("recommend", 5, source=source, result_path=result_path)
     return _recommend(category, modalities=modalities, atac=atac, methods=methods,
-                      metrics=metrics, long_df=long_df, min_methods=min_methods,
-                      source=source or "rerun", result_path=result_path)
+                      metrics=metrics, long_df=long_df, min_methods=min_methods)
 
 
 def _recommend(
@@ -1096,6 +1023,7 @@ def _recommend(
     result_path: Path | str | None = None,
 ) -> pd.DataFrame:
     """:func:`recommend` with the deprecated ``source=`` and ``result_path=``."""
+    source = source or "rerun"
     from ..plot import style
 
     config.category_folder(category)
@@ -1313,6 +1241,6 @@ def _recommend(
             + (" Leave out source= to rank the re-run tables."
                if source == "published" and long_df_was_none else ""))
     if notes:
-        warnings.warn(f"recommend({category!r}):\n  - " + "\n  - ".join(notes),
-                      UserWarning, stacklevel=4)
+        _compat.warn(f"recommend({category!r}):\n  - " + "\n  - ".join(notes),
+                     UserWarning)
     return out

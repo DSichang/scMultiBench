@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 
 from . import io
+from .. import _compat
 from ..config import _and_list
 from ..plot.bar import CLASSIFICATION_METRICS as _CLASSIFICATION_METRICS
 from .pipeline import (_Table, _as_written, _cell_ids, _count_error,
@@ -20,7 +21,8 @@ from .pipeline import (_Table, _as_written, _cell_ids, _count_error,
 COLUMNS = ["reference", "batch", "cell", "label", "predicted"]
 
 
-def classify(output, labels=None, *, batch=None, reference=None,
+@_compat.keywords("classify", renamed={"output": "embedding"})
+def classify(embedding, labels=None, *, batch=None, reference=None,
              obsm: str = "X_emb", label_order=None, seed: int = 0) -> pd.DataFrame:
     """Predict the cell type of each query cell from a reference batch.
 
@@ -30,7 +32,7 @@ def classify(output, labels=None, *, batch=None, reference=None,
 
     Parameters
     ----------
-    output
+    embedding
         Embedding, cells x dims, in the forms ``mtb.evaluate`` takes: a run
         output file (``embedding.h5``, ``.h5ad``, ``.csv``), an AnnData, a
         DataFrame or an array.
@@ -45,7 +47,7 @@ def classify(output, labels=None, *, batch=None, reference=None,
         The batch to learn from. ``None`` = every batch in turn, as in the
         article.
     obsm : str
-        ``.obsm`` key of an AnnData or ``.h5ad`` ``output``; ``'X'`` means
+        ``.obsm`` key of an AnnData or ``.h5ad`` ``embedding``; ``'X'`` means
         ``.X``.
     label_order : list of str
         Keys of a ``labels`` dict in the method's cell order, as in
@@ -60,13 +62,13 @@ def classify(output, labels=None, *, batch=None, reference=None,
     pandas.DataFrame
         One row per query cell and reference, with the columns
         ``reference``, ``batch`` (the cell's own batch), ``cell`` (the cell
-        id, or the row number when the output has none), ``label`` (the
+        id, or the row number when the embedding has none), ``label`` (the
         true cell type) and ``predicted``.
 
     Raises
     ------
     ValueError
-        Fewer than two batches, an output that is not an embedding, a
+        Fewer than two batches, an input that is not an embedding, a
         ``reference`` that is not a batch, and the label and batch errors of
         ``mtb.evaluate``.
 
@@ -104,24 +106,24 @@ def classify(output, labels=None, *, batch=None, reference=None,
         stems = [Path(p).stem for p in labels]
         names = stems if len(set(stems)) == len(stems) else \
             [str(i + 1) for i in range(len(labels))]
-    _check_embedding(output)
+    _check_embedding(embedding)
 
-    cells = "adata.obs_names" if io._is_anndata(output) else None
-    if isinstance(output, (str, Path)) and Path(output).suffix.lower() == ".h5ad":
+    cells = "adata.obs_names" if io._is_anndata(embedding) else None
+    if isinstance(embedding, (str, Path)) and Path(embedding).suffix.lower() == ".h5ad":
         import anndata as ad
-        output = ad.read_h5ad(output)
-    adata = output if io._is_anndata(output) else None
+        embedding = ad.read_h5ad(embedding)
+    adata = embedding if io._is_anndata(embedding) else None
     table = None
-    if isinstance(output, (str, Path)) and Path(output).suffix.lower() in {".csv", ".tsv"}:
-        file = io._require_file(output, "output")
+    if isinstance(embedding, (str, Path)) and Path(embedding).suffix.lower() in {".csv", ".tsv"}:
+        file = io._require_file(embedding, "output")
         emb, ids = io._read_csv_embedding(file)
         if ids is not None and emb.shape[0] != emb.shape[1] \
                 and _n_values(labels, adata) == emb.shape[1]:
             ids = None           # dims x cells: the first column names the dimensions
         table = None if ids is None else _Table(file.name)
     else:
-        ids = _cell_ids(output)
-        emb = np.asarray(io.as_matrix(output, obsm=obsm))
+        ids = _cell_ids(embedding)
+        emb = np.asarray(io.as_matrix(embedding, obsm=obsm))
     if emb.ndim != 2:
         raise ValueError(_NOT_EMBEDDING.format(what="output"))
     if _is_label_path_list(labels):
@@ -169,23 +171,23 @@ def classify(output, labels=None, *, batch=None, reference=None,
             f"reference={reference!r} is not a batch. Pass one of "
             f"{_and_list(batches, 'or')}.")
     if miss.any():
-        warnings.warn(f"{int(miss.sum()):,} of the {n_cells:,} cells have no label; "
-                      f"they are left out.", UserWarning, stacklevel=2)
+        _compat.warn(f"{int(miss.sum()):,} of the {n_cells:,} cells have no label; "
+                     f"they are left out.", UserWarning)
     cell = np.asarray(ids, dtype=object) if ids is not None else np.arange(n_cells)
     frames = []
     for ref in batches if reference is None else [str(reference)]:
         train = keep & (ba == ref)
         types = pd.unique(ct[train])
         if len(types) < 2:
-            warnings.warn(
+            _compat.warn(
                 f"Reference batch {ref} has " + ("no labelled cell" if len(types) == 0
                                                  else "one cell type")
-                + "; skipped.", UserWarning, stacklevel=2)
+                + "; skipped.", UserWarning)
             continue
         query = keep & (ba != ref) & np.isin(ct, types)
         if not query.any():
-            warnings.warn(f"No other batch has a cell type of reference batch {ref}; "
-                          f"skipped.", UserWarning, stacklevel=2)
+            _compat.warn(f"No other batch has a cell type of reference batch {ref}; "
+                         f"skipped.", UserWarning)
             continue
         predicted = _mlp(emb[train], ct[train], seed).predict(emb[query])
         frames.append(pd.DataFrame({

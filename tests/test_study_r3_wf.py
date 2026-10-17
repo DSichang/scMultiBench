@@ -304,7 +304,7 @@ def test_run_records_keep_the_caveat_without_the_notes_on_starting(tmp_path, mon
                  modalities=["rna", "atac"], data_path=root, evaluate=False,
                  allow_atac_mismatch=True)
     log = capsys.readouterr().out
-    cav = res.results[0]["caveat"]
+    cav = res.records[0]["caveat"]
     assert cav == f"Matilda {GAS_CAV}", cav
     assert "The method scripts are not in" not in log
     assert W._run_caveat("Matilda reads inputs/a.h5. mtb.run writes that file first") == ""

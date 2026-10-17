@@ -34,7 +34,7 @@ import multibench as mtb
 from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs
-from multibench.plot import bubble
+from multibench.plot import build_table
 from tests.test_docs_r4 import _flat, needs_docs
 from tests.test_study_r4_wf import ALL_ENVS, _h5, _quiet, _Res, cite  # noqa: F401
 from tests.test_study_r6_msg import (_cli, _lung_ids, needs_git, pinned,  # noqa: F401
@@ -113,7 +113,7 @@ def _rescore(res, **kw):
 # ============================================================ saved batch
 def test_positional_labels_place_the_saved_batch_in_the_stored_order(stacked):
     res, emb_labels, _ = stacked
-    rec = res.results[0]
+    rec = res.records[0]
     assert rec["labels_used"] == [f"cty{b}.csv" for b in EMB_ORDER]
     assert rec["batch_source"] == "user" and rec["n_batches"] == 2
     new, caught = _rescore(mtb.load_batch("out"), labels=emb_labels)
@@ -126,7 +126,7 @@ def test_a_saved_batch_is_dropped_when_the_dataset_folder_is_not_found(stacked):
     shutil.move(str(root / "data"), str(root / "gone"))
     back = mtb.load_batch("out")
     new, caught = _rescore(back, labels=emb_labels)
-    rec = new.results[0]
+    rec = new.records[0]
     assert rec["status"] == "CHAIN_OK" and "ARI" in rec["metrics"]
     for k in ("ASW_batch", "iLISI", "GC"):
         assert k not in rec["metrics"], k
@@ -139,7 +139,7 @@ def test_a_saved_batch_is_dropped_when_the_dataset_folder_is_not_found(stacked):
     new.save(root / "again")
     shutil.move(str(root / "gone"), str(root / "data"))
     back = mtb.load_batch(root / "again")
-    assert back.results[0]["batch_file"] == res.results[0]["batch_file"]
+    assert back.records[0]["batch_file"] == res.records[0]["batch_file"]
     assert _batch_cols(_quiet(back.rescore)) == _batch_cols(res)
 
 
@@ -163,7 +163,7 @@ def test_the_folder_found_is_recorded_as_an_absolute_path(rel, monkeypatch):
     shutil.move(str(root / "out"), str(root / "moved_out"))
     monkeypatch.chdir(root / "nb")
     back = mtb.load_batch("../moved_out", data_path="../gone")
-    rec = back.results[0]
+    rec = back.records[0]
     gone = str((root / "gone").resolve())
     assert rec["data_path"] == rec["data_root"] == gone
     assert rec["out_dir"] == str((root / "moved_out" / "Matilda_MYCITE").resolve())
@@ -192,7 +192,7 @@ def test_no_unsaved_batch_warning_without_a_batch_metric(cite, tmp_path):
         # the toy cells give no resolution with one cluster per cell type
         warnings.filterwarnings("ignore", message="No Leiden resolution gave")
         new = old.rescore(metrics=["ARI"])
-    assert new.results[0]["status"] == "CHAIN_OK"
+    assert new.records[0]["status"] == "CHAIN_OK"
     with pytest.warns(UserWarning, match="which older versions did not save"):
         old.rescore(metrics=["ARI", "iLISI"])
 
@@ -303,7 +303,7 @@ def test_plot_unknown_names_are_one_sentence_form(tmp_path, capsys):
                          "method": ["A", "A", "B", "B"], "dataset": "D11",
                          "category": "vertical"})
     with pytest.raises(ValueError) as e:
-        bubble.build_table(long, methods=["Matlida"])
+        build_table(long, methods=["Matlida"])
     assert str(e.value) == ("Unknown method Matlida. Did you mean Matilda? The table has "
                             "A and B.")
     csv = tmp_path / "long.csv"
@@ -421,7 +421,7 @@ def test_the_changes_page_quotes_the_live_texts(tmp_path, monkeypatch):
     long = pd.DataFrame({"metric": ["ARI"] * 2, "value": [0.5, 0.4], "method": ["A", "B"],
                          "dataset": "D11"})
     with pytest.raises(ValueError) as e:
-        bubble.build_table(long, methods=["Matlida"])
+        build_table(long, methods=["Matlida"])
     assert f"`{e.value}`" in text
     for name in ("D11", "D28", "D52"):
         (tmp_path / "data" / name).mkdir(parents=True)

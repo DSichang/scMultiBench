@@ -18,7 +18,7 @@ import multibench as mtb
 from multibench import cli
 from multibench import workflow as W
 from multibench.data import catalog
-from multibench.plot import bubble as B
+B = importlib.import_module("multibench.plot.bubble")   # the module
 
 CODES = ["OCA", "ACA", "Spec", "Sens", "F1"]
 SCIB = ["ARI", "NMI", "ASW", "iASW", "iF1", "cLISI", "ASW_batch", "ARI_batch", "NMI_batch",
@@ -417,4 +417,4 @@ def test_cli_help_names_the_family(capsys):
     assert "classification" in capsys.readouterr().out
     ns = cli.build_parser().parse_args(["plot", "bar", "--input", "x.csv", "--group",
                                         "classification", "--out", "x.png"])
-    assert ns.group == "classification"
+    assert ns.metrics == "classification"          # --group is a deprecated --metrics

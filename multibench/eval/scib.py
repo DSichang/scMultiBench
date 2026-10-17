@@ -15,6 +15,8 @@ import warnings
 import numpy as np
 import pandas as pd
 
+from .. import _compat
+
 #: metrics that run scib's prebuilt LISI helper binary
 _LISI_METRICS = ("cLISI", "iLISI")
 
@@ -228,10 +230,10 @@ def _resolve_flavor(flavor) -> str:
     if flavor == "igraph" and not igraph_flavor_available():
         if not _fallback_warned:
             from importlib.metadata import version
-            warnings.warn(
+            _compat.warn(
                 f"scanpy {version('scanpy')} cannot run flavor='igraph' "
                 f"(needs scanpy>=1.10 and the igraph package); using leidenalg for "
-                f"this process - same metrics, slower clustering", UserWarning, stacklevel=3)
+                f"this process - same metrics, slower clustering", UserWarning)
             _fallback_warned = True
         return "leidenalg"
     return flavor
@@ -324,8 +326,8 @@ def _n_clusters(graph, n: int, flavor: str, per: str | None = None) -> np.ndarra
     if not _search_n_clusters(graph, n, key, flavor):
         got = graph.obs[key].nunique()
         what = f"{n} clusters" + (f", one per {per}" if per else "")
-        warnings.warn(f"No Leiden resolution gave {what}; using the {got} clusters "
-                      f"of the last try.", UserWarning, stacklevel=3)
+        _compat.warn(f"No Leiden resolution gave {what}; using the {got} clusters "
+                     f"of the last try.", UserWarning)
     out = np.asarray(graph.obs[key].astype(str))
     del graph.obs[key]
     return out
@@ -403,8 +405,8 @@ def leiden_sweep(emb, *, flavor=None):
     """
     from scib.metrics.clustering import get_resolutions
 
-    warnings.warn("leiden_sweep is deprecated and will be removed in 0.5. "
-                  "Use leiden_n_clusters.", FutureWarning, stacklevel=2)
+    _compat.warn("leiden_sweep is deprecated and will be removed in 0.5. "
+                 "Use leiden_n_clusters.", FutureWarning)
     flavor = _resolve_flavor(flavor)
     import anndata as ad
     adata = ad.AnnData(np.asarray(emb, dtype=float))
@@ -570,7 +572,7 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
         if name in _LISI_METRICS:
             problem = _lisi_helper_problem()
             if problem:
-                warnings.warn(_lisi_fallback_message(name, problem))
+                _compat.warn(_lisi_fallback_message(name, problem))
                 out[name] = float("nan")
                 return
         try:
@@ -580,7 +582,7 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
                 warnings.simplefilter("ignore")
                 out[name] = _tidy_value(name, fn())
         except Exception as exc:  # noqa: BLE001 - report and continue
-            warnings.warn(
+            _compat.warn(
                 f"scib metric {name!r} could not be computed "
                 f"({type(exc).__name__}: {str(exc)[:160]}); recording NaN."
             )

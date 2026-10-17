@@ -7,7 +7,7 @@ import re
 import warnings
 from pathlib import Path
 
-from .. import config
+from .. import _compat, config
 from ..config import _and_list
 from . import registry
 from .schema import (_NON_MODALITY_ROLES, AmbiguousVariantError, _batch_of,
@@ -277,7 +277,7 @@ def missing_dataset_message(base, dataset: str) -> str:
                           "holds it. multibench layout shows the layout."))
 
 
-def canonical_dataset(base, dataset: str, *, stacklevel: int = 3) -> str:
+def canonical_dataset(base, dataset: str) -> str:
     """The spelling of ``dataset`` in the listing of ``base``, with a warning
     when it differs only in case: a case-insensitive file system opens
     ``d52`` for ``D52``, and ``'d52'`` would then name a second dataset in
@@ -293,11 +293,11 @@ def canonical_dataset(base, dataset: str, *, stacklevel: int = 3) -> str:
     same = [n for n in listing if n.lower() == name.lower() and (base / n).is_dir()]
     if len(same) != 1:
         return name
-    warnings.warn(
+    _compat.warn(
         f"dataset {name!r} is not a folder under {base}, but {same[0]!r} is - using "
         f"that on-disk spelling (this file system ignores letter case; Linux does "
         f"not, and results, out_dir names and records carry {same[0]!r})",
-        UserWarning, stacklevel=stacklevel)
+        UserWarning)
     return same[0]
 
 
@@ -451,10 +451,10 @@ def inputs_for(dataset: str, category: str, method: str, *,
                 _check_atac_gas_cells(method, dataset, named)
                 _check_diagonal_label_files(named)
     elif check is None and missing:
-        warnings.warn(
+        _compat.warn(
             _missing_inputs_text(method, category, ds_dir, missing, near)
             + " Pass check=True to raise this as an error, or check=False to silence it.",
-            UserWarning, stacklevel=2)
+            UserWarning)
     return out
 
 
@@ -1383,14 +1383,14 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
         msg = f"labels_for({dataset!r}, {category!r}): {hint}"
         if check:
             raise ValueError(msg)
-        warnings.warn(msg, UserWarning, stacklevel=2)
+        _compat.warn(msg, UserWarning)
     files = {p.stem: str(p) for p in ds_dir.glob("*cty*.csv")
              if "scjoint" not in p.name.lower()}
     stems = sorted(files, key=_label_sort_key)
     if method is None:
         note = _default_order_warning(dataset, category, stems, base)
         if note:
-            warnings.warn(note, UserWarning, stacklevel=2)
+            _compat.warn(note, UserWarning)
     if method is not None and category is not None:
         spec = registry.get(method)
         mods = registry.normalize_modalities(modalities)

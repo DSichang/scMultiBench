@@ -22,9 +22,11 @@ def _one_warning(call):
     return out, future[0]
 
 
-def _msg(old, new=None):
-    return f"{old} is deprecated and will be removed in 0.5. " + (
-        f"Use {new}." if new else "It has no effect.")
+def _msg(old, new=None, *, note="it has no effect"):
+    """The policy text: ``Use <new>.`` when a name replaces ``old``, else ``; <note>.``"""
+    if new:
+        return f"{old} is deprecated and will be removed in 0.5. Use {new}."
+    return f"{old} is deprecated and will be removed in 0.5; {note}."
 
 
 # ------------------------------------------------------------------ discover
@@ -52,11 +54,12 @@ def test_find_methods_task_still_filters():
     assert msg == _msg("find_methods(task=)", "category=")
 
 
-def test_find_methods_runnable_has_no_effect():
-    for value in (True, False):
+def test_find_methods_runnable_still_filters():
+    # True: the methods with a variant the package runs (all of them); False: stubs
+    for value, want in ((True, mtb.find_methods("vertical")), (False, [])):
         got, msg = _one_warning(lambda: mtb.find_methods("vertical", runnable=value))
-        assert got == mtb.find_methods("vertical")
-        assert msg == _msg("find_methods(runnable=)")
+        assert got == want
+        assert msg == _msg("find_methods(runnable=)", "scan")
 
 
 def test_cite_fmt_is_format():
@@ -76,8 +79,7 @@ def test_run_task_has_no_effect_and_convert_still_works():
     got, msg = _one_warning(lambda: mtb.run("Matilda", "vertical", inputs=inp, out_dir="o",
                                             dry_run=True, convert=False))
     assert got == ref
-    assert msg == _msg("run(convert=)", "canonical .h5 inputs, which run passes through "
-                                        "unchanged")
+    assert msg == _msg("run(convert=)", note="run converts the inputs it needs itself")
 
 
 def test_run_repo_path_still_points_at_the_scripts():
@@ -94,8 +96,7 @@ def test_scan_per_method_still_works():
     assert list(default.columns) == ["method", "modalities", "runnable", "reason"]
     got, msg = _one_warning(lambda: mtb.scan("D11", "vertical", per_method=True, verbose=False))
     pd.testing.assert_frame_equal(got, default)
-    assert msg == _msg("scan(per_method=)", "scan(); run_all(dry_run=True) returns one row "
-                                            "per variant")
+    assert msg == _msg("scan(per_method=)", "run_all(..., dry_run=True)")
     full, _ = _one_warning(lambda: mtb.scan("D11", "vertical", per_method=False, verbose=False))
     pd.testing.assert_frame_equal(full, mtb.run_all("D11", "vertical", dry_run=True,
                                                     verbose=False))
@@ -129,7 +130,7 @@ def test_source_still_reads_the_published_tables():
     got, msg = _one_warning(lambda: mtb.load_results("vertical", dataset="D11",
                                                      source="published"))
     assert set(got.source) == {"published"}
-    assert msg == _msg("load_results(source=)", "the default, the package's re-run tables")
+    assert msg == _msg("load_results(source=)", note="leave it out to read the re-run tables")
     assert set(mtb.load_results("vertical", dataset="D11").source) == {"rerun"}
 
 
@@ -140,37 +141,44 @@ def test_result_path_and_clustering_still_work(result_dir):
     with warnings.catch_warnings(record=True) as rec:
         warnings.simplefilter("always")
         mtb.load_results("vertical", dataset="D11", source="published", clustering="default")
-    assert _msg("load_results(clustering=)", "the default, the package's re-run tables") in \
+    assert _msg("load_results(clustering=)",
+                note="it picks the clustering variant of the published tables") in \
         [str(w.message) for w in rec]
 
 
-def test_available_datasets_is_results_coverage():
+def test_available_datasets_still_lists_the_published_tables():
     got, msg = _one_warning(mtb.available_datasets)
+    assert got == ["D11", "D24", "D25", "D28", "D52"]          # its 0.3 default
+    got, _ = _one_warning(lambda: mtb.available_datasets(source="rerun"))
     assert got == sorted(mtb.results_coverage().dataset.unique())
     assert msg == _msg("available_datasets", "results_coverage")
 
 
 def test_results_coverage_and_recommend_source():
     _, msg = _one_warning(lambda: mtb.results_coverage("vertical", source="rerun"))
-    assert msg == _msg("results_coverage(source=)", "the default, the package's re-run tables")
+    assert msg == _msg("results_coverage(source=)",
+                       note="leave it out to read the re-run tables")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
         ref = mtb.recommend("vertical")
         got, msg = _one_warning(lambda: mtb.recommend("vertical", source="rerun"))
     pd.testing.assert_frame_equal(got, ref)
-    assert msg == _msg("recommend(source=)", "the default, the package's re-run tables")
+    assert msg == _msg("recommend(source=)", note="leave it out to read the re-run tables")
 
 
 # ------------------------------------------------------------------ catalog / io / plot / env
-@pytest.mark.parametrize("name, new", [
-    ("canonical_id", "the name as written; every function accepts any spelling"),
-    ("canonical_metric", "the name as written; every function accepts any spelling"),
-    ("known_metrics", "catalog.metrics()"),
-    ("PAPER_COLUMNS", None),
+_ANY_SPELLING = "every function accepts any spelling of a name"
+
+
+@pytest.mark.parametrize("name, new, note", [
+    ("canonical_id", None, _ANY_SPELLING),
+    ("canonical_metric", None, _ANY_SPELLING),
+    ("known_metrics", "catalog.metrics()", None),
+    ("PAPER_COLUMNS", None, "it has no effect"),
 ])
-def test_catalog_names(name, new):
+def test_catalog_names(name, new, note):
     value, msg = _one_warning(lambda: getattr(mtb.catalog, name))
-    assert msg == _msg(f"catalog.{name}", new)
+    assert msg == _msg(f"catalog.{name}", new, note=note)
     assert name not in mtb.catalog.__all__ and name not in dir(mtb.catalog)
     if name == "known_metrics":
         assert value() == list(mtb.catalog.metrics().metric)
@@ -204,7 +212,7 @@ def test_io_normalize_peak_names(tmp_path):
     fn(src, dst)
     with h5py.File(dst) as h:
         assert [x.decode() for x in h["matrix/features"][:]] == ["chr1:1-200", "chr2:5-9"]
-    assert msg == _msg("io.normalize_peak_names", "run, which renames the peaks itself")
+    assert msg == _msg("io.normalize_peak_names", note="run renames the peaks itself")
     assert "normalize_peak_names" not in mtb.io.__all__ + dir(mtb.io)
 
 
@@ -254,7 +262,7 @@ def test_export_dataset_compression_still_works(tmp_path):
     out, msg = _one_warning(lambda: mtb.io.export_dataset(a, tmp_path / "X", compression=None))
     with h5py.File(out / "rna.h5") as h:
         assert h["matrix/data"].compression is None
-    assert msg == _msg("io.export_dataset(compression=)", "the default, gzip")
+    assert msg == _msg("io.export_dataset(compression=)", note="leave it out for gzip")
 
 
 def test_export_dataset_reads_the_atac_kind_from_the_names(tmp_path):
@@ -276,7 +284,8 @@ def test_export_dataset_reads_the_atac_kind_from_the_names(tmp_path):
         mtb.io.export_dataset(None, tmp_path / "Q", rna=rna, atac=odd)
 
 
-@pytest.mark.parametrize("name, new", [("status", "env.doctor"), ("plan", "env.install")])
+@pytest.mark.parametrize("name, new", [("status", "env.doctor"),
+                                       ("plan", "env.install(['Matilda'])")])
 def test_env_names(name, new):
     rows, msg = _one_warning(lambda: getattr(mtb.env, name)(**({} if name == "status" else
                                                              {"methods": ["Matilda"]})))
@@ -349,7 +358,7 @@ def test_cli_deprecated_commands_warn_once_and_work():
     code, out, err = _cli("find", "--category", "vertical", "--runnable")
     assert out.split() == mtb.find_methods("vertical")
     assert err.strip() == "warning: --runnable is deprecated and will be removed in 0.5. " \
-                          "It has no effect."
+                          "Use multibench scan."
     code, out, err = _cli("find", "--task", "dimension_reduction")
     assert out.split() == ["Matilda", "sciPENN"]
     assert err.strip() == "warning: --task is deprecated and will be removed in 0.5. " \
