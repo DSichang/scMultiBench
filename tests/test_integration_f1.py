@@ -169,8 +169,8 @@ def test_vertical_tutorial_export_demo_writes_counts(root, tmp_path, monkeypatch
     i = next(i for i, src in enumerate(code) if "mtb.io.export_dataset(adata" in src)
     export = code[i]                       # the check and run_all have a cell each
     assert "run_all" not in export and export.startswith('NAME = "MYCITE"')
-    assert code[i + 1].startswith("mtb.scan(NAME, ")
-    assert code[i + 2].startswith("mine = mtb.run_all(NAME")
+    assert code[i + 1].startswith("mtb.scan(\"mydata/\" + NAME, ")
+    assert code[i + 2].startswith("mine = mtb.run_all(\"mydata/\" + NAME")
     monkeypatch.setattr(mtb.config.DEFAULT, "data_path", root / "data")
     monkeypatch.chdir(tmp_path)
     ns = {"mtb": mtb, "pd": pd}

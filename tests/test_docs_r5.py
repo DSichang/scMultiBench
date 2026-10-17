@@ -50,7 +50,8 @@ def test_quickstart_cli_block_runs_and_plots_without_label_files():
 def test_evaluate_page_comparability_sentence_is_plain():
     visible = " ".join(_visible(_read("tutorials/evaluate.md")).split())
     assert "compare ranks, not decimals" not in visible
-    assert "Most methods' scores vary slightly between runs. Compare ranks." in visible
+    assert ("most methods give a slightly different embedding on each run. Compare ranks."
+            in visible)
 
 
 @needs_docs

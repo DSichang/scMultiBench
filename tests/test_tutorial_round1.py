@@ -208,8 +208,8 @@ def _own_data_cells(key):
     i = next(i for i, src in enumerate(code) if "mtb.io.export_dataset(" in src)
     assert "run_all" not in code[i], code[i]
     assert code[i].startswith(f'NAME = "{GEN.OWN[key]["name"]}"'), code[i]
-    assert code[i + 1].startswith("mtb.scan(NAME, "), code[i + 1]
-    assert code[i + 2].startswith("mine = mtb.run_all(NAME, "), code[i + 2]
+    assert code[i + 1].startswith("mtb.scan(\"mydata/\" + NAME, "), code[i + 1]
+    assert code[i + 2].startswith("mine = mtb.run_all(\"mydata/\" + NAME, "), code[i + 2]
     assert code[i - 2] == f'mtb.data.write_example("{GEN.TASKS[key]["ds"]}")', code[i - 2]
     return code[i - 2], code[i - 1], code[i]
 
