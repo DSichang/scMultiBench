@@ -663,10 +663,12 @@ def _atac_role(feats, rna_feats) -> str:
     genes = set(rna_feats or ())
     if genes and sum(1 for x in feats if x in genes) > 0.5 * len(feats):
         return "atac_gas"
+    what = ("neither peaks such as chr1:100-200 nor the RNA's gene names" if genes
+            else "not peaks such as chr1:100-200")
     raise ValueError(
-        "The ATAC feature names are neither peaks such as chr1:100-200 nor the RNA's "
-        "gene names. Pass " + config.hint("atac_kind='peak' or atac_kind='gene_activity'.",
-                                          "--atac-kind peak or --atac-kind gene_activity."))
+        f"The ATAC feature names are {what}. Pass "
+        + config.hint("atac_kind='peak' or atac_kind='gene_activity'.",
+                      "--atac-kind peak or --atac-kind gene_activity."))
 
 
 def _write_canonical(out: Path, X, feats, bars, *, dtype, compression, block):

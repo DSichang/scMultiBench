@@ -123,8 +123,9 @@ def test_export_dataset_atac_kinds(tmp_path):
     # 0.4: without atac_kind= the kind is read from the feature names
     d3 = ingest.export_dataset(peaks, tmp_path / "E", rna=None, atac="X")
     assert sorted(p.name for p in d3.iterdir()) == ["atac.h5", "atac_peak.h5"]
-    with pytest.raises(ValueError, match="neither peaks such as chr1:100-200 nor the "
-                                         "RNA's gene names"):
+    # no RNA to compare with: the message names the peaks only
+    with pytest.raises(ValueError, match=r"^The ATAC feature names are not peaks such as "
+                                         r"chr1:100-200\. Pass atac_kind="):
         ingest.export_dataset(genes, tmp_path / "E2", rna=None, atac="X")
     with pytest.raises(ValueError, match="atac_kind= must be one of"):
         ingest.export_dataset(peaks, tmp_path / "E3", rna=None, atac="X", atac_kind="gas")
