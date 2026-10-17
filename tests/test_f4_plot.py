@@ -149,14 +149,14 @@ def test_na_raise_does_not_offer_to_hide_the_error():
 def test_na_raise_cli_spelling(tmp_path, capsys):
     p = tmp_path / "in.csv"
     _with_gap().to_csv(p, index=False)
-    # 0.4: plot --na is deprecated and has no effect; the figure is drawn
+    # 0.4.x: plot --na is deprecated and keeps its effect: raise refuses the table
     rc = cli.main(["plot", "bubble", "--input", str(p), "--na", "raise",
                    "--out", str(tmp_path / "f.png")])
     err = capsys.readouterr().err
-    assert rc == 0
-    assert ("warning: --na is deprecated and will be removed in 0.5; it has no effect."
-            in err)
-    assert "Its Overall uses the metrics it has." in err
+    assert rc != 0
+    assert ("warning: --na is deprecated and will be removed in 0.5; leave it out for a "
+            "warning that names the n/a cells." in err)
+    assert "Leave out --na to draw the figure with these gaps." in err
     assert "hide this message" not in err
 
 

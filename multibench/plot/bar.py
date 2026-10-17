@@ -18,8 +18,10 @@ CLASSIFICATION_METRICS = FAMILY_METRICS["classification"]
 FAMILY_CMAPS = {"clustering": "Blues", "batch": "Greens", "classification": "Pinks"}
 
 
-@_compat.keywords("plot.bar", renamed={"group": "metrics"},
-                  dropped=("cmap", "show_datasets"))
+@_compat.keywords("plot.bar", renamed={"group": "metrics"}, private="_bar", kept={
+    "cmap": _compat.note("leave it out for the metric family's colours"),
+    "show_datasets": _compat.note(
+        'leave it out to draw the dataset dots of overall="mean_overall"')})
 def bar(long_df: pd.DataFrame, *, metrics=None, top: int | None = None,
         title: str | None = None, save: str | None = None, overall: str = "rank"):
     """Draw each method's overall score across datasets as a horizontal bar.
@@ -82,6 +84,15 @@ def bar(long_df: pd.DataFrame, *, metrics=None, top: int | None = None,
     mtb.plot.bubble : per-dataset (or rank-averaged) bubble table, same ``overall=`` formulas.
     mtb.load_results : stored metric tables as a long frame.
     """
+    return _bar(long_df, metrics=metrics, top=top, title=title, save=save,
+                overall=overall)
+
+
+def _bar(long_df: pd.DataFrame, *, metrics=None, top: int | None = None,
+         title: str | None = None, save: str | None = None, overall: str = "rank",
+         cmap: str = "Blues", show_datasets: bool = True):
+    """:func:`bar`, with the deprecated ``cmap`` (the colours when no metric
+    family is drawn) and ``show_datasets`` of 0.3."""
     import matplotlib.pyplot as plt
     from .bubble import _resolve
     from ..data import catalog
@@ -145,7 +156,7 @@ def bar(long_df: pd.DataFrame, *, metrics=None, top: int | None = None,
     # importing scib (mtb.evaluate) switches them to seaborn's "talk" sizes
     with plt.style.context("default"):
         fig, ax = plt.subplots(figsize=(7.2, max(2.2, 0.34 * n + 1.1)))
-        colors = style.colormap(FAMILY_CMAPS.get(family, "Blues"))(
+        colors = style.colormap(FAMILY_CMAPS.get(family, cmap))(
             0.35 + 0.55 * minmax(mean.to_numpy()))
         # whisker = SD across datasets; none for a method in one dataset, and none
         # under overall="rank", whose bar is not a mean of per-dataset scores
@@ -159,7 +170,7 @@ def bar(long_df: pd.DataFrame, *, metrics=None, top: int | None = None,
                 linewidth=0.6, zorder=2, xerr=xerr,
                 error_kw=dict(ecolor="#333", elinewidth=1.0, capsize=3, capthick=1.0))
 
-        if overall == "mean_overall" and per_ds.shape[1] > 1:
+        if show_datasets and overall == "mean_overall" and per_ds.shape[1] > 1:
             for i, m in enumerate(mean.index):
                 vals = per_ds.loc[m].dropna().to_numpy()
                 ax.scatter(vals, np.full(len(vals), i), s=16, facecolor="white",

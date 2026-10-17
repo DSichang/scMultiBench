@@ -257,13 +257,13 @@ def test_the_na_hint_uses_the_spelling_of_the_caller(tmp_path, capsys):
     matplotlib.use("Agg")
     args = ["plot", "bubble", "--category", "diagonal", "--dataset", "D28",
             "--metrics", "ARI,NMI,ASW", "--out", str(tmp_path / "f.png")]
-    # 0.4: --na / na= of bubble have no effect, so no message offers them
+    # 0.4: --na / na= of bubble are deprecated, so no message offers them
     assert cli.main(args) == 0
     err = capsys.readouterr().err
     assert "hide this message" not in err and "na='skip'" not in err
     assert cli.main(args + ["--na", "skip"]) == 0
-    assert ("warning: --na is deprecated and will be removed in 0.5; it has no effect."
-            in capsys.readouterr().err)
+    assert ("warning: --na is deprecated and will be removed in 0.5; leave it out for a "
+            "warning that names the n/a cells." in capsys.readouterr().err)
     with warnings.catch_warnings(record=True) as rec:
         warnings.simplefilter("always")
         mtb.plot.bubble(mtb.load_results("diagonal", dataset="D28"),

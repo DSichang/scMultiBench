@@ -956,9 +956,15 @@ def _cmd_plot(args) -> int:
         metrics = metrics[0]
     with _quiet_stdout():
         if args.kind == "bubble":
-            plot_ns.bubble(df, metrics=metrics, methods=methods, aggregate=args.aggregate,
-                           title=title, save=args.out, overall=args.overall,
-                           require_complete=args.require_complete)
+            kw = dict(metrics=metrics, methods=methods, aggregate=args.aggregate,
+                      title=title, save=args.out, overall=args.overall,
+                      require_complete=args.require_complete)
+            if args.na is None:
+                plot_ns.bubble(df, **kw)
+            else:
+                # --na (deprecated, warned once) keeps its effect until 0.5
+                from .plot.bubble import _bubble
+                _bubble(df, **kw, na=args.na)
         else:
             plot_ns.bar(df, metrics=metrics, top=args.top, title=title, save=args.out,
                         overall=args.overall)
@@ -2099,7 +2105,8 @@ def build_parser() -> argparse.ArgumentParser:
     pp.add_argument("--require-complete", dest="require_complete", action="store_true",
                     help="bubble --aggregate summary: keep only methods present in "
                          "every dataset instead of warning")
-    pp.add_argument("--na", choices=["warn", "skip", "raise"], action=_Retired)
+    pp.add_argument("--na", choices=["warn", "skip", "raise"], action=_Retired,
+                    tail=_compat.note("leave it out for a warning that names the n/a cells"))
     pp.add_argument("--group", choices=["clustering", "batch", "classification"],
                     dest="metrics", action=_Retired, tail=_compat.use("--metrics"))
     pp.add_argument("--top", type=int, help="bar only: keep the N best methods")

@@ -475,12 +475,14 @@ def test_na_rule_in_summary_mode_is_rank_zero():
     assert tbl.na_cells == ["B: NMI n/a in D2 -> rank 0 there"]
 
 
-def test_bubble_na_is_deprecated_and_has_no_effect():
-    # 0.4: bubble(na=) warns once and is ignored (build_table(na=) still works)
+def test_bubble_na_is_deprecated_and_keeps_its_effect():
+    # 0.4.x: bubble(na=) warns once and still applies the policy, as in 0.3.9
     import matplotlib; matplotlib.use("Agg")
     with pytest.warns(FutureWarning, match=r"plot\.bubble\(na=\) is deprecated and will "
-                                           r"be removed in 0\.5; it has no effect\."):
-        bubble.bubble(_with_gap(), na="raise")      # draws: the old policy is not applied
+                                           r"be removed in 0\.5; leave it out for a "
+                                           r"warning that names the n/a cells\."), \
+            pytest.raises(ValueError, match="Pass na='warn' to draw the figure"):
+        bubble.bubble(_with_gap(), na="raise")
 
 
 def test_radius_uses_methods_scored_in_the_column():

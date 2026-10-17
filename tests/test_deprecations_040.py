@@ -230,21 +230,68 @@ def _long():
     return mtb.load_results("vertical", dataset="D11")
 
 
-def test_bar_group_is_metrics_and_the_styling_keywords_have_no_effect():
+def _pixels(fig):
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=40)
+    return buf.getvalue()
+
+
+#: the tails of the 0.3 styling keywords, which keep their effect through 0.4.x
+#: (the figures equal 0.3.9's for the same table)
+BAR_TAILS = {"cmap": "leave it out for the metric family's colours",
+             "show_datasets": 'leave it out to draw the dataset dots of overall="mean_overall"'}
+BUBBLE_TAILS = {"cmap": "leave it out for the families' colours",
+                "show_language": "leave it out to draw the Py / R chips",
+                "na": "leave it out for a warning that names the n/a cells"}
+
+
+def test_bar_group_is_metrics_and_the_styling_keywords_keep_their_effect():
     import matplotlib.pyplot as plt
     _, msg = _one_warning(lambda: mtb.plot.bar(_long(), group="clustering"))
     assert msg == _msg("plot.bar(group=)", "metrics=")
-    for kw in ({"cmap": "Reds"}, {"show_datasets": False}):
-        _, msg = _one_warning(lambda: mtb.plot.bar(_long(), **kw))
-        assert msg == _msg(f"plot.bar({next(iter(kw))}=)")
+    two = mtb.load_results("vertical")                       # D11 and D11s: dots drawn
+    plain = _pixels(mtb.plot.bar(two, overall="mean_overall"))
+    for kw, value in (("cmap", "Reds"), ("show_datasets", False)):
+        fig, msg = _one_warning(lambda: mtb.plot.bar(two, overall="mean_overall",
+                                                     **{kw: value}))
+        assert msg == _msg(f"plot.bar({kw}=)", note=BAR_TAILS[kw])
+        assert _pixels(fig) != plain, kw
+    from matplotlib.collections import PathCollection        # the dots: a scatter
+    dots = mtb.plot.bar(two, overall="mean_overall", show_datasets=True)
+    no_dots = mtb.plot.bar(two, overall="mean_overall", show_datasets=False)
+    assert [c for c in dots.axes[0].collections if isinstance(c, PathCollection)]
+    assert not [c for c in no_dots.axes[0].collections if isinstance(c, PathCollection)]
+    # a metric family keeps its own colours, as in 0.3.9
+    fam = _pixels(mtb.plot.bar(_long(), metrics="clustering"))
+    assert _pixels(mtb.plot.bar(_long(), metrics="clustering", cmap="Reds")) == fam
     plt.close("all")
 
 
-@pytest.mark.parametrize("kw", [{"na": "skip"}, {"cmap": "Reds"}, {"show_language": False}])
-def test_bubble_styling_keywords_have_no_effect(kw):
+@pytest.mark.parametrize("kw", [{"cmap": "Reds"}, {"show_language": False}])
+def test_bubble_styling_keywords_keep_their_effect(kw):
     import matplotlib.pyplot as plt
-    _, msg = _one_warning(lambda: mtb.plot.bubble(_long(), **kw))
-    assert msg == _msg(f"plot.bubble({next(iter(kw))}=)")
+    plain = _pixels(mtb.plot.bubble(_long()))
+    fig, msg = _one_warning(lambda: mtb.plot.bubble(_long(), **kw))
+    name = next(iter(kw))
+    assert msg == _msg(f"plot.bubble({name}=)", note=BUBBLE_TAILS[name])
+    assert _pixels(fig) != plain
+    if name == "show_language":
+        assert not {"Py", "R"} & {t.get_text() for t in fig.axes[0].texts}
+    plt.close("all")
+
+
+def test_bubble_na_keeps_its_effect():
+    import matplotlib.pyplot as plt
+    df = _long()
+    gap = df[~((df.method == "MOFA2") & (df.metric == "NMI"))]
+    _, msg = _one_warning(lambda: mtb.plot.bubble(gap, na="skip"))
+    assert msg == _msg("plot.bubble(na=)", note=BUBBLE_TAILS["na"])
+    with warnings.catch_warnings(record=True) as rec:
+        warnings.simplefilter("always")
+        mtb.plot.bubble(gap, na="skip")
+    assert not [w for w in rec if "has no NMI" in str(w.message)]
+    with pytest.warns(FutureWarning), pytest.raises(ValueError, match="has no NMI"):
+        mtb.plot.bubble(gap, na="raise")
     plt.close("all")
 
 

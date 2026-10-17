@@ -635,7 +635,8 @@ def _na_message(missing: list, df: pd.DataFrame, aggregate: str,
         sentences.append("Its Overall uses the metrics it has." if len(missing) == 1
                          else "Each row's Overall uses the metrics it has.")
     if na == "raise":
-        sentences.append("Pass na='warn' to draw the figure with these gaps.")
+        sentences.append(_config.hint("Pass na='warn' to draw the figure with these gaps.",
+                                      "Leave out --na to draw the figure with these gaps."))
     return " ".join(sentences)
 
 
@@ -985,7 +986,13 @@ def _fit_width(fig, ax, pad_pt=3.0, rounds=4):
         fig.tight_layout()
 
 
-@_compat.keywords("plot.bubble", dropped=("na", "cmap", "show_language"))
+#: the 0.3 keywords of bubble, which keep their effect until 0.5
+_KEPT = {"cmap": _compat.note("leave it out for the families' colours"),
+         "show_language": _compat.note("leave it out to draw the Py / R chips"),
+         "na": _compat.note("leave it out for a warning that names the n/a cells")}
+
+
+@_compat.keywords("plot.bubble", private="_bubble", kept=_KEPT)
 def bubble(long_df, *, metrics=None, methods=None, order=None,
            aggregate="dataset", title=None, save=None, require_complete=False,
            overall="rank"):
@@ -1056,12 +1063,22 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
     mtb.plot.bar : one bar per method across datasets; same ``overall=`` formulas.
     mtb.to_long : reshape ``mtb.evaluate``'s scores into a long table.
     """
+    return _bubble(long_df, metrics=metrics, methods=methods, order=order,
+                   aggregate=aggregate, title=title, save=save,
+                   require_complete=require_complete, overall=overall)
+
+
+def _bubble(long_df, *, metrics=None, methods=None, order=None,
+            aggregate="dataset", title=None, save=None, require_complete=False,
+            overall="rank", cmap=None, show_language=True, na="warn"):
+    """:func:`bubble`, with the deprecated ``cmap``, ``show_language`` and
+    ``na`` of 0.3 (``render``'s and ``build_table``'s)."""
     tbl = build_table(long_df, metrics=metrics, methods=methods, order=order,
                       aggregate=aggregate, require_complete=require_complete,
-                      overall=overall)
+                      overall=overall, na=na)
     if len(tbl.methods) == 2:
         _compat.warn(style.TWO_METHODS, UserWarning)
-    fig = render(tbl, title=title)
+    fig = render(tbl, cmap=cmap, title=title, show_language=show_language)
     if save is not None:
         fig.savefig(save, bbox_inches="tight")
     return fig
