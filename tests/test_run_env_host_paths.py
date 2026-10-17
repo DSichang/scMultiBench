@@ -19,7 +19,7 @@ import re
 
 import pytest
 
-from multibench.engine import registry, runner
+from multibench.engine import envs, registry, runner
 
 
 def _is_paths(x) -> bool:
@@ -56,8 +56,10 @@ def _rerooted(env: dict, root) -> dict:
 
 
 def _old_merge(run_env: dict) -> dict:
-    """The child environment exactly as the runner built it before the fix."""
-    env = {**os.environ, "PYTHONNOUSERSITE": "1", **{k: str(v) for k, v in run_env.items()}}
+    """The child environment exactly as the runner built it before the fix,
+    over the environment without the user's R library (0.4.0)."""
+    env = {**envs.without_user_r_library(os.environ), "PYTHONNOUSERSITE": "1",
+           **{k: str(v) for k, v in run_env.items()}}
     if "MPLBACKEND" not in run_env:
         env["MPLBACKEND"] = "Agg"
     return env

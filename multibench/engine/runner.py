@@ -805,8 +805,10 @@ def _run(method: str, category: str, *, inputs: dict, out_dir: str,
     ours = cmd_template is None or ENV_CMD in cmd_template
     provenance = config.run_provenance(envs.group_for(method) if ours else None, repo)
 
-    # user site-packages (~/.local) can shadow the env's packages
-    run_env = {**os.environ, "PYTHONNOUSERSITE": "1", **_host_run_env(variant.run_env)}
+    # user site-packages (~/.local) can shadow the env's packages, and so can
+    # the user's personal R library: our env holds every package it needs
+    base_env = envs.without_user_r_library(os.environ) if ours else dict(os.environ)
+    run_env = {**base_env, "PYTHONNOUSERSITE": "1", **_host_run_env(variant.run_env)}
     # a Jupyter kernel's MPLBACKEND (matplotlib_inline) does not exist in the env
     if "MPLBACKEND" not in (variant.run_env or {}):
         run_env["MPLBACKEND"] = "Agg"

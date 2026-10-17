@@ -1713,9 +1713,37 @@ def create_group(group: str, env_name: str | None = None, conda: str | None = No
     return cmds
 
 
+#: R's variables that name a library of the user's own; :func:`without_user_r_library`
+#: removes them
+_R_USER_LIBRARY_VARS = ("R_LIBS", "R_LIBS_SITE")
+#: R's variables set to a path that is not a directory: R leaves such a path off
+#: .libPaths() and reads no file there. An empty R_LIBS_USER would not do:
+#: R's etc/Renviron sets ${R_LIBS_USER:-'%U'}, the default personal library.
+_R_NO_USER_FILES = ("R_LIBS_USER", "R_ENVIRON_USER", "R_PROFILE_USER")
+
+
+def without_user_r_library(environ) -> dict:
+    """``environ`` as a dict in which R sees only the env's own library.
+
+    A package in the user's personal library (``R_LIBS_USER``, by default
+    ``~/R/<platform>-library/<x.y>``) is loaded before the env's copy, and
+    one built with another compiler fails to load (MOFA2: plyr.so,
+    ``CXXABI_1.3.15 not found``). ``R_LIBS`` and ``R_LIBS_SITE`` go,
+    ``R_LIBS_USER`` points at a path that is not a directory, and so do
+    ``R_ENVIRON_USER`` and ``R_PROFILE_USER``: ``~/.Renviron`` and
+    ``~/.Rprofile`` can set the library again.
+    """
+    out = {k: v for k, v in environ.items() if k not in _R_USER_LIBRARY_VARS}
+    out.update(dict.fromkeys(_R_NO_USER_FILES, os.devnull))
+    return out
+
+
 def _run_all(cmds: list[list[str]]) -> None:
     # else pip skips a package that ~/.local provides, which run() hides
     os.environ.setdefault("PYTHONNOUSERSITE", "1")
+    # else a post-install script finds an R package in the user's library,
+    # skips it, and the run, which does not read that library, fails
+    env = without_user_r_library(os.environ)
     if cmds and shutil.which(cmds[0][0]) is None:
         raise RuntimeError(
             "Neither conda nor mamba is on this machine. Method environments "
@@ -1724,7 +1752,7 @@ def _run_all(cmds: list[list[str]]) -> None:
             "list, stored results and figures work without them."
         )
     for c in cmds:
-        proc = subprocess.run(c, capture_output=True, text=True)
+        proc = subprocess.run(c, capture_output=True, text=True, env=env)
         if proc.returncode != 0:
             raise RuntimeError(
                 f"env command failed: {' '.join(c)}\nstderr tail:\n{proc.stderr[-2000:]}"
