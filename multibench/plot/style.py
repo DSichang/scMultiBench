@@ -27,13 +27,16 @@ def _tie_round(x) -> np.ndarray:
 def minmax(x: np.ndarray) -> np.ndarray:
     """Scale to [0,1]; a constant vector -> ones (as in R); NaN stays NaN.
 
-    Values are compared after rounding to :data:`TIE_DECIMALS` places, so a
-    column that differs only by floating-point noise counts as constant.
+    A column whose values agree to :data:`TIE_DECIMALS` places counts as
+    constant, so one that differs only by floating-point noise is all ones.
     The bubble figure draws such a column in a neutral grey
-    (:func:`constant_columns`); the numbers stay as in R.
+    (:func:`constant_columns`); the numbers stay as in R. Other columns are
+    scaled from the unrounded values: rounding first would move a value of a
+    narrow column (0.99995 to 0.99999) by up to 1e-9 / its range.
     """
-    x = _tie_round(x)
-    if not np.isfinite(x).any() or np.nanmin(x) == np.nanmax(x):
+    x = np.asarray(x, dtype=float)
+    r = _tie_round(x)
+    if not np.isfinite(r).any() or np.nanmin(r) == np.nanmax(r):
         return np.where(np.isnan(x), np.nan, 1.0)
     lo, hi = np.nanmin(x), np.nanmax(x)
     return (x - lo) / (hi - lo)
