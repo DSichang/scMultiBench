@@ -513,7 +513,7 @@ def load_results(
     pandas.DataFrame
         One row per score: ``metric, value, method, dataset, category,
         clustering, source``. ``attrs["rerun_version"]`` holds the package
-        version that ran the methods.
+        version that scored the stored rows.
 
     Raises
     ------
@@ -840,8 +840,8 @@ def results_coverage(category: str | None = None) -> pd.DataFrame:
     -------
     pandas.DataFrame
         One sorted row per ``category, dataset, method, clustering, source``;
-        ``attrs["rerun_version"]`` holds the package version that ran the
-        methods.
+        ``attrs["rerun_version"]`` holds the package version that scored
+        the stored rows.
 
     Raises
     ------

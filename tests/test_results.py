@@ -77,7 +77,7 @@ def test_source_column_and_values(result_dir):
     rr = results.load_results("diagonal", dataset="D28")
     assert (rr.source == "rerun").all()
     assert rr.method.nunique() == 12
-    assert abs(_val(rr, "iNMF", "ARI") - 0.472126) < 1e-6
+    assert abs(_val(rr, "iNMF", "ARI") - 0.234054) < 1e-6
 
 
 def test_source_both_concat(result_dir):
@@ -306,7 +306,7 @@ def test_user_method_name_accepted_in_file(tmp_path):
 
 
 def test_degenerate_rerun_rows_are_flagged(result_dir):
-    with pytest.warns(DegenerateRerunWarning, match=r"Conos/D28 \(re-run 0.2.1, ARI 0.0004\)") as rec:
+    with pytest.warns(DegenerateRerunWarning, match=r"Conos/D28 \(re-run 0.4.0, ARI 0.0013\)") as rec:
         rr = results.load_results("diagonal", dataset="D28")
     assert "Conos" in set(rr.method)          # flagged, never dropped silently
     msg = str(rec[0].message)
@@ -366,17 +366,17 @@ def test_source_column_is_plain_rerun_and_version_in_attrs(result_dir, tmp_path)
     frame.attrs['rerun_version']."""
     rr = _quiet_rerun("vertical", dataset="D11")
     assert set(rr.source) == {"rerun"}
-    assert rr.attrs["rerun_version"] == "0.2.1"
+    assert rr.attrs["rerun_version"] == "0.4.0"
     assert len(rr[rr.source == "rerun"]) == len(rr)
     both = _quiet_rerun("cross", dataset="D52", source="both")
     assert set(both.source) == {"published", "rerun"}
-    assert both.attrs["rerun_version"] == "0.2.1"
+    assert both.attrs["rerun_version"] == "0.4.0"
     # published-only frames carry the key too, as None
     pub = results.load_results("diagonal", dataset="D28", source="published")
     assert set(pub.source) == {"published"} and pub.attrs["rerun_version"] is None
     # results_coverage reports the same stamp and plain 'rerun' rows
     cov = mtb.results_coverage("cross", source="both")
-    assert set(cov.source) == {"published", "rerun"} and cov.attrs["rerun_version"] == "0.2.1"
+    assert set(cov.source) == {"published", "rerun"} and cov.attrs["rerun_version"] == "0.4.0"
     # a user file: the column keeps whatever it carries, an old stamp is
     # still matched by source='rerun' (prefix) and parsed into attrs
     old = rr.assign(source="rerun-0.1.0")
@@ -390,7 +390,7 @@ def test_source_column_is_plain_rerun_and_version_in_attrs(result_dir, tmp_path)
     back = results.load_results(result_path=f, source="rerun")
     assert set(back.source) == {"rerun"} and back.attrs["rerun_version"] is None
     # the DegenerateRerunWarning keeps naming the full stamp
-    with pytest.warns(DegenerateRerunWarning, match=r"Conos/D28 \(re-run 0.2.1, ARI"):
+    with pytest.warns(DegenerateRerunWarning, match=r"Conos/D28 \(re-run 0.4.0, ARI"):
         results.load_results("diagonal", dataset="D28")
 
 

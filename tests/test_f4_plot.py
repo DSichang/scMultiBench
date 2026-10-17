@@ -227,7 +227,7 @@ def test_degenerate_rerun_warning_head_is_a_sentence(result_dir):
     msg = str(rec[0].message)
     assert msg.startswith(
         "This re-run row has ARI below 0.01, while the published table has above 0.2 "
-        "for the same method and dataset: Conos/D28 (re-run 0.2.1, ARI 0.0004). Such a "
+        "for the same method and dataset: Conos/D28 (re-run 0.4.0, ARI 0.0013). Such a "
         "row most likely comes from a failed re-run")
     _no_log_joins(msg)
 
