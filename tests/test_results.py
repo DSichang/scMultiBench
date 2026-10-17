@@ -342,11 +342,14 @@ def test_catalog_datasets_covers_every_dataset_with_results(result_dir, layout_t
     assert len(extra) == 4 and extra.has_results.all()
     assert extra.set_index("dataset").loc["D11s", "category"] == "vertical"
     # the CSV rows come first, the appended ids after them in natural order
-    tail = cat.dataset.tolist()[-4:]
-    assert tail == ["D11s", "D28s", "D45s", "D52s"]
-    # category / has_results come from the re-run tables only: a configured
-    # root with published tables only (the layout tree) marks nothing and
-    # appends none of its ids
+    tail = cat.dataset.tolist()[-5:]
+    assert tail == ["D11s", "D24", "D28s", "D45s", "D52s"]
+    # the article's datasets keep their category; has_results is the re-run tables'
+    rows = cat.set_index("dataset")
+    assert rows.loc["D24", "category"] == rows.loc["D25", "category"] == "diagonal"
+    assert not rows.loc["D24", "has_results"] and not rows.loc["D25", "has_results"]
+    # a configured root with published tables only (the layout tree) marks no
+    # dataset as having results
     monkeypatch.setattr(mtb.config.DEFAULT, "result_path", layout_tree)
     cat2 = mtb.catalog.datasets()
     assert not cat2.has_results.any()
@@ -459,7 +462,8 @@ def test_shipped_tree_is_consistent_across_the_api(result_dir):
            for c in ("vertical", "diagonal", "mosaic", "cross")}
     assert pub == {"vertical": ["D11"], "diagonal": ["D24", "D25", "D28"],
                    "mosaic": [], "cross": ["D52"]}
-    rr = results.available_datasets()
+    assert results.available_datasets() == ["D11", "D24", "D25", "D28", "D52"]   # 0.3 default
+    rr = results.available_datasets(source="rerun")
     assert rr == ["D11", "D11s", "D28", "D28s", "D45", "D45s", "D52", "D52s"]
     cov = mtb.results_coverage(source="both")
     assert set(cov[cov.source == "published"].dataset) == set(sum(pub.values(), []))

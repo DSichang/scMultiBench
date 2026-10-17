@@ -317,15 +317,17 @@ def datasets(files_dir: Path | str | None = None, *,
     files_dir : Path | str | None
         Folder holding ``dataset.csv``; ``None`` = the package's shipped ``files/``.
     category : str | None
-        Keep only datasets with stored results in this integration category
-        (``vertical``, ``diagonal``, ``mosaic`` or ``cross``); ``None`` = all.
+        Keep only the datasets the benchmark scored in this integration
+        category (``vertical``, ``diagonal``, ``mosaic`` or ``cross``);
+        ``None`` = all.
 
     Returns
     -------
     pandas.DataFrame
         One row per dataset id: ``dataset``, ``simulated`` (ids starting with
-        ``SD``), ``category`` (the categories whose stored scores hold it,
-        ``;``-joined) and ``has_results``.
+        ``SD``), ``category`` (the categories the benchmark scored it in,
+        ``;``-joined) and ``has_results`` (``mtb.load_results`` has scores
+        for it).
 
     Raises
     ------
@@ -351,13 +353,16 @@ def datasets(files_dir: Path | str | None = None, *,
     name_col = "dataset name" if "dataset name" in raw.columns else "dataset"
     raw = raw.assign(**{name_col: raw[name_col].astype(str).str.strip()})
 
-    # from the result tree at each call, so no dataset load_results serves is missing
+    # from the result tree at each call, so no dataset load_results serves is
+    # missing; the article's tables give the category of D24 and D25 too
     from . import results
     cat_of: dict[str, list[str]] = {}
+    served: set[str] = set()
     for cat in results._CATEGORIES:
         try:
-            for ds in results._available_datasets(cat):
+            for ds in results._available_datasets(cat, source="both"):
                 cat_of.setdefault(ds, []).append(cat)
+            served.update(results._available_datasets(cat, source="rerun"))
         except Exception:       # a broken/absent tree must not break the catalog
             continue
     csv_ids = list(raw[name_col])
@@ -369,7 +374,7 @@ def datasets(files_dir: Path | str | None = None, *,
     out["dataset"] = raw[name_col].astype(str).str.strip()
     out["simulated"] = out["dataset"].str.upper().str.startswith("SD")
     out["category"] = out["dataset"].map(lambda d: ";".join(cat_of[d]) if d in cat_of else None)
-    out["has_results"] = out["dataset"].isin(cat_of.keys())
+    out["has_results"] = out["dataset"].isin(served)
 
     for col in _PAPER_COLUMNS:
         if col in raw.columns and raw[col].notna().any():
