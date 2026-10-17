@@ -90,8 +90,9 @@ def load_batch(out_dir, *, methods=None, data_path=None) -> "BatchResult":
     ``BatchResult.long`` is rebuilt from the records' rounded ``metrics``.
     ``methods=`` only filters: records keep the order the tree ran them.
 
-    A record whose ``out_dir`` does not exist is pointed at the folder of the
-    same name next to ``batch_result.json``. The dataset folder is looked up
+    A record whose ``out_dir`` does not exist, or that has none, is pointed at
+    the folder of the same name (``<method>_<dataset>``) next to
+    ``batch_result.json``. The dataset folder is looked up
     under ``data_path=``, the recorded ``data_path`` and then ``data_root``,
     and the one found is recorded as an absolute path. So a ``fetch_outputs``
     tree or a copied ``run_all`` folder can be re-scored.
@@ -120,9 +121,10 @@ def load_batch(out_dir, *, methods=None, data_path=None) -> "BatchResult":
         records = [r for r in records if r.get("method") in set(methods)]
     _check_data_path(data_path, blob["dataset"])
     for r in records:
-        # a tree copied from another host: the output folder sits next to the JSON
-        saved = r.get("out_dir")
-        if saved and not Path(saved).exists() and (folder / Path(saved).name).is_dir():
+        # a tree copied from another host: the output folder sits next to the JSON;
+        # an older record without out_dir: the folder run_all names
+        saved = r.get("out_dir") or f"{r.get('method')}_{blob['dataset']}"
+        if not Path(saved).exists() and (folder / Path(saved).name).is_dir():
             r["out_dir"] = str((folder / Path(saved).name).resolve())
         # left as recorded when no root holds the dataset; rescore then names the roots
         root, found = _dataset_root(r, blob["dataset"], data_path)
@@ -2168,6 +2170,10 @@ class BatchResult:
 
         Raises
         ------
+        FileNotFoundError
+            The output of no method is found; the message gives the first
+            method's error. A method that cannot be scored otherwise is
+            recorded as ``RUN_OK_EVAL_FAILED``, with the reason in ``error``.
         ValueError
             ``labels`` or ``batch`` holds ids that are not cells of the dataset,
             or a cell has no batch.
@@ -2222,6 +2228,7 @@ class BatchResult:
                 batch_at[root] = (vec, by_cell, file)
         if batch is None and _names_batch_metric(metrics):
             _warn_unsaved_batch([r for r in self.records if _scorable(r)], self)
+        no_output = []             # records whose saved output is not found
         for r, (root, ok) in zip(self.records, found):
             rec = copy.deepcopy({k: v for k, v in r.items() if k != "_long"})
             rec["_long"] = None
@@ -2235,7 +2242,16 @@ class BatchResult:
             try:
                 mods = rec.get("modalities") or []
                 variant = registry.get(method).select(self.category, set(mods))
-                emb = _load_embedding(Path(rec["out_dir"]), variant)
+                try:
+                    if not rec.get("out_dir"):
+                        raise FileNotFoundError(
+                            f"The record of {method} has no out_dir, and "
+                            f"{Path(self.out_dir or '.') / f'{method}_{self.dataset}'} "
+                            f"does not exist.")
+                    emb = _load_embedding(Path(rec["out_dir"]), variant)
+                except FileNotFoundError:
+                    no_output.append(method)
+                    raise
                 if emb is None:
                     rec["status"] = "RUN_OK_NO_EMBEDDING"
                     rec["note"] = (f"output kind={variant.output.kind}; this method does not "
@@ -2275,7 +2291,16 @@ class BatchResult:
                        if str(r.get("note") or "").startswith("The saved batch is not used")),
                       None)
         if unused:
-            warnings.warn(unused, UserWarning, stacklevel=2)
+            _compat.warn(unused, UserWarning)
+        # a tree whose outputs are all gone (moved, or an older layout): nothing
+        # to score, so say so instead of returning a table without scores
+        tried_records = [r for r in new.records if _scorable(r)]
+        if tried_records and len(no_output) == len(tried_records):
+            first = tried_records[0]
+            n = len(tried_records)
+            raise FileNotFoundError(f"rescore found the output of none of the {n} "
+                                    f"{'method' if n == 1 else 'methods'}. "
+                                    f"{first['method']}: {first.get('error')}")
         return new
 
     def save(self, out_dir=None) -> "Path":

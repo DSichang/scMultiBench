@@ -485,9 +485,13 @@ def test_named_blocked_methods_are_logged_and_recorded(tmp_path, monkeypatch, ca
     back = mtb.load_batch(tmp_path / "out")
     assert set(back.failures["method"]) == {"UnitedNet", "MIRA"}
     assert "2 skipped" in repr(back)
-    # rescore keeps a SKIPPED record as it is
-    again = _quiet(back.rescore, metrics=["ARI"])
+    # rescore keeps a SKIPPED record as it is (scMVP's fake run left no output,
+    # and a tree with no output to score raises: MIRA alone)
+    again = _quiet(mtb.load_batch(tmp_path / "out", methods=["MIRA"]).rescore,
+                   metrics=["ARI"])
     assert {r["method"]: r["status"] for r in again.records}["MIRA"] == "SKIPPED"
+    with pytest.raises(FileNotFoundError, match="rescore found the output of none of"):
+        _quiet(back.rescore, metrics=["ARI"])
 
 
 def test_unnamed_gpu_rows_are_skipped_but_not_failures(tmp_path, monkeypatch, capsys):

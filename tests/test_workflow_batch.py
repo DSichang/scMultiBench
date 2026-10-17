@@ -138,9 +138,11 @@ def test_rescore_handles_missing_output(cite, tmp_path):
     res = mtb.run_all("MYCITE", "vertical", methods=["Matilda"], modalities=["rna", "adt"],
                       out_dir=tmp_path / "out", data_path=data, verbose=False)
     (tmp_path / "out" / "Matilda_MYCITE" / "embedding.h5").unlink()
-    re = res.rescore()
-    assert re.summary.loc[0, "status"] == "RUN_OK_EVAL_FAILED"
-    assert "no output" in re.records[0]["error"]
+    # 0.4: no output to score at all is an error, not a table without scores
+    with pytest.raises(FileNotFoundError, match=r"rescore found the output of none of the "
+                                                r"1 method\. Matilda: FileNotFoundError: "
+                                                r"no output .* to score"):
+        res.rescore()
 
 
 def test_rescore_is_documented():
