@@ -18,6 +18,7 @@ import re
 from pathlib import Path
 
 import pytest
+from tests.conftest import full_scan
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -402,7 +403,7 @@ def test_every_method_of_a_task_has_its_input_files_on_the_dataset(key):
     everyone = GEN.task_methods(key)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        sc = mtb.scan(t["ds"], t["cat"], methods=everyone, assume_gpu=True, verbose=False)
+        sc = full_scan(t["ds"], t["cat"], methods=everyone, assume_gpu=True, verbose=False)
     assert sorted(set(sc[sc.files_ok].method)) == everyone, \
         (key, sorted(set(everyone) - set(sc[sc.files_ok].method)))
 

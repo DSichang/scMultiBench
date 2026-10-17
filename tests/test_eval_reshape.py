@@ -141,7 +141,7 @@ def _evaluate_frame():
     import numpy as np
     lab = np.repeat(["a", "b"], 20)
     emb = np.random.default_rng(0).normal(size=(40, 3)) + (lab == "b")[:, None] * 5.0
-    return mtb.evaluate(emb, labels=lab, clustering=lab, metrics=["ARI", "NMI"])
+    return mtb.evaluate(emb, labels=lab, clusters=lab, metrics=["ARI", "NMI"])
 
 
 def test_to_long_accepts_plain_read_csv_of_evaluate_frame(tmp_path):
@@ -170,8 +170,8 @@ def test_to_long_accepts_cli_evaluate_out_read_back_plainly(tmp_path):
     labels = tmp_path / "cty.csv"
     pd.DataFrame({"x": lab}).to_csv(labels, index=False)
     f = tmp_path / "wide.csv"
-    assert cli.main(["evaluate", "--output", str(emb), "--labels", str(labels),
-                     "--clustering", str(labels), "--metrics", "ARI,NMI", "--out", str(f)]) == 0
+    assert cli.main(["evaluate", "--embedding", str(emb), "--labels", str(labels),
+                     "--clusters", str(labels), "--metrics", "ARI,NMI", "--out", str(f)]) == 0
     out = to_long(pd.read_csv(f), method="M", dataset="D", category="vertical")
     assert out.metric.tolist() == ["ARI", "NMI"]
 

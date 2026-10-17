@@ -17,6 +17,7 @@ import pytest
 import multibench as mtb
 from multibench import cli, workflow
 from multibench.engine import envs, registry
+from tests.conftest import full_scan
 
 
 
@@ -70,12 +71,12 @@ def test_requested_method_with_no_variant_in_category_is_a_request_error(no_envs
 
 # ------------------------------------------------------------------ J6: did-you-mean before any I/O
 @pytest.mark.parametrize("call", [
-    lambda: mtb.scan("NOPE", "vertical", data_path="/nonexistent/dir", methods=["StabMapp"]),
+    lambda: full_scan("NOPE", "vertical", data_path="/nonexistent/dir", methods=["StabMapp"]),
     lambda: mtb.run_all("NOPE", "vertical", out_dir="/tmp/unused", data_path="/nonexistent/dir",
                         methods=["StabMapp"], verbose=False),
     lambda: mtb.run_all("NOPE", "vertical", out_dir="/tmp/unused", data_path="/nonexistent/dir",
                         params={"StabMapp": {"k": 1}}, verbose=False),
-    lambda: mtb.scan("NOPE", "vertical", data_path="/nonexistent/dir", methods=["StabMapp"],
+    lambda: full_scan("NOPE", "vertical", data_path="/nonexistent/dir", methods=["StabMapp"],
                      out_dir="runs"),
 ])
 def test_unknown_method_raises_did_you_mean_before_filesystem(call):
@@ -104,15 +105,15 @@ def test_cli_scan_default_table_is_compact(capsys):
     assert rc == 0
     header = out.splitlines()[0].split()
     # the compact set, plus atac because D11's vertical variants read ATAC
-    assert header == cli._compact_plan_columns(mtb.scan("D11", "vertical", verbose=False))
-    assert [c for c in header if c not in ("atac", "caveat")] == cli._COMPACT_PLAN_COLUMNS
+    assert header == workflow.compact_columns(full_scan("D11", "vertical", verbose=False))
+    assert [c for c in header if c not in ("atac", "caveat")] == workflow.COMPACT_COLUMNS
     assert _widest(out) <= 160, _widest(out)
     assert "..." in out                      # long reasons are clipped
     assert "env_reason" not in out
 
 
 def test_cli_scan_columns_all_and_machine_formats_are_full(capsys):
-    full_cols = list(mtb.scan("D11", "vertical", verbose=False).columns)
+    full_cols = list(full_scan("D11", "vertical", verbose=False).columns)
     assert "command" in full_cols                     # --columns all includes it
     rc = cli.main(["scan", "D11", "--category", "vertical", "--columns", "all"])
     out = capsys.readouterr().out
@@ -141,7 +142,7 @@ def test_cli_scan_columns_all_and_machine_formats_are_full(capsys):
     from multibench import config
     config._CLI = True
     try:
-        _frame = multibench.scan("D11", "vertical", methods=["Matilda"])
+        _frame = full_scan("D11", "vertical", methods=["Matilda"])
     finally:
         config._CLI = False
     assert rc == 0 and all(str(r) in out for r in _frame["reason"] if r)
@@ -161,8 +162,8 @@ def test_cli_run_all_dry_run_is_compact_too(capsys, tmp_path):
     cap = capsys.readouterr()
     assert rc == 0
     table = cap.out.split("\n# Commands")[0]
-    assert table.splitlines()[0].split() == cli._compact_plan_columns(
-        mtb.scan("D11", "vertical", verbose=False))
+    assert table.splitlines()[0].split() == workflow.compact_columns(
+        full_scan("D11", "vertical", verbose=False))
     assert _widest(table) <= 160
     assert "# Dry run." in cap.err and "# Dry run." not in cap.out
 
@@ -204,8 +205,8 @@ def test_run_all_dry_run_help_matches_behaviour():
 
 
 def test_scan_command_column_renders_for_out_dir():
-    df = mtb.scan("D11", "vertical", out_dir="runs", methods=["Matilda"], verbose=False)
-    plan = mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False)
+    df = full_scan("D11", "vertical", out_dir="runs", methods=["Matilda"], verbose=False)
+    plan = full_scan("D11", "vertical", methods=["Matilda"], verbose=False)
     # the '<out_dir>' placeholder by default; a real out_dir renders paste-ready lines
     assert list(df.columns) == list(plan.columns) == workflow.SCAN_COLUMNS
     pd.testing.assert_frame_equal(df.drop(columns="command"), plan.drop(columns="command"))
@@ -344,7 +345,7 @@ _SAMPLE = ["Matilda", "UINMF", "SCALEX", "Concerto", "totalVI", "MOFA2", "scMoMa
 
 
 def test_default_env_name_is_the_env_every_entry_point_uses():
-    scan_env = dict(zip(*[mtb.scan("D11", "vertical")[c] for c in ("method", "env")]))
+    scan_env = dict(zip(*[full_scan("D11", "vertical")[c] for c in ("method", "env")]))
     for m in _SAMPLE:
         assert envs.default_env_name(m) == envs.group_for(m) == mtb.method_info(m)["env"]
         if m in scan_env:
@@ -494,8 +495,8 @@ def test_warnings_are_formatted_on_stderr(monkeypatch, capsys):
 
     def warn_scan(*a, **k):
         warnings.warn("something odd in the data")
-        return pd.DataFrame({"method": ["M"], "runnable": [True]})
-    monkeypatch.setattr(mtb, "scan", warn_scan)
+        return pd.DataFrame({"method": ["M"], "runnable": [True]}), None
+    monkeypatch.setattr(workflow, "_scan", warn_scan)
     monkeypatch.delenv("MULTIBENCH_DEBUG", raising=False)
     rc = cli.main(["scan", "D11", "--category", "vertical"])
     cap = capsys.readouterr()

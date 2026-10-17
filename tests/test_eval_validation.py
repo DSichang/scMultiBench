@@ -148,7 +148,7 @@ def test_labels_series_aligned_by_obs_names_against_anndata_output():
     pd.testing.assert_frame_equal(got.sort_index(), ref.sort_index())
     # clustering= too (and an obs column name works for clustering, like labels)
     a.obs["leiden"] = pd.Categorical(ct)
-    c1 = evaluate(a, labels="celltype", clustering="leiden", metrics=["ARI"])
+    c1 = evaluate(a, labels="celltype", clusters="leiden", metrics=["ARI"])
     c2 = evaluate(a, labels="celltype",
                   clustering=pd.Series(ct, index=ids).sample(frac=1, random_state=3),
                   metrics=["ARI"])
@@ -217,7 +217,7 @@ def test_labels_for_some_cells_say_how_to_mark_the_others(tmp_path, capsys):
     assert str(exc.value) == file.format("labels") + row.format('missing_labels="drop"')
     # the command line names its own flag
     a.write_h5ad(tmp_path / "emb.h5ad")
-    assert cli.main(["evaluate", "--output", str(tmp_path / "emb.h5ad"), "--labels",
+    assert cli.main(["evaluate", "--embedding", str(tmp_path / "emb.h5ad"), "--labels",
                      str(tmp_path / "some.csv"), "--metrics", "ASW",
                      "--missing-labels", "drop"]) == 1
     assert ("error: " + file.format("labels") + row.format("--missing-labels drop")
@@ -409,7 +409,7 @@ def test_evaluate_to_long_concat_with_published_builds_the_bubble_table():
     emb, ct, bat, _ = _toy()
     mine_wide = evaluate(emb, metrics="all", labels=ct, batch=bat)
     mine = to_long(mine_wide, method="MyMethod", dataset="D52", category="cross")
-    published = mtb.load_results("cross", dataset="D52", source="rerun")
+    published = mtb.load_results("cross", dataset="D52")
     both = pd.concat([published, mine], ignore_index=True)
     # one spelling per metric after canonicalisation - no duplicate columns
     canon = both["metric"].map(mtb.data.catalog.canonical_metric)

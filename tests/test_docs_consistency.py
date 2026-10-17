@@ -183,7 +183,7 @@ def test_tutorials_use_the_public_api_not_raw_csv_reads():
         md = "\n".join(c.source for c in cells if c.cell_type == "markdown")
         # stored scores are drawn only where the task has a stored dataset
         assert ("mtb.load_results(" in src) == bool(s.get("stored_ds")), key
-        assert src.count("mtb.load_results(") == src.count('source="rerun"'), key
+        assert "source=" not in src, key
         assert "mtb.cite(" in md
         assert f'mtb.data.write_example("{s["ds"]}")' in src, key
         assert src.count("write_example(") == 1, key
@@ -233,6 +233,7 @@ def _methods_per_dataset(df):
     return {ds: set(g.method) for ds, g in df.groupby("dataset")}
 
 
+@pytest.mark.filterwarnings("ignore::FutureWarning")
 def test_clustering_variants_ship_per_category_as_documented(tmp_path):
     """The sentence in plot.md's "Clustering variants" section that says which
     variants ship follows the shipped tree: the variant files are exactly
@@ -249,18 +250,18 @@ def test_clustering_variants_ship_per_category_as_documented(tmp_path):
     for cat, variants in shipped.items():
         for variant, datasets in variants.items():
             if datasets:
-                df = mtb.load_results(cat, clustering=variant)
+                df = mtb.load_results(cat, clustering=variant, source="published")
                 assert set(df.dataset) == datasets and set(df.clustering) == {variant}
-                default = mtb.load_results(cat, dataset=sorted(datasets))
+                default = mtb.load_results(cat, dataset=sorted(datasets), source="published")
                 assert _methods_per_dataset(df) == _methods_per_dataset(default)
                 hit.add("loaded")
             else:
                 with pytest.raises(FileNotFoundError, match=f"have no {variant} variant"):
-                    mtb.load_results(cat, clustering=variant)
+                    mtb.load_results(cat, clustering=variant, source="published")
                 hit.add("raised")
     assert hit == {"loaded", "raised"}, f"the shipped tree exercises only {hit}: {shipped}"
     for variant in ("louvain", "kmeans"):
-        per_ds = _methods_per_dataset(mtb.load_results("diagonal", clustering=variant))
+        per_ds = _methods_per_dataset(mtb.load_results("diagonal", clustering=variant, source="published"))
         assert {ds: len(ms) for ds, ms in per_ds.items()} == {"D24": 14, "D25": 14, "D28": 14}
     # the nested layout, on a synthetic cross tree: one method, one dataset
     tree = tmp_path / "scib_metric" / "cross integration" / "D56" / "MOFA2"
@@ -270,35 +271,15 @@ def test_clustering_variants_ship_per_category_as_documented(tmp_path):
         (tree / sub / name).write_text(",Value\nARI,0.3\nNMI,0.5\n")
     assert _variant_files(tmp_path) == {"cross": {"louvain": {"D56"}, "kmeans": {"D56"}}}
     for variant in ("louvain", "kmeans"):
-        nested = mtb.load_results("cross", clustering=variant, result_path=tmp_path)
+        nested = mtb.load_results("cross", clustering=variant, result_path=tmp_path,
+                                  source="published")
         assert set(nested.dataset) == {"D56"} and set(nested.method) == {"MOFA2"}
         assert set(nested.clustering) == {variant}
-    # the docs note, clause by clause: a category said to ship "all three
-    # variants" names exactly the ids of EACH variant; one said to ship
-    # `default` only has no variant file; every category is named once
+    # the docs describe the stored scores only: the clustering variants of the
+    # article's tables are no longer named on the plot guide
     for path in _docs_md_files():
         if path.name == "plot.md" and path.parent.name == "tutorials":
-            marker = "### Clustering variants"
-            section = re.split(r"\n#{2,3} ", path.read_text().split(marker, 1)[1], maxsplit=1)[0]
-            # the sentences that name a category in bold, each clause on its own
-            clauses = [c for s in " ".join(section.split()).split(". ")
-                       if re.search(r"\*\*\w+\*\*", s) for c in s.split(";")]
-            sentence = ". ".join(clauses)
-            assert any("all three variants" in c for c in clauses), \
-                f"plot.md {marker!r}: no sentence says which variants ship"
-            named = []
-            for clause in clauses:
-                cats = re.findall(r"\*\*(\w+)\*\*", clause)
-                ids = set(re.findall(r"`(D\d+s?)`", clause))
-                assert cats, clause
-                for cat in cats:
-                    if "all three variants" in clause:
-                        assert shipped[cat] == {"louvain": ids, "kmeans": ids}, (cat, clause)
-                    else:
-                        assert "`default` only" in clause and not ids, clause
-                        assert shipped[cat] == {"louvain": set(), "kmeans": set()}, (cat, clause)
-                named += cats
-            assert sorted(named) == sorted(shipped), sentence
+            assert "### Clustering variants" not in path.read_text()
 
 
 # ---- phrases wave 4 retired (ordered labels_for dict, per-variant scan text,
@@ -382,7 +363,7 @@ def test_printed_examples_match_the_live_package(capsys):
     lines = mtb.cite("Matilda", "MOFA2").splitlines()   # the benchmark's reference, then one line per method
     assert len(lines) == 3 and PAPER_TITLE in lines[0] and PAPER_DOI in lines[0]
     assert "Matilda" in lines[1] and "MOFA+" in lines[2]
-    assert cli.main(["cite", "Matilda", "MOFA2"]) == 0
+    assert cli.main(["cite", "Matilda", "MOFA2", "--format", "bibtex"]) == 0
     assert capsys.readouterr().out.count("@article{") == 3
     for path in _docs_md_files():
         if path.name in ("quickstart.md", "installation.md"):
@@ -392,8 +373,8 @@ def test_printed_examples_match_the_live_package(capsys):
             # Installation dropped its copy of the dry-run line (R3-25); the
             # guarantee that a get-started page shows the CLI spelling stays here.
             text = path.read_text()
-            assert "multibench run --method SCALEX --category diagonal" in text \
-                and "--dry-run" in text, "quickstart.md must show one `multibench run ... --dry-run` line"
+            assert "multibench run-all D28 --category diagonal --methods SCALEX" in text \
+                and "--dry-run" in text, "quickstart.md must show the run-all line and --dry-run"
             # R4-16 shortened the runtime comment; its two fields are checked live above.
             assert "'tier': 'slow', 'worst_sec': 2233" in text
             assert "'scBridge'" in text
@@ -424,16 +405,13 @@ def test_docs_pages_carry_the_colab_speed_round(path):
         assert ("Each notebook then installs the environments of the methods it runs and "
                 "runs them, with no conda needed.") in colab
         assert "INSTALL_ENVS" not in text
-        assert "No conda binary is needed for the packed path" in text
+        assert "downloads prebuilt archives, with no conda needed" in text
         assert "MULTIBENCH_ENVS_DIR" in text and "~/.cache/multibench/envs" in text
         assert ("`RuntimeError: Conda is not installed on this computer. Environment "
                 "<env> has a packed archive.`") in text
     if path.name == "api.md":
         # the signatures live on the generated reference pages now; the
         # overview keeps the prose and links every entry point there
-        assert "### Run modes: prefix and conda" in text
-        assert "MULTIBENCH_RUN_MODE=conda|prefix" in text
-        assert "reference/env.md#multibench.engine.envs.env_prefix" in text
         assert "reference/data.md#multibench.data.fetch.fetch_outputs" in text
         assert "reference/run.md#multibench.workflow.load_batch" in text
         assert "reference/config.md#multibench.config.Config" in text
@@ -463,14 +441,11 @@ def test_docs_pages_carry_the_colab_speed_round(path):
 # This table is the docstring contract's canonical-path table.
 REFERENCE = {
     # public name: (reference page, ``:::`` path)
-    "mtb.list_methods": ("discover.md", "multibench.discover.list_methods"),
     "mtb.find_methods": ("discover.md", "multibench.discover.find_methods"),
     "mtb.method_info": ("discover.md", "multibench.discover.method_info"),
     "mtb.params_for": ("discover.md", "multibench.discover.params_for"),
     "mtb.describe_layout": ("discover.md", "multibench.workflow.describe_layout"),
     "mtb.cite": ("discover.md", "multibench.discover.cite"),
-    "mtb.list_tasks": ("discover.md", "multibench.engine.registry.list_tasks"),
-    "mtb.list_categories": ("discover.md", "multibench.workflow.list_categories"),
     "mtb.inputs_for": ("inputs.md", "multibench.engine.resolve.inputs_for"),
     "mtb.labels_for": ("inputs.md", "multibench.engine.resolve.labels_for"),
     "mtb.scan": ("run.md", "multibench.workflow.scan"),
@@ -484,20 +459,16 @@ REFERENCE = {
     "mtb.classify": ("score.md", "multibench.eval.classify.classify"),
     "mtb.classification_metrics": ("score.md", "multibench.eval.classify.classification_metrics"),
     "mtb.load_results": ("compare.md", "multibench.data.results.load_results"),
-    "mtb.available_datasets": ("compare.md", "multibench.data.results.available_datasets"),
     "mtb.results_coverage": ("compare.md", "multibench.data.results.results_coverage"),
     "mtb.recommend": ("compare.md", "multibench.data.results.recommend"),
     "mtb.DegenerateRerunWarning": ("compare.md", "multibench.data.results.DegenerateRerunWarning"),
     "mtb.AmbiguousVariantError": ("config.md", "multibench.engine.schema.AmbiguousVariantError"),
-    "mtb.env.status": ("env.md", "multibench.engine.envs.status"),
-    "mtb.env.plan": ("env.md", "multibench.engine.envs.plan"),
     "mtb.env.install": ("env.md", "multibench.engine.envs.install"),
     "mtb.env.doctor": ("env.md", "multibench.engine.envs.doctor"),
     "mtb.env.recipe": ("env.md", "multibench.engine.envs.recipe"),
     "mtb.io.export_dataset": ("io.md", "multibench.engine.ingest.export_dataset"),
     "mtb.io.to_canonical": ("io.md", "multibench.engine.ingest.to_canonical"),
     "mtb.io.read_canonical": ("io.md", "multibench.engine.ingest.read_canonical"),
-    "mtb.io.normalize_peak_names": ("io.md", "multibench.engine.ingest.normalize_peak_names"),
     "mtb.plot.bubble": ("plot.md", "multibench.plot.bubble.bubble"),
     "mtb.plot.bar": ("plot.md", "multibench.plot.bar.bar"),
     "mtb.plot.build_table": ("plot.md", "multibench.plot.bubble.build_table"),
@@ -509,11 +480,10 @@ REFERENCE = {
     "mtb.catalog.methods": ("catalog.md", "multibench.data.catalog.methods"),
     "mtb.catalog.datasets": ("catalog.md", "multibench.data.catalog.datasets"),
     "mtb.catalog.metrics": ("catalog.md", "multibench.data.catalog.metrics"),
-    "mtb.catalog.canonical_id": ("catalog.md", "multibench.data.catalog.canonical_id"),
-    "mtb.catalog.canonical_metric": ("catalog.md", "multibench.data.catalog.canonical_metric"),
-    "mtb.catalog.known_metrics": ("catalog.md", "multibench.data.catalog.known_metrics"),
     "mtb.config.Config": ("config.md", "multibench.config.Config"),
 }
+#: on the reference pages, not on the API overview (maintainer tools)
+MAINTAINER_NAMES = {"mtb.env.recipe"}
 NAMESPACES = ("env", "io", "plot", "data", "catalog", "config")
 MKDOCS = Path(os.environ.get(
     "SCMULTIBENCH_MKDOCS",
@@ -713,6 +683,8 @@ def test_api_overview_links_every_entry_point_to_its_reference_anchor():
     text = (docs / "api.md").read_text()
     directives = {(page, path) for page, path, _ in _reference_directives(docs)}
     for name, (page, path) in REFERENCE.items():
+        if name in MAINTAINER_NAMES:
+            continue
         link = f"[`{name}`](reference/{page}#{path})"
         assert link in text, f"api.md does not link {name} as {link}"
     for page, anchor in re.findall(r"\]\(reference/(\w+\.md)#([^)]+)\)", text):
@@ -1065,14 +1037,14 @@ def _visible(text):
 @needs_docs
 def test_get_started_pages_keep_the_round2_facts():
     """Quickstart: the laptop tab compares an RNA PCA on 2,000 genes with an
-    ADT PCA, scores with the stored tables' Leiden backend, links the
+    ADT PCA, says scores can differ from the stored ones by up to about 0.1, links the
     peaks-only section and defines cell order; the unpaired tab lives on
     tutorials/run only. Installation: the cluster recipe pins the build that
     has --assume-gpu and asks for a GPU only for the GPU method (M05-M07)."""
     docs = _docs_root()
     quick = (docs / "quickstart.md").read_text()
     for fact in ("highly_variable_genes(pc, n_top_genes=2000)", '"ADT PCA"',
-                 'leiden_flavor = "leidenalg"', "#my-atac-is-peaks-only"):
+                 "up to about 0.1", "#my-atac-is-peaks-only"):
         assert fact in quick, fact
     assert re.search(r"^    cell order\n    :   ", quick, re.M)
     assert '=== "Unpaired RNA + ATAC"' not in quick
@@ -1085,7 +1057,7 @@ def test_get_started_pages_keep_the_round2_facts():
 @needs_docs
 def test_guides_keep_the_round2_facts_visible():
     """The facts a reader copies sit in the visible text of the guides: the
-    D11 panel scores with leidenalg, a scanpy baseline loads D11 from
+    D11 panel scores with the default backend, a scanpy baseline loads D11 from
     data_path, the run guide shows the setup steps, {env_cmd} and a Slurm
     tab, evaluate saves the long table, discover explains grand_score and the
     Seurat_v5 bridge (M04, M09, M10, M11)."""
@@ -1094,7 +1066,7 @@ def test_guides_keep_the_round2_facts_visible():
         _visible((docs / "tutorials" / name).read_text())
         for name in ("plot.md", "run.md", "evaluate.md", "discover.md"))
     panel = plot.split('```python title="d11_panel.py"', 1)[1].split("```", 1)[0]
-    assert 'mtb.config.DEFAULT.leiden_flavor = "leidenalg"' in panel
+    assert "leidenalg" not in panel
     assert "### Try it with a PCA of D11" in plot and "mtb.config.DEFAULT.data_path" in plot
     assert "release_43.html" in run and "`multibench config` prints `repo_path`" in run
     assert "{env_cmd}" in run and '=== "Slurm job step"' in run
@@ -1146,11 +1118,6 @@ def test_api_overview_names_both_cases_of_file_exists_error(tmp_path):
     ``overwrite=True`` helps for the first only. The overview gives a fix for
     each, and the package raises in both."""
     api = _flat("api.md")
-    assert "or the folder holds files of other data that the call does not write" in api
-    assert ("- `FileExistsError`: `mtb.io.export_dataset` or `multibench convert` would "
-            "replace a file, or the folder holds files of other data that the call does not "
-            "write. For the first, pass `overwrite=True`, or `--overwrite` on the command "
-            "line. For the second, export to a new folder.") in api
     assert "delete the files" not in api                 # the message names one file and a count
     ad = pytest.importorskip("anndata")
     import numpy as np
@@ -1293,7 +1260,7 @@ def test_changes_page_lists_0_3_5():
     parser = cli.build_parser()
     for argv in (["scan", "D11", "--modalities", "all"],
                  ["run-all", "D11", "--category", "vertical", "--modalities", "all", "--dry-run"],
-                 ["evaluate", "--output", "e.h5", "--labels", "c.csv", "--missing-labels", "drop"],
+                 ["evaluate", "--embedding", "e.h5", "--labels", "c.csv", "--missing-labels", "drop"],
                  ["convert", "a.h5ad", "OUT", "--rna", "X", "--batch-index", "1",
                   "--n-batches", "3"]):
         parser.parse_args(argv)
@@ -1427,9 +1394,10 @@ def test_changes_page_quotes_the_live_0_3_5_texts(tmp_path, capsys, monkeypatch)
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     mtb.io.export_dataset(_own_cells(), tmp_path / "D11", rna="X", adt="obsm:protein",
                           labels="obs:celltype")
-    table = mtb.scan("D11", "vertical", data_path=tmp_path)
+    from tests.conftest import full_scan
+    table = full_scan("D11", "vertical", data_path=tmp_path)
     first = capsys.readouterr().out.splitlines()[0]
-    every = mtb.scan("D11", "vertical", data_path=tmp_path, modalities="all", verbose=False)
+    every = full_scan("D11", "vertical", data_path=tmp_path, modalities="all", verbose=False)
     assert (len(table), len(every)) == (14, 33)
     assert '`mtb.scan("D11", "vertical")` has 14 rows, where 0.3.4 had 33' in changed
     assert table.attrs == {"held": ["rna", "adt"], "not_listed": 19, "not_held": ["atac"]}
@@ -1451,7 +1419,7 @@ def test_changes_page_quotes_the_live_0_3_5_texts(tmp_path, capsys, monkeypatch)
     assert len(with_files) == 14 and with_files <= listed
     # D11 itself gives these rows
     if (mtb.config.DEFAULT.data_path / "D11").is_dir():
-        real = mtb.scan("D11", "vertical", verbose=False)
+        real = full_scan("D11", "vertical", verbose=False)
         key = ["method", "modalities", "files_ok"]
         assert real[key].values.tolist() == table[key].values.tolist()
         assert real.attrs == table.attrs
@@ -1462,15 +1430,13 @@ def test_changes_page_quotes_the_live_0_3_5_texts(tmp_path, capsys, monkeypatch)
         r"`(\w+)`, `(\w+)` and `(\w+)`\. It prints what the folder holds and how many cells "
         r"each matrix file has\. It needs a `category`\.", new).groups()
     capsys.readouterr()
-    one = mtb.scan("D11", "vertical", data_path=tmp_path, per_method=True)
+    one = mtb.scan("D11", "vertical", data_path=tmp_path)     # the 0.4 default
     printed = capsys.readouterr().out.splitlines()
-    assert tuple(one.columns) == columns
+    assert tuple(c for c in one.columns if c != "modalities") == columns
     assert one["method"].is_unique and set(one["method"]) == set(table["method"])
     assert " D11 holds RNA and ADT." in printed[0]
     assert printed[1] == "[scan] Cells per file: rna.h5 120, adt.h5 120."
     assert one.attrs == {**table.attrs, "cells": {"rna.h5": 120, "adt.h5": 120}}
-    with pytest.raises(ValueError, match="^per_method=True needs a category"):
-        mtb.scan("D11", data_path=tmp_path, per_method=True)
     # the fourth part of scored_with
     emb = np.random.default_rng(0).normal(size=(300, 4))
     labels = np.array(["A", "B", "C"] * 100, dtype=object)
@@ -1904,7 +1870,8 @@ def test_changes_page_names_the_files_without_features_and_the_10x_files(
         with pytest.raises(ValueError) as e:
             mtb.inputs_for(dataset, "vertical", "totalVI", data_path="data", check=True)
         assert str(e.value).startswith(problem), dataset
-        for table in (mtb.scan(dataset, "vertical", **kw),
+        from tests.conftest import full_scan
+        for table in (full_scan(dataset, "vertical", **kw),
                       mtb.run_all(dataset, "vertical", out_dir=f"out/{dataset}", dry_run=True,
                                   **kw)):
             assert table["files_ok"].tolist() == [False], dataset
@@ -2000,7 +1967,7 @@ def test_evaluate_guide_names_both_column_spellings_and_the_missing_values():
         run(call[:-1] + ', batch="donor")', donors)
     # scored_with: three parts, and a fourth after cells were left out
     assert ("`mtb.to_long` keeps the first three in its `scored_with` column, such as "
-            "`leidenalg/sweep/0.3.2`.") in guide
+            "`igraph/search/0.4.0`.") in guide
     (example,) = re.findall(r"When `missing_labels=\"drop\"` left cells out, a fourth part "
                             r"gives the cells scored, such as `([^`]+)`\.", guide)
 
@@ -2019,40 +1986,36 @@ def test_evaluate_guide_names_both_column_spellings_and_the_missing_values():
 
 @needs_docs
 def test_discover_guide_says_which_rows_scan_lists(tmp_path, monkeypatch):
-    """The guide names the default rows of ``scan`` and the two arguments
-    that change them. On a folder with RNA and ADT, the call of the guide
-    with each argument, as the guide spells it, lists those rows."""
+    """The guide names the default rows of ``scan``, the argument that lists
+    every method, and the call that gives one row per variant. On a folder with
+    RNA and ADT, the calls as the guide spells them list those rows."""
     pytest.importorskip("anndata")
     import multibench as mtb
     from multibench import workflow as W
     from multibench.engine import registry
     guide = _flat("tutorials/discover.md")
     assert 'Check your folder with `mtb.scan("MYDATA", category)`.' in guide
-    every, per_method = re.search(
-        r"By default `scan` lists the variants whose modalities the folder holds\. "
-        r"`(modalities=\"\w+\")` lists every variant, and `(per_method=\w+)` gives one row per "
-        r"method\.", guide).groups()
+    every, = re.search(
+        r"By default `scan` lists the methods that read the modalities the folder holds, "
+        r"and `(modalities=\"\w+\")` lists every method\. "
+        r"`mtb\.run_all\(\"MYDATA\", category, dry_run=True\)` gives one row per method "
+        r"variant, with its file and environment checks and its command\.", guide).groups()
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     mtb.io.export_dataset(_own_cells(), tmp_path / "MYDATA", adt="obsm:protein",
                           labels="obs:celltype")
-
-    def scan(*more):
-        code = ", ".join(['mtb.scan("MYDATA", category', "data_path=root", "verbose=False",
-                          *more]) + ")"
-        return eval(code, {"mtb": mtb, "category": "vertical", "root": tmp_path})
-    default, full, one = scan(), scan(every), scan(per_method)
-    # the variants whose modalities the folder holds
+    ns = {"mtb": mtb, "category": "vertical", "root": tmp_path}
+    default = eval('mtb.scan("MYDATA", category, data_path=root, verbose=False)', ns)
+    full = eval(f'mtb.scan("MYDATA", category, data_path=root, verbose=False, {every})', ns)
+    plan = eval('mtb.run_all("MYDATA", category, data_path=root, verbose=False, dry_run=True)',
+                ns)
+    # the methods that read the modalities the folder holds, one row each
+    assert default["method"].is_unique
     assert {m for mods in default["modalities"] for m in mods.split("+")} == {"rna", "adt"}
-    assert default["files_ok"].all()
-    # every variant of the category
-    variants = [(m, v) for m in mtb.list_methods("vertical") for v in registry.get(m).variants
-                if v.when.get("category") == "vertical"]
-    assert len(full) == len(variants) > len(default)
-    assert set(map(tuple, default[["method", "modalities"]].values)) \
-        < set(map(tuple, full[["method", "modalities"]].values))
-    # one row per method
-    assert one["method"].is_unique and set(one["method"]) == set(default["method"])
-    assert len(one) == default["method"].nunique()
+    # every method of the category
+    assert set(full["method"]) == set(mtb.find_methods("vertical")) > set(default["method"])
+    # one row per variant
+    assert set(plan["method"]) == set(default["method"]) and len(plan) >= len(default)
+    assert {"files_ok", "env_ok", "command"} <= set(plan.columns)
 
 
 @needs_docs

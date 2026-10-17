@@ -23,27 +23,27 @@ def _quiet(fn, *a, **kw):
 def test_raises_when_no_ranked_dataset_measured_the_modality():
     # a warning until 0.3.9; the ranking was returned all the same
     with pytest.raises(ValueError) as e:
-        mtb.recommend("vertical", modalities=["rna", "atac"], source="rerun")
+        mtb.recommend("vertical", modalities=["rna", "atac"])
     assert str(e.value) == (
         "Stored vertical scores come from D11, D11s (rna+adt). None of these datasets "
         "measured atac, so they cannot rank methods for RNA+ATAC data. Pass scores on "
         "such data as long_df=.")
     # atac= names the modality as well
-    with pytest.raises(ValueError, match=r"come from D11 \(rna\+adt\)\. None of these "
+    with pytest.raises(ValueError, match=r"come from D11, D11s \(rna\+adt\)\. None of these "
                                          r"datasets measured atac"):
         mtb.recommend("vertical", atac="peak")
 
 
 def test_no_modality_warning_when_the_data_measured_it():
-    for call in (lambda: mtb.recommend("vertical", modalities=["rna", "adt"], source="rerun"),
-                 lambda: mtb.recommend("diagonal", modalities=["rna", "atac"], source="rerun"),
-                 lambda: mtb.recommend("vertical", source="rerun")):
+    for call in (lambda: mtb.recommend("vertical", modalities=["rna", "adt"]),
+                 lambda: mtb.recommend("diagonal", modalities=["rna", "atac"]),
+                 lambda: mtb.recommend("vertical")):
         _, msgs = _quiet(call)
         assert not any("datasets measured" in m for m in msgs), msgs
 
 
 def test_datasets_column_names_where_each_score_comes_from():
-    r, _ = _quiet(mtb.recommend, "vertical", source="rerun")
+    r, _ = _quiet(mtb.recommend, "vertical")
     assert list(r.columns[:5]) == ["method", "grand_score", "n_datasets",
                                    "n_datasets_total", "coverage"]
     assert "datasets" in r.columns

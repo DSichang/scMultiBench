@@ -14,6 +14,7 @@ import pytest
 import multibench as mtb
 from multibench import cli, config, workflow
 from multibench.engine import envs, resolve
+from tests.conftest import full_scan
 
 PEAKS = [f"chr1:{i * 1000}-{i * 1000 + 200}" for i in range(40)]
 GENES = [f"g{i}" for i in range(30)]
@@ -53,7 +54,7 @@ def _diagonal(root, name, rna_cells, peak_cells, gas_cells=None):
 
 
 def _row(name, category, method, data_path, **kw):
-    df = mtb.scan(name, category, methods=[method], data_path=data_path, verbose=False, **kw)
+    df = full_scan(name, category, methods=[method], data_path=data_path, verbose=False, **kw)
     return df[df.method == method].iloc[0]
 
 
@@ -103,12 +104,6 @@ def test_seurat_v5_setup_hint_says_unpaired_data_cannot_run():
     assert mtb.method_info("Seurat_v5")["setup_hint"] == (
         "Seurat_v5 uses your RNA and ATAC files as its paired bridge, so both must hold "
         "the same cells. Unpaired data cannot run through the package.")
-
-
-def test_recommend_notes_name_the_bridge_dataset_of_the_stored_scores():
-    doc = mtb.recommend.__doc__
-    assert ("The stored Seurat_v5 diagonal scores come from runs with a separate paired "
-            "bridge dataset") in " ".join(doc.split())
 
 
 # --- M16: atac_gas.h5 must list the ATAC cells of atac_peak.h5, in its order --
@@ -161,7 +156,7 @@ def test_a_gem_well_suffix_alone_is_the_same_cells(tmp_path):
 
 
 def test_d28_scans_as_before(root):
-    df = mtb.scan("D28", "diagonal", data_path=root / "data", verbose=False)
+    df = full_scan("D28", "diagonal", data_path=root / "data", verbose=False)
     # the rows for several RNA and ATAC batches read numbered files D28 lacks
     several = df.modalities.str.contains(r"\d")
     assert sorted(df[several].method) == ["GLUE", "iNMF", "online_iNMF", "scJoint"]
@@ -372,7 +367,7 @@ def test_labels_for_uinmf_returns_the_batches_it_reads(root):
 
 
 def test_scan_caveat_names_the_unused_batch(root):
-    df = mtb.scan("D52", "cross", data_path=root / "data", verbose=False)
+    df = full_scan("D52", "cross", data_path=root / "data", verbose=False)
     df = df[df.files_ok]
     by = df.set_index(["method", "modalities"])["caveat"]
     assert by[("UINMF", "+".join(TWO_BATCHES))].startswith(

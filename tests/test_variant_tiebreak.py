@@ -20,6 +20,7 @@ import pytest
 import multibench as mtb
 from multibench import workflow as W
 from multibench.engine import envs, registry, resolve
+from tests.conftest import full_scan
 
 DEMO = Path(os.environ.get("MULTIBENCH_DATA_PATH", ""))
 NESTED = ("scMoMaT", "Multigrate", "MOFA2")       # these read peak ATAC
@@ -154,7 +155,7 @@ def _fake_run(calls, n_cells=24):
 
 def test_scan_keeps_every_row(tmp_path, all_envs):
     _tri(tmp_path)
-    df = mtb.scan("TRI", "vertical", methods=["scMoMaT"], data_path=tmp_path, verbose=False)
+    df = full_scan("TRI", "vertical", methods=["scMoMaT"], data_path=tmp_path, verbose=False)
     assert sorted(df["modalities"]) == ["rna+adt", "rna+adt+atac", "rna+atac"]
     assert df["runnable"].all()
 

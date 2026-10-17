@@ -21,6 +21,7 @@ import pytest
 import multibench as mtb
 from multibench import cli, config, workflow as W
 from multibench.engine import envs, ingest
+from tests.conftest import full_scan
 
 ad = pytest.importorskip("anndata")
 
@@ -177,7 +178,7 @@ def test_vertical_peak_file_under_the_diagonal_name_says_how_to_fix(tmp_path, ga
     _mu_tc(tmp_path)
     # the real Matilda reads peaks and gets scMVP's advice; `gas_matilda`
     # stands for a vertical method that reads gene activity
-    df = mtb.scan("MU_TC", "vertical", data_path=tmp_path, verbose=False)
+    df = full_scan("MU_TC", "vertical", data_path=tmp_path, verbose=False)
     df = df.set_index(["method", "modalities"])
     peak = df.loc[("scMVP", "rna+atac"), "reason"]
     assert ('scMVP reads atac.h5 for vertical. Rename atac_peak.h5 to atac.h5, or write it '
@@ -201,7 +202,7 @@ def test_vertical_peak_file_under_the_diagonal_name_says_how_to_fix(tmp_path, ga
 def test_vertical_peak_fix_names_the_cli_flag(tmp_path, monkeypatch):
     _mu_tc(tmp_path)
     monkeypatch.setattr(config, "_CLI", True)
-    df = mtb.scan("MU_TC", "vertical", data_path=tmp_path, methods=["scMVP"], verbose=False)
+    df = full_scan("MU_TC", "vertical", data_path=tmp_path, methods=["scMVP"], verbose=False)
     assert ("Rename atac_peak.h5 to atac.h5, or write it with --category vertical."
             in df["reason"].iloc[0])
 
@@ -224,7 +225,6 @@ def _subparsers():
 
 def test_export_dataset_atac_lines_leave_out_cross():
     doc = ingest.export_dataset.__doc__
-    assert "``'diagonal'``: ``atac_peak.h5`` or ``atac_gas.h5``" in doc
     assert "``'cross'``: ``atac_peak" not in doc
 
 
@@ -269,9 +269,9 @@ def test_strict_counts_a_missing_env_and_a_missing_gpu_apart(monkeypatch, capsys
 
 def test_scan_assume_gpu_keeps_the_row_and_says_so(login_node):
     kw = dict(methods=["SMILE"], verbose=False)
-    plain = mtb.scan("D45", "mosaic", **kw).iloc[0]
+    plain = full_scan("D45", "mosaic", **kw).iloc[0]
     assert not plain["runnable"] and "NVIDIA GPU" in plain["env_reason"]
-    row = mtb.scan("D45", "mosaic", assume_gpu=True, **kw).iloc[0]
+    row = full_scan("D45", "mosaic", assume_gpu=True, **kw).iloc[0]
     assert row["runnable"] and row["env_ok"] and row["env_reason"] == ""
     assert row["caveat"].startswith("SMILE needs an NVIDIA GPU. This check assumes the job "
                                     "runs on a GPU node.")
@@ -281,8 +281,8 @@ def test_scan_assume_gpu_previews_the_gpu_node_command(login_node, tmp_path):
     from tests.test_gpu_requirements import _cite
     _cite(tmp_path)
     kw = dict(methods=["scMDC"], data_path=tmp_path, verbose=False)
-    cpu = mtb.scan("CITE", "vertical", **kw)
-    gpu = mtb.scan("CITE", "vertical", assume_gpu=True, **kw)
+    cpu = full_scan("CITE", "vertical", **kw)
+    gpu = full_scan("CITE", "vertical", assume_gpu=True, **kw)
     assert "--device cpu" in cpu[cpu.modalities == "rna+adt"]["command"].iloc[0]
     assert "--device" not in gpu[gpu.modalities == "rna+adt"]["command"].iloc[0]
 
@@ -290,7 +290,7 @@ def test_scan_assume_gpu_previews_the_gpu_node_command(login_node, tmp_path):
 def test_scan_assume_gpu_is_a_no_op_on_a_gpu_host(monkeypatch):
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
-    row = mtb.scan("D45", "mosaic", methods=["SMILE"], assume_gpu=True,
+    row = full_scan("D45", "mosaic", methods=["SMILE"], assume_gpu=True,
                    verbose=False).iloc[0]
     assert row["runnable"] and "GPU node" not in row["caveat"]
 

@@ -14,6 +14,7 @@ import pytest
 import multibench as mtb
 from multibench import workflow as W
 from multibench.engine import envs, registry
+from tests.conftest import full_scan
 
 #: the caveat of a gene-activity method given peaks in atac.h5 (after the method)
 GAS_CAV = ("needs gene-activity ATAC. The features of atac.h5 look like chr:start-end, "
@@ -57,7 +58,7 @@ def all_envs(monkeypatch):
 
 def test_scan_file_gate_runs_without_envs(tmp_path, no_envs):
     _rna_only(tmp_path)
-    df = mtb.scan("ONLYRNA", "vertical", data_path=tmp_path)
+    df = full_scan("ONLYRNA", "vertical", data_path=tmp_path)
     rows = df[df["modalities"] == "rna+adt"]
     assert len(rows) > 0
     assert not rows["files_ok"].any()
@@ -81,7 +82,7 @@ def test_scan_file_gate_runs_without_envs(tmp_path, no_envs):
 def test_scan_missing_dataset_folder_raises(tmp_path):
     (tmp_path / "HERE").mkdir()
     with pytest.raises(FileNotFoundError) as e:
-        mtb.scan("D99", data_path=tmp_path)
+        full_scan("D99", data_path=tmp_path)
     msg = str(e.value)
     assert "D99" in msg and "does not exist" in msg
     assert "HERE" in msg, "must list the folders that DO exist"
@@ -91,7 +92,7 @@ def test_scan_empty_folder_flags_data_dir_methods(tmp_path, all_envs, monkeypatc
     # scBridge calls CUDA unconditionally; a mocked GPU keeps the env gate open
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
     (tmp_path / "EMPTY").mkdir()
-    df = mtb.scan("EMPTY", "diagonal", data_path=tmp_path)
+    df = full_scan("EMPTY", "diagonal", data_path=tmp_path)
     rows = df[df["method"] == "scBridge"]
     assert len(rows) == 1
     r = rows.iloc[0]
@@ -107,24 +108,24 @@ def test_scan_empty_folder_flags_data_dir_methods(tmp_path, all_envs, monkeypatc
 
 
 def test_scan_runnable_equals_files_ok_and_env_ok(all_envs):
-    df = mtb.scan("D11")
+    df = full_scan("D11")
     assert (df["runnable"] == (df["files_ok"] & df["env_ok"])).all()
     assert ((df["reason"].str.len() > 0) == ~df["runnable"]).all()
     assert df["runnable"].any(), "D11 CITE-seq must have runnable vertical rows once envs exist"
 
 
 def test_scan_env_reason_names_method_and_category(no_envs):
-    df = mtb.scan("D11", "cross")
+    df = full_scan("D11", "cross")
     row = df[df["method"] == "StabMap"].iloc[0]
     assert "--methods StabMap" in row["env_reason"]
     assert "--category cross" in row["env_reason"]
-    assert "--packed --run" in row["env_reason"]
+    assert "--run" in row["env_reason"]
     assert row["env_reason"].startswith(f"Environment {row['env']} is not installed.")
     assert not row["env_ok"]
 
 
 def test_scan_new_columns_present_and_old_order_kept(all_envs):
-    df = mtb.scan("D11", modalities="all")
+    df = full_scan("D11", modalities="all")
     assert list(df.columns[:len(OLD_COLUMNS)]) == OLD_COLUMNS
     assert list(df.columns) == W.SCAN_COLUMNS == OLD_COLUMNS + NEW_COLUMNS
     assert set(df["atac"].dropna()) <= {"peak", "gene_activity"}
@@ -140,23 +141,23 @@ def test_scan_new_columns_present_and_old_order_kept(all_envs):
 
 
 def test_scan_methods_filter_and_unknown_raises():
-    df = mtb.scan("D11", "vertical", methods=["Matilda"])
+    df = full_scan("D11", "vertical", methods=["Matilda"])
     assert set(df["method"]) == {"Matilda"} and len(df) >= 1
     with pytest.raises(KeyError, match="Unknown method Nope"):
-        mtb.scan("D11", "vertical", methods=["Nope"])
+        full_scan("D11", "vertical", methods=["Nope"])
     with pytest.raises(KeyError, match="Did you mean StabMap"):
-        mtb.scan("D11", "cross", methods=["StabMapp"])
+        full_scan("D11", "cross", methods=["StabMapp"])
 
 
 def test_scan_modalities_filter_accepts_protein_alias():
-    a = mtb.scan("D11", "vertical", modalities=["rna", "protein"])
-    b = mtb.scan("D11", "vertical", modalities=["rna", "adt"])
+    a = full_scan("D11", "vertical", modalities=["rna", "protein"])
+    b = full_scan("D11", "vertical", modalities=["rna", "adt"])
     assert len(a) > 0 and set(a["modalities"]) == {"rna+adt"}
     pd.testing.assert_frame_equal(a, b)
 
 
 def test_scan_verbose_prints_one_summary_line(capsys, no_envs):
-    df = mtb.scan("D11", "vertical", modalities="all")  # verbose=True is the default
+    df = full_scan("D11", "vertical", modalities="all")  # verbose=True is the default
     out = capsys.readouterr().out
     n = len(df)
     k = int(df["files_ok"].sum())
@@ -164,7 +165,7 @@ def test_scan_verbose_prints_one_summary_line(capsys, no_envs):
             f"environment installed.") in out
     assert out.count("[scan]") == 1
     # verbose=False is silent (run_all(verbose=False) passes it through)
-    mtb.scan("D11", "vertical", verbose=False)
+    full_scan("D11", "vertical", verbose=False)
     assert capsys.readouterr().out == ""
     mtb.run_all("D11", "vertical", methods=["Matilda"], dry_run=True, verbose=False)
     assert capsys.readouterr().out == ""
@@ -176,7 +177,7 @@ def test_scan_label_length_mismatch_is_a_file_problem(tmp_path, all_envs):
     _h5(d / "rna.h5", 30, 60, "g")
     _h5(d / "adt.h5", 5, 60, "p")
     pd.DataFrame({"x": ["A"] * 59}).to_csv(d / "cty.csv", index=False)   # one short
-    df = mtb.scan("BADCTY", "vertical", data_path=tmp_path)
+    df = full_scan("BADCTY", "vertical", data_path=tmp_path)
     mat = df[(df["method"] == "Matilda") & (df["modalities"] == "rna+adt")].iloc[0]
     assert not mat["files_ok"]
     assert "cty.csv has 59 labels" in mat["files_reason"] and "60 cells" in mat["files_reason"]
@@ -198,7 +199,7 @@ def test_scan_atac_gas_peak_caveat(tmp_path, all_envs):
         g.create_dataset("barcodes", data=np.array([f"c{i}" for i in range(45)], dtype="S8"))
     pd.DataFrame({"x": ["A"] * 50}).to_csv(d / "rna_cty.csv", index=False)
     pd.DataFrame({"x": ["A"] * 45}).to_csv(d / "atac_cty.csv", index=False)
-    df = mtb.scan("PEAKY", "diagonal", data_path=tmp_path)
+    df = full_scan("PEAKY", "diagonal", data_path=tmp_path)
     portal = df[df["method"] == "Portal"].iloc[0]          # wants gene activity
     assert portal["files_ok"]
     assert f"Portal {GAS_CAV}" in portal["caveat"]
@@ -239,7 +240,7 @@ def test_run_all_dry_run_equals_scan_with_methods():
     # the plan IS the scan frame (the `command` column included), rendered for out_dir
     assert list(plan.columns) == W.SCAN_COLUMNS and plan.columns[-1] == "command"
     pd.testing.assert_frame_equal(
-        plan, mtb.scan("D11", "vertical", methods=["Matilda", "totalVI"],
+        plan, full_scan("D11", "vertical", methods=["Matilda", "totalVI"],
                        out_dir="/tmp/unused", verbose=False))
 
 
@@ -259,10 +260,10 @@ def test_run_all_dry_run_missing_dataset_raises_filenotfound():
 
 
 def test_scan_is_the_dry_run_frame(no_envs):
-    a = mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False)
+    a = full_scan("D11", "vertical", methods=["Matilda"], verbose=False)
     b = mtb.run_all("D11", "vertical", out_dir=None, methods=["Matilda"],
                     dry_run=True, verbose=False)
     pd.testing.assert_frame_equal(a, b)
     assert len(a) >= 1 and not a["runnable"].any()
     with pytest.raises(ValueError, match="Matilda does not run on diagonal data"):
-        mtb.scan("D28", "diagonal", methods=["Matilda"], verbose=False)
+        full_scan("D28", "diagonal", methods=["Matilda"], verbose=False)

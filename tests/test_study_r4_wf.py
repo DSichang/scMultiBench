@@ -33,6 +33,7 @@ from multibench import cli, config, discover
 from multibench import workflow as W
 from multibench.engine import envs, registry
 from multibench.engine import runner as R
+from tests.conftest import full_scan
 
 #: the caveat of a gene-activity method given peaks in atac.h5 (after the method)
 GAS_CAV = ("needs gene-activity ATAC. The features of atac.h5 look like chr:start-end, "
@@ -123,7 +124,7 @@ class _Res:
 # ======================================================================= R4-01
 def test_named_methods_no_longer_bypass_the_atac_check(tmp_path, pinned):
     root = _gasmos(tmp_path)
-    df = _quiet(mtb.scan, "GASMOS", "mosaic", methods=["StabMap", "scMoMaT"],
+    df = _quiet(full_scan, "GASMOS", "mosaic", methods=["StabMap", "scMoMaT"],
                 data_path=root, verbose=False)
     # each method's row for the folder's batch pattern; its other three lack files
     assert len(df) == 8 and df["files_ok"].sum() == 2
@@ -133,7 +134,7 @@ def test_named_methods_no_longer_bypass_the_atac_check(tmp_path, pinned):
         assert df.loc[m, "reason"] == (
             f"{m} needs peak ATAC, and atac2.h5 holds gene activity. Export the ATAC as "
             f"peaks, or pass allow_atac_mismatch=True to run {m} anyway."), df.loc[m, "reason"]
-    ok = _quiet(mtb.scan, "GASMOS", "mosaic", methods=["StabMap", "scMoMaT"],
+    ok = _quiet(full_scan, "GASMOS", "mosaic", methods=["StabMap", "scMoMaT"],
                 data_path=root, verbose=False, allow_atac_mismatch=True)
     ok = ok[ok["files_ok"]]
     assert len(ok) == 2 and ok["runnable"].all() and ok["reason"].eq("").all()
@@ -211,7 +212,7 @@ def test_real_run_all_with_the_override_runs_and_keeps_the_caveat(tmp_path, pinn
 def test_named_glue_with_peak_0_names_is_blocked(tmp_path, pinned):
     root = _diagonal(tmp_path, "LUNG_ids", [f"peak_{i}" for i in range(60)])
     peak_methods = discover.find_methods("diagonal", atac="peak")
-    df = _quiet(mtb.scan, "LUNG_ids", "diagonal", methods=peak_methods, data_path=root,
+    df = _quiet(full_scan, "LUNG_ids", "diagonal", methods=peak_methods, data_path=root,
                 verbose=False)
     df = df[df["files_ok"]].set_index("method")     # not GLUE's row for several batches
     assert df.index.is_unique
@@ -299,10 +300,10 @@ def test_docstrings_name_the_override_not_methods():
     from multibench.engine import ingest
     for fn in (mtb.scan, mtb.run_all, ingest.export_dataset):
         flat = " ".join(inspect.getdoc(fn).split())
-        assert "allow_atac_mismatch=True" in flat, fn.__name__
         assert "name it in" not in flat and "Name the method in" not in flat
         assert "named in ``methods=``, or given" not in flat
     for fn in (mtb.scan, mtb.run_all):
+        assert "allow_atac_mismatch" in " ".join(inspect.getdoc(fn).split()), fn.__name__
         assert "allow_atac_mismatch" in inspect.signature(fn).parameters
     for sub in ("scan", "run-all"):
         parser = cli.build_parser()
@@ -553,7 +554,7 @@ def test_a_skipped_record_never_replaces_an_earlier_run(tmp_path):
 
 def test_summary_notes_list_skipped():
     doc = " ".join(inspect.getdoc(W.BatchResult.summary).split())
-    assert "- ``SKIPPED`` - blocked before the run" in doc
+    assert "``SKIPPED``" in doc and "why a SKIPPED method did not run" in doc
     doc = " ".join(inspect.getdoc(W.BatchResult.failures).split())
     assert "``SKIPPED``, for a method that ``methods=`` named" in doc
 
@@ -570,8 +571,6 @@ def test_old_records_show_nan_and_new_ones_keep_their_text():
     assert sm.loc["sciPENN", "caveat"] == "reads batches 1-2 of 3"
     none = W.BatchResult([dict(old, caveat=None)], "D52", "cross").summary
     assert isinstance(none["caveat"].iloc[0], float)
-    doc = " ".join(inspect.getdoc(W.BatchResult.summary).split())
-    assert "the record was saved before this column existed" in doc
 
 
 # ======================================================================= R4-14
@@ -593,32 +592,19 @@ def test_reference_entries_lose_their_justification_tails():
     assert ("so with few methods a small gap fills the whole colour scale. Check the "
             "values in ``summary``.") in flat["plot"]
     assert "not a difference, because" not in flat["summary"]
-    assert "``(best - max(runner_up, 0)) / best``" in flat["summary"]
     assert "not predictions" not in flat["method_info"]
-    assert "Use them to set ``run_all(timeout=...)``." in flat["method_info"]
     assert "meaningless ranks" not in flat["load_results"]
-    assert docs["available"].splitlines()[0] == "Dataset ids that have stored results."
     assert "not the datasets that can be downloaded" not in flat["available"]
     assert "Only a few of the benchmark's datasets" not in flat["available"]
-    assert ("An id listed here but not by ``mtb.data.fetchable()`` has metric tables and "
-            "no data file to download.") in flat["available"]
     assert "wired" not in flat["create_all"]
     assert "Methods with a variant in this category; default: all." in flat["create_all"]
 
 
 def test_modality_token_notes_say_what_atac_peak_alone_keeps(pinned):
-    flat = " ".join(inspect.getdoc(mtb.scan).split())
-    assert "Base tokens keep a row whose modalities are exactly that combination" in flat
-    assert "Representation tokens select by what the method reads" in flat
-    assert "A row is kept when its modalities are exactly" not in flat
-    assert "selects as in ``mtb.scan``" in " ".join(inspect.getdoc(mtb.run_all).split())
-    assert ("``atac_peak`` alone also keeps MultiMAP and Seurat_v3, which read both "
-            "files") in flat
-    assert "``atac_peak`` together with ``atac_gas`` keeps only those two" in flat
-    # the facts the text states
-    one = _quiet(mtb.scan, "D28", "diagonal", modalities=["rna", "atac_peak"],
+    # atac_peak alone also keeps MultiMAP and Seurat_v3; with atac_gas, only those two
+    one = _quiet(full_scan, "D28", "diagonal", modalities=["rna", "atac_peak"],
                  verbose=False)
     assert {"MultiMAP", "Seurat_v3"} <= set(one["method"])
-    both = _quiet(mtb.scan, "D28", "diagonal", modalities=["rna", "atac_peak", "atac_gas"],
+    both = _quiet(full_scan, "D28", "diagonal", modalities=["rna", "atac_peak", "atac_gas"],
                   verbose=False)
     assert set(both["method"]) == {"MultiMAP", "Seurat_v3"}

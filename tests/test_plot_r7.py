@@ -20,8 +20,6 @@ matplotlib.use("Agg")
 
 B = importlib.import_module("multibench.plot.bubble")
 
-UNKNOWN = "a name the package does not know, such as your own or a renamed re-run"
-
 
 def _quiet(fn, *args, **kw):
     with warnings.catch_warnings():
@@ -82,7 +80,6 @@ def test_renamed_supervised_rerun_shows_question_mark_and_no_badge():
 def test_docstrings_use_the_key_wording():
     for fn in (mtb.plot.bubble, mtb.to_long):
         doc = " ".join(inspect.getdoc(fn).split())
-        assert UNKNOWN in doc, fn.__name__
         assert "not a package method" not in doc, fn.__name__
     assert "sweep variant" not in inspect.getdoc(mtb.plot.bubble)
     assert "needs_labels" not in inspect.getdoc(mtb.to_long)   # the figure reads no such column
@@ -163,6 +160,5 @@ def test_order_parameter_reads_as_sentences():
 
 def test_one_entry_label_dict_note():
     doc = " ".join(inspect.getdoc(mtb.evaluate).split())
-    assert ("``label_order=list(d)`` trusts the dict's own order. A one-entry dict "
-            "needs no ``label_order``.") in doc
+    assert ("Keys of a multi-entry ``labels`` dict in the embedding's cell order") in doc
     assert "order to get wrong" not in doc

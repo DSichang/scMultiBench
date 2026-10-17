@@ -18,6 +18,7 @@ import pytest
 import multibench as mtb
 from multibench import cli
 from multibench.engine import registry
+from tests.conftest import full_scan
 
 SHIPPED = [("D11", "vertical"), ("D28", "diagonal"), ("D45", "mosaic"),
            ("D46", "mosaic"), ("D52", "cross")]
@@ -34,13 +35,13 @@ def data(root):
 def test_a_scan_rows_modalities_select_that_row_again(data, ds, cat):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        sc = mtb.scan(ds, cat, data_path=data, verbose=False)
+        sc = full_scan(ds, cat, data_path=data, verbose=False)
         rows = sc[sc["modalities"] != "(data_dir)"]
         assert len(rows)
         for m, mods in zip(rows["method"], rows["modalities"]):
             # the spelling scan shows, unchanged: named in methods=, moETM's
             # rna+atac_gas row is selected by it although moETM reads peaks
-            back = mtb.scan(ds, cat, methods=[m], modalities=mods.split("+"),
+            back = full_scan(ds, cat, methods=[m], modalities=mods.split("+"),
                             data_path=data, verbose=False)
             assert ((back["method"] == m) & (back["modalities"] == mods)).any(), (m, mods)
 
@@ -48,7 +49,7 @@ def test_a_scan_rows_modalities_select_that_row_again(data, ds, cat):
 def test_two_representations_select_the_methods_that_read_both_files(data):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        sc = mtb.scan("D28", "diagonal", modalities=BOTH, data_path=data, verbose=False)
+        sc = full_scan("D28", "diagonal", modalities=BOTH, data_path=data, verbose=False)
         plan = mtb.run_all("D28", "diagonal", modalities=BOTH, data_path=data, dry_run=True)
     want = {"MultiMAP", "Seurat_v3"}
     assert set(sc["method"]) == want and set(plan["method"]) == want
@@ -78,7 +79,7 @@ def test_the_cli_round_trip_of_a_two_file_row(data, tmp_path, capsys):
 def test_a_two_file_method_gets_no_representation_caveat(data):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        sc = mtb.scan("D28", "diagonal", data_path=data, verbose=False)
+        sc = full_scan("D28", "diagonal", data_path=data, verbose=False)
     for m in ("MultiMAP", "Seurat_v3"):
         assert "look like peaks" not in sc.loc[sc["method"] == m, "caveat"].item()
 
@@ -96,7 +97,7 @@ def test_inputs_for_applies_the_representation_rule(data, ds, cat, method, mods,
     # scan leaves the same method out for the same tokens
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        sc = mtb.scan(ds, cat, modalities=mods, data_path=data, verbose=False)
+        sc = full_scan(ds, cat, modalities=mods, data_path=data, verbose=False)
     assert method not in set(sc["method"])
 
 
@@ -124,7 +125,6 @@ def test_the_vocabulary_message_calls_peak_and_gas_representation_tokens():
            "ATAC form a method reads" in msg
     notes = mtb.inputs_for.__doc__
     assert "``peak`` / ``peaks`` for ``atac_peak``" not in notes
-    assert "the representation tokens ``atac_peak`` (also ``peak``, ``peaks``)" in notes
 
 
 # ------------------------------------------------------------------ L13 the two rules
@@ -133,17 +133,14 @@ def test_scan_keeps_one_combination_and_find_methods_at_least(data):
     assert {"Multigrate", "StabMap", "scMoMaT"} <= fm
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        sc = mtb.scan("D46", "mosaic", modalities=["rna", "adt"], data_path=data,
+        sc = full_scan("D46", "mosaic", modalities=["rna", "adt"], data_path=data,
                       verbose=False)
     # every kept row reads exactly RNA and ADT: no ATAC role
     assert len(sc) and not sc["modalities"].str.contains("atac").any()
     assert set(sc["method"]) < fm
     scan_doc, fm_doc = mtb.scan.__doc__, mtb.find_methods.__doc__
     assert "the rule is the one ``mtb.find_methods`` uses" not in scan_doc
-    assert ("Base tokens keep a row whose modalities are exactly that combination."
-            in " ".join(scan_doc.split()))
-    assert "A method matches when one variant reads at least" in fm_doc
-    assert "a row's modalities must be exactly the named combination" in fm_doc
+    assert "a row's modalities must be exactly the named combination" not in fm_doc
 
 
 # ------------------------------------------------------------------ L61 method_info text
@@ -162,7 +159,7 @@ def test_method_info_notes_and_setup_hint_hold_no_internal_names(method):
 def test_a_command_that_reads_a_prepared_file_says_so(data, tmp_path, capsys):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        sc = mtb.scan("D28", "diagonal", data_path=data, verbose=False)
+        sc = full_scan("D28", "diagonal", data_path=data, verbose=False)
     row = sc.set_index("method").loc["Seurat_v3"]
     assert "/inputs/atac_peak_normpeaks.h5" in row["command"]
     assert ("Seurat_v3 reads inputs/atac_peak_normpeaks.h5. mtb.run writes that "
@@ -194,7 +191,8 @@ def test_leiden_flavor_help_names_both_stored_tables(cmd, capsys):
     with pytest.raises(SystemExit):
         cli.main([cmd, "--help"])
     text = " ".join(capsys.readouterr().out.split())
-    assert "leidenalg matches both stored tables, published and re-run" in text
+    assert "Scores can differ by up to about 0.1 between the two" in text
+    assert "leidenalg matches both stored tables" not in text
     assert "backend of the published tables" not in text
 
 
@@ -259,14 +257,18 @@ def test_the_na_hint_uses_the_spelling_of_the_caller(tmp_path, capsys):
     matplotlib.use("Agg")
     args = ["plot", "bubble", "--category", "diagonal", "--dataset", "D28",
             "--metrics", "ARI,NMI,ASW", "--out", str(tmp_path / "f.png")]
+    # 0.4: --na / na= of bubble have no effect, so no message offers them
     assert cli.main(args) == 0
     err = capsys.readouterr().err
-    assert "Pass --na skip to hide this message." in err and "na='skip'" not in err
+    assert "hide this message" not in err and "na='skip'" not in err
     assert cli.main(args + ["--na", "skip"]) == 0
-    assert "to hide this message" not in capsys.readouterr().err
-    with pytest.warns(UserWarning, match="Pass na='skip' to hide this message."):
+    assert ("warning: --na is deprecated and will be removed in 0.5. It has no effect."
+            in capsys.readouterr().err)
+    with warnings.catch_warnings(record=True) as rec:
+        warnings.simplefilter("always")
         mtb.plot.bubble(mtb.load_results("diagonal", dataset="D28"),
                         metrics=["ARI", "NMI", "ASW"])
+    assert not [w for w in rec if "hide this message" in str(w.message)]
 
 
 # ------------------------------------------------------------------ plain vocabulary
@@ -306,12 +308,14 @@ def test_reference_docstrings_use_plain_words(name, obj):
 
 def test_signatures_render_without_internal_names():
     import inspect
-    assert str(inspect.signature(mtb.list_methods)) == "(category: 'str | None' = None) -> 'list[str]'"
-    assert inspect.signature(mtb.scan).parameters["out_dir"].default == "<out_dir>"
-    with pytest.raises(TypeError, match="use find_methods"):
-        mtb.list_methods(task="clustering")
-    with pytest.raises(TypeError, match="unexpected keyword argument 'bogus'"):
-        mtb.list_methods(bogus=1)
+    # 0.4: list_methods is the deprecated name of find_methods
+    assert inspect.signature(mtb.list_methods) == inspect.signature(mtb.find_methods)
+    assert "out_dir" not in inspect.signature(mtb.scan).parameters
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", FutureWarning)
+        assert mtb.list_methods(task="clustering") == mtb.find_methods(task="clustering")
+        with pytest.raises(TypeError, match="unexpected keyword argument 'bogus'"):
+            mtb.list_methods(bogus=1)
     assert mtb.catalog.metrics.__doc__.splitlines()[0] == \
         "Table describing the metrics: one row per metric code."
 

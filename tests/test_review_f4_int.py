@@ -32,6 +32,7 @@ from multibench import workflow as W
 from multibench.engine import envs, registry
 from multibench.engine import resolve as RS
 from multibench.engine import runner as R
+from tests.conftest import full_scan
 
 #: the caveat of a gene-activity method given peaks in atac.h5 (after the method)
 GAS_CAV = ("needs gene-activity ATAC. The features of atac.h5 look like chr:start-end, "
@@ -96,7 +97,7 @@ def _vertical(root, name, atac_feats, n=60, adt=False):
 # ------------------------------------------- peak_0 names are not gene activity
 def test_peak_ids_leave_multimap_runnable_and_block_glue_and_seurat_v3(tmp_path, pinned):
     root = _diagonal(tmp_path, "LUNG_ids", [f"peak_{i}" for i in range(60)])
-    sc = _quiet(mtb.scan, "LUNG_ids", "diagonal", data_path=root, verbose=False,
+    sc = _quiet(full_scan, "LUNG_ids", "diagonal", data_path=root, verbose=False,
                 methods=discover.find_methods("diagonal", atac="peak"))
     # the rows whose files the folder holds: GLUE's row for several batches has none
     sc = sc[sc["files_ok"]].set_index("method")
@@ -121,7 +122,7 @@ def test_peak_ids_in_a_vertical_folder_give_both_kinds_a_caveat(tmp_path, pinned
     peak methods run with a caveat, and so does a gene-activity method
     (``gas_matilda``: the real Matilda reads peaks)."""
     root = _vertical(tmp_path, "MYMO_ids", [f"peak_{i}" for i in range(40)])
-    sc = _quiet(mtb.scan, "MYMO_ids", "vertical", methods=["scMVP", "Matilda"],
+    sc = _quiet(full_scan, "MYMO_ids", "vertical", methods=["scMVP", "Matilda"],
                 modalities=["rna", "atac"], data_path=root, verbose=False).set_index("method")
     assert sc["runnable"].all(), sc["reason"].tolist()
     assert sc.loc["scMVP", "caveat"].startswith(
@@ -134,7 +135,7 @@ def test_peak_ids_in_a_vertical_folder_give_both_kinds_a_caveat(tmp_path, pinned
 def test_gene_names_in_the_peak_file_still_block_multimap(tmp_path, pinned):
     """Names that are the folder's genes are gene activity, whatever their case."""
     root = _diagonal(tmp_path, "LUNG_ga", [g.lower() for g in GENES])
-    row = _quiet(mtb.scan, "LUNG_ga", "diagonal", methods=["MultiMAP"], data_path=root,
+    row = _quiet(full_scan, "LUNG_ga", "diagonal", methods=["MultiMAP"], data_path=root,
                  verbose=False).iloc[0]
     assert not row["runnable"]
     assert row["reason"].startswith("MultiMAP needs peak ATAC, and atac_peak.h5 holds gene "
@@ -167,7 +168,7 @@ def test_the_override_is_the_last_clause_of_a_gpu_blocked_row(tmp_path, pinned,
     as_gene_activity("UnitedNet")
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
     root = _vertical(tmp_path, "MU_PEAK", PEAKS)
-    row = _quiet(mtb.scan, "MU_PEAK", "vertical", methods=["UnitedNet"],
+    row = _quiet(full_scan, "MU_PEAK", "vertical", methods=["UnitedNet"],
                  modalities=["rna", "atac"], data_path=root, verbose=False).iloc[0]
     assert not row["runnable"]
     assert "needs an NVIDIA GPU" in row["reason"]
@@ -288,7 +289,7 @@ def test_missing_and_foreign_ids_get_their_own_fix(mycite):
 def test_run_all_raises_names_the_batch_series_error():
     doc = inspect.getdoc(mtb.run_all)
     raises = doc.split("Raises\n------\n")[1].split("\n\n")[0]
-    assert "A ``batch`` Series or CSV holds ids that are not cells of the dataset." in raises
+    assert "a ``batch`` that does not fit the cells" in " ".join(raises.split())
 
 
 # ------------------------------------------- --strict reads the row on the disk
@@ -344,7 +345,7 @@ def test_a_single_build_env_reports_single(tmp_path, monkeypatch):
 
 # ------------------------------------------------------------ plain vocabulary
 def test_no_user_visible_text_says_registry(monkeypatch, capsys):
-    for argv in (["list", "--help"], ["cite", "--help"], ["evaluate", "--help"]):
+    for argv in (["find", "--help"], ["cite", "--help"], ["evaluate", "--help"]):
         with pytest.raises(SystemExit):
             cli.main(argv)
         assert "registry" not in capsys.readouterr().out.lower(), argv
@@ -352,13 +353,13 @@ def test_no_user_visible_text_says_registry(monkeypatch, capsys):
     cli._platform_note()
     err = capsys.readouterr().err
     assert "The method list, stored results" in err and "registry" not in err
-    assert inspect.getdoc(mtb.list_methods).startswith("Return the method ids")
-    assert "the package does not know, such as your own" in " ".join(
-        inspect.getdoc(mtb.to_long).split())
+    assert inspect.getdoc(mtb.find_methods).startswith("Return the method ids")
+    # 0.4: list_methods, catalog.canonical_id and env.status are deprecated;
+    # the names that replace them are checked
     for fn in (mtb.run, mtb.inputs_for, mtb.labels_for, mtb.method_info, mtb.params_for,
-               mtb.sweep, mtb.env.recipe, mtb.to_long, mtb.list_methods, mtb.recommend,
-               mtb.load_results, mtb.catalog.methods, mtb.catalog.canonical_id,
-               mtb.env.status, mtb.cite):
+               mtb.sweep, mtb.env.recipe, mtb.to_long, mtb.find_methods, mtb.recommend,
+               mtb.load_results, mtb.catalog.methods, mtb.catalog.metrics,
+               mtb.env.doctor, mtb.cite):
         assert "registry" not in inspect.getdoc(fn).lower(), fn.__name__
 
 

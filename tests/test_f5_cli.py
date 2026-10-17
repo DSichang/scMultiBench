@@ -12,6 +12,7 @@ reason is sentences with their own subjects, counts without '(s)'.
 """
 import ast
 import re
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -22,6 +23,7 @@ import multibench as mtb
 from multibench import cli, config
 from multibench.data import results as R
 from tests.test_f4_cli import _diag_folder
+from tests.conftest import full_scan
 
 pytest.importorskip("scib")
 
@@ -29,21 +31,29 @@ _PKG = Path(mtb.__file__).resolve().parent
 
 
 # ====================================================================== R5-06
+def _published(*args, **kwargs):
+    """``load_results`` on the published tables (the deprecated ``source=``)."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", FutureWarning)
+        return mtb.load_results(*args, source="published", **kwargs)
+
+
 def test_mosaic_error_starts_with_the_category_and_the_fix():
     with pytest.raises(FileNotFoundError) as e:
-        mtb.load_results("mosaic")
+        _published("mosaic")
     msg = str(e.value)
-    assert msg.startswith("mosaic has no published tables. Pass source='rerun' ")
+    assert msg == ("mosaic has no published tables. Leave out source= to load the "
+                   "package's re-run tables.")
     assert " - " not in msg and "package sweeps" not in msg
     assert "multibench/result/scib_metric" not in msg          # not an install problem
 
 
 def test_wrong_result_path_keeps_the_path_advice_without_mosaic(tmp_path):
     with pytest.raises(FileNotFoundError) as e:
-        mtb.load_results("vertical", result_path=tmp_path)
+        _published("vertical", result_path=tmp_path)
     msg = str(e.value)
     assert msg.startswith(f"no published scIB metric tables under {tmp_path}")
-    assert "result_path=" in msg
+    assert "mtb.config.DEFAULT.result_path" in msg
     assert "mosaic" not in msg and " - " not in msg
 
 
@@ -55,7 +65,7 @@ def test_the_condition_is_read_from_the_shipped_tree(tmp_path, monkeypatch):
     assert R._category_unpublished("vertical")
     assert not R._category_unpublished("mosaic")
     with pytest.raises(FileNotFoundError, match=r"^vertical has no published tables\."):
-        mtb.load_results("vertical", result_path=tmp_path / "result")
+        _published("vertical", result_path=tmp_path / "result")
 
 
 def _mosaic_rows(path):
@@ -67,22 +77,22 @@ def _mosaic_rows(path):
 def test_plot_overlay_on_mosaic_names_source_rerun_first(tmp_path, capsys):
     own = _mosaic_rows(tmp_path / "mine.csv")
     rc = cli.main(["plot", "bar", "--input", str(own), "--category", "mosaic",
-                   "--out", str(tmp_path / "o.png")])
+                   "--source", "published", "--out", str(tmp_path / "o.png")])
     err = capsys.readouterr().err
     assert rc == 1
-    assert err.startswith(
-        "error: mosaic has no published tables. Pass --source rerun to plot your rows "
-        "with the package's re-run tables, or drop --category to plot your rows alone.")
+    assert (
+        "\nerror: mosaic has no published tables. Leave out --source to plot your rows "
+        "with the package's re-run tables, or drop --category to plot your rows alone.") in err
     assert "--result-path" not in err and "scib_metric" not in err
 
 
 def test_plot_stored_mosaic_without_input_names_source_rerun(tmp_path, capsys):
-    rc = cli.main(["plot", "bubble", "--category", "mosaic",
+    rc = cli.main(["plot", "bubble", "--category", "mosaic", "--source", "published",
                    "--out", str(tmp_path / "o.png")])
     err = capsys.readouterr().err
     assert rc == 1
-    assert err.startswith("error: mosaic has no published tables. Pass --source rerun "
-                          "to plot the package's re-run tables.")
+    assert ("\nerror: mosaic has no published tables. Leave out --source to plot the "
+            "package's re-run tables.") in err
 
 
 def test_plot_wrong_result_path_keeps_the_flag_advice(tmp_path, capsys):
@@ -104,7 +114,7 @@ def diag(tmp_path, monkeypatch):
 
 
 def _evaluate(emb, *label_files, method="uniPort", name=None, out=None):
-    argv = ["evaluate", "--output", str(emb)]
+    argv = ["evaluate", "--embedding", str(emb)]
     for f in label_files:
         argv += ["--labels", str(f)]
     argv += ["--method", method, "--dataset", "D28", "--category", "diagonal",
@@ -147,7 +157,7 @@ def test_name_needs_a_package_method(diag, capsys):
 def test_name_without_method_needs_labels(diag, capsys):
     d, emb = diag
     with pytest.raises(SystemExit) as e:
-        cli.main(["evaluate", "--output", str(emb), "--name", "x", "--dataset", "D28",
+        cli.main(["evaluate", "--embedding", str(emb), "--name", "x", "--dataset", "D28",
                   "--category", "diagonal"])
     assert e.value.code == 2
     assert "Without --method, pass the label files with --labels" in capsys.readouterr().err
@@ -280,13 +290,13 @@ def test_scan_reason_is_sentences_with_their_own_subjects(tmp_path, monkeypatch)
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
     root = _diagonal(tmp_path, "LUNG_ids", [f"peak_{i}" for i in range(60)])
-    sc = _quiet(mtb.scan, "LUNG_ids", "diagonal", methods=["GLUE"], data_path=root,
+    sc = _quiet(full_scan, "LUNG_ids", "diagonal", methods=["GLUE"], data_path=root,
                 verbose=False).iloc[0]
     assert sc["reason"] == (
         f"Environment {sc['env']} runs only on Linux, not on this computer. GLUE reads peak names such as chr1:100-200. atac_peak.h5 holds other "
         f"names, for example peak_0. Rename them to chr:start-end, or pass "
         f"allow_atac_mismatch=True to run GLUE anyway.")
-    moetm = _quiet(mtb.scan, "D11", "vertical", methods=["moETM"], verbose=False).iloc[0]
+    moetm = _quiet(full_scan, "D11", "vertical", methods=["moETM"], verbose=False).iloc[0]
     assert moetm["reason"] == (
         f"Environment {moetm['env']} runs only on Linux, not on this computer. moETM needs an NVIDIA GPU, and this computer has none. See "
         f"method_info(\"moETM\")[\"requires_gpu\"].")
@@ -303,14 +313,14 @@ def test_scan_env_reason_on_linux_names_the_command_without_backticks(monkeypatc
     assert rc == 0
     assert row["reason"] == (
         "Environment matilda is not installed. Run multibench env install --methods "
-        "Matilda --packed --run. Use --category vertical to install the environments of "
+        "Matilda --run. Use --category vertical to install the environments of "
         "every vertical method.")
 
 
 def test_count_lines_say_rows_without_plural_brackets(monkeypatch, capsys, tmp_path):
     monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
-    df = mtb.scan("D11", "vertical", modalities="all")
+    df = full_scan("D11", "vertical", modalities="all")
     out = capsys.readouterr().out
     n, k = len(df), int(df["files_ok"].sum())
     assert out == (f"[scan] {k} of {n} rows have their input files. 0 of {n} have their "

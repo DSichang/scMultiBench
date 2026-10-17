@@ -81,15 +81,15 @@ def test_clustering_takes_the_obs_prefix():
     emb, lab = _cells()
     a = _adata(emb, celltype=lab, leiden=lab, other=_scrambled(lab))
     kw = dict(labels="celltype", metrics=["ARI", "NMI"])
-    bare = mtb.evaluate(a, clustering="leiden", **kw)
+    bare = mtb.evaluate(a, clusters="leiden", **kw)
     # before, "obs:leiden" was taken for the path of an h5 file
-    prefixed = mtb.evaluate(a, clustering="obs:leiden", **kw)
+    prefixed = mtb.evaluate(a, clusters="obs:leiden", **kw)
     _same(prefixed, bare)
     assert bare["Value"].tolist() == [1.0, 1.0] and bare.attrs["clustering"] == "user"
-    assert mtb.evaluate(a, clustering="obs:other", **kw).loc["ARI", "Value"] < 0.1
+    assert mtb.evaluate(a, clusters="obs:other", **kw).loc["ARI", "Value"] < 0.1
     # a column called obs:leiden wins over the prefix reading
     a.obs["obs:leiden"] = a.obs["other"]
-    assert mtb.evaluate(a, clustering="obs:leiden", **kw).loc["ARI", "Value"] < 0.1
+    assert mtb.evaluate(a, clusters="obs:leiden", **kw).loc["ARI", "Value"] < 0.1
 
 
 def test_unknown_column_keeps_its_error():
@@ -132,10 +132,10 @@ def test_array_output_with_a_column_name(tmp_path, monkeypatch):
         "batch='obs:donor' is not a file, and the output has no obs. Pass the values, as "
         "batch=adata.obs['donor'].")
     with pytest.raises(FileNotFoundError) as e:
-        mtb.evaluate(emb, labels=lab, clustering="obs:leiden", metrics=["ARI"])
+        mtb.evaluate(emb, labels=lab, clusters="obs:leiden", metrics=["ARI"])
     assert str(e.value) == (
-        "clustering='obs:leiden' is not a file, and the output has no obs. Pass the "
-        "values, as clustering=adata.obs['leiden'].")
+        "clusters='obs:leiden' is not a file, and the output has no obs. Pass the "
+        "values, as clusters=adata.obs['leiden'].")
     # a name that reads as a file keeps the text of a missing file
     cwd = Path.cwd()
     with pytest.raises(FileNotFoundError) as e:
@@ -149,7 +149,7 @@ def test_array_output_with_a_column_name(tmp_path, monkeypatch):
         f"The batch file sub/donor does not exist. From the working directory "
         f"{cwd}, the path resolves to {Path('sub/donor').resolve()}.")
     with pytest.raises(FileNotFoundError) as e:
-        mtb.evaluate(emb, labels=lab, clustering="clusters.h5", metrics=["ARI"])
+        mtb.evaluate(emb, labels=lab, clusters="clusters.h5", metrics=["ARI"])
     assert str(e.value) == (
         f"The clustering file clusters.h5 does not exist. From the working directory "
         f"{cwd}, the path resolves to {Path('clusters.h5').resolve()}.")
@@ -188,10 +188,5 @@ def test_names_no_file(tmp_path, monkeypatch):
 
 def test_docstring_states_the_rule():
     doc = " ".join(mtb.evaluate.__doc__.split())
-    assert ("the name of an ``.obs`` column, with or without the ``obs:`` prefix "
-            "(``\"celltype\"`` or ``\"obs:celltype\"``)") in doc
-    # the one rule for column names, as the other entry points word it
-    assert ("``\"obs:<column>\"`` and ``\"<column>\"`` name a column of the object you "
-            "pass. ``export_dataset`` and ``evaluate`` take both. ``run_all`` and "
-            "``rescore`` are given a folder, not the object, so they take the column "
-            "itself, for example ``batch=adata.obs[\"donor\"]``.") in doc
+    assert ("an ``.obs`` column name (``\"celltype\"``, ``\"obs:celltype\"``, "
+            "``\"rna:celltype\"`` for a MuData modality)") in doc

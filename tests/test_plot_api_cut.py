@@ -26,11 +26,14 @@ def _toy_long():
 
 
 def test_plot_all_and_dir_are_the_contract():
-    assert mtb.plot.__all__ == ["bubble", "bar", "build_table", "BubbleTable", "FAMILIES",
-                                "CLUSTERING_METRICS", "BATCH_METRICS",
-                                "CLASSIFICATION_METRICS"]
+    assert mtb.plot.__all__ == ["bubble", "bar", "build_table", "BubbleTable"]
     listed = [n for n in dir(mtb.plot) if not n.startswith("__")]
     assert sorted(listed) == sorted(mtb.plot.__all__)
+    # deprecated in 0.4 (catalog.metrics() has the family column): importable, warn
+    for name in ("FAMILIES", "CLUSTERING_METRICS", "BATCH_METRICS",
+                 "CLASSIFICATION_METRICS"):
+        with pytest.warns(FutureWarning, match=f"plot.{name} is deprecated"):
+            getattr(mtb.plot, name)
     # importable, just not listed
     from multibench.plot import render, FamilyBlock, plot_bubble   # noqa: F401
     assert callable(mtb.plot.render) and mtb.plot.FamilyBlock is FamilyBlock
@@ -57,7 +60,8 @@ def test_bubble_bar_build_table_are_keyword_only_after_long_df():
     # today's defaults are kept
     sig = inspect.signature(mtb.plot.bubble).parameters
     assert sig["aggregate"].default == "dataset" and sig["overall"].default == "rank"
-    assert sig["na"].default == "warn" and sig["show_language"].default is True
+    assert "na" not in sig and "show_language" not in sig          # deprecated in 0.4
+    assert inspect.signature(mtb.plot.build_table).parameters["na"].default == "warn"
     with pytest.raises(TypeError):
         mtb.plot.build_table(_toy_long(), ["ARI"])
     tbl = mtb.plot.build_table(_toy_long(), metrics=["ARI"])

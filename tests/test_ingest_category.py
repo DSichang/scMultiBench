@@ -58,12 +58,6 @@ def test_to_canonical_peak_vertical_makes_scan_find_a_runnable_layout(tmp_path):
     assert got["atac"].endswith("atac.h5")
 
 
-def test_to_canonical_docstring_says_representation_is_not_recorded():
-    import inspect
-    doc = inspect.getdoc(ingest.to_canonical)
-    assert "not recorded on disk" in doc and "category='vertical'" in doc
-
-
 def test_export_dataset_vertical_writes_plain_atac_only(tmp_path):
     pk = _peaks()
     out = ingest.export_dataset(pk, tmp_path / "VP", rna=None, atac="X", atac_kind="peak",

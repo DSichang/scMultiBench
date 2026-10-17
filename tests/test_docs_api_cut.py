@@ -127,12 +127,10 @@ def test_every_mtb_name_mentioned_is_public(path):
 def test_retired_names_live_on_the_changes_page():
     """The old -> new tables are on changes.md, not on the API overview: api.md
     has no deprecation section (so the check above reads it whole) and links
-    to changes.md, and the docstrings that mention retired keywords point to
-    the Changes page."""
+    to changes.md. The docstrings no longer list retired keywords."""
     import multibench as mtb
     for doc in (mtb.evaluate.__doc__, mtb.load_results.__doc__):
         assert "The API overview lists" not in doc
-        assert "The Changes page lists" in doc
     if not os.environ.get("SCMULTIBENCH_DOCS"):
         pytest.skip("SCMULTIBENCH_DOCS not set")
     changes, api = _docs_pages("changes.md"), _docs_pages("api.md")

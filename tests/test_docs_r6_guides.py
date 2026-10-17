@@ -25,9 +25,9 @@ def test_evaluate_page_points_to_evaluate_notes_for_the_exact_computation():
     section = visible.split("### What each metric measures", 1)[1].split("## ", 1)[0]
     assert "gives each definition in full" not in section
     assert "describes each metric in one line." in section
-    assert ("[evaluate's Notes](../reference/score.md#multibench.eval.pipeline.evaluate) "
-            "give the exact computation.") in section
-    # the catalog rows are indeed one line each, and evaluate's Notes hold the median
+    assert "The details below give the exact computation." in section
+    # the catalog rows are indeed one line each, and the page's details hold the median
     rows = mtb.catalog.metrics().set_index("metric")["description"]
     assert all("\n" not in d for d in rows)
-    assert "take the median m of the per-cell scores" in " ".join(mtb.evaluate.__doc__.split())
+    assert "take the median m of the per-cell scores" in " ".join(
+        _read("tutorials/evaluate.md").split())

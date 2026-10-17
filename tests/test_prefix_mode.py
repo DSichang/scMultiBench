@@ -32,6 +32,7 @@ from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, runner
 from _serve import serve_archives
+from tests.conftest import full_scan
 
 MARKER = "MTB_ACTIVATED_MARKER"
 
@@ -478,12 +479,12 @@ def test_install_dry_run_needs_no_conda(linux_no_conda):
 def test_scan_env_gate_flips_on_the_fake_prefix(envs_dir):
     # no cache to clear between the two scans: the env counts at once
     env = envs.group_for("Matilda")
-    df = mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False)
+    df = full_scan("D11", "vertical", methods=["Matilda"], verbose=False)
     row = df[df["modalities"] == "rna+adt"].iloc[0]
     assert not row["env_ok"] and "not installed" in row["env_reason"]
     assert row["command"].startswith("conda run -n " + env)
     make_prefix(envs_dir, env)
-    df = mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False)
+    df = full_scan("D11", "vertical", methods=["Matilda"], verbose=False)
     row = df[df["modalities"] == "rna+adt"].iloc[0]
     assert row["env_ok"] and row["files_ok"] and row["runnable"]
     assert row["env_reason"] == ""

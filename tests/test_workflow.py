@@ -9,6 +9,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+from tests.conftest import full_scan
 
 
 def _envs_installed(category=None) -> bool:
@@ -25,7 +26,7 @@ _NO_ENVS = "reference-host runnable counts need the method conda envs (none here
 
 @pytest.mark.skipif(not _envs_installed(), reason=_NO_ENVS)
 def test_scan_returns_runnable_and_reasons():
-    df = mtb.scan("D11")
+    df = full_scan("D11")
     assert {"method", "category", "modalities", "runnable", "reason"} <= set(df.columns)
     assert df["runnable"].any()
     # anything not runnable must say why
@@ -34,7 +35,7 @@ def test_scan_returns_runnable_and_reasons():
 
 
 def test_scan_filters_by_category():
-    df = mtb.scan("D11", category="vertical")
+    df = full_scan("D11", category="vertical")
     assert set(df["category"]) == {"vertical"}
 
 
@@ -69,7 +70,7 @@ def test_run_all_dry_run_is_the_scan_frame():
         plan = mtb.run_all(ds, cat, out_dir="/tmp/unused", dry_run=True, verbose=False)
         assert list(plan.columns)[-1] == "command"      # the CLI csv's column, in scan too
         pd.testing.assert_frame_equal(
-            plan, mtb.scan(ds, cat, out_dir="/tmp/unused", verbose=False))
+            plan, full_scan(ds, cat, out_dir="/tmp/unused", verbose=False))
 
 
 @pytest.mark.skipif(not (_envs_installed("vertical") and _envs_installed("cross")

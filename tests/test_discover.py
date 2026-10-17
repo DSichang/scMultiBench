@@ -76,7 +76,8 @@ def test_find_methods_modalities_excludes_stub():
     # appear in a modalities= filter. Checked dynamically over any remaining
     # stubs: every method is currently wired (zero stubs), so this may be
     # vacuous now, but it stays correct if an unwired stub is ever re-added.
-    for stub in discover.find_methods(runnable=False):
+    from multibench.engine import registry
+    for stub in [s.id for s in registry.load() if not s.variants]:
         for req in (["rna"], ["rna", "atac"], ["adt"]):
             assert stub not in discover.find_methods(modalities=req)
 
@@ -116,18 +117,16 @@ def test_find_methods_modalities_none_unchanged():
 
 
 def test_find_methods_runnable_filter():
+    # runnable= is deprecated in 0.4 and has no effect: every method is wired
+    from multibench.engine import registry
     all_ids = discover.find_methods()
-    runnable = discover.find_methods(runnable=True)
-    stubs = discover.find_methods(runnable=False)
-    assert set(runnable) <= set(all_ids)
-    assert set(runnable) | set(stubs) == set(all_ids)        # complete partition
-    assert set(runnable) & set(stubs) == set()               # disjoint
-    assert "SCALEX" in runnable                              # has a variant
-    assert set(stubs) == set(all_ids) - set(runnable)        # stubs == the non-runnable
+    for flag in (True, False):
+        with pytest.warns(FutureWarning, match=r"runnable=\) is deprecated .* It has no effect"):
+            assert discover.find_methods(runnable=flag) == all_ids
+    assert "SCALEX" in all_ids
     # Milestone: every method is now wired -> zero stubs, every id dispatchable.
     # (Guard: adding a new declared-but-unwired method should wire it or update this.)
-    assert stubs == []
-    assert set(runnable) == set(all_ids)
+    assert [s.id for s in registry.load() if not s.variants] == []
 
 
 # --- P06: derived needs_labels / explicit atac reach discovery ---------------
@@ -202,7 +201,7 @@ def test_method_info_unknown_method_points_at_mtb_list_methods():
     import pytest
     with pytest.raises(KeyError) as e:
         discover.method_info("StabMapp")
-    assert "Did you mean StabMap" in str(e.value) and "mtb.list_methods()" in str(e.value)
+    assert "Did you mean StabMap" in str(e.value) and "mtb.find_methods()" in str(e.value)
 
 
 def test_params_for_validates_and_aliases():

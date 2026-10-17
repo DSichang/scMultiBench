@@ -1,15 +1,22 @@
+import pytest
+
 from multibench.data import results
+
+# source= / result_path= / clustering= and available_datasets are deprecated in
+# 0.4 (one FutureWarning each); the published-table tests pass them on purpose.
+pytestmark = pytest.mark.filterwarnings(
+    "ignore:.* is deprecated and will be removed in 0.5:FutureWarning")
 
 
 def test_load_results_returns_tidy_long_frame(result_dir):
-    df = results.load_results(category="diagonal", dataset="D28", result_path=result_dir)
+    df = results.load_results(category="diagonal", dataset="D28")
     assert set(["metric", "value", "method", "dataset", "category"]).issubset(df.columns)
     assert (df["category"] == "diagonal").all()
     assert (df["dataset"] == "D28").all()
 
 
 def test_known_value_matches_disk(result_dir):
-    df = results.load_results(category="diagonal", dataset="D28", result_path=result_dir)
+    df = results.load_results(category="diagonal", dataset="D28", source="published")
     row = df[(df["method"] == "scBridge") & (df["metric"] == "ARI")]
     assert len(row) == 1
     assert abs(float(row["value"].iloc[0]) - 0.61240856) < 1e-6
@@ -17,9 +24,9 @@ def test_known_value_matches_disk(result_dir):
 
 def test_clustering_variant_changes_values(result_dir):
     default = results.load_results(category="diagonal", dataset="D28",
-                                   clustering="default", result_path=result_dir)
+                                   clustering="default", source="published")
     louvain = results.load_results(category="diagonal", dataset="D28",
-                                   clustering="louvain", result_path=result_dir)
+                                   clustering="louvain", source="published")
     # ASW genuinely differs between default (corrected ~0.6973) and louvain
     # (~0.7014): louvain must reflect its own file, not the default correction.
     d = float(default[(default.method == "scBridge") & (default.metric == "ASW")]["value"].iloc[0])
@@ -33,12 +40,12 @@ def test_clustering_variant_changes_values(result_dir):
 
 def test_metric_filter(result_dir):
     df = results.load_results(category="diagonal", dataset="D28",
-                              metrics=["ARI", "NMI"], result_path=result_dir)
+                              metrics=["ARI", "NMI"])
     assert set(df["metric"].unique()) <= {"ARI", "NMI"}
 
 
 def test_methods_are_canonicalized(result_dir):
-    df = results.load_results(category="diagonal", result_path=result_dir)
+    df = results.load_results(category="diagonal")
     # no result-dir-style dotted names leak through
     assert not any("." in m for m in df["method"].unique())
 
@@ -63,13 +70,11 @@ def _val(df, method, metric):
 
 
 def test_source_column_and_values(result_dir):
-    pub = results.load_results("diagonal", dataset="D28", source="published",
-                               result_path=result_dir)
+    pub = results.load_results("diagonal", dataset="D28", source="published")
     assert list(pub.columns) == COLS
     assert (pub.source == "published").all() and (pub.clustering == "default").all()
     assert abs(_val(pub, "iNMF", "ARI") - 0.198677) < 1e-6
-    rr = results.load_results("diagonal", dataset="D28", source="rerun",
-                              result_path=result_dir)
+    rr = results.load_results("diagonal", dataset="D28")
     assert (rr.source == "rerun").all()
     assert rr.method.nunique() == 12
     assert abs(_val(rr, "iNMF", "ARI") - 0.472126) < 1e-6
@@ -77,9 +82,9 @@ def test_source_column_and_values(result_dir):
 
 def test_source_both_concat(result_dir):
     import matplotlib; matplotlib.use("Agg")
-    pub = results.load_results("diagonal", dataset="D28", result_path=result_dir)
-    rr = results.load_results("diagonal", dataset="D28", source="rerun", result_path=result_dir)
-    both = results.load_results("diagonal", dataset="D28", source="both", result_path=result_dir)
+    pub = results.load_results("diagonal", dataset="D28", source="published")
+    rr = results.load_results("diagonal", dataset="D28")
+    both = results.load_results("diagonal", dataset="D28", source="both")
     assert len(both) == len(pub) + len(rr)
     assert list(both.columns) == COLS
     assert set(both.source.unique()) == {"published", "rerun"}
@@ -91,14 +96,15 @@ def test_source_both_concat(result_dir):
 def test_suffix_dir_splits_method_and_clustering(result_dir, layout_tree):
     # vertical/D3 of the layout tree holds a Concerto_louvain directory
     lo = results.load_results("vertical", dataset="D3", clustering="louvain",
-                              result_path=layout_tree)
+                              source="published", result_path=layout_tree)
     assert "Concerto" in set(lo.method)
     assert (lo[lo.method == "Concerto"].clustering == "louvain").all()
-    default = results.load_results("vertical", dataset="D3", result_path=layout_tree)
+    default = results.load_results("vertical", dataset="D3", source="published",
+                                   result_path=layout_tree)
     assert not any("_louvain" in m for m in default.method.unique())
     assert "Concerto" not in set(default.method)   # the dir IS the louvain variant
     for cat in ("vertical", "diagonal", "cross"):
-        df = results.load_results(cat, result_path=result_dir)
+        df = results.load_results(cat, source="published")
         assert not any(m.endswith(("_louvain", "_kmeans")) for m in df.method.unique()), cat
 
 
@@ -107,59 +113,56 @@ def test_zero_row_filter_warns(result_dir):
     # "where are its rows then?" question (results_coverage says rerun has D11)
     with pytest.warns(UserWarning, match="no published rows for method 'Concerto'") as rec:
         df = results.load_results("vertical", dataset="D11", methods="Concerto",
-                                  result_path=result_dir)
+                                  source="published")
     assert len(df) == 0 and list(df.columns) == COLS
-    msg = str(rec[0].message)
-    assert msg.endswith(". The re-run tables hold 1 dataset (D11). Pass source='rerun' "
-                        "or 'both'.")
+    msg = [str(w.message) for w in rec if issubclass(w.category, UserWarning)][0]
+    assert msg.endswith(". The re-run tables hold 1 dataset (D11). Leave out source= to "
+                        "read them.")
     # a KNOWN metric absent from the tables: still the empty-frame-plus-warning
     with pytest.warns(UserWarning, match="kBET"):
-        df = results.load_results("vertical", dataset="D11", metrics=["kBET"],
-                                  result_path=result_dir)
+        df = results.load_results("vertical", dataset="D11", metrics=["kBET"])
     assert len(df) == 0
     # an UNKNOWN metric code is a typo: ValueError listing both vocabularies
     with pytest.raises(ValueError, match=r"unknown metric\(s\) \['ZZZ'\]; valid codes: \['ARI'") as e:
-        results.load_results("vertical", dataset="D11", metrics=["ZZZ"], result_path=result_dir)
+        results.load_results("vertical", dataset="D11", metrics=["ZZZ"])
     assert "present in this frame: ['ARI'" in str(e.value)
     with pytest.raises(ValueError, match=r"unknown metric\(s\) \['NOPE'\]"):
-        results.load_results("vertical", dataset="D11", metrics=["ARI", "NOPE"],
-                             result_path=result_dir)
+        results.load_results("vertical", dataset="D11", metrics=["ARI", "NOPE"])
 
 
 def test_methods_filter_accepts_list_and_aliases(result_dir):
-    df = results.load_results("diagonal", dataset="D28", methods=["scbridge", "Seurat v3"],
-                              result_path=result_dir)
+    df = results.load_results("diagonal", dataset="D28", methods=["scbridge", "Seurat v3"])
     assert set(df.method) == {"scBridge", "Seurat_v3"}
-    df2 = results.load_results("diagonal", dataset="D28", methods="scBridge",
-                               result_path=result_dir)
+    df2 = results.load_results("diagonal", dataset="D28", methods="scBridge")
     assert set(df2.method) == {"scBridge"}
 
 
 def test_metrics_filters_by_family(result_dir):
-    full = results.load_results("diagonal", dataset="D28", result_path=result_dir)
-    b = results.load_results("diagonal", dataset="D28", metrics="batch", result_path=result_dir)
-    assert set(b.metric) <= set(mtb.plot.BATCH_METRICS) and len(b)
-    c = results.load_results("diagonal", dataset="D28", metrics="clustering", result_path=result_dir)
-    assert set(c.metric) <= set(mtb.plot.CLUSTERING_METRICS) and len(c)
+    full = results.load_results("diagonal", dataset="D28")
+    fam = mtb.catalog.metrics().groupby("family")["metric"].apply(set)
+    b = results.load_results("diagonal", dataset="D28", metrics="batch")
+    assert set(b.metric) <= fam["batch"] and len(b)
+    c = results.load_results("diagonal", dataset="D28", metrics="clustering")
+    assert set(c.metric) <= fam["clustering"] and len(c)
     assert len(b) + len(c) == len(full)      # the two families partition the frame
     with pytest.raises(ValueError, match=r"Unknown metrics= token bogus\. Pass 'all', "
                                          r"'clustering', 'batch' or 'classification'"):
-        results.load_results("diagonal", dataset="D28", metrics="bogus", result_path=result_dir)
-    # a list_tasks() token in the metrics slot is explained, not just rejected
-    with pytest.raises(ValueError, match="selects a metric family, not a task of mtb.list_tasks"):
-        results.load_results("diagonal", metrics="dimension_reduction", result_path=result_dir)
+        results.load_results("diagonal", dataset="D28", metrics="bogus")
+    # a task token in the metrics slot is explained, not just rejected
+    with pytest.raises(ValueError, match=r"metrics= selects a metric family, not a task\."):
+        results.load_results("diagonal", metrics="dimension_reduction")
     # everything after category is keyword-only: the positional slip is a TypeError
     with pytest.raises(TypeError):
-        results.load_results("vertical", "D11", result_path=result_dir)
+        results.load_results("vertical", "D11")
     # None == 'all' == today's frame
     pd.testing.assert_frame_equal(
-        results.load_results("diagonal", dataset="D28", metrics="all", result_path=result_dir), full)
+        results.load_results("diagonal", dataset="D28", metrics="all"), full)
     pd.testing.assert_frame_equal(
-        results.load_results("diagonal", dataset="D28", metrics=None, result_path=result_dir), full)
+        results.load_results("diagonal", dataset="D28", metrics=None), full)
 
 
 def test_result_path_single_csv(tmp_path, result_dir):
-    rr = results.load_results("cross", dataset="D52", source="rerun", result_path=result_dir)
+    rr = results.load_results("cross", dataset="D52")
     five = rr[["metric", "value", "method", "dataset", "category"]]
     f = tmp_path / "mine.csv"
     five.to_csv(f, index=False)
@@ -178,7 +181,7 @@ def test_result_path_single_csv(tmp_path, result_dir):
 
 def test_missing_published_error_text(tmp_path):
     with pytest.raises(FileNotFoundError) as e:
-        results.load_results("vertical", result_path=tmp_path)
+        results.load_results("vertical", source="published", result_path=tmp_path)
     msg = str(e.value)
     assert "result_path" in msg and "multibench/result/scib_metric" in msg
     # a category whose tables should be there: no mosaic advice (R5-06)
@@ -186,38 +189,38 @@ def test_missing_published_error_text(tmp_path):
 
 
 def test_mosaic_rerun_loads(result_dir):
-    m = results.load_results("mosaic", source="rerun", result_path=result_dir)
+    m = results.load_results("mosaic")
     assert set(m.dataset) == {"D45", "D45s"}
     with pytest.raises(FileNotFoundError):
-        results.load_results("mosaic", source="published", result_path=result_dir)
+        results.load_results("mosaic", source="published")
     # 'both' on mosaic = rerun only, no error
-    b = results.load_results("mosaic", source="both", result_path=result_dir)
+    b = results.load_results("mosaic", source="both")
     assert set(b.source) == {"rerun"}
 
 
 def test_category_none_unions_everything(result_dir):
-    df = results.load_results(result_path=result_dir)
+    df = results.load_results(source="published")
     assert set(df.category) == {"cross", "diagonal", "vertical"}    # mosaic has no published
-    both = results.load_results(source="both", result_path=result_dir)
+    both = results.load_results(source="both")
     assert "mosaic" in set(both.category)
     with pytest.raises(ValueError, match="unknown category"):
-        results.load_results("sideways", result_path=result_dir)
+        results.load_results("sideways")
     with pytest.raises(ValueError, match="unknown source"):
-        results.load_results("vertical", source="paper", result_path=result_dir)
+        results.load_results("vertical", source="paper")
 
 
 def test_dataset_list_and_unknown_dataset(result_dir):
-    df = results.load_results("diagonal", dataset=["D24", "D28"], result_path=result_dir)
+    df = results.load_results("diagonal", dataset=["D24", "D28"], source="published")
     assert set(df.dataset) == {"D24", "D28"}
-    # an unknown id: the error names the datasets that DO have tables and the
-    # result_path= escape hatch, for either source
+    # an unknown id: the error names the datasets that DO have tables, for
+    # either source
     with pytest.raises(FileNotFoundError, match="D999") as e:
-        results.load_results("diagonal", dataset="D999", result_path=result_dir)
+        results.load_results("diagonal", dataset="D999", source="published")
     assert "The published tables of diagonal hold D24, D25 and D28, not D999." in str(e.value)
-    assert "Pass result_path= to read another results folder." in str(e.value)
+    assert "result_path=" not in str(e.value)
     with pytest.raises(FileNotFoundError, match="The re-run tables of diagonal") as e:
-        results.load_results("diagonal", dataset="D999", source="rerun", result_path=result_dir)
-    assert "result_path=" in str(e.value) and "hold D28 and D28s, not D999" in str(e.value)
+        results.load_results("diagonal", dataset="D999")
+    assert "hold D28 and D28s, not D999" in str(e.value)
 
 
 # ---------------------------------------------------------------------------
@@ -233,7 +236,7 @@ def _quiet_rerun(*a, **k):
 
 
 def test_concat_to_csv_reload_keeps_provenance(tmp_path, result_dir):
-    rr = results.load_results("vertical", dataset="D11", source="rerun", result_path=result_dir)
+    rr = results.load_results("vertical", dataset="D11")
     mine = mtb.to_long(pd.DataFrame({"Value": [0.5, 0.6]}, index=["ARI", "NMI"]), method="MyMethod", dataset="D11", category="vertical")
     f = tmp_path / "all.csv"
     pd.concat([rr, mine]).to_csv(f, index=False)
@@ -250,7 +253,7 @@ def test_concat_to_csv_reload_keeps_provenance(tmp_path, result_dir):
         results.load_results(result_path=f, source="bogus")
     # the directory branch still validates against the fixed vocabulary
     with pytest.raises(ValueError, match="unknown source 'user'"):
-        results.load_results("vertical", source="user", result_path=result_dir)
+        results.load_results("vertical", source="user")
 
 
 def test_load_long_csv_fills_nan_provenance(tmp_path):
@@ -269,26 +272,25 @@ def test_load_long_csv_fills_nan_provenance(tmp_path):
 
 
 def test_dataset_list_validates_every_element(result_dir):
-    with pytest.raises(FileNotFoundError, match=r"^The published tables of diagonal hold D24, D25 and D28, not D99\. Pass result_path=") as e:
-        results.load_results("diagonal", dataset=["D24", "D99"], result_path=result_dir)
+    with pytest.raises(FileNotFoundError, match=r"^The published tables of diagonal hold D24, D25 and D28, not D99\.$") as e:
+        results.load_results("diagonal", dataset=["D24", "D99"], source="published")
     with pytest.raises(FileNotFoundError, match=r"The re-run tables of diagonal hold D28 and D28s, not D98 and D99\."):
-        _quiet_rerun("diagonal", dataset=["D28", "D98", "D99"], source="rerun",
-                     result_path=result_dir)
+        _quiet_rerun("diagonal", dataset=["D28", "D98", "D99"])
     # source='both': an id present in ONE source is fine (D24 is published-only)
-    both = _quiet_rerun("diagonal", dataset=["D24", "D28"], source="both", result_path=result_dir)
+    both = _quiet_rerun("diagonal", dataset=["D24", "D28"], source="both")
     assert set(both.dataset) == {"D24", "D28"}
     # category=None: the union across categories must cover every id
-    df = results.load_results(dataset=["D11", "D28"], result_path=result_dir)
+    df = results.load_results(dataset=["D11", "D28"])
     assert set(df.dataset) == {"D11", "D28"}
 
 
 def test_method_list_validates_every_element(result_dir):
     with pytest.raises(KeyError, match=r"Unknown method Matlida. Did you mean Matilda\?"):
-        results.load_results("vertical", methods="Matlida", result_path=result_dir)
+        results.load_results("vertical", methods="Matlida")
     with pytest.raises(KeyError, match="Unknown method Nope"):
-        results.load_results("vertical", methods=["Matilda", "Nope"], result_path=result_dir)
+        results.load_results("vertical", methods=["Matilda", "Nope"])
     # case-folded names resolve (registry id 'totalVI')
-    df = _quiet_rerun("vertical", methods="totalvi", source="rerun", result_path=result_dir)
+    df = _quiet_rerun("vertical", methods="totalvi")
     assert set(df.method) == {"totalVI"}
     # a name that exists only in a user file is accepted for that file
     long = mtb.to_long(pd.DataFrame({"Value": [0.5]}, index=["ARI"]), method="MyMethod", dataset="D1", category="vertical")
@@ -305,7 +307,7 @@ def test_user_method_name_accepted_in_file(tmp_path):
 
 def test_degenerate_rerun_rows_are_flagged(result_dir):
     with pytest.warns(DegenerateRerunWarning, match=r"Conos/D28 \(re-run 0.2.1, ARI 0.0004\)") as rec:
-        rr = results.load_results("diagonal", dataset="D28", source="rerun", result_path=result_dir)
+        rr = results.load_results("diagonal", dataset="D28")
     assert "Conos" in set(rr.method)          # flagged, never dropped silently
     msg = str(rec[0].message)
     assert "df[df.method != 'Conos']" in msg
@@ -320,41 +322,35 @@ def test_degenerate_rerun_rows_are_flagged(result_dir):
     # published-only loads and a filter that removes the row are silent
     with warnings.catch_warnings():
         warnings.simplefilter("error", DegenerateRerunWarning)
-        results.load_results("diagonal", dataset="D28", result_path=result_dir)
-        results.load_results("diagonal", dataset="D28", source="rerun", methods="iNMF",
-                             result_path=result_dir)
-        results.load_results("diagonal", dataset="D28s", source="rerun", result_path=result_dir)
+        results.load_results("diagonal", dataset="D28", source="published")
+        results.load_results("diagonal", dataset="D28", methods="iNMF")
+        results.load_results("diagonal", dataset="D28s")
     # results_coverage is a WHERE scan and stays quiet
     with warnings.catch_warnings():
         warnings.simplefilter("error", DegenerateRerunWarning)
-        mtb.results_coverage("diagonal", result_path=result_dir)
+        mtb.results_coverage("diagonal")
     # recommend inherits the flag (Conos sits in its ranking)
     with pytest.warns(DegenerateRerunWarning):
-        mtb.recommend("diagonal", source="rerun", result_path=result_dir)
+        mtb.recommend("diagonal")
 
 
 def test_catalog_datasets_covers_every_dataset_with_results(result_dir, layout_tree, monkeypatch):
     cat = mtb.catalog.datasets()
-    have = set(mtb.available_datasets(source="both", result_path=result_dir))
+    have = set(mtb.results_coverage().dataset)
     assert have <= set(cat.dataset)
-    extra = cat[cat.dataset.isin({"D11s", "D24", "D28s", "D45s", "D52s"})]
-    assert len(extra) == 5 and extra.has_results.all()
+    extra = cat[cat.dataset.isin({"D11s", "D28s", "D45s", "D52s"})]
+    assert len(extra) == 4 and extra.has_results.all()
     assert extra.set_index("dataset").loc["D11s", "category"] == "vertical"
-    assert extra.set_index("dataset").loc["D24", "category"] == "diagonal"
     # the CSV rows come first, the appended ids after them in natural order
-    tail = cat.dataset.tolist()[-5:]
-    assert tail == ["D11s", "D24", "D28s", "D45s", "D52s"]
-    # the catalog reads the configured root: an id that tree holds but
-    # dataset.csv does not name is appended (natural order: SD7 before SD10,
-    # which a plain string sort would reverse), an SD id is flagged simulated
+    tail = cat.dataset.tolist()[-4:]
+    assert tail == ["D11s", "D28s", "D45s", "D52s"]
+    # category / has_results come from the re-run tables only: a configured
+    # root with published tables only (the layout tree) marks nothing and
+    # appends none of its ids
     monkeypatch.setattr(mtb.config.DEFAULT, "result_path", layout_tree)
     cat2 = mtb.catalog.datasets()
-    assert cat2.dataset.tolist()[-2:] == ["SD7", "SD10"]
-    row = cat2.set_index("dataset").loc["SD7"]
-    assert row.simulated == True and row.category == "diagonal" and row.has_results   # noqa: E712
-    assert set(cat2[cat2.has_results].dataset) == set(
-        mtb.available_datasets(source="both", result_path=layout_tree))
-    assert "D11s" not in set(cat2.dataset)          # no re-run sweep in that tree
+    assert not cat2.has_results.any()
+    assert "SD7" not in set(cat2.dataset) and "D11s" not in set(cat2.dataset)
 
 
 # ---------------------------------------------------------------------------
@@ -365,18 +361,18 @@ def test_source_column_is_plain_rerun_and_version_in_attrs(result_dir, tmp_path)
     empty frame: the column carried the file stamp 'rerun-0.2.1'. The column
     now holds exactly 'published' | 'rerun' | 'user'; the stamp lives in
     frame.attrs['rerun_version']."""
-    rr = _quiet_rerun("vertical", dataset="D11", source="rerun", result_path=result_dir)
+    rr = _quiet_rerun("vertical", dataset="D11")
     assert set(rr.source) == {"rerun"}
     assert rr.attrs["rerun_version"] == "0.2.1"
     assert len(rr[rr.source == "rerun"]) == len(rr)
-    both = _quiet_rerun("cross", dataset="D52", source="both", result_path=result_dir)
+    both = _quiet_rerun("cross", dataset="D52", source="both")
     assert set(both.source) == {"published", "rerun"}
     assert both.attrs["rerun_version"] == "0.2.1"
     # published-only frames carry the key too, as None
-    pub = results.load_results("diagonal", dataset="D28", result_path=result_dir)
+    pub = results.load_results("diagonal", dataset="D28", source="published")
     assert set(pub.source) == {"published"} and pub.attrs["rerun_version"] is None
     # results_coverage reports the same stamp and plain 'rerun' rows
-    cov = mtb.results_coverage("cross", result_path=result_dir)
+    cov = mtb.results_coverage("cross", source="both")
     assert set(cov.source) == {"published", "rerun"} and cov.attrs["rerun_version"] == "0.2.1"
     # a user file: the column keeps whatever it carries, an old stamp is
     # still matched by source='rerun' (prefix) and parsed into attrs
@@ -392,39 +388,41 @@ def test_source_column_is_plain_rerun_and_version_in_attrs(result_dir, tmp_path)
     assert set(back.source) == {"rerun"} and back.attrs["rerun_version"] is None
     # the DegenerateRerunWarning keeps naming the full stamp
     with pytest.warns(DegenerateRerunWarning, match=r"Conos/D28 \(re-run 0.2.1, ARI"):
-        results.load_results("diagonal", dataset="D28", source="rerun", result_path=result_dir)
+        results.load_results("diagonal", dataset="D28")
 
 
 def test_single_method_table_warns_when_other_source_has_more(result_dir, layout_tree):
-    """The instructor got a silent 1-method cross/D52 table under the default
-    source='published' (the CLI warns, the API did not)."""
+    """The instructor got a silent 1-method cross/D52 table under the then
+    default source='published' (the CLI warns, the API did not)."""
     with pytest.warns(UserWarning, match=r"The published table for cross/D52 has one "
                                          r"method, scMoMaT\. Every rank in it is the "
                                          r"same\. ") as rec:
-        df = results.load_results("cross", dataset="D52", result_path=result_dir)
+        df = results.load_results("cross", dataset="D52", source="published")
     assert set(df.method) == {"scMoMaT"}          # a warning, never an error
     msgs = [str(w.message) for w in rec if "has one method" in str(w.message)]
     assert len(msgs) == 1
     assert "The re-run tables have 8 methods for cross/D52: Concerto, " in msgs[0]
-    assert msgs[0].endswith('Pass source="rerun" or "both".')
+    assert msgs[0].endswith("Leave out source= to read them.")
     assert "meaningful" not in msgs[0] and " - " not in msgs[0] and ";" not in msgs[0]
     # without a dataset filter the selection is named as the category
     with pytest.warns(UserWarning, match=r"The published table for cross has one method"):
-        results.load_results("cross", result_path=result_dir)
+        results.load_results("cross", source="published")
     # source='rerun' / 'both' for the same selection are quiet; so is a
     # published selection with >= 2 methods (D53 and the whole cross category
     # of the layout tree) and a coverage scan
     with warnings.catch_warnings():
         warnings.simplefilter("error", UserWarning)
         warnings.simplefilter("ignore", DegenerateRerunWarning)
-        results.load_results("cross", dataset="D52", source="rerun", result_path=result_dir)
-        results.load_results("cross", dataset="D52", source="both", result_path=result_dir)
-        results.load_results("cross", dataset="D53", result_path=layout_tree)
-        results.load_results("cross", result_path=layout_tree)
-        mtb.results_coverage("cross", result_path=result_dir)
+        results.load_results("cross", dataset="D52")
+        results.load_results("cross", dataset="D52", source="both")
+        results.load_results("cross", dataset="D53", source="published",
+                             result_path=layout_tree)
+        results.load_results("cross", source="published", result_path=layout_tree)
+        mtb.results_coverage("cross")
         # the source the user asked for is the ONLY one with rows: no warning
         # (D54 has a single published method and that tree has no re-run sweep)
-        results.load_results("cross", dataset="D54", result_path=layout_tree)
+        results.load_results("cross", dataset="D54", source="published",
+                             result_path=layout_tree)
     # ... and the same when re-run sweeps exist but none covers the dataset:
     # a different FileNotFoundError inside the lookup, the same silence
     import shutil
@@ -433,7 +431,8 @@ def test_single_method_table_warns_when_other_source_has_more(result_dir, layout
         results._load_rerun("cross", ["D54"], layout_tree)
     with warnings.catch_warnings():
         warnings.simplefilter("error", UserWarning)
-        one = results.load_results("cross", dataset="D54", result_path=layout_tree)
+        one = results.load_results("cross", dataset="D54", source="published",
+                                   result_path=layout_tree)
     assert set(one.method) == {"Concerto"}
 
 
@@ -445,32 +444,32 @@ def test_fetchable_lists_the_release_assets(result_dir):
     # the two vocabularies overlap but are DIFFERENT (D46 downloads and has no
     # stored results; D24 has published tables and no download) - which is
     # exactly why they are two functions; the docstring says which is which
-    have = set(mtb.available_datasets(source="both", result_path=result_dir))
+    have = set(mtb.results_coverage().dataset)
     assert set(ids) & have and set(ids) != have
-    assert "D46" in ids and "D46" not in have and "D24" in have and "D24" not in ids
-    doc = mtb.available_datasets.__doc__
-    assert "Dataset ids that have stored results." in doc and "fetch" in doc
-    assert "``mtb.data.fetchable`` lists the ids that can be downloaded." in doc
+    assert "D46" in ids and "D46" not in have and "D11s" in have and "D11s" not in ids
+    doc = results.fetchable.__doc__
+    assert "Dataset ids ``mtb.data.fetch`` can download." in doc
+    assert "``mtb.results_coverage`` lists the datasets with stored scores" in doc
 
 
 def test_shipped_tree_is_consistent_across_the_api(result_dir):
     """available_datasets, results_coverage, catalog.datasets()['has_results']
     and the "no table" error all describe the same shipped tables."""
-    pub = {c: results.available_datasets(c, result_path=result_dir)
+    pub = {c: results.available_datasets(c, source="published")
            for c in ("vertical", "diagonal", "mosaic", "cross")}
     assert pub == {"vertical": ["D11"], "diagonal": ["D24", "D25", "D28"],
                    "mosaic": [], "cross": ["D52"]}
-    rr = results.available_datasets(source="rerun", result_path=result_dir)
+    rr = results.available_datasets()
     assert rr == ["D11", "D11s", "D28", "D28s", "D45", "D45s", "D52", "D52s"]
-    cov = mtb.results_coverage(result_path=result_dir)
+    cov = mtb.results_coverage(source="both")
     assert set(cov[cov.source == "published"].dataset) == set(sum(pub.values(), []))
     assert set(cov[cov.source == "rerun"].dataset) == set(rr)
+    assert set(mtb.results_coverage().dataset) == set(rr)      # the default lists rerun rows
     cat = mtb.catalog.datasets()
-    assert set(cat[cat.has_results].dataset) == set(
-        mtb.available_datasets(source="both", result_path=result_dir))
+    assert set(cat[cat.has_results].dataset) == set(rr)
     for c, ds in pub.items():
         if not ds:
             continue
-        with pytest.raises(FileNotFoundError, match="result_path=") as e:
-            results.load_results(c, dataset="D999", result_path=result_dir)
+        with pytest.raises(FileNotFoundError) as e:
+            results.load_results(c, dataset="D999", source="published")
         assert f"The published tables of {c} hold {results._and_list(ds)}, not D999." in str(e.value)

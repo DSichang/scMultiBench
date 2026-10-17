@@ -94,8 +94,7 @@ def _cite_adata(n_cells=400, n_genes=2500, n_adt=14, seed=0):
 def test_laptop_tab_prints_the_totalvi_command_before_the_table(tmp_path, monkeypatch, capsys):
     import matplotlib.pyplot as plt
     code = _laptop_tab()
-    assert 'cmd = mtb.run("totalVI", "vertical", inputs=inputs, out_dir="out/totalVI",' in code
-    assert 'print(" ".join(cmd))' in code
+    assert 'mtb.scan("data/MYCITE", "vertical", modalities=["rna", "adt"])' in code
     assert max(len(line) for line in code.splitlines()) <= 80
     monkeypatch.chdir(tmp_path)
     _cite_adata().write_h5ad(tmp_path / "my_citeseq.h5ad")
@@ -105,10 +104,9 @@ def test_laptop_tab_prints_the_totalvi_command_before_the_table(tmp_path, monkey
         exec(compile(code, "quickstart-laptop-tab", "exec"), scope)
     out = capsys.readouterr().out
     lines = out.splitlines()
-    cmd_line = [i for i, l in enumerate(lines) if "main_totalVI.py" in l]
+    scan_line = [i for i, l in enumerate(lines) if l.startswith("[scan] ")]
     table = [i for i, l in enumerate(lines) if l.split()[:1] == ["metric"]]
-    assert cmd_line and table and cmd_line[0] < table[0], out
-    assert lines[cmd_line[0]] == " ".join(scope["cmd"])
+    assert scan_line and table and scan_line[0] < table[0], out
     plt.close("all")
 
 
@@ -139,9 +137,9 @@ def test_step1_details_carry_the_donor_counts():
     n_v, n_c = _counts()
     details = _step1_all().split("```", 1)[1]           # after the first code block
     assert (f"For CITE-seq donors, the `vertical` category has {n_v} RNA + ADT methods "
-            "and the stored table D11.") in details
+            "and stored scores on D11.") in details
     assert (f"The `cross` category has {n_c} RNA + ADT methods, which integrate the donors "
-            "as batches, and the stored table D52.") in details
+            "as batches, and stored scores on D52.") in details
     assert ("These methods read batches 1-3. UINMF also has a variant for two "
             "batches.") in details
 
@@ -193,10 +191,6 @@ def test_api_page_names_exit_code_3_and_the_atac_override():
     assert ("`2` on a usage error, and `3` when `run-all` finished but a method failed, "
             "or a method named in `--methods` was skipped. A line on stderr names those "
             "methods.") in api
-    assert ("`--allow-atac-mismatch` on `scan` and `run-all` counts a method as runnable "
-            "when its ATAC file holds the other representation or peak names the method "
-            "cannot read.") in api
-    assert "It also exits with `1` while the method scripts are not fetched." in api
 
 
 @needs_docs

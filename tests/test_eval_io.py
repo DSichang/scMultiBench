@@ -52,7 +52,7 @@ def test_evaluate_rejects_non_scib():
     import pytest
     from multibench.eval import pipeline
     with pytest.raises(ValueError) as exc:
-        pipeline.evaluate(output="x.h5", category="mosaic", metrics="dimension_reduction",
+        pipeline.evaluate(embedding="x.h5", category="mosaic", metrics="dimension_reduction",
                           labels="c.csv")
     assert "dimension_reduction" in str(exc.value) and "metric family" in str(exc.value)
 
@@ -61,8 +61,8 @@ def test_evaluate_requires_labels_and_clustering(tmp_path):
     import pytest
     from multibench.eval import pipeline
     with pytest.raises(ValueError):
-        pipeline.evaluate(output="x.h5", category="vertical", metrics="clustering",
-                          labels=None, clustering=None)
+        pipeline.evaluate(embedding="x.h5", category="vertical", metrics="clustering",
+                          labels=None, clusters=None)
 
 
 def test_evaluate_requires_batch_for_batch_task():
@@ -72,8 +72,8 @@ def test_evaluate_requires_batch_for_batch_task():
     cl = np.array([0, 0, 1, 1, 2, 2])
     ct = cl.copy()
     with pytest.raises(ValueError) as exc:
-        pipeline.evaluate(output=emb, category="vertical", metrics="batch",
-                          labels=ct, clustering=cl, batch=None)
+        pipeline.evaluate(embedding=emb, category="vertical", metrics="batch",
+                          labels=ct, clusters=cl, batch=None)
     assert "metrics='batch' needs batch labels" in str(exc.value)
 
 
@@ -379,10 +379,10 @@ def test_evaluate_clustering_accepts_csv_and_arraylike(tmp_path):
     from multibench.eval.pipeline import evaluate
     emb, ct, _ = _toy()
     p = tmp_path / "cluster.csv"; _write_cty(p, ct)
-    ref = evaluate(emb, labels=ct, clustering=ct, metrics=["ARI"])
+    ref = evaluate(emb, labels=ct, clusters=ct, metrics=["ARI"])
     assert float(ref.loc["ARI", "Value"]) == pytest.approx(1.0)
     for cl in (p, pd.Series(ct), list(ct)):
-        got = evaluate(emb, labels=ct, clustering=cl, metrics=["ARI"])
+        got = evaluate(emb, labels=ct, clusters=cl, metrics=["ARI"])
         assert float(got.loc["ARI", "Value"]) == float(ref.loc["ARI", "Value"])
 
 
@@ -396,8 +396,8 @@ def test_evaluate_clustering_h5_path_reads_like_the_str(tmp_path):
     with h5py.File(p, "w") as f:
         f.create_group("obs").create_dataset(
             "cluster_leiden", data=np.repeat([0, 1], len(ct) // 2))
-    as_str = evaluate(emb, labels=ct, clustering=str(p), metrics=["ARI"])
-    as_path = evaluate(emb, labels=ct, clustering=p, metrics=["ARI"])
+    as_str = evaluate(emb, labels=ct, clusters=str(p), metrics=["ARI"])
+    as_path = evaluate(emb, labels=ct, clusters=p, metrics=["ARI"])
     assert float(as_str.loc["ARI", "Value"]) == pytest.approx(1.0)
     assert float(as_path.loc["ARI", "Value"]) == float(as_str.loc["ARI", "Value"])
 

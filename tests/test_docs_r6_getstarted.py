@@ -24,7 +24,7 @@ def test_quickstart_cli_details_give_the_own_method_route(tmp_path):
     d, emb = _diag_folder(tmp_path / "data")
     np.save(tmp_path / "emb.npy", emb)
     out = tmp_path / "mine.csv"
-    argv = ["evaluate", "--output", str(tmp_path / "emb.npy"), "--name", "RNA+ATAC PCA",
+    argv = ["evaluate", "--embedding", str(tmp_path / "emb.npy"), "--name", "RNA+ATAC PCA",
             "--labels", str(d / "rna_cty.csv"), "--labels", str(d / "atac_cty.csv"),
             "--dataset", "MYDATA", "--category", "diagonal", "--metrics", "ASW,iLISI",
             "--out", str(out)]

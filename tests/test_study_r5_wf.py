@@ -355,7 +355,7 @@ def test_evaluate_aligns_a_barcode_csv_to_the_obs_names(tmp_path):
         if name == "obs":
             _one_column(tmp_path / batch, SAMPLES)
             batch = str(tmp_path / batch)
-        assert cli.main(["evaluate", "--output", str(tmp_path / "mine.h5ad"), "--labels",
+        assert cli.main(["evaluate", "--embedding", str(tmp_path / "mine.h5ad"), "--labels",
                          str(tmp_path / "ct.csv"), "--batch", batch, "--metrics",
                          "ASW_batch,iLISI", "--out", str(tmp_path / f"{name}.out")]) == 0
     assert pd.read_csv(tmp_path / "obs.out").equals(pd.read_csv(tmp_path / "csv.out"))

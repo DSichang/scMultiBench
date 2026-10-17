@@ -15,6 +15,7 @@ import pytest
 
 import multibench as mtb
 from multibench.engine import resolve
+from tests.conftest import full_scan
 
 
 def _h5(path, n_feat, n_cell, feats=None):
@@ -42,7 +43,7 @@ def _per_batch_folder(d):
 # ------------------------------------------------------------------ L03
 def test_per_batch_folder_fails_every_vertical_row_with_the_hint(tmp_path):
     _per_batch_folder(tmp_path / "MB")
-    sc = mtb.scan("MB", "vertical", data_path=tmp_path)
+    sc = full_scan("MB", "vertical", data_path=tmp_path)
     assert len(sc) > 20 and not sc["files_ok"].any()
     assert sc["files_reason"].str.contains(
         r"This folder holds per-batch files \(rna1.h5, rna2.h5, \.\.\.\)\. Vertical methods "
@@ -91,9 +92,9 @@ def test_a_single_numbered_file_still_resolves(tmp_path):
 
 def test_demo_folders_resolve_as_before(root):
     data = root / "data"
-    d11 = mtb.scan("D11", "vertical", data_path=data)
+    d11 = full_scan("D11", "vertical", data_path=data)
     assert d11.loc[d11["modalities"] == "rna+adt", "files_ok"].all()
-    d52 = mtb.scan("D52", "cross", data_path=data)
+    d52 = full_scan("D52", "cross", data_path=data)
     # D52 holds RNA + ADT: every row of those two modalities has its files,
     # and no row that reads ATAC has
     rna_adt = ~d52["modalities"].str.contains("atac")
@@ -128,7 +129,7 @@ def test_numbered_atac_role_reads_the_031_peak_name(tmp_path):
     _h5(d / "adt1.h5", 6, 40)
     _h5(d / "atac_peak2.h5", 30, 50, feats=peaks)
     assert resolve._resolve_role(d, "atac2").name == "atac_peak2.h5"
-    sc = mtb.scan("LABMOS", "mosaic", data_path=tmp_path)
+    sc = full_scan("LABMOS", "mosaic", data_path=tmp_path)
     ok = sc[sc["method"].isin(["StabMap", "scMoMaT"])
             & (sc["modalities"] == "rna1+rna2+rna3+adt1+atac2")]     # the folder's pattern
     assert len(ok) == 2 and ok["files_ok"].all(), ok["files_reason"].tolist()
@@ -152,7 +153,5 @@ def test_stabmap_reference_batch_is_exposed_and_documented():
                    ("mosaic", "rna1+rna2+atac2+atac3"): 2}
     assert all(e["reference_batch"] is None for e in mtb.method_info("Matilda")["supports"])
     doc = inspect.getdoc(mtb.labels_for)
-    assert ("StabMap uses a fixed reference batch for each layout: in cross the last\n"
-            "batch (batch 3 of three, batch 2 of two), in mosaic batch 1 or batch 2") in doc
-    assert "Number the" in doc and "donor you want as reference accordingly" in doc
+    assert "StabMap: its reference batch first" in doc
     assert "methods.yaml" not in doc and "output.cell_order" not in doc

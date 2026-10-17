@@ -80,7 +80,7 @@ def _embedding(tmp_path, n=300, gaps=30):
     lab = np.array(["A"] * (n // 2) + ["B"] * (n // 2), dtype=object)
     lab[:gaps] = "NA"
     pd.DataFrame({"x": lab}).to_csv(tmp_path / "labels.csv", index=False)
-    return ["evaluate", "--output", str(tmp_path / "emb.npy"), "--labels",
+    return ["evaluate", "--embedding", str(tmp_path / "emb.npy"), "--labels",
             str(tmp_path / "labels.csv"), "--metrics", "ASW"]
 
 
@@ -160,7 +160,7 @@ def test_evaluate_dataset_without_label_files(category, method, files, named, tm
             f["matrix/barcodes"] = np.array([f"{name}{i}" for i in range(30)], dtype="S16")
     cells = 30 if category == "vertical" else 60        # the cells of the folder
     np.save(tmp_path / "emb.npy", np.random.default_rng(0).normal(size=(cells, 5)))
-    argv = ["evaluate", "--output", str(tmp_path / "emb.npy"), "--dataset", "NOLAB",
+    argv = ["evaluate", "--embedding", str(tmp_path / "emb.npy"), "--dataset", "NOLAB",
             "--method", method, "--category", category, "--data-path", str(tmp_path),
             "--metrics", "ASW"]
     for extra in ([], ["--missing-labels", "drop"], ["--column", "celltype"]):
@@ -182,7 +182,7 @@ def test_evaluate_dataset_without_label_files(category, method, files, named, tm
 def test_scan_modalities_all_and_the_stderr_note(no_envs, capsys):
     rc, out, err = _cli(["scan", "D11", "--category", "vertical"], capsys)
     assert rc == 0 and len(out.splitlines()) == 1 + 14
-    assert out.splitlines()[0].split() == cli._COMPACT_PLAN_COLUMNS      # no atac column
+    assert out.splitlines()[0].split() == W.COMPACT_COLUMNS      # no atac column
     assert err.splitlines() == [NOTE]
     rc, lines = _one_stream(["scan", "D11", "--category", "vertical"])
     assert rc == 0 and lines[-1] == NOTE and len(lines) == 16              # after the table

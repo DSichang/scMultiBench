@@ -20,6 +20,7 @@ from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, registry
 from multibench.engine import runner as R
+from tests.conftest import full_scan
 
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 GENES = [f"GENE{i}" for i in range(40)]
@@ -106,9 +107,9 @@ def _only(monkeypatch, methods):
 def test_columns_order_and_one_row_per_method(linux, monkeypatch):
     _only(monkeypatch, ["Matilda", "sciPENN"])
     pm = mtb.scan("D11", "vertical", per_method=True, verbose=False)
-    full = mtb.scan("D11", "vertical", verbose=False)
+    full = full_scan("D11", "vertical", verbose=False)
     assert type(pm) is pd.DataFrame
-    assert list(pm.columns) == ["method", "runnable", "reason"]
+    assert list(pm.columns) == ["method", "modalities", "runnable", "reason"]
     assert pm["method"].is_unique and set(pm["method"]) == set(full["method"])
     assert pm["runnable"].dtype == bool
     # runnable methods first, then by name
@@ -137,6 +138,7 @@ def test_the_example_of_the_tutorials(linux, monkeypatch, tmp_path, capsys):
         "computer. MYCITE holds RNA and ADT.\n"
         "[scan] Cells per file: rna.h5 1,718, adt.h5 1,718.\n")
     assert pm.to_dict("list") == {"method": ["Matilda", "totalVI"],
+                                  "modalities": ["rna+adt", "rna+adt"],
                                   "runnable": [True, True], "reason": ["", ""]}
 
 
@@ -450,10 +452,10 @@ def test_reasons_are_printed_in_full(linux, monkeypatch, tmp_path, capsys):
     assert out[2:] == [
         "[scan] Matilda: cty.csv is missing.",
         "[scan] sciPENN: Environment env_sciPENN is not installed. Run multibench env "
-        "install --methods sciPENN --packed --run. Use --category vertical to install the "
+        "install --methods sciPENN --run. Use --category vertical to install the "
         "environments of every vertical method.",
         "[scan] totalVI: Environment scmb_scvi is not installed. Run multibench env "
-        "install --methods totalVI --packed --run. Use --category vertical to install the "
+        "install --methods totalVI --run. Use --category vertical to install the "
         "environments of every vertical method."]
     # one line per method that cannot run, in the order of the table, whole
     assert [l.split(": ")[0].split()[-1] for l in out[2:]] == list(pm["method"])
@@ -495,7 +497,7 @@ def test_folder_caveats_are_printed_and_fixed_notes_are_not(linux, tmp_path, cap
     assert pm["runnable"].all()
     # the note on the method itself, the same on every folder, is run_all's
     _on_disk("D27mini")
-    full = mtb.scan("D27mini", "diagonal", methods=["online_iNMF", "SCALEX"], verbose=False)
+    full = full_scan("D27mini", "diagonal", methods=["online_iNMF", "SCALEX"], verbose=False)
     assert "online_iNMF needs about 5,000 cells" in " ".join(full["caveat"])
     mtb.scan("D27mini", "diagonal", methods=["online_iNMF", "SCALEX"], per_method=True)
     out = capsys.readouterr().out
@@ -524,7 +526,7 @@ def test_reason_row_choice(linux, monkeypatch, tmp_path):
     # are nearest speaks, not the first of the table
     _cite(tmp_path, labels=False)
     kw = dict(methods=["Matilda"], data_path=tmp_path, verbose=False)
-    full = mtb.scan("MYCITE", "vertical", modalities="all", **kw)
+    full = full_scan("MYCITE", "vertical", modalities="all", **kw)
     assert list(full["modalities"]) == ["rna+adt", "rna+atac", "rna+adt+atac"]
     pm = mtb.scan("MYCITE", "vertical", modalities="all", per_method=True, **kw)
     assert pm.loc[0, "reason"] == full.loc[0, "reason"]
@@ -536,7 +538,7 @@ def test_reason_row_choice(linux, monkeypatch, tmp_path):
     _h5(d / "rna.h5", GENES[:30], bars)
     _h5(d / "atac.h5", PEAKS, bars)
     _labels(d / "cty.csv", 60)
-    full = mtb.scan("MULTIOME", "vertical", modalities="all", **kw)
+    full = full_scan("MULTIOME", "vertical", modalities="all", **kw)
     on_disk = [W._inputs_on_disk(r, "MULTIOME", tmp_path) for _, r in full.iterrows()]
     assert list(full["modalities"]) == ["rna+adt", "rna+atac", "rna+adt+atac"]
     assert on_disk == [False, True, False] and not full["runnable"].any()
@@ -546,24 +548,23 @@ def test_reason_row_choice(linux, monkeypatch, tmp_path):
     # no row has its files: the one that lacks the fewest
     (d / "atac.h5").unlink()
     (d / "cty.csv").unlink()
-    full = mtb.scan("MULTIOME", "vertical", modalities="all", **kw)
+    full = full_scan("MULTIOME", "vertical", modalities="all", **kw)
     lacking = [W._missing_inputs(r, "MULTIOME", tmp_path) for _, r in full.iterrows()]
     assert lacking == [2, 2, 3]
     pm = mtb.scan("MULTIOME", "vertical", modalities="all", per_method=True, **kw)
     assert pm.loc[0, "reason"] == full.loc[0, "reason"]         # a tie: the first row
 
 
-def test_per_method_needs_a_category(tmp_path):
-    with pytest.raises(ValueError) as e:
-        mtb.scan("D11", per_method=True)
-    assert str(e.value) == ("per_method=True needs a category, as mtb.scan('D11', 'vertical', "
-                            "per_method=True).")
-    # before anything is read
-    with pytest.raises(ValueError) as e:
-        mtb.scan("NO_SUCH_FOLDER", per_method=True, data_path=tmp_path)
-    assert str(e.value) == ("per_method=True needs a category, as mtb.scan('NO_SUCH_FOLDER', "
-                            "'vertical', per_method=True).")
-    assert mtb.scan("D11", per_method=False, verbose=False).columns.tolist() == W.SCAN_COLUMNS
+def test_per_method_without_a_category_is_the_default_scan(tmp_path):
+    # 0.4: one row per method and category is scan's default; per_method= only warns
+    with pytest.warns(FutureWarning, match=r"scan\(per_method=\) is deprecated"):
+        pm = mtb.scan("D11", per_method=True, verbose=False)
+    pd.testing.assert_frame_equal(pm, mtb.scan("D11", verbose=False))
+    assert pm.columns.tolist() == ["method", "category", "modalities", "runnable", "reason"]
+    with pytest.raises(FileNotFoundError):
+        _quiet(mtb.scan, "NO_SUCH_FOLDER", per_method=True, data_path=tmp_path)
+    assert _quiet(mtb.scan, "D11", per_method=False,
+                  verbose=False).columns.tolist() == W.SCAN_COLUMNS
 
 
 def test_verbose_false_prints_nothing(linux, capsys):

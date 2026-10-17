@@ -19,6 +19,7 @@ import warnings
 from pathlib import Path
 
 import pytest
+from tests.conftest import full_scan
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -256,7 +257,7 @@ def test_own_data_demo_writes_the_folder_with_export_dataset(key, tmp_path, monk
     assert sorted(f.name for f in folder.iterdir()) == EXPECTED_FILES[key]
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        frame = mtb.scan(own, cat, data_path=tmp_path / "mydata", verbose=False)
+        frame = full_scan(own, cat, data_path=tmp_path / "mydata", verbose=False)
     ok = set(frame[frame.files_ok].method)
     assert set(t["methods"]) <= ok
     everyone = set(GEN.task_methods(key))

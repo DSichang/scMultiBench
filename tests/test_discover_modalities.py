@@ -16,7 +16,7 @@ def test_find_methods_modalities_keeps_scbridge_without_warning():
         assert "scBridge" in discover.find_methods(category="diagonal", modalities=["rna", "atac_gas"])
         assert "scBridge" not in discover.find_methods(category="diagonal", modalities=["rna", "adt"])
         assert len(discover.find_methods(category="diagonal", modalities=["rna", "atac"])) == \
-            len(mtb.list_methods(category="diagonal"))
+            len(mtb.find_methods(category="diagonal"))
 
 
 def test_find_methods_modalities_never_warns():
@@ -26,19 +26,17 @@ def test_find_methods_modalities_never_warns():
         warnings.simplefilter("error")
         for cat in (None, "vertical", "diagonal", "mosaic", "cross"):
             discover.find_methods(category=cat, modalities=["rna"])
-    doc = discover.find_methods.__doc__
-    assert "Directory-fed methods" in doc and "scBridge" in doc
 
 
 def test_recommend_modalities_keeps_scbridge(result_dir):
-    a = mtb.recommend("diagonal", modalities=["rna", "atac"], result_path=result_dir)
-    b = mtb.recommend("diagonal", result_path=result_dir)
+    a = mtb.recommend("diagonal", modalities=["rna", "atac"])
+    b = mtb.recommend("diagonal")
     assert a.method.tolist() == b.method.tolist()
     assert "scBridge" in a.method.tolist()
 
 
 def test_method_info_supports_exposes_labels():
-    for m in mtb.list_methods():
+    for m in mtb.find_methods():
         for s in mtb.method_info(m)["supports"]:
             assert isinstance(s["labels"], list)
     assert mtb.method_info("UnitedNet")["supports"][0]["labels"] == ["cty"]
@@ -89,16 +87,16 @@ def test_params_for_dataset_disambiguates_by_folder(tmp_path):
 
 
 def test_cite_is_variadic_and_keeps_the_list_form():
-    both = mtb.cite("Matilda", "MOFA2", fmt="bibtex")
-    assert both == mtb.cite(["Matilda", "MOFA2"], fmt="bibtex")
-    assert both == mtb.cite(("Matilda", "MOFA2"), fmt="bibtex")
+    both = mtb.cite("Matilda", "MOFA2", format="bibtex")
+    assert both == mtb.cite(["Matilda", "MOFA2"], format="bibtex")
+    assert both == mtb.cite(("Matilda", "MOFA2"), format="bibtex")
     assert "Matilda" in both and "MOFA2" in both and both.startswith("@article{scMultiBench")
     assert mtb.cite() == mtb.cite(None)
     assert "https://doi.org/" in mtb.cite() and "@article" not in mtb.cite()   # text is the default
-    assert mtb.cite("Matilda") == mtb.cite(["Matilda"], fmt="text")
-    assert mtb.cite("all") == mtb.cite(["all"][0]) and mtb.cite("all", fmt="bibtex").count("@") > 30
-    with pytest.raises(ValueError, match="unknown fmt 'nope'"):
-        mtb.cite("Matilda", fmt="nope")
+    assert mtb.cite("Matilda") == mtb.cite(["Matilda"], format="text")
+    assert mtb.cite("all") == mtb.cite(["all"][0]) and mtb.cite("all", format="bibtex").count("@") > 30
+    with pytest.raises(ValueError, match="unknown format 'nope'"):
+        mtb.cite("Matilda", format="nope")
     with pytest.raises(KeyError, match="Did you mean Matilda"):
         mtb.cite("Matlida")
     with pytest.raises(TypeError, match="pass one list"):

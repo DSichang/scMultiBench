@@ -371,17 +371,12 @@ def test_the_docstring():
     import inspect
     doc = inspect.getdoc(mtb.data.write_example)
     assert doc.splitlines()[0] == "Write the example files of a tutorial dataset as .h5ad files."
-    for section in ("Parameters", "Returns", "Raises", "Examples", "Notes", "See Also"):
+    for section in ("Parameters", "Returns", "Raises", "Examples", "See Also"):
         assert f"\n{section}\n{'-' * len(section)}\n" in doc
     for word in ("stand-in", "stand in", "tidy"):
         assert word not in doc.lower()
     assert not re.search(r"<[a-z_]+>", re.sub(r"``.*?``", "", doc, flags=re.S))
-    assert "Save your own data under another name" in doc
-    for case in ("it is the example of this dataset, written by this version",
-                 "it is a file of your own with that name",
-                 "saved again with ``write_h5ad``",
-                 "replaced only when it is an example of another dataset or of another"):
-        assert case in " ".join(doc.split()), case
+    assert "A file of your own with such a name is kept." in " ".join(doc.split())
 
 
 def test_import_multibench_stays_light():

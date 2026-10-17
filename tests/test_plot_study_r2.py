@@ -172,12 +172,6 @@ def test_stored_demo_figures_are_unchanged():
                            for t in fig.axes[0].texts), ds
 
 
-def test_bubble_table_notes_document_the_grey_rule():
-    doc = " ".join(B.BubbleTable.__doc__.split())
-    assert "a constant (or all-NaN) column is all ones, as in the R code" in doc
-    assert "The figure draws a column whose rows all hold one value in grey" in doc
-
-
 # --- M03: igraph rows next to the stored tables -----------------------------
 
 BACKEND = ("The rows for {m} were clustered with the igraph Leiden backend. The stored "

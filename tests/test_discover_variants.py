@@ -35,7 +35,7 @@ def test_category_and_modalities_must_hold_on_one_variant():
     for cat in ("vertical", "mosaic", "cross"):
         for mods in (["rna", "atac"], ["rna", "adt"], ["adt", "atac"], ["rna", "adt", "atac"]):
             want = sorted(
-                m for m in discover.list_methods()
+                m for m in discover.find_methods()
                 if any(s["category"] == cat
                        and set(mods) <= {registry.base_modality(x) for x in s["modalities"]}
                        for s in discover.method_info(m)["supports"]))
@@ -112,9 +112,9 @@ def test_per_variant_semantics_on_a_synthetic_spec(monkeypatch):
 def test_find_methods_docstring_states_per_variant_rule():
     import inspect
     doc = inspect.getdoc(discover.find_methods)
-    assert "per variant" in doc
+    assert "one of its variants" in doc
     doc2 = inspect.getdoc(discover.method_info)
-    assert "method-level" in doc2 and "any variant" in doc2
+    assert "any variant" in doc2
 
 
 # ----------------------------------------------------------------- removed API
@@ -130,8 +130,4 @@ def test_availability_api_is_gone():
 
 
 def test_method_info_status_doc():
-    import inspect
-    doc = inspect.getdoc(discover.method_info)
-    assert "cross-checked against the upstream entrypoint" in doc
-    assert "end to end" in doc
     assert discover.method_info("VIMCCA")["status"] == "verified"

@@ -23,6 +23,7 @@ import pytest
 import multibench as mtb
 from multibench import workflow as W
 from multibench.engine import envs, registry, runner, schema
+from tests.conftest import full_scan
 
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 
@@ -360,14 +361,14 @@ def test_requires_gpu_dry_run_still_previews(tmp_path, no_gpu):
 
 def test_run_docstring_documents_the_contract():
     doc = mtb.run.__doc__ or ""
-    assert "cpu_params" in doc and "requires_gpu" in doc and "OSError" in doc
+    assert "OSError" in doc and "needs a GPU this host lacks" in " ".join(doc.split())
 
 
 # ------------------------------------------------------------ scan / run_all gate
 
 def test_scan_reports_requires_gpu_in_the_env_gate(tmp_path, no_gpu, all_envs):
     _cite(tmp_path)
-    df = mtb.scan("CITE", "vertical", methods=["moETM", "scMDC"], data_path=tmp_path,
+    df = full_scan("CITE", "vertical", methods=["moETM", "scMDC"], data_path=tmp_path,
                   verbose=False)
     df = df[df["modalities"] == "rna+adt"].set_index("method")
     m = df.loc["moETM"]
@@ -382,7 +383,7 @@ def test_scan_reports_requires_gpu_in_the_env_gate(tmp_path, no_gpu, all_envs):
 
 def test_scan_unchanged_on_gpu_host(tmp_path, gpu, all_envs):
     _cite(tmp_path)
-    df = mtb.scan("CITE", "vertical", methods=["moETM", "scMDC"], data_path=tmp_path,
+    df = full_scan("CITE", "vertical", methods=["moETM", "scMDC"], data_path=tmp_path,
                   verbose=False)
     df = df[df["modalities"] == "rna+adt"].set_index("method")
     assert bool(df.loc["moETM", "runnable"]) and df.loc["moETM", "env_reason"] == ""
@@ -392,7 +393,7 @@ def test_scan_unchanged_on_gpu_host(tmp_path, gpu, all_envs):
 def test_scan_joins_missing_env_and_missing_gpu(tmp_path, no_gpu, monkeypatch):
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     _cite(tmp_path)
-    df = mtb.scan("CITE", "vertical", methods=["moETM"], data_path=tmp_path, verbose=False)
+    df = full_scan("CITE", "vertical", methods=["moETM"], data_path=tmp_path, verbose=False)
     r = df[df["modalities"] == "rna+adt"].iloc[0]
     assert not bool(r["env_ok"])
     assert r["env_reason"].startswith("Environment ") and "not installed" in r["env_reason"]
@@ -415,7 +416,7 @@ def test_run_all_never_dispatches_a_requires_gpu_method(tmp_path, no_gpu, all_en
 
 
 def test_scan_docstring_documents_the_gate():
-    assert "requires_gpu" in (mtb.scan.__doc__ or "")
+    assert "skip this host's GPU test" in " ".join((mtb.scan.__doc__ or "").split())
 
 
 def test_runtime_hint_names_its_host():

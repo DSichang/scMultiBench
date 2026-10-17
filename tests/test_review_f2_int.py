@@ -33,6 +33,7 @@ import multibench as mtb
 from multibench import cli, config, workflow as W
 from multibench.engine import envs, registry, resolve, runner
 from multibench.plot import bubble as B
+from tests.conftest import full_scan
 
 ROOT = Path(__file__).resolve().parents[1]
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
@@ -337,7 +338,7 @@ def test_config_says_when_the_scripts_are_not_fetched(tmp_path, monkeypatch):
 def test_glue_d28_caveat_names_the_rename_call(tmp_path):
     # R3-04: mtb.run rewrites D28's chr_start_end names for GLUE, so the
     # caveat has no peak-name clause and does not name the dataset
-    r = mtb.scan("D28", "diagonal", methods=["GLUE"], verbose=False).iloc[0]
+    r = full_scan("D28", "diagonal", methods=["GLUE"], verbose=False).iloc[0]
     assert r["caveat"].startswith("GLUE reads the GENCODE v43 human annotation")
     assert "peak names" not in r["caveat"] and "D28" not in r["caveat"]
     assert ";" not in r["caveat"] and "D27" not in r["caveat"]
@@ -405,16 +406,16 @@ def test_help_texts_put_the_object_first_and_end_in_plain_sentences():
     assert _help(["fetch"], "--ref").endswith(
         "Scripts already present must be at that commit or tag.")
     doc = " ".join(mtb.scan.__doc__.split())
-    assert ("``True`` = skip this host's GPU test; for a login node without a GPU that "
-            "checks a GPU-node job.") in doc
+    assert ("``True`` = skip this host's GPU test, to check a job for a GPU node from a "
+            "login node.") in doc
     doubled = [(" ".join(p), a.option_strings or [a.dest], a.help) for p, a in _actions()
                if re.search(r"\)\s*\(", a.help)]
     assert doubled == []
     assert _help(["params"], "--category").endswith(
         "each with the same modalities). Only that category's variants.")
-    assert _help(["list"], "--task") == (
-        "task within the category: clustering, batch or dimension_reduction. "
-        "mtb.list_tasks() lists them. The same filter as mtb.find_methods(task=).")
+    import argparse
+    # 0.4: --task (and the list alias) are deprecated and hidden from the help
+    assert _help(["list"], "--task") == argparse.SUPPRESS
 
 
 # ====================================================================== M25
@@ -432,9 +433,8 @@ def test_docstrings_drop_the_justification_tails():
             "the stored tables.") in flat["to_long"]
     assert "the placeholder the plotting layer uses" not in flat["to_long"]
     assert "bounded above by the ARI itself" not in flat["summary"]
-    # R4-14 deleted the ratio sentence; the formula stays
+    # R4-14 deleted the ratio sentence; 0.4 cut the formula with the long notes
     assert "not a difference, because" not in flat["summary"]
-    assert "``(best - max(runner_up, 0)) / best``" in flat["summary"]
     assert "so a whole category needs only a few envs" not in flat["plan"]
     assert "go straight to" not in flat["load_results"]
 
@@ -568,8 +568,7 @@ def test_plot_guide_describes_the_averaged_row_labels():
             "(`Matilda · 2 ds`).") in text
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        fig = mtb.plot.bubble(mtb.load_results("vertical", dataset=["D11", "D11s"],
-                                               source="rerun"))
+        fig = mtb.plot.bubble(mtb.load_results("vertical", dataset=["D11", "D11s"]))
     labels = {t.get_text() for ax in fig.axes for t in ax.get_yticklabels()}
     labels |= set(_figure_texts(fig))
     assert "Matilda · 2 ds" in labels
@@ -584,8 +583,4 @@ def test_api_and_changes_pages_say_cell_order():
         for old in ("stacks its cells", "stacks the cells", "the order it stacks",
                     "in which Seurat_v5 stacks"):
             assert old not in text, (page, old)
-    api = " ".join((docs / "api.md").read_text().split())
-    assert "only the files that method reads, in the method's cell order." in api
-    assert "in the method's cell order. It is `None` when they could not be matched." in api
-    assert "run on the CPU even on a GPU host." in api
     assert "Seurat_v5's cell order." in " ".join((docs / "changes.md").read_text().split())

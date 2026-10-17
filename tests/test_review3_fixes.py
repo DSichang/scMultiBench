@@ -28,6 +28,7 @@ from multibench import cli, config
 from multibench import workflow as W
 from multibench.engine import envs, ingest, registry
 
+from tests.conftest import full_scan
 from tests.test_docs_r4 import _read, needs_docs
 
 ad = pytest.importorskip("anndata")
@@ -370,9 +371,9 @@ def test_the_rows_listed_for_a_gene_activity_folder(linux, tmp_path, capsys):
     _cross(tmp_path, "PK", "atac_peak")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        gas = mtb.scan("GA", "cross", data_path=tmp_path, verbose=False)
-        every = mtb.scan("GA", "cross", data_path=tmp_path, verbose=False, modalities="all")
-        peak = mtb.scan("PK", "cross", data_path=tmp_path, verbose=False)
+        gas = full_scan("GA", "cross", data_path=tmp_path, verbose=False)
+        every = full_scan("GA", "cross", data_path=tmp_path, verbose=False, modalities="all")
+        peak = full_scan("PK", "cross", data_path=tmp_path, verbose=False)
     assert sorted(zip(gas["method"], gas["modalities"])) \
         == sorted(zip(peak["method"], peak["modalities"]))
     assert gas.attrs["held"] == ["rna", "atac"] and gas.attrs["not_held"] == ["adt"]

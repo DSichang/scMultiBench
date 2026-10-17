@@ -34,16 +34,16 @@ def _messages(fn, *args, **kw):
 def _stored_plus_lone_baseline():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        stored = mtb.load_results("mosaic", source="rerun")
+        stored = mtb.load_results("mosaic")
     return pd.concat([stored, pd.DataFrame(_rows("PCA_standin", "LABMOS"))],
                      ignore_index=True)
 
 
 def test_bar_warns_about_a_lone_method_and_the_incomplete_matrix():
-    fig, msgs = _messages(mtb.plot.bar, _stored_plus_lone_baseline())
+    fig, msgs = _messages(mtb.plot.bar, _stored_plus_lone_baseline())   # overall="rank"
     lone = [m for m in msgs if m.startswith("Dataset LABMOS has only one method")]
-    assert lone == ["Dataset LABMOS has only one method, PCA_standin. Its Overall "
-                    "there is always 1.0. Plot it with methods scored on the same "
+    assert lone == ["Dataset LABMOS has only one method, PCA_standin. Its rank "
+                    "there is always the lowest. Plot it with methods scored on the same "
                     "dataset."]
     inc = [m for m in msgs if m.startswith("The summary ranks ")]
     assert len(inc) == 1 and "PCA_standin has scores on 1 of them." in inc[0]
@@ -109,8 +109,10 @@ def test_require_complete_drops_the_incomplete_method_without_a_coverage_warning
     assert [m for m in msgs if not m.startswith("require_complete=True dropped")] == []
 
 
-@pytest.mark.parametrize("fn", [mtb.plot.bar, mtb.plot.build_table])
-def test_docstrings_list_the_warnings(fn):
+@pytest.mark.parametrize("fn, said", [
+    (mtb.plot.bar, "a method missing from some datasets, a dataset with one method"),
+    (mtb.plot.build_table, "an incomplete method x dataset matrix")])
+def test_docstrings_list_the_warnings(fn, said):
     doc = " ".join(fn.__doc__.split())
     assert "Warns" in fn.__doc__
-    assert "a dataset holds one method, or no method spans two datasets" in doc.lower()
+    assert said in doc.lower()

@@ -21,6 +21,7 @@ import multibench as mtb
 from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, registry
+from tests.conftest import full_scan
 
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 
@@ -63,7 +64,7 @@ def test_glue_record_keeps_the_caveat_without_the_prepared_file_note(tmp_path, m
                         _Res(np.zeros((40, 5))))
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        row = mtb.scan("LUNG_us", "diagonal", methods=["GLUE"], data_path=tmp_path,
+        row = full_scan("LUNG_us", "diagonal", methods=["GLUE"], data_path=tmp_path,
                        verbose=False).iloc[0]
         res = mtb.run_all("LUNG_us", "diagonal", tmp_path / "out", methods=["GLUE"],
                           data_path=tmp_path, evaluate=False)
@@ -91,7 +92,7 @@ def test_wrong_kind_and_scripts_ref_keep_both_reasons(tmp_path, monkeypatch, gas
     monkeypatch.setattr(W, "_run", lambda *a, **k: pytest.fail("no method may start"))
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        sc = mtb.scan("MU_PEAK", "vertical", methods=None, modalities=["rna", "atac"],
+        sc = full_scan("MU_PEAK", "vertical", methods=None, modalities=["rna", "atac"],
                       data_path=tmp_path, verbose=False).set_index("method")
         r = sc.loc["Matilda"]
         # the ref is its own blocker, like the wrong ATAC kind: the files are fine

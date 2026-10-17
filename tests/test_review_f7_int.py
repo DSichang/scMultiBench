@@ -29,6 +29,7 @@ from multibench.engine import envs, ingest, registry
 from multibench.engine import runner as R
 from tests.test_docs_r4 import _flat, needs_docs
 from tests.test_study_r7_msg import ALL_ENVS, GENES, _h5, _lung, _quiet
+from tests.conftest import full_scan
 
 ROOT = __import__("pathlib").Path(__file__).resolve().parent.parent
 
@@ -42,18 +43,18 @@ def test_scan_summary_names_doctor_on_linux_when_an_environment_is_missing(monke
                                                                             capsys):
     monkeypatch.setattr(R, "linux_only_sentence", lambda: None)
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
-    mtb.scan("D11", "vertical", modalities="all")
+    full_scan("D11", "vertical", modalities="all")
     line = capsys.readouterr().out.strip()
     assert line.startswith("[scan] ") and line.endswith(
         " have their environment installed. mtb.env.doctor() checks the environments."), line
     monkeypatch.setattr(config, "_CLI", True)
-    mtb.scan("D11", "vertical", modalities="all")
+    full_scan("D11", "vertical", modalities="all")
     assert capsys.readouterr().out.strip().endswith(
         "multibench env doctor checks the environments.")
     # every environment installed: nothing to check
     monkeypatch.setattr(config, "_CLI", False)
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
-    mtb.scan("D11", "vertical")
+    full_scan("D11", "vertical")
     assert "doctor" not in capsys.readouterr().out
 
 
@@ -61,7 +62,7 @@ def test_env_reason_names_the_category_in_a_sentence(monkeypatch):
     monkeypatch.setattr(R, "linux_only_sentence", lambda: None)
     text = W._env_hint("glue", "GLUE", "diagonal")
     assert text == ("Environment glue is not installed. Run multibench env install "
-                    "--methods GLUE --packed --run. Use --category diagonal to install the "
+                    "--methods GLUE --run. Use --category diagonal to install the "
                     "environments of every diagonal method.")
     assert not re.search(r"\. --category", text)
 
@@ -70,7 +71,7 @@ def test_env_reason_names_the_category_in_a_sentence(monkeypatch):
 def test_reason_column_starts_with_the_file_of_a_cell_check(tmp_path):
     d = _lung(tmp_path)
     _h5(d / "atac_gas.h5", GENES, [f"a{i}" for i in reversed(range(20))])
-    row = _quiet(mtb.scan, "LUNG", "diagonal", methods=["SCALEX"], data_path=tmp_path,
+    row = _quiet(full_scan, "LUNG", "diagonal", methods=["SCALEX"], data_path=tmp_path,
                  verbose=False).iloc[0]
     assert row["reason"].startswith("atac_gas.h5 lists the ATAC cells in another order "
                                     "than atac_peak.h5."), row["reason"]
@@ -114,7 +115,7 @@ def test_missing_batch_file_on_the_cli(tmp_path, monkeypatch, capsys):
     out = tmp_path / "out"
     shutil.copytree(src / "scalex_D28" if (src / "scalex_D28").is_dir() else
                     next(p for p in src.iterdir() if p.is_dir()), out)
-    rc = _quiet(cli.main, ["evaluate", "--output", str(out / "embedding.h5"),
+    rc = _quiet(cli.main, ["evaluate", "--embedding", str(out / "embedding.h5"),
                            "--method", "SCALEX", "--dataset", "D28", "--category",
                            "diagonal", "--batch", "missing.csv", "--metrics", "iLISI"])
     err = capsys.readouterr().err
@@ -141,7 +142,9 @@ def test_diagonal_layout_points_to_its_own_list(monkeypatch):
 
 # ====================================================== several-datasets warning
 def test_several_datasets_warning_lists_the_datasets_in_words():
-    df = mtb.load_results("diagonal", dataset=["D24", "D28"])
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", FutureWarning)       # source= (0.4)
+        df = mtb.load_results("diagonal", dataset=["D24", "D28"], source="published")
     with warnings.catch_warnings(record=True) as rec:
         warnings.simplefilter("always")
         mtb.plot.build_table(df, metrics=["ARI", "NMI"])
@@ -165,11 +168,11 @@ def linux_without_conda(monkeypatch):
 def test_no_conda_error_names_the_flag_on_the_cli(linux_without_conda, capsys):
     env = envs.group_for("StabMap")
     assert env in envs.packed_manifest()
-    rc = cli.main(["env", "install", "--methods", "StabMap", "--run"])
+    rc = cli.main(["env", "install", "--methods", "StabMap", "--build", "--run"])
     err = capsys.readouterr().err
     assert rc == 1
     assert (f"error: Conda is not installed on this computer. Environment {env} has a "
-            f"packed archive. Pass --packed to install it.") in err, err
+            f"packed archive. Leave out --build to install it.") in err, err
     assert ";" not in err and "packed=True" not in err
 
 
@@ -205,7 +208,7 @@ def test_modalities_warning_on_the_cli_is_sentences(tmp_path, monkeypatch, capsy
 def test_modalities_warning_in_python_is_sentences(tmp_path):
     _lung_data(tmp_path)
     with pytest.warns(UserWarning) as rec:
-        mtb.scan("LUNG", "diagonal", data_path=tmp_path / "data",
+        full_scan("LUNG", "diagonal", data_path=tmp_path / "data",
                  modalities=["rna", "atac_gas"], verbose=False)
     msg = next(str(w.message) for w in rec if "scBridge" in str(w.message))
     assert msg == ("The modalities rna and atac_gas leave out scBridge, which reads a "
@@ -309,23 +312,8 @@ def test_method_info_returns_and_raises_read_as_a_card():
     assert "(" not in returns and ";" not in returns
     assert "declared stub" not in raises
     flat = " ".join(doc.split())
-    assert "A method listed but not yet runnable raises ``KeyError``." in flat
-    assert "``params`` - what ``run(params=...)`` can change" in flat
-
-
-def test_normalize_peak_names_example_follows_to_canonical(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    atac = ad.AnnData(np.ones((6, 3)))
-    atac.obs_names = [f"c{i}" for i in range(6)]
-    atac.var_names = ["chr1_100_200", "chr1_300_400", "chr2_10_20"]
-    written = _quiet(mtb.io.to_canonical, atac, "data/MYMULTI/", modality="peak",
-                     category="vertical")
-    assert str(written) == "data/MYMULTI/atac.h5"
-    example = next(l for l in inspect.getdoc(mtb.io.normalize_peak_names).splitlines()
-                   if "normalize_peak_names(" in l)
-    src, dst = re.findall(r'"([^"]+)"', example)
-    assert src == str(written)
-    assert mtb.io.normalize_peak_names(src, dst).is_file()
+    assert ("params per variant 'category:mods': defaults, tunable, effective "
+            "(mtb.params_for)") in flat
 
 
 # ==================================================== docs pages
@@ -349,7 +337,10 @@ def test_installation_heading_quotes_the_no_conda_error():
 
 @needs_docs
 def test_changes_page_quotes_the_live_several_datasets_warning():
-    df = mtb.load_results("diagonal", dataset=["D24", "D25", "D28"])
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", FutureWarning)       # source= (0.4)
+        df = mtb.load_results("diagonal", dataset=["D24", "D25", "D28"],
+                              source="published")
     with warnings.catch_warnings(record=True) as rec:
         warnings.simplefilter("always")
         mtb.plot.build_table(df, metrics=["ARI", "NMI"])

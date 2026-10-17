@@ -116,15 +116,15 @@ def test_the_scan_sees_the_known_choice_sets():
             m = _CHOICE_LINE.match(line)
             if m:
                 seen.setdefault(path, set()).update(m.group("names").split(", "))
-    assert {"group", "overall"} <= seen["multibench.plot.bar.bar"]
+    assert {"overall"} <= seen["multibench.plot.bar.bar"]
     # bubble's __module__ is set to "multibench.plot" (plot/__init__.py)
-    assert {"aggregate", "overall", "na"} <= seen["multibench.plot.bubble"]
+    assert {"aggregate", "overall"} <= seen["multibench.plot.bubble"]
     assert {"aggregate", "overall", "na"} <= seen["multibench.plot.bubble.build_table"]
     assert "flavor" in seen["multibench.eval.scib.compute"]
     assert "flavor" in seen["multibench.eval.scib.leiden_sweep"]
 
 
-@pytest.mark.parametrize("name, expected", [("group", None), ("overall", "mean_overall")])
+@pytest.mark.parametrize("name, expected", [("overall", "rank")])
 def test_bar_reference_defaults_match_the_code(name, expected):
     griffe = pytest.importorskip("griffe")
     # the package attribute multibench.plot.bar is the function; reach the module

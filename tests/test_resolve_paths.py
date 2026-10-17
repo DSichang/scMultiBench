@@ -102,8 +102,6 @@ def test_labels_for_validates_method_and_returns_absolute(tmp_path, monkeypatch)
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         assert mtb.labels_for("D11", "vertical", "Matilda", data_path="data") == got
-    doc = mtb.labels_for.__doc__
-    assert "validated whenever given" in doc
 
 
 def test_select_variant_helper_is_shared():

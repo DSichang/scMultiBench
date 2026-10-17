@@ -1,6 +1,6 @@
 """``multibench evaluate --help`` says that --labels can name an obs column.
 
-With an ``.h5ad`` --output, ``--labels celltype`` and ``--labels obs:celltype``
+With an ``.h5ad`` --embedding, ``--labels celltype`` and ``--labels obs:celltype``
 read the column of its obs. The help named files only. The forms that do
 not work stay errors: a column next to ``--column``, a column given twice,
 and a column with an output that has no obs.
@@ -33,13 +33,13 @@ def _help(capsys):
 
 def test_the_help_names_the_obs_column(capsys):
     text = _help(capsys)
-    assert ("With an .h5ad --output, --labels can instead name a column of its obs, as "
+    assert ("With an .h5ad --embedding, --labels can instead name a column of its obs, as "
             "celltype or obs:celltype: give it once, without --column.") in text
     assert ("--batch BATCH per-cell batch labels CSV; a first column of barcodes is "
-            "aligned as for --labels. With an .h5ad --output it can instead name a column "
+            "aligned as for --labels. With an .h5ad --embedding it can instead name a column "
             "of its obs, without --batch-column.") in text
-    assert ("A first column of barcodes is aligned to the obs_names of an .h5ad --output, "
-            "or to the barcodes in the first column of a .csv --output.") in text
+    assert ("A first column of barcodes is aligned to the obs_names of an .h5ad --embedding, "
+            "or to the barcodes in the first column of a .csv --embedding.") in text
     assert (".csv/.tsv (a first column of barcodes gives the cell ids: labels and batches "
             "with barcodes are matched by them)") in text
     assert "is dropped" not in text
@@ -69,7 +69,7 @@ def _run(argv, capsys):
 @pytest.mark.parametrize("labels", ["celltype", "obs:celltype"])
 def test_what_the_help_says_works(out, capsys, labels):
     scores = out / "scores.csv"
-    rc, _, err = _run(["--output", str(out / "out.h5ad"), "--labels", labels, "--batch",
+    rc, _, err = _run(["--embedding", str(out / "out.h5ad"), "--labels", labels, "--batch",
                        labels.replace("celltype", "donor"), "--metrics", "ARI,NMI,iLISI",
                        "--out", str(scores)], capsys)
     assert rc == 0, err
@@ -79,10 +79,10 @@ def test_what_the_help_says_works(out, capsys, labels):
 
 def test_the_forms_the_help_rules_out_are_errors(out, capsys):
     h5ad = str(out / "out.h5ad")
-    for argv in (["--output", h5ad, "--labels", "celltype", "--column", "x"],
-                 ["--output", h5ad, "--labels", "celltype", "--labels", "donor"],
-                 ["--output", str(out / "emb.npy"), "--labels", "celltype"],
-                 ["--output", h5ad, "--labels", "celltype", "--batch", "donor",
+    for argv in (["--embedding", h5ad, "--labels", "celltype", "--column", "x"],
+                 ["--embedding", h5ad, "--labels", "celltype", "--labels", "donor"],
+                 ["--embedding", str(out / "emb.npy"), "--labels", "celltype"],
+                 ["--embedding", h5ad, "--labels", "celltype", "--batch", "donor",
                   "--batch-column", "x"]):
         rc, _, err = _run([*argv, "--metrics", "ARI"], capsys)
         assert rc == 1 and "error: " in err

@@ -12,6 +12,7 @@ import pytest
 
 import multibench
 from multibench import cli
+from tests.conftest import full_scan
 
 
 # ----------------------------------------------------------------- helpers
@@ -77,7 +78,7 @@ def test_cli_usage_error_exit_2():
 def test_cli_runtime_error_exit_1_and_debug_reraise(monkeypatch, capsys):
     def boom(*a, **k):
         raise ValueError("kaboom from the api")
-    monkeypatch.setattr(multibench, "scan", boom)
+    monkeypatch.setattr(multibench.workflow, "_scan", boom)
     monkeypatch.delenv("MULTIBENCH_DEBUG", raising=False)
     rc = cli.main(["scan", "D28", "--category", "diagonal"])
     err = capsys.readouterr().err
@@ -98,7 +99,7 @@ def test_cli_scan_prints_frame(capsys):
     assert "runnable" in out
     # the default table is the COMPACT column set; --columns all prints every
     # column scan() returns (the full frame is ~1450 chars wide)
-    for col in cli._COMPACT_PLAN_COLUMNS:
+    for col in multibench.workflow.COMPACT_COLUMNS:
         assert col in out
     assert "env_reason" not in out and "files_reason" not in out
     assert "scBridge" not in out          # --methods filters rows
@@ -106,7 +107,7 @@ def test_cli_scan_prints_frame(capsys):
                    "--columns", "all"])
     out = capsys.readouterr().out
     assert rc == 0
-    for col in multibench.scan("D28", "diagonal").columns:
+    for col in full_scan("D28", "diagonal").columns:
         assert col in out
 
 
@@ -140,9 +141,9 @@ def test_cli_scan_without_category_scans_every_category(capsys):
     out = capsys.readouterr().out
     assert rc == 0
     df = pd.read_csv(io.StringIO(out))
-    assert set(df["category"]) == set(multibench.scan("D28")["category"])
+    assert set(df["category"]) == set(full_scan("D28")["category"])
     assert len(set(df["category"])) > 1
-    assert len(df) == len(multibench.scan("D28"))
+    assert len(df) == len(full_scan("D28"))
 
 
 def test_cli_layout(capsys, monkeypatch):
@@ -192,9 +193,9 @@ def test_cli_cite(capsys, tmp_path):
     rc = cli.main(["cite", "SCALEX", "--format", "text"])
     out = capsys.readouterr().out
     assert rc == 0
-    assert out.strip() == multibench.cite(["SCALEX"], fmt="text").strip()
-    assert "scMultiBench" in multibench.cite(["SCALEX"], fmt="bibtex") and "Xiong" in out
-    rc = cli.main(["cite", "--out", str(tmp_path / "refs.bib")])
+    assert out.strip() == multibench.cite(["SCALEX"], format="text").strip()
+    assert "scMultiBench" in multibench.cite(["SCALEX"], format="bibtex") and "Xiong" in out
+    rc = cli.main(["cite", "--format", "bibtex", "--out", str(tmp_path / "refs.bib")])
     assert rc == 0 and (tmp_path / "refs.bib").read_text().startswith("@article")
     with pytest.raises(SystemExit) as ei:
         cli.main(["cite", "SCALEX", "--all"])
@@ -344,7 +345,7 @@ def test_cli_plot_single_method_warning_and_default_title(tmp_path, capsys, monk
                    "--out", str(tmp_path / "x.png")])
     assert rc == 0 and "The table has one method." in capsys.readouterr().err
     # default title for stored results is '<category> <dataset>'
-    monkeypatch.setattr(multibench, "load_results", lambda **k: _long_df())
+    monkeypatch.setattr(multibench.data.results, "_load_results", lambda *a, **k: _long_df())
     rc = cli.main(["plot", "bubble", "--category", "vertical", "--dataset", "D1",
                    "--out", str(tmp_path / "x.png")])
     assert rc == 0 and seen["title"] == "vertical D1"
@@ -355,54 +356,58 @@ def test_cli_plot_source_and_methods_forwarded(tmp_path, monkeypatch):
     import multibench.cli as cli_mod
     calls = {}
 
-    def fake_load(**kw):
-        calls["load"] = kw
+    def fake_load(category, **kw):
+        calls["load"] = dict(kw, category=category)
         return _long_df()
 
     def fake_bubble(df, **kw):
         calls["bubble"] = kw
-    monkeypatch.setattr(multibench, "load_results", fake_load)
+    monkeypatch.setattr(multibench.data.results, "_load_results", fake_load)
     monkeypatch.setattr(plot_ns, "bubble", fake_bubble)
     rc = cli_mod.main(["plot", "bubble", "--category", "vertical", "--dataset", "D1",
-                       "--source", "rerun", "--methods", "A,B", "--require-complete",
+                       "--methods", "A,B", "--require-complete",
                        "--aggregate", "summary", "--out", str(tmp_path / "x.png")])
     assert rc == 0
-    assert calls["load"] == {"category": "vertical", "dataset": ["D1"], "source": "rerun"}
+    assert calls["load"] == {"category": "vertical", "dataset": ["D1"], "source": "rerun",
+                             "result_path": None}
     assert calls["bubble"]["methods"] == ["A", "B"]
     assert calls["bubble"]["require_complete"] is True
     assert calls["bubble"]["aggregate"] == "summary"
-    assert "overall" not in calls["bubble"]          # library default kept
+    assert calls["bubble"]["overall"] == "rank"      # the default for bubble and bar
 
 
 def test_cli_plot_result_path_reads_another_results_root(tmp_path, layout_tree, capsys):
-    """`multibench plot` names a hatch its own flags offer: a dataset without a
-    stored table is reported with --result-path (the CLI spelling of
-    result_path=), and --result-path reads that other results root."""
+    """`multibench plot` reads the re-run tables by default: a dataset they do
+    not hold is reported in flag spelling, without the removed --result-path
+    advice; the deprecated --source / --result-path still read another root."""
     rc = cli.main(["plot", "bubble", "--category", "cross", "--dataset", "D53",
                    "--out", str(tmp_path / "x.png")])
     err = capsys.readouterr().err
     assert rc == 1
-    assert "Pass --result-path to read another results folder." in err
-    assert "result_path=" not in err
+    assert "error: The re-run tables of cross hold D52 and D52s, not D53." in err
+    assert "--result-path" not in err and "result_path=" not in err
     # a category without published tables: the fact and the flag, in flag spelling
     rc = cli.main(["plot", "bubble", "--category", "mosaic", "--dataset", "D45",
-                   "--out", str(tmp_path / "x.png")])
+                   "--source", "published", "--out", str(tmp_path / "x.png")])
     err = capsys.readouterr().err
     assert rc == 1
-    assert ("error: mosaic has no published tables. Pass --source rerun to plot the "
+    assert ("error: mosaic has no published tables. Leave out --source to plot the "
             "package's re-run tables.") in err
     for api_spelling in ("result_path=", "source='", "category='", "mtb.config"):
         assert api_spelling not in err, err
-    # ... and the flag it names works
+    # ... and the advice works
     swept = tmp_path / "d45.png"
     rc = cli.main(["plot", "bubble", "--category", "mosaic", "--dataset", "D45",
-                   "--source", "rerun", "--out", str(swept)])
+                   "--out", str(swept)])
     assert rc == 0 and swept.stat().st_size > 0
     capsys.readouterr()
     out = tmp_path / "d53.png"
     rc = cli.main(["plot", "bubble", "--category", "cross", "--dataset", "D53",
-                   "--result-path", str(layout_tree), "--out", str(out)])
+                   "--source", "published", "--result-path", str(layout_tree),
+                   "--out", str(out)])
+    err = capsys.readouterr().err
     assert rc == 0 and out.stat().st_size > 0
+    assert "warning: --result-path is deprecated" in err
 
 
 def test_cli_plot_input_run_all_dir(tmp_path, monkeypatch):
@@ -444,8 +449,8 @@ def _wide():
 def test_cli_evaluate_npy_only_method_dataset(monkeypatch, tmp_path, capsys):
     captured = {}
 
-    def fake_eval(**kw):
-        captured.update(kw)
+    def fake_eval(embedding, **kw):
+        captured.update(kw, embedding=embedding)
         return _wide()
     monkeypatch.setattr(multibench, "evaluate", fake_eval)
     emb = tmp_path / "e.npy"
@@ -453,12 +458,12 @@ def test_cli_evaluate_npy_only_method_dataset(monkeypatch, tmp_path, capsys):
     labels = tmp_path / "cty.csv"
     pd.DataFrame({"x": list("ABABA")}).to_csv(labels, index=False)
     out = tmp_path / "long.csv"
-    rc = cli.main(["evaluate", "--output", str(emb), "--labels", str(labels),
+    rc = cli.main(["evaluate", "--embedding", str(emb), "--labels", str(labels),
                    "--category", "vertical", "--metrics", "ARI,NMI", "--method", "M",
                    "--dataset", "D", "--out", str(out)])
     assert rc == 0
     assert captured["metrics"] == ["ARI", "NMI"]
-    assert captured["output"] == str(emb)
+    assert captured["embedding"] == str(emb)
     df = pd.read_csv(out)
     # the fake evaluate frame carries no scoring record
     assert list(df.columns) == ['metric', 'value', 'method', 'dataset', 'category', 'clustering',
@@ -467,25 +472,25 @@ def test_cli_evaluate_npy_only_method_dataset(monkeypatch, tmp_path, capsys):
     assert set(df["method"]) == {"M"} and set(df["dataset"]) == {"D"}
     capsys.readouterr()
     # long mode printed (no --out) has no index column
-    rc = cli.main(["evaluate", "--output", str(emb), "--labels", str(labels),
+    rc = cli.main(["evaluate", "--embedding", str(emb), "--labels", str(labels),
                    "--category", "vertical", "--method", "M", "--dataset", "D"])
     out_txt = capsys.readouterr().out
     assert rc == 0 and out_txt.lstrip().startswith("metric")
 
 
 def test_cli_evaluate_wide_default_unchanged(monkeypatch, tmp_path, capsys):
-    monkeypatch.setattr(multibench, "evaluate", lambda **kw: _wide())
+    monkeypatch.setattr(multibench, "evaluate", lambda *a, **kw: _wide())
     out = tmp_path / "metric.csv"
-    rc = cli.main(["evaluate", "--output", "e.h5", "--labels", "l.csv", "--out", str(out)])
+    rc = cli.main(["evaluate", "--embedding", "e.h5", "--labels", "l.csv", "--out", str(out)])
     assert rc == 0
     df = pd.read_csv(out, index_col=0)
     assert list(df.columns) == ["Value"] and list(df.index) == ["ARI", "NMI", "ASW"]
 
 
 def test_cli_evaluate_long_mode_requires_all_three(monkeypatch, capsys):
-    monkeypatch.setattr(multibench, "evaluate", lambda **kw: _wide())
+    monkeypatch.setattr(multibench, "evaluate", lambda *a, **kw: _wide())
     with pytest.raises(SystemExit) as ei:
-        cli.main(["evaluate", "--output", "e.h5", "--labels", "l.csv", "--method", "M"])
+        cli.main(["evaluate", "--embedding", "e.h5", "--labels", "l.csv", "--method", "M"])
     assert ei.value.code == 2
     err = capsys.readouterr().err
     assert ("A long table needs --dataset, --category, and --method or --name. "
@@ -495,21 +500,20 @@ def test_cli_evaluate_long_mode_requires_all_three(monkeypatch, capsys):
 def test_cli_evaluate_clustering_alias(monkeypatch):
     captured = {}
 
-    def fake_eval(**kw):
+    def fake_eval(embedding, **kw):
         captured.clear(); captured.update(kw)
         return _wide()
     monkeypatch.setattr(multibench, "evaluate", fake_eval)
-    for flag in ("--clustering", "--cluster"):
-        rc = cli.main(["evaluate", "--output", "e.h5", "--labels", "l.csv", flag, "x.h5"])
-        assert rc == 0 and captured["clustering"] == "x.h5"
+    rc = cli.main(["evaluate", "--embedding", "e.h5", "--labels", "l.csv", "--clusters", "x.h5"])
+    assert rc == 0 and captured["clusters"] == "x.h5"
     assert "obsm" not in captured and "column" not in captured
     assert captured["metrics"] is None                  # Python's default metric set
-    rc = cli.main(["evaluate", "--output", "e.h5ad", "--labels", "l.csv", "--obsm", "X_pca",
+    rc = cli.main(["evaluate", "--embedding", "e.h5ad", "--labels", "l.csv", "--obsm", "X_pca",
                    "--metrics", "all", "--batch", "b.csv"])
     assert rc == 0
     assert captured["obsm"] == "X_pca" and "column" not in captured
     assert captured["metrics"] == "all" and captured["batch"] == "b.csv"
-    rc = cli.main(["evaluate", "--output", "e.h5ad", "--labels", "l.csv", "--metrics", "batch"])
+    rc = cli.main(["evaluate", "--embedding", "e.h5ad", "--labels", "l.csv", "--metrics", "batch"])
     assert rc == 0 and captured["metrics"] == "batch"    # a family token, not a 1-list
 
 
@@ -525,9 +529,9 @@ def test_cli_evaluate_real_npy_and_csv(tmp_path, capsys):
     pd.DataFrame({"x": labels}).to_csv(tmp_path / "cty.csv", index=False)
     pd.DataFrame({"x": labels}).to_csv(tmp_path / "clu.csv", index=False)
     for emb_file in ("e.npy", "e.csv"):
-        rc = cli.main(["evaluate", "--output", str(tmp_path / emb_file),
+        rc = cli.main(["evaluate", "--embedding", str(tmp_path / emb_file),
                        "--labels", str(tmp_path / "cty.csv"),
-                       "--clustering", str(tmp_path / "clu.csv"),
+                       "--clusters", str(tmp_path / "clu.csv"),
                        "--metrics", "ARI,NMI", "--method", "Mine", "--dataset", "T",
                        "--category", "vertical", "--out", str(tmp_path / "long.csv")])
         assert rc == 0, capsys.readouterr().err
@@ -539,25 +543,18 @@ def test_cli_evaluate_real_npy_and_csv(tmp_path, capsys):
 def test_cli_evaluate_unknown_metric_exit_1(tmp_path, capsys):
     np.save(tmp_path / "e.npy", np.zeros((4, 2)))
     pd.DataFrame({"x": list("ABAB")}).to_csv(tmp_path / "c.csv", index=False)
-    rc = cli.main(["evaluate", "--output", str(tmp_path / "e.npy"),
+    rc = cli.main(["evaluate", "--embedding", str(tmp_path / "e.npy"),
                    "--labels", str(tmp_path / "c.csv"), "--metrics", "ARI,BOGUS"])
     assert rc == 1
     assert "BOGUS" in capsys.readouterr().err
 
 
-def test_cli_evaluate_only_is_a_hidden_deprecated_alias(monkeypatch, capsys):
-    """``--only`` still parses (hidden from --help) and maps to metrics=; a
-    deprecation line goes to stderr."""
-    captured = {}
-
-    def fake_eval(**kw):
-        captured.update(kw)
-        return _wide()
-    monkeypatch.setattr(multibench, "evaluate", fake_eval)
-    rc = cli.main(["evaluate", "--output", "e.h5", "--labels", "l.csv", "--only", "ARI,NMI"])
-    cap = capsys.readouterr()
-    assert rc == 0 and captured["metrics"] == ["ARI", "NMI"] and "only" not in captured
-    assert "warning: --only is deprecated" in cap.err and "--metrics" in cap.err
+def test_cli_evaluate_only_is_removed(monkeypatch, capsys):
+    """``--only`` is gone in 0.4: argparse rejects it, and --help names --metrics."""
+    monkeypatch.setattr(multibench, "evaluate", lambda *a, **kw: _wide())
+    with pytest.raises(SystemExit) as ei:
+        cli.main(["evaluate", "--embedding", "e.h5", "--labels", "l.csv", "--only", "ARI,NMI"])
+    assert ei.value.code == 2 and "--only" in capsys.readouterr().err
     sub = next(a for a in cli.build_parser()._actions if a.dest == "command").choices["evaluate"]
     assert "--only" not in sub.format_help() and "--metrics" in sub.format_help()
 
@@ -643,8 +640,8 @@ def test_cli_env_install_packed_dry_run_labels(monkeypatch, capsys):
     # the "add --run" hint is a diagnostic: stderr, so stdout is the table only
     assert "dry-run" in cap.err and "--run" in cap.err
     assert not any(l.startswith("#") for l in out.splitlines())
-    # without --packed the wording is unchanged
-    rc = cli.main(["env", "install"])
+    # --build: the lockfile wording
+    rc = cli.main(["env", "install", "--build"])
     out = capsys.readouterr().out
     assert "build(dry-run)" in out and "packed" not in out.split("#")[0]
 
@@ -656,7 +653,7 @@ def test_cli_env_doctor_next_hint_and_strict(monkeypatch, capsys):
     out = capsys.readouterr().out
     assert rc == 0
     assert "# legend:" in out
-    assert "multibench env install --methods SCALEX,X,Y --packed --run" in out
+    assert "multibench env install --methods SCALEX,X,Y --run" in out
     rc = cli.main(["env", "doctor", "--strict"])
     assert rc == 1
     capsys.readouterr()

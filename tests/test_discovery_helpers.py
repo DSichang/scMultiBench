@@ -4,12 +4,19 @@ import pytest
 import multibench as mtb
 from multibench.engine import resolve
 
+# source= / result_path= and available_datasets are deprecated in 0.4 (one
+# FutureWarning each); the published-table tests below pass them on purpose.
+pytestmark = pytest.mark.filterwarnings(
+    "ignore:.* is deprecated and will be removed in 0.5:FutureWarning")
+
 
 def test_available_datasets_lists_diagonal(result_dir):
-    ds = mtb.available_datasets("diagonal", result_path=result_dir)
+    with pytest.warns(FutureWarning, match=r"available_datasets is deprecated .* "
+                                           r"Use results_coverage\."):
+        ds = mtb.available_datasets("diagonal")
     assert isinstance(ds, list) and "D28" in ds
     # mosaic has no published results -> empty list (not an error)
-    assert mtb.available_datasets("mosaic", result_path=result_dir) == []
+    assert mtb.available_datasets("mosaic", source="published") == []
 
 
 def test_inputs_for_check_raises_on_missing(tmp_path):
@@ -84,25 +91,25 @@ def test_inputs_for_default_no_warning_when_present(tmp_path):
 def test_available_datasets_warns_on_missing_root(tmp_path, result_dir):
     with pytest.warns(UserWarning, match="does not exist"):
         assert mtb.available_datasets("vertical", result_path=tmp_path / "nope") == []
-    assert mtb.available_datasets("mosaic", source="rerun", result_path=result_dir) == ["D45", "D45s"]
-    assert mtb.available_datasets("mosaic", result_path=result_dir) == []   # published: still none
+    assert mtb.available_datasets("mosaic") == ["D45", "D45s"]   # the re-run default
+    assert mtb.available_datasets("mosaic", source="published") == []   # published: still none
     assert "D28" in mtb.available_datasets()
-    assert "D28" in mtb.available_datasets("diagonal", result_path=result_dir)
+    assert "D28" in mtb.available_datasets("diagonal")
 
 
 def test_results_coverage(result_dir, layout_tree):
     from multibench.data.results import results_coverage
-    cov = results_coverage("cross", result_path=result_dir)
+    cov = results_coverage("cross", source="both")
     assert list(cov.columns) == ["category", "dataset", "method", "clustering", "source"]
     d52 = cov[cov.dataset == "D52"]
     assert set(d52[d52.source == "published"].method) == {"scMoMaT"}
     assert d52[d52.source == "rerun"].method.nunique() == 8
     # clustering variants surface: a louvain-only Concerto_louvain directory
     # (vertical D3 of the layout tree) shows up under clustering='louvain'
-    allc = results_coverage(result_path=layout_tree)
+    allc = results_coverage(source="published", result_path=layout_tree)
     row = allc[(allc.dataset == "D3") & (allc.method == "Concerto")]
     assert set(row.clustering) == {"louvain"}
-    assert results_coverage("mosaic", source="published", result_path=result_dir).empty
+    assert results_coverage("mosaic", source="published").empty
 
 
 def test_recommend_ranks_with_coverage(result_dir):
@@ -112,7 +119,7 @@ def test_recommend_ranks_with_coverage(result_dir):
     # D25 and D28: a complete matrix, so no coverage note at all
     with warnings.catch_warnings():
         warnings.simplefilter("error", UserWarning)
-        r = recommend("diagonal", result_path=result_dir)
+        r = recommend("diagonal", source="published")
     assert list(r.columns) == ["method", "grand_score", "n_datasets", "n_datasets_total",
                                "coverage", "needs_labels", "runtime_tier", "worst_sec",
                                "env", "output_kind", "datasets"]
@@ -126,7 +133,7 @@ def test_recommend_ranks_with_coverage(result_dir):
     # the re-run sweep scores 12 of the 14 on D28/D28s: source='both' makes
     # the matrix incomplete and the warning says so
     with pytest.warns(UserWarning, match="scores on only part of the datasets"):
-        rb = recommend("diagonal", source="both", result_path=result_dir)
+        rb = recommend("diagonal", source="both")
     assert (rb.n_datasets <= rb.n_datasets_total).all() and (rb.coverage < 1.0).any()
     assert (rb.n_datasets_total == 4).all()
     assert rb.grand_score.dropna().is_monotonic_decreasing
@@ -137,7 +144,8 @@ def test_recommend_ranks_with_coverage(result_dir):
 def test_recommend_drops_singleton_datasets_and_warns(layout_tree):
     from multibench.data.results import recommend
     with pytest.warns(UserWarning, match="fewer than 2 methods") as rec:
-        r = recommend("cross", result_path=layout_tree)
+        r = recommend("cross", source="published", result_path=layout_tree)
+    rec = [w for w in rec if not issubclass(w.category, FutureWarning)]
     # the layout tree's cross part has ONE method with a metric table in every
     # dataset but D53 (six methods) and D57 (UINMF and MOFA2's nested
     # filtered5/metric.csv). The singleton datasets must be dropped, so
@@ -170,7 +178,7 @@ def test_recommend_drops_singleton_datasets_and_warns(layout_tree):
         "out of the ranking.")
     with pytest.raises(ValueError, match=r"No cross dataset has 50 or more methods\. D52 "
                                          r"has 1, D53 has 6") as e:
-        recommend("cross", min_methods=50, result_path=layout_tree)
+        recommend("cross", min_methods=50, source="published", result_path=layout_tree)
     assert "pass source=" not in str(e.value)       # that tree has no other source
 
 
@@ -185,18 +193,18 @@ def test_recommend_single_dataset_category_names_the_other_source(result_dir):
                                          r"1\.0\.") as e:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
-            recommend("cross", result_path=result_dir)
+            recommend("cross", source="published")
     msg = str(e.value)
     assert ("The re-run tables have 8 methods for cross: Concerto, sciPENN, scMDC, scMM, "
-            "scMoMaT, StabMap, totalVI, UINMF. Pass source=\"rerun\" or \"both\".") in msg
+            "scMoMaT, StabMap, totalVI, UINMF. Leave out source= to rank them.") in msg
     assert "meaningless" not in msg and ">=" not in msg and "(s)" not in msg
     assert msg.endswith("Otherwise pass long_df= with more methods, or lower min_methods.")
     # that source ranks them on D52 + D52s, nothing dropped
-    r, m = _rec("cross", source="rerun", result_path=result_dir)
+    r, m = _rec("cross")
     assert r.grand_score.notna().sum() == 8 and (r.n_datasets_total == 2).all()
     assert "dropped" not in m
     # a single-dataset category with several methods ranks (vertical: D11)
-    r2, _ = _rec("vertical", result_path=result_dir)
+    r2, _ = _rec("vertical", source="published")
     assert (r2.n_datasets_total == 1).all() and r2.grand_score.notna().sum() == 6
 
 
@@ -205,7 +213,7 @@ def test_recommend_unknown_result_id_and_modalities(result_dir):
     from multibench.data.results import recommend
     # a non-registry id (e.g. a result-dir token or the user's own method) gets
     # None metadata, no KeyError
-    long = mtb.load_results("vertical", dataset="D11", result_path=result_dir)
+    long = mtb.load_results("vertical", dataset="D11")
     mine = long[long.method == "scMM"].assign(method="Concerto_louvain")
     mine = mine.assign(value=mine.value * 0.5)
     r = recommend("vertical", long_df=pd.concat([long, mine]))
@@ -230,12 +238,13 @@ def _rec(*a, **k):
     with warnings.catch_warnings(record=True) as rec:
         warnings.simplefilter("always")
         r = recommend(*a, **k)
-    msgs = [str(w.message) for w in rec if "recommend(" in str(w.message)]
+    msgs = [str(w.message) for w in rec if "recommend(" in str(w.message)
+            and not issubclass(w.category, FutureWarning)]
     return r, (msgs[0] if msgs else "")
 
 
 def test_recommend_lists_unscored_methods(result_dir):
-    r, msg = _rec("vertical", modalities=["rna", "adt"], result_path=result_dir)
+    r, msg = _rec("vertical", modalities=["rna", "adt"], source="published")
     nan_rows = r[r.grand_score.isna()]
     assert set(nan_rows.method) == {"Concerto", "Matilda", "MOFA2", "Seurat_WNN", "UINMF",
                                     "VIMCCA", "scMDC", "totalVI"}
@@ -253,19 +262,18 @@ def test_recommend_lists_unscored_methods(result_dir):
     import re
     assert re.search(rf"These {len(nan_rows)} methods have no published scores and "
                      r"are listed last: .*totalVI", msg)
-    assert msg.endswith('Try source="rerun".')
+    assert msg.endswith("Leave out source= to rank the re-run tables.")
     # the coverage line appears only where the matrix IS incomplete
     # (the single published vertical dataset scores its 6 methods completely;
     # diagonal source='both' lacks GLUE / Seurat_v5 in the re-run rows)
     assert "only part of the datasets" not in msg
-    _, msg_b = _rec("diagonal", source="both", result_path=result_dir)
+    _, msg_b = _rec("diagonal", source="both")
     assert "Some methods have scores on only part of the datasets: " in msg_b
     assert "Check the coverage column before reading the order." in msg_b
 
 
 def test_recommend_rerun_missing_only_seurat_wnn(result_dir):
-    r, msg = _rec("vertical", modalities=["rna", "adt"], source="rerun",
-                  result_path=result_dir)
+    r, msg = _rec("vertical", modalities=["rna", "adt"])
     assert set(r[r.grand_score.isna()].method) == {"Seurat_WNN"}
     assert r.attrs["source"] == "rerun" and r.attrs["not_scored"] == ["Seurat_WNN"]
     assert "Seurat_WNN has no re-run scores and is listed last." in msg
@@ -273,7 +281,7 @@ def test_recommend_rerun_missing_only_seurat_wnn(result_dir):
 
 
 def test_recommend_long_df_records_source_and_family(result_dir):
-    long = mtb.load_results("vertical", dataset="D11", source="rerun", result_path=result_dir)
+    long = mtb.load_results("vertical", dataset="D11")
     r, _ = _rec("vertical", long_df=long, metrics="clustering")
     assert r.attrs["source"] == "long_df" and r.attrs["family"] == "clustering"
     r2, _ = _rec("vertical", long_df=long, metrics=["ARI", "NMI"])
@@ -281,12 +289,10 @@ def test_recommend_long_df_records_source_and_family(result_dir):
 
 
 def test_recommend_attrs_are_the_documented_keys(result_dir, layout_tree):
-    """``frame.attrs`` carries exactly the keys recommend's Notes list."""
+    """``frame.attrs`` carries exactly these keys."""
     keys = {"metrics", "family", "source", "not_scored", "missing", "dropped_methods"}
-    doc = mtb.recommend.__doc__
-    for r, _ in (_rec("cross", result_path=layout_tree), _rec("vertical", result_path=result_dir)):
+    for r, _ in (_rec("cross", source="published", result_path=layout_tree), _rec("vertical")):
         assert set(r.attrs) == keys
-    assert all(f'``"{k}"``' in doc for k in keys)
 
 
 def test_recommend_scores_only_methods_the_registry_lists_for_the_category(
@@ -296,15 +302,15 @@ def test_recommend_scores_only_methods_the_registry_lists_for_the_category(
     Seurat_WNN, vertical methods) used to be ranked, and shaped every other
     method's within-dataset rank."""
     layout_tree = layout_tree_foreign
-    r, msg = _rec("cross", result_path=layout_tree)
-    listed = set(mtb.list_methods(category="cross"))
+    r, msg = _rec("cross", source="published", result_path=layout_tree)
+    listed = set(mtb.find_methods(category="cross"))
     assert set(r.method) <= listed
     assert not ({"scMSI", "Seurat_WNN"} & set(r.method))
     assert r.attrs["dropped_methods"] == ["scMSI", "Seurat_WNN"]
     assert ("scMSI and Seurat_WNN have scores in the published table, but this "
             "package does not run them for cross, so they are left out of the "
             "ranking.") in msg
-    assert "mtb.list_methods(category='cross') does not list them" in msg
+    assert "mtb.find_methods(category='cross') does not list them" in msg
     # MOFA2 and Multigrate are cross methods of the package and are ranked
     assert {"MOFA2", "Multigrate"} <= set(r.method[r.grand_score.notna()])
     # the dropped-datasets line stays first; the drop line follows it
@@ -313,7 +319,8 @@ def test_recommend_scores_only_methods_the_registry_lists_for_the_category(
     assert lines[1].startswith("- scMSI and Seurat_WNN have scores in")
     # the same rule on a user frame: registry methods foreign to the category
     # are dropped and named ("long_df frame"), an unknown name (yours) is kept
-    long = mtb.load_results("cross", dataset="D53", result_path=layout_tree)
+    long = mtb.load_results("cross", dataset="D53", source="published",
+                            result_path=layout_tree)
     mine = mtb.to_long(pd.DataFrame({"Value": [0.5, 0.6]}, index=["ARI", "NMI"]),
                        method="MyMethod", dataset="D53", category="cross")
     r2, msg2 = _rec("cross", long_df=pd.concat([long, mine]))
@@ -321,7 +328,7 @@ def test_recommend_scores_only_methods_the_registry_lists_for_the_category(
     assert ("scMSI and Seurat_WNN have scores in the long_df frame, but this package "
             "does not run them for cross") in msg2
     # a category where every stored method is listed: nothing dropped, no line
-    r3, msg3 = _rec("vertical", result_path=result_dir)
+    r3, msg3 = _rec("vertical")
     assert r3.attrs["dropped_methods"] == [] and "does not run" not in msg3
     # nothing rankable left -> ValueError naming the culprits
     with pytest.raises(ValueError, match=r"every row in long_df belongs to a method this package does not run for cross \(scMSI"):
@@ -333,18 +340,20 @@ def test_recommend_methods_keyword(layout_tree):
     reached for it and got a TypeError)."""
     from multibench.data.results import recommend
     result_dir = layout_tree        # cross: D53 holds several methods, D52 one
-    r, msg = _rec("cross", methods=["scmdc", "sciPENN", "scMoMaT"], result_path=result_dir)
+    r, msg = _rec("cross", methods=["scmdc", "sciPENN", "scMoMaT"], source="published",
+                  result_path=result_dir)
     assert r.method.tolist() == ["sciPENN", "scMDC", "scMoMaT"]        # alias/case tolerant
     assert r.attrs["not_scored"] == ["scMoMaT"]                        # restricted to the request
     assert "StabMap" not in msg and "totalVI" not in msg
     # a requested method without rows is still listed as unscored
-    r2, msg2 = _rec("cross", methods=["sciPENN", "scMDC", "totalVI"], result_path=result_dir)
+    r2, msg2 = _rec("cross", methods=["sciPENN", "scMDC", "totalVI"], source="published",
+                    result_path=result_dir)
     assert r2.method.tolist() == ["sciPENN", "scMDC", "totalVI"]
     assert "totalVI has no published scores and is listed last." in msg2
     with pytest.raises(KeyError, match=r"Unknown method Matlida. Did you mean Matilda\?"):
-        recommend("cross", methods=["Matlida"], result_path=result_dir)
-    with pytest.raises(ValueError, match=r"none of methods=\['totalVI'\] has rows in source='published' for cross"):
-        recommend("cross", methods=["totalVI"], result_path=result_dir)
+        recommend("cross", methods=["Matlida"], source="published", result_path=result_dir)
+    with pytest.raises(ValueError, match=r"none of methods=\['totalVI'\] has rows in the published table for cross"):
+        recommend("cross", methods=["totalVI"], source="published", result_path=result_dir)
     # category is the only positional; every selector is keyword-only
     import inspect
     params = list(inspect.signature(recommend).parameters)
@@ -357,16 +366,17 @@ def test_recommend_task_error_names_real_metrics(result_dir):
     # vertical ships no batch metrics; the error must list what IS there,
     # not "metrics present: []" (the loader used to pre-filter by task)
     with pytest.raises(ValueError, match=r"metrics present: \['ARI'"):
-        recommend("vertical", metrics="batch", result_path=result_dir)
+        recommend("vertical", metrics="batch")
     with pytest.raises(ValueError, match=r"metrics present: \['ARI'"):
-        recommend("vertical", metrics=["GC", "iLISI"], result_path=result_dir)
+        recommend("vertical", metrics=["GC", "iLISI"])
 
 
 def test_recommend_metrics_batch_on_diagonal_rerun(result_dir):
-    r, _ = _rec("diagonal", metrics="batch", source="rerun", result_path=result_dir)
+    r, _ = _rec("diagonal", metrics="batch")
     assert r.attrs["family"] == "batch" and r.grand_score.notna().any()
     # the explicit list of the same family scores the same
-    r2, _ = _rec("diagonal", metrics=list(mtb.plot.BATCH_METRICS), source="rerun",
-                 result_path=result_dir)
-    assert r2.attrs["family"] is None and r2.attrs["metrics"] == list(mtb.plot.BATCH_METRICS)
+    m = mtb.catalog.metrics()
+    batch = m.loc[m.family == "batch", "metric"].tolist()
+    r2, _ = _rec("diagonal", metrics=batch)
+    assert r2.attrs["family"] is None and r2.attrs["metrics"] == batch
     pd.testing.assert_frame_equal(r, r2)

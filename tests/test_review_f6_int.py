@@ -40,6 +40,7 @@ from tests.test_study_r4_wf import ALL_ENVS, _h5, _quiet, _Res, cite  # noqa: F4
 from tests.test_study_r6_msg import (_cli, _lung_ids, needs_git, pinned,  # noqa: F401
                                      wrong_ref)
 from tests.test_study_r6_wf import KW, MOVED, _shuffled_labels, rel  # noqa: F401
+from tests.conftest import full_scan
 
 pytest.importorskip("scib")
 
@@ -237,7 +238,7 @@ def test_files_reason_parts_are_joined_as_sentences(tmp_path, pinned, monkeypatc
     _h5(d / "rna.h5", [f"g{i}" for i in range(30)], [f"c{i}" for i in range(20)])
     script = "MIRA's script imports logger.py. mtb.method_info('MIRA')['setup_hint'] shows how."
     monkeypatch.setattr(W, "_missing_script", lambda v, method=None: script)
-    row = _quiet(mtb.scan, "CITE", "vertical", methods=["MIRA"], data_path=tmp_path / "data",
+    row = _quiet(full_scan, "CITE", "vertical", methods=["MIRA"], data_path=tmp_path / "data",
                  verbose=False).iloc[0]
     assert row["files_reason"].startswith(f"{script} FileNotFoundError: MIRA (vertical) "
                                           f"needs atac.h5"), row["files_reason"]
@@ -248,7 +249,7 @@ def test_scan_count_line_for_one_method_without_files(tmp_path, pinned, capsys):
     d = tmp_path / "data" / "CITE"
     d.mkdir(parents=True)
     _h5(d / "rna.h5", [f"g{i}" for i in range(30)], [f"c{i}" for i in range(20)])
-    mtb.scan("CITE", "vertical", methods=["MIRA"], data_path=tmp_path / "data")
+    full_scan("CITE", "vertical", methods=["MIRA"], data_path=tmp_path / "data")
     assert capsys.readouterr().out.startswith(
         "[scan] 0 of 1 method has its input files. 1 of 1 has its environment installed.")
     assert W._have_their(0, 14) == "have their" and W._have_their(1, 14) == "has its"
@@ -257,7 +258,7 @@ def test_scan_count_line_for_one_method_without_files(tmp_path, pinned, capsys):
 def test_the_no_variant_and_missing_folder_errors_are_sentences(tmp_path):
     with pytest.raises(ValueError) as e:
         # (Matilda has a variant for the three modalities; VIMCCA has none)
-        _quiet(mtb.scan, "D11", "vertical", methods=["VIMCCA"],
+        _quiet(full_scan, "D11", "vertical", methods=["VIMCCA"],
                modalities=["rna", "atac", "adt"], verbose=False)
     assert str(e.value) == ("VIMCCA does not read rna+atac+adt in vertical data. "
                             "mtb.method_info('VIMCCA')['supports'] lists what VIMCCA "
@@ -267,7 +268,7 @@ def test_the_no_variant_and_missing_folder_errors_are_sentences(tmp_path):
     (tmp_path / "D11").mkdir()
     (tmp_path / "D28").mkdir()
     with pytest.raises(FileNotFoundError) as e:
-        mtb.scan("MYCITE", data_path=tmp_path)
+        full_scan("MYCITE", data_path=tmp_path)
     assert str(e.value) == (f"The folder {tmp_path / 'MYCITE'} does not exist. {tmp_path} "
                             f"holds D11 and D28. dataset= is the folder name, and "
                             f"data_path= the folder that holds it. mtb.describe_layout() "
@@ -321,7 +322,7 @@ def test_plot_unknown_names_are_one_sentence_form(tmp_path, capsys):
     with pytest.raises(KeyError) as e:
         mtb.load_results("vertical", methods=["Matlida"])
     assert e.value.args[0] == ("Unknown method Matlida. Did you mean Matilda? "
-                               "mtb.list_methods() shows all methods.")
+                               "mtb.find_methods() shows all methods.")
 
 
 def test_the_overlay_error_names_several_methods(tmp_path, monkeypatch, capsys):
@@ -385,22 +386,12 @@ def test_docstrings_quote_the_current_texts():
         "run_all": mtb.run_all, "save": W.BatchResult.save, "run": mtb.run,
         "rescore": W.BatchResult.rescore, "load_batch": mtb.load_batch}.items()}
     assert "nothing is runnable" not in flat["run_all"]
-    # R7-01: the messages are quoted with concrete values, in code spans
-    assert ("Nothing runnable: ``ValueError``. Its first line is ``No method can run "
-            "on D11 (vertical).`` With ``methods=``, it starts ``None of the "
-            "requested methods (Matilda, totalVI) can run on D11 (vertical).``") \
-        in flat["run_all"]
+    # 0.4: the Notes of run_all, run and rescore that quoted these texts are cut
     assert "no 'cross' variant matches" not in flat["run_all"]
     assert "and the ``batch`` vector" not in flat["run_all"]
-    assert "With ``batch=``, the vector is saved as ``batch_<hash>.csv``." in flat["run_all"]
     assert "all four files" not in flat["save"]
     assert "every file in the list above is rewritten from the merged set" in flat["save"]
-    assert "and a note for an input path that does not exist." in flat["run"]
-    assert "**Label order.** With ``labels=None``" in flat["rescore"]
     assert "see its Notes" not in flat["rescore"]
-    # R7-12 (c)
-    assert ("When the dataset folder has moved, pass the folder that now holds it as "
-            "``mtb.load_batch(data_path=)``.") in flat["rescore"]
     assert "the one found is recorded as an absolute path" in flat["load_batch"]
 
 
@@ -436,7 +427,7 @@ def test_the_changes_page_quotes_the_live_texts(tmp_path, monkeypatch):
         (tmp_path / "data" / name).mkdir(parents=True)
     monkeypatch.chdir(tmp_path)
     with pytest.raises(FileNotFoundError) as e:
-        mtb.scan("MYCITE", data_path="data")
+        full_scan("MYCITE", data_path="data")
     quoted = "The folder data/MYCITE does not exist. data holds D11, D28 and D52. "
     assert str(e.value).startswith(quoted) and f"`{quoted}...`" in text
     assert ("`cty.csv has 15 labels, but rna.h5 has 20 cells. Give each cell one label, "
@@ -447,4 +438,3 @@ def test_the_changes_page_quotes_the_live_texts(tmp_path, monkeypatch):
 def test_the_evaluate_page_names_no_vague_definitions():
     text = _flat("tutorials/evaluate.md")
     assert "with the same metric definitions" not in text
-    assert "The re-run tables were scored by `evaluate` from multibench 0.2.1." in text

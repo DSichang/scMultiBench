@@ -108,16 +108,6 @@ def test_gpu_refusal_names_the_cli_command_in_the_cli(tmp_path, no_gpu, monkeypa
     assert "tools_scripts" not in row["reason"] and "method_info(" not in row["reason"]
 
 
-def test_scan_notes_quote_the_gpu_refusal_run_raises():
-    """scan's Notes quote the env_reason of a GPU-only row in its current
-    form (the one plain sentence), never the old CUDA/file:line text."""
-    notes = " ".join(inspect.getdoc(W.scan).split())
-    lead = registry.get("moETM").requires_gpu_reason.split(". ")[0].replace("moETM", "<method>")
-    assert f"{lead}." in notes
-    assert "needs an NVIDIA GPU; this computer has none" not in notes
-    assert "calls CUDA unconditionally (<file>:<line>)" not in notes
-
-
 def test_moetm_gpu_evidence_names_both_scripts():
     ev = mtb.method_info("moETM")["gpu_evidence"]
     assert "tools_scripts/moETM/main_moETM_rna_adt.py:109" in ev
@@ -248,8 +238,8 @@ def test_env_plan_fallback_line_agrees_in_number(monkeypatch):
 
 def test_env_status_help_is_one_sentence_and_one_tag_per_line():
     p = _sub("env", "status")
-    assert p.description == ("One line per method: installed or not, the environment "
-                             "name and a difficulty tag.")
+    assert p.description == ("Deprecated: use multibench env doctor. One line per method: "
+                             "installed or not, the environment name and a difficulty tag.")
     text = p.format_help()
     assert "without surprises" not in text
     for tag in envs.DIFFICULTY:
@@ -259,7 +249,7 @@ def test_env_status_help_is_one_sentence_and_one_tag_per_line():
 # ====================================================================== M27
 def test_evaluate_and_run_help_texts():
     ev = _sub("evaluate")
-    clus = _opt_help(ev, "--clustering")
+    clus = _opt_help(ev, "--clusters")
     assert "they replace the Leiden clusters of ARI, NMI, ASW, iASW and iF1" in clus
     meth = _opt_help(ev, "--method")
     assert meth.startswith("package method whose label order is used, or with --labels "
@@ -272,7 +262,7 @@ def test_evaluate_and_run_help_texts():
 def test_evaluate_unknown_method_on_the_dataset_route_names_labels(tmp_path, capsys):
     emb = tmp_path / "emb.npy"
     np.save(emb, np.zeros((10, 3)))
-    rc = cli.main(["evaluate", "--output", str(emb), "--dataset", "D11", "--category",
+    rc = cli.main(["evaluate", "--embedding", str(emb), "--dataset", "D11", "--category",
                    "vertical", "--method", "PriyaNet"])
     err = capsys.readouterr().err
     assert rc == 1

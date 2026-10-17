@@ -50,11 +50,8 @@ def test_no_placeholder_observations_and_worst_is_max():
 
 
 def test_tier_matches_worst_sec_and_docstring_thresholds():
-    import inspect
     for m, rec in _runtimes().items():
         assert rec["tier"] == _tier(rec["worst_sec"]), (m, rec["tier"], rec["worst_sec"])
-    doc = inspect.getdoc(mtb.method_info)
-    assert "<5 min" in doc and "5-30 min" in doc and "30 min-2 h" in doc
 
 
 def test_summary_csv_run_sec_is_not_understated():

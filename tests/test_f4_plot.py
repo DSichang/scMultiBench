@@ -18,6 +18,7 @@ import pytest
 
 import multibench as mtb
 from multibench import cli, config
+from tests.conftest import full_scan
 
 B = importlib.import_module("multibench.plot.bubble")
 style = importlib.import_module("multibench.plot.style")
@@ -45,7 +46,7 @@ def test_chip_note_names_no_registry():
     # the family name stays: build_table's columns carry it
     assert B.FAMILIES[0][0] == "DR and clustering"
     notes = " ".join(inspect.getdoc(mtb.plot.bubble).split())
-    assert "registry" not in notes and "a name the package does not know" in notes
+    assert "registry" not in notes
 
 
 # --- R4-12 (b): two folders of the same cells --------------------------------
@@ -71,7 +72,7 @@ def test_two_own_datasets_sharing_no_method_mention_the_same_cells(fn, kw):
 def test_stored_rows_keep_the_no_overlap_text():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        stored = mtb.load_results("vertical", dataset="D11", source="rerun")
+        stored = mtb.load_results("vertical", dataset="D11")
     _, msgs = _messages(mtb.plot.build_table,
                         pd.concat([stored, _mine("RNA PCA", "MYCITE")], ignore_index=True))
     (msg,) = [m for m in msgs if m.startswith("The rows come from")]
@@ -137,21 +138,25 @@ def test_na_raise_does_not_offer_to_hide_the_error():
     # the warning keeps its own last sentence
     _, msgs = _messages(mtb.plot.build_table, _with_gap())
     (warn,) = [m for m in msgs if "has no" in m]
-    assert warn.endswith("Pass na='skip' to hide this message.")
+    assert warn.endswith("Its Overall uses the metrics it has.")
+    assert "hide this message" not in warn
     # R5-11: the error leaves out the Overall sentence (no figure is drawn)
-    assert "Overall uses the metrics" in warn and "Overall uses the metrics" not in msg
+    assert "Overall uses the metrics" not in msg
     body = warn.replace(" Its Overall uses the metrics it has.", "")
-    assert body.rsplit(". ", 1)[0] == msg.rsplit(". ", 1)[0]
+    assert msg.startswith(body + " ")
 
 
 def test_na_raise_cli_spelling(tmp_path, capsys):
     p = tmp_path / "in.csv"
     _with_gap().to_csv(p, index=False)
+    # 0.4: plot --na is deprecated and has no effect; the figure is drawn
     rc = cli.main(["plot", "bubble", "--input", str(p), "--na", "raise",
                    "--out", str(tmp_path / "f.png")])
     err = capsys.readouterr().err
-    assert rc != 0
-    assert "Pass --na warn to draw the figure with these gaps." in err
+    assert rc == 0
+    assert ("warning: --na is deprecated and will be removed in 0.5. It has no effect."
+            in err)
+    assert "Its Overall uses the metrics it has." in err
     assert "hide this message" not in err
 
 
@@ -171,7 +176,8 @@ def _recommend(*a, **kw):
     with warnings.catch_warnings(record=True) as rec:
         warnings.simplefilter("always")
         r = mtb.recommend(*a, **kw)
-    msgs = [str(w.message) for w in rec if str(w.message).startswith("recommend(")]
+    msgs = [str(w.message) for w in rec if str(w.message).startswith("recommend(")
+            and "is deprecated" not in str(w.message)]
     return r, (msgs[0] if msgs else "")
 
 
@@ -186,29 +192,29 @@ def _no_log_joins(msg):
 
 
 def test_recommend_unscored_methods_line_is_plain(result_dir):
-    r, msg = _recommend("vertical", result_path=result_dir)
+    r, msg = _recommend("vertical")
     unscored = r[r.grand_score.isna()].method.tolist()
-    assert (f"These {len(unscored)} methods have no published scores and are listed "
-            f"last: {', '.join(unscored)}. Try source=\"rerun\".") in msg
+    assert (f"These {len(unscored)} methods have no re-run scores and are listed "
+            f"last: {', '.join(unscored)}.") in msg
+    assert "Try source" not in msg
     _no_log_joins(msg)
-    _, msg = _recommend("vertical", modalities=["rna", "adt"], source="rerun",
-                        result_path=result_dir)
+    _, msg = _recommend("vertical", modalities=["rna", "adt"])
     assert "Seurat_WNN has no re-run scores and is listed last." in msg
     assert "Try source" not in msg
 
 
 def test_recommend_coverage_and_dropped_lines_are_plain(result_dir, layout_tree_foreign):
     layout_tree = layout_tree_foreign
-    _, msg = _recommend("diagonal", source="both", result_path=result_dir)
+    _, msg = _recommend("diagonal", source="both")
     assert ("Some methods have scores on only part of the datasets: Seurat_v5 3 of 4, "
             "GLUE 3 of 4. Check the coverage column before reading the order.") in msg
     _no_log_joins(msg)
-    _, msg = _recommend("cross", result_path=layout_tree)
+    _, msg = _recommend("cross", source="published", result_path=layout_tree)
     assert ("scMoMaT has scores only on datasets left out of the ranking, "
             "so it is listed last.") in msg
     assert ("scMSI and Seurat_WNN have scores in the published table, but this package "
             "does not run them for cross, so they are left out of the ranking. "
-            "mtb.list_methods(category='cross') does not list them.") in msg
+            "mtb.find_methods(category='cross') does not list them.") in msg
     assert "A min-max score over one method is always 1.0." in msg
     _no_log_joins(msg)
 
@@ -217,7 +223,7 @@ def test_recommend_coverage_and_dropped_lines_are_plain(result_dir, layout_tree_
 
 def test_degenerate_rerun_warning_head_is_a_sentence(result_dir):
     with pytest.warns(mtb.DegenerateRerunWarning) as rec:
-        mtb.load_results("diagonal", dataset="D28", source="rerun", result_path=result_dir)
+        mtb.load_results("diagonal", dataset="D28")
     msg = str(rec[0].message)
     assert msg.startswith(
         "This re-run row has ARI below 0.01, while the published table has above 0.2 "
@@ -289,7 +295,7 @@ def test_dry_run_count_line_is_plain(no_envs, root, capsys, tmp_path):
 def test_prepared_file_note_names_the_method(root):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        sc = mtb.scan("D28", "diagonal", data_path=root / "data", verbose=False)
+        sc = full_scan("D28", "diagonal", data_path=root / "data", verbose=False)
     # GLUE's one-batch row; its several-batch row lacks its files in D28
     cav = sc.set_index(["method", "modalities"]).loc[("GLUE", "rna+atac_peak"), "caveat"]
     assert ("GLUE reads inputs/atac_peak_normpeaks.h5. mtb.run writes that file "
@@ -337,6 +343,3 @@ def test_batch_with_atac_warning_names_run_all():
         "batch= with atac=: only mosaic methods read numbered ATAC files. For mosaic pass "
         "category='mosaic'; otherwise export without batch= and pass the column itself, as "
         'run_all(batch=adata.obs["donor"])']
-    for fn in (mtb.io.export_dataset, mtb.labels_for):
-        flat = " ".join(inspect.getdoc(fn).split())
-        assert "``mtb.run_all(batch=...)`` or ``mtb.evaluate(batch=...)``" in flat, fn

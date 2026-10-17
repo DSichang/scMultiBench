@@ -24,6 +24,7 @@ import multibench as mtb
 from multibench import workflow as W
 from multibench.engine import registry, resolve, runner
 from multibench.eval import pipeline
+from tests.conftest import full_scan
 
 GAS_METHODS = ("iNMF", "online_iNMF", "scJoint")
 METHODS = GAS_METHODS + ("GLUE",)
@@ -166,7 +167,7 @@ def test_the_hint_still_fires_when_no_variant_reads_the_folder(tmp_path):
 
 def test_scan_finds_the_four_rows_and_no_export_advice(tmp_path, no_envs):
     _folder(tmp_path)
-    df = mtb.scan("MB", "diagonal", data_path=tmp_path, verbose=False)
+    df = full_scan("MB", "diagonal", data_path=tmp_path, verbose=False)
     ok = df[df["files_ok"]]
     assert sorted(ok["method"]) == sorted(METHODS)
     assert all(m.startswith("rna1+rna2+rna3+atac_") for m in ok["modalities"])
@@ -211,7 +212,7 @@ def test_a_truncated_label_file_fails_the_file_check(tmp_path, no_envs, short):
         assert f"{short}.csv has {full - 2} labels, but {data} has {full} cells" in str(e.value)
     with pytest.raises(ValueError, match=rf"{short}\.csv has {full - 2} labels"):
         mtb.inputs_for("MB", "diagonal", "GLUE", data_path=tmp_path, check=True)
-    df = mtb.scan("MB", "diagonal", data_path=tmp_path, verbose=False)
+    df = full_scan("MB", "diagonal", data_path=tmp_path, verbose=False)
     rows = df[df["method"].isin(METHODS) & df["modalities"].str.startswith("rna1+")]
     assert len(rows) == 4 and not rows["files_ok"].any()
     assert rows["files_reason"].str.contains(f"{short}.csv has {full - 2} labels").all()
@@ -303,7 +304,7 @@ def test_export_writes_one_diagonal_batch_per_call(tmp_path, no_envs, kind, role
         with h5py.File(out / f"{role}{i}.h5") as f:
             assert f["matrix/barcodes"].shape == (n_atac,)
     assert list(mtb.labels_for("MINE", data_path=tmp_path)) == ORDER
-    sc = mtb.scan("MINE", "diagonal", data_path=tmp_path, verbose=False)
+    sc = full_scan("MINE", "diagonal", data_path=tmp_path, verbose=False)
     assert set(sc[sc.files_ok].method) == set(readers)
     several = sc[sc.files_ok].modalities.str.contains(f"{role}3")
     assert bool(several.all())

@@ -224,8 +224,7 @@ def test_section_5_has_the_twelve_cells(key):
     first = src[EXPORT].splitlines()[0]
     assert re.sub(r" {4,}", "   ", first) == f'NAME = "{NAMES[key]}"   {NAME_MARK}'
     assert (first != f'NAME = "{NAMES[key]}"   {NAME_MARK}') == (key == "diagonal_multi")
-    assert src[CHECK] == (f'mtb.scan(NAME, "{t["cat"]}", methods=METHODS, data_path="mydata",\n'
-                          f'         per_method=True)')
+    assert src[CHECK] == f'mtb.scan(NAME, "{t["cat"]}", methods=METHODS, data_path="mydata")'
     assert src[RUN].startswith("mine = mtb.run_all(NAME,")
     assert src[RUN] == (f'mine = mtb.run_all(NAME, "{t["cat"]}", methods=METHODS, '
                         f'data_path="mydata",\n'
@@ -724,7 +723,7 @@ CHECK_CROSS = (" With fewer batches than the methods read, such a line names the
 #: the tutorials whose folder holds the ATAC peaks under two names
 TWO_ATAC_NAMES = {"vertical_rna_atac", "vertical_rna_adt_atac"}
 
-SMALL_DATASET_ROW = ("| a method fails on a small dataset | `mtb.scan` without `per_method=True` "
+SMALL_DATASET_ROW = ("| a method fails on a small dataset | `mtb.run_all(..., dry_run=True)` "
                      "names what the method needs from the data's size in its `caveat` column |")
 WRONG_NAME = ("A wrong name after `obsm:`, `layer:` or `obs:` raises an error that lists the "
               "names the file has.")
@@ -872,7 +871,7 @@ def test_the_check_sentence_covers_the_further_lines(linux, tmp_path, monkeypatc
         f"[scan] Cells per file: rna1.h5 {n1}, adt1.h5 {n1}, rna2.h5 {n2}, adt2.h5 {n2}.",
         "[scan] StabMap: rna3.h5, adt3.h5 are missing.",
         "[scan] sciPENN: rna3.h5, adt3.h5 are missing."]
-    assert table.to_dict("list") == {"method": ["StabMap", "sciPENN"], "runnable": [False] * 2,
+    assert table.drop(columns="modalities").to_dict("list") == {"method": ["StabMap", "sciPENN"], "runnable": [False] * 2,
                                      "reason": ["rna3.h5, adt3.h5 are missing."] * 2}
 
     # five donors: the methods run, and leave two batches out
@@ -892,7 +891,7 @@ def test_the_check_sentence_covers_the_further_lines(linux, tmp_path, monkeypatc
                                               for i, c in enumerate(n, 1)) + " and 2 more.",
         "[scan] StabMap reads batches 1-3 of 5. Batches 4-5 are not used.",
         "[scan] sciPENN reads batches 1-3 of 5. Batches 4-5 are not used."]
-    assert table.to_dict("list") == {"method": ["StabMap", "sciPENN"], "runnable": [True] * 2,
+    assert table.drop(columns="modalities").to_dict("list") == {"method": ["StabMap", "sciPENN"], "runnable": [True] * 2,
                                      "reason": [""] * 2}
 
 
@@ -927,9 +926,9 @@ def test_the_check_names_the_two_atac_files(key, tmp_path, monkeypatch, capsys):
 
 def test_the_small_dataset_row_names_the_scan_that_has_the_column(tmp_path, monkeypatch,
                                                                   capsys):
-    """The Troubleshooting row sends a reader to the ``caveat`` column of
-    ``scan``. The check cell of the tutorial has no such column, so the row
-    names the call that has it: the same one without ``per_method=True``."""
+    """The Troubleshooting row sends a reader to the ``caveat`` column of the
+    full plan. The check cell of the tutorial has no such column, so the row
+    names the call that has it: ``run_all(..., dry_run=True)``."""
     for key in KEYS:
         rows = [ln for _, s in _cells(key) for ln in s.splitlines()
                 if ln.startswith("| a method fails on a small dataset |")]
@@ -940,10 +939,10 @@ def test_the_small_dataset_row_names_the_scan_that_has_the_column(tmp_path, monk
     src, ns = _sources(key), _namespace(key)
     for i in (EXAMPLE, READ, EXPORT):
         _run_cell(src[i], ns)
-    assert list(_run_cell(src[CHECK], ns).columns) == ["method", "runnable", "reason"]
-    flag = ",\n         per_method=True)"
-    assert src[CHECK].count(flag) == 1
-    full = _run_cell(src[CHECK].replace(flag, ")"), ns)
+    assert list(_run_cell(src[CHECK], ns).columns) == ["method", "modalities", "runnable",
+                                                       "reason"]
+    full = _run_cell(src[CHECK].replace("mtb.scan(", "mtb.run_all(").replace(
+        ")", ", dry_run=True)"), ns)
     capsys.readouterr()
     needs = "online_iNMF needs about 5,000 cells in total. On fewer it stops with std::exception."
     assert needs in [v.size_hint for v in registry.get("online_iNMF").variants]

@@ -155,7 +155,7 @@ def test_host_has_gpu_is_in_dir_but_not_in_all():
     assert callable(envs.host_has_gpu) and callable(mtb.env.host_has_gpu)
     assert "host_has_gpu" not in mtb.env.__all__ and "host_has_gpu" in dir(mtb.env)
     assert "env_prefix" in dir(mtb.env)
-    assert set(mtb.env.__all__) == {"status", "plan", "install", "doctor", "recipe"}
+    assert set(mtb.env.__all__) == {"install", "doctor", "recipe"}
 
 
 # ---------------------------------------------------------------- archive_for: published, placeholder, none
@@ -407,8 +407,7 @@ def test_install_signature_and_docs():
                envs.archive_for, envs.installed_flavor, envs.check_flavor):
         doc = inspect.getdoc(fn)
         assert doc and "Returns" in doc, fn.__name__
-    assert "flavor" in inspect.getdoc(envs.install) and "flavor" in inspect.getdoc(envs.plan)
-    assert "flavor" in inspect.getdoc(envs.doctor) and "flavor" in inspect.getdoc(envs.status)
+    assert "flavor" in inspect.getdoc(envs.install) and "flavor" in inspect.getdoc(envs.doctor)
 
 
 # ---------------------------------------------------------------- plan / doctor / status show the record
@@ -472,8 +471,8 @@ def test_cli_install_help_explains_auto(capsys):
         assert "'<env>-cpu' archive" in out and "mtb.env.host_has_gpu" in out
     with pytest.raises(SystemExit):
         cli.main(["env", "install", "--help"])
-    out = " ".join(capsys.readouterr().out.split())
-    assert "--flavor picks the CPU-only or the CUDA archive" in out
+    out = " ".join(capsys.readouterr().out.split()).replace("CPU- only", "CPU-only")
+    assert "--flavor picks the CPU-only or the CUDA archive" in out   # argparse wraps at "-"
 
 
 def test_cli_install_dry_run_total_names_the_flavour(cli_linux, plan_rows, monkeypatch, capsys):
@@ -508,6 +507,14 @@ def test_cli_install_dry_run_total_names_the_flavour(cli_linux, plan_rows, monke
             "because this host has an NVIDIA GPU.") in capsys.readouterr().err
 
 
+def _after_plan_warning(err):
+    """stderr of the deprecated ``env plan`` after its one deprecation line."""
+    first, rest = err.split("\n", 1)
+    assert first == ("warning: multibench env plan is deprecated and will be removed in "
+                     "0.5. Use multibench env install.")
+    return rest
+
+
 def test_cli_plan_flavor(cli_linux, fake_tables, monkeypatch, capsys):
     monkeypatch.setattr(envs, "installed_flavor", lambda env, conda=None: None)
     assert cli.main(["env", "plan", "--methods", "Matilda,SCALEX,UINMF", "--flavor", "cpu"]) == 0
@@ -515,7 +522,7 @@ def test_cli_plan_flavor(cli_linux, fake_tables, monkeypatch, capsys):
     lines = {l.split()[0]: l for l in cap.out.splitlines()}
     assert "0.8 GB dl" in lines["matilda"] and "2.5 GB disk" in lines["matilda"]
     assert "4.5 GB dl" in lines["scmb_torch"] and "0.9 GB dl" in lines["scmb_r"]
-    assert cap.err.startswith(
+    assert _after_plan_warning(cap.err).startswith(
         "# total for 3 envs: 6.2 GB download\n"
         "# 1 of 3 envs has the CPU build. 1 env gets the GPU build, because its CPU build "
         "is not published yet. 1 env has a single build (the same archive for CPU and "
@@ -526,8 +533,9 @@ def test_cli_plan_flavor(cli_linux, fake_tables, monkeypatch, capsys):
     assert cli.main(["env", "plan", "--methods", "Matilda", "--flavor", "gpu"]) == 0
     cap = capsys.readouterr()
     assert "3.0 GB dl" in cap.out and "9.0 GB disk" in cap.out
-    assert cap.err.startswith("# total for 1 env: 3.0 GB download, 9.0 GB on disk\n"
-                              "# This env has the GPU build.\n")
+    assert _after_plan_warning(cap.err).startswith(
+        "# total for 1 env: 3.0 GB download, 9.0 GB on disk\n"
+        "# This env has the GPU build.\n")
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
     assert cli.main(["env", "plan", "--methods", "Matilda"]) == 0        # auto
     cap = capsys.readouterr()

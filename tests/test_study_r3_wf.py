@@ -31,6 +31,7 @@ import multibench as mtb
 from multibench import cli, discover
 from multibench import workflow as W
 from multibench.engine import envs, registry
+from tests.conftest import full_scan
 
 #: the caveat of a gene-activity method given peaks in atac.h5 (after the method)
 GAS_CAV = ("needs gene-activity ATAC. The features of atac.h5 look like chr:start-end, "
@@ -90,7 +91,7 @@ def test_gene_activity_token_keeps_only_the_gene_activity_methods(tmp_path, tok)
     root = _vertical(tmp_path, "MU_GA", "atac.h5", GENES)
     want = set(discover.find_methods("vertical", atac="gene_activity"))
     assert want == GAS_METHODS
-    df = _quiet(mtb.scan, "MU_GA", "vertical", modalities=["rna", tok], data_path=root,
+    df = _quiet(full_scan, "MU_GA", "vertical", modalities=["rna", tok], data_path=root,
                 verbose=False)
     assert set(df["method"]) == want
     plan = _quiet(mtb.run_all, "MU_GA", "vertical", modalities=["rna", tok],
@@ -101,7 +102,7 @@ def test_gene_activity_token_keeps_only_the_gene_activity_methods(tmp_path, tok)
 
 def test_peak_token_still_keeps_the_peak_methods_behind_an_atac_gas_role(tmp_path):
     root = _vertical(tmp_path, "MU_PK", "atac.h5", PEAKS)
-    for call in (mtb.scan, lambda *a, **k: mtb.run_all(*a, dry_run=True, **k)):
+    for call in (full_scan, lambda *a, **k: mtb.run_all(*a, dry_run=True, **k)):
         df = _quiet(call, "MU_PK", "vertical", modalities=["rna", "atac_peak"],
                     data_path=root, verbose=False)
         assert set(df["method"]) == PEAK_METHODS
@@ -110,7 +111,7 @@ def test_peak_token_still_keeps_the_peak_methods_behind_an_atac_gas_role(tmp_pat
 
 def test_gene_activity_near_miss_states_the_vertical_rule(tmp_path):
     root = _vertical(tmp_path, "MU_TC", "atac_peak.h5", PEAKS)
-    df = _quiet(mtb.scan, "MU_TC", "vertical", modalities=["rna", "atac"], data_path=root,
+    df = _quiet(full_scan, "MU_TC", "vertical", modalities=["rna", "atac"], data_path=root,
                 verbose=False)
     for m in ("scMDC", "UnitedNet", "Matilda"):
         text = df.loc[df.method == m, "files_reason"].iloc[0]
@@ -120,16 +121,10 @@ def test_gene_activity_near_miss_states_the_vertical_rule(tmp_path):
         assert "atac_gas.h5 or atac.h5" not in text
 
 
-def test_modality_token_notes_state_the_exception():
-    flat = " ".join(inspect.getdoc(mtb.scan).split())
-    assert ("moETM, scMM and iPOLNG read peaks through a role named ``atac_gas``, so "
-            "``atac_peak`` selects them and ``atac_gas`` does not") in flat
-
-
 # ----------------------------------------------------------------- R3-02
 def test_scan_blocks_the_other_atac_kind_unless_allowed(tmp_path):
     root = _vertical(tmp_path, "MU_PEAK", "atac.h5", PEAKS)
-    for call in (mtb.scan, lambda *a, **k: mtb.run_all(*a, dry_run=True, **k)):
+    for call in (full_scan, lambda *a, **k: mtb.run_all(*a, dry_run=True, **k)):
         df = _quiet(call, "MU_PEAK", "vertical", modalities=["rna", "atac"],
                     data_path=root, verbose=False).set_index("method")
         for m in GAS_METHODS:
@@ -153,7 +148,7 @@ def test_scan_blocks_the_other_atac_kind_unless_allowed(tmp_path):
 
 def test_scan_blocks_peak_methods_given_gene_activity(tmp_path):
     root = _vertical(tmp_path, "MU_GA", "atac.h5", GENES)
-    df = _quiet(mtb.scan, "MU_GA", "vertical", modalities=["rna", "atac"], data_path=root,
+    df = _quiet(full_scan, "MU_GA", "vertical", modalities=["rna", "atac"], data_path=root,
                 verbose=False).set_index("method")
     for m in ("moETM", "scMM", "iPOLNG", "scMVP"):
         assert not df.loc[m, "runnable"] and df.loc[m, "files_ok"], m
@@ -166,7 +161,7 @@ def test_the_cli_spelling_of_the_reason(tmp_path, monkeypatch):
     from multibench import config
     root = _vertical(tmp_path, "MU_PEAK", "atac.h5", PEAKS)
     monkeypatch.setattr(config, "_CLI", True)
-    df = _quiet(mtb.scan, "MU_PEAK", "vertical", methods=None, data_path=root,
+    df = _quiet(full_scan, "MU_PEAK", "vertical", methods=None, data_path=root,
                 verbose=False)
     r = df[(df.method == "Matilda") & (df.modalities == "rna+atac")].iloc[0]
     assert r.reason.endswith("or pass --allow-atac-mismatch to run Matilda anyway.")
@@ -245,19 +240,19 @@ def test_old_records_without_a_caveat_still_summarise():
                                               ("D45", "mosaic"), ("D46", "mosaic"),
                                               ("D52", "cross")])
 def test_demo_datasets_have_no_row_blocked_by_the_atac_kind(dataset, category):
-    df = _quiet(mtb.scan, dataset, category, verbose=False)
+    df = _quiet(full_scan, dataset, category, verbose=False)
     assert not W._is_wrong_atac(df["reason"]).any(), df.loc[
         W._is_wrong_atac(df["reason"]), ["method", "reason"]]
 
 
 def test_run_all_notes_say_it_skips_the_other_representation():
     flat = " ".join(inspect.getdoc(mtb.run_all).split())
-    assert "``run_all`` skips a method given the other representation, also when " \
-           "``methods=`` names it. With ``allow_atac_mismatch=True`` the method runs" in flat
+    assert ("``True`` = also run a method whose ATAC file holds the other representation "
+            "or peak names it cannot read.") in flat
     assert "runs without an error and gives a wrong embedding; ``mtb.scan``" not in flat
     flat = " ".join(inspect.getdoc(mtb.scan).split())
-    assert "``allow_atac_mismatch=True`` keeps such a row runnable, with its caveat." \
-        in flat
+    assert ("``True`` = keep a method runnable when its ATAC file holds the other "
+            "representation or peak names it cannot read.") in flat
 
 
 # ----------------------------------------------------------------- R3-17
@@ -287,9 +282,8 @@ def test_generated_sounding_passages_are_rewritten():
         for phrase in gone:
             assert phrase not in flat, (name, phrase)
     s = " ".join(docs["summary"].split())
-    assert ("scMoMaT also writes a UMAP, which is scored: ``CHAIN_OK_GRAPH_METHOD``. "
-            "Seurat_WNN writes only a neighbour graph: ``RUN_OK_NO_EMBEDDING``") in s
-    assert "Near 1, one order clearly fits. Below about 0.5, two orders scored alike" in s
+    assert ("``CHAIN_OK_GRAPH_METHOD`` (a graph method scored on the UMAP it writes), "
+            "``RUN_OK_NO_EMBEDDING`` (only a graph)") in s
     f = " ".join(docs["failures"].split())
     assert ("no label file has as many cells as the output, so nothing was scored. Check "
             "the folder with ``mtb.inputs_for(check=True)`` and ``mtb.labels_for``.") in f
@@ -301,7 +295,7 @@ def test_run_records_keep_the_caveat_without_the_notes_on_starting(tmp_path, mon
     from multibench import config
     root = _vertical(tmp_path, "MU_PEAK", "atac.h5", PEAKS)
     monkeypatch.setattr(config.DEFAULT, "repo_path", tmp_path / "no_checkout")
-    plan = _quiet(mtb.scan, "MU_PEAK", "vertical", methods=["Matilda"],
+    plan = _quiet(full_scan, "MU_PEAK", "vertical", methods=["Matilda"],
                   modalities=["rna", "atac"], data_path=root, verbose=False)
     assert "The method scripts are not in" in plan["caveat"].iloc[0]
     monkeypatch.setattr(W, "_run", lambda method, category, inputs, out_dir, params=None:

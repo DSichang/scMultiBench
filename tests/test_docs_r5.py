@@ -36,31 +36,15 @@ def _cli_block():
 
 
 @needs_docs
-def test_quickstart_cli_block_reads_the_labels_in_the_method_order(tmp_path, monkeypatch,
-                                                                   capsys):
+def test_quickstart_cli_block_runs_and_plots_without_label_files():
+    """The command-line block of the Quickstart runs SCALEX with run-all and
+    plots its folder: no label file and no data path to type."""
     block = _cli_block()
     assert "--labels" not in block and "<data_path>" not in block
     cmds = [" ".join(c.split()) for c in block.replace("\\\n", " ").splitlines()]
-    line = next(c for c in cmds if c.startswith("multibench evaluate "))
-    assert "--method SCALEX --name SCALEX_rerun --dataset D28 --category diagonal" in line
-    # run the printed line on a small D28 folder (RNA cells first, as SCALEX)
-    d, emb = _diag_folder(tmp_path / "data")
-    monkeypatch.setattr(config.DEFAULT, "data_path", tmp_path / "data")
-    argv = shlex.split(line)[1:]
-    out_h5, out_csv = tmp_path / "embedding.h5", tmp_path / "mine.csv"
-    with h5py.File(out_h5, "w") as f:
-        f["data"] = emb
-    argv[argv.index("--output") + 1] = str(out_h5)
-    argv[argv.index("--out") + 1] = str(out_csv)
-    assert cli.main(argv) == 0
-    err = capsys.readouterr().err
-    assert "# labels: rna_cty.csv, atac_cty.csv from D28, in SCALEX's cell order" in err
-    df = pd.read_csv(out_csv)
-    assert set(df["method"]) == {"SCALEX_rerun"} and set(df["dataset"]) == {"D28"}
-    assert np.isfinite(df.set_index("metric").loc["ARI", "value"])
+    assert "multibench run-all D28 --category diagonal --methods SCALEX --out-dir out/" in cmds
+    assert "multibench plot bubble --input out/ --out mine.pdf" in cmds
 
-
-# ---- guides (R5-17, R5-02) -----------------------------------------------
 
 @needs_docs
 def test_evaluate_page_comparability_sentence_is_plain():

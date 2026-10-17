@@ -140,7 +140,7 @@ def test_recommend_backend_line_cli_spelling(monkeypatch):
 def test_recommend_documents_the_backend_line():
     doc = " ".join(mtb.recommend.__doc__.split())
     assert "Warns" in mtb.recommend.__doc__
-    assert "igraph" in doc and "leidenalg" in doc
+    assert "One message: partial coverage, methods left out and why." in doc
 
 
 # --- R3-08 -------------------------------------------------------------------
@@ -158,16 +158,15 @@ def test_na_warning_names_the_stored_row_in_short_sentences():
     (msg,) = [m for m in msgs if "has no" in m]
     assert msg.startswith("The stored row Conos (D28, published) has no ASW, iASW or "
                           "ASW_batch. Its Overall uses the metrics it has.")
-    assert msg.endswith("Pass na='skip' to hide this message.")
+    assert msg.endswith("Its Overall uses the metrics it has.")
+    assert "hide this message" not in msg
     assert " - the family Overall" not in msg and "LiNet" not in msg
     with pytest.raises(ValueError) as e:
         mtb.plot.build_table(_d28_with_mine(), na="raise")
     # R4-12: the error names na='warn' instead of offering to hide itself
     # R5-11: and leaves out the Overall sentence, since no figure is drawn
-    assert str(e.value) == (msg.replace("Pass na='skip' to hide this message.",
-                                        "Pass na='warn' to draw the figure with "
-                                        "these gaps.")
-                            .replace(" Its Overall uses the metrics it has.", ""))
+    assert str(e.value) == (msg.replace(" Its Overall uses the metrics it has.", "")
+                            + " Pass na='warn' to draw the figure with these gaps.")
 
 
 def test_na_warning_names_your_row():
@@ -209,7 +208,7 @@ def test_na_warning_cli_spelling(tmp_path, capsys):
                      str(tmp_path / "f.png")]) == 0
     err = capsys.readouterr().err
     assert "warning: The stored row Conos (D28, published) has no" in err
-    assert "Pass --na skip to hide this message." in err and "na='skip'" not in err
+    assert "hide this message" not in err and "na='skip'" not in err
 
 
 def test_na_cells_keep_their_per_family_lines():

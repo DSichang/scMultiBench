@@ -38,7 +38,7 @@ def _quiet(fn, *args, **kw):
 
 
 def _d52():
-    return _quiet(mtb.load_results, "cross", dataset="D52", source="rerun")
+    return _quiet(mtb.load_results, "cross", dataset="D52")
 
 
 # ============================================================ R8-03 pills
@@ -146,7 +146,7 @@ def test_grey_column_warnings_are_plain_sentences():
 
 
 def test_one_method_table_warning_is_plain_sentences():
-    _, msgs = _warned(mtb.load_results, "cross", dataset="D52")
+    _, msgs = _warned(mtb.load_results, "cross", dataset="D52", source="published")
     one = [m for m in msgs if re.match(R._ONE_METHOD_WARNING, m)]
     assert len(one) == 1, msgs
     assert one[0].startswith("The published table for cross/D52 has one method, "

@@ -19,6 +19,7 @@ import multibench as mtb
 from multibench import cli
 from multibench.engine import ingest
 from multibench.engine import resolve
+from tests.conftest import full_scan
 
 ad = pytest.importorskip("anndata")
 
@@ -92,21 +93,21 @@ def test_scan_caveat_names_the_non_integer_file(tmp_path):
     a.X = np.log1p(a.X)
     with pytest.warns(UserWarning, match="not whole numbers"):
         ingest.export_dataset(a, tmp_path / "LOG", adt="obsm:protein", labels="obs:cell_type")
-    sc = mtb.scan("LOG", "vertical", data_path=tmp_path, modalities=["rna", "adt"])
+    sc = full_scan("LOG", "vertical", data_path=tmp_path, modalities=["rna", "adt"])
     assert sc["files_ok"].all()                      # a caveat, not a file failure
     assert all(f"{m} needs raw counts. rna.h5 holds non-integer values." in c
                for m, c in zip(sc["method"], sc["caveat"])), sc["caveat"].tolist()
     assert not sc["caveat"].str.contains("adt.h5").any()
     b = _cite()
     ingest.export_dataset(b, tmp_path / "INT", adt="obsm:protein", labels="obs:cell_type")
-    sc = mtb.scan("INT", "vertical", data_path=tmp_path, modalities=["rna", "adt"])
+    sc = full_scan("INT", "vertical", data_path=tmp_path, modalities=["rna", "adt"])
     assert not sc["caveat"].str.contains("non-integer").any()
 
 
 @pytest.mark.parametrize("ds,cat", [("D11", "vertical"), ("D28", "diagonal"),
                                     ("D45", "mosaic"), ("D46", "mosaic"), ("D52", "cross")])
 def test_demo_folders_hold_raw_counts(root, ds, cat):
-    sc = mtb.scan(ds, cat, data_path=root / "data")
+    sc = full_scan(ds, cat, data_path=root / "data")
     assert not sc["caveat"].str.contains("non-integer").any()
 
 
@@ -154,7 +155,7 @@ def test_diagonal_export_writes_unpaired_rna_and_atac(tmp_path):
     assert _n_cells(d / "rna.h5") == 120 and _n_cells(d / "atac_peak.h5") == 90
     assert pd.read_csv(d / "rna_cty.csv")["x"].tolist() == rna.obs["cell_type"].tolist()
     assert pd.read_csv(d / "atac_cty.csv")["x"].tolist() == atac.obs["cell_type"].tolist()
-    sc = mtb.scan("LUNG", "diagonal", data_path=tmp_path)
+    sc = full_scan("LUNG", "diagonal", data_path=tmp_path)
     glue = sc[(sc["method"] == "GLUE") & (sc["modalities"] == "rna+atac_peak")]
     assert glue["files_ok"].item()
     # gene activity goes to atac_gas.h5
@@ -215,14 +216,14 @@ def test_scan_checks_diagonal_label_rows_and_flags_a_lone_cty(tmp_path):
     d = ingest.export_dataset(_rna(), tmp_path / "LC", atac=_atac(), atac_kind="peak",
                               labels="obs:cell_type", category="diagonal")
     pd.DataFrame({"x": ["T"] * 10}).to_csv(d / "atac_cty.csv", index=False)
-    sc = mtb.scan("LC", "diagonal", data_path=tmp_path)
+    sc = full_scan("LC", "diagonal", data_path=tmp_path)
     glue = sc[sc["method"] == "GLUE"].iloc[0]
     assert not glue["files_ok"]
     assert "atac_cty.csv has 10 labels, but atac_peak.h5 has 90 cells" in glue["files_reason"]
     # a diagonal folder whose only label file is cty.csv: caveat
     (d / "atac_cty.csv").unlink()
     (d / "rna_cty.csv").rename(d / "cty.csv")
-    sc = mtb.scan("LC", "diagonal", data_path=tmp_path)
+    sc = full_scan("LC", "diagonal", data_path=tmp_path)
     glue = sc[sc["method"] == "GLUE"].iloc[0]
     assert glue["files_ok"]
     assert glue["caveat"].startswith("GLUE needs rna_cty.csv and atac_cty.csv for diagonal. "
@@ -277,7 +278,7 @@ def test_batch_index_writes_the_d46_pattern_and_scan_finds_it(tmp_path):
         "adt1.h5", "atac2.h5", "cty1.csv", "cty2.csv", "cty3.csv",
         "rna1.h5", "rna2.h5", "rna3.h5"]
     assert _n_cells(tmp_path / "LAB" / "rna2.h5") == 80
-    sc = mtb.scan("LAB", "mosaic", data_path=tmp_path)
+    sc = full_scan("LAB", "mosaic", data_path=tmp_path)
     ok = sc[sc["method"].isin(["StabMap", "scMoMaT"])
             & (sc["modalities"] == "rna1+rna2+rna3+adt1+atac2")]     # the D46 pattern
     assert len(ok) == 2 and ok["files_ok"].all(), ok["files_reason"].tolist()
@@ -314,7 +315,7 @@ def test_mosaic_batch_split_writes_atac_i(tmp_path, capsys):
     assert {"atac1.h5", "atac2.h5", "atac3.h5"} <= set(names)
     assert not any(n.startswith("atac_peak") for n in names)
     # the folder holds the D46 pattern (rna1-3, adt1, atac2): scan finds it
-    sc = mtb.scan("MOS", "mosaic", data_path=tmp_path)
+    sc = full_scan("MOS", "mosaic", data_path=tmp_path)
     ok = sc[sc["method"].isin(["StabMap", "scMoMaT"])
             & (sc["modalities"] == "rna1+rna2+rna3+adt1+atac2")]     # the D46 pattern
     assert len(ok) == 2 and ok["files_ok"].all(), ok["files_reason"].tolist()

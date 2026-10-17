@@ -10,6 +10,7 @@ import warnings
 from pathlib import Path
 
 import pytest
+from tests.conftest import full_scan
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -33,7 +34,7 @@ def test_scan_prints_one_count_line_on_the_tutorial_dataset(key, capsys):
         pytest.skip(f"{t['ds']} is not on disk")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        mtb.scan(t["ds"], t["cat"])
+        full_scan(t["ds"], t["cat"])
     scan_out = capsys.readouterr().out.strip().splitlines()
     assert len(scan_out) == 1 and scan_out[0].startswith("[scan] "), scan_out
 
@@ -60,13 +61,13 @@ def test_scan_count_line_noun_on_the_tutorial_datasets(key, capsys):
         pytest.skip(f"{t['ds']} is not on disk")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        frame = mtb.scan(t["ds"], t["cat"], modalities="all")
+        frame = full_scan(t["ds"], t["cat"], modalities="all")
     line = capsys.readouterr().out.strip()
     assert line.startswith(f"[scan] {int(frame.files_ok.sum())} of {len(frame)} rows "), line
     assert not frame.method.is_unique
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        listed = mtb.scan(t["ds"], t["cat"])
+        listed = full_scan(t["ds"], t["cat"])
     line = capsys.readouterr().out.strip()
     noun = "methods" if key in ONE_ROW_PER_METHOD else "rows"
     assert line.startswith(f"[scan] {int(listed.files_ok.sum())} of {len(listed)} {noun} "), line

@@ -7,32 +7,33 @@ import warnings
 
 import pytest
 
-import multibench as mtb
 from multibench.data import results
 
+# every test here reads the published layout through the deprecated source= /
+# result_path= / clustering= (0.4: one FutureWarning each)
+pytestmark = pytest.mark.filterwarnings(
+    "ignore:.* is deprecated and will be removed in 0.5:FutureWarning")
 
-def test_d56_is_visible_everywhere(layout_tree, monkeypatch):
-    assert "D56" in results.available_datasets("cross", result_path=layout_tree)
-    df = results.load_results("cross", dataset="D56", result_path=layout_tree)
+
+def test_d56_is_visible_everywhere(layout_tree):
+    pub = dict(source="published", result_path=layout_tree)
+    assert "D56" in results.available_datasets("cross", **pub)
+    df = results.load_results("cross", dataset="D56", **pub)
     assert set(df.method) == {"MOFA2"} and (df.clustering == "default").all()
     assert abs(float(df[df.metric == "ARI"].value.iloc[0]) - 0.28) < 1e-9
-    km = results.load_results("cross", dataset="D56", clustering="kmeans", result_path=layout_tree)
+    km = results.load_results("cross", dataset="D56", clustering="kmeans", **pub)
     assert set(km.method) == {"MOFA2"} and (km.clustering == "kmeans").all()
     assert abs(float(km[km.metric == "ARI"].value.iloc[0]) - 0.25) < 1e-9
-    lo = results.load_results("cross", dataset="D56", clustering="louvain", result_path=layout_tree)
+    lo = results.load_results("cross", dataset="D56", clustering="louvain", **pub)
     assert set(lo.method) == {"MOFA2"}
-    cov = results.results_coverage("cross", source="published", result_path=layout_tree)
+    cov = results.results_coverage("cross", **pub)
     assert set(cov[cov.dataset == "D56"].clustering) == {"default", "kmeans", "louvain"}
-    monkeypatch.setattr(mtb.config.DEFAULT, "result_path", layout_tree)
-    cat = mtb.data.catalog.datasets()
-    row = cat[cat.dataset == "D56"].iloc[0]
-    assert row.has_results and "cross" in str(row.category)
 
 
 def test_nested_tables_for_d53_and_d57_are_read_too(layout_tree):
-    d57 = results.load_results("cross", dataset="D57", result_path=layout_tree)
+    d57 = results.load_results("cross", dataset="D57", source="published", result_path=layout_tree)
     assert {"MOFA2", "UINMF"} <= set(d57.method)
-    d53 = results.load_results("cross", dataset="D53", result_path=layout_tree)
+    d53 = results.load_results("cross", dataset="D53", source="published", result_path=layout_tree)
     assert "MOFA2" in set(d53.method)
     # raw kBET folders are not metric tables: no dataset/method appears because of one
     assert not any(m.lower() == "kbet" for m in d53.method.unique())
@@ -41,9 +42,9 @@ def test_nested_tables_for_d53_and_d57_are_read_too(layout_tree):
 
 
 def _available_list_and_error_agree(root):
-    avail = results.available_datasets("cross", result_path=root)
+    avail = results.available_datasets("cross", source="published", result_path=root)
     with pytest.raises(FileNotFoundError) as ei:
-        results.load_results("cross", dataset="D99", result_path=root)
+        results.load_results("cross", dataset="D99", source="published", result_path=root)
     msg = str(ei.value)
     held = re.match(r"The published tables of cross hold (.*), not D99\.", msg).group(1)
     have = re.split(r", | and ", held)
@@ -79,6 +80,6 @@ def test_nested_layout_end_to_end_on_a_synthetic_tree(tmp_path):
     (root / "metric_asw_iasw_if1.csv").write_text(",Value\nASW,0.7\n")
     (root.parent / "kbet").mkdir()
     (root.parent / "kbet" / "benchmark_results111.csv").write_text("a,b\n1,2\n")
-    assert results.available_datasets("cross", result_path=tmp_path) == ["D99"]
-    df = results.load_results("cross", dataset="D99", result_path=tmp_path)
+    assert results.available_datasets("cross", source="published", result_path=tmp_path) == ["D99"]
+    df = results.load_results("cross", dataset="D99", source="published", result_path=tmp_path)
     assert set(df.method) == {"MOFA2"} and set(df.metric) == {"ARI", "NMI"}

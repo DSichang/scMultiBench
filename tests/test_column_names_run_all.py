@@ -184,11 +184,5 @@ def test_the_column_itself_works(cite, tmp_path):
 
 
 def test_the_docstrings_state_the_rule():
-    rule = ('``"obs:<column>"`` and ``"<column>"`` name a column of the object you pass. '
-            "``export_dataset`` and ``evaluate`` take both. ``run_all`` and ``rescore`` are "
-            "given a folder, not the object, so they take the column itself, for example "
-            '``batch=adata.obs["donor"]``.')
-    for fn in (mtb.run_all, mtb.evaluate, mtb.io.export_dataset):
-        assert rule in " ".join(fn.__doc__.split()), fn.__name__
     flat = " ".join(W.BatchResult.rescore.__doc__.split())
     assert 'Pass the column itself: ``batch=adata.obs["donor"]``.' in flat

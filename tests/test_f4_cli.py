@@ -4,7 +4,7 @@ R4-03: ``run-all`` exits 3 when a finished run lists a method in failures,
 and the ``-> FAIL`` / ``-> TIMEOUT`` progress line ends with the error.
 R4-05: ``evaluate`` refuses ``--labels`` files typed in an order that
 contradicts the method named by ``--method``; the count error speaks of the
-row order of ``--output``, not batches.
+row order of ``--embedding``, not batches.
 R4-07: the ``run-all`` help names the files it saves and the config default.
 R4-08: an env with one archive is "a single build" in ``env plan`` /
 ``env install`` and the install warning; the total is short lines with no
@@ -206,7 +206,7 @@ def diag(tmp_path, monkeypatch):
 
 
 def _evaluate(emb, *label_files, method="uniPort", dataset="D28", extra=()):
-    argv = ["evaluate", "--output", str(emb)]
+    argv = ["evaluate", "--embedding", str(emb)]
     for f in label_files:
         argv += ["--labels", str(f)]
     if method is not None:
@@ -268,12 +268,12 @@ def test_count_error_speaks_of_the_row_order_of_output(tmp_path, capsys):
     for i in range(3):
         pd.DataFrame({"x": ["a"] * 15 + ["b"] * 15}).to_csv(folder / f"cty{i + 1}.csv",
                                                            index=False)
-    assert cli.main(["evaluate", "--output", str(tmp_path / "emb.npy"),
+    assert cli.main(["evaluate", "--embedding", str(tmp_path / "emb.npy"),
                      "--labels", str(folder / "cty1.csv"), "--metrics", "ASW"]) == 1
     err = capsys.readouterr().err
     assert "batch order" not in err
     assert ("For several label files (cty1.csv, cty2.csv, cty3.csv), repeat --labels in "
-            "the row order of --output, or pass --dataset, --category and --method.") in err
+            "the row order of --embedding, or pass --dataset, --category and --method.") in err
 
 
 # ====================================================================== R4-07
@@ -319,9 +319,17 @@ def _parens_with_semicolon(text):
     return [m for m in re.findall(r"\(([^()]*)\)", text) if ";" in m]
 
 
+def _plan_err(capsys):
+    """stderr of the deprecated ``env plan`` without its one deprecation line."""
+    first, rest = capsys.readouterr().err.split("\n", 1)
+    assert first == ("warning: multibench env plan is deprecated and will be removed in "
+                     "0.5. Use multibench env install.")
+    return rest
+
+
 def test_stabmap_cpu_plan_calls_its_env_a_single_build(linux_cpu, capsys):
     assert cli.main(["env", "plan", "--methods", "StabMap", "--flavor", "cpu"]) == 0
-    err = capsys.readouterr().err
+    err = _plan_err(capsys)
     assert "GPU build" not in err
     lines = err.splitlines()
     assert lines[0] == "# total for 1 env: 0.9 GB download"
@@ -333,7 +341,7 @@ def test_stabmap_cpu_plan_calls_its_env_a_single_build(linux_cpu, capsys):
 def test_mosaic_auto_plan_has_short_lines_without_semicolons_in_parentheses(linux_cpu,
                                                                            capsys):
     assert cli.main(["env", "plan", "--category", "mosaic"]) == 0
-    err = capsys.readouterr().err
+    err = _plan_err(capsys)
     assert not _parens_with_semicolon(err), err
     lines = err.splitlines()
     assert lines[0] == "# total for 6 envs: 7.6 GB download"
@@ -348,7 +356,7 @@ def test_mosaic_auto_plan_has_short_lines_without_semicolons_in_parentheses(linu
 
 def test_gpu_plan_says_gpu_build_only_for_envs_that_have_both(linux_cpu, capsys):
     assert cli.main(["env", "plan", "--methods", "StabMap,scMoMaT", "--flavor", "gpu"]) == 0
-    err = capsys.readouterr().err
+    err = _plan_err(capsys)
     assert err.splitlines()[:2] == [
         "# total for 2 envs: 5.4 GB download",
         "# 1 of 2 envs has the GPU build. 1 env has a single build (the same archive for "
@@ -408,7 +416,7 @@ def test_env_status_shows_no_flavour_for_a_single_build(monkeypatch, capsys):
              "difficulty": "easy", "verified_working": True, "flavor": "gpu"},
             {"method": "scMoMaT", "env": "scmb_torch", "exists": True, "has_lock": True,
              "difficulty": "easy", "verified_working": True, "flavor": "cpu"}]
-    monkeypatch.setattr(envs, "status", lambda: [dict(r) for r in rows])
+    monkeypatch.setattr(envs, "_status", lambda: [dict(r) for r in rows])
     monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
     assert cli.main(["env", "status", "--methods", "StabMap,scMoMaT"]) == 0
     out = {l.split()[1]: l for l in capsys.readouterr().out.splitlines()}

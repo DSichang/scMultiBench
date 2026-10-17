@@ -26,6 +26,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from tests.conftest import full_scan
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -249,7 +250,7 @@ def test_runnable_sentence_holds_for_the_named_method_calls_of_the_run_cells(
     # D46's pattern: the mosaic task whose batches all hold RNA
     task = GEN.TASKS["mosaic_shared"]
     trio, mods = task["methods"], "+".join(task["variants"][0])
-    sc = _quiet(mtb.scan, "MYMOSAIC", "mosaic", methods=trio, data_path=tmp_path,
+    sc = _quiet(full_scan, "MYMOSAIC", "mosaic", methods=trio, data_path=tmp_path,
                 verbose=False)
     plan = _quiet(mtb.run_all, "MYMOSAIC", "mosaic", tmp_path / "out", methods=trio,
                   data_path=tmp_path, dry_run=True, verbose=False)

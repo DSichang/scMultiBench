@@ -23,6 +23,7 @@ from multibench import cli, config
 from multibench import workflow as W
 from multibench.engine import envs, ingest, registry
 from multibench.engine import runner as R
+from tests.conftest import full_scan
 
 GENES = [f"GENE{i}" for i in range(60)]
 PEAKS = [f"chr1:{i * 100}-{i * 100 + 50}" for i in range(40)]
@@ -81,7 +82,7 @@ def test_both_file_variants_say_they_read_both_files(tmp_path, monkeypatch, meth
         assert msg.endswith(both), msg
         assert "method_info" not in msg and "multibench info" not in msg, msg
     monkeypatch.setattr(config, "_CLI", False)
-    row = _quiet(mtb.scan, "LUNG", "diagonal", methods=[method], data_path=tmp_path,
+    row = _quiet(full_scan, "LUNG", "diagonal", methods=[method], data_path=tmp_path,
                  verbose=False).iloc[0]
     assert both in row["files_reason"], row["files_reason"]
     assert "method_info" not in row["files_reason"]
@@ -134,7 +135,7 @@ def test_python_run_all_dry_run_prints_the_ref_note_only_when_verbose(wrong_ref,
 def _stored(dataset):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        return mtb.load_results("vertical", dataset=dataset, source="rerun")
+        return mtb.load_results("vertical", dataset=dataset)
 
 
 def _mine(method="PriyaNet", dataset="MYCITE"):
@@ -365,22 +366,22 @@ def test_env_reason_on_linux_leads_with_the_install_command(monkeypatch):
     monkeypatch.setattr(R, "linux_only_sentence", lambda: None)
     text = W._env_hint("scmb_r", "StabMap", "mosaic")
     assert text == ("Environment scmb_r is not installed. Run multibench env install "
-                    "--methods StabMap --packed --run. Use --category mosaic to install "
+                    "--methods StabMap --run. Use --category mosaic to install "
                     "the environments of every mosaic method.")
-    assert "multibench env install --methods StabMap --packed --run." in text[:120]
+    assert "multibench env install --methods StabMap --run." in text[:120]
     assert W._env_hint("scmb_r", "StabMap", None) == (
         "Environment scmb_r is not installed. Run multibench env install --methods "
-        "StabMap --packed --run.")
+        "StabMap --run.")
     # every method's install command fits in the first 120 characters
     for m in registry.list_methods():
         env = envs.group_for(m)
-        cmd = f"multibench env install --methods {m} --packed --run."
+        cmd = f"multibench env install --methods {m} --run."
         assert cmd in W._env_hint(env, m, "vertical")[:120], m
 
 
 def test_scan_env_reason_on_linux(monkeypatch):
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
-    row = _quiet(mtb.scan, "D11", "vertical", methods=["totalVI"], verbose=False).iloc[0]
+    row = _quiet(full_scan, "D11", "vertical", methods=["totalVI"], verbose=False).iloc[0]
     assert row["env_reason"].startswith(f"Environment {row['env']} is not installed. ")
     assert "doctor" not in row["env_reason"]
 
@@ -393,14 +394,14 @@ def test_run_error_on_linux_is_sentences(tmp_path, monkeypatch):
         mtb.run("totalVI", "vertical", inputs=inp, out_dir=str(tmp_path / "out"))
     assert str(e.value) == (
         f"Environment {env} of totalVI is not installed. Run multibench env install "
-        f"--methods totalVI --packed --run. In Python, call "
+        f"--methods totalVI --run. In Python, call "
         f"mtb.env.install(['totalVI'], dry_run=False).")
     monkeypatch.setattr(config, "_CLI", True)
     with pytest.raises(OSError) as e:
         mtb.run("totalVI", "vertical", inputs=inp, out_dir=str(tmp_path / "out"))
     assert str(e.value) == (
         f"Environment {env} of totalVI is not installed. Run multibench env install "
-        f"--methods totalVI --packed --run.")
+        f"--methods totalVI --run.")
 
 
 # ======================================================================= R7-11
@@ -411,7 +412,7 @@ def test_same_cells_error_starts_with_the_method(tmp_path, pinned):
     msg = str(e.value)
     assert msg == ("Seurat_v5 needs RNA and ATAC from the same cells as its bridge. In "
                    "LUNG, rna.h5 and atac_peak.h5 share 0 of 20 and 16 cells.")
-    row = _quiet(mtb.scan, "LUNG", "diagonal", methods=["Seurat_v5"], data_path=tmp_path,
+    row = _quiet(full_scan, "LUNG", "diagonal", methods=["Seurat_v5"], data_path=tmp_path,
                  verbose=False).iloc[0]
     assert row["files_reason"] == f"ValueError: {msg}"
     assert row["reason"].startswith(msg)

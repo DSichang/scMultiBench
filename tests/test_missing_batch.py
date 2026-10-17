@@ -159,9 +159,8 @@ def test_a_complete_batch_changes_nothing(tmp_path):
 
 def test_docstring_says_every_cell_needs_a_batch():
     doc = " ".join(mtb.evaluate.__doc__.split())
-    assert ("needed for the batch metrics unless ``labels`` lists two or more files. "
-            "Every cell needs a batch.") in doc
-    assert "or a cell without a batch in ``batch``." in doc           # Raises
+    assert "needed for the batch metrics unless ``labels`` lists two or more files." in doc
+    assert "Missing or misaligned labels or batches" in doc           # Raises
 
 
 def test_drop_checks_the_batch_of_the_cells_it_keeps():

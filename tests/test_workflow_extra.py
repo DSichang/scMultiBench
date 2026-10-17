@@ -56,10 +56,12 @@ def test_skip_existing_with_params_is_refused():
 
 def test_batch_result_attributes_are_documented():
     import inspect
-    for attr in ("summary", "long", "failures", "results", "plot"):
+    for attr in ("summary", "long", "failures", "plot"):
         a = getattr(mtb.BatchResult, attr)
         doc = inspect.getdoc(a.fget if isinstance(a, property) else a)
         assert doc and len(doc) > 40, f"BatchResult.{attr} needs a real docstring"
+    # records (results until 0.4) is an instance attribute, documented on the class
+    assert "records : list[dict]" in inspect.getdoc(mtb.BatchResult)
 
 
 def test_failures_excludes_successful_but_unscorable_runs():

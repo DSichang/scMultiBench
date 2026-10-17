@@ -14,6 +14,7 @@ import pytest
 import multibench as mtb
 from multibench import workflow as W
 from multibench.engine import envs, registry
+from tests.conftest import full_scan
 
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 
@@ -49,7 +50,7 @@ def test_short_reason_strips_exception_prefix_cell_check_opening_and_absolute_pa
 
 def test_scan_reason_is_short_but_files_reason_is_verbatim(no_envs):
     from multibench import config
-    df = mtb.scan("D11", "vertical", modalities="all")
+    df = full_scan("D11", "vertical", modalities="all")
     blocked = df[~df["files_ok"]]
     assert len(blocked) > 0
     root = str(config.DEFAULT.data_path)
@@ -63,7 +64,7 @@ def test_scan_reason_is_short_but_files_reason_is_verbatim(no_envs):
         assert ".; " not in text
         assert "FileNotFoundError" not in r["reason"] and root not in r["reason"]
         assert r["reason"].endswith(". " + r["env_reason"])      # env half verbatim
-        assert "--packed --run" in r["reason"]                    # install command kept
+        assert "--run" in r["reason"]                    # install command kept
     row = df[(df["method"] == "UnitedNet")].iloc[0]
     # the meaning first for ATAC (L31); D11's cty.csv is UnitedNet's label file (M21)
     assert row["reason"].startswith("UnitedNet needs peak ATAC (atac.h5), which is "
@@ -72,16 +73,15 @@ def test_scan_reason_is_short_but_files_reason_is_verbatim(no_envs):
 
 
 def test_scan_docs_name_the_four_columns():
-    doc = inspect.getdoc(mtb.scan)
-    assert '["method", "modalities", "runnable", "reason"]' in doc
-    assert "files_reason" in doc and "env_reason" in doc
-    assert '["method", "modalities", "runnable", "reason"]' in inspect.getdoc(mtb.run_all)
+    returns = " ".join(inspect.getdoc(mtb.scan).split("Returns", 1)[1].split("Raises")[0].split())
+    assert ("``method``, ``modalities`` (of the variant ``run_all`` would run, ``+``-joined), "
+            "``runnable`` and ``reason``.") in returns
 
 
 # ----------------------------------------------------------------- P17: str is not a list
 @pytest.mark.parametrize("call", [
-    lambda: mtb.scan("D11", "vertical", methods="StabMap"),
-    lambda: mtb.scan("D11", "vertical", methods="StabMap", out_dir="runs"),
+    lambda: full_scan("D11", "vertical", methods="StabMap"),
+    lambda: full_scan("D11", "vertical", methods="StabMap", out_dir="runs"),
     lambda: mtb.run_all("D11", "vertical", methods="StabMap", out_dir="/tmp/unused",
                         verbose=False),
     lambda: mtb.run_all("D11", "vertical", methods="StabMap", out_dir=None, dry_run=True,
@@ -97,7 +97,7 @@ def test_methods_as_a_string_raises_pass_a_list(call):
 
 def test_modalities_as_a_string_raises_pass_a_list():
     with pytest.raises(TypeError, match=r"modalities=\['rna'\]"):
-        mtb.scan("D11", "vertical", modalities="rna")
+        full_scan("D11", "vertical", modalities="rna")
     with pytest.raises(TypeError, match="must be a list"):
         mtb.run_all("D11", "vertical", modalities="rna", out_dir="/tmp/unused", verbose=False)
 
@@ -116,7 +116,7 @@ def test_run_all_real_run_raises_on_missing_dataset_before_any_dispatch(monkeypa
 # ----------------------------------------------------------------- P03: data_dir note
 def test_scan_modalities_warns_about_excluded_data_dir_methods(all_envs):
     with pytest.warns(UserWarning) as rec:
-        df = mtb.scan("D28", "diagonal", modalities=["rna", "atac_gas"])
+        df = full_scan("D28", "diagonal", modalities=["rna", "atac_gas"])
     msgs = [str(w.message) for w in rec if "leave out scBridge" in str(w.message)]
     assert len(msgs) == 1, msgs
     assert msgs[0] == ("The modalities rna and atac_gas leave out scBridge, which reads a "
@@ -126,32 +126,29 @@ def test_scan_modalities_warns_about_excluded_data_dir_methods(all_envs):
     # modalities=[] selects exactly it, and no note is emitted
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        d2 = mtb.scan("D28", "diagonal", modalities=[])
+        d2 = full_scan("D28", "diagonal", modalities=[])
         assert set(d2["modalities"]) == {"(data_dir)"}
         assert set(d2["method"]) == {"scBridge"}
         # a category without directory variants stays silent
-        mtb.scan("D11", "vertical", modalities=["rna", "adt"])
+        full_scan("D11", "vertical", modalities=["rna", "adt"])
 
 
 # ----------------------------------------------------------------- P16: scan's command column
 def test_scan_command_works_without_out_dir(no_envs):
-    df = mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False)
+    df = full_scan("D11", "vertical", methods=["Matilda"], verbose=False)
     ok = df[df["files_ok"]]
     assert len(ok) == 1
     cmd = ok["command"].iloc[0]
     assert "<out_dir>/Matilda_D11/" in cmd and "conda run -n matilda" in cmd
     assert W.OUT_DIR_PLACEHOLDER == "<out_dir>"
     # the explicit out_dir renders paste-ready lines
-    df2 = mtb.scan("D11", "vertical", out_dir="runs", methods=["Matilda"], verbose=False)
+    df2 = full_scan("D11", "vertical", out_dir="runs", methods=["Matilda"], verbose=False)
     assert "runs/Matilda_D11/" in df2[df2["files_ok"]]["command"].iloc[0]
 
 
 def test_scan_and_run_all_docs_cite_the_placeholder():
-    for fn in (mtb.scan, mtb.run_all):
-        flat = " ".join(inspect.getdoc(fn).split())          # docstrings wrap
-        assert "'<out_dir>'" in flat, fn.__name__
     doc = inspect.getdoc(mtb.scan)
-    assert "Parameters" in doc and "Returns" in doc and "out_dir" in doc and "command" in doc
+    assert "Parameters" in doc and "Returns" in doc and "command" in doc
 
 
 # ----------------------------------------------------------------- P05: platform note

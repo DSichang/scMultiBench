@@ -37,6 +37,7 @@ import multibench as mtb
 from multibench import cli, config
 from multibench import workflow as W
 from multibench.engine import envs, ingest, registry
+from tests.conftest import full_scan
 
 #: the caveat of a gene-activity method given peaks in atac.h5 (after the method)
 GAS_CAV = ("needs gene-activity ATAC. The features of atac.h5 look like chr:start-end, "
@@ -94,7 +95,7 @@ def _vertical_peaks(root, name="MU_PEAK", n=60):
 # ---------------------------------------------------------- wrong peak names block
 def test_gene_names_in_the_peak_file_block_glue_seurat_v3_and_multimap(tmp_path, pinned):
     root = _diagonal(tmp_path, "LUNG_ga", [f"GENE{i}" for i in range(60)])
-    sc = _quiet(mtb.scan, "LUNG_ga", "diagonal", data_path=root, verbose=False)
+    sc = _quiet(full_scan, "LUNG_ga", "diagonal", data_path=root, verbose=False)
     # the rows whose files the folder holds: GLUE's row for several batches has none
     sc = sc[sc["files_ok"]].set_index("method")
     assert sc.index.is_unique
@@ -107,11 +108,11 @@ def test_gene_names_in_the_peak_file_block_glue_seurat_v3_and_multimap(tmp_path,
         "example GENE0. Rename them to chr:start-end, or pass ")
     # R4-01: naming the method keeps it blocked; allow_atac_mismatch runs it
     for m in ("GLUE", "Seurat_v3", "MultiMAP"):
-        named = _quiet(mtb.scan, "LUNG_ga", "diagonal", methods=[m], data_path=root,
+        named = _quiet(full_scan, "LUNG_ga", "diagonal", methods=[m], data_path=root,
                        verbose=False)
         assert not named["runnable"].any(), m
         assert named["files_ok"].sum() == 1, m
-        allowed = _quiet(mtb.scan, "LUNG_ga", "diagonal", methods=[m], data_path=root,
+        allowed = _quiet(full_scan, "LUNG_ga", "diagonal", methods=[m], data_path=root,
                          verbose=False, allow_atac_mismatch=True).iloc[0]
         assert allowed["runnable"] and allowed["reason"] == "", m
 
@@ -145,12 +146,12 @@ def test_a_named_method_keeps_the_row_its_roles_spell(pinned, capsys):
     """moETM's own spelling, as scan and method_info show it."""
     assert ["rna", "atac_gas"] in [s["modalities"] for s in
                                    mtb.method_info("moETM")["supports"]]
-    for call in (mtb.scan, lambda *a, **k: mtb.run_all(*a, dry_run=True, **k)):
+    for call in (full_scan, lambda *a, **k: mtb.run_all(*a, dry_run=True, **k)):
         df = _quiet(call, "D28", "vertical", methods=["moETM"],
                     modalities=["rna", "atac_gas"], verbose=False)
         assert list(df["modalities"]) == ["rna+atac_gas"]
     # without methods= the token still keeps only the gene-activity methods
-    df = _quiet(mtb.scan, "D28", "vertical", modalities=["rna", "atac_gas"], verbose=False)
+    df = _quiet(full_scan, "D28", "vertical", modalities=["rna", "atac_gas"], verbose=False)
     assert "moETM" not in set(df["method"])
     rc = _quiet(cli.main, ["run-all", "D28", "--category", "vertical", "--methods", "moETM",
                            "--modalities", "rna,atac_gas", "--dry-run"])
@@ -158,7 +159,7 @@ def test_a_named_method_keeps_the_row_its_roles_spell(pinned, capsys):
 
 
 def test_a_representation_token_that_drops_a_named_method_says_why(pinned, capsys):
-    for call in (mtb.scan, lambda *a, **k: mtb.run_all(*a, dry_run=True, **k)):
+    for call in (full_scan, lambda *a, **k: mtb.run_all(*a, dry_run=True, **k)):
         with pytest.raises(ValueError) as e:
             _quiet(call, "D28", "vertical", methods=["moETM"],
                    modalities=["rna", "gene_activity"], verbose=False)
@@ -170,13 +171,13 @@ def test_a_representation_token_that_drops_a_named_method_says_why(pinned, capsy
     with pytest.raises(ValueError, match=r"Matilda reads peaks\. Pass "
                                          r"modalities=\['rna', 'atac_peak'\] or "
                                          r"\['rna', 'atac'\]\.$"):
-        _quiet(mtb.scan, "D11", "vertical", methods=["Matilda"],
+        _quiet(full_scan, "D11", "vertical", methods=["Matilda"],
                modalities=["rna", "atac_gas"], verbose=False)
     # the other direction, on a diagonal method that reads gene activity
     with pytest.raises(ValueError, match=r"SCALEX reads gene activity\. Pass "
                                          r"modalities=\['rna', 'atac_gas'\] or "
                                          r"\['rna', 'atac'\]\.$"):
-        _quiet(mtb.scan, "D28", "diagonal", methods=["SCALEX"],
+        _quiet(full_scan, "D28", "diagonal", methods=["SCALEX"],
                modalities=["rna", "atac_peak"], verbose=False)
     # the command line keeps the message and gives its own spelling
     for sub in ("scan", "run-all"):
@@ -186,11 +187,6 @@ def test_a_representation_token_that_drops_a_named_method_says_why(pinned, capsy
         err = capsys.readouterr().err
         assert "moETM reads peaks through its atac_gas input. Pass --modalities " \
                "rna,atac_peak or rna,atac." in err, err
-
-
-def test_scan_notes_list_gas_among_the_tokens():
-    flat = " ".join(inspect.getdoc(mtb.scan).split())
-    assert "``atac_gas`` / ``gas`` / ``gene_activity``" in flat
 
 
 def test_modalities_help_says_the_representation_tokens_select_by_what_is_read():
@@ -272,7 +268,7 @@ def scripts_at_head(tmp_path, monkeypatch):
 
 @needs_git
 def test_a_scripts_ref_mismatch_is_its_own_blocker(scripts_at_head, capsys):
-    sc = mtb.scan("D11", "vertical", methods=["totalVI"], verbose=False)
+    sc = full_scan("D11", "vertical", methods=["totalVI"], verbose=False)
     r = sc.iloc[0]
     assert not r["runnable"] and r["files_ok"] and r["command"]
     assert "(MULTIBENCH_SCRIPTS_REF)" in r["reason"]
@@ -361,7 +357,7 @@ def test_a_dataset_order_batch_is_cut_to_the_batches_a_method_reads(tmp_path, mo
 def test_batch_docs_name_the_label_file_order():
     p = " ".join(inspect.getdoc(mtb.run_all).split("Parameters", 1)[1]
                  .split("Returns", 1)[0].split())
-    assert "cells in the order of ``mtb.labels_for(dataset)``" in p
+    assert "One batch per cell, in the order of ``mtb.labels_for(dataset)``" in p
 
 
 # ---------------------------------------------------------- pinned demo sets
@@ -412,7 +408,7 @@ PINNED = {
 
 @pytest.mark.parametrize("dataset", sorted(PINNED))
 def test_demo_datasets_keep_their_pinned_runnable_rows(dataset, pinned):
-    df = _quiet(mtb.scan, dataset, verbose=False)
+    df = _quiet(full_scan, dataset, verbose=False)
     got = sorted(f"{r.method}|{r.category}|{r.modalities}" for r in df[df.runnable].itertuples())
     assert got == sorted(PINNED[dataset])
     blocked = df[W._is_wrong_atac(df["reason"])]
@@ -434,21 +430,21 @@ def test_the_empty_summary_ends_like_a_full_one():
 def test_evaluate_count_errors_name_where_the_labels_came_from(tmp_path, capsys):
     emb = tmp_path / "emb_small.npy"
     np.save(emb, np.random.default_rng(0).normal(size=(500, 4)))
-    rc = _quiet(cli.main, ["evaluate", "--output", str(emb), "--dataset", "D46",
+    rc = _quiet(cli.main, ["evaluate", "--embedding", str(emb), "--dataset", "D46",
                            "--category", "mosaic", "--method", "scMoMaT"])
     err = capsys.readouterr().err
     assert rc == 1
     assert ("error: the label files of D46 (cty1.csv, cty2.csv, cty3.csv) hold 21,416 "
-            "labels for 500 cells in --output.") in err, err
+            "labels for 500 cells in --embedding.") in err, err
     assert "--labels" not in err
     lab = tmp_path / "cty.csv"
     pd.DataFrame({"x": ["A", "B"] * 250}).to_csv(lab, index=False)
     cl = tmp_path / "cl.csv"
     pd.DataFrame({"x": [1, 2] * 15}).to_csv(cl, index=False)
-    rc = _quiet(cli.main, ["evaluate", "--output", str(emb), "--labels", str(lab),
-                           "--clustering", str(cl), "--metrics", "ARI"])
+    rc = _quiet(cli.main, ["evaluate", "--embedding", str(emb), "--labels", str(lab),
+                           "--clusters", str(cl), "--metrics", "ARI"])
     err = capsys.readouterr().err
-    assert rc == 1 and "--clustering gave 30 cluster ids (cl.csv) for 500 cells" in err, err
+    assert rc == 1 and "--clusters gave 30 cluster ids (cl.csv) for 500 cells" in err, err
 
 
 def test_an_unpacked_size_below_the_archive_reads_unknown(tmp_path, monkeypatch):
@@ -480,8 +476,6 @@ def test_layout_and_export_notes_say_scan_skips_the_other_representation():
     assert "mtb.scan and mtb.run_all skip such a method unless allow_atac_mismatch=True." \
         in txt
     notes = " ".join(inspect.getdoc(ingest.export_dataset).split())
-    assert "``mtb.scan`` and ``run_all`` skip a method whose file holds the other " \
-           "representation" in notes
     assert "reports the mismatch in its ``caveat`` column" not in notes
 
 
@@ -580,7 +574,7 @@ def test_discover_details_say_a_representation_token_keeps_the_readers():
             '`"atac_peak"` also keeps MultiMAP and Seurat_v3.') in text
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        got = set(mtb.scan("D28", "diagonal", modalities=["rna", "atac_peak"],
+        got = set(full_scan("D28", "diagonal", modalities=["rna", "atac_peak"],
                            verbose=False)["method"])
     assert {"MultiMAP", "Seurat_v3"} <= got
 

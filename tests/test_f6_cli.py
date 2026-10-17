@@ -48,7 +48,7 @@ def _err(capsys, argv):
 def test_name_alone_with_labels_writes_rows_with_that_name(diag, tmp_path, capsys):
     d, emb = diag
     out = tmp_path / "mine.csv"
-    rc = cli.main(["evaluate", "--output", str(emb), "--name", "RNA+ATAC PCA",
+    rc = cli.main(["evaluate", "--embedding", str(emb), "--name", "RNA+ATAC PCA",
                    "--labels", str(d / "rna_cty.csv"), "--labels", str(d / "atac_cty.csv"),
                    "--dataset", "MYDIAG", "--category", "diagonal", "--metrics", "ASW",
                    "--out", str(out)])
@@ -61,7 +61,7 @@ def test_name_alone_with_labels_writes_rows_with_that_name(diag, tmp_path, capsy
 def test_name_without_method_or_labels_is_a_usage_error(diag, capsys):
     d, emb = diag
     with pytest.raises(SystemExit) as e:
-        cli.main(["evaluate", "--output", str(emb), "--name", "x", "--dataset", "D28",
+        cli.main(["evaluate", "--embedding", str(emb), "--name", "x", "--dataset", "D28",
                   "--category", "diagonal"])
     assert e.value.code == 2
     assert ("Without --method, pass the label files with --labels, once per file, in "
@@ -70,14 +70,14 @@ def test_name_without_method_or_labels_is_a_usage_error(diag, capsys):
 
 def test_unknown_method_with_name_says_leave_out_method(diag, capsys):
     d, emb = diag
-    rc, err = _err(capsys, ["evaluate", "--output", str(emb), "--method", "MyPCA",
+    rc, err = _err(capsys, ["evaluate", "--embedding", str(emb), "--method", "MyPCA",
                             "--name", "RNA+ADT PCA", "--labels", "cty.csv",
                             "--dataset", "MYCITE", "--category", "vertical"])
     assert rc == 1
     assert ('error: MyPCA is not a package method. For your own embedding, leave out '
             '--method: --name "RNA+ADT PCA" --labels cty.csv.') in err
     # a close name adds the did-you-mean sentence
-    rc, err = _err(capsys, ["evaluate", "--output", str(emb), "--method", "Matlida",
+    rc, err = _err(capsys, ["evaluate", "--embedding", str(emb), "--method", "Matlida",
                             "--name", "x", "--labels", "cty.csv",
                             "--dataset", "MYCITE", "--category", "vertical"])
     assert rc == 1 and "Matlida is not a package method. Did you mean Matilda? " in err
@@ -86,7 +86,7 @@ def test_unknown_method_with_name_says_leave_out_method(diag, capsys):
 
 def test_unknown_method_without_labels_names_the_rename(diag, capsys):
     d, emb = diag
-    rc, err = _err(capsys, ["evaluate", "--output", str(emb), "--method", "uniPort_rerun",
+    rc, err = _err(capsys, ["evaluate", "--embedding", str(emb), "--method", "uniPort_rerun",
                             "--dataset", "D28", "--category", "diagonal"])
     assert rc == 1
     assert ("error: uniPort_rerun is not a package method. To name your rows "
@@ -94,7 +94,7 @@ def test_unknown_method_without_labels_names_the_rename(diag, capsys):
             "method, pass --name and the label files with --labels, once per file, in "
             "your embedding's cell order.") in err
     # a typo gets 'Did you mean', not the rename
-    rc, err = _err(capsys, ["evaluate", "--output", str(emb), "--method", "Matlida",
+    rc, err = _err(capsys, ["evaluate", "--embedding", str(emb), "--method", "Matlida",
                             "--dataset", "D28", "--category", "diagonal"])
     assert rc == 1 and "Did you mean Matilda?" in err and "--name Matlida" not in err
 
@@ -103,10 +103,10 @@ def test_check_method_is_short_sentences():
     with pytest.raises(KeyError) as e:
         registry.check_method("stabmapp")
     assert e.value.args[0] == ("Unknown method stabmapp. Did you mean StabMap? "
-                               "mtb.list_methods() shows all methods.")
+                               "mtb.find_methods() shows all methods.")
     with pytest.raises(KeyError) as e:
         registry.check_method("zzz")
-    assert e.value.args[0] == "Unknown method zzz. mtb.list_methods() shows all methods."
+    assert e.value.args[0] == "Unknown method zzz. mtb.find_methods() shows all methods."
 
 
 def test_no_category_message_names_the_categories():
@@ -141,10 +141,10 @@ def test_no_unknown_method_or_no_category_message_has_variant_or_qsemicolon(tmp_
     ])
     np.save(tmp_path / "emb.npy", np.zeros((10, 3)))
     for argv in (["info", "stabmapp"], ["params", "Matilda", "--category", "cross"],
-                 ["evaluate", "--output", str(tmp_path / "emb.npy"), "--method", "SCALEX",
+                 ["evaluate", "--embedding", str(tmp_path / "emb.npy"), "--method", "SCALEX",
                   "--name", "ADT_PCA", "--dataset", "D11", "--category", "vertical",
                   "--data-path", str(_DATA)],
-                 ["evaluate", "--output", str(tmp_path / "emb.npy"), "--method",
+                 ["evaluate", "--embedding", str(tmp_path / "emb.npy"), "--method",
                   "uniPort_rerun", "--dataset", "D11", "--category", "vertical"]):
         rc, err = _err(capsys, argv)
         assert rc == 1
@@ -154,7 +154,7 @@ def test_no_unknown_method_or_no_category_message_has_variant_or_qsemicolon(tmp_
         assert "?;" not in m and "variant" not in m, m
     assert ("error: SCALEX does not run on vertical data. Its categories: diagonal. For "
             "your own embedding, pass the label files with --labels.") in msgs[10]
-    assert "error: Unknown method stabmapp. Did you mean StabMap? multibench list shows " \
+    assert "error: Unknown method stabmapp. Did you mean StabMap? multibench find shows " \
            "all methods." in msgs[8]
 
 
@@ -168,7 +168,7 @@ def _d11_emb(tmp_path):
 def test_name_with_package_method_writes_no_needs_labels(tmp_path):
     emb = _d11_emb(tmp_path)
     out = tmp_path / "m.csv"
-    assert cli.main(["evaluate", "--output", str(emb), "--method", "Matilda", "--name",
+    assert cli.main(["evaluate", "--embedding", str(emb), "--method", "Matilda", "--name",
                      "Matilda_rerun", "--dataset", "D11", "--category", "vertical",
                      "--data-path", str(_DATA), "--metrics", "ASW", "--out", str(out)]) == 0
     mine = pd.read_csv(out)
@@ -176,7 +176,7 @@ def test_name_with_package_method_writes_no_needs_labels(tmp_path):
     assert "needs_labels" not in mine.columns
     # the same columns as the long table without --name
     out2 = tmp_path / "plain.csv"
-    assert cli.main(["evaluate", "--output", str(emb), "--method", "Matilda",
+    assert cli.main(["evaluate", "--embedding", str(emb), "--method", "Matilda",
                      "--dataset", "D11", "--category", "vertical", "--data-path",
                      str(_DATA), "--metrics", "ASW", "--out", str(out2)]) == 0
     assert list(pd.read_csv(out2).columns) == list(mine.columns)
@@ -286,7 +286,7 @@ def test_dry_run_with_existing_inputs_has_no_missing_note(tmp_path, capsys):
 
 # ====================================================================== R6-13
 def _stored(ds):
-    return mtb.load_results("vertical", dataset=ds, source="rerun")
+    return mtb.load_results("vertical", dataset=ds)
 
 
 def test_plot_messages_are_sentences(tmp_path, capsys):

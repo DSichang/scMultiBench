@@ -22,6 +22,7 @@ from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, registry
 from multibench.engine import runner as R
+from tests.conftest import full_scan
 
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 GENES = [f"GENE{i}" for i in range(40)]
@@ -117,8 +118,8 @@ def linux(monkeypatch, tmp_path):
 @pytest.mark.parametrize("ds,cat", list(LISTED), ids=lambda v: str(v))
 def test_default_rows_are_a_subset_with_the_same_files_ok_rows(ds, cat):
     _on_disk(ds)
-    every = _quiet(mtb.scan, ds, cat, modalities="all", verbose=False)
-    listed = _quiet(mtb.scan, ds, cat, verbose=False)
+    every = _quiet(full_scan, ds, cat, modalities="all", verbose=False)
+    listed = _quiet(full_scan, ds, cat, verbose=False)
     n_all, n_listed, n_files = LISTED[ds, cat]
     assert (len(every), len(listed), int(listed["files_ok"].sum())) == \
         (n_all, n_listed, n_files)
@@ -139,14 +140,14 @@ def test_default_rows_are_a_subset_with_the_same_files_ok_rows(ds, cat):
 @pytest.mark.parametrize("ds,cat", [("D11", "vertical"), ("D28", "diagonal"),
                                     ("D45", "mosaic"), ("D52", "cross"), ("D11", None)])
 def test_all_is_every_variant(ds, cat):
-    df = _quiet(mtb.scan, ds, cat, modalities="all", verbose=False)
+    df = _quiet(full_scan, ds, cat, modalities="all", verbose=False)
     want = {(s.id, c, "+".join(mods) or "(data_dir)") for s, _v, c, mods in W._variant_rows(cat)}
     assert _rows(df) == want and len(df) == len(want)
     assert df.attrs["not_listed"] == 0 and df.attrs["not_held"] == []
 
 
 def test_all_is_the_one_string_modalities_takes():
-    for call in (lambda m: mtb.scan("D11", "vertical", modalities=m, verbose=False),
+    for call in (lambda m: full_scan("D11", "vertical", modalities=m, verbose=False),
                  lambda m: mtb.run_all("D11", "vertical", modalities=m, dry_run=True,
                                        verbose=False)):
         assert len(call("all")) == 33
@@ -167,7 +168,7 @@ def test_all_is_the_one_string_modalities_takes():
                                     ("D27mini", "diagonal")])
 def test_scan_and_dry_run_are_one_table(ds, cat, mods, capsys):
     _on_disk(ds)
-    scan = _quiet(mtb.scan, ds, cat, modalities=mods, verbose=False)
+    scan = _quiet(full_scan, ds, cat, modalities=mods, verbose=False)
     plan = _quiet(mtb.run_all, ds, cat, modalities=mods, dry_run=True, verbose=False)
     pd.testing.assert_frame_equal(scan, plan)
     assert scan.attrs == plan.attrs
@@ -186,7 +187,7 @@ def test_a_real_run_tries_the_same_rows(ds, cat, linux, tmp_path):
         runs[mods] = (sorted(linux), {r["method"]: r["status"] for r in res.records})
     assert runs[None] == runs["all"] and runs[None][0]
     # the rows tried are the rows scan calls runnable, less the nested ones
-    plan = _quiet(mtb.scan, ds, cat, verbose=False)
+    plan = _quiet(full_scan, ds, cat, verbose=False)
     plan = plan[plan["runnable"]]
     tried = plan.drop(index=W._nested_rows(plan)[0])
     assert runs[None][0] == sorted(zip(tried["method"], tried["modalities"]))
@@ -237,7 +238,7 @@ def test_nothing_left_means_no_filter(tmp_path, no_envs):
     d = tmp_path / "RNA_ONLY"
     d.mkdir()
     _h5(d / "rna.h5", GENES[:30], [f"c{i}" for i in range(20)])
-    df = mtb.scan("RNA_ONLY", "vertical", data_path=tmp_path, verbose=False)
+    df = full_scan("RNA_ONLY", "vertical", data_path=tmp_path, verbose=False)
     # no vertical variant reads RNA alone: every one is listed, with its reason
     assert len(df) == 33 and not df["files_ok"].any()
     assert df.attrs == {"held": ["rna"], "not_listed": 0, "not_held": []}
@@ -247,28 +248,28 @@ def test_nothing_left_means_no_filter(tmp_path, no_envs):
 
 def test_nothing_held_means_no_filter(tmp_path, no_envs, capsys):
     (tmp_path / "EMPTY").mkdir()
-    df = mtb.scan("EMPTY", "vertical", data_path=tmp_path)
+    df = full_scan("EMPTY", "vertical", data_path=tmp_path)
     assert len(df) == 33 and df.attrs == {"held": [], "not_listed": 0, "not_held": []}
     assert capsys.readouterr().out == (
         "[scan] 0 of 33 rows have their input files. 0 of 33 have their environment "
         "installed. mtb.env.doctor() checks the environments.\n")
     # five batches scanned as vertical: rna.h5 is not there, rna1.h5 ... are
     _donors(tmp_path, "FIVE", 5)
-    df = _quiet(mtb.scan, "FIVE", "vertical", data_path=tmp_path, verbose=False)
+    df = _quiet(full_scan, "FIVE", "vertical", data_path=tmp_path, verbose=False)
     assert len(df) == 33 and df.attrs["held"] == [] and df.attrs["not_listed"] == 0
     assert "This folder holds per-batch files" in df["reason"].iloc[0]
 
 
 def test_a_row_that_reads_a_folder_is_always_listed(tmp_path, no_envs):
     # scBridge reads the folder; D11 holds no ATAC file
-    df = mtb.scan("D11", "diagonal", verbose=False)
+    df = full_scan("D11", "diagonal", verbose=False)
     assert "(data_dir)" in set(df["modalities"])
     assert list(df["method"]) == ["scBridge"] and df.attrs["not_held"] == ["atac"]
     assert df.attrs["not_listed"] == len(list(W._variant_rows("diagonal"))) - 1
 
 
 def test_a_named_method_keeps_its_rows(no_envs):
-    df = mtb.scan("D11", "vertical", methods=["MIRA", "sciPENN"], verbose=False)
+    df = full_scan("D11", "vertical", methods=["MIRA", "sciPENN"], verbose=False)
     assert sorted(zip(df["method"], df["modalities"])) == [("MIRA", "rna+atac"),
                                                            ("sciPENN", "rna+adt")]
     mira = df.set_index("method").loc["MIRA"]
@@ -276,11 +277,11 @@ def test_a_named_method_keeps_its_rows(no_envs):
                                      "the folder.")
     assert df.attrs == {"held": ["rna", "adt"], "not_listed": 0, "not_held": []}
     # a named method with a listed row is listed by that row
-    df = mtb.scan("D11", "vertical", methods=["Matilda", "MIRA"], verbose=False)
+    df = full_scan("D11", "vertical", methods=["Matilda", "MIRA"], verbose=False)
     assert sorted(zip(df["method"], df["modalities"])) == [("MIRA", "rna+atac"),
                                                            ("Matilda", "rna+adt")]
     assert df.attrs["not_listed"] == 2 and df.attrs["not_held"] == ["atac"]
-    every = mtb.scan("D11", "vertical", methods=["Matilda", "MIRA"], modalities="all",
+    every = full_scan("D11", "vertical", methods=["Matilda", "MIRA"], modalities="all",
                      verbose=False)
     assert len(every) == 4
 
@@ -293,32 +294,32 @@ def test_params_keys_are_checked_before_the_filter(monkeypatch):
         seen.append(len(plan_df))
         return real(plan_df, params)
     monkeypatch.setattr(W, "_check_param_keys", check)
-    df = mtb.scan("D11", "vertical", params={"Matilda": {"epochs": 1}}, verbose=False)
+    df = full_scan("D11", "vertical", params={"Matilda": {"epochs": 1}}, verbose=False)
     assert seen == [33] and len(df) == 14          # every variant was checked
     with pytest.raises(KeyError, match="Matilda does not accept"):
-        mtb.scan("D11", "vertical", params={"Matilda": {"no_such_key": 1}}, verbose=False)
+        full_scan("D11", "vertical", params={"Matilda": {"no_such_key": 1}}, verbose=False)
 
 
 # ------------------------------------------------------------------ the count line
 def test_count_line_names_what_is_not_listed(no_envs, capsys, monkeypatch):
-    mtb.scan("D11", "vertical")
+    full_scan("D11", "vertical")
     assert capsys.readouterr().out == (
         "[scan] 14 of 14 methods have their input files. 0 of 14 have their environment "
         "installed. D11 holds RNA and ADT. 19 rows that read ATAC are not listed. "
         'modalities="all" lists them. mtb.env.doctor() checks the environments.\n')
     # every modality held: the line of 0.3.4, word for word
     _on_disk("D22mini")
-    mtb.scan("D22mini", "vertical")
+    full_scan("D22mini", "vertical")
     assert capsys.readouterr().out == (
         "[scan] 33 of 33 rows have their input files. 0 of 33 have their environment "
         "installed. mtb.env.doctor() checks the environments.\n")
-    mtb.scan("D11", "vertical", modalities="all")
+    full_scan("D11", "vertical", modalities="all")
     assert capsys.readouterr().out == (
         "[scan] 14 of 33 rows have their input files. 0 of 33 have their environment "
         "installed. mtb.env.doctor() checks the environments.\n")
     # one row, and the command-line spelling
     monkeypatch.setattr(config, "_CLI", True)
-    mtb.scan("D11", "vertical", methods=["totalVI", "Seurat_WNN"])
+    full_scan("D11", "vertical", methods=["totalVI", "Seurat_WNN"])
     assert capsys.readouterr().out == (
         "[scan] 2 of 2 methods have their input files. 0 of 2 have their environment "
         "installed. D11 holds RNA and ADT. 1 row that reads ATAC is not listed. "
@@ -330,7 +331,7 @@ def test_count_line_off_linux_and_with_batches(monkeypatch, capsys):
                         lambda: "Methods run only on Linux, and this computer runs macOS.")
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     _on_disk("D52mini")
-    mtb.scan("D52mini", "cross")
+    full_scan("D52mini", "cross")
     assert capsys.readouterr().out == (
         "[scan] 11 of 11 rows have their input files. 0 of 11 have their environment "
         "installed. D52mini holds RNA and ADT, in batches 1-3. 19 rows that read ATAC are "
@@ -342,7 +343,7 @@ def test_two_families_can_be_lacking(tmp_path, no_envs, capsys):
     d = tmp_path / "RNA_ONLY"
     d.mkdir()
     _h5(d / "rna.h5", GENES[:30], [f"c{i}" for i in range(20)])
-    df = mtb.scan("RNA_ONLY", data_path=tmp_path)
+    df = full_scan("RNA_ONLY", data_path=tmp_path)
     line = capsys.readouterr().out
     assert list(df["modalities"]) == ["(data_dir)"]
     assert df.attrs == {"held": ["rna"], "not_listed": 96, "not_held": ["adt", "atac"]}
@@ -353,17 +354,17 @@ def test_two_families_can_be_lacking(tmp_path, no_envs, capsys):
 
 
 def test_attrs():
-    df = mtb.scan("D11", "vertical", verbose=False)
+    df = full_scan("D11", "vertical", verbose=False)
     assert df.attrs == {"held": ["rna", "adt"], "not_listed": 19, "not_held": ["atac"]}
-    assert mtb.scan("D11", "vertical", modalities="all", verbose=False).attrs == \
+    assert full_scan("D11", "vertical", modalities="all", verbose=False).attrs == \
         {"held": ["rna", "adt"], "not_listed": 0, "not_held": []}
     # what the folder holds does not follow the selection
-    assert mtb.scan("D11", "vertical", modalities=["rna", "atac"], verbose=False).attrs == \
+    assert full_scan("D11", "vertical", modalities=["rna", "atac"], verbose=False).attrs == \
         {"held": ["rna", "adt"], "not_listed": 0, "not_held": []}
-    assert mtb.scan("D11", "vertical", methods=["MIRA"], verbose=False).attrs == \
+    assert full_scan("D11", "vertical", methods=["MIRA"], verbose=False).attrs == \
         {"held": ["rna", "adt"], "not_listed": 0, "not_held": []}
     _on_disk("D22mini")
-    assert mtb.scan("D22mini", "vertical", verbose=False).attrs == \
+    assert full_scan("D22mini", "vertical", verbose=False).attrs == \
         {"held": ["rna", "adt", "atac"], "not_listed": 0, "not_held": []}
     # the dry run carries them, and a selection of rows keeps them
     plan = mtb.run_all("D11", "vertical", dry_run=True, verbose=False)
@@ -381,12 +382,12 @@ def test_an_older_file_name_counts_as_held(tmp_path):
     _h5(d / "rna.h5", GENES[:30], [f"r{i}" for i in range(20)])
     _h5(d / "peak.h5", [f"chr1:{i * 100}-{i * 100 + 50}" for i in range(40)],
         [f"a{i}" for i in range(20)])
-    df = _quiet(mtb.scan, "OLD", "diagonal", data_path=tmp_path, verbose=False)
+    df = _quiet(full_scan, "OLD", "diagonal", data_path=tmp_path, verbose=False)
     assert df.attrs["held"] == ["rna", "atac"] and df.attrs["not_listed"] == 0
 
 
 def test_verbose_false_prints_nothing_and_sets_attrs(capsys):
-    df = mtb.scan("D11", "vertical", verbose=False)
+    df = full_scan("D11", "vertical", verbose=False)
     assert capsys.readouterr().out == ""
     assert len(df) == 14 and df.attrs["not_listed"] == 19 and df.attrs["not_held"] == ["atac"]
     assert type(df) is pd.DataFrame and list(df.columns) == W.SCAN_COLUMNS
@@ -394,7 +395,7 @@ def test_verbose_false_prints_nothing_and_sets_attrs(capsys):
 
 def test_two_donor_folder_keeps_the_missing_batch_reason(tmp_path, linux):
     _donors(tmp_path, "TWO", 2)
-    df = mtb.scan("TWO", "cross", data_path=tmp_path, verbose=False)
+    df = full_scan("TWO", "cross", data_path=tmp_path, verbose=False)
     assert len(df) == 11 and int(df["files_ok"].sum()) == 1
     assert df.attrs == {"held": ["rna", "adt"], "not_listed": 19, "not_held": ["atac"]}
     assert list(df[df["files_ok"]]["modalities"]) == ["rna1+rna2+adt1+adt2"]

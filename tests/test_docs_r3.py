@@ -60,7 +60,8 @@ def test_dry_run_line_is_on_the_quickstart_only():
     quick, install = _read("quickstart.md"), _read("installation.md")
     for text in (quick, install):
         assert "mtb.describe_layout(" in text
-    assert "multibench run --method SCALEX --category diagonal" in quick and "--dry-run" in quick
+    assert "multibench run-all D28 --category diagonal --methods SCALEX" in quick
+    assert "--dry-run" in quick
     assert "**Preview a run.**" not in install and "**Custom launch.**" not in install
 
 
@@ -90,7 +91,7 @@ def test_step1_names_both_routes_for_citeseq_donors():
             "[One file per batch](tutorials/run.md#one-file-per-batch) tab. With another "
             "number of donors, use `vertical`, as in the recipe "
             "[Another number of donors](tutorials/run.md#recipe-donors).") in step1
-    assert f"the `vertical` category has {n_v} RNA + ADT methods and the stored table D11" in whole
+    assert f"the `vertical` category has {n_v} RNA + ADT methods and stored scores on D11" in whole
     # cross has tasks without RNA + ADT since the article's 13 tasks: the
     # sentence counts the methods that read the CITE-seq donors
     assert (f"The `cross` category has {n_c} RNA + ADT methods, which integrate the donors as "
@@ -161,7 +162,7 @@ def test_run_guide_shows_the_peak_token_and_both_batch_spellings():
 # ---- API overview and Changes (R3-28) --------------------------------------
 @needs_docs
 def test_strict_pages_name_both_exit_rules():
-    for page in ("api.md", "changes.md"):
+    for page in ("changes.md",):
         text = _flat(page)
         assert "when nothing you asked for can run" not in text, page
         assert ("exits with `1` when no requested row is runnable. With `--methods`, it "
@@ -171,10 +172,8 @@ def test_strict_pages_name_both_exit_rules():
 @needs_docs
 def test_api_page_run_all_batch_and_off_linux_refusal():
     api = _flat("api.md")
-    assert "`--batch CSV` on `evaluate` and `run-all` gives one batch id per cell." in api
     assert "The message names the install command. On macOS and Windows it first says" not in api
-    assert ("On Linux, a missing environment gets the install command. On macOS and "
-            "Windows, the message says that methods run only on Linux.") in api
+    assert "Methods run only on Linux: elsewhere `mtb.run` raises `OSError`." in api
 
 
 @needs_docs

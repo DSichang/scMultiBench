@@ -1,4 +1,4 @@
-"""The 0.3.0 public-surface cut, pinned.
+"""The public surface (the 0.3.0 cut and the 0.4 deprecations), pinned.
 
 ``__all__`` of ``mtb``, ``mtb.plot``, ``mtb.io``, ``mtb.env`` and
 ``mtb.config`` are EXACTLY the contract's sets; ``dir()`` of those namespaces
@@ -17,19 +17,17 @@ from multibench import cli
 from multibench.engine import envs, ingest
 
 MTB_ALL = {
-    "config", "plot", "eval", "catalog", "io", "env", "data",
-    "list_methods", "find_methods", "method_info", "params_for", "describe_layout", "cite",
-    "list_tasks", "list_categories",
+    "config", "plot", "catalog", "io", "env", "data",
+    "find_methods", "method_info", "params_for", "describe_layout", "cite",
     "inputs_for", "labels_for",
     "scan", "run", "run_all", "sweep", "load_batch", "BatchResult",
     "evaluate", "to_long", "classify", "classification_metrics",
-    "load_results", "available_datasets", "results_coverage", "recommend",
+    "load_results", "results_coverage", "recommend",
     "AmbiguousVariantError", "DegenerateRerunWarning", "__version__",
 }
-PLOT_ALL = {"bubble", "bar", "build_table", "BubbleTable", "FAMILIES",
-            "CLUSTERING_METRICS", "BATCH_METRICS", "CLASSIFICATION_METRICS"}
-IO_ALL = {"export_dataset", "to_canonical", "read_canonical", "normalize_peak_names"}
-ENV_ALL = {"status", "plan", "install", "doctor", "recipe"}
+PLOT_ALL = {"bubble", "bar", "build_table", "BubbleTable"}
+IO_ALL = {"export_dataset", "to_canonical", "read_canonical"}
+ENV_ALL = {"install", "doctor", "recipe"}
 CONFIG_ALL = {"Config", "DEFAULT"}
 
 
@@ -145,27 +143,11 @@ def test_io_from_mudata_and_write_labels_are_gone():
     assert callable(ingest._write_labels)
 
 
-def test_list_methods_task_and_runnable_raise_naming_find_methods():
+@pytest.mark.parametrize("kw", [{"available": True}, {"foo": 1}])
+def test_find_methods_other_keywords_raise_pythons_own_typeerror(kw):
     with pytest.raises(TypeError) as e:
-        mtb.list_methods(task="clustering")
-    assert str(e.value) == ("list_methods() only takes category since 0.3.0; task=... are "
-                            "find_methods filters - use find_methods(category, task=...)")
-    with pytest.raises(TypeError, match="find_methods\\(category, runnable=...\\)"):
-        mtb.list_methods(runnable=True)
-    assert mtb.list_methods("vertical") == mtb.list_methods(category="vertical")
-    assert mtb.find_methods("vertical", task="clustering")
-
-
-@pytest.mark.parametrize("kw", [{"available": True}, {"foo": 1},
-                                {"task": "clustering", "available": True}])
-def test_list_methods_other_keywords_raise_pythons_own_typeerror(kw):
-    # only a real find_methods filter is pointed at find_methods: available=
-    # is not one any more, and following such a pointer would fail too
-    with pytest.raises(TypeError) as e:
-        mtb.list_methods(**kw)
-    bad = next(k for k in kw if k != "task")
-    assert str(e.value) == f"list_methods() got an unexpected keyword argument {bad!r}"
-    assert "find_methods" not in str(e.value)
+        mtb.find_methods(**kw)
+    assert str(e.value).endswith(f"got an unexpected keyword argument {next(iter(kw))!r}")
 
 
 def test_find_methods_filters_are_keyword_only():
@@ -186,7 +168,7 @@ def test_method_info_files_dir_is_gone_and_runtime_is_there():
 def test_cite_methods_keyword_is_gone():
     with pytest.raises(TypeError, match="methods"):
         mtb.cite(methods=["Matilda"])
-    assert inspect.signature(mtb.cite).parameters["fmt"].default == "text"
+    assert inspect.signature(mtb.cite).parameters["format"].default == "text"
 
 
 def test_inputs_for_old_order_raises_the_contract_message():
@@ -205,17 +187,20 @@ def test_inputs_for_old_order_raises_the_contract_message():
         mtb.labels_for("D11", "vertical", "Matilda", ["rna", "adt"])
 
 
-def test_scan_data_path_is_keyword_only_and_has_command():
+def test_scan_data_path_is_keyword_only_and_the_plan_has_command():
     with pytest.raises(TypeError):
         mtb.scan("D11", "vertical", "data")
-    df = mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False)
+    df = mtb.run_all("D11", "vertical", methods=["Matilda"], dry_run=True, verbose=False)
     assert df.columns[-1] == "command" and len(df.columns) == 18
+    assert list(mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False).columns) == \
+        ["method", "modalities", "runnable", "reason"]
 
 
-def test_run_all_dry_run_is_scan_and_out_dir_is_required_for_a_real_run():
+def test_run_all_dry_run_is_the_full_plan_and_out_dir_is_required_for_a_real_run():
     import pandas as pd
+    from tests.conftest import full_scan
     a = mtb.run_all("D11", "vertical", methods=["Matilda"], dry_run=True, verbose=False)
-    b = mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False)
+    b = full_scan("D11", "vertical", methods=["Matilda"], verbose=False)
     pd.testing.assert_frame_equal(a, b)
     with pytest.raises(TypeError, match="out_dir"):
         mtb.run_all("D11", "vertical", methods=["Matilda"], verbose=False)

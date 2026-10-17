@@ -14,6 +14,7 @@ import pandas as pd
 
 import multibench as mtb
 from multibench.engine import resolve
+from tests.conftest import full_scan
 
 PEAKS = [f"chr1:{i * 1000}-{i * 1000 + 200}" for i in range(40)]
 
@@ -37,7 +38,7 @@ def _folder(root, name, rna_cells, atac_cells):
 
 
 def _row(tmp_path, name):
-    df = mtb.scan(name, "diagonal", methods=["Seurat_v5"], data_path=tmp_path, verbose=False)
+    df = full_scan(name, "diagonal", methods=["Seurat_v5"], data_path=tmp_path, verbose=False)
     return df[df.method == "Seurat_v5"].iloc[0]
 
 

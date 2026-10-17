@@ -63,11 +63,11 @@ def _methods(df):
 def test_recommend_takes_atac_like_find_methods():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        r = mtb.recommend("diagonal", atac="peak", source="rerun")
+        r = mtb.recommend("diagonal", atac="peak")
         peak = set(discover.find_methods("diagonal", atac="peak"))
         assert _methods(r) and _methods(r) <= peak
-        assert _methods(mtb.recommend("diagonal", modalities=["rna", "peak"], source="rerun")) == _methods(r)
-        assert _methods(mtb.recommend("diagonal", modalities=["rna", "atac"], source="rerun")) > _methods(r)
+        assert _methods(mtb.recommend("diagonal", modalities=["rna", "peak"])) == _methods(r)
+        assert _methods(mtb.recommend("diagonal", modalities=["rna", "atac"])) > _methods(r)
 
 
 def test_recommend_rejects_a_bad_atac_before_loading(tmp_path):

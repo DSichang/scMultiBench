@@ -184,13 +184,13 @@ def _long(method, n=3):
 def test_cli_plot_input_with_category_concatenates_onto_stored(tmp_path, monkeypatch, capsys):
     from multibench import plot as plot_ns
     seen = {}
-    monkeypatch.setattr(multibench, "load_results",
-                        lambda **kw: pd.concat([_long("A"), _long("B")], ignore_index=True))
+    monkeypatch.setattr(multibench.data.results, "_load_results",
+                        lambda *a, **kw: pd.concat([_long("A"), _long("B")], ignore_index=True))
     monkeypatch.setattr(plot_ns, "bubble", lambda df, **kw: seen.update(df=df, kw=kw))
     mine = tmp_path / "mine.csv"
     _long("Mine").to_csv(mine, index=False)
     rc = cli.main(["plot", "bubble", "--category", "vertical", "--dataset", "D1",
-                   "--source", "rerun", "--input", str(mine), "--out", str(tmp_path / "x.png")])
+                   "--input", str(mine), "--out", str(tmp_path / "x.png")])
     cap = capsys.readouterr()
     assert rc == 0
     assert sorted(seen["df"]["method"].unique()) == ["A", "B", "Mine"]
@@ -250,7 +250,10 @@ def test_env_commands_silent_on_linux(monkeypatch, capsys):
                  ["env", "install", "--methods", "Matilda"], ["env", "status", "--methods", "Matilda"]):
         rc = cli.main(argv)
         cap = capsys.readouterr()
-        assert rc == 0 and "warning:" not in cap.err, argv
+        # env plan / env status are deprecated: their one deprecation line is allowed
+        warned = [l for l in cap.err.splitlines()
+                  if l.startswith("warning:") and "is deprecated" not in l]
+        assert rc == 0 and warned == [], argv
 
 
 def test_force_flag_everywhere_it_matters():
@@ -302,7 +305,8 @@ def test_env_plan_shows_sizes_and_total(monkeypatch, capsys):
     assert re.search(r"(\d+(\.\d+)? [KMG]B|\?) dl", lines["matilda"])   # size when known, ? otherwise
     # "X GB download" when every size is known, "at least X GB download" and a
     # line counting the unmeasured envs when some are still unmeasured
-    assert cap.err.startswith("# total") and "download" in cap.err
+    assert cap.err.startswith("warning: multibench env plan is deprecated")
+    assert cap.err.splitlines()[1].startswith("# total") and "download" in cap.err
     # counts depend on the recorded sizes; the disk count must equal the '? disk' rows
     from tests.test_env_cli_consistency import total_unknowns
     n, dl, disk = total_unknowns(cap.err)
@@ -319,7 +323,8 @@ def test_env_status_legend_explains_every_tag_on_stderr(monkeypatch, capsys):
     assert rc == 0
     assert len(cap.out.strip().splitlines()) == 3            # rows only on stdout
     assert "old-scvi" in cap.out and "verified" in cap.out and " R" in cap.out
-    assert cap.err.startswith("# legend:")
+    assert cap.err.startswith("warning: multibench env status is deprecated")
+    assert cap.err.splitlines()[1].startswith("# legend:")
     for tag in ("old-scvi", "verified", "R"):
         assert f"{tag} = {envs.DIFFICULTY[tag]}" in cap.err
     assert "verified_working" in cap.err

@@ -168,7 +168,7 @@ def test_batch_and_clustering_files_and_a_series_are_matched_too(tmp_path, capsy
         warnings.simplefilter("error")
         mtb.evaluate(emb, labels=pd.Series(TYPES, index=BARS).iloc[PERM],
                      batch=_labels(tmp_path, "batch.csv", other, donors, column="donor"),
-                     clustering=_labels(tmp_path, "clusters.csv", PERM, clusters,
+                     clusters=_labels(tmp_path, "clusters.csv", PERM, clusters,
                                         column="leiden"), metrics="all")
     assert capsys.readouterr().err == (
         "evaluate: matched the labels Series and 2 more to the rows of emb.csv by "
@@ -195,7 +195,7 @@ def test_the_command_line_matches_by_barcode(tmp_path, capsys):
     out = tmp_path / "scores.csv"
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        rc = cli.main(["evaluate", "--output", emb, "--labels",
+        rc = cli.main(["evaluate", "--embedding", emb, "--labels",
                        _labels(tmp_path, "shuffled.csv", PERM), "--metrics", "ARI,NMI",
                        "--out", str(out)])
     assert rc == 0
@@ -242,7 +242,7 @@ def test_a_file_with_no_id_in_common_is_matched_by_position(tmp_path, capsys, se
             ("batch.csv", dict(labels=TYPES, batch=_labels(
                 tmp_path, "batch.csv", bars=NO_SUFFIX, values=donors, column="donor")),
              "batch"),
-            ("clusters.csv", dict(labels=TYPES, clustering=_labels(
+            ("clusters.csv", dict(labels=TYPES, clusters=_labels(
                 tmp_path, "clusters.csv", bars=NO_SUFFIX, values=donors, column="leiden")),
              "clustering")):
         seen.clear()
@@ -276,12 +276,13 @@ def test_a_series_with_no_id_in_common_is_matched_by_position(tmp_path, capsys, 
     for kw, said, values in (
             (dict(labels=pd.Series(TYPES[PERM], index=NO_SUFFIX)), "labels", TYPES[PERM]),
             (dict(labels=TYPES, batch=pd.Series(donors, index=NO_SUFFIX)), "batch", donors),
-            (dict(labels=TYPES, clustering=pd.Series(donors, index=NO_SUFFIX)),
+            (dict(labels=TYPES, clusters=pd.Series(donors, index=NO_SUFFIX)),
              "clustering", donors)):
         seen.clear()
         with pytest.warns(UserWarning) as rec:
             mtb.evaluate(emb, metrics="all" if said == "batch" else ["ARI"], **kw)
-        assert [str(w.message) for w in rec] == [SERIES_NONE_SHARED.format(said)]
+        assert [str(w.message) for w in rec] == [SERIES_NONE_SHARED.format(
+            "clusters" if said == "clustering" else said)]
         assert seen[said] == list(values)
     assert capsys.readouterr().err == ""
 
@@ -476,7 +477,7 @@ def test_a_dims_by_cells_table_is_still_transposed(tmp_path, capsys, seen):
         mtb.evaluate(str(path), labels=_labels(tmp_path, order=PERM), metrics=["ARI"])
     assert [str(w.message) for w in rec] == [
         NO_IDS.format("labels.csv"),
-        "output was (dims x cells) (5, 60); transposed to (cells x dims)"]
+        "embedding was (dims x cells) (5, 60); transposed to (cells x dims)"]
     assert seen["emb"].shape == (CELLS, 5) and seen["labels"] == list(TYPES[PERM])
     assert capsys.readouterr().err == ""
 

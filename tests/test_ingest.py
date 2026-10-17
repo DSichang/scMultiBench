@@ -319,9 +319,13 @@ def test_write_labels_roundtrip(tmp_path):
 
 def test_namespace_exports():
     import multibench as mtb
-    for name in ("export_dataset", "to_canonical", "read_canonical", "normalize_peak_names"):
+    for name in ("export_dataset", "to_canonical", "read_canonical"):
         assert name in mtb.io.__all__
         assert callable(getattr(mtb.io, name))
+    # deprecated in 0.4: still importable, with one FutureWarning, but not exported
+    assert "normalize_peak_names" not in mtb.io.__all__
+    with pytest.warns(FutureWarning, match="normalize_peak_names is deprecated"):
+        assert callable(mtb.io.normalize_peak_names)
     for gone in ("write_labels", "from_mudata"):
         assert gone not in mtb.io.__all__ and not hasattr(mtb.io, gone)
 

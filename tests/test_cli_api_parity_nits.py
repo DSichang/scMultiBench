@@ -17,6 +17,7 @@ import multibench as mtb
 from multibench import cli
 from multibench import workflow as W
 from multibench.engine import envs, registry, resolve
+from tests.conftest import full_scan
 
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 
@@ -80,9 +81,9 @@ def test_scan_and_inputs_for_carry_the_on_disk_name(tmp_path, monkeypatch):
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     _cite(tmp_path, "MYCITE")
     with pytest.warns(UserWarning, match="on-disk spelling"):
-        df = mtb.scan("mycite", "vertical", data_path=tmp_path)
+        df = full_scan("mycite", "vertical", data_path=tmp_path)
     assert (df["files_reason"].str.contains("/mycite")).sum() == 0
-    assert len(df) == len(mtb.scan("MYCITE", "vertical", data_path=tmp_path))
+    assert len(df) == len(full_scan("MYCITE", "vertical", data_path=tmp_path))
     with pytest.warns(UserWarning, match="on-disk spelling"):
         inp = mtb.inputs_for("mycite", "vertical", "Matilda", modalities=["rna", "adt"],
                              data_path=tmp_path)
@@ -130,7 +131,7 @@ def test_run_all_dry_run_returns_the_cli_csv_command_column(capsys):
 
 
 def test_scan_without_out_dir_uses_the_placeholder():
-    plan = mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False)
+    plan = full_scan("D11", "vertical", methods=["Matilda"], verbose=False)
     ok = plan[plan["files_ok"]]
     assert ok["command"].str.contains(W.OUT_DIR_PLACEHOLDER + "/Matilda_D11").all()
     assert (plan[~plan["files_ok"]]["command"] == "").all()

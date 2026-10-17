@@ -25,6 +25,7 @@ from multibench import cli
 from multibench import workflow as W
 from multibench.engine import envs, runner as R
 from tests.test_f4_cli import working  # noqa: F401 - the stand-in Matilda env fixture
+from tests.conftest import full_scan
 
 
 def _doc(obj) -> str:
@@ -81,9 +82,8 @@ def test_the_rewritten_passages_keep_their_facts():
            "``out_dir``." in _doc(W.BatchResult.rescore)
     assert "``mtb.run_all`` and ``mtb.load_batch`` build it. It keeps one record per " \
            "method, which ``rescore`` and ``plot`` read." in _doc(W.BatchResult)
-    assert ("The column is numeric, and a blank is ``NaN``. So ``> 0.5`` is ``False`` "
-            "for it and ``.isna()`` finds it. It is blank in three cases, named by "
-            "``label_order_note``:") in _doc(W.BatchResult.summary.fget)
+    assert ("how clearly that order won, 0-1 (blank: label_order_note says "
+            "why)") in _doc(W.BatchResult.summary.fget)
 
 
 # ============================================================ R8-01
@@ -166,7 +166,7 @@ def lung(tmp_path, monkeypatch):
 def _scan_warnings(**kw):
     with warnings.catch_warnings(record=True) as seen:
         warnings.simplefilter("always")
-        mtb.scan("LUNG", "diagonal", data_path="data", verbose=False, **kw)
+        full_scan("LUNG", "diagonal", data_path="data", verbose=False, **kw)
     return [str(w.message) for w in seen if issubclass(w.category, UserWarning)]
 
 
@@ -202,14 +202,6 @@ def test_the_cli_scan_with_a_peak_token_does_not_name_scbridge(lung, capsys):
         capsys.readouterr().err
 
 
-def test_the_docstrings_say_which_folder_fed_method_is_named():
-    for fn in (W.scan, W.run_all):
-        assert ("``modalities`` leaves out scBridge, which reads a folder, without "
-                "excluding its ATAC form.") in _doc(fn)
-    assert ("Other lists drop them, with a ``UserWarning`` unless the tokens already "
-            "exclude their ATAC representation.") in _doc(W.scan)
-
-
 # ============================================================ R8-04
 @pytest.fixture
 def no_envs(monkeypatch):
@@ -233,12 +225,12 @@ _TOTALVI = "totalVI does not run on mosaic data. Its categories: vertical, cross
 
 def test_scan_raises_for_a_named_method_of_another_category(no_envs, labmos):
     with pytest.raises(ValueError) as e:
-        mtb.scan("LABMOS", "mosaic", data_path="data", methods=["StabMap", "totalVI"],
+        full_scan("LABMOS", "mosaic", data_path="data", methods=["StabMap", "totalVI"],
                  verbose=False)
     assert str(e.value) == _TOTALVI
     # one sentence per method
     with pytest.raises(ValueError) as e:
-        mtb.scan("LABMOS", "mosaic", data_path="data",
+        full_scan("LABMOS", "mosaic", data_path="data",
                  methods=["totalVI", "StabMap", "SCALEX"], verbose=False)
     assert str(e.value) == (f"{_TOTALVI} SCALEX does not run on mosaic data. Its "
                             "categories: diagonal.")
@@ -255,23 +247,23 @@ def test_run_all_raises_before_anything_runs(no_envs, labmos, capsys):
 
 
 def test_a_selection_with_every_method_present_is_unchanged(no_envs, labmos):
-    one = mtb.scan("LABMOS", "mosaic", data_path="data", methods=["StabMap"],
+    one = full_scan("LABMOS", "mosaic", data_path="data", methods=["StabMap"],
                    verbose=False)
     assert set(one["method"]) == {"StabMap"} and len(one) == 4     # its four mosaic rows
-    every = mtb.scan("LABMOS", "mosaic", data_path="data", verbose=False)
+    every = full_scan("LABMOS", "mosaic", data_path="data", verbose=False)
     assert {"StabMap", "scMoMaT"} <= set(every["method"])
 
 
 def test_a_method_the_modalities_drop_raises_with_the_representation_note(lung):
     with pytest.raises(ValueError) as e:
-        mtb.scan("LUNG", "diagonal", data_path="data", methods=["GLUE", "SCALEX"],
+        full_scan("LUNG", "diagonal", data_path="data", methods=["GLUE", "SCALEX"],
                  modalities=["rna", "atac_peak"], verbose=False)
     assert str(e.value) == ("SCALEX does not read rna+atac_peak in diagonal data. SCALEX "
                             "reads gene activity. Pass modalities=['rna', 'atac_gas'] or "
                             "['rna', 'atac'].")
     # another category and the modalities, in one message
     with pytest.raises(ValueError) as e:
-        mtb.scan("LUNG", "diagonal", data_path="data", methods=["GLUE", "Matilda", "SCALEX"],
+        full_scan("LUNG", "diagonal", data_path="data", methods=["GLUE", "Matilda", "SCALEX"],
                  modalities=["rna", "atac_peak"], verbose=False)
     assert str(e.value).startswith("Matilda does not run on diagonal data. Its categories: "
                                    "vertical. SCALEX does not read rna+atac_peak in "
@@ -299,10 +291,8 @@ def test_the_cli_scan_gives_the_same_sentence(no_envs, labmos, capsys):
 
 
 def test_the_docstrings_say_a_method_without_a_variant_raises():
-    assert ("A method in ``methods`` has no variant in ``category`` or ``modalities``, "
-            "even when other named methods have one.") in _doc(W.scan)
-    assert ("a named method or a selection with no variant, before anything runs, "
-            "dry run included") in _doc(W.run_all)
+    assert "or a method in ``methods`` without a variant there." in _doc(W.scan)
+    assert "checked before anything runs." in _doc(W.run_all)
 
 
 # ============================================================ R8-05
@@ -336,7 +326,7 @@ def _nothing_runnable(**kw):
 
 
 def _plan(**kw):
-    return mtb.scan("MYDATA", "vertical", data_path="data", verbose=False, **kw)
+    return full_scan("MYDATA", "vertical", data_path="data", verbose=False, **kw)
 
 
 def test_rows_blocked_only_by_the_platform_are_not_listed(macos, mydata):
@@ -451,9 +441,3 @@ def test_the_dry_run_header_names_no_column(no_envs, mydata, capsys):
                    "--methods", "Matilda", "--dry-run", "--modalities", "all"])
     head = capsys.readouterr().err.splitlines()[0]
     assert head.endswith(" A row whose input files are missing has no command."), head
-
-
-def test_the_run_all_notes_describe_the_off_linux_list():
-    doc = _doc(W.run_all)
-    assert ("On macOS or Windows, its second line says that methods run only on Linux, "
-            "and it lists only the rows something else also blocks.") in doc

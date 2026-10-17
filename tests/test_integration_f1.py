@@ -24,6 +24,7 @@ import pytest
 
 import multibench as mtb
 from multibench.engine import registry
+from tests.conftest import full_scan
 
 
 def _h5(path, n_feat, n_cell):
@@ -42,7 +43,7 @@ def test_scan_reason_names_a_per_batch_folder(tmp_path):
         _h5(d / f"rna{i}.h5", 20, n)
         _h5(d / f"adt{i}.h5", 6, n)
         pd.DataFrame({"x": ["T"] * n}).to_csv(d / f"cty{i}.csv", index=False)
-    sc = mtb.scan("MB", "vertical", modalities=["rna", "adt"], data_path=tmp_path,
+    sc = full_scan("MB", "vertical", modalities=["rna", "adt"], data_path=tmp_path,
                   verbose=False)
     assert len(sc) and not sc["files_ok"].any()
     for reason in sc["reason"]:
@@ -52,7 +53,7 @@ def test_scan_reason_names_a_per_batch_folder(tmp_path):
 
 
 def test_scan_reason_has_no_batch_hint_on_a_plain_folder(root):
-    sc = mtb.scan("D11", "vertical", modalities=["rna", "atac"],
+    sc = full_scan("D11", "vertical", modalities=["rna", "atac"],
                   data_path=root / "data", verbose=False)
     assert not sc["reason"].str.contains("per-batch").any()
 
@@ -62,7 +63,7 @@ def test_scan_and_find_methods_read_two_representations_alike(root):
     mods = ["rna", "atac_peak", "atac_gas"]
     want = {"MultiMAP", "Seurat_v3"}
     assert set(mtb.find_methods("diagonal", modalities=mods)) == want
-    sc = mtb.scan("D28", "diagonal", modalities=mods, data_path=root / "data",
+    sc = full_scan("D28", "diagonal", modalities=mods, data_path=root / "data",
                   verbose=False)
     assert set(sc["method"]) == want
     plan = mtb.run_all("D28", "diagonal", modalities=mods, data_path=root / "data",
@@ -72,7 +73,7 @@ def test_scan_and_find_methods_read_two_representations_alike(root):
 
 def test_scan_and_find_methods_agree_per_representation(root):
     for mods, atac in ((["rna", "atac_peak"], "peak"), (["rna", "atac_gas"], "gene_activity")):
-        sc = mtb.scan("D28", "diagonal", modalities=mods, data_path=root / "data",
+        sc = full_scan("D28", "diagonal", modalities=mods, data_path=root / "data",
                       verbose=False)
         # scBridge is fed a folder: no modality token selects it in scan
         want = set(mtb.find_methods("diagonal", atac=atac)) - {"scBridge"}
@@ -96,7 +97,7 @@ def test_a_constant_placeholder_is_not_a_modality_the_variant_reads():
 
 
 def test_scan_has_no_setup_note_for_the_checked_bridge_requirement(root):
-    sc = mtb.scan("D28", "diagonal", methods=["Seurat_v5"], data_path=root / "data",
+    sc = full_scan("D28", "diagonal", methods=["Seurat_v5"], data_path=root / "data",
                   verbose=False)
     row = sc.iloc[0]
     assert "setup:" not in row["caveat"]
@@ -141,7 +142,7 @@ def test_off_linux_messages_say_to_make_the_commands_on_the_linux_machine(
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     monkeypatch.setattr(runner.envs, "installed_envs", lambda conda=None: [])
 
-    df = mtb.scan("D11", "vertical", methods=["totalVI"])
+    df = full_scan("D11", "vertical", methods=["totalVI"])
     out = capsys.readouterr().out
     rna = [a for a in shlex.split(df.iloc[0]["command"]) if a.endswith("rna.h5")]
     assert rna and os.path.isabs(rna[0]), "the command holds this computer's absolute paths"
@@ -181,7 +182,7 @@ def test_vertical_tutorial_export_demo_writes_counts(root, tmp_path, monkeypatch
     assert not [w for w in seen if "whole numbers" in str(w.message)]
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        sc = mtb.scan("MYCITE", "vertical", data_path=tmp_path / "mydata", verbose=False)
+        sc = full_scan("MYCITE", "vertical", data_path=tmp_path / "mydata", verbose=False)
     assert sc["files_ok"].any()
     assert not sc["caveat"].str.contains("non-integer").any()
 
@@ -196,12 +197,12 @@ def test_scan_checks_label_rows_for_a_folder_fed_method(tmp_path):
     _h5(d / "atac_gas.h5", 20, 40)
     pd.DataFrame({"x": ["T"] * 50}).to_csv(d / "rna_cty.csv", index=False)
     pd.DataFrame({"x": ["T"] * 10}).to_csv(d / "atac_cty.csv", index=False)
-    sc = mtb.scan("SB", "diagonal", methods=["scBridge"], data_path=tmp_path,
+    sc = full_scan("SB", "diagonal", methods=["scBridge"], data_path=tmp_path,
                   verbose=False)
     row = sc.iloc[0]
     assert not row["files_ok"]
     assert "atac_cty.csv has 10 labels, but atac_gas.h5 has 40 cells" in row["files_reason"]
     pd.DataFrame({"x": ["T"] * 40}).to_csv(d / "atac_cty.csv", index=False)
-    sc = mtb.scan("SB", "diagonal", methods=["scBridge"], data_path=tmp_path,
+    sc = full_scan("SB", "diagonal", methods=["scBridge"], data_path=tmp_path,
                   verbose=False)
     assert sc.iloc[0]["files_ok"], sc.iloc[0]["files_reason"]

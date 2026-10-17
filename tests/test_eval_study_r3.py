@@ -44,13 +44,13 @@ def _batch_folder(tmp_path):
 
 def test_cli_one_label_file_of_three_names_the_flags_and_the_fix(tmp_path, capsys):
     _, _, folder = _batch_folder(tmp_path)
-    code = cli.main(["evaluate", "--output", str(tmp_path / "emb.npy"),
+    code = cli.main(["evaluate", "--embedding", str(tmp_path / "emb.npy"),
                      "--labels", str(folder / "cty1.csv"), "--metrics", "ASW"])
     err = capsys.readouterr().err
     assert code == 1
-    assert ("error: --labels gave 30 labels (cty1.csv) for 90 cells in --output. "
+    assert ("error: --labels gave 30 labels (cty1.csv) for 90 cells in --embedding. "
             "For several label files (cty1.csv, cty2.csv, cty3.csv), repeat --labels in "
-            "the row order of --output, or pass --dataset, --category and --method.") in err
+            "the row order of --embedding, or pass --dataset, --category and --method.") in err
     assert "celltype" not in err and "emb has" not in err
 
 
@@ -68,19 +68,19 @@ def test_batch_and_clustering_counts_follow_the_same_pattern(tmp_path, capsys):
     with pytest.raises(ValueError, match=r"^batch has 30 entries for 90 cells in the "
                                          r"embedding\.$"):
         mtb.evaluate(emb, labels=lab, batch=lab[:30], metrics="all")
-    with pytest.raises(ValueError, match=r"^clustering has 30 entries for 90 cells in "
+    with pytest.raises(ValueError, match=r"^clusters has 30 entries for 90 cells in "
                                          r"the embedding\.$"):
-        mtb.evaluate(emb, labels=lab, clustering=lab[:30], metrics=["ARI"])
+        mtb.evaluate(emb, labels=lab, clusters=lab[:30], metrics=["ARI"])
     np.save(tmp_path / "emb.npy", emb)
     pd.DataFrame({"x": lab}).to_csv(tmp_path / "cty.csv", index=False)
     pd.DataFrame({"x": lab[:30]}).to_csv(tmp_path / "batch.csv", index=False)
-    code = cli.main(["evaluate", "--output", str(tmp_path / "emb.npy"), "--labels",
+    code = cli.main(["evaluate", "--embedding", str(tmp_path / "emb.npy"), "--labels",
                      str(tmp_path / "cty.csv"), "--batch", str(tmp_path / "batch.csv"),
                      "--metrics", "all"])
     err = capsys.readouterr().err
     assert code == 1
     # each flag counts its own unit: batch ids for --batch
-    assert "error: --batch gave 30 batch ids (batch.csv) for 90 cells in --output." in err
+    assert "error: --batch gave 30 batch ids (batch.csv) for 90 cells in --embedding." in err
 
 
 def test_more_labels_than_cells_gives_no_per_batch_advice():
@@ -94,11 +94,11 @@ def test_cli_one_label_file_without_siblings_gives_the_general_fix(tmp_path, cap
     emb, lab = _blobs()
     np.save(tmp_path / "emb.npy", emb)
     pd.DataFrame({"x": lab[:30]}).to_csv(tmp_path / "cells.csv", index=False)
-    assert cli.main(["evaluate", "--output", str(tmp_path / "emb.npy"),
+    assert cli.main(["evaluate", "--embedding", str(tmp_path / "emb.npy"),
                      "--labels", str(tmp_path / "cells.csv"), "--metrics", "ASW"]) == 1
     err = capsys.readouterr().err
-    assert ("--labels gave 30 labels (cells.csv) for 90 cells in --output. For several "
-            "label files, repeat --labels in the row order of --output, or pass --dataset, "
+    assert ("--labels gave 30 labels (cells.csv) for 90 cells in --embedding. For several "
+            "label files, repeat --labels in the row order of --embedding, or pass --dataset, "
             "--category and --method.") in err
 
 
@@ -154,22 +154,22 @@ def test_label_files_of_one_diagonal_side_are_named(tmp_path, capsys):
             with pytest.raises(ValueError) as e:
                 mtb.evaluate(emb, labels=labels, metrics=["ASW"], **kw)
             assert str(e.value) == py
-    out = ["--output", str(tmp_path / "emb.npy"), "--metrics", "ASW"]
+    out = ["--embedding", str(tmp_path / "emb.npy"), "--metrics", "ASW"]
     dataset = ["--dataset", "BRAIN", "--method", "SCALEX", "--category", "diagonal",
                "--data-path", str(data)]
     from_dataset = _cli_error(capsys, *out, *dataset, "--missing-labels", "drop")
     assert from_dataset == (
         "the label files of BRAIN (rna_cty.csv) hold 80 labels for 150 cells in "
-        "--output. " + _one_side("BRAIN", "RNA"))
+        "--embedding. " + _one_side("BRAIN", "RNA"))
     # --column reads the same files
     assert _cli_error(capsys, *out, *dataset, "--column", "x") == from_dataset
     from_file = _cli_error(capsys, *out, "--labels", str(d / "rna_cty.csv"),
                            "--missing-labels", "drop")
     assert from_file == (
-        "--labels gave 80 labels (rna_cty.csv) for 150 cells in --output. "
+        "--labels gave 80 labels (rna_cty.csv) for 150 cells in --embedding. "
         + _one_side("rna_cty.csv", "RNA"))
     for msg in (py, from_dataset, from_file):
-        assert "Check that --output holds" not in msg
+        assert "Check that --embedding holds" not in msg
         assert "pass mtb.labels_for(" not in msg
     # the ATAC side alone reads the other way round, and of two files the
     # first is named
@@ -195,19 +195,19 @@ def test_other_short_label_files_keep_their_advice(tmp_path, capsys):
     np.save(tmp_path / "emb.npy", emb)
     np.save(tmp_path / "emb80.npy", emb[:80])
     data = tmp_path / "data"
-    out = ["--output", str(tmp_path / "emb.npy"), "--metrics", "ASW"]
+    out = ["--embedding", str(tmp_path / "emb.npy"), "--metrics", "ASW"]
     # a paired folder: the embedding is the first thing to check
     _folder(data, "OLDPAIR", {"rna.h5": 120, "adt.h5": 120}, {"rna_cty.csv": 120})
     assert _cli_error(capsys, *out, "--dataset", "OLDPAIR", "--method", "totalVI",
                       "--category", "vertical", "--data-path", str(data)) == (
         "the label files of OLDPAIR (rna_cty.csv) hold 120 labels for 150 cells in "
-        "--output. Check that --output holds the embedding of --method on OLDPAIR.")
+        "--embedding. Check that --embedding holds the embedding of --method on OLDPAIR.")
     # the label file of the other side is next to it: several files are the fix
     d = _folder(data, "BOTH", {"rna.h5": 80, "atac_gas.h5": 70},
                 {"rna_cty.csv": 80, "atac_cty.csv": 70})
     assert _cli_error(capsys, *out, "--labels", str(d / "rna_cty.csv")) == (
-        "--labels gave 80 labels (rna_cty.csv) for 150 cells in --output. For several "
-        "label files, repeat --labels in the row order of --output, or pass --dataset, "
+        "--labels gave 80 labels (rna_cty.csv) for 150 cells in --embedding. For several "
+        "label files, repeat --labels in the row order of --embedding, or pass --dataset, "
         "--category and --method.")
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=str(d / "rna_cty.csv"), metrics=["ASW"])
@@ -216,11 +216,11 @@ def test_other_short_label_files_keep_their_advice(tmp_path, capsys):
         "label file per batch, pass mtb.labels_for(dataset, category, method).")
     # one file of several of one side, which add up to the cells: the same
     d = _folder(data, "RNA2", {}, {"rna_cty1.csv": 40, "rna_cty2.csv": 40})
-    assert _cli_error(capsys, "--output", str(tmp_path / "emb80.npy"), "--metrics", "ASW",
+    assert _cli_error(capsys, "--embedding", str(tmp_path / "emb80.npy"), "--metrics", "ASW",
                       "--labels", str(d / "rna_cty1.csv")) == (
-        "--labels gave 40 labels (rna_cty1.csv) for 80 cells in --output. For several "
+        "--labels gave 40 labels (rna_cty1.csv) for 80 cells in --embedding. For several "
         "label files (rna_cty1.csv, rna_cty2.csv), repeat --labels in the row order of "
-        "--output, or pass --dataset, --category and --method.")
+        "--embedding, or pass --dataset, --category and --method.")
 
 
 def test_an_empty_labels_dict_has_nothing_to_score(tmp_path):
@@ -270,7 +270,7 @@ def test_sweep_note_is_short_sentences(capsys, monkeypatch):
     assert re.fullmatch(
         r"Clustering 90 cells for ARI, NMI, ASW, iASW and iF1 with the "
         r"(igraph|leidenalg) Leiden backend\. This takes from seconds to a few "
-        r"minutes\. To skip it, pass clustering=, or metrics= without ARI, NMI, ASW, "
+        r"minutes\. To skip it, pass clusters=, or metrics= without ARI, NMI, ASW, "
         r"iASW and iF1\.", err), err
     assert " - " not in err and ";" not in err and "per 3,000 cells" not in err
 
@@ -281,11 +281,11 @@ def test_sweep_note_cli_spelling(tmp_path, capsys, monkeypatch):
     emb, lab = _blobs()
     np.save(tmp_path / "emb.npy", emb)
     pd.DataFrame({"x": lab}).to_csv(tmp_path / "cty.csv", index=False)
-    assert cli.main(["evaluate", "--output", str(tmp_path / "emb.npy"), "--labels",
+    assert cli.main(["evaluate", "--embedding", str(tmp_path / "emb.npy"), "--labels",
                      str(tmp_path / "cty.csv"), "--metrics", "ARI,NMI"]) == 0
     err = capsys.readouterr().err
     assert ("for ARI and NMI with the") in err
-    assert "To skip it, pass --clustering, or --metrics without ARI and NMI." in err
+    assert "To skip it, pass --clusters, or --metrics without ARI and NMI." in err
 
 
 # --- R3-16 (b) ---------------------------------------------------------------
@@ -323,7 +323,7 @@ def test_cli_column_keeps_the_label_file_name_in_the_error(tmp_path, capsys):
     np.save(tmp_path / "emb.npy", emb)
     pd.DataFrame({"barcode": range(30), "celltype": lab[:30]}).to_csv(
         tmp_path / "meta.csv", index=False)
-    assert cli.main(["evaluate", "--output", str(tmp_path / "emb.npy"), "--labels",
+    assert cli.main(["evaluate", "--embedding", str(tmp_path / "emb.npy"), "--labels",
                      str(tmp_path / "meta.csv"), "--column", "celltype",
                      "--metrics", "ASW"]) == 1
     assert "--labels gave 30 labels (meta.csv) for 90 cells" in capsys.readouterr().err

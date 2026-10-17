@@ -45,21 +45,14 @@ def test_score_legend_says_the_fill_is_scaled_per_column():
     assert by["(scaled per column)"][1] < by["Score"][1] - 0.4
 
 
-def test_bubble_notes_say_the_lightest_fill_is_not_zero():
-    doc = " ".join(mtb.plot.bubble.__doc__.split())
-    assert "The lightest fill is the lowest value of that column in this figure, not zero." in doc
-    assert '"(scaled per column)"' in doc
-
-
 def test_evaluate_examples_show_the_anndata_and_mudata_calls():
     doc = pipeline.evaluate.__doc__
-    assert '>>> mtb.evaluate(adata, labels="celltype", obsm="X_pca")' in doc
-    assert ('>>> mtb.evaluate(mdata, labels="celltype", batch="sample", obsm="X_joint",'
+    assert ('>>> mtb.evaluate(adata, labels="celltype", batch="sample", obsm="X_pca")'
             in doc)
     flat = " ".join(doc.split())
-    assert "AnnData or MuData (``.obsm[obsm]``; ``labels``/``batch`` may name ``.obs`` columns)" in flat
-    assert ("``mtb.to_long`` makes the long frame (lowercase ``value``) that "
-            "``load_results`` returns") in flat
+    assert "AnnData or MuData (``.obsm[obsm]``)" in flat
+    assert ("``mtb.to_long`` reshapes the result for plotting or for "
+            "``mtb.load_results``") in flat
 
 
 def test_evaluate_takes_a_mudata_with_obs_keys():

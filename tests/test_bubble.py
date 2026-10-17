@@ -144,8 +144,8 @@ def test_bubble_is_plain_function_with_signature_and_docstring():
     assert inspect.isfunction(mtb.plot.bubble)
     params = list(inspect.signature(mtb.plot.bubble).parameters)
     assert params[0] == "long_df"
-    for p in ("metrics", "methods", "order", "aggregate", "cmap", "title", "save",
-              "show_language", "require_complete", "overall"):
+    for p in ("metrics", "methods", "order", "aggregate", "title", "save",
+              "require_complete", "overall"):
         assert p in params
     assert "Parameters" in mtb.plot.bubble.__doc__
     assert "mean_overall" in mtb.plot.bubble.__doc__      # OVERALL_DOC written out
@@ -438,7 +438,6 @@ def test_na_warn_default_names_method_and_rule():
         tbl = bubble.build_table(_with_gap())
     msg = str([w for w in rec if "has no NMI" in str(w.message)][0].message)
     assert "Its Overall uses the metrics it has." in msg
-    assert "na='skip'" in msg
     assert tbl.na_cells == ["B: DR and clustering Overall over 2 of 3 metrics (NMI n/a)"]
     # the arithmetic the message describes: B's Overall is the mean over ARI, cLISI ranks
     b = tbl.blocks[0]
@@ -471,13 +470,12 @@ def test_na_rule_in_summary_mode_is_rank_zero():
     assert tbl.na_cells == ["B: NMI n/a in D2 -> rank 0 there"]
 
 
-def test_bubble_passes_na_through():
+def test_bubble_na_is_deprecated_and_has_no_effect():
+    # 0.4: bubble(na=) warns once and is ignored (build_table(na=) still works)
     import matplotlib; matplotlib.use("Agg")
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        bubble(_with_gap(), na="skip")
-    with pytest.raises(ValueError, match="has no NMI"):
-        bubble(_with_gap(), na="raise")
+    with pytest.warns(FutureWarning, match=r"plot\.bubble\(na=\) is deprecated and will "
+                                           r"be removed in 0\.5\. It has no effect\."):
+        bubble(_with_gap(), na="raise")      # draws: the old policy is not applied
 
 
 def test_radius_uses_methods_scored_in_the_column():
@@ -493,7 +491,6 @@ def test_radius_uses_methods_scored_in_the_column():
     # the best circle of the NMI column (2 of 3 scored) is still full size
     best = max(c.radius for c in circles)
     assert best == pytest.approx(0.5 * 0.85 * 0.9)
-    assert "methods scored in that column" in bubble.__doc__
 
 
 def test_circles_of_values_tied_by_rounding_have_one_size():

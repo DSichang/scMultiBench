@@ -13,7 +13,8 @@ import pytest
 import multibench as mtb
 from multibench import cli, config
 from multibench import workflow as W
-from multibench.engine import envs, ingest, registry, runner
+from multibench.engine import envs, ingest, registry
+from tests.conftest import full_scan
 
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 
@@ -43,7 +44,7 @@ def _diagonal(root, name, peaks):
 def _scan_row(root, name, method):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        sc = mtb.scan(name, "diagonal", methods=[method], data_path=root, verbose=False)
+        sc = full_scan(name, "diagonal", methods=[method], data_path=root, verbose=False)
     return sc.iloc[0]
 
 
@@ -82,7 +83,7 @@ def test_peak_ids_without_coordinates_get_the_peak_names_caveat(tmp_path):
 
 
 def test_d28_glue_caveat_does_not_name_the_dataset():
-    r = mtb.scan("D28", "diagonal", methods=["GLUE"], verbose=False).iloc[0]
+    r = full_scan("D28", "diagonal", methods=["GLUE"], verbose=False).iloc[0]
     assert "D28" not in r["caveat"] and "peak names" not in r["caveat"]
 
 
@@ -92,8 +93,7 @@ def test_normalize_peak_names_notes_name_the_methods_run_renames_for():
                      if any(v.normalize_peaks for v in registry.get(m).variants))
     assert renamed == ["GLUE", "Seurat_v3"]
     doc = " ".join(inspect.getdoc(ingest.normalize_peak_names).split())
-    para = doc.split("**Inside ``mtb.run``.**", 1)[1].split("**", 1)[0]
-    assert "applies this itself for GLUE and Seurat_v3," in para
+    assert "``run`` applies it for GLUE and Seurat_v3." in doc
 
 
 # ============================================================ R3-10 scripts ref
@@ -135,16 +135,16 @@ def _mismatch(head):
 @needs_git
 def test_scan_blocks_every_row_under_another_scripts_ref(scripts, monkeypatch):
     repo, head = scripts
-    before = mtb.scan("D11", "vertical", methods=["Matilda"], modalities=["rna", "adt"],
+    before = full_scan("D11", "vertical", methods=["Matilda"], modalities=["rna", "adt"],
                       verbose=False)
     assert before["runnable"].all()
     monkeypatch.setenv(config.SCRIPTS_REF_VAR, "deadbeef")
-    sc = mtb.scan("D11", "vertical", verbose=False)
+    sc = full_scan("D11", "vertical", verbose=False)
     assert not sc["runnable"].any()
     assert (sc["reason"].str.startswith(_mismatch(head))).all()
     # the matching ref changes nothing
     monkeypatch.setenv(config.SCRIPTS_REF_VAR, head[:7])
-    after = mtb.scan("D11", "vertical", methods=["Matilda"], modalities=["rna", "adt"],
+    after = full_scan("D11", "vertical", methods=["Matilda"], modalities=["rna", "adt"],
                      verbose=False)
     pd.testing.assert_frame_equal(before, after)
 
@@ -227,16 +227,6 @@ def test_scripts_ref_problem_is_none_without_scripts_or_variable(tmp_path, monke
 
 
 # ============================================================ R3-12 Slurm example
-def test_slurm_example_requests_a_gpu_for_a_method_that_uses_one():
-    doc = inspect.getdoc(runner.run)
-    block = doc.split("A Slurm job step:", 1)[1].split("```", 2)[1]
-    method = re.search(r'mtb\.run\("(\w+)"', block).group(1)
-    assert "--gres=gpu:1" in block
-    assert mtb.method_info(method)["gpu"] in ("used when present", "required")
-    assert "StabMap" not in block
-    assert "Request a GPU only for a method that uses one" in doc
-
-
 def test_slurm_example_dry_run_works(tmp_path):
     argv = mtb.run("scMoMaT", "mosaic", inputs=mtb.inputs_for("D46", "mosaic", "scMoMaT"),
                    out_dir=str(tmp_path / "scMoMaT"),

@@ -194,8 +194,11 @@ def test_cli_overlay_line_is_plain(tmp_path, monkeypatch, capsys):
     def _long(method):
         return pd.DataFrame({"metric": ["ARI", "NMI", "ASW"], "value": [0.5, 0.6, 0.7],
                              "method": method, "dataset": "D1", "category": "diagonal"})
-    monkeypatch.setattr(mtb, "load_results",
-                        lambda **kw: pd.concat([_long("A"), _long("B")], ignore_index=True))
+    from multibench.data import results as results_mod
+    # the CLI reads the stored table through the private loader (no source= warning)
+    monkeypatch.setattr(results_mod, "_load_results",
+                        lambda *a, **kw: pd.concat([_long("A"), _long("B")],
+                                                   ignore_index=True))
     monkeypatch.setattr(plot_ns, "bubble", lambda df, **kw: None)
     mine = tmp_path / "mine.csv"
     _long("PCA_LSI_stack").to_csv(mine, index=False)
@@ -204,7 +207,7 @@ def test_cli_overlay_line_is_plain(tmp_path, monkeypatch, capsys):
     err = capsys.readouterr().err
     assert rc == 0, err
     assert ("# Added your 3 rows (PCA_LSI_stack) to the stored diagonal table, "
-            "which has 6 rows (source published).") in err.splitlines()
+            "which has 6 rows (source rerun).") in err.splitlines()
     assert "# overlay" not in err
 
 
@@ -222,8 +225,7 @@ def test_na_raise_leaves_out_the_overall_sentence():
     assert str(e.value) == ("Row B has no NMI. Pass na='warn' to draw the figure "
                             "with these gaps.")
     _, msgs = _messages(mtb.plot.build_table, _with_gap())
-    assert ("Row B has no NMI. Its Overall uses the metrics it has. Pass na='skip' "
-            "to hide this message.") in msgs
+    assert "Row B has no NMI. Its Overall uses the metrics it has." in msgs
 
 
 # --- R5-11 (e): the label-order error names a method only when one was used ---
@@ -271,19 +273,7 @@ def test_reordered_labels_for_dict_names_the_method_order(tmp_path):
     assert "are not in the default order" in str(e.value)
 
 
-# --- R5-14: the LISI median and scaling are written down ----------------------
-
-def test_evaluate_notes_state_the_lisi_median_and_scaling():
-    doc = mtb.evaluate.__doc__
-    sentence = ("cLISI and iLISI take the median m of the per-cell scores and scale "
-                "it: cLISI = (L - m)/(L - 1), iLISI = (m - 1)/(B - 1), with L cell "
-                "types and B batches.")
-    assert sentence in " ".join(doc.split())
-    # after the scib-call table, before the re-run paragraph
-    flat = " ".join(doc.split())
-    assert flat.index("computed only when named in metrics=[...]") < flat.index(sentence)
-    assert flat.index(sentence) < flat.index("The re-run tables were scored")
-
+# --- R5-14: the LISI median and scaling ---------------------------------------
 
 def test_lisi_formula_matches_scib():
     """The documented formula is what scib computes from the per-cell scores."""

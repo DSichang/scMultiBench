@@ -18,6 +18,7 @@ import multibench as mtb
 from multibench import config
 from multibench import workflow as W
 from multibench.engine import resolve
+from tests.conftest import full_scan
 
 
 @pytest.fixture
@@ -62,14 +63,14 @@ def _rna_adt_rows(df):
 
 def test_intact_numbered_layout_passes(tmp_path, no_envs):
     _numbered(tmp_path, "GOOD")
-    df = mtb.scan("GOOD", "cross", data_path=tmp_path)
+    df = full_scan("GOOD", "cross", data_path=tmp_path)
     rows = _rna_adt_rows(df)
     assert len(rows) > 0 and rows["files_ok"].all(), rows[["method", "files_reason"]]
 
 
 def test_truncated_cty_of_one_batch_blocks_every_cross_method(tmp_path, no_envs):
     _numbered(tmp_path, "BADLAB", short=(2, 5))
-    df = mtb.scan("BADLAB", "cross", data_path=tmp_path)
+    df = full_scan("BADLAB", "cross", data_path=tmp_path)
     rows = _rna_adt_rows(df)
     assert len(rows) > 0 and not rows["files_ok"].any()
     for _, r in rows.iterrows():
@@ -82,7 +83,7 @@ def test_truncated_cty_of_one_batch_blocks_every_cross_method(tmp_path, no_envs)
 
 def test_only_the_broken_batch_is_named(tmp_path, no_envs):
     _numbered(tmp_path, "BAD3", short=(3, 1))
-    df = mtb.scan("BAD3", "cross", data_path=tmp_path)
+    df = full_scan("BAD3", "cross", data_path=tmp_path)
     why = _rna_adt_rows(df).iloc[0]["files_reason"]
     assert "cty3.csv has 59 labels" in why and "batch 3" in why
     assert "cty1.csv" not in why and "cty2.csv" not in why
@@ -90,7 +91,7 @@ def test_only_the_broken_batch_is_named(tmp_path, no_envs):
 
 def test_extra_label_rows_are_caught_too(tmp_path, no_envs):
     _numbered(tmp_path, "LONG", short=(1, -4))          # 4 rows too MANY
-    df = mtb.scan("LONG", "cross", data_path=tmp_path)
+    df = full_scan("LONG", "cross", data_path=tmp_path)
     why = _rna_adt_rows(df).iloc[0]["files_reason"]
     assert "cty1.csv has 44 labels" in why and "rna1.h5 has 40 cells" in why
 
@@ -100,7 +101,7 @@ def test_missing_cty_file_is_not_a_length_problem(tmp_path, no_envs):
     d = _numbered(tmp_path, "NOCTY")
     for i in (1, 2, 3):
         (d / f"cty{i}.csv").unlink()
-    df = mtb.scan("NOCTY", "cross", data_path=tmp_path)
+    df = full_scan("NOCTY", "cross", data_path=tmp_path)
     rows = _rna_adt_rows(df)
     assert rows["files_ok"].all()
 
@@ -135,11 +136,11 @@ def test_reference_d52_copy_with_five_rows_cut(tmp_path, no_envs):
             os.symlink(f.resolve(), bad / f.name)
     lines = (src / "cty1.csv").read_text().splitlines()
     (bad / "cty1.csv").write_text("\n".join(lines[:-5]) + "\n")
-    df = mtb.scan("BADLAB", "cross", data_path=tmp_path)
+    df = full_scan("BADLAB", "cross", data_path=tmp_path)
     rows = _rna_adt_rows(df)
     assert len(rows) >= 8 and not rows["files_ok"].any()
     assert rows["files_reason"].str.contains(r"cty1\.csv has \d+ labels, but rna1\.h5 has \d+ cells").all()
     assert rows["files_reason"].str.contains("batch 1").all()
     # and the untouched reference dataset still passes the label check
-    ok = mtb.scan("D52", "cross")
+    ok = full_scan("D52", "cross")
     assert not ok["files_reason"].str.contains("labels, but").any()

@@ -3,8 +3,8 @@
 Section 6 of a task tutorial whose task has stored scores reads the package's
 stored re-run scores;
 ``notebooks/results`` holds a second copy of the same tables. These tests pin
-the counts and the error the section states, the ``source=`` every
-``load_results`` call names, and the agreement of the two copies.
+the counts the section states, that no ``load_results`` call names the
+deprecated ``source=``, and the agreement of the two copies.
 """
 import ast
 import importlib.util
@@ -58,8 +58,9 @@ def _quiet(fn, *a, **kw):
 
 
 @pytest.mark.parametrize("name", NOTEBOOKS)
-def test_every_load_results_call_names_its_source(name):
-    """The default source raises for mosaic, so every call names one."""
+def test_no_load_results_call_names_a_source(name):
+    """The stored scores are the package's runs: no call passes the deprecated
+    ``source=``."""
     n = 0
     for kind, src in _cells(name):
         if kind != "code":
@@ -67,8 +68,8 @@ def test_every_load_results_call_names_its_source(name):
         for node in ast.walk(_tree(src)):
             if isinstance(node, ast.Call) and ast.unparse(node.func) == "mtb.load_results":
                 n += 1
-                assert any(k.arg == "source" for k in node.keywords), \
-                    f"{name}: load_results without source=: {ast.unparse(node)[:80]}"
+                assert not any(k.arg == "source" for k in node.keywords), \
+                    f"{name}: load_results with source=: {ast.unparse(node)[:80]}"
     assert (n >= 1) == (name in DRAWING), name
 
 
@@ -84,8 +85,7 @@ def test_the_stored_scores_section_follows_the_task():
 
 @pytest.mark.parametrize("key", STORED)
 def test_stored_scores_section_states_the_measured_counts(key):
-    """The method counts of section 6 are those load_results gives, and the
-    sentence on source="published" holds on the live package."""
+    """The method counts of section 6 are those load_results gives."""
     t = GEN.TASKS[key]
     cat, ds, shown = t["cat"], t["stored_ds"], t["ds"]
     cells = _cells(f"tutorial_{key}")
@@ -93,7 +93,7 @@ def test_stored_scores_section_states_the_measured_counts(key):
               if kind == "markdown" and src.startswith("## 6. Stored scores"))
     md = " ".join(md.split())
     code = "\n".join(src for kind, src in cells if kind == "code")
-    assert f'mtb.load_results("{cat}", dataset="{ds}", source="rerun")' in code
+    assert f'mtb.load_results("{cat}", dataset="{ds}")' in code
     cov = mtb.results_coverage(cat)
     if ds != shown:
         # a tutorial-size subset: its own scores are never stored
@@ -105,25 +105,18 @@ def test_stored_scores_section_states_the_measured_counts(key):
             assert (f"There are no stored scores for `{shown}`. `{ds}` is another "
                     f"benchmark dataset of the same task.") in md
     cov = cov[cov.dataset == ds]
-    rerun = _quiet(mtb.load_results, cat, dataset=ds, source="rerun")
+    rerun = _quiet(mtb.load_results, cat, dataset=ds)
     assert f"stored scores for {rerun.method.nunique()} methods on `{ds}`" in md
-    n_pub = cov[cov.source == "published"].method.nunique()
-    if n_pub:
-        published = _quiet(mtb.load_results, cat, dataset=ds)
-        assert published.method.nunique() == n_pub
-        assert re.search(rf"which hold {n_pub} methods? for `{ds}`", md), md
-    else:
-        with pytest.raises(FileNotFoundError):
-            _quiet(mtb.load_results, cat, dataset=ds)
-        assert (f"There is no published scIB table for {cat}, so `source=\"published\"`, "
-                f"the default, raises `FileNotFoundError`.") in md
+    assert cov.method.nunique() == rerun.method.nunique()
+    assert "The stored scores are the package's own runs of the methods." in md
+    assert "published" not in md and "source=" not in md
 
 
 @pytest.mark.parametrize("ds", ["D11", "D28", "D45", "D52"])
 def test_the_package_rerun_tables_match_the_results_folder(ds):
     """notebooks/results and the package's stored re-run tables are two copies
     of the same scores."""
-    long_pkg = _quiet(mtb.load_results, dataset=ds, source="rerun")
+    long_pkg = _quiet(mtb.load_results, dataset=ds)
     long_here = pd.read_csv(RESULTS / f"long_all_{ds}.csv")
     both = long_here.merge(long_pkg, on=["method", "metric"], how="outer", indicator=True)
     assert (both._merge == "both").all() and np.allclose(both.value_x, both.value_y), ds

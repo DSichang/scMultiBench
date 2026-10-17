@@ -71,13 +71,13 @@ def _reference(emb, paths):
 
 # ---------------------------------------------------------------- vocabulary
 def test_the_family_and_its_codes():
-    assert mtb.plot.CLASSIFICATION_METRICS == CODES
-    assert "CLASSIFICATION_METRICS" in mtb.plot.__all__
-    assert mtb.catalog.known_metrics() == [
+    m = mtb.catalog.metrics()
+    assert m.loc[m.family == "classification", "metric"].tolist() == CODES
+    assert m["metric"].tolist() == [
         "ARI", "NMI", "ASW", "iASW", "iF1", "cLISI", "ASW_batch", "ARI_batch",
         "NMI_batch", "GC", "iLISI", "kBET", "OCA", "ACA", "Spec", "Sens", "F1"]
-    assert [catalog.canonical_metric(c) for c in ("oca", "Aca", "SPEC", "sens", "f1",
-                                                  "if1")] == CODES + ["iF1"]
+    assert [_quiet(catalog.canonical_metric, c)
+            for c in ("oca", "Aca", "SPEC", "sens", "f1", "if1")] == CODES + ["iF1"]
 
 
 def test_metrics_selects_the_family():
@@ -386,7 +386,7 @@ def test_stored_tables_have_no_classification():
                        metrics="classification")
     # one line says so since 0.4, as for metrics="batch" on a single-batch dataset
     assert df.empty and said == [
-        "The published vertical tables of D11 have no classification scores, so no rows "
+        "The rerun vertical tables of D11 have no classification scores, so no rows "
         "are left. Leave out metrics= to get the scores they have (ARI, ASW, NMI, cLISI, "
         "iASW, iF1)."]
 
@@ -397,13 +397,13 @@ def test_cli_evaluate_metrics_classification(three, tmp_path, capsys):
     h5 = tmp_path / "embedding.h5"
     with h5py.File(h5, "w") as f:
         f.create_dataset("data", data=emb.T)
-    args = ["evaluate", "--output", str(h5)]
+    args = ["evaluate", "--embedding", str(h5)]
     for p in paths:
         args += ["--labels", str(p)]
     assert cli.main(args + ["--metrics", "classification"]) == 0
     printed = capsys.readouterr().out.split()
     assert [w for w in printed if w in CODES] == CODES
-    code = cli.main(["evaluate", "--output", str(h5), "--labels",
+    code = cli.main(["evaluate", "--embedding", str(h5), "--labels",
                      str(paths[0]), "--metrics", "classification"])
     err = capsys.readouterr().err
     assert code == 1

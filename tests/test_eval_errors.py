@@ -30,7 +30,7 @@ def test_metrics_token_typo_is_a_value_error_listing_valid_values():
         evaluate(emb, labels=lab, metrics="clusterin")
     # a declared benchmark task is not a metric family: the error says which
     # slot this is, without the word "v1"
-    with pytest.raises(ValueError, match="selects a metric family, not a task of mtb.list_tasks") as e:
+    with pytest.raises(ValueError, match=r"selects a metric family, not a task\.") as e:
         evaluate(emb, labels=lab, metrics="dimension_reduction")
     assert "dimension_reduction" in str(e.value) and "v1" not in str(e.value)
 
@@ -101,14 +101,14 @@ def test_verbose_sweep_notice(capsys, monkeypatch):
     err = capsys.readouterr().err
     assert re.search(r"Clustering 120 cells for ARI with the "
                      r"(igraph|leidenalg) Leiden backend\.", err)
-    assert "To skip it, pass clustering=, or metrics= without ARI." in err
-    # with batches, the batch clusters are named and clustering= is not offered
-    evaluate(emb, labels=lab, clustering=lab, batch=np.arange(len(lab)) % 2,
+    assert "To skip it, pass clusters=, or metrics= without ARI." in err
+    # with batches, the batch clusters are named and clusters= is not offered
+    evaluate(emb, labels=lab, clusters=lab, batch=np.arange(len(lab)) % 2,
              metrics=["NMI_batch"])
     err = capsys.readouterr().err
     assert "Clustering 120 cells for NMI_batch with the " in err
     assert err.rstrip().endswith("To skip it, pass metrics= without NMI_batch.")
-    evaluate(emb, labels=lab, clustering=lab)               # nothing left to cluster
+    evaluate(emb, labels=lab, clusters=lab)               # nothing left to cluster
     assert "Leiden" not in capsys.readouterr().err
     evaluate(emb, labels=lab, metrics=["ARI"], verbose=False)
     assert "Leiden" not in capsys.readouterr().err
@@ -118,10 +118,7 @@ def test_verbose_sweep_notice(capsys, monkeypatch):
 
 def test_docstrings_match_the_code():
     doc = " ".join(evaluate.__doc__.split())
-    assert "is used as it is, in the order ``labels_for`` gave it" in doc
-    assert "any other dict goes in as is only in the default order" in doc
-    assert "otherwise needs ``label_order=``" in doc
-    assert "Leiden clustering" in doc and "minutes for ~10^4" in doc
+    assert "not needed for an unchanged ``mtb.labels_for`` dict" in doc
     assert "v1" not in doc
     assert "verbose" in doc and "2,000 cells" in doc
     import multibench.plot as mplot

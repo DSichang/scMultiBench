@@ -29,6 +29,7 @@ from multibench import cli, config
 from multibench import workflow as W
 from multibench.engine import envs, ingest, registry
 from multibench.engine import runner as R
+from tests.conftest import full_scan
 
 #: the caveat of a gene-activity method given peaks in atac.h5 (after the method)
 GAS_CAV = ("needs gene-activity ATAC. The features of atac.h5 look like chr:start-end, "
@@ -114,17 +115,17 @@ def _cli(argv, capsys):
 def test_no_scan_caveat_has_a_semicolon_or_starts_in_lower_case(tmp_path, pinned, root,
                                                                 monkeypatch):
     frames = [
-        _quiet(mtb.scan, "LUNG_ids", "diagonal", data_path=_lung_ids(tmp_path / "a"),
+        _quiet(full_scan, "LUNG_ids", "diagonal", data_path=_lung_ids(tmp_path / "a"),
                verbose=False, allow_atac_mismatch=True),
-        _quiet(mtb.scan, "LOGCITE", "vertical", data_path=_log_cite(tmp_path / "b"),
+        _quiet(full_scan, "LOGCITE", "vertical", data_path=_log_cite(tmp_path / "b"),
                verbose=False),
-        _quiet(mtb.scan, "MU_PEAK", "vertical", data_path=_mu_peak(tmp_path / "c"),
+        _quiet(full_scan, "MU_PEAK", "vertical", data_path=_mu_peak(tmp_path / "c"),
                verbose=False, allow_atac_mismatch=True),
-        _quiet(mtb.scan, "D52", "cross", data_path=root / "data", verbose=False),
-        _quiet(mtb.scan, "D28", "diagonal", data_path=root / "data", verbose=False),
+        _quiet(full_scan, "D52", "cross", data_path=root / "data", verbose=False),
+        _quiet(full_scan, "D28", "diagonal", data_path=root / "data", verbose=False),
     ]
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
-    frames.append(_quiet(mtb.scan, "D45", "mosaic", data_path=root / "data",
+    frames.append(_quiet(full_scan, "D45", "mosaic", data_path=root / "data",
                          verbose=False, assume_gpu=True))
     seen = [mc for df in frames for mc in _caveats(df)]
     assert len(seen) > 20
@@ -142,7 +143,7 @@ def test_no_scan_caveat_has_a_semicolon_or_starts_in_lower_case(tmp_path, pinned
 
 def test_the_glue_uinmf_and_raw_count_caveats_read_as_sentences(tmp_path, pinned, root,
                                                                monkeypatch):
-    glue = _quiet(mtb.scan, "LUNG_ids", "diagonal", methods=["GLUE"],
+    glue = _quiet(full_scan, "LUNG_ids", "diagonal", methods=["GLUE"],
                   data_path=_lung_ids(tmp_path / "a"), verbose=False).iloc[0]
     assert glue["caveat"].startswith(
         "GLUE reads peak names such as chr1:100-200. atac_peak.h5 holds other names, for "
@@ -152,28 +153,28 @@ def test_the_glue_uinmf_and_raw_count_caveats_read_as_sentences(tmp_path, pinned
         f"{SCRIPTS_NOTE}{pinned}. The first real run clones PYangLab/scMultiBench with "
         "git. On a host without network, run multibench fetch --scripts first. GLUE reads "
         "inputs/atac_peak_normpeaks.h5."), glue["caveat"]
-    uinmf = _quiet(mtb.scan, "D52", "cross", methods=["UINMF"], data_path=root / "data",
+    uinmf = _quiet(full_scan, "D52", "cross", methods=["UINMF"], data_path=root / "data",
                    verbose=False).iloc[0]
     assert uinmf["caveat"].startswith("UINMF reads batches 1-2 of 3. Batch 3 is not used. "
                                       f"{SCRIPTS_NOTE}{pinned}.")
-    tv = _quiet(mtb.scan, "LOGCITE", "vertical", methods=["totalVI"],
+    tv = _quiet(full_scan, "LOGCITE", "vertical", methods=["totalVI"],
                 data_path=_log_cite(tmp_path / "b"), verbose=False).iloc[0]
     assert tv["caveat"].startswith("totalVI needs raw counts. rna.h5 holds non-integer "
                                    "values. ")
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
-    smile = _quiet(mtb.scan, "D45", "mosaic", methods=["SMILE"], data_path=root / "data",
+    smile = _quiet(full_scan, "D45", "mosaic", methods=["SMILE"], data_path=root / "data",
                    verbose=False, assume_gpu=True).iloc[0]
     assert smile["caveat"].startswith("SMILE needs an NVIDIA GPU. This check assumes the "
                                       "job runs on a GPU node. ")
 
 
 def test_the_atac_caveats_start_with_the_method(tmp_path, pinned, gas_matilda):
-    sc = _quiet(mtb.scan, "MU_PEAK", "vertical", methods=["Matilda", "scMVP"],
+    sc = _quiet(full_scan, "MU_PEAK", "vertical", methods=["Matilda", "scMVP"],
                 modalities=["rna", "atac"], data_path=_mu_peak(tmp_path),
                 verbose=False, allow_atac_mismatch=True).set_index("method")
     assert sc.loc["Matilda", "caveat"].startswith(f"Matilda {GAS_CAV} ")
     # the reason the row carries without the override is unchanged
-    blocked = _quiet(mtb.scan, "MU_PEAK", "vertical", methods=["Matilda"],
+    blocked = _quiet(full_scan, "MU_PEAK", "vertical", methods=["Matilda"],
                      modalities=["rna", "atac"], data_path=tmp_path,
                      verbose=False).iloc[0]
     assert blocked["reason"] == (
@@ -270,7 +271,7 @@ def test_strict_passes_on_the_uinmf_folder_with_the_scripts(root, monkeypatch, c
 
 
 def test_scbridge_reason_is_a_sentence(tmp_path, pinned):
-    row = _quiet(mtb.scan, "LUNG_ids", "diagonal", methods=["scBridge"],
+    row = _quiet(full_scan, "LUNG_ids", "diagonal", methods=["scBridge"],
                  data_path=_lung_ids(tmp_path), verbose=False).iloc[0]
     assert row["reason"] == "scBridge needs atac_gas.h5, and LUNG_ids has no such file."
     assert f"{tmp_path / 'LUNG_ids'} has no such file." in row["files_reason"]
@@ -334,7 +335,7 @@ def test_the_scripts_ref_reason_is_sentences(wrong_ref):
     assert config.scripts_ref_problem() == (
         f"The method scripts are at {head}, not deadbeef (MULTIBENCH_SCRIPTS_REF). Unset "
         f"the variable, or fetch that ref into a new repo_path.")
-    reason = _quiet(mtb.scan, "D11", "vertical", methods=["Matilda"],
+    reason = _quiet(full_scan, "D11", "vertical", methods=["Matilda"],
                     modalities=["rna", "adt"], verbose=False)["reason"].iloc[0]
     assert reason.startswith("The method scripts are at "), reason
     # the error of a real run names the folder; the --ref form reads the same way
@@ -394,13 +395,13 @@ def test_count_lines_say_methods_only_when_each_has_one_row(monkeypatch, capsys,
     rows = [s.id for s, *_ in W._variant_rows("diagonal")]
     single = [m for m in dict.fromkeys(rows) if rows.count(m) == 1]
     assert len(single) == 10
-    df = mtb.scan("D28", "diagonal", methods=single)
+    df = full_scan("D28", "diagonal", methods=single)
     assert df["method"].is_unique
     out = capsys.readouterr().out
     assert out.startswith(f"[scan] {int(df['files_ok'].sum())} of {len(df)} methods have "
                           f"their input files. 0 of {len(df)} have their environment "
                           f"installed."), out
-    d11 = mtb.scan("D11", "vertical", modalities="all")
+    d11 = full_scan("D11", "vertical", modalities="all")
     assert not d11["method"].is_unique
     assert f"of {len(d11)} rows have their input files." in capsys.readouterr().out
     mtb.run_all("D52", "cross", out_dir=tmp_path, dry_run=True,
@@ -419,7 +420,7 @@ def test_linux_only_summary_is_three_sentences(monkeypatch, capsys):
         "again on the Linux machine.")
     monkeypatch.setattr(envs, "host_platform_problem", lambda: "not linux")
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
-    mtb.scan("D11", "vertical", methods=["totalVI"])
+    full_scan("D11", "vertical", methods=["totalVI"])
     assert W.LINUX_ONLY_SUMMARY in capsys.readouterr().out
 
 
@@ -522,20 +523,11 @@ def test_positional_warning_is_plural_for_several_files(tmp_path):
 # ======================================================================= R6-14
 def test_notes_passages_have_no_dash_insertions():
     flat = {fn: " ".join(inspect.getdoc(fn).split()) for fn in (
-        mtb.BatchResult.results.fget, mtb.run, mtb.io.export_dataset,
+        mtb.BatchResult, mtb.run, mtb.io.export_dataset,
         mtb.BatchResult.rescore, mtb.recommend)}
-    assert ("``label_order_candidates`` holds every ordering tried and its ARI. "
-            "``summary``'s ``label_order_confidence`` is computed from them.") in \
-        flat[mtb.BatchResult.results.fget]
-    assert ("``cpu_params`` are the flags that turn CUDA off in a script that uses it by "
-            "default") in flat[mtb.run]
-    assert ("Every modality is re-indexed by barcode to one order: ``data.obs_names``, or "
-            "the first modality's ``obs_names`` when ``data`` is not given.") in \
-        flat[mtb.io.export_dataset]
-    assert ("Without ``labels=``, a ``batch`` array follows the order of "
-            "``mtb.labels_for(dataset)``.") in flat[mtb.BatchResult.rescore]
-    assert 'The re-run tables may hold more of these methods (``source="rerun"``).' in \
-        flat[mtb.recommend]
+    assert "the label orderings tried (``label_order_candidates``)" in flat[mtb.BatchResult]
+    assert "Batch ids in the order of ``mtb.labels_for(dataset)``" in \
+        flat[mtb.BatchResult.rescore]
     for doc in flat.values():
         assert " - the evidence" not in doc and "- the flags" not in doc
         assert "written in one order -" not in doc and "need not score" not in doc

@@ -131,14 +131,14 @@ def test_the_command_line_names_its_options(tmp_path, capsys, monkeypatch):
     pd.DataFrame({"celltype": TYPES, "nCount_RNA": COUNTS},
                  index=[f"cell{i}-1" for i in range(N)]).to_csv(obs)
     capsys.readouterr()
-    assert cli.main(["evaluate", "--output", str(emb), "--labels", str(obs), "--column",
+    assert cli.main(["evaluate", "--embedding", str(emb), "--labels", str(obs), "--column",
                      "nCount_RNA", "--metrics", "ARI"]) == 0
     err = capsys.readouterr().err
     assert err.splitlines()[-1] == (
         f"warning: --labels (obs.csv) has 60 different labels for 60 cells. {CHECK}")
     assert "--column" not in err
     assert config._CLI is False
-    assert cli.main(["evaluate", "--output", str(emb), "--labels", str(obs), "--column",
+    assert cli.main(["evaluate", "--embedding", str(emb), "--labels", str(obs), "--column",
                      "celltype", "--metrics", "ARI"]) == 0
     assert "measured" not in capsys.readouterr().err
 

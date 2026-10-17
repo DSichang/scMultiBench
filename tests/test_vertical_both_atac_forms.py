@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 
 import multibench as mtb
+from tests.conftest import full_scan
 
 
 def _h5(path, names):
@@ -57,5 +58,5 @@ def test_a_folder_with_one_atac_file_is_read_as_before(tmp_path):
 def test_a_diagonal_folder_is_not_read_as_vertical(both):
     """atac_cty.csv marks unpaired ATAC cells: no vertical method takes them."""
     (both / "BOTH" / "atac_cty.csv").write_text("x\n" + "a\n" * 6)
-    sc = mtb.scan("BOTH", "vertical", data_path=both, methods=["MIRA"], verbose=False)
+    sc = full_scan("BOTH", "vertical", data_path=both, methods=["MIRA"], verbose=False)
     assert not sc.files_ok.any()

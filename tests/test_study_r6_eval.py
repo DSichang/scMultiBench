@@ -43,7 +43,7 @@ def _h5ad(tmp_path):
 
 
 def _evaluate(h5ad, *flags):
-    return cli.main(["evaluate", "--output", str(h5ad), *flags,
+    return cli.main(["evaluate", "--embedding", str(h5ad), *flags,
                      "--metrics", ",".join(METRICS)])
 
 
@@ -98,7 +98,7 @@ def test_run_all_batch_column_dry_run_and_run(batchy, tmp_path, capsys):
 
 @pytest.mark.parametrize("command", ["evaluate", "run-all"])
 def test_batch_column_without_batch_is_a_usage_error(command, tmp_path, capsys):
-    argv = (["evaluate", "--output", str(tmp_path / "x.h5"), "--labels",
+    argv = (["evaluate", "--embedding", str(tmp_path / "x.h5"), "--labels",
              str(tmp_path / "cty.csv")] if command == "evaluate"
             else ["run-all", "MYCITE", "--category", "vertical", "--dry-run"])
     with pytest.raises(SystemExit) as e:

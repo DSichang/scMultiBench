@@ -33,16 +33,16 @@ def _quiet(**kw):
 # ---------------------------------------------------------------- signature
 def test_evaluate_signature_is_the_contract():
     params = inspect.signature(evaluate).parameters
-    assert list(params) == ["output", "labels", "category", "batch", "metrics",
-                            "clustering", "obsm", "label_order", "verbose",
+    assert list(params) == ["embedding", "labels", "category", "batch", "metrics",
+                            "clusters", "obsm", "label_order", "verbose",
                             "missing_labels"]
     assert params["labels"].kind is inspect.Parameter.POSITIONAL_OR_KEYWORD
-    for name in ("category", "batch", "metrics", "clustering", "obsm", "label_order", "verbose",
+    for name in ("category", "batch", "metrics", "clusters", "obsm", "label_order", "verbose",
                  "missing_labels"):
         assert params[name].kind is inspect.Parameter.KEYWORD_ONLY, name
     assert params["metrics"].default is None and params["verbose"].default is True
     assert params["missing_labels"].default == "error"
-    assert "metrics" in evaluate.__doc__ and "slow_metrics" in evaluate.__doc__
+    assert "metrics" in evaluate.__doc__ and "kBET" in evaluate.__doc__
 
 
 def test_to_long_signature_is_the_contract():
@@ -61,8 +61,8 @@ def test_deprecated_task_maps_to_metrics_token():
     pd.testing.assert_frame_equal(old, new)
     # the paper's alias of the clustering family maps too
     with pytest.warns(DeprecationWarning, match="use metrics='clustering'"):
-        dr = evaluate(emb, labels=ct, clustering=ct, task="dimension_reduction")
-    assert set(dr.index) == set(evaluate(emb, labels=ct, clustering=ct, metrics="clustering").index)
+        dr = evaluate(emb, labels=ct, clusters=ct, task="dimension_reduction")
+    assert set(dr.index) == set(evaluate(emb, labels=ct, clusters=ct, metrics="clustering").index)
 
 
 def test_deprecated_family_maps_to_metrics_token():

@@ -621,7 +621,7 @@ def test_drop_equals_scoring_the_labelled_cells(tmp_path):
     with pytest.warns(UserWarning) as rec:
         got = mtb.evaluate(emb.T, labels=nan, metrics=["ASW"], missing_labels="drop")
     assert [str(w.message) for w in rec][0] == \
-        "output was (dims x cells) (8, 300); transposed to (cells x dims)"
+        "embedding was (dims x cells) (8, 300); transposed to (cells x dims)"
     assert len(_scored(rec)) == 1
     _same(got, mtb.evaluate(emb[KEEP], labels=lab[KEEP], metrics=["ASW"]))
 
@@ -785,8 +785,5 @@ def test_docstring_names_the_argument_and_its_errors():
     flat = " ".join(doc.split())
     # the first choice is the default (tests/test_docstring_defaults.py)
     assert '\nmissing_labels : {"error", "drop"}\n' in doc
-    assert ("A cell without a label (unless ``missing_labels=\"drop\"``), no cell "
-            "with a label, or a cell without a batch in ``batch``.") in flat
-    assert "**Missing labels.** A label is missing when it is NaN" in flat
-    assert "``cells_scored`` and ``cells_total``" in flat
-    assert "cells_scored" in " ".join(mtb.to_long.__doc__.split())
+    assert "A cell without a label raises, or is left out with a warning." in flat
+    assert "Missing or misaligned labels or batches" in flat              # Raises

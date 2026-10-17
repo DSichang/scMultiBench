@@ -230,4 +230,4 @@ def test_check_data_dir_names_the_missing_files(tmp_path):
 def test_labels_for_docstring_says_how_to_hand_to_evaluate():
     import inspect
     doc = inspect.getdoc(resolve.labels_for)
-    assert "list(labels_for(ds).values())" in doc and "evaluate(labels=" in doc
+    assert "Hand the dict to ``mtb.evaluate(labels=...)`` as is" in " ".join(doc.split())

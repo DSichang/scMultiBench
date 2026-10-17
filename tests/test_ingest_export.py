@@ -10,6 +10,7 @@ import pytest
 
 from multibench.engine import ingest
 from multibench.engine import resolve as _resolve
+from tests.conftest import full_scan
 
 ad = pytest.importorskip("anndata")
 
@@ -58,7 +59,7 @@ def test_export_dataset_vertical(tmp_path):
     assert got["rna"].endswith("rna.h5") and got["adt"].endswith("adt.h5")
     # ... and scan() lists the vertical rna+adt methods for it (env-independent)
     import multibench as mtb
-    sc = mtb.scan("MYCITE", "vertical", data_path=root)
+    sc = full_scan("MYCITE", "vertical", data_path=root)
     assert ((sc["method"] == "Matilda") & (sc["modalities"] == "rna+adt")).any()
     # the file gate now runs on every host: the rna+adt rows must pass it (the
     # rna+atac rows legitimately miss atac.h5 and say so)
@@ -119,10 +120,14 @@ def test_export_dataset_atac_kinds(tmp_path):
     # gene-activity export never provides a plain atac.h5 (no silent fallback)
     assert _resolve._resolve_role(d, "atac_gas").name == "atac_gas.h5"
     assert not (d / "atac.h5").exists()
-    with pytest.raises(ValueError, match="needs atac_kind="):
-        ingest.export_dataset(peaks, tmp_path / "E", rna=None, atac="X")
-    with pytest.raises(ValueError, match="needs atac_kind="):
-        ingest.export_dataset(peaks, tmp_path / "E", rna=None, atac="X", atac_kind="gas")
+    # 0.4: without atac_kind= the kind is read from the feature names
+    d3 = ingest.export_dataset(peaks, tmp_path / "E", rna=None, atac="X")
+    assert sorted(p.name for p in d3.iterdir()) == ["atac.h5", "atac_peak.h5"]
+    with pytest.raises(ValueError, match="neither peaks such as chr1:100-200 nor the "
+                                         "RNA's gene names"):
+        ingest.export_dataset(genes, tmp_path / "E2", rna=None, atac="X")
+    with pytest.raises(ValueError, match="atac_kind= must be one of"):
+        ingest.export_dataset(peaks, tmp_path / "E3", rna=None, atac="X", atac_kind="gas")
     with pytest.warns(UserWarning, match="look like peaks such as chr1:100-200, not genes"):
         ingest.export_dataset(peaks, tmp_path / "W", rna=None, atac="X",
                               atac_kind="gene_activity")

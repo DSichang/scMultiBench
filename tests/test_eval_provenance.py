@@ -43,7 +43,7 @@ def test_evaluate_records_a_search():
 
 def test_evaluate_records_user_clusters_and_no_sweep():
     emb, lab = _blobs()
-    wide = mtb.evaluate(emb, labels=lab, clustering=lab, metrics=["ARI", "NMI"])
+    wide = mtb.evaluate(emb, labels=lab, clusters=lab, metrics=["ARI", "NMI"])
     assert wide.attrs["clustering"] == "user"
     assert wide.attrs["leiden_flavor"] is None          # nothing needed a sweep
 
@@ -102,7 +102,7 @@ def test_scored_with_column_passes_through_the_consumers(tmp_path):
     import matplotlib
     matplotlib.use("Agg")
     mine = _mine()
-    stored = mtb.load_results("vertical", dataset="D11", source="rerun")
+    stored = mtb.load_results("vertical", dataset="D11")
     both = pd.concat([stored, mine], ignore_index=True)
     assert both["scored_with"].notna().sum() == len(mine)
     with warnings.catch_warnings():

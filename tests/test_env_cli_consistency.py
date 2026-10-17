@@ -14,6 +14,7 @@ import pytest
 import multibench as mtb
 from multibench import cli, workflow
 from multibench.engine import runner, envs, registry
+from tests.conftest import full_scan
 
 
 @pytest.fixture(autouse=True)
@@ -192,6 +193,6 @@ def test_scan_reports_the_mira_helper_when_the_checkout_lacks_it(tmp_path, monke
     monkeypatch.setattr(workflow.config.DEFAULT, "repo_path", tmp_path)
     # a helper the package does not ship (MIRA's logger.py is shipped since 0.3.4)
     monkeypatch.setattr("multibench.engine.runner.shipped_helper", lambda m, h: None)
-    row = mtb.scan("D11", "vertical", methods=["MIRA"]).iloc[0]
+    row = full_scan("D11", "vertical", methods=["MIRA"]).iloc[0]
     assert not row["files_ok"] and "logger.py" in row["files_reason"]
     assert "logger.py" in row["reason"]

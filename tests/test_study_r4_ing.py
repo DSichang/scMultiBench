@@ -21,6 +21,7 @@ import multibench as mtb
 from multibench import cli, config
 from multibench import workflow as W
 from multibench.engine import envs, registry
+from tests.conftest import full_scan
 
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 needs_git = pytest.mark.skipif(shutil.which("git") is None, reason="git not installed")
@@ -65,7 +66,7 @@ def _use(monkeypatch, repo):
 def _scan_row(**kw):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        return mtb.scan("D11", "vertical", methods=["Matilda"], modalities=["rna", "adt"],
+        return full_scan("D11", "vertical", methods=["Matilda"], modalities=["rna", "adt"],
                         verbose=False, **kw).iloc[0]
 
 

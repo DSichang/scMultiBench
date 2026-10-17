@@ -28,6 +28,7 @@ import h5py
 import numpy as np
 import pandas as pd
 import pytest
+from tests.conftest import full_scan
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -107,7 +108,7 @@ def test_troubleshooting_quotes_the_live_orientation_error(name, tmp_path):
         mtb.inputs_for("MYCITE", "vertical", "Matilda", modalities=["rna", "adt"],
                        data_path=tmp_path, check=True)
     assert words in str(e.value), (words, str(e.value))
-    row = _quiet(mtb.scan, "MYCITE", "vertical", methods=["Matilda"], data_path=tmp_path,
+    row = _quiet(full_scan, "MYCITE", "vertical", methods=["Matilda"], data_path=tmp_path,
                  modalities=["rna", "adt"], verbose=False).iloc[0]
     assert not row["files_ok"]
     assert words in row["reason"], row["reason"]
@@ -192,13 +193,13 @@ def test_env_reason_on_linux_holds_the_install_command_the_tutorials_name(name, 
     t = GEN.TASKS[name.removeprefix("tutorial_")]
     cat, methods = t["cat"], t["methods"]
     md = _markdown(name, "## 2. Download the data and the environments")
-    assert f"`multibench env install --methods {','.join(methods)} --packed --run`" in md
+    assert f"`multibench env install --methods {','.join(methods)} --run`" in md
     monkeypatch.setattr(R, "linux_only_sentence", lambda: None)
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     ds = t["ds"]
     if not (mtb.config.DEFAULT.data_path / ds).is_dir():
         pytest.skip(f"{ds} is not on disk")
     for m in methods:
-        row = _quiet(mtb.scan, ds, cat, methods=[m], verbose=False).iloc[0]
+        row = _quiet(full_scan, ds, cat, methods=[m], verbose=False).iloc[0]
         assert not row["env_ok"]
-        assert f"multibench env install --methods {m} --packed --run" in row["env_reason"]
+        assert f"multibench env install --methods {m} --run" in row["env_reason"]

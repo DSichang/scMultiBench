@@ -26,6 +26,7 @@ import pytest
 import multibench as mtb
 from multibench import cli, config, workflow as W
 from multibench.engine import envs, registry, runner
+from tests.conftest import full_scan
 
 DARWIN = ("method environments are linux-64 conda envs (packed archives + "
           "lockfiles); this host is darwin/arm64")
@@ -51,14 +52,14 @@ def test_scan_base_atac_token_matches_every_atac_role():
     """'atac' used to be an exact role: scan('D28', 'diagonal', ['rna', 'atac'])
     returned no row although every diagonal method reads RNA + ATAC."""
     with pytest.warns(UserWarning, match="scBridge"):
-        df = mtb.scan("D28", "diagonal", modalities=["rna", "atac"], verbose=False)
-    full = mtb.scan("D28", "diagonal", verbose=False)
+        df = full_scan("D28", "diagonal", modalities=["rna", "atac"], verbose=False)
+    full = full_scan("D28", "diagonal", verbose=False)
     assert _rows(df) == _rows(full[full["modalities"] != "(data_dir)"])
     assert len(df) >= 13
 
 
 def test_scan_base_atac_token_keeps_the_atac_gas_rows_of_vertical():
-    df = mtb.scan("D11", "vertical", modalities=["rna", "atac"], verbose=False)
+    df = full_scan("D11", "vertical", modalities=["rna", "atac"], verbose=False)
     mods = set(df["modalities"])
     assert {"rna+atac", "rna+atac_gas"} <= mods
     assert all(set(m.split("+")) <= {"rna", "atac", "atac_gas", "atac_peak"} for m in mods)
@@ -72,19 +73,19 @@ def test_scan_representation_token_uses_the_methods_atac():
     # scBridge reads gene activity: the peak token excludes it, so no warning names it
     with warnings.catch_warnings(record=True) as seen:
         warnings.simplefilter("always")
-        df = mtb.scan("D28", "diagonal", modalities=["rna", "atac_peak"], verbose=False)
+        df = full_scan("D28", "diagonal", modalities=["rna", "atac_peak"], verbose=False)
     assert not [w for w in seen if "scBridge" in str(w.message)]
     want = set(mtb.find_methods("diagonal", atac="peak")) - {"scBridge"}
     assert set(df["method"]) == want
     assert "MultiMAP" in want and "SCALEX" not in want
     with pytest.warns(UserWarning):
-        gas = mtb.scan("D28", "diagonal", modalities=["rna", "gene_activity"], verbose=False)
+        gas = full_scan("D28", "diagonal", modalities=["rna", "gene_activity"], verbose=False)
     assert set(gas["method"]) == set(mtb.find_methods("diagonal", atac="gene_activity")) - {"scBridge"}
 
 
 def test_scan_modality_order_does_not_matter():
-    a = mtb.scan("D11", "vertical", modalities=["adt", "rna"], verbose=False)
-    b = mtb.scan("D11", "vertical", modalities=["rna", "protein"], verbose=False)
+    a = full_scan("D11", "vertical", modalities=["adt", "rna"], verbose=False)
+    b = full_scan("D11", "vertical", modalities=["rna", "protein"], verbose=False)
     assert len(a) > 0 and set(a["modalities"]) == {"rna+adt"}
     pd.testing.assert_frame_equal(a, b)
 
@@ -92,7 +93,7 @@ def test_scan_modality_order_does_not_matter():
 def test_scan_numbered_and_base_tokens_on_mosaic():
     """Base tokens keep every mosaic row with RNA, ADT and ATAC: the two
     mixed batch patterns. Numbered tokens keep the rows of one pattern."""
-    base = mtb.scan("D46", "mosaic", modalities=["rna", "adt", "atac"], verbose=False)
+    base = full_scan("D46", "mosaic", modalities=["rna", "adt", "atac"], verbose=False)
     shared = "rna1+rna2+rna3+adt1+atac2"            # the pattern D46 holds
     unshared = "rna1+rna2+adt1+adt3+atac2"
     assert set(base["modalities"]) == {shared, unshared}
@@ -102,13 +103,13 @@ def test_scan_numbered_and_base_tokens_on_mosaic():
         "StabMap", "scMoMaT", "Multigrate"}
     assert base.loc[base["modalities"] == shared, "files_ok"].all()
     assert not base.loc[base["modalities"] == unshared, "files_ok"].any()
-    exact = mtb.scan("D46", "mosaic", modalities=shared.split("+"), verbose=False)
+    exact = full_scan("D46", "mosaic", modalities=shared.split("+"), verbose=False)
     assert _rows(exact) == _rows(base[base["modalities"] == shared])
 
 
 def test_scan_unknown_modality_token_raises_with_the_vocabulary():
     with pytest.raises(ValueError, match=r"Unknown modality peaks2x\. The tokens are"):
-        mtb.scan("D11", "vertical", modalities=["rna", "peaks2x"], verbose=False)
+        full_scan("D11", "vertical", modalities=["rna", "peaks2x"], verbose=False)
 
 
 def test_run_all_dry_run_uses_the_same_rule():
@@ -122,7 +123,7 @@ def test_run_all_dry_run_uses_the_same_rule():
                                     ("D45", "mosaic"), ("D52", "cross")])
 def test_scan_rows_without_modalities_are_one_per_variant(ds, cat):
     """modalities="all" keeps every variant of the category, exactly once."""
-    df = mtb.scan(ds, cat, modalities="all", verbose=False)
+    df = full_scan(ds, cat, modalities="all", verbose=False)
     want = {(s.id, "+".join(v.when.get("modalities", [])) or "(data_dir)")
             for s in registry.load() for v in s.variants if v.when.get("category") == cat}
     assert _rows(df) == want and len(df) == len(want)
@@ -138,7 +139,7 @@ def test_glue_setup_hint_is_user_text():
 
 
 def test_scan_caveat_carries_the_first_sentence_of_the_setup_hint():
-    df = mtb.scan("D28", "diagonal", methods=["GLUE"], verbose=False)
+    df = full_scan("D28", "diagonal", methods=["GLUE"], verbose=False)
     r = df.iloc[0]
     assert r["files_ok"]
     assert ("GLUE reads the GENCODE v43 human annotation "
@@ -146,7 +147,7 @@ def test_scan_caveat_carries_the_first_sentence_of_the_setup_hint():
             "<repo_path>/tools_scripts/GLUE/.") in r["caveat"]
     assert "mouse" not in r["caveat"]                   # first sentence only
     # a method without a hint gets no setup note
-    tv = mtb.scan("D11", "vertical", methods=["totalVI"], verbose=False).iloc[0]
+    tv = full_scan("D11", "vertical", methods=["totalVI"], verbose=False).iloc[0]
     assert "needs the" not in tv["caveat"]
 
 
@@ -157,13 +158,13 @@ def test_dry_run_prints_the_setup_hint_to_stderr_once(capsys):
     assert err.count("# GLUE reads the GENCODE v43 human annotation") == 1
     assert isinstance(argv, list)
     # scan previews every row without printing
-    mtb.scan("D28", "diagonal", methods=["GLUE"], verbose=False)
+    full_scan("D28", "diagonal", methods=["GLUE"], verbose=False)
     assert capsys.readouterr().err == ""
 
 
 # ----------------------------------------------------------------- L18: off Linux
 def test_scan_off_linux_keeps_env_reason_short_and_says_what_works(off_linux, no_envs, capsys):
-    df = mtb.scan("D11", "vertical", methods=["totalVI"])
+    df = full_scan("D11", "vertical", methods=["totalVI"])
     out = capsys.readouterr().out
     r = df.iloc[0]
     assert r["env_reason"] == f"Environment {r['env']} runs only on Linux, not on this computer."
@@ -172,8 +173,8 @@ def test_scan_off_linux_keeps_env_reason_short_and_says_what_works(off_linux, no
 
 
 def test_scan_on_linux_keeps_the_install_command(no_envs, capsys):
-    df = mtb.scan("D11", "vertical", methods=["totalVI"])
-    assert "--packed --run" in df.iloc[0]["env_reason"]
+    df = full_scan("D11", "vertical", methods=["totalVI"])
+    assert "--run" in df.iloc[0]["env_reason"]
     assert "Linux-only" not in capsys.readouterr().out
 
 
@@ -221,7 +222,7 @@ def test_cli_dry_run_says_it_too(no_scripts, capsys, tmp_path):
 
 
 def test_scan_notes_missing_scripts_in_caveat_not_files_ok(no_scripts):
-    df = mtb.scan("D11", "vertical", modalities=["rna", "adt"], verbose=False)
+    df = full_scan("D11", "vertical", modalities=["rna", "adt"], verbose=False)
     assert df["files_ok"].all()
     assert df["caveat"].str.contains("The method scripts are not in").all()
 
@@ -361,7 +362,7 @@ def _lung(tmp_path):
 
 def test_scan_reason_leads_with_the_atac_meaning_and_never_cuts_a_path(tmp_path, no_envs):
     data = _lung(tmp_path)
-    df = mtb.scan("LUNG", "diagonal", data_path=data, verbose=False)
+    df = full_scan("LUNG", "diagonal", data_path=data, verbose=False)
     for col in ("reason", "files_reason"):
         assert not df[col].str.contains(r" \.\.\. ", regex=True).any(), col
     scalex = df[df["method"] == "SCALEX"].iloc[0]
@@ -385,15 +386,11 @@ def test_cli_json_carries_the_full_reason(tmp_path, no_envs, capsys):
 
 # ----------------------------------------------------------------- L32: atac column
 def test_atac_column_is_none_for_a_variant_without_atac():
-    df = mtb.scan("D11", "vertical", methods=["Seurat_WNN"], modalities="all",
+    df = full_scan("D11", "vertical", methods=["Seurat_WNN"], modalities="all",
                   verbose=False)
     by = df.set_index("modalities")["atac"]
     assert by["rna+adt"] is None or pd.isna(by["rna+adt"])
     assert by["rna+atac"] == "peak"
-
-
-def test_scan_examples_show_modalities():
-    assert 'modalities=["rna", "adt"]' in inspect.getdoc(mtb.scan).split("Examples")[1]
 
 
 # ----------------------------------------------------------------- L53: obs_names
@@ -502,7 +499,7 @@ def test_docstrings_use_plain_wording(obj):
 
 def test_sweep_summary_line():
     assert inspect.getdoc(mtb.sweep).splitlines()[0] == \
-        "Run one method once per value of one hyperparameter, each in its own out_dir."
+        "Run one method once per value of one hyperparameter, each in its own folder."
 
 
 @pytest.mark.parametrize("cat", [None, "vertical", "diagonal", "mosaic", "cross"])

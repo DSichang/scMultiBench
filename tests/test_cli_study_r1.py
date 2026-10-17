@@ -69,7 +69,7 @@ def test_info_unknown_method_names_the_cli_listing(capsys):
     rc = cli.main(["info", "Matlida"])
     err = capsys.readouterr().err
     assert rc == 1 and "Did you mean Matilda" in err
-    assert "multibench list shows all methods" in err and "mtb.list_methods()" not in err
+    assert "multibench find shows all methods" in err and "mtb.find_methods()" not in err
     assert "`" not in err
 
 
@@ -296,7 +296,7 @@ def test_cli_runner_help_and_dry_run(tmp_path, capsys):
                    "--out-dir", str(tmp_path), "--dry-run", "--runner", "srun {env_cmd}"])
     out = capsys.readouterr().out
     assert rc == 0 and re.match(r"srun \S*conda run -n matilda python ", out)
-    assert "{env_cmd}" in runner.run.__doc__ and "srun --gres=gpu:1 {env_cmd}" in runner.run.__doc__
+    assert "{env_cmd}" in runner.run.__doc__
 
 
 # ================================================================ L27 total line
@@ -374,7 +374,7 @@ def test_scan_reason_names_the_cli_install_check(no_envs, capsys):
                    "--format", "csv", "--columns", "reason"])
     out = capsys.readouterr().out
     # R7-10: the reason leads with the shell install command, and names no Python call
-    assert rc == 0 and "multibench env install --methods Matilda --packed --run." in out
+    assert rc == 0 and "multibench env install --methods Matilda --run." in out
     assert "mtb.env" not in out
     assert "`" not in out
 
@@ -382,7 +382,7 @@ def test_scan_reason_names_the_cli_install_check(no_envs, capsys):
 def test_evaluate_hints_use_flag_names(tmp_path, capsys):
     np.save(tmp_path / "e.npy", np.zeros((6, 2)))
     pd.DataFrame({"x": list("AABBCC")}).to_csv(tmp_path / "l.csv", index=False)
-    rc = cli.main(["evaluate", "--output", str(tmp_path / "e.npy"),
+    rc = cli.main(["evaluate", "--embedding", str(tmp_path / "e.npy"),
                    "--labels", str(tmp_path / "l.csv"), "--metrics", "batch"])
     err = capsys.readouterr().err
     assert rc == 1 and "Pass --batch CSV, or two or more --labels files." in err
@@ -401,16 +401,18 @@ def test_compact_view_adds_atac_and_caveat_when_they_apply(capsys):
     assert "GLUE reads the GENCODE" in glue and "peak names" not in glue
     rc = cli.main(["scan", "D11", "--category", "vertical", "--modalities", "rna,adt"])
     header = capsys.readouterr().out.splitlines()[0].split()
-    assert rc == 0 and header == cli._COMPACT_PLAN_COLUMNS    # no ATAC row, no caveat
+    assert rc == 0 and header == workflow.COMPACT_COLUMNS    # no ATAC row, no caveat
 
 
 def test_compact_columns_and_word_boundary_clip():
     df = pd.DataFrame({"method": ["A", "B"], "modalities": ["rna+adt", "rna+atac"],
-                       "atac": [None, "peak"], "caveat": ["", None], "reason": ["", ""]})
-    assert cli._compact_plan_columns(df) == ["method", "modalities", "atac", "runnable",
+                       "atac": [None, "peak"], "caveat": ["", None], "reason": ["", ""],
+                       "runnable": True, "files_ok": True, "env_ok": True,
+                       "runtime_tier": "fast"})
+    assert workflow.compact_columns(df) == ["method", "modalities", "atac", "runnable",
                                              "files_ok", "env_ok", "runtime_tier", "reason"]
     df["caveat"] = ["", "needs peaks"]
-    assert cli._compact_plan_columns(df)[-1] == "caveat"
+    assert workflow.compact_columns(df)[-1] == "caveat"
     clipped = cli._truncate("input files not found on disk: atac_gas.h5 not found here", 40)
     assert clipped == "input files not found on disk..." and len(clipped) <= 40
 
@@ -420,7 +422,7 @@ def test_compact_columns_and_word_boundary_clip():
 def fake_eval(monkeypatch):
     seen = {}
 
-    def _fake(**kw):
+    def _fake(embedding, **kw):
         seen.clear()
         seen.update(kw, leiden=config.DEFAULT.leiden_flavor)
         lab = kw["labels"]
@@ -432,11 +434,11 @@ def fake_eval(monkeypatch):
 
 
 def test_evaluate_repeated_labels_and_python_default_metrics(fake_eval, tmp_path):
-    rc = cli.main(["evaluate", "--output", "e.h5", "--labels", "a.csv", "--labels", "b.csv"])
+    rc = cli.main(["evaluate", "--embedding", "e.h5", "--labels", "a.csv", "--labels", "b.csv"])
     assert rc == 0
     assert fake_eval["labels"] == ["a.csv", "b.csv"]          # stacked in order, each a batch
     assert fake_eval["metrics"] is None                       # Python's default set
-    rc = cli.main(["evaluate", "--output", "e.h5", "--labels", "a.csv"])
+    rc = cli.main(["evaluate", "--embedding", "e.h5", "--labels", "a.csv"])
     assert rc == 0 and fake_eval["labels"] == "a.csv"
 
 
@@ -444,7 +446,7 @@ def test_evaluate_column_applies_to_every_labels_file(fake_eval, tmp_path):
     for name, vals in (("a.csv", ["A", "B"]), ("b.csv", ["C"])):
         pd.DataFrame({"bc": [f"c{i}" for i in range(len(vals))], "x": ["?"] * len(vals),
                       "ct": vals}).to_csv(tmp_path / name, index=False)
-    rc = cli.main(["evaluate", "--output", "e.h5", "--labels", str(tmp_path / "a.csv"),
+    rc = cli.main(["evaluate", "--embedding", "e.h5", "--labels", str(tmp_path / "a.csv"),
                    "--labels", str(tmp_path / "b.csv"), "--column", "ct"])
     assert rc == 0 and fake_eval["label_rows"] == [["A", "B"], ["C"]]
     act = next(a for a in _sub("evaluate")._actions if a.dest == "column")
@@ -452,7 +454,7 @@ def test_evaluate_column_applies_to_every_labels_file(fake_eval, tmp_path):
 
 
 def test_evaluate_reads_labels_for_without_labels(fake_eval, capsys):
-    rc = cli.main(["evaluate", "--output", "e.h5", "--dataset", "D28", "--method", "GLUE",
+    rc = cli.main(["evaluate", "--embedding", "e.h5", "--dataset", "D28", "--method", "GLUE",
                    "--category", "diagonal", "--data-path", str(config.DEFAULT.data_path)])
     assert rc == 0
     want = mtb.labels_for("D28", "diagonal", "GLUE")
@@ -460,22 +462,22 @@ def test_evaluate_reads_labels_for_without_labels(fake_eval, capsys):
     assert list(fake_eval["labels"]) == list(want)
     assert "# labels: " in capsys.readouterr().err
     with pytest.raises(SystemExit) as e:
-        cli.main(["evaluate", "--output", "e.h5"])
+        cli.main(["evaluate", "--embedding", "e.h5"])
     assert e.value.code == 2
 
 
 def test_evaluate_leiden_flavor_and_task_deprecation(fake_eval, capsys):
     before = config.DEFAULT.leiden_flavor
-    rc = cli.main(["evaluate", "--output", "e.h5", "--labels", "a.csv",
+    rc = cli.main(["evaluate", "--embedding", "e.h5", "--labels", "a.csv",
                    "--leiden-flavor", "leidenalg"])
     assert rc == 0 and fake_eval["leiden"] == "leidenalg"
     assert config.DEFAULT.leiden_flavor == before                # restored
-    rc = cli.main(["evaluate", "--output", "e.h5", "--labels", "a.csv", "--task", "batch"])
+    rc = cli.main(["evaluate", "--embedding", "e.h5", "--labels", "a.csv", "--task", "batch"])
     err = capsys.readouterr().err
     assert rc == 0 and fake_eval["metrics"] == "batch"
-    assert "warning: --task is deprecated. Use --metrics batch." in err
+    assert "warning: --task is deprecated and will be removed in 0.5. Use --metrics batch." in err
     with pytest.raises(SystemExit) as e:
-        cli.main(["evaluate", "--output", "e.h5", "--labels", "a.csv",
+        cli.main(["evaluate", "--embedding", "e.h5", "--labels", "a.csv",
                   "--task", "dimension_reduction"])
     assert e.value.code == 2
     act = next(a for a in _sub("run-all")._actions if a.dest == "leiden_flavor")
@@ -491,9 +493,9 @@ def test_evaluate_two_label_files_score_the_batch_family(tmp_path, capsys):
     pd.DataFrame({"x": labels[:60]}).to_csv(tmp_path / "l1.csv", index=False)
     pd.DataFrame({"x": labels[60:]}).to_csv(tmp_path / "l2.csv", index=False)
     pd.DataFrame({"x": labels}).to_csv(tmp_path / "clu.csv", index=False)
-    rc = cli.main(["evaluate", "--output", str(tmp_path / "e.npy"),
+    rc = cli.main(["evaluate", "--embedding", str(tmp_path / "e.npy"),
                    "--labels", str(tmp_path / "l1.csv"), "--labels", str(tmp_path / "l2.csv"),
-                   "--clustering", str(tmp_path / "clu.csv"), "--out", str(tmp_path / "m.csv")])
+                   "--clusters", str(tmp_path / "clu.csv"), "--out", str(tmp_path / "m.csv")])
     assert rc == 0
     got = pd.read_csv(tmp_path / "m.csv", index_col=0)
     assert {"ARI", "ASW_batch", "iLISI"} <= set(got.index)
@@ -527,7 +529,8 @@ def test_plot_input_rows_all_removed_by_dataset_is_an_error(tmp_path, monkeypatc
 def test_plot_input_rows_partly_removed_warns(tmp_path, monkeypatch, capsys):
     from multibench import plot as plot_ns
     seen = {}
-    monkeypatch.setattr(multibench, "load_results", lambda **kw: _long("A", "D11"))
+    monkeypatch.setattr(multibench.data.results, "_load_results",
+                        lambda *a, **kw: _long("A", "D11"))
     monkeypatch.setattr(plot_ns, "bubble", lambda df, **kw: seen.update(df=df))
     mine = tmp_path / "mine.csv"
     pd.concat([_long("Mine", "D11"), _long("Other", "MYCITE")]).to_csv(mine, index=False)
@@ -593,7 +596,7 @@ def test_help_text_has_no_internal_names_or_capital_emphasis():
                "FORMAT", "TASK", "LABELS", "BATCH", "METRICS", "OUTPUT", "CATEGORY",
                "MODALITY", "LAYER", "OBSM", "DTYPE", "MODALITIES", "INPUT", "TITLE",
                "RUNNER", "SOURCE", "OVERALL", "AGGREGATE", "TIMEOUT", "PARAM", "METHODS",
-               "COMMAND", "DEFAULT", "CITE", "SCRIPTS", "SKIPPED", "SCALEX"}
+               "COMMAND", "DEFAULT", "CITE", "SCRIPTS", "SKIPPED", "SCALEX", "EMBEDDING"}
     for parser in _all_parsers():
         text = parser.format_help()
         for word in internal:

@@ -41,6 +41,7 @@ from multibench.engine import envs
 from multibench.engine import runner as R
 from tests.test_docs_r4 import _flat, needs_docs
 from tests.test_study_r8_other import _depth, _fetch_error, _plain, _subparser
+from tests.conftest import full_scan
 
 matplotlib.use("Agg")
 
@@ -108,7 +109,7 @@ def _nothing_runnable(dataset, category, **kw):
 
 def test_the_macos_list_counts_only_rows_whose_files_are_present(macos_no_gpu):
     msg = _nothing_runnable("D11", "vertical", modalities="all")
-    plan = mtb.scan("D11", "vertical", verbose=False, modalities="all")
+    plan = full_scan("D11", "vertical", verbose=False, modalities="all")
     lacking = int((~plan["files_ok"]).sum())
     have = len(plan) - lacking
     lines = msg.splitlines()
@@ -164,25 +165,25 @@ def test_labels_for_names_a_missing_folder_as_scan_does(in_tmp):
     with pytest.raises(FileNotFoundError) as e:
         mtb.labels_for("MYCITE", "vertical", "Matilda", data_path="data")
     with pytest.raises(FileNotFoundError) as s:
-        mtb.scan("MYCITE", "vertical", data_path="data", verbose=False)
+        full_scan("MYCITE", "vertical", data_path="data", verbose=False)
     assert str(e.value) == str(s.value)
     assert str(e.value).startswith("The folder data/MYCITE does not exist. data holds D11.")
 
 
 @pytest.mark.parametrize("kw,start", [
-    (dict(category="vertical", clustering="louvain"),
+    # 0.4: the default is the re-run tables; the published ones need source=
+    (dict(category="vertical", clustering="louvain", source="published"),
      "The published tables of vertical have no louvain variant. They have default only."),
     (dict(category="cross", dataset="D52s", source="published"),
-     "The published tables of cross hold D52, not D52s. Pass result_path= to read "
-     "another results folder."),
-    (dict(category="cross", dataset=["D52", "D52s"]),
      "The published tables of cross hold D52, not D52s."),
-    (dict(category="cross", dataset="D99", source="rerun"),
+    (dict(category="cross", dataset=["D52", "D52s"], source="published"),
+     "The published tables of cross hold D52, not D52s."),
+    (dict(category="cross", dataset="D99"),
      "The re-run tables of cross hold D52 and D52s, not D99."),
     (dict(category="cross", dataset="D99", source="both"),
      "The published tables of cross hold D52, not D99. The re-run tables of cross hold "
-     "D52 and D52s, not D99. Pass result_path= to read another results folder."),
-    (dict(dataset="D99", source="rerun"), "The re-run tables hold D11, D11s, "),
+     "D52 and D52s, not D99."),
+    (dict(dataset="D99"), "The re-run tables hold D11, D11s, "),
 ])
 def test_missing_tables_are_named_in_plain_sentences(kw, start):
     with warnings.catch_warnings():
@@ -191,17 +192,19 @@ def test_missing_tables_are_named_in_plain_sentences(kw, start):
             mtb.load_results(**kw)
     msg = str(e.value)
     assert msg.startswith(start), msg
-    assert msg.count("Pass result_path=") <= 1
+    assert "result_path=" not in msg                  # 0.4: no longer suggested
     _plain(msg)
     assert "scib_metric" not in msg and str(RS._SHIPPED_BASE) not in msg
 
 
-def test_the_cli_names_the_result_path_flag(capsys, tmp_path):
+def test_the_cli_names_no_result_path_flag(capsys, tmp_path):
+    # 0.4: --result-path is deprecated and hidden, so the error no longer offers it
     rc = cli.main(["plot", "bubble", "--category", "cross", "--dataset", "D53",
                    "--out", str(tmp_path / "x.png")])
     err = capsys.readouterr().err
     assert rc == 1
-    assert "Pass --result-path to read another results folder." in err, err
+    assert "error: The re-run tables of cross hold D52 and D52s, not D53." in err, err
+    assert "--result-path" not in err and "result_path=" not in err, err
 
 
 # ====================================================== old-style messages
@@ -216,7 +219,7 @@ def _raised(fn, *args, **kw):
 
 
 def test_an_unknown_modality_is_named_in_sentences():
-    e = _raised(mtb.scan, "D11", "vertical", modalities=["rna", "adtt"], verbose=False)
+    e = _raised(full_scan, "D11", "vertical", modalities=["rna", "adtt"], verbose=False)
     assert isinstance(e, ValueError)
     assert str(e) == ("Unknown modality adtt. The tokens are rna, adt (or protein) and "
                       "atac. atac_peak (or peak, peaks) and atac_gas (or gas, "
@@ -273,14 +276,18 @@ def test_the_empty_cli_table_is_a_sentence(capsys):
 
 def test_the_deprecated_evaluate_flags_warn_in_sentences(monkeypatch, capsys):
     from tests.test_cli_parity import _wide
-    monkeypatch.setattr(mtb, "evaluate", lambda **kw: _wide())
-    err = ""
-    for flag in (["--only", "ARI"], ["--task", "clustering"]):
-        assert cli.main(["evaluate", "--output", "e.h5", "--labels", "l.csv", *flag]) == 0
-        err += capsys.readouterr().err
-    assert "warning: --only is deprecated. Use --metrics.\n" in err, err
-    assert "warning: --task is deprecated. Use --metrics clustering.\n" in err, err
+    monkeypatch.setattr(mtb, "evaluate", lambda *a, **kw: _wide())
+    assert cli.main(["evaluate", "--embedding", "e.h5", "--labels", "l.csv",
+                     "--task", "clustering"]) == 0
+    err = capsys.readouterr().err
+    assert ("warning: --task is deprecated and will be removed in 0.5. Use --metrics "
+            "clustering.\n") in err, err
     assert "deprecated;" not in err
+    # 0.4: --only is removed; argparse refuses it
+    with pytest.raises(SystemExit) as e:
+        cli.main(["evaluate", "--embedding", "e.h5", "--labels", "l.csv", "--only", "ARI"])
+    assert e.value.code == 2
+    assert "unrecognized arguments: --only ARI" in capsys.readouterr().err
 
 
 # ================================================================ fetch error
@@ -319,7 +326,7 @@ def test_preflight_is_gone_from_what_users_read():
 # ============================================================ scripts checkout
 def test_scan_names_a_missing_scripts_checkout_in_the_caveat(monkeypatch, tmp_path):
     monkeypatch.setattr(R, "_repo_root_no_fetch", lambda: tmp_path / "no_scripts")
-    plan = mtb.scan("D28", "diagonal", methods=["uniPort"], verbose=False)
+    plan = full_scan("D28", "diagonal", methods=["uniPort"], verbose=False)
     assert plan.loc[0, "caveat"].startswith(R.SCRIPTS_NOT_HERE)
 
 
@@ -341,9 +348,4 @@ def test_changes_page_follows_the_review_of_round_8(capsys, monkeypatch):
     for gone in ("The commands exit with `1`.", "In these three cases",
                  "family headers and key fit", "a scripts checkout"):
         assert gone not in text, gone
-    # the deprecation line the page quotes is the one the command prints
-    from tests.test_cli_parity import _wide
-    monkeypatch.setattr(mtb, "evaluate", lambda **kw: _wide())
-    cli.main(["evaluate", "--output", "e.h5", "--labels", "l.csv", "--only", "ARI"])
-    line = capsys.readouterr().err.strip().splitlines()[-1]
-    assert f"(stderr: `{line}`)" in text, line
+    # the 0.3 --only deprecation line the page quotes is history: 0.4 removed --only

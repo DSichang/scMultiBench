@@ -61,8 +61,7 @@ FENCES = {
                       'ann.index = ann.index + "-1"',
                       'adata = adata[adata.obs["celltype"].notna()].copy()',
                       'kind = adata.var["feature_types"]', 'kind = adata.var["feature_types"]',
-                      'mtb.scan(NAME, "vertical", methods=METHODS, data_path="mydata", '
-                      'per_method=True)'],
+                      'mtb.scan(NAME, "vertical", methods=METHODS, data_path="mydata")'],
     "recipe-labels-csv": ["import pandas as pd",
                           'ann.index = ann.index + "-1"',
                           'adata = adata[adata.obs["celltype"].notna()].copy()'],
@@ -974,7 +973,7 @@ def test_the_label_file_that_the_check_names_depends_on_the_layout(host, tmp_pat
     capsys.readouterr()
     seen = {}
     for folder in (name, "PEAKS"):
-        table = mtb.scan(folder, "diagonal", data_path="mydata", per_method=True)
+        table = mtb.scan(folder, "diagonal", data_path="mydata")
         out = capsys.readouterr().out.splitlines()
         reason = dict(zip(table["method"], table["reason"]))
         seen[folder] = {m: r for m, r in reason.items() if "cty" in r}
@@ -1268,9 +1267,9 @@ def test_donor_recipe(host, tmp_path, monkeypatch, capsys):
     run, show, keep_three = _fences("recipe-donors")
     # the batch metrics that the recipe names
     metrics = list(_quoted("recipe-donors", r"The summary then has the batch metrics `(\w+)`, "
-                                            r"`(\w+)` and `(\w+)`, which say how well the "
-                                            r"donors mix\."))
-    assert metrics == ["ASW_batch", "GC", "iLISI"]
+                                            r"`(\w+)`, `(\w+)`, `(\w+)` and `(\w+)`, which "
+                                            r"say how well the donors mix\."))
+    assert metrics == ["ASW_batch", "ARI_batch", "NMI_batch", "GC", "iLISI"]
     _says("recipe-donors", "The methods do not read `batch=`.")
     for key in VERTICAL:
         (tmp_path / key).mkdir()
@@ -1283,7 +1282,8 @@ def test_donor_recipe(host, tmp_path, monkeypatch, capsys):
         assert sorted(summary["method"]) == sorted(ns["METHODS"])
         assert set(summary["status"]) == {"CHAIN_OK"}, key
         # they are the batch metrics of the summary, with a value for each method
-        assert [c for c in summary.columns if c in mtb.plot.BATCH_METRICS] == metrics
+        batch = set(mtb.catalog.metrics().query("family == 'batch'").metric)
+        assert [c for c in summary.columns if c in batch] == metrics
         assert summary[metrics].notna().all().all()
         assert set(summary["n_batches"]) == {5} and set(summary["batch_source"]) == {"user"}
         # the methods were given the files of the folder, and no donor
@@ -1483,11 +1483,11 @@ def test_quoted_check_lines_are_live(host, tmp_path, monkeypatch, capsys):
         mtb.io.export_dataset(part, "mydata/" + name, rna="X", adt="obsm:protein",
                               labels="obs:celltype", batch="obs:donor", category="cross")
     capsys.readouterr()
-    table = mtb.scan("FIVE", "cross", methods=methods, data_path="mydata", per_method=True)
+    table = mtb.scan("FIVE", "cross", methods=methods, data_path="mydata")
     out = capsys.readouterr().out.splitlines()
     assert out[0].endswith("FIVE holds RNA and ADT, in batches 1-5.")
     assert f"[scan] {more}" in out and table["runnable"].all()
-    table = mtb.scan("TWO", "cross", methods=methods, data_path="mydata", per_method=True)
+    table = mtb.scan("TWO", "cross", methods=methods, data_path="mydata")
     out = capsys.readouterr().out.splitlines()
     assert out[0] == ("[scan] 0 of 2 methods have their input files in TWO. 0 of 2 can run on "
                       "this computer. TWO holds RNA and ADT, in batches 1-2.")

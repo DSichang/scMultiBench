@@ -17,6 +17,7 @@ import warnings
 from pathlib import Path
 
 import pytest
+from tests.conftest import full_scan
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -87,7 +88,7 @@ def test_uinmf_reads_every_batch_of_d52_and_its_two_batch_variant_says_what_it_s
     two = ["rna1", "rna2", "adt1", "adt2"]
     assert list(mtb.labels_for("D52", "cross", "UINMF")) == ["cty1", "cty2", "cty3"]
     assert list(mtb.labels_for("D52", "cross", "UINMF", modalities=two)) == ["cty1", "cty2"]
-    sc = mtb.scan("D52", "cross", methods=["UINMF"], verbose=False)
+    sc = full_scan("D52", "cross", methods=["UINMF"], verbose=False)
     sc = sc[sc.files_ok].set_index("modalities")
     assert sc.at["+".join(two), "caveat"] == "UINMF reads batches 1-2 of 3. Batch 3 is not used."
     assert not sc.at["rna1+rna2+rna3+adt1+adt2+adt3", "caveat"]
@@ -125,10 +126,9 @@ class _Recorder:
         return pd.DataFrame({"Value": [0.5]}, index=["ARI"])
 
 
-def test_end_to_end_evaluates_with_the_backend_of_the_stored_tables(monkeypatch):
-    """Section 8 plots this run next to the stored D11 scores, so section 7
-    sets the stored scores' Leiden backend before evaluate (M03: igraph rows
-    next to stored rows warn)."""
+def test_end_to_end_evaluates_with_the_default_backend(monkeypatch):
+    """Section 7 scores with the default Leiden backend (0.4 stops teaching the
+    leidenalg override) and says scores can differ by up to about 0.1."""
     import numpy as np
     import pandas as pd
     import multibench as mtb
@@ -137,9 +137,10 @@ def test_end_to_end_evaluates_with_the_backend_of_the_stored_tables(monkeypatch)
     ns = {"mtb": _Recorder(mtb, seen), "pd": pd, "emb": np.zeros((3, 2)),
           "labels": mtb.labels_for("D11")}
     exec(_e2e_cell("mtb.evaluate("), ns)
-    assert seen == ["leidenalg"]
-    md = _visible(_markdown(E2E, "## 7. Score"))
-    assert "Leiden backend of the stored scores" in md
+    assert seen == ["igraph"]
+    md = " ".join(_markdown(E2E, "## 7. Score").split())
+    assert "can differ from the stored ones by up to about 0.1" in md
+    assert "leidenalg" not in md
 
 
 def _scores_like_evaluate(flavor):
@@ -149,7 +150,7 @@ def _scores_like_evaluate(flavor):
     import multibench as mtb
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        stored = mtb.load_results("vertical", dataset="D11", source="rerun", methods=["Matilda"])
+        stored = mtb.load_results("vertical", dataset="D11", methods=["Matilda"])
     df = pd.DataFrame({"Value": dict(zip(stored.metric, stored.value))})
     df.attrs = {"leiden_flavor": flavor, "clustering": "sweep",
                 "multibench_version": mtb.__version__, "scib_version": "1.1.7"}

@@ -102,13 +102,6 @@ def test_find_methods_by_task_still_works():
         mtb.find_methods(task="no_such_task")
 
 
-def test_cli_task_help_names_the_live_tasks():
-    p = dict(_walk_parsers(cli.build_parser()))["multibench list"]
-    text = " ".join(p.format_help().split())
-    for task in TASKS:
-        assert task in text, task
-
-
 # ---- user-visible return values and help ------------------------------------
 def test_api_return_values_stay_in_scope():
     found = []

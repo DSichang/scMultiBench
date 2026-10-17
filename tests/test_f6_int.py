@@ -65,7 +65,7 @@ def test_name_alone_with_a_batch_column(tmp_path, capsys):
     a.write_h5ad(tmp_path / "mine.h5ad")
     sheet = _sheet(tmp_path / "obs_sheet.csv", list(a.obs_names))
     one = _barcode_csv(tmp_path / "one.csv", SAMPLES, index=list(a.obs_names))
-    base = ["evaluate", "--output", str(tmp_path / "mine.h5ad"), "--labels",
+    base = ["evaluate", "--embedding", str(tmp_path / "mine.h5ad"), "--labels",
             str(sheet), "--column", "celltype", "--name", "RNA+ADT PCA", "--dataset",
             "MYCITE", "--category", "vertical", "--metrics", "ASW_batch,iLISI"]
     assert _quiet(cli.main, base + ["--batch", str(sheet), "--batch-column", "sample",

@@ -445,19 +445,12 @@ def test_label_order_confidence_stays_within_0_and_1():
 def test_docstrings_state_the_new_rules():
     flat = {k: " ".join(inspect.getdoc(o).split()) for k, o in {
         "rescore": W.BatchResult.rescore, "load_batch": mtb.load_batch,
-        "summary": W.BatchResult.summary, "results": W.BatchResult.results,
         "save": W.BatchResult.save}.items()}
-    assert ("With ``labels=None`` and several label files, ``rescore`` ranks the file "
-            "orders by ARI, which needs one Leiden clustering. It keeps the stored order "
-            "and skips the ranking when ``metrics=`` has no ARI, NMI or iF1.") in flat["rescore"]
     assert "is handed to ``evaluate(metrics=)``" not in flat["rescore"]
     assert ("``None`` = the batch ``run_all`` was given, else each cell's label "
             "file.") in flat["rescore"]
-    assert "the batch that ``run_all(batch=)`` saved is reused" in flat["rescore"]
     # R7-12 (b)
     assert "data_path : path-like | None Folder that holds the dataset folder; " \
         "``None`` = the path each record saved." in flat["load_batch"]
-    assert "``(best - max(runner_up, 0)) / best``" in flat["summary"]
-    assert "data_root" in flat["results"] and "batch_file" in flat["results"]
     assert "``batch_<hash>.csv``" in flat["save"]
     assert "data_path" in inspect.signature(mtb.load_batch).parameters

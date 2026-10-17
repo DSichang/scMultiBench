@@ -81,8 +81,7 @@ def test_labels_for_follows_the_variants_modality_order_when_method_and_category
 
 def test_labels_for_docstring_documents_the_order():
     doc = inspect.getdoc(resolve.labels_for)
-    assert "not alphabetical" in doc and "rna, adt, atac" in doc
-    assert "numeric order" in doc and "list(labels_for(ds).values())" in doc
+    assert "in the method's cell order" in doc and "RNA cells first, then ATAC" in doc
     assert "evaluate(labels=" in doc and "modalities" in doc
 
 

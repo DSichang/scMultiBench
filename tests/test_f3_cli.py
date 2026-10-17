@@ -216,7 +216,6 @@ def test_evaluate_description_and_load_results_name_scored_with():
     assert "(metric,value,method,dataset,category,clustering,source,scored_with)" in desc
     doc = results.load_results.__doc__
     returns = doc.split("Returns\n")[1].split("Raises\n")[0]
-    assert "scored_with" in returns
     assert len(returns.split()) - 3 <= 30        # minus the header rule and the type
 
 

@@ -84,4 +84,3 @@ def test_run_keeps_in_memory_anndata_inputs(tmp_path, monkeypatch):
 def test_run_help_has_no_v1_or_reserved_wording():
     doc = mtb.run.__doc__
     assert "v1" not in doc and "reserved" not in doc
-    assert "currently" in doc

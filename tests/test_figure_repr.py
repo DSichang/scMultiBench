@@ -7,7 +7,7 @@ import multibench as mtb
 
 
 def test_bubble_figure_has_a_png_repr():
-    long = mtb.load_results("vertical", dataset="D11", source="rerun")
+    long = mtb.load_results("vertical", dataset="D11")
     fig = mtb.plot.bubble(long)
     png = fig._repr_png_()
     assert png[:8] == b"\x89PNG\r\n\x1a\n" and len(png) > 10_000

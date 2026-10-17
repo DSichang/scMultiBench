@@ -22,6 +22,7 @@ import pytest
 import multibench as mtb
 from multibench import config
 from multibench.engine import envs, runner
+from tests.conftest import full_scan
 
 FAKE_CONDA = r"""#!/bin/sh
 ROOT="__ROOT__"
@@ -137,12 +138,12 @@ def test_only_the_first_command_in_the_history_decides(tmp_path):
 
 
 def test_scan_reports_the_users_env_and_does_not_run_it(fake_root):
-    row = mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False).iloc[0]
+    row = full_scan("D11", "vertical", methods=["Matilda"], verbose=False).iloc[0]
     assert not row.env_ok and not row.runnable
     assert row.env_reason == (
         f"Environment matilda was not installed by this version of multibench, so it is "
         f"not used. Rename or remove {fake_root / 'envs' / 'matilda'}, then run multibench env "
-        f"install --methods Matilda --packed --run.")
+        f"install --methods Matilda --run.")
 
 
 def test_doctor_names_the_users_env(fake_root):
@@ -209,7 +210,7 @@ def test_run_all_and_the_cli_refuse_the_users_env(fake_root, tmp_path, capsys):
     assert cli.main(argv) == 1
     err = capsys.readouterr().err
     assert (f"so it is not used. Rename or remove {fake_root / 'envs' / 'matilda'}, then "
-            f"run multibench env install --methods Matilda --packed --run.") in err
+            f"run multibench env install --methods Matilda --run.") in err
     assert not (tmp_path / "cli").exists()
 
 

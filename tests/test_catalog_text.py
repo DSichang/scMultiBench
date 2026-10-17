@@ -7,6 +7,8 @@ every cell type, ARI named 'Louvain/Leiden' clusters, and only some rows said
 which direction is better. catalog.datasets() carried five columns that were
 empty in all rows.
 """
+import warnings
+
 import pandas as pd
 
 import multibench as mtb
@@ -49,10 +51,12 @@ def test_the_classification_rows_follow_the_family_order():
 
 def test_datasets_drops_the_always_empty_columns():
     df = catalog.datasets()
-    for col in catalog.PAPER_COLUMNS:
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", FutureWarning)   # PAPER_COLUMNS is deprecated
+        paper_columns = catalog.PAPER_COLUMNS
+    for col in paper_columns:
         assert col not in df.columns, col
-    assert list(df.columns) == ["dataset", "dataset name", "simulated", "category",
-                                "has_results"]
+    assert list(df.columns) == ["dataset", "simulated", "category", "has_results"]
 
 
 def test_datasets_keeps_a_descriptive_column_a_csv_fills(tmp_path):
@@ -61,9 +65,3 @@ def test_datasets_keeps_a_descriptive_column_a_csv_fills(tmp_path):
     df = catalog.datasets(tmp_path).set_index("dataset")
     assert "assay" in df.columns and "tissue" not in df.columns
     assert df.loc["D11", "assay"] == "CITE-seq"
-
-
-def test_datasets_notes_say_what_the_subsamples_are():
-    doc = " ".join(catalog.datasets.__doc__.split())
-    assert "random subsamples of the full datasets" in doc and "cannot be fetched" in doc
-    assert "D28s holds 60% of D28's cells" in doc

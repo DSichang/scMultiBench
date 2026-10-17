@@ -52,38 +52,17 @@ def test_evaluate_records_the_installed_scib():
 def test_evaluate_notes_name_each_neighbourhood():
     doc = " ".join(inspect.getdoc(pipeline.evaluate).split())
     assert "scib 1.x" not in doc
-    assert "``scib >= 1.1``" in doc and 'attrs["scib_version"]' in doc
-    # R3-15: LISI takes the 90 cells nearest by path on scib's own 15-neighbour
-    # graph, not a 90-nearest-neighbour graph in the embedding. R4-10: an
-    # edge's length is its connectivity weight (scib 1.1.7 lisi.py writes
-    # obsp['connectivities'] for knn_graph.o), not its distance
-    assert ("cLISI and iLISI: scib builds scanpy's 15-neighbour graph from the "
-            "embedding. For each cell it takes the 90 cells with the shortest "
-            "paths on that graph, where the length of an edge is its "
-            "connectivity weight (``obsp[\"connectivities\"]``), not its "
-            "distance. Perplexity 30. A cell with fewer than 90 reachable cells "
-            "counts as one label") in doc
-    assert doc.count("90 nearest by path over the connectivity weights of the "
-                     "15-neighbour graph") == 2
+    # 0.4: the Notes that described each neighbourhood are cut from the
+    # docstring; the retired wordings stay out of it
     assert "nearest by path length on it" not in doc
     assert "k0 = 90 neighbours" not in doc
-    assert ("the cluster search (ARI, NMI, ASW, iASW, iF1, ARI_batch, NMI_batch) uses "
-            "scanpy's default 15-neighbour graph without ``use_rep``") in doc
-    assert "GC uses the 15-neighbour graph of the embedding" in doc
-    assert "ARI can be slightly below 0, which means a random clustering" in doc
     # the table is a fenced block: a trailing '::' rendered as text on the site
     assert not [ln for ln in inspect.getdoc(pipeline.evaluate).splitlines()
                 if ln.rstrip().endswith("::")]
 
 
 def test_stated_scib_facts_match_the_requirement_and_scib_defaults():
-    """The Notes restate two facts owned elsewhere; fail when either moves."""
-    import re
-    from pathlib import Path
-    pyproject = (Path(pipeline.__file__).parents[2] / "pyproject.toml").read_text()
-    spec = re.search(r'"scib>=([0-9.]+)"', pyproject).group(1)
-    doc = " ".join(inspect.getdoc(pipeline.evaluate).split())
-    assert f"``scib >= {spec}``" in doc
+    """The scib defaults the LISI scores rely on; fail when one moves."""
     import scib.metrics as me
     for fn in (me.clisi_graph, me.ilisi_graph):
         assert inspect.signature(fn).parameters["k0"].default == 90, fn

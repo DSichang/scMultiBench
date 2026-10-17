@@ -16,6 +16,7 @@ import warnings
 from pathlib import Path
 
 import pytest
+from tests.conftest import full_scan
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -112,7 +113,7 @@ def _scan(name, cat, root, modalities):
     import multibench as mtb
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        df = mtb.scan(name, cat, data_path=root, verbose=False)
+        df = full_scan(name, cat, data_path=root, verbose=False)
     df = df[df.modalities == "+".join(modalities)].set_index("method")
     assert df.index.is_unique
     return df

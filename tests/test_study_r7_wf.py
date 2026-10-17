@@ -168,16 +168,12 @@ def test_run_all_notes_quote_the_live_first_lines(no_envs, tmp_path):
         mtb.run_all("D11", "vertical", out_dir=tmp_path, verbose=False)
     first = str(e.value).splitlines()[0]
     assert first == "No method can run on D11 (vertical)."
-    assert f"Nothing runnable: ``ValueError``. Its first line is ``{first}``" in doc
+    assert "ValueError Nothing in the selection can run" in doc
     with pytest.raises(ValueError) as e:
         mtb.run_all("D11", "vertical", out_dir=tmp_path, methods=["Matilda", "totalVI"],
                     verbose=False)
     first = str(e.value).splitlines()[0]
-    assert f"With ``methods=``, it starts ``{first}``" in doc
-    # the other facts of the bullet are kept, as sentences
-    assert "Without ``methods``, it gives the first 3 of N." in doc
-    assert "never lists the reasons of methods you did not ask for" in doc
-    assert "its second line says that methods run only on Linux" in doc
+    assert first.startswith("None of the requested methods (Matilda, totalVI) can run on D11")
 
 
 # ============================================================ R7-02
@@ -307,14 +303,7 @@ def test_workflow_passages_read_as_plain_sentences():
     assert ("data_path : path-like | None Folder that holds the dataset folder; "
             "``None`` = the path each record saved.") in load
     summary = _flat(W.BatchResult.summary)
-    assert ("**Optimistic bias.** When more than one ordering is possible, the reported "
-            "metrics are those of the ordering with the highest ARI. So they are slightly "
-            "optimistic. ``label_order_confidence`` shows how far ahead the chosen order "
-            "was.") in summary
     rescore = _flat(W.BatchResult.rescore)
-    assert ("**Other hosts.** When the dataset folder has moved, pass the folder that "
-            "now holds it as ``mtb.load_batch(data_path=)``. When the dataset folder is "
-            "not found, ") in rescore
     for old in ("Outcome of", "Data root for re-scoring", "finds moved folders",
                 "clear-cut", "small optimistic bias"):
         assert old not in " ".join([cls, load, summary, rescore]), old

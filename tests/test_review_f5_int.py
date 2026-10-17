@@ -67,7 +67,7 @@ def test_r_row_numbers_score_as_before_on_numbered_obs_names(tmp_path):
     for tag, (lab, bat) in {"r": (rl, rb), "one": (
             _one_column(tmp_path / "l1.csv", CELLTYPE),
             _one_column(tmp_path / "b1.csv", SAMPLES))}.items():
-        assert _quiet(cli.main, ["evaluate", "--output", str(tmp_path / "num.h5ad"),
+        assert _quiet(cli.main, ["evaluate", "--embedding", str(tmp_path / "num.h5ad"),
                                  "--labels", str(lab), "--batch", str(bat), "--metrics",
                                  ",".join(METRICS), "--out", str(tmp_path / tag)]) == 0
     assert pd.read_csv(tmp_path / "r").equals(pd.read_csv(tmp_path / "one"))
@@ -130,7 +130,7 @@ def test_several_barcode_label_files_are_aligned_with_their_batch(tmp_path):
     runs = {"labels": [x for f in files for x in ("--labels", f)],
             "column": [x for f in wide for x in ("--labels", f)] + ["--column", "celltype"]}
     for tag, flags in runs.items():
-        assert _quiet(cli.main, ["evaluate", "--output", str(tmp_path / "mine.h5ad"),
+        assert _quiet(cli.main, ["evaluate", "--embedding", str(tmp_path / "mine.h5ad"),
                                  *flags, "--metrics", ",".join(METRICS),
                                  "--out", str(tmp_path / f"{tag}.csv")]) == 0, tag
         out = pd.read_csv(tmp_path / f"{tag}.csv", index_col=0)["Value"]
