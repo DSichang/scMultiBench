@@ -179,7 +179,7 @@ def _():
 def _():
     e, lab = _emb_and_labels()
     cl = pd.Series(lab).astype("category").cat.codes.to_numpy()
-    v = mtb.evaluate(e, category="vertical", metrics="clustering", labels=lab, clustering=cl)
+    v = mtb.evaluate(e, category="vertical", metrics="clustering", labels=lab, clusters=cl)
     return f"ARI={float(v['Value']['ARI']):.3f}"
 
 @check("evaluate(metrics=[...]) - list of codes, no Leiden clustering")

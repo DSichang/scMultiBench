@@ -30,7 +30,7 @@ import h5py
 import numpy as np
 import pandas as pd
 
-#: suffixes of a CSV-like label file; evaluate() reads a clustering= path with
+#: suffixes of a CSV-like label file; evaluate() reads a clusters= path with
 #: another suffix as an h5, and as_vector() takes other strings as label values
 _LABEL_FILE_SUFFIXES = {".csv", ".tsv", ".txt"}
 

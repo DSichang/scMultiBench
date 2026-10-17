@@ -996,7 +996,7 @@ def evaluate(
     Examples
     --------
     >>> import multibench as mtb
-    >>> mtb.evaluate(res.output, labels=mtb.labels_for("D11"))   # res = mtb.run(...)
+    >>> mtb.evaluate(res.output, labels=mtb.labels_for("D11"))  # res: mtb.run(...)
     >>> mtb.evaluate(adata, labels="celltype", batch="sample", obsm="X_pca")
 
     See Also

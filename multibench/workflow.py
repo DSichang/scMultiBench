@@ -1433,7 +1433,9 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
     for (method, cat), group in df.groupby(["method", "category"], sort=False):
         n_files += bool(group["files_ok"].any())
         if group["runnable"].any():
-            i = group.index[group["runnable"].to_numpy().astype(bool)][0]
+            # the variant run_all runs: the one with the most modalities
+            i = max(group.index[group["runnable"].to_numpy().astype(bool)],
+                    key=lambda i: len(str(group.at[i, "modalities"]).split("+")))
             rows.append((method, cat, group.at[i, "modalities"], True, ""))
             continue
         # the row that speaks for the method: files on disk, families held, fewest missing
@@ -1663,7 +1665,7 @@ def _evaluate_best_order(emb, category, cands, *, metrics=None, user_batch=False
     # for a metric that uses it: evaluate would warn about a batch never given
     use_batch = (user_batch and batch_given) or _names_batch_metric(metrics)
 
-    def _full(lab, batch, clustering=None):
+    def _full(lab, batch, clusters=None):
         several = len(set(np.asarray(batch).tolist())) > 1
         if user_batch and batch_given and not several and metrics is not None \
                 and _names_batch_metric(metrics):
@@ -1680,7 +1682,7 @@ def _evaluate_best_order(emb, category, cands, *, metrics=None, user_batch=False
                                  or _names_batch_metric(chosen))
         return _evaluate(emb, category=category, labels=lab,
                          verbose=False, batch=(batch if multi else None),
-                         clustering=clustering, metrics=chosen)
+                         clusters=clusters, metrics=chosen)
 
     if len(cands) == 1:
         names, lab, batch = cands[0]
@@ -1724,7 +1726,7 @@ def _evaluate_best_order(emb, category, cands, *, metrics=None, user_batch=False
     scored.sort(key=lambda r: -r[0])
     ari, names, lab, batch, clusters = scored[0]
     try:
-        val = _full(lab, batch, clustering=clusters)    # reuses the winning clustering
+        val = _full(lab, batch, clusters=clusters)      # reuses the winning clustering
         if val.attrs.get("clustering") == "user":
             # the clusters came from the screening search, not from the user
             val.attrs.update(clustering="search", leiden_flavor=_escib._resolve_flavor(None))
@@ -2427,8 +2429,9 @@ def _error_tail(error, width: int = 200) -> str:
 def _scan_hint(dataset: str, category: str, *, data_path=None, methods=None,
                modalities=None, allow_atac_mismatch: bool = False,
                assume_gpu: bool = False, every: bool = False) -> str:
-    """The ``mtb.scan`` call (or ``multibench scan`` command) that shows the rows of
-    a ``run_all`` call, with every non-default argument as the caller gave it."""
+    """The ``mtb.run_all(..., dry_run=True)`` call (or ``multibench scan`` command)
+    that shows the rows of a ``run_all`` call, with every non-default argument as
+    the caller gave it."""
     py, cli = [repr(dataset), repr(category)], [dataset, "--category", category]
     if data_path is not None and (os.path.realpath(data_path)
                                   != os.path.realpath(config.DEFAULT.data_path)):
@@ -2449,7 +2452,7 @@ def _scan_hint(dataset: str, category: str, *, data_path=None, methods=None,
     if assume_gpu:
         py.append("assume_gpu=True")
         cli.append("--assume-gpu")
-    return config.hint(f"mtb.scan({', '.join(py)})",
+    return config.hint(f"mtb.run_all({', '.join(py + ['dry_run=True'])})",
                        "multibench scan " + " ".join(shlex.quote(str(a)) for a in cli))
 
 

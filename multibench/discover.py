@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import functools
-import inspect
 import os
 from pathlib import Path
 from urllib.parse import quote as _quote

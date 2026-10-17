@@ -595,7 +595,7 @@ def load_results(
     _retired_tables("load_results", 5, clustering=clustering, source=source,
                     result_path=result_path)
     return _load_results(category, dataset=dataset, methods=methods, metrics=metrics,
-                         clustering=clustering or "default", source=source or "rerun",
+                         clustering=clustering or "default", source=source,
                          result_path=result_path)
 
 
@@ -606,11 +606,12 @@ def _load_results(
     methods: str | list[str] | None = None,
     metrics=None,
     clustering: str = "default",
-    source: str = "rerun",
+    source: str | None = None,
     result_path: Path | str | None = None,
 ) -> pd.DataFrame:
     """:func:`load_results` with the deprecated ``clustering=``, ``source=`` and
-    ``result_path=``, without their warnings."""
+    ``result_path=``, without their warnings. ``source=None`` reads the re-run
+    tables, or every row of a long CSV given as ``result_path``."""
     if clustering not in _CLUSTERING_FILES:
         raise ValueError(
             f"unknown clustering {clustering!r}; valid: {sorted(_CLUSTERING_FILES)}"
@@ -625,6 +626,8 @@ def _load_results(
     wanted_methods = _as_list(methods)
 
     base = _base_path(result_path)
+    if source is None:
+        source = "both" if base.is_file() else "rerun"
     if result_path is not None and not base.exists() and (
             base.suffix.lower() in (".csv", ".tsv") or source not in SOURCES):
         raise FileNotFoundError(
@@ -722,7 +725,8 @@ def _load_results(
                 f"({_SOURCE_WORD.get(source, source)} tables; "
                 f"available: {have_metrics})", UserWarning, stacklevel=4)
         elif out.empty and before:
-            tables = " ".join(x for x in (source, category, "tables") if x)
+            tables = " ".join(x for x in (_SOURCE_WORD.get(source, source), category,
+                                          "tables") if x)
             of = f" of {', '.join(map(str, datasets))}" if datasets else ""
             warnings.warn(
                 f"The {tables}{of} have no {sel.family} scores, so no rows are left. "

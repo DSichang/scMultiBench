@@ -887,7 +887,8 @@ def _cmd_plot(args) -> int:
     inputs = _csv_list(args.input) or []
     if not inputs and args.category is None:
         _usage_error(args, "need --category (stored results) or --input LONG_CSV")
-    for flag, value, new in (("--source", args.source, None),
+    for flag, value, new in (("--source", args.source,
+                              "the default, the package's re-run tables"),
                              ("--result-path", args.result_path, "--input"),
                              ("--na", args.na, None), ("--group", args.group, "--metrics")):
         if value is not None:

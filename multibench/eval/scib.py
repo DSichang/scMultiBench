@@ -543,9 +543,9 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
             needs = ((wanted(_CLUSTER_METRICS) if search_ct else [])
                      + (wanted(_BATCH_CLUSTER_METRICS) if search_bat else []))
             names = config._and_list(needs)
-            # clustering= replaces only the cell-type clusters
-            skip = (config.hint(f"clustering=, or metrics= without {names}",
-                                f"--clustering, or --metrics without {names}")
+            # clusters= replaces only the cell-type clusters
+            skip = (config.hint(f"clusters=, or metrics= without {names}",
+                                f"--clusters, or --metrics without {names}")
                     if set(needs) <= set(_CLUSTER_METRICS) else
                     config.hint(f"metrics= without {names}",
                                 f"--metrics without {names}"))

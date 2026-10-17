@@ -94,8 +94,8 @@ def bar(long_df: pd.DataFrame, *, metrics=None, top: int | None = None,
             f"'value']; missing {sorted(need - have)}")
     if len(long_df) == 0:
         raise ValueError(
-            "long_df has no rows to plot. load_results may have returned none; "
-            "its UserWarning says why.")
+            "long_df has no rows to plot. If it came from load_results, its "
+            "UserWarning says why.")
     family = metrics if isinstance(metrics, str) and metrics in FAMILY_METRICS else None
     if family:
         metrics = FAMILY_METRICS[family]
