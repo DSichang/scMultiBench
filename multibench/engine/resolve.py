@@ -1275,14 +1275,20 @@ def _agreed_label_order(spec, category: str, stems: list[str]) -> list[str] | No
     return list(orders.pop()) if len(orders) == 1 else None
 
 
-def _reordering_methods(stems: list[str], category: str | None,
-                        ds_dir: Path) -> list[tuple[str, str]]:
-    """``(method, category)`` of the methods that can run on ``ds_dir`` and
-    put the cells of the label files ``stems`` in another order than the
-    default one (the order of ``stems``); one pair per method, of
-    ``category`` when given."""
+#: the start of the warning of ``labels_for`` without a method (internal
+#: callers that want the default order filter it with this pattern)
+DEFAULT_ORDER_WARNING = r"labels_for\(.*\) returns the files in the default order"
+
+
+def _reordering_methods(stems: list[str], category: str | None, dataset: str,
+                        base: Path) -> list[tuple[str, str]]:
+    """``(method, category)`` of the methods whose files the folder holds (the
+    file check of ``mtb.scan``) and whose ``labels_for(dataset, category,
+    method)`` puts the label files ``stems`` in another order than the
+    default one (the order of ``stems``); of ``category`` when given."""
     batches = {int(m.group(1)) for st in stems if (m := _NUMBERED_LABEL_RE.fullmatch(st))}
-    out = []
+    ds_dir = base / dataset
+    cands: dict[tuple[str, str], list] = {}
     for spec in registry.load():
         for v in spec.variants:
             cat = v.when.get("category")
@@ -1298,27 +1304,62 @@ def _reordering_methods(stems: list[str], category: str | None,
                 continue
             if sorted(stems, key=lambda st: rank[st]) != list(stems) \
                     and _variant_satisfiable(v, ds_dir, spec.id):
-                out.append((spec.id, cat))
+                cands.setdefault((spec.id, cat), []).append(v)
+    out = []
+    with warnings.catch_warnings():       # the calls below only probe the folder
+        warnings.simplefilter("ignore")
+        for (method, cat), variants in cands.items():
+            try:
+                order = list(labels_for(dataset, cat, method, data_path=base, check=False))
+            except Exception:  # noqa: BLE001 - no order to compare
+                continue
+            if sorted(order) != sorted(stems) or order == list(stems):
+                continue
+            for mods in [None] + [v.when.get("modalities") for v in variants]:
+                try:
+                    inputs_for(dataset, cat, method, modalities=mods, data_path=base,
+                               check=True)
+                except AmbiguousVariantError:
+                    continue
+                except Exception:  # noqa: BLE001 - the files fail scan's file check
+                    break
+                out.append((method, cat))
                 break
     return out
 
 
 def _default_order_warning(dataset: str, category, stems: list[str],
-                           ds_dir: Path) -> str | None:
-    """The warning of ``labels_for`` without a method when some method puts
-    these files' cells in another order, else ``None``."""
+                           base: Path) -> str | None:
+    """The warning of ``labels_for`` without a method when a method whose files
+    the folder holds reads these label files in another order, else ``None``."""
     if len(stems) < 2:
         return None
-    others = _reordering_methods(stems, category, ds_dir)
+    others = _reordering_methods(stems, category, dataset, base)
     if not others:
         return None
-    names = [m for m, _ in others]
-    shown = _and_list(names[:3] + ([f"{len(names) - 3} more"] if len(names) > 3 else []))
-    method, cat = others[0]
-    return (f"labels_for({dataset!r}) has no method: the files are in the default order "
-            f"{', '.join(stems)}, and {shown} {'puts its' if len(names) == 1 else 'put their'} "
-            f"cells in another order. For a method's output, pass "
-            f"labels_for({dataset!r}, {cat!r}, {method!r}).")
+    by_cat: dict[str, list[str]] = {}
+    for m, cat in others:
+        by_cat.setdefault(cat, []).append(m)
+    call = (f"labels_for({dataset!r})" if category is None
+            else f"labels_for({dataset!r}, {category!r})")
+    head = f"{call} returns the files in the default order {', '.join(stems)}."
+
+    def who(names):
+        return f"{_and_list(names)} {'reads' if len(names) == 1 else 'read'}"
+    if len(by_cat) == 1:
+        (cat, names), = by_cat.items()
+        where = "" if category is not None else f"In {cat}, "
+        doer = who(names)
+        method = repr(names[0]) if len(names) == 1 else "<method>"
+        whose = "its" if len(names) == 1 else "their"
+        return (f"{head} {where}{doer} them in another order: pass "
+                f"labels_for({dataset!r}, {cat!r}, {method}) for {whose} output.")
+    parts = [f"in {cat}, {who(names)} them in another order" if i == 0
+             else f"in {cat}, {_and_list(names)} {'does' if len(names) == 1 else 'do'}"
+             for i, (cat, names) in enumerate(by_cat.items())]
+    text = "; ".join(parts)
+    return (f"{head} {text[0].upper()}{text[1:]}: pass labels_for({dataset!r}, "
+            f"<category>, <method>) for their output.")
 
 
 class LabelFiles(dict):
@@ -1528,7 +1569,7 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
              if "scjoint" not in p.name.lower()}
     stems = sorted(files, key=_label_sort_key)
     if method is None:
-        note = _default_order_warning(dataset, category, stems, ds_dir)
+        note = _default_order_warning(dataset, category, stems, base)
         if note:
             warnings.warn(note, UserWarning, stacklevel=2)
     if method is not None and category is not None:

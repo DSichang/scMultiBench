@@ -69,7 +69,8 @@ def test_labels_for_vertical_on_a_per_batch_folder_warns_or_raises(tmp_path):
     # without a method only the default-order warning (StabMap reorders), since 0.4
     with pytest.warns(UserWarning) as rec:
         mtb.labels_for("MB", data_path=tmp_path)
-    assert [str(w.message).split(":")[0] for w in rec] == ["labels_for('MB') has no method"]
+    assert [str(w.message).startswith("labels_for('MB') returns the files in the default "
+                                      "order") for w in rec] == [True]
 
 
 def test_a_single_numbered_file_still_resolves(tmp_path):

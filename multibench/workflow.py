@@ -596,8 +596,8 @@ def _env_hint(env: str, method: str, category: str | None, other=None) -> str:
     if _runner.linux_only_sentence():
         return f"Environment {env} runs only on Linux, not on this computer."
     if other is not None:
-        return (f"{envs.other_env_text(env, other)} Rename or remove it, then run "
-                f"multibench env install --methods {method} --packed --run.")
+        return envs.other_env_text(env, other, f"run multibench env install --methods "
+                                                f"{method} --packed --run.")
     alt = (f" Use --category {category} to install the environments of every "
            f"{category} method." if category else "")
     return (f"Environment {env} is not installed. Run "
@@ -2769,7 +2769,7 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
             blocked = blocked.loc[[r.name for r, _ in shown]]
             lacking = (f"\n{n_lacking} {'row needs' if n_lacking == 1 else 'rows need'} "
                        f"files that {dataset} does not have.")
-    if methods and not every and not (platform and others is not None):
+    if methods and not every and not lacking:
         # the rows whose files the folder holds; the others are only counted
         held = [i for i, r in blocked.iterrows() if _inputs_on_disk(r, dataset, data_path)]
         if held and len(held) < len(blocked):
@@ -2897,8 +2897,10 @@ def _label_file_sizes(dataset, category=None, method=None, *, modalities=None,
                       data_path=None) -> list:
     """``[(file name, cells)]`` of ``labels_for(...)``; ``[]`` when unreadable."""
     try:
-        files = _resolve.labels_for(dataset, category, method, modalities=modalities,
-                                    data_path=data_path, check=False)
+        with warnings.catch_warnings():     # the default order is meant without a method
+            warnings.filterwarnings("ignore", message=_resolve.DEFAULT_ORDER_WARNING)
+            files = _resolve.labels_for(dataset, category, method, modalities=modalities,
+                                        data_path=data_path, check=False)
         return [(Path(p).name, len(_eio.read_labels(p))) for p in files.values()]
     except Exception:  # noqa: BLE001 - no label files: nothing to compare against
         return []
