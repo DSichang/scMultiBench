@@ -2214,8 +2214,8 @@ def build_parser() -> argparse.ArgumentParser:
                      help=_BATCH_COLUMN_HELP)
     adv.add_argument("--leiden-flavor", dest="leiden_flavor", choices=["igraph", "leidenalg"],
                      help="Leiden backend of the clustering when scoring (default: "
-                          "shown by multibench config). Scores can differ by up to "
-                          "about 0.1 between the two")
+                          "leidenalg, the article's, as multibench config shows). "
+                          "Scores can differ by up to about 0.1 between the two")
     pra.set_defaults(func=_cmd_run_all, _parser=pra)
 
     # ---- evaluate
@@ -2278,9 +2278,9 @@ def build_parser() -> argparse.ArgumentParser:
                                       "when there are two or more batches and "
                                       "--category is not vertical")
     pe.add_argument("--leiden-flavor", dest="leiden_flavor", choices=["igraph", "leidenalg"],
-                    help="Leiden backend of the clustering (default: shown by "
-                         "multibench config). Scores can differ by up to about 0.1 "
-                         "between the two")
+                    help="Leiden backend of the clustering (default: leidenalg, the "
+                         "article's, as multibench config shows). Scores can differ "
+                         "by up to about 0.1 between the two")
     pe.add_argument("--missing-labels", dest="missing_labels", choices=["error", "drop"],
                     default="error",
                     help="what to do when a label is missing. error (default) stops. "

@@ -90,11 +90,13 @@ def test_default_reads_the_config_field(monkeypatch):
     assert _asked(seen) == {_eff("igraph")}
 
 
-def test_shipped_default_is_igraph():
-    """``config.DEFAULT.leiden_flavor`` defaults to ``"igraph"``; a Config
-    without the field (older checkouts) resolves to the same."""
-    assert getattr(config.DEFAULT, "leiden_flavor", "igraph") == "igraph"
-    assert S._resolve_flavor(None) == _eff("igraph")
+def test_shipped_default_is_leidenalg():
+    """0.4: ``config.DEFAULT.leiden_flavor`` defaults to ``"leidenalg"``, the
+    article's backend and the stored tables'; igraph stays selectable."""
+    assert config.DEFAULT.leiden_flavor == "leidenalg"
+    assert config.Config().leiden_flavor == "leidenalg"
+    assert S._resolve_flavor(None) == "leidenalg"
+    assert S._resolve_flavor("igraph") == _eff("igraph")
 
 
 def test_unknown_flavor_raises():

@@ -185,9 +185,9 @@ class Config:
         ``mtb.scan`` and ``mtb.run_all`` use it. Default
         ``$MULTIBENCH_DATA_PATH``, else ``<base>/data``.
     leiden_flavor : str
-        Leiden backend of the clustering in ``mtb.evaluate``: ``"igraph"``
-        (default, faster) or ``"leidenalg"``. Scores can differ by up to about
-        0.1 between the two.
+        Leiden backend of the clustering in ``mtb.evaluate``: ``"leidenalg"``
+        (default, the article's and the stored tables') or ``"igraph"``
+        (faster). Scores can differ by up to about 0.1 between the two.
     envs_dir : pathlib.Path
         Where the method environments live (``<envs_dir>/<env>``). Default
         ``$MULTIBENCH_ENVS_DIR``, else the first writable envs folder of the
@@ -210,7 +210,7 @@ class Config:
     files_path: Path = field(default_factory=lambda: _ROOT / "multibench" / "files")
     repo_path: Path = _LazyPath(_default_repo_path, cache=False)
     data_path: Path = _LazyPath(_default_data_path, cache=False)
-    leiden_flavor: str = "igraph"
+    leiden_flavor: str = "leidenalg"
     envs_dir: Path = _LazyPath(_default_envs_dir, cache=True)
 
 
@@ -406,7 +406,7 @@ def _sources(cfg: Config | None = None) -> list[dict]:
                             if cfg.result_path == _ROOT / "multibench" / "result"
                             else "set in Python")})
     rows.append({"name": "leiden_flavor", "value": cfg.leiden_flavor,
-                 "source": "default" if cfg.leiden_flavor == "igraph" else "set in Python"})
+                 "source": "default" if cfg.leiden_flavor == "leidenalg" else "set in Python"})
     return rows
 
 
