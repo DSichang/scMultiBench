@@ -1114,6 +1114,7 @@ def _scan_note(df: "pd.DataFrame", dataset: str, data_path=None,
     command line); ``""`` when every row is listed."""
     if not df.attrs.get("not_listed"):
         return ""
+    dataset, data_path = _resolve.split_dataset(dataset, data_path)
     base = Path(data_path) if data_path is not None else config.DEFAULT.data_path
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")       # scan warned about the spelling

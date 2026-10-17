@@ -264,8 +264,15 @@ def _check_representation(spec, modalities) -> None:
 
 def missing_dataset_message(base, dataset: str) -> str:
     """The error for a dataset folder that does not exist, listing the
-    folders ``base`` holds."""
+    folders ``base`` holds. A bare name that is a folder of the working directory,
+    not of the default data path, gets the path to pass instead."""
     base = Path(base)
+    here = Path(str(dataset))
+    default = Path(os.path.abspath(config.DEFAULT.data_path))
+    if len(here.parts) == 1 and here.is_dir() and Path(os.path.abspath(base)) == default:
+        path = f"./{dataset}"
+        return (f"The folder {base / dataset} does not exist. {path} exists here: pass "
+                + config.hint(f"{path!r}.", f"{path}."))
     dirs = sorted(p.name for p in base.iterdir() if p.is_dir()) if base.is_dir() else []
     holds = (f"{base} holds {_and_list(dirs)}." if dirs else
              f"{base} holds no folders." if base.is_dir() else
