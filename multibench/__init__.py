@@ -47,7 +47,7 @@ for _name, _module in (("io", io), ("catalog", catalog), ("env", env)):
     _sys.modules.setdefault(f"{__name__}.{_name}", _module)
 del _sys, _name, _module
 
-__version__ = "0.3.9"
+__version__ = "0.4.0"
 
 __all__ = [
     # sub-namespaces
