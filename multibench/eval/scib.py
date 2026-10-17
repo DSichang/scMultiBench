@@ -445,7 +445,7 @@ def count_error(what: str, n: int, n_cells: int) -> str:
     """``'labels has 3,000 entries for 7,500 cells in the embedding.'``
 
     ``what`` is the argument of ``mtb.evaluate`` that holds ``n`` values:
-    ``labels``, ``clustering`` or ``batch``.
+    ``labels``, ``clusters`` or ``batch``.
     """
     return f"{what} has {n:,} entries for {n_cells:,} cells in the embedding."
 

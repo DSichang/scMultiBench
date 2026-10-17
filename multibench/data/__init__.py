@@ -7,3 +7,8 @@ from .fetch import fetch, fetch_outputs  # noqa: F401
 from .results import fetchable  # noqa: F401  (the downloadable reference datasets)
 
 __all__ = ["fetch", "fetch_outputs", "fetchable", "write_example"]
+
+
+def __dir__() -> list[str]:
+    """Only the public names and dunders (PEP 562); the submodules stay importable."""
+    return sorted(set(__all__) | {n for n in globals() if n.startswith("__")})

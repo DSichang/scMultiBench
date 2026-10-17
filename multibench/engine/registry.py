@@ -164,14 +164,14 @@ def load() -> list[MethodSpec]:
 def check_method(method_id: str) -> str:
     """The registry id of a method name: an id in any letter case
     (``"totalvi"``) or a display name (``"MOFA+"``, ``"Seurat(WNN)"``, as
-    ``mtb.catalog.canonical_id`` reads them). Anything else raises
+    ``catalog._canonical_id`` reads them). Anything else raises
     ``KeyError`` with :func:`unknown_method_message`."""
     ids = [s.id for s in load()]
     if method_id in ids:
         return method_id
     if isinstance(method_id, str):
         from ..data import catalog          # lazy: catalog imports registry lazily
-        canon = catalog.canonical_id(method_id)
+        canon = catalog._canonical_id(method_id)
         if canon in ids:
             return canon
     raise KeyError(unknown_method_message(method_id))
@@ -183,7 +183,7 @@ def unknown_method_message(method_id, hint: str | None = None) -> str:
     hint = closest_method(method_id) if hint is None else hint
     return (f"Unknown method {method_id}."
             + (f" Did you mean {hint}?" if hint else "")
-            + " " + config.hint("mtb.list_methods()", "multibench list")
+            + " " + config.hint("mtb.find_methods()", "multibench find")
             + " shows all methods.")
 
 

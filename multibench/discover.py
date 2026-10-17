@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 from urllib.parse import quote as _quote
 
+from . import _compat
 from .config import _and_list
 from .engine import registry, upstream, envs
 from .engine import resolve as _resolve
@@ -68,11 +69,30 @@ def _variant_matches(v, category, want, needs_labels, atac) -> bool:
     return True
 
 
-def find_methods(category: str | None = None, *, task: str | None = None,
+def _with_task(ids: list[str], task: str | None) -> list[str]:
+    """``ids`` whose method declares ``task`` (the deprecated ``task=`` filter)."""
+    registry.check_task(task)
+    return [m for m in ids if task is None or task in registry.get(m).tasks]
+
+
+def _retired_filters(fn):
+    """``find_methods`` with its deprecated keywords: ``task=`` still filters,
+    ``runnable=`` has no effect."""
+    @functools.wraps(fn)
+    def find(*args, task=None, runnable=None, **kwargs):
+        if task is not None:
+            _compat.deprecated("find_methods(task=)", "category=")
+        if runnable is not None:
+            _compat.deprecated("find_methods(runnable=)")
+        return _with_task(fn(*args, **kwargs), task)
+    return find
+
+
+@_retired_filters
+def find_methods(category: str | None = None, *,
                  needs_labels: bool | None = None,
                  atac: str | None = None,
                  modalities: list[str] | set[str] | None = None,
-                 runnable: bool | None = None,
                  tunable: bool | None = None) -> list[str]:
     """Return the method ids that match every filter you pass.
 
@@ -84,8 +104,6 @@ def find_methods(category: str | None = None, *, task: str | None = None,
     category : str | None
         Integration category: ``vertical``, ``diagonal``, ``mosaic`` or
         ``cross``; ``None`` = any.
-    task : str | None
-        A task from ``mtb.list_tasks()``, e.g. ``"clustering"``; ``None`` = any.
     needs_labels : bool | None
         ``True`` = a matching variant needs cell-type labels; ``False`` = one
         runs without them; ``None`` = no filter.
@@ -96,10 +114,6 @@ def find_methods(category: str | None = None, *, task: str | None = None,
         Modalities a variant must consume, e.g. ``["rna", "adt"]``;
         ``"atac_peak"`` / ``"atac_gas"`` also select by ATAC representation.
         ``None`` = no filter.
-    runnable : bool | None
-        ``True`` = methods with a variant the package runs (not a check of
-        your host: see ``mtb.scan``); ``False`` = declared stubs; ``None`` =
-        both.
     tunable : bool | None
         ``True`` = methods with command-line hyperparameters that
         ``run(params=...)`` can set; ``False`` = the rest (settings fixed in
@@ -113,7 +127,7 @@ def find_methods(category: str | None = None, *, task: str | None = None,
     Raises
     ------
     ValueError
-        Unknown ``category``, ``task``, ``atac`` or modality token, or a
+        Unknown ``category``, ``atac`` or modality token, or a
         token that contradicts ``atac``.
     TypeError
         ``modalities`` is a bare string, not a list.
@@ -129,8 +143,8 @@ def find_methods(category: str | None = None, *, task: str | None = None,
 
     Notes
     -----
-    **Per-variant matching.** ``task``, ``runnable`` and ``tunable`` are
-    method-level; the other four filters hold per variant. Two consequences:
+    **Per-variant matching.** ``tunable`` is method-level; the other four
+    filters hold per variant. Two consequences:
 
     - ``find_methods('vertical', modalities=['rna', 'adt'], needs_labels=False)``
       looks at the label need of the vertical rna+adt variant alone, not at
@@ -179,25 +193,16 @@ def find_methods(category: str | None = None, *, task: str | None = None,
 
     See Also
     --------
-    mtb.list_methods : the same ids filtered by ``category`` only.
-
-    mtb.list_tasks : the vocabulary of ``task=``.
-
     mtb.method_info : the per-variant ``supports`` table these filters are read from.
 
     mtb.scan : which of these methods can actually run on a given dataset.
     """
     registry.check_category(category)
-    registry.check_task(task)
     want, atac = _modality_filter(modalities, atac)
     both = _reads_both_files(modalities)
     out = []
     for s in registry.load():
         if category and category not in s.categories:
-            continue
-        if task and task not in s.tasks:
-            continue
-        if runnable is not None and bool(s.variants) != runnable:
             continue
         if tunable is not None and any(v.tunable for v in s.variants) != tunable:
             continue
@@ -216,68 +221,8 @@ def find_methods(category: str | None = None, *, task: str | None = None,
     return out
 
 
-def _find_methods_filters_raise(fn):
-    """Keyword guard of ``list_methods``: a ``find_methods`` filter raises a
-    ``TypeError`` naming ``find_methods``; another keyword gets Python's message."""
-    @functools.wraps(fn)
-    def guard(*args, **kwargs):
-        extra = [k for k in kwargs if k != "category"]
-        if extra:
-            filters = set(inspect.signature(find_methods).parameters) - {"category"}
-            unknown = [k for k in extra if k not in filters]
-            if unknown:
-                raise TypeError(
-                    f"list_methods() got an unexpected keyword argument {unknown[0]!r}")
-            keys = ", ".join(f"{k}=..." for k in extra)
-            raise TypeError(
-                f"list_methods() only takes category since 0.3.0; {keys} are find_methods "
-                f"filters - use find_methods(category, {keys})")
-        return fn(*args, **kwargs)
-    return guard
-
-
-@_find_methods_filters_raise
-def list_methods(category: str | None = None) -> list[str]:
-    """Return the method ids, optionally restricted to one category.
-
-    Parameters
-    ----------
-    category : str | None
-        Integration category: ``vertical``, ``diagonal``, ``mosaic`` or
-        ``cross``; ``None`` = every method.
-
-    Returns
-    -------
-    list[str]
-        Method ids in the package's order.
-
-    Raises
-    ------
-    ValueError
-        Unknown ``category``; the message lists the valid ones.
-    TypeError
-        A keyword other than ``category``. For a ``find_methods`` filter such as
-        ``task=`` the message names the call to use: ``find_methods(category, task=...)``.
-
-    Examples
-    --------
-    >>> import multibench as mtb
-    >>> mtb.list_methods()                 # every method id
-    >>> mtb.list_methods("vertical")       # ids with a vertical variant
-
-    Notes
-    -----
-    A method is listed under a category when it has a variant for that
-    category - the same set ``scan``, ``run_all`` and
-    ``find_methods(category=)`` dispatch.
-
-    See Also
-    --------
-    mtb.find_methods : filter by task, modalities, labels, ATAC representation and more.
-
-    mtb.list_categories : the four category tokens with a description of each.
-    """
-    return registry.list_methods(category)
+#: deprecated alias of :func:`find_methods`
+list_methods = _compat.renamed("list_methods", "find_methods", find_methods)
 
 
 def _effective(v) -> dict:
@@ -301,7 +246,7 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     Parameters
     ----------
     method : str
-        Method id, e.g. ``"Matilda"``; see ``mtb.list_methods()``.
+        Method id, e.g. ``"Matilda"``; see ``mtb.find_methods()``.
     verbose : bool
         ``True`` adds ``notes_long``, the long upstream-audit notes.
 
@@ -522,7 +467,7 @@ def params_for(method: str, category: str | None = None,
     Parameters
     ----------
     method : str
-        Method id, e.g. ``"Matilda"``; see ``mtb.list_methods()``.
+        Method id, e.g. ``"Matilda"``; see ``mtb.find_methods()``.
     category : str | None
         Integration category of the variant: ``vertical``, ``diagonal``,
         ``mosaic`` or ``cross``; ``None`` = infer it from the other arguments.
@@ -622,6 +567,8 @@ def params_for(method: str, category: str | None = None,
 
     mtb.AmbiguousVariantError : raised when several variants fit the selection.
     """
+    if dataset is not None:
+        dataset, data_path = _resolve.split_dataset(dataset, data_path)
     s = registry.get(method)
     method = s.id
     registry.check_category(category)
@@ -769,7 +716,8 @@ def _format_entry(tag: str, ref: dict, fmt: str) -> str:
     return line
 
 
-def cite(*methods, fmt: str = "text") -> str:
+@_compat.keywords("cite", fmt="format")
+def cite(*methods, format: str = "text") -> str:
     """Return citation text for the benchmark and, optionally, the methods you ran.
 
     Parameters
@@ -777,7 +725,7 @@ def cite(*methods, fmt: str = "text") -> str:
     *methods : str | list[str]
         Method ids, one per argument or as one list; ``"all"`` = every
         method; none = the benchmark only.
-    fmt : str
+    format : str
         ``"text"`` (one line per entry) or ``"bibtex"`` (one ``@article`` per
         entry).
 
@@ -790,7 +738,7 @@ def cite(*methods, fmt: str = "text") -> str:
     Raises
     ------
     ValueError
-        ``fmt`` is neither ``"text"`` nor ``"bibtex"``; the message lists both.
+        ``format`` is neither ``"text"`` nor ``"bibtex"``; the message lists both.
     KeyError
         Unknown method id; the message suggests a close match, if any.
     TypeError
@@ -803,7 +751,7 @@ def cite(*methods, fmt: str = "text") -> str:
     >>> print(mtb.cite("Matilda", "MOFA2"))
     >>> res = mtb.load_batch("out/")
     >>> ran = res.summary.query("status not in ['SKIPPED', 'FAIL', 'TIMEOUT']")
-    >>> print(mtb.cite(ran.method, fmt="bibtex"))      # methods that finished
+    >>> print(mtb.cite(ran.method, format="bibtex"))      # methods that finished
 
     Notes
     -----
@@ -830,8 +778,8 @@ def cite(*methods, fmt: str = "text") -> str:
     mtb.method_info : carries the same ``reference``, ``repo_url`` and ``version`` per method.
     """
     args = list(methods)
-    if fmt not in _CITE_FORMATS:
-        raise ValueError(f"unknown fmt {fmt!r}; valid: {list(_CITE_FORMATS)}")
+    if format not in _CITE_FORMATS:
+        raise ValueError(f"unknown format {format!r}; valid: {list(_CITE_FORMATS)}")
     if not args:
         ids: list[str] = []
     elif len(args) == 1 and not isinstance(args[0], str):
@@ -845,14 +793,14 @@ def cite(*methods, fmt: str = "text") -> str:
                 f"cite(): method ids must be strings, got {type(bad[0]).__name__}; "
                 f"pass one list (cite(['Matilda', 'MOFA2'])) or one id per argument")
         ids = [registry.check_method(m) for m in args]
-    parts = [_format_entry("scMultiBench", registry.benchmark_reference(), fmt)]
+    parts = [_format_entry("scMultiBench", registry.benchmark_reference(), format)]
     for m in ids:
         s = registry.get(m)
         ref = s.reference.get("reference")
         if ref:
-            parts.append(_format_entry(m, ref, fmt))
+            parts.append(_format_entry(m, ref, format))
         else:
             url = s.reference.get("repo_url") or "(no repo_url)"
             note = f"{m}: no verified reference; see {url}"
-            parts.append(("% " + note) if fmt == "bibtex" else note)
-    return "\n\n".join(parts) if fmt == "bibtex" else "\n".join(parts)
+            parts.append(("% " + note) if format == "bibtex" else note)
+    return "\n\n".join(parts) if format == "bibtex" else "\n".join(parts)

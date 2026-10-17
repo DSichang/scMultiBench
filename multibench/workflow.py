@@ -27,7 +27,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import config
+from . import _compat, config
 from .config import _and_list
 from .discover import _REPRESENTATION_TOKENS, _runtimes
 from .engine import envs, registry, resolve as _resolve
@@ -37,8 +37,7 @@ from .engine.runner import run as _run
 from .eval import io as _eio, scib as _escib
 from .eval.pipeline import LONG_COLUMNS as _LONG_COLUMNS, evaluate as _evaluate, to_long as _to_long
 
-__all__ = ["scan", "run_all", "BatchResult", "list_categories", "describe_layout",
-           "load_batch", "sweep"]
+__all__ = ["scan", "run_all", "BatchResult", "describe_layout", "load_batch", "sweep"]
 
 
 def _registry_id_or(name):
@@ -177,26 +176,12 @@ OLDER_NAMES = ("Older names still read: peak.h5 for peaks, and atac.h5 for gene 
                "activity.")
 
 
-def list_categories() -> dict:
-    """Return the valid ``category`` values with a plain-language description of each.
-
-    Returns
-    -------
-    dict
-        ``{category: description}`` for ``vertical``, ``diagonal``, ``mosaic``
-        and ``cross``: the values ``mtb.run_all`` requires as ``category``.
-
-    Examples
-    --------
-    >>> import multibench as mtb
-    >>> mtb.list_categories()["vertical"]
-    'Several modalities measured in the same cells ...'
-
-    See Also
-    --------
-    mtb.describe_layout : the file layout each category expects.
-    """
+def _categories() -> dict:
+    """``{category: description}`` (the deprecated ``list_categories``)."""
     return dict(CATEGORIES)
+
+
+list_categories = _compat.renamed("list_categories", "describe_layout", _categories)
 
 
 def describe_layout(category: str | None = None) -> str:
@@ -254,8 +239,6 @@ def describe_layout(category: str | None = None) -> str:
 
     See Also
     --------
-    mtb.list_categories : the four categories with a description of each.
-
     mtb.scan : checks a laid-out folder (``files_ok`` / ``files_reason`` per method).
 
     mtb.io.export_dataset : writes a whole dataset in this layout from an AnnData.
@@ -288,7 +271,7 @@ def describe_layout(category: str | None = None) -> str:
               "per cell.",
               "",
               "Each method runs in its own environment, on Linux. Install one with:",
-              "  multibench env install --methods X --packed --run",
+              "  multibench env install --methods X --run",
               config.hint("mtb.scan", "multibench scan") + " checks the files and the "
               "environment for each method (columns files_ok, env_ok).",
               config.hint(
@@ -584,7 +567,27 @@ SCAN_COLUMNS = ["method", "category", "modalities", "env", "output_kind", "n_tun
                 "files_ok", "files_reason", "env_ok", "env_reason", "needs_labels", "atac",
                 "command"]
 
-#: Default ``out_dir`` of :func:`scan`'s ``command`` column: a preview needs no
+#: The columns :func:`scan` returns, and ``multibench scan`` prints by default.
+COMPACT_COLUMNS = ["method", "modalities", "runnable", "files_ok", "env_ok",
+                   "runtime_tier", "reason"]
+
+
+def compact_columns(df) -> list[str]:
+    """:data:`COMPACT_COLUMNS`, plus ``category`` when the rows span several,
+    ``atac`` when a row reads an ATAC file and ``caveat`` when any row has one."""
+    cols = list(COMPACT_COLUMNS)
+    if "category" in df.columns and df["category"].nunique() > 1:
+        cols.insert(1, "category")
+    if "atac" in df.columns and "modalities" in df.columns and any(
+            "atac" in str(m) for m in df["modalities"]):
+        cols.insert(cols.index("modalities") + 1, "atac")
+    if "caveat" in df.columns and any(str(c).strip() not in ("", "None", "nan")
+                                      for c in df["caveat"]):
+        cols.insert(cols.index("reason") + 1, "caveat")
+    return [c for c in cols if c in df.columns]
+
+
+#: Default ``out_dir`` of the plan's ``command`` column: a preview needs no
 #: real directory.
 OUT_DIR_PLACEHOLDER = "<out_dir>"
 
@@ -597,11 +600,11 @@ def _env_hint(env: str, method: str, category: str | None, other=None) -> str:
         return f"Environment {env} runs only on Linux, not on this computer."
     if other is not None:
         return envs.other_env_text(env, other, f"run multibench env install --methods "
-                                                f"{method} --packed --run.")
+                                                f"{method} --run.")
     alt = (f" Use --category {category} to install the environments of every "
            f"{category} method." if category else "")
     return (f"Environment {env} is not installed. Run "
-            f"multibench env install --methods {method} --packed --run.{alt}")
+            f"multibench env install --methods {method} --run.{alt}")
 
 
 #: ``.format(method=)`` caveat of a GPU-only row that ``scan(assume_gpu=True)``
@@ -1127,11 +1130,12 @@ def scan(dataset: str, category: str | None = None, *,
          verbose: bool = True,
          assume_gpu: bool = False,
          allow_atac_mismatch: bool = False,
-         per_method: bool = False) -> pd.DataFrame:
-    """Report what can run on a dataset, why the rest cannot, and each command.
+         per_method=None) -> pd.DataFrame:
+    """Report what can run on a dataset and why the rest cannot.
 
     Nothing is executed. Call it first on a new dataset;
-    ``run_all(dry_run=True)`` returns the same frame.
+    ``run_all(dry_run=True)`` returns the full plan, with every column and the
+    command of each row.
 
     Parameters
     ----------
@@ -1163,9 +1167,6 @@ def scan(dataset: str, category: str | None = None, *,
     allow_atac_mismatch : bool
         ``True`` = keep a row runnable when its ATAC file holds the other
         representation or peak names the method cannot read.
-    per_method : bool
-        ``True`` = one row per method with the columns ``method``,
-        ``runnable`` and ``reason``; needs ``category``.
 
     Returns
     -------
@@ -1280,7 +1281,7 @@ def scan(dataset: str, category: str | None = None, *,
     ``atac_peak.h5`` in its order. ``env_ok``: the method's conda env exists
     and multibench installed it, on Linux; ``env_reason`` names the env and
     the one-method install command (``multibench env install --methods X
-    --packed --run``), names an env of the same name that multibench did not
+    --run``), names an env of the same name that multibench did not
     install (it is not used), or on macOS and Windows says it runs only on
     Linux (``multibench env doctor`` checks every env). For
     a method with ``requires_gpu``, the host also needs an NVIDIA GPU. Without
@@ -1344,14 +1345,14 @@ def scan(dataset: str, category: str | None = None, *,
 
     mtb.inputs_for : the ``{role: path}`` resolution behind ``files_ok``.
     """
-    if per_method and category is None:
-        raise ValueError(f"per_method=True needs a category, as "
-                         f"mtb.scan({dataset!r}, 'vertical', per_method=True).")
+    if per_method is not None:
+        _compat.deprecated("scan(per_method=)", "scan(); run_all(dry_run=True) "
+                                                "returns one row per variant")
     df, private = _scan(dataset, category, methods=methods, modalities=modalities,
                         data_path=data_path, out_dir=out_dir, params=params,
-                        verbose=verbose and not per_method, assume_gpu=assume_gpu,
+                        verbose=verbose and per_method is False, assume_gpu=assume_gpu,
                         allow_atac_mismatch=allow_atac_mismatch, stacklevel=3)
-    if not per_method:
+    if per_method is False:
         return df
     return _per_method(df, private, data_path=data_path, verbose=verbose,
                        nested=not isinstance(modalities, (list, tuple)))
@@ -1362,8 +1363,10 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
           verbose: bool = True, assume_gpu: bool = False,
           allow_atac_mismatch: bool = False,
           stacklevel: int = 2) -> "tuple[pd.DataFrame, pd.DataFrame]":
-    """:func:`scan`'s frame, and a second frame aligned with it: ``_other`` (the
+    """The full plan (every column of :data:`SCAN_COLUMNS`), and a second frame
+    aligned with it: ``_other`` (the
     reason without the off-Linux sentence), ``_label_inputs`` and ``_folder_caveat``."""
+    dataset, data_path = _resolve.split_dataset(dataset, data_path)
     registry.check_category(category)
     registry.check_id_list(methods, "methods")
     every, modalities = _every_combination(modalities)
@@ -1575,21 +1578,27 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
     dataset, ds_dir = private.attrs["dataset"], private.attrs["folder"]
     rows, reasons, n_files = [], [], 0
     held = set(df.attrs["held"])
-    for method, group in df.groupby("method", sort=False):
+    several = df["category"].nunique() > 1
+    for (method, cat), group in df.groupby(["method", "category"], sort=False):
         n_files += bool(group["files_ok"].any())
         if group["runnable"].any():
-            rows.append((method, True, ""))
+            i = group.index[group["runnable"].to_numpy().astype(bool)][0]
+            rows.append((method, cat, group.at[i, "modalities"], True, ""))
             continue
         # the row that speaks for the method: files on disk, families held, fewest missing
         i = min(group.index, key=lambda i: (
             not _inputs_on_disk(group.loc[i], dataset, data_path),
             len(_row_families(group.at[i, "modalities"]) - held),
             _missing_inputs(group.loc[i], dataset, data_path), i))
-        rows.append((method, False, group.at[i, "reason"]))
+        rows.append((method, cat, group.at[i, "modalities"], False, group.at[i, "reason"]))
         reasons.append((method, private.at[i, "_other"]))
-    out = pd.DataFrame(rows, columns=["method", "runnable", "reason"])
-    order = out.sort_values(["runnable", "method"], ascending=[False, True]).index
+    out = pd.DataFrame(rows, columns=["method", "category", "modalities", "runnable",
+                                      "reason"])
+    order = out.sort_values(["runnable", "method", "category"],
+                            ascending=[False, True, True]).index
     out = out.loc[order].reset_index(drop=True)
+    if not several:
+        out = out.drop(columns="category")
     cells = _cells_per_file(ds_dir)
     out.attrs = {**df.attrs, "cells": cells}
     if not verbose:
@@ -1619,10 +1628,10 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
     print(line, flush=True)
     if cells:
         print(f"[scan] {_cells_line(cells)}", flush=True)
-    by_name = dict(reasons)
-    for method in out["method"]:
-        if by_name.get(method):
-            print(f"[scan] {method}: {by_name[method]}", flush=True)
+    if not several:                   # one category: why each method cannot run
+        for method, reason in sorted(reasons):
+            if reason:
+                print(f"[scan] {method}: {reason}", flush=True)
     would = [i for i, r in df.iterrows() if _would_run(r)]
     if nested:
         would = [i for i in would if i not in set(_nested_rows(df.loc[would])[0])]
@@ -1980,7 +1989,9 @@ class BatchResult:
     Attributes
     ----------
     records : list[dict]
-        The per-method records (the same list ``results`` returns).
+        One dict per method: ``method``, ``status``, ``out_dir``, ``metrics``
+        and, where they apply, the run's provenance and the label orderings
+        tried (``label_order_candidates``).
     dataset : str
         Dataset folder name.
     category : str
@@ -2119,7 +2130,7 @@ class BatchResult:
         --------
         BatchResult.failures : the rows whose status means something went wrong.
 
-        BatchResult.results : the raw records with every ordering tried.
+        BatchResult.records : the raw records with every ordering tried.
         """
         rows = []
         for r in self.records:
@@ -2216,55 +2227,7 @@ class BatchResult:
 
     @property
     def results(self) -> list:
-        """The raw per-method records: status, out_dir, metrics and the orderings tried.
-
-        Returns
-        -------
-        list[dict]
-            One dict per method. Read ``method``, ``status``, ``out_dir`` and
-            ``metrics`` first; the other keys are listed in Notes.
-
-        Examples
-        --------
-        >>> res = mtb.load_batch("out/")
-        >>> [r["out_dir"] for r in res.results]
-        >>> res.results[0].get("label_order_candidates")  # None with a single ordering
-
-        Notes
-        -----
-        **Record keys.** A key is present only when it applies:
-
-        ```text
-        method, category, dataset   what ran, and on what
-        modalities                  the variant's modality roles
-        status                      outcome (see BatchResult.summary)
-        out_dir                     the method's output folder
-        metrics                     {metric: value}, rounded to 4 places
-        params_used                 the hyperparameter overrides passed
-        run_sec, emb_shape          timing and embedding shape
-        labels_used                 the label file(s) behind the metrics
-        label_order_candidates      every label ordering tried, with its ARI
-        batch_source, n_batches     the batch vector the batch metrics used
-        batch_file                  the file in out_dir that holds a user batch
-        error, traceback, note      why a method failed, was skipped or was not scored
-        requested                   SKIPPED records: True when methods= named it
-        reused                      True when skip_existing reused the output
-        env, output_kind, n_tunable the scan row the method ran from
-        caveat                      that row's caveat, or ""
-        data_path, multibench_version, started_at   provenance of the run
-        data_root                   data_path as an absolute path
-        scripts_commit, env_flavor, hostname        the scripts, env build and
-                                    computer of the run that made the output
-        _long                       internal; read BatchResult.long instead
-        ```
-
-        ``label_order_candidates`` holds every ordering tried and its ARI.
-        ``summary``'s ``label_order_confidence`` is computed from them.
-
-        See Also
-        --------
-        BatchResult.summary : the same records as a table.
-        """
+        _compat.deprecated("BatchResult.results", "BatchResult.records")
         return self.records
 
     @property
@@ -3645,6 +3608,7 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
 
     mtb.run : one method, one variant, with explicit inputs.
     """
+    dataset, data_path = _resolve.split_dataset(dataset, data_path)
     # the arguments first, so a bad combination is not reported as an I/O error
     registry.check_category(category)
     registry.check_id_list(methods, "methods")
@@ -3893,7 +3857,7 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
     category : str
         Integration category of the variant to run.
     method : str
-        Method id, e.g. ``"Matilda"``; see ``mtb.list_methods()``.
+        Method id, e.g. ``"Matilda"``; see ``mtb.find_methods()``.
     param : str
         Hyperparameter to sweep; one of the variant's ``tunable`` keys
         (``mtb.params_for``).
@@ -3965,6 +3929,7 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
 
     mtb.run_all : what each setting runs through.
     """
+    dataset, data_path = _resolve.split_dataset(dataset, data_path)
     method = registry.check_method(method)
     values = list(values)
 

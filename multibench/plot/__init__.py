@@ -11,8 +11,9 @@ deprecated 0.2.x name of ``bubble``.
 """
 from . import bubble as _bubble_module
 from . import style
+from .. import _compat
 from .bubble import (bubble, plot_bubble, build_table, render, BubbleTable,
-                     FamilyBlock, FAMILIES)
+                     FamilyBlock, FAMILIES as _FAMILIES)
 from .bar import bar, CLUSTERING_METRICS, BATCH_METRICS, CLASSIFICATION_METRICS
 
 # the 0.2.x attribute paths (``mtb.plot.bubble.build_table`` ...) until 0.4
@@ -23,8 +24,15 @@ bubble.style = style
 bubble.__module__ = "multibench.plot"
 del _n
 
-__all__ = ["bubble", "bar", "build_table", "BubbleTable", "FAMILIES",
-           "CLUSTERING_METRICS", "BATCH_METRICS", "CLASSIFICATION_METRICS"]
+__all__ = ["bubble", "bar", "build_table", "BubbleTable"]
+
+__getattr__ = _compat.module_getattr(__name__, "plot", {
+    "FAMILIES": (_FAMILIES, "catalog.metrics()"),
+    "CLUSTERING_METRICS": (CLUSTERING_METRICS, "catalog.metrics()"),
+    "BATCH_METRICS": (BATCH_METRICS, "catalog.metrics()"),
+    "CLASSIFICATION_METRICS": (CLASSIFICATION_METRICS, "catalog.metrics()"),
+})
+del CLUSTERING_METRICS, BATCH_METRICS, CLASSIFICATION_METRICS
 
 
 def __dir__() -> list[str]:

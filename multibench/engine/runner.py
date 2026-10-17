@@ -11,7 +11,7 @@ import warnings
 from dataclasses import dataclass
 from pathlib import Path
 
-from .. import config
+from .. import _compat, config
 from . import builder, io, ingest, registry, envs
 from .schema import _batch_of, base_modality, is_label_role
 
@@ -642,10 +642,10 @@ def check_gpu_requirement(spec) -> None:
         raise OSError(spec.requires_gpu_reason)
 
 
+@_compat.keywords("run", task=None, convert=None)
 def run(method: str, category: str, *, inputs: dict, out_dir: str,
-        params: dict | None = None, task: str | None = None, convert: bool = True,
-        cmd_template: str | None = None, repo_path: Path | None = None,
-        dry_run: bool = False):
+        params: dict | None = None, cmd_template: str | None = None,
+        dry_run: bool = False, repo_path=None):
     """Run one method on explicit inputs and load its output.
 
     Use it for full control over one run; ``mtb.run_all`` runs and scores
@@ -654,7 +654,7 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     Parameters
     ----------
     method : str
-        Method id, e.g. ``"Matilda"``; see ``mtb.list_methods()``.
+        Method id, e.g. ``"Matilda"``; see ``mtb.find_methods()``.
     category : str
         Integration category of the variant: ``vertical``, ``diagonal``,
         ``mosaic`` or ``cross``.
@@ -666,17 +666,9 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     params : dict | None
         Hyperparameter overrides merged over the variant's defaults, keyed
         by parameter name (``mtb.params_for``); ``None`` = the defaults.
-    task : str | None
-        Accepted for forward compatibility; currently ignored.
-    convert : bool
-        Convert modality inputs to the canonical ``.h5`` layout before the run.
     cmd_template : str | None
         Launcher template: ``{cmd}`` = the bare command, ``{env_cmd}`` = the
         command inside the method env; ``None`` = enter the method env.
-    repo_path : Path | None
-        Checkout holding ``tools_scripts/``; ``None`` =
-        ``mtb.config.DEFAULT.repo_path`` if it has one, else the package root
-        if it has one, else a clone into the former.
     dry_run : bool
         ``True`` = return the command without running it or writing anything.
 
@@ -745,7 +737,6 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     a peak file the method needs renamed ``<out_dir>/inputs/<role>_normpeaks.h5``.
     A MuData raises ``ValueError``: pass one modality per role
     (``mdata.mod["rna"]``) or write the folder with ``mtb.io.export_dataset``.
-    With ``convert=False`` every modality input must be a file path.
     Before anything runs, canonical ``.h5`` inputs get the cell checks of
     ``mtb.inputs_for(check=True)``: Seurat_v5's ``rna`` and ``atac_peak`` must
     hold the same cells, and a diagonal ``atac_gas`` file must list the cells
@@ -806,6 +797,8 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
 
     mtb.evaluate : scores ``RunResult.output``.
     """
+    if repo_path is not None:
+        _compat.deprecated("run(repo_path=)", "config.DEFAULT.repo_path", stacklevel=4)
     _check_template(cmd_template)
     method = registry.check_method(method)
     inputs = _rename_old_roles(method, inputs)
@@ -816,8 +809,8 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     mismatch = _atac_mismatch_caveats(method, category, inputs)
     if dry_run:
         argv, notes = preview(method, category, inputs=inputs, out_dir=out_dir,
-                              params=params, convert=convert,
-                              cmd_template=cmd_template, repo_path=repo_path)
+                              params=params, cmd_template=cmd_template,
+                              repo_path=repo_path)
         notes = _missing_input_notes(method, inputs) + notes
         for note in notes + mismatch:
             print(f"# {note}", file=sys.stderr, flush=True)
@@ -857,20 +850,19 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
             raise EnvironmentError(envs.other_env_text(
                 env_name, other,
                 config.hint(f"call mtb.env.install([{method!r}], dry_run=False).",
-                            f"run multibench env install --methods {method} --packed "
-                            f"--run.")))
+                            f"run multibench env install --methods {method} --run.")))
         if have and env_name not in have:
             py = f" In Python, call mtb.env.install([{method!r}], dry_run=False)."
             raise EnvironmentError(
                 f"Environment {env_name} of {method} is not installed. Run "
-                f"multibench env install --methods {method} --packed --run."
+                f"multibench env install --methods {method} --run."
                 + config.hint(py, ""))
 
     inputs, out_str = normalize_paths(inputs, out_dir)
     out = Path(out_str)
     inputs_dir = out / "inputs"
     # every input-format check before anything is written or fetched
-    plan = _plan_inputs(variant, inputs, inputs_dir, convert=convert, real=True)
+    plan = _plan_inputs(variant, inputs, inputs_dir, convert=True, real=True)
     repo = _fetch_scripts(repo_path)
     provide_script_files(spec, variant, repo)
     out.mkdir(parents=True, exist_ok=True)
@@ -883,7 +875,7 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
             ingest.to_canonical(step["src"], out=inputs_dir / f"{role}.h5",
                                 **_convert_kw(role))
         if step["normpeaks_from"] is not None:
-            ingest.normalize_peak_names(step["normpeaks_from"], step["value"])
+            ingest._normalize_peak_names(step["normpeaks_from"], step["value"])
         values[role] = step["value"]
     cmd = _argv(variant, method, values, out_str, repo, params, cmd_template)
     # a {cmd} template runs the method in the caller's env, whose build is not ours

@@ -232,8 +232,8 @@ def _expand_families(metrics, available) -> list:
 
     def in_figure_order(names):
         return sorted(names, key=lambda a: (
-            paper.index(catalog.canonical_metric(a))
-            if catalog.canonical_metric(a) in paper else len(paper), str(a)))
+            paper.index(catalog._canonical_metric(a))
+            if catalog._canonical_metric(a) in paper else len(paper), str(a)))
 
     requested = [metrics] if isinstance(metrics, str) else list(metrics)
     available = [a for a in available if a is not None]
@@ -244,7 +244,7 @@ def _expand_families(metrics, available) -> list:
             out += in_figure_order(available)
         elif word in FAMILY_METRICS:
             codes = FAMILY_METRICS[word]
-            got = [a for a in available if catalog.canonical_metric(a) in codes]
+            got = [a for a in available if catalog._canonical_metric(a) in codes]
             if not got:
                 raise ValueError(f"The table has no {word} metrics. It has "
                                  f"{_and_distinct(sorted(map(str, available)))}.")
@@ -431,12 +431,12 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     df = df.dropna(subset=["metric"])
     if methods is not None:
         methods = _resolve(methods, df["method"].unique().tolist(), "method",
-                           catalog.canonical_id)
+                           catalog._canonical_id)
         df = df[df["method"].isin(methods)]
     if metrics is not None:
         metrics = _expand_families(metrics, df["metric"].unique().tolist())
         metrics = _resolve(metrics, df["metric"].unique().tolist(), "metric",
-                           catalog.canonical_metric)
+                           catalog._canonical_metric)
         df = df[df["metric"].isin(metrics)]
     if df.empty:
         raise ValueError("no rows left after applying methods=/metrics= filters")
@@ -551,7 +551,7 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     # stable sort: tied methods keep alphabetical order, as in plot.bar
     ranked = combined.sort_values(ascending=False, kind="mergesort").index.tolist()
     if order is not None:
-        order = _resolve(order, raw_all.index.tolist(), "method", catalog.canonical_id)
+        order = _resolve(order, raw_all.index.tolist(), "method", catalog._canonical_id)
         rows = order + [m for m in ranked if m not in order]
     else:
         rows = ranked
@@ -724,11 +724,7 @@ def _na_message(missing: list, df: pd.DataFrame, aggregate: str,
         sentences.append("Its Overall uses the metrics it has." if len(missing) == 1
                          else "Each row's Overall uses the metrics it has.")
     if na == "raise":
-        sentences.append(_config.hint("Pass na='warn' to draw the figure with these gaps.",
-                                      "Pass --na warn to draw the figure with these gaps."))
-    else:
-        sentences.append(_config.hint("Pass na='skip' to hide this message.",
-                                      "Pass --na skip to hide this message."))
+        sentences.append("Pass na='warn' to draw the figure with these gaps.")
     return " ".join(sentences)
 
 
@@ -1078,10 +1074,10 @@ def _fit_width(fig, ax, pad_pt=3.0, rounds=4):
         fig.tight_layout()
 
 
+@_compat.keywords("plot.bubble", na=None, cmap=None, show_language=None)
 def bubble(long_df, *, metrics=None, methods=None, order=None,
-           aggregate="dataset", cmap=None, title=None, save=None,
-           show_language=True, require_complete=False, overall="rank",
-           na="warn"):
+           aggregate="dataset", title=None, save=None, require_complete=False,
+           overall="rank"):
     """Draw the paper-style bubble table: methods as rows, metrics as columns.
 
     Metrics are grouped into task families, each led by an *Overall* bar;
@@ -1107,16 +1103,11 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
         ``"dataset"``: one dataset's values, drawn as circles. ``"summary"``:
         within-dataset ranks averaged across datasets, drawn as bars (the
         paper's panel c).
-    cmap : str | None
-        Matplotlib colormap for the first family; ``None`` = blues, greens,
-        pinks and purples per family.
     title : str | None
         Figure title; ``None`` = no title.
     save : str or path-like | None
         File to write the figure to (tight bounding box); the suffix picks
         the format, e.g. ``.pdf``, ``.png``, ``.svg``.
-    show_language : bool
-        Draw the ``Py`` / ``R`` chip left of each row (Notes).
     require_complete : bool
         With ``aggregate="summary"``: keep only the methods present in every
         dataset.
@@ -1124,9 +1115,6 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
         Across-dataset *Overall*: ``"rank"`` re-ranks mean ranks (missing
         dataset = rank 0); ``"mean_overall"`` averages per-dataset Overalls
         (missing dataset skipped). Applies under ``aggregate="summary"``.
-    na : {"warn", "skip", "raise"}
-        How to report ``n/a`` cells (a method lacking a metric): warn once,
-        stay silent, or raise.
 
     Returns
     -------
@@ -1179,7 +1167,7 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
       methods each column holds the higher and the lower one; a
       ``UserWarning`` says so.
 
-    **Chips** (``show_language``). ``Py`` / ``R`` = language; ``?`` = a name
+    **Chips.** ``Py`` / ``R`` = language; ``?`` = a name
     the package does not know, such as your own or a renamed re-run.
 
     See Also
@@ -1191,11 +1179,11 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
     """
     tbl = build_table(long_df, metrics=metrics, methods=methods, order=order,
                       aggregate=aggregate, require_complete=require_complete,
-                      overall=overall, na=na)
+                      overall=overall)
     if len(tbl.methods) == 2:
         import warnings
         warnings.warn(style.TWO_METHODS, UserWarning, stacklevel=2)
-    fig = render(tbl, cmap=cmap, title=title, show_language=show_language)
+    fig = render(tbl, title=title)
     if save is not None:
         fig.savefig(save, bbox_inches="tight")
     return fig

@@ -12,7 +12,7 @@ same parameter names where a flag exists (``--category``, ``--metrics``,
     multibench info Matilda                            # env, GPU, labels, ATAC input
     multibench params Matilda                          # what --param accepts
     multibench run --method Matilda --category vertical --input rna=... --out-dir runs/Matilda
-    multibench evaluate --output runs/Matilda/embedding.h5 --labels data/MYCITE/cty.csv \\
+    multibench evaluate --embedding runs/Matilda/embedding.h5 --labels data/MYCITE/cty.csv \\
         --method Matilda --dataset MYCITE --category vertical --out runs/Matilda/long.csv
     multibench plot bubble --category vertical --dataset D11 --out fig.pdf
     multibench cite Matilda MOFA2
@@ -57,7 +57,7 @@ import numpy as np
 import pandas as pd
 
 import multibench
-from . import __version__, config, discover, workflow
+from . import __version__, _compat, config, discover, workflow
 from . import plot as plot_ns
 from .config import _and_list
 from .data.results import _unpublished_msg
@@ -103,9 +103,6 @@ def _tri_state(value) -> bool | None:
     return _TRI[value]
 
 
-#: The columns ``scan`` / ``run-all --dry-run`` print by default in table mode.
-_COMPACT_PLAN_COLUMNS = ["method", "modalities", "runnable", "files_ok", "env_ok",
-                         "runtime_tier", "reason"]
 #: Free-text columns are clipped to this many characters in the default table view.
 _TRUNCATE_WIDTH = 80
 _TRUNCATE_COLUMNS = ("reason", "files_reason", "env_reason", "caveat", "command", "error")
@@ -133,18 +130,6 @@ def _blank(value) -> bool:
     if isinstance(value, float) and value != value:
         return True
     return str(value).strip() in ("", "None", "nan")
-
-
-def _compact_plan_columns(df) -> list[str]:
-    """:data:`_COMPACT_PLAN_COLUMNS`, plus ``atac`` when a row reads an ATAC file
-    and ``caveat`` when any row has one."""
-    cols = list(_COMPACT_PLAN_COLUMNS)
-    if "atac" in df.columns and "modalities" in df.columns and any(
-            "atac" in str(m) for m in df["modalities"]):
-        cols.insert(cols.index("modalities") + 1, "atac")
-    if "caveat" in df.columns and not all(_blank(c) for c in df["caveat"]):
-        cols.insert(cols.index("reason") + 1, "caveat")
-    return cols
 
 
 def _resolve_columns(df, columns, fmt: str, compact=None) -> list | None:
@@ -282,22 +267,31 @@ def _platform_note() -> str | None:
 
 
 # ----------------------------------------------------------------- commands
+def _retired_find_flags(args) -> None:
+    """The warnings of ``list`` / ``find``'s deprecated ``--task`` and ``--runnable``."""
+    if args.task is not None:
+        _compat.deprecated("--task", "--category")
+    if args.runnable:
+        _compat.deprecated("--runnable")
+
+
 def _cmd_list(args) -> int:
-    """``multibench list``: method ids, one per line (``find_methods`` filters)."""
-    for m in discover.find_methods(category=args.category, task=args.task,
-                                   runnable=args.runnable or None):
+    """``multibench list`` (deprecated): ``multibench find --category``."""
+    _compat.deprecated("multibench list", "multibench find")
+    _retired_find_flags(args)
+    for m in discover._with_task(discover.find_methods(category=args.category), args.task):
         print(m)
     return _EXIT_OK
 
 
 def _cmd_find(args) -> int:
     """``multibench find``: :func:`multibench.find_methods` with the same filters."""
-    for m in discover.find_methods(category=args.category, task=args.task,
-                                   needs_labels=_tri_state(args.needs_labels),
-                                   atac=args.atac,
-                                   modalities=_csv_list(args.modalities),
-                                   runnable=args.runnable or None,
-                                   tunable=_tri_state(args.tunable)):
+    _retired_find_flags(args)
+    ids = discover.find_methods(category=args.category,
+                                needs_labels=_tri_state(args.needs_labels),
+                                atac=args.atac, modalities=_csv_list(args.modalities),
+                                tunable=_tri_state(args.tunable))
+    for m in discover._with_task(ids, args.task):
         print(m)
     return _EXIT_OK
 
@@ -308,14 +302,14 @@ def _cmd_scan(args) -> int:
     methods = _csv_list(args.methods)
     for m in methods or []:
         registry.check_method(m)               # did-you-mean KeyError before any I/O
-    df = multibench.scan(args.dataset, args.category, methods=methods,
-                         data_path=args.data_path,
-                         modalities=_modalities_arg(args.modalities), verbose=False,
-                         assume_gpu=args.assume_gpu,
-                         allow_atac_mismatch=args.allow_atac_mismatch)
+    df, _ = workflow._scan(args.dataset, args.category, methods=methods,
+                           data_path=args.data_path,
+                           modalities=_modalities_arg(args.modalities), verbose=False,
+                           assume_gpu=args.assume_gpu,
+                           allow_atac_mismatch=args.allow_atac_mismatch)
     shown = _strict_table(df) if args.strict else df
     _print_frame(shown, columns=_csv_list(args.columns), fmt=args.format,
-                 compact=_compact_plan_columns(df))
+                 compact=workflow.compact_columns(df))
     note = _scan_note(df, args.dataset, args.data_path, args.category)
     code = _EXIT_OK
     if args.strict:
@@ -783,7 +777,7 @@ def _cmd_cite(args) -> int:
     # cite A,B as well: every other multi-id flag of the CLI is comma-separated
     ids = [m for tok in (args.methods or []) for m in _csv_list(tok)]
     methods = "all" if args.all else (ids or None)
-    text = discover.cite(methods, fmt=args.format)
+    text = discover.cite(methods, format=args.format)
     if args.out:
         Path(args.out).write_text(text + "\n")
         print(f"wrote {args.out}")
@@ -814,10 +808,8 @@ def _load_long_input(path) -> pd.DataFrame:
 
 #: ``load_results`` keywords in its messages -> ``plot`` flags; longest pattern first.
 _API_TO_FLAGS = (
-    (r"result_path= / mtb\.config\.DEFAULT\.result_path", "--result-path"),
-    (r"result_path=<file>", "--result-path <file>"),
-    (r"result_path=", "--result-path"),
     (r"\b(source|category)=['\"](\w+)['\"]", r"--\1 \2"),
+    (r"\bsource=", "--source"),
     (r"\(or '(\w+)'\)", r"(or \1)"),
 )
 
@@ -832,10 +824,10 @@ def _cli_spelling(message: str) -> str:
 def _unpublished_plot_msg(category: str, inputs) -> str:
     """``plot``'s error for a category without published tables (mosaic)."""
     if inputs:
-        return (f"{category} has no published tables. Pass --source rerun to plot your "
+        return (f"{category} has no published tables. Leave out --source to plot your "
                 f"rows with the package's re-run tables, or drop --category to plot "
                 f"your rows alone.")
-    return (f"{category} has no published tables. Pass --source rerun to plot the "
+    return (f"{category} has no published tables. Leave out --source to plot the "
             f"package's re-run tables.")
 
 
@@ -895,15 +887,18 @@ def _cmd_plot(args) -> int:
     inputs = _csv_list(args.input) or []
     if not inputs and args.category is None:
         _usage_error(args, "need --category (stored results) or --input LONG_CSV")
+    for flag, value, new in (("--source", args.source, None),
+                             ("--result-path", args.result_path, "--input"),
+                             ("--na", args.na, None), ("--group", args.group, "--metrics")):
+        if value is not None:
+            _compat.deprecated(flag, new)
+    source = args.source or "rerun"
     frames = []
     if args.category is not None:
-        from . import load_results
-        kw = dict(category=args.category, dataset=_csv_list(args.dataset),
-                  source=args.source)
-        if args.result_path:
-            kw["result_path"] = args.result_path
+        from .data.results import _load_results
         try:
-            frames.append(load_results(**kw))
+            frames.append(_load_results(args.category, dataset=_csv_list(args.dataset),
+                                        source=source, result_path=args.result_path))
         except FileNotFoundError as e:
             if str(e) == _unpublished_msg(args.category):
                 raise FileNotFoundError(_unpublished_plot_msg(args.category, inputs)) from e
@@ -921,7 +916,7 @@ def _cmd_plot(args) -> int:
             own_methods = sorted(set().union(*[set(f["method"].astype(str)) for f in frames[1:]]))
             print(f"# Added your {own_rows} row{'' if own_rows == 1 else 's'} "
                   f"({', '.join(own_methods)}) to the stored {args.category} table, "
-                  f"which has {len(frames[0])} rows (source {args.source}).",
+                  f"which has {len(frames[0])} rows (source {source}).",
                   file=sys.stderr)
     methods = _csv_list(args.methods)
     if methods and args.kind == "bar":
@@ -941,21 +936,18 @@ def _cmd_plot(args) -> int:
     if title is None:
         title = " ".join(x for x in (args.category, args.dataset) if x) or None
     metrics = _csv_list(args.metrics)
-    if args.kind == "bubble":
-        kw = dict(metrics=metrics, methods=methods, aggregate=args.aggregate,
-                  title=title, save=args.out, require_complete=args.require_complete,
-                  na=args.na)
-        if args.overall is not None:
-            kw["overall"] = args.overall
-        with _quiet_stdout():
-            plot_ns.bubble(df, **kw)
-    else:
-        kw = dict(metrics=metrics, group=args.group, top=args.top, title=title,
-                  save=args.out)
-        if args.overall is not None:
-            kw["overall"] = args.overall
-        with _quiet_stdout():
-            plot_ns.bar(df, **kw)
+    if metrics is not None and len(metrics) == 1 and metrics[0] in _METRIC_FAMILIES:
+        metrics = metrics[0]
+    if args.group is not None:
+        metrics = args.group
+    with _quiet_stdout():
+        if args.kind == "bubble":
+            plot_ns.bubble(df, metrics=metrics, methods=methods, aggregate=args.aggregate,
+                           title=title, save=args.out, overall=args.overall,
+                           require_complete=args.require_complete)
+        else:
+            plot_ns.bar(df, metrics=metrics, top=args.top, title=title, save=args.out,
+                        overall=args.overall)
     print(f"wrote {args.out}")
     return _EXIT_OK
 
@@ -975,6 +967,8 @@ def _parse_inputs(pairs, args) -> dict:
 
 def _cmd_run(args) -> int:
     """``multibench run``: :func:`multibench.run` one method on explicit inputs."""
+    if args.task is not None:
+        _compat.deprecated("--task")
     args.method = registry.check_method(args.method)     # any case, or a display name
     params = _parse_params(args.param, args, default_method=args.method)
     inputs = _parse_inputs(args.input, args)
@@ -998,7 +992,7 @@ def _cmd_run(args) -> int:
         print(shlex.join(argv))
         return _EXIT_OK
     with _quiet_stdout():
-        res = multibench.run(method=args.method, category=args.category, task=args.task,
+        res = multibench.run(method=args.method, category=args.category,
                            inputs=inputs, out_dir=args.out,
                            params=params.get(args.method) or None,
                            cmd_template=args.runner)
@@ -1065,7 +1059,8 @@ def _run_all_command(args, stack) -> int:
                                         args.data_path)
             if bad:          # the scoring of the real run would fail: exit 1 now
                 raise ValueError(bad)
-        _print_frame(df, columns=columns, fmt=args.format, compact=_compact_plan_columns(df))
+        _print_frame(df, columns=columns, fmt=args.format,
+                     compact=workflow.compact_columns(df))
         if args.format == "table" and not columns:
             have = df[df["command"].astype(str).str.len() > 0]
             print()
@@ -1333,6 +1328,15 @@ def _unknown_method_message(method, name=None, files=()) -> str:
 def _cmd_evaluate(args) -> int:
     """``multibench evaluate``: :func:`multibench.evaluate` on an embedding file; with
     ``--method`` or ``--name``, ``--dataset`` and ``--category`` the long table (``to_long``)."""
+    for flag, value, new in (("--output", args.output, "--embedding"),
+                             ("--clustering", args.clustering, "--clusters"),
+                             ("--cluster", args.cluster, "--clusters")):
+        if value is not None:
+            _compat.deprecated(flag, new)
+    embedding = args.embedding or args.output
+    if embedding is None:
+        _usage_error(args, "the following arguments are required: --embedding")
+    clusters = args.clusters or args.clustering or args.cluster
     name = args.name
     long_mode = args.method is not None or args.dataset is not None or name is not None
     if long_mode:
@@ -1352,25 +1356,17 @@ def _cmd_evaluate(args) -> int:
             # with --name, --method only sets the label order: it must be known
             raise KeyError(_unknown_method_message(args.method, name,
                                                    args.labels or ())) from None
-    # --only and --task are older spellings of --metrics
     metrics = _csv_list(args.metrics)
     if metrics is not None and len(metrics) == 1 and metrics[0] in _METRIC_FAMILIES:
         metrics = metrics[0]
-    if args.only is not None:
-        print("warning: --only is deprecated. Use --metrics.", file=sys.stderr)
-        if metrics is None:
-            metrics = _csv_list(args.only)
-    if args.task is not None:
-        with warnings.catch_warnings():
-            warnings.simplefilter("always", DeprecationWarning)
-            warnings.warn(f"--task is deprecated. Use --metrics {args.task}.",
-                          DeprecationWarning, stacklevel=2)
+    if args.task is not None:                  # an older spelling of --metrics
+        _compat.deprecated("--task", f"--metrics {args.task}")
         if metrics is None:
             metrics = args.task
     with contextlib.ExitStack() as stack:
         batch = _batch_arg(args, stack)
         labels = _evaluate_labels(args, stack)
-        kw = dict(category=args.category, labels=labels, clustering=args.cluster,
+        kw = dict(category=args.category, labels=labels, clusters=clusters,
                   batch=batch, missing_labels=args.missing_labels)
         if args.obsm is not None:
             kw["obsm"] = args.obsm
@@ -1378,7 +1374,7 @@ def _cmd_evaluate(args) -> int:
         token = pipeline._CLI_LABELS_FROM.set(None if args.labels else args.dataset)
         try:
             with _quiet_stdout(), _leiden_flavor(args.leiden_flavor):
-                df = multibench.evaluate(output=args.output, metrics=metrics, **kw)
+                df = multibench.evaluate(embedding, metrics=metrics, **kw)
         finally:
             pipeline._CLI_LABELS_FROM.reset(token)
     if long_mode:
@@ -1537,6 +1533,8 @@ def _flavor_token(flavor, env: str | None = None) -> str:
 def _cmd_env(args) -> int:
     """``multibench env ...``: environment recipes, preflight and installation."""
     cmd = args.env_cmd
+    if cmd in _RETIRED_ENV_COMMANDS:
+        _compat.deprecated(f"multibench env {cmd}", _RETIRED_ENV_COMMANDS[cmd])
     refusing = cmd == "install" and args.run and not args.force
     if cmd in ("status", "plan", "doctor", "install") and not refusing:
         _platform_note()
@@ -1548,7 +1546,7 @@ def _cmd_env(args) -> int:
         elif args.category:
             keep = set(registry.list_methods(category=args.category))
         seen_tags = []
-        for r in envs.status():
+        for r in envs._status():
             if keep is not None and r["method"] not in keep:
                 continue
             mark = envs.env_mark(r["exists"], r["has_lock"])
@@ -1572,7 +1570,7 @@ def _cmd_env(args) -> int:
         flavor = args.flavor
         sizes = envs.packed_sizes()
         manifest = envs.packed_manifest()
-        rows = envs.plan(category=args.category, methods=_csv_list(args.methods))
+        rows = envs._plan(category=args.category, methods=_csv_list(args.methods))
         # sizes follow the archive --flavor selects per env (its fallback to
         # the GPU build included); the total line says which flavour it summed
         summed = []
@@ -1608,12 +1606,12 @@ def _cmd_env(args) -> int:
         if missing:
             miss_methods = sorted({m for r in missing for m in r["methods"]})
             print(f"# next: multibench env install --methods {','.join(miss_methods)} "
-                  "--packed --run")
+                  "--run")
         if args.strict and missing:
             return _EXIT_ERROR
         return _EXIT_OK
     if cmd == "install":
-        flavor, packed = args.flavor, args.packed
+        flavor, packed = args.flavor, not args.build
         with _quiet_stdout():
             rows = envs.install(_csv_list(args.methods), category=args.category,
                                 packed=packed, dry_run=not args.run, force=args.force,
@@ -1739,15 +1737,16 @@ _CATEGORY_HELP = ("integration category: vertical (several modalities measured i
                   "same cells, e.g. CITE-seq), diagonal (modalities measured in different "
                   "cells, no pairing), mosaic (several batches, only some share a "
                   "modality) or cross (several batches, each with the same modalities).")
-_TASK_HELP = ("task within the category: clustering, batch or dimension_reduction. "
-              "mtb.list_tasks() lists them.")
-_METHODS_HELP = "comma-separated method ids, as printed by multibench list"
+#: the replacement of each deprecated ``env`` command
+_RETIRED_ENV_COMMANDS = {"status": "multibench env doctor", "groups": "multibench env doctor",
+                         "plan": "multibench env install"}
+_METHODS_HELP = "comma-separated method ids, as printed by multibench find"
 _FLAVOR_HELP = ("which packed archive to take per env: 'cpu' = the '<env>-cpu' archive "
                 "(the same env without the CUDA libraries, 3-4x smaller) where "
                 "published, else the '<env>' archive with a warning, 'gpu' = the "
                 "'<env>' archive, 'auto' (default) = 'cpu' when no NVIDIA GPU is "
                 "visible on this host (mtb.env.host_has_gpu), 'gpu' otherwise. The env "
-                "name is the same whatever the flavour; env status/doctor show which "
+                "name is the same whatever the flavour; env doctor shows which "
                 "flavour is installed. Installing on a login node for jobs on GPU "
                 "nodes: pass gpu")
 #: ``--allow-atac-mismatch`` of scan and run-all
@@ -1781,16 +1780,11 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="command", required=True, metavar="<command>",
                            title="commands")
 
-    # ---- list
-    pl = sub.add_parser("list", help="list method ids (mtb.list_methods; --task/--runnable "
-                                     "are mtb.find_methods filters)",
-                        description="Print the method ids, one per line.")
+    # ---- list: deprecated, not listed (no help=): multibench find
+    pl = sub.add_parser("list", description="Deprecated: use multibench find.")
     pl.add_argument("--category", help=_CATEGORY_HELP)
-    pl.add_argument("--task", help=_TASK_HELP + " The same filter as "
-                                               "mtb.find_methods(task=).")
-    pl.add_argument("--runnable", action="store_true",
-                    help="only methods with a declared variant (usable by run; "
-                         "mtb.find_methods(runnable=True))")
+    pl.add_argument("--task", help=argparse.SUPPRESS)
+    pl.add_argument("--runnable", action="store_true", help=argparse.SUPPRESS)
     pl.set_defaults(func=_cmd_list, _parser=pl)
 
     # ---- find
@@ -1799,7 +1793,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Print method ids matching all given filters, one per line. "
                     "Every filter is optional; with none, every method is listed.")
     pf.add_argument("--category", help=_CATEGORY_HELP)
-    pf.add_argument("--task", help=_TASK_HELP)
+    pf.add_argument("--task", help=argparse.SUPPRESS)
     pf.add_argument("--modalities",
                     help="comma-separated modalities the method must consume, e.g. "
                          "rna,adt or rna,atac ('protein' is accepted for adt)")
@@ -1812,8 +1806,7 @@ def build_parser() -> argparse.ArgumentParser:
     pf.add_argument("--atac", choices=["peak", "gene_activity"],
                     help="filter by the ATAC representation the method consumes: "
                          "peak (chr:start-end matrix) or gene_activity (gene scores)")
-    pf.add_argument("--runnable", action="store_true",
-                    help="only methods with a declared variant (usable by run)")
+    pf.add_argument("--runnable", action="store_true", help=argparse.SUPPRESS)
     pf.add_argument("--tunable", nargs="?", const="true", choices=["true", "false"],
                     metavar="{true,false}",
                     help="true (or the bare flag): only methods exposing hyperparameters "
@@ -1831,7 +1824,7 @@ def build_parser() -> argparse.ArgumentParser:
                     "knobs it does not expose. Without --category/--modalities every "
                     "variant is printed. An empty tunable table means the script "
                     "hardcodes its hyperparameters.")
-    ppa.add_argument("method", help="method id, as printed by multibench list. An "
+    ppa.add_argument("method", help="method id, as printed by multibench find. An "
                                     "unknown id gets a did-you-mean error")
     ppa.add_argument("--category", help=_CATEGORY_HELP + " Only that category's variants.")
     ppa.add_argument("--modalities", help="comma-separated modality roles selecting one "
@@ -1852,7 +1845,7 @@ def build_parser() -> argparse.ArgumentParser:
                     "it needs labels, which ATAC representation it reads, its variants "
                     "(category and input roles), each observed runtime with its cell "
                     "count and host, and the setup hint.")
-    pin.add_argument("method", help="method id, as printed by multibench list")
+    pin.add_argument("method", help="method id, as printed by multibench find")
     pin.add_argument("--format", choices=["text", "json"], default="text",
                      help="text (default) or json (the whole mtb.method_info dict)")
     pin.set_defaults(func=_cmd_info, _parser=pin)
@@ -1908,7 +1901,8 @@ def build_parser() -> argparse.ArgumentParser:
                     "variant, with files_ok, env_ok, runnable and reason. The table "
                     "shows the main columns and clips long text to "
                     f"{_TRUNCATE_WIDTH} characters. --columns all, or --format csv, "
-                    "tsv or json, prints every column that mtb.scan returns.")
+                    "tsv or json, prints every column of the plan, the table "
+                    "mtb.run_all(dry_run=True) returns.")
     ps.add_argument("dataset", help="dataset id = the folder name under --data-path "
                                    "(e.g. D11, or MYCITE for your own data)")
     ps.add_argument("--category", help=_CATEGORY_HELP + " Default: every category, "
@@ -1937,11 +1931,12 @@ def build_parser() -> argparse.ArgumentParser:
                          "named in --methods has none, or when the method scripts are "
                          "not fetched. Example: multibench scan DS --category C "
                          "--strict && sbatch ...")
-    ps.add_argument("--assume-gpu", dest="assume_gpu", action="store_true",
-                    help="skip this host's GPU test. On a login node without a GPU, "
-                         "it checks a job for a GPU node. Python: assume_gpu=True")
-    ps.add_argument("--allow-atac-mismatch", dest="allow_atac_mismatch",
-                    action="store_true", help=_ATAC_MISMATCH_HELP)
+    adv = ps.add_argument_group("advanced (HPC and checks)")
+    adv.add_argument("--assume-gpu", dest="assume_gpu", action="store_true",
+                     help="skip this host's GPU test. On a login node without a GPU, "
+                          "it checks a job for a GPU node. Python: assume_gpu=True")
+    adv.add_argument("--allow-atac-mismatch", dest="allow_atac_mismatch",
+                     action="store_true", help=_ATAC_MISMATCH_HELP)
     ps.set_defaults(func=_cmd_scan, _parser=ps)
 
     # ---- layout
@@ -2038,8 +2033,8 @@ def build_parser() -> argparse.ArgumentParser:
                           "entry is printed")
     pci.add_argument("--all", action="store_true",
                      help="cite every method")
-    pci.add_argument("--format", choices=["bibtex", "text"], default="bibtex",
-                     help="bibtex (default; one @article per entry) or text (one line "
+    pci.add_argument("--format", choices=["text", "bibtex"], default="text",
+                     help="text (default; one line per entry) or bibtex (one @article "
                           "per entry)")
     pci.add_argument("--out", help="write to this file instead of stdout")
     pci.set_defaults(func=_cmd_cite, _parser=pci)
@@ -2048,7 +2043,7 @@ def build_parser() -> argparse.ArgumentParser:
     pp = sub.add_parser(
         "plot", help="draw the bubble table or summary bars of a results frame "
                      "(mtb.plot.bubble / mtb.plot.bar)",
-        description="Plot stored result tables (--category [--dataset] [--source]), "
+        description="Plot the stored re-run tables (--category [--dataset]), "
                     "your own long table (--input long.csv or a run_all output "
                     "dir, as written by multibench evaluate --method/--dataset "
                     "and multibench run-all), or both: --input together with "
@@ -2062,14 +2057,8 @@ def build_parser() -> argparse.ArgumentParser:
     pp.add_argument("--dataset", help="dataset id(s), comma-separated; with --category "
                                       "selects the stored table(s), with --input "
                                       "filters the frame")
-    pp.add_argument("--source", choices=["published", "rerun"], default="published",
-                    help="stored table to load: published (the scIB tables shipped "
-                         "with the package, default) or rerun (the package's re-run "
-                         "sweeps)")
-    pp.add_argument("--result-path", dest="result_path", metavar="DIR",
-                    help="with --category: another results root to read the stored "
-                         "tables from (holding scib_metric/ and/or rerun/; default: "
-                         "the tables shipped with the package)")
+    pp.add_argument("--source", choices=["published", "rerun"], help=argparse.SUPPRESS)
+    pp.add_argument("--result-path", dest="result_path", help=argparse.SUPPRESS)
     pp.add_argument("--input", action="append", metavar="LONG_CSV_OR_DIR",
                     help="a long results CSV (metric,value,method,dataset,category[,clustering,source]) or "
                          "a run_all output directory; repeatable. Alone: the table to "
@@ -2084,19 +2073,15 @@ def build_parser() -> argparse.ArgumentParser:
     pp.add_argument("--aggregate", choices=["dataset", "summary"], default="dataset",
                     help="bubble only: dataset = one dataset's raw values (default); "
                          "summary = across-dataset rank panel")
-    pp.add_argument("--overall", choices=["rank", "mean_overall"],
-                    help="how the Overall score is formed (default: rank for bubble, "
-                         "mean_overall for bar; pass the same value to both to get "
-                         "the same ordering)")
+    pp.add_argument("--overall", choices=["rank", "mean_overall"], default="rank",
+                    help="how the Overall score is formed: rank (default) ranks the "
+                         "mean ranks; mean_overall averages the per-dataset scores")
     pp.add_argument("--require-complete", dest="require_complete", action="store_true",
                     help="bubble --aggregate summary: keep only methods present in "
                          "every dataset instead of warning")
-    pp.add_argument("--na", choices=["warn", "skip", "raise"], default="warn",
-                    help="bubble only: a metric not computed for a method is drawn as "
-                         "a dash; warn = name those cells (default), skip = draw "
-                         "without the warning, raise = refuse an incomplete table")
+    pp.add_argument("--na", choices=["warn", "skip", "raise"], help=argparse.SUPPRESS)
     pp.add_argument("--group", choices=["clustering", "batch", "classification"],
-                    help="bar only: metric family shorthand (overrides --metrics)")
+                    help=argparse.SUPPRESS)
     pp.add_argument("--top", type=int, help="bar only: keep the N best methods")
     pp.add_argument("--title", help="figure title (default: '<category> <dataset>')")
     pp.add_argument("--out", required=True,
@@ -2115,7 +2100,7 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("--method", required=True, help="method id, as printed by "
                                                     "multibench list")
     pr.add_argument("--category", required=True, help=_CATEGORY_HELP)
-    pr.add_argument("--task", default="clustering", help=_TASK_HELP + " Default: clustering.")
+    pr.add_argument("--task", help=argparse.SUPPRESS)
     pr.add_argument("--input", action="append", metavar="ROLE=PATH",
                     help="one input as role=path, repeatable, e.g. --input rna=rna.h5 "
                          "--input adt=adt.h5 --input cty=cty.csv. multibench layout "
@@ -2123,11 +2108,11 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("--out-dir", "--out", dest="out", required=True,
                     help="output directory for this run (embedding.h5, metric.csv, "
                          "log); --out is an alias")
-    pr.add_argument("--runner", metavar="TEMPLATE",
-                    help="template for launching the command: {cmd} = the bare command "
-                         "(no env activation), {env_cmd} = the command inside the "
-                         "method env, e.g. \"srun --gres=gpu:1 {env_cmd}\" "
-                         "(mtb.run(cmd_template=))")
+    pr.add_argument_group("advanced (HPC)").add_argument(
+        "--runner", metavar="TEMPLATE",
+        help="template for launching the command: {cmd} = the bare command (no env "
+             "activation), {env_cmd} = the command inside the method env, e.g. "
+             "\"srun --gres=gpu:1 {env_cmd}\" (mtb.run(cmd_template=))")
     pr.add_argument("--param", "-p", action="append", metavar="KEY=VALUE",
                     help="one hyperparameter override, repeatable: --param epochs=5 "
                          "--param lr=0.001 (METHOD:KEY=VALUE is accepted when METHOD "
@@ -2171,10 +2156,11 @@ def build_parser() -> argparse.ArgumentParser:
     pra.add_argument("--dry-run", dest="dry_run", action="store_true",
                      help="print the plan (one row per method variant, as in "
                           "multibench scan) and the commands; nothing runs")
-    pra.add_argument("--assume-gpu", dest="assume_gpu", action="store_true",
+    adv = pra.add_argument_group("advanced (HPC and checks)")
+    adv.add_argument("--assume-gpu", dest="assume_gpu", action="store_true",
                      help="with --dry-run: skip this host's GPU test, as scan "
                           "--assume-gpu does")
-    pra.add_argument("--allow-atac-mismatch", dest="allow_atac_mismatch",
+    adv.add_argument("--allow-atac-mismatch", dest="allow_atac_mismatch",
                      action="store_true", help=_ATAC_MISMATCH_HELP)
     pra.add_argument("--param", "-p", action="append", metavar="METHOD:KEY=VALUE",
                      help="one hyperparameter override, repeatable, e.g. --param "
@@ -2206,10 +2192,10 @@ def build_parser() -> argparse.ArgumentParser:
                           "(default: one batch per label file)")
     pra.add_argument("--batch-column", dest="batch_column", metavar="NAME",
                      help=_BATCH_COLUMN_HELP)
-    pra.add_argument("--leiden-flavor", dest="leiden_flavor", choices=["igraph", "leidenalg"],
-                     help="Leiden backend of the clustering when scoring "
-                          "(default: shown by multibench config). leidenalg matches "
-                          "both stored tables, published and re-run")
+    adv.add_argument("--leiden-flavor", dest="leiden_flavor", choices=["igraph", "leidenalg"],
+                     help="Leiden backend of the clustering when scoring (default: "
+                          "shown by multibench config). Scores can differ by up to "
+                          "about 0.1 between the two")
     pra.set_defaults(func=_cmd_run_all, _parser=pra)
 
     # ---- evaluate
@@ -2221,22 +2207,23 @@ def build_parser() -> argparse.ArgumentParser:
                     "--dataset and --category the table is written in the long "
                     "format (metric,value,method,dataset,category,clustering,source,"
                     "scored_with) that multibench plot --input reads.")
-    pe.add_argument("--output", required=True,
-                    help="the embedding, cells x dims: .h5 (dataset 'data', the "
-                         "benchmark's embedding.h5), .h5ad (uses --obsm), .npy, "
+    pe.add_argument("--embedding",
+                    help="required: the embedding, cells x dims: .h5 (dataset 'data', "
+                         "the benchmark's embedding.h5), .h5ad (uses --obsm), .npy, "
                          ".csv/.tsv (a first column of barcodes gives the cell ids: "
                          "labels and batches with barcodes are matched by them)")
+    pe.add_argument("--output", help=argparse.SUPPRESS)
     pe.add_argument("--category", help=_CATEGORY_HELP + " Required with --method or "
                                                         "--dataset.")
-    pe.add_argument("--task", choices=["clustering", "batch", "all"],
-                    help="deprecated: use --metrics with the same word")
+    pe.add_argument("--task", choices=["clustering", "batch", "all"], help=argparse.SUPPRESS)
     pe.add_argument("--labels", action="append", metavar="CSV",
                     help="cell-type labels CSV with a header row, one row per cell "
                          "in the embedding's order. The labels are column x, the only "
                          "column, or --column. A first column of barcodes is aligned "
-                         "to the obs_names of an .h5ad --output, or to the barcodes in "
-                         "the first column of a .csv --output. With an .h5ad --output, "
-                         "--labels can instead name a column of its obs, as celltype or "
+                         "to the obs_names of an .h5ad --embedding, or to the barcodes "
+                         "in the first column of a .csv --embedding. With an .h5ad "
+                         "--embedding, --labels can instead name a column of its obs, "
+                         "as celltype or "
                          "obs:celltype: give it once, without --column. Repeat --labels "
                          "for several files. They are stacked in the order given, and "
                          "each file counts as one batch. Without --labels, --dataset, "
@@ -2248,15 +2235,17 @@ def build_parser() -> argparse.ArgumentParser:
                          "configured data_path, shown by multibench config)")
     pe.add_argument("--batch", help="per-cell batch labels CSV; a first column of "
                                     "barcodes is aligned as for --labels. With an .h5ad "
-                                    "--output it can instead name a column of its obs, "
+                                    "--embedding it can instead name a column of its obs, "
                                     "without --batch-column. Without "
                                     "--metrics the batch metrics are then computed too")
     pe.add_argument("--batch-column", dest="batch_column", metavar="NAME",
                     help=_BATCH_COLUMN_HELP)
-    pe.add_argument("--clustering", "--cluster", dest="cluster", metavar="PATH",
+    pe.add_argument("--clusters", metavar="PATH",
                     help="precomputed clusters (CSV, or an .h5 read from "
                          "/obs/cluster_leiden); they replace the Leiden clusters of "
-                         "ARI, NMI, ASW, iASW and iF1. --cluster is an alias")
+                         "ARI, NMI, ASW, iASW and iF1")
+    pe.add_argument("--clustering", help=argparse.SUPPRESS)
+    pe.add_argument("--cluster", help=argparse.SUPPRESS)
     pe.add_argument("--metrics", help="what to compute (mtb.evaluate(metrics=)): a family "
                                       "(clustering | batch | classification | all) or a "
                                       "comma-separated list of metric codes (e.g. "
@@ -2268,13 +2257,12 @@ def build_parser() -> argparse.ArgumentParser:
                                       "--category is not vertical")
     pe.add_argument("--leiden-flavor", dest="leiden_flavor", choices=["igraph", "leidenalg"],
                     help="Leiden backend of the clustering (default: shown by "
-                         "multibench config). leidenalg matches both stored tables, "
-                         "published and re-run")
+                         "multibench config). Scores can differ by up to about 0.1 "
+                         "between the two")
     pe.add_argument("--missing-labels", dest="missing_labels", choices=["error", "drop"],
                     default="error",
                     help="what to do when a label is missing. error (default) stops. "
                          "drop scores the labelled cells only and says how many")
-    pe.add_argument("--only", help=argparse.SUPPRESS)     # deprecated spelling of --metrics
     pe.add_argument("--obsm", help="for .h5ad input: the .obsm key holding the "
                                    "embedding (default X_emb; 'X' = .X)")
     pe.add_argument("--column", metavar="NAME",
@@ -2294,31 +2282,31 @@ def build_parser() -> argparse.ArgumentParser:
 
     # ---- env
     pv = sub.add_parser(
-        "env", help="per-method conda environments: status, plan, doctor, install, "
-                    "recipes (mtb.env)",
-        description="Every method runs in its own (or a shared) conda env built from "
-                    "a committed lockfile or a published packed archive. Typical "
-                    "flow: env doctor --category C, then env install --category C "
-                    "--packed --run.")
+        "env", help="the methods' conda environments: doctor and install (mtb.env)",
+        description="Every method runs in its own (or a shared) conda env, unpacked "
+                    "from a published archive or built from a committed lockfile. "
+                    "Typical flow: env doctor --category C, then env install "
+                    "--category C --run.")
     ev = pv.add_subparsers(dest="env_cmd", required=True, metavar="<env-command>",
                            title="env commands")
-    es = ev.add_parser("status", help="per method: env installed? env name, difficulty",
-                       description="One line per method: installed or not, the "
+    es = ev.add_parser("status",
+                       description="Deprecated: use multibench env doctor. One line "
+                                   "per method: installed or not, the "
                                    "environment name and a difficulty tag.",
                        epilog=_status_epilog(), formatter_class=_HelpFormatter)
     es.add_argument("--category", help=_CATEGORY_HELP + " Only that category's methods.")
     es.add_argument("--methods", help=_METHODS_HELP + "; only those")
     es.set_defaults(func=_cmd_env, _parser=es)
-    egr = ev.add_parser("groups", help="list the shared env groups and their members",
-                        description="Shared conda envs (one env serving several methods) "
-                                    "and the methods in each.")
+    egr = ev.add_parser("groups", description="Deprecated: use multibench env doctor.")
     egr.set_defaults(func=_cmd_env, _parser=egr)
     _NAME_HELP = ("environment name. The default is the environment the package "
                   "uses for METHOD, shown in the env column of multibench scan and "
                   "used by run, env doctor and env create. For example, Matilda uses "
                   "matilda and UINMF uses scmb_r")
-    er = ev.add_parser("recipe", help="print the conda/pip commands that build a method's env",
-                       description="Print, without running, the hand-written recipe "
+    # maintainer commands: no help=, so env --help does not list them
+    er = ev.add_parser("recipe",
+                       description="(Maintainers.) Print, without running, the "
+                                   "hand-written recipe "
                                    "commands that create the environment for METHOD, "
                                    "named as scan/run expect it (first line: a comment "
                                    "naming that env). env create METHOD builds the same "
@@ -2327,16 +2315,18 @@ def build_parser() -> argparse.ArgumentParser:
     er.add_argument("method", help="method id")
     er.add_argument("--name", help=_NAME_HELP)
     er.set_defaults(func=_cmd_env, _parser=er)
-    ey = ev.add_parser("yml", help="print/write a conda environment.yml for a method",
-                       description="Emit an environment.yml for METHOD (stdout, or --out) "
+    ey = ev.add_parser("yml",
+                       description="(Maintainers.) Emit an environment.yml for METHOD "
+                                   "(stdout, or --out) "
                                    "whose name: is the env scan/run expect (the env "
                                    "column of multibench scan).")
     ey.add_argument("method", help="method id")
     ey.add_argument("--name", help=_NAME_HELP)
     ey.add_argument("--out", help="write the yml here instead of stdout")
     ey.set_defaults(func=_cmd_env, _parser=ey)
-    ec = ev.add_parser("create", help="create one method's env (dry run unless --run)",
-                       description="Create the conda environment for METHOD from its "
+    ec = ev.add_parser("create",
+                       description="(Maintainers.) Create the conda environment for "
+                                   "METHOD from its "
                                    "committed lockfile (falling back to the recipe when "
                                    "none is captured), under the name scan/run expect; "
                                    "without --run only the commands are printed.")
@@ -2346,8 +2336,10 @@ def build_parser() -> argparse.ArgumentParser:
                     help="actually create the env; without it the command is a dry run")
     ec.add_argument("--force", action="store_true", help=_FORCE_HELP)
     ec.set_defaults(func=_cmd_env, _parser=ec)
-    ep = ev.add_parser("plan", help="which envs a set of methods needs (collapsed per env)",
-                       description="Group methods by the conda environment they need, "
+    ep = ev.add_parser("plan",
+                       description="Deprecated: use multibench env install (its dry run "
+                                   "shows the same rows). Group methods by the conda "
+                                   "environment they need, "
                                    "and mark shared and own environments. 'dl' is the "
                                    "packed-archive download size and 'disk' the unpacked "
                                    "size, recorded for this release. '?' means not "
@@ -2356,10 +2348,10 @@ def build_parser() -> argparse.ArgumentParser:
     ep.add_argument("--methods", help=_METHODS_HELP + "; only their envs")
     ep.add_argument("--flavor", choices=envs.FLAVORS, default="auto", help=_FLAVOR_HELP)
     ep.set_defaults(func=_cmd_env, _parser=ep)
-    eg = ev.add_parser("create-group", help="create one shared group env (dry run unless --run)",
-                       description="Create the shared conda env GROUP; without --run only "
-                                   "the commands are printed.")
-    eg.add_argument("group", help="group name, as printed by multibench env groups")
+    eg = ev.add_parser("create-group",
+                       description="(Maintainers.) Create the shared conda env GROUP; "
+                                   "without --run only the commands are printed.")
+    eg.add_argument("group", help="group name: an env that serves several methods")
     eg.add_argument("--run", action="store_true",
                     help="actually create the env; without it the command is a dry run")
     eg.add_argument("--force", action="store_true", help=_FORCE_HELP)
@@ -2377,14 +2369,14 @@ def build_parser() -> argparse.ArgumentParser:
                            "--strict || env install ...")
     edoc.set_defaults(func=_cmd_env, _parser=edoc)
     ei = ev.add_parser(
-        "install", help="build every needed env from its lockfile or packed archive "
-                        "(mtb.env.install)",
-        description="Install the environments the selected methods need. Without "
-                    "--run, a dry run prints one line per environment: "
-                    "'have', 'build(dry-run)' or 'NO-LOCK'. With --packed, a line reads "
-                    "'packed archive published', with the archive's download size, "
-                    "unpacked size and URL for this release, or 'no archive - lockfile "
-                    "build'. '?' means not measured. A '# total' line goes to stderr. "
+        "install", help="unpack or build every needed env (mtb.env.install)",
+        description="Install the environments the selected methods need, from the "
+                    "published archives (a lockfile build where none is published). "
+                    "Without --run, a dry run prints one line per environment: "
+                    "'have', 'packed archive published' with the archive's download "
+                    "size, unpacked size and URL for this release, or 'no archive - "
+                    "lockfile build'. '?' means not measured. A '# total' line goes "
+                    "to stderr. With --build: 'build(dry-run)' or 'NO-LOCK'. "
                     "--flavor picks the CPU-only or the CUDA archive. auto picks by "
                     "whether this computer has an NVIDIA GPU. The environment name is "
                     "the same either way. They are linux-64 conda environments. On "
@@ -2392,16 +2384,17 @@ def build_parser() -> argparse.ArgumentParser:
                     "--run refuses unless --force is given.")
     ei.add_argument("--category", help=_CATEGORY_HELP)
     ei.add_argument("--methods", help=_METHODS_HELP + "; only their envs")
-    ei.add_argument("--packed", action="store_true",
-                    help="use prebuilt archives when published (the URLs recorded "
-                         "for this release); fall back to the lockfile build")
+    ei.add_argument("--build", action="store_true",
+                    help="build every env from its lockfile instead of unpacking the "
+                         "published archives")
+    ei.add_argument("--packed", action="store_true", help=argparse.SUPPRESS)
     ei.add_argument("--flavor", choices=envs.FLAVORS, default="auto", help=_FLAVOR_HELP)
     ei.add_argument("--run", action="store_true",
                     help="actually create the envs; without it the command is a dry run")
     ei.add_argument("--force", action="store_true", help=_FORCE_HELP)
     ei.set_defaults(func=_cmd_env, _parser=ei)
-    ef = ev.add_parser("freeze", help="capture an env (or --all) to a committed lockfile",
-                       description="Write the lockfile of an installed env (maintainers).")
+    ef = ev.add_parser("freeze",
+                       description="(Maintainers.) Write the lockfile of an installed env.")
     ef.add_argument("env", nargs="?", help="env name to freeze")
     ef.add_argument("--all", action="store_true", help="freeze every required env")
     ef.add_argument("--category", help=_CATEGORY_HELP + " With --all: only that "

@@ -317,6 +317,17 @@ def _is_method_id(token) -> bool:
     return True
 
 
+def split_dataset(dataset, data_path) -> tuple[str, Path | str | None]:
+    """``(name, data_path)`` for ``dataset``: a folder name under ``data_path``, or
+    a folder path (a ``Path``, or a str with a ``/``), relative to ``data_path``
+    when it is given, else to the working directory."""
+    if not isinstance(dataset, os.PathLike) and "/" not in str(dataset) \
+            and os.sep not in str(dataset):
+        return dataset, data_path
+    folder = Path(os.path.abspath(Path(data_path or "") / dataset))
+    return folder.name, folder.parent
+
+
 def _old_order_error(fn: str, dataset, category, method) -> None:
     """``TypeError`` when the category slot holds a method id and the method
     slot a category (or nothing): the order before 0.3.0."""
@@ -345,7 +356,7 @@ def inputs_for(dataset: str, category: str, method: str, *,
         Integration category: ``vertical``, ``diagonal``, ``mosaic`` or
         ``cross``.
     method : str
-        Method id, e.g. ``"Matilda"``; see ``mtb.list_methods()``.
+        Method id, e.g. ``"Matilda"``; see ``mtb.find_methods()``.
     modalities : list[str] | set[str] | None
         Modality tokens that pick the variant, e.g. ``["rna", "adt"]``;
         ``None`` = the files in the dataset folder decide.
@@ -507,6 +518,7 @@ def inputs_for(dataset: str, category: str, method: str, *,
     mtb.describe_layout : the folder layout these roles resolve against.
     """
     _old_order_error("inputs_for", dataset, category, method)
+    dataset, data_path = split_dataset(dataset, data_path)
     root = data_path if data_path is not None else config.DEFAULT.data_path
     base = Path(os.path.abspath(os.fspath(root)))
     spec = registry.get(method)
@@ -963,7 +975,7 @@ def _names_are_genes(path: Path) -> bool | None:
 
 
 def _unrewritable_peak_name(path: Path) -> str | None:
-    """The first of the first 50 feature names ``normalize_peak_names`` cannot
+    """The first of the first 50 feature names ``ingest._normalize_peak_names`` cannot
     rewrite, when more than 10% are such names; else ``None``."""
     from .ingest import _PEAK_RE
 
@@ -1549,6 +1561,7 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
             "labels_for: pass data_path= by keyword; the 2nd positional argument "
             "is category since 0.3.0 (order: (dataset, category, method))")
     _old_order_error("labels_for", dataset, category, method)
+    dataset, data_path = split_dataset(dataset, data_path)
     if category is not None:
         registry.check_category(category)
     if method is not None:

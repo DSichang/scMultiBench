@@ -25,8 +25,8 @@ from .. import _compat
 from . import catalog
 from ..engine.registry import _BASE_MODALITIES
 
-__all__ = ["load_results", "available_datasets", "fetchable", "results_coverage",
-           "recommend", "COLUMNS", "SOURCES", "DegenerateRerunWarning"]
+__all__ = ["load_results", "fetchable", "results_coverage", "recommend", "COLUMNS",
+           "SOURCES", "DegenerateRerunWarning"]
 
 #: clustering variant -> metric file of a method folder
 _CLUSTERING_FILES = {
@@ -126,7 +126,7 @@ def _read_metric_csv(path: Path) -> pd.DataFrame:
     raw = pd.read_csv(path)
     raw.columns = ["metric", "value"] + list(raw.columns[2:])
     raw = raw[["metric", "value"]].copy()
-    raw["metric"] = raw["metric"].map(catalog.canonical_metric)
+    raw["metric"] = raw["metric"].map(catalog._canonical_metric)
     raw = raw.dropna(subset=["metric"])
     return raw
 
@@ -145,26 +145,19 @@ def _base_path(result_path) -> Path:
 
 #: how the "no table for <dataset>" errors name each ``source=``
 _SOURCE_WORD = {"published": "published", "rerun": "re-run", "both": "published or re-run"}
-#: the last sentence of those errors, for a results tree of the user's own
-_RESULT_PATH_HINT = "Pass result_path= to read another results folder."
 
 
 def _no_dataset_msg(source: str, category, missing, have) -> str:
-    """The error for datasets without a stored table: the datasets the tables
-    hold, and the ``result_path=`` sentence."""
+    """The error for datasets without a stored table: the datasets the tables hold."""
     of = f" of {category}" if category else ""
     held = (f"hold {_and_list(have)}" if have else "hold no dataset") + (
         f", not {_and_list(missing)}." if missing else ".")
-    return f"The {_SOURCE_WORD.get(source, source)} tables{of} {held} {_RESULT_PATH_HINT}"
+    return f"The {_SOURCE_WORD.get(source, source)} tables{of} {held}"
 
 
 def _joined_errors(errors) -> str:
-    """The lookup errors of both sources as one text, the ``result_path=``
-    sentence once at the end."""
-    parts = [e.replace(_RESULT_PATH_HINT, "").strip() for e in errors]
-    text = " ".join(dict.fromkeys(p for p in parts if p))
-    return text + (f" {_RESULT_PATH_HINT}" if any(_RESULT_PATH_HINT in e for e in errors)
-                   else "")
+    """The lookup errors of both sources as one text, each once."""
+    return " ".join(dict.fromkeys(e.strip() for e in errors if e.strip()))
 
 
 #: the results the package ships (``multibench/result``)
@@ -180,9 +173,8 @@ def _category_unpublished(category: str) -> bool:
 
 def _unpublished_msg(category: str) -> str:
     """The error for a category without published tables."""
-    return (f"{category} has no published tables. Pass source='rerun' to load the "
-            f"package's re-run tables, or load your own long CSV with "
-            f"result_path=<file>.")
+    return (f"{category} has no published tables. Leave out source= to load the "
+            f"package's re-run tables.")
 
 
 def _published_missing_msg(root: Path, base: Path, category: str) -> str:
@@ -191,7 +183,7 @@ def _published_missing_msg(root: Path, base: Path, category: str) -> str:
     return (
         f"no published scIB metric tables under {root}. The tables ship inside "
         f"the multibench wheel at multibench/result/scib_metric. Check "
-        f"result_path= / mtb.config.DEFAULT.result_path (currently {base})."
+        f"mtb.config.DEFAULT.result_path (currently {base})."
     )
 
 
@@ -238,12 +230,12 @@ def _iter_published(root: Path, datasets: list | None, clustering: str):
                 mfile = _find_metric_file(m_dir, "metric.csv")
                 if mfile is None:
                     continue
-                yield ds_dir, mfile.parent, mfile, catalog.canonical_id(m.group(1)), m.group(2), False
+                yield ds_dir, mfile.parent, mfile, catalog._canonical_id(m.group(1)), m.group(2), False
                 continue
             mfile = _find_metric_file(m_dir, fname)
             if mfile is None:
                 continue
-            yield ds_dir, mfile.parent, mfile, catalog.canonical_id(m_dir.name), clustering, True
+            yield ds_dir, mfile.parent, mfile, catalog._canonical_id(m_dir.name), clustering, True
 
 
 def _published_root(base: Path, category: str) -> Path:
@@ -321,7 +313,7 @@ def _load_rerun(category: str | None, datasets: list | None, base: Path) -> pd.D
     if not files:
         raise FileNotFoundError(
             f"no re-run sweeps ({_RERUN_GLOB}) under {root}. They ship inside the "
-            f"multibench wheel at multibench/result/rerun; check result_path= / "
+            f"multibench wheel at multibench/result/rerun; check "
             f"mtb.config.DEFAULT.result_path (currently {base}).")
     frames = []
     versions: set[str] = set()
@@ -363,7 +355,7 @@ def _load_long_csv(path: Path) -> pd.DataFrame:
             f"with mtb.to_long(...).to_csv(path, index=False) or "
             f"BatchResult.save().")
     df = df.copy()
-    df["metric"] = df["metric"].map(catalog.canonical_metric)
+    df["metric"] = df["metric"].map(catalog._canonical_metric)
     df = df.dropna(subset=["metric"])
     if "dataset" not in df.columns:
         df["dataset"] = path.stem
@@ -397,7 +389,7 @@ def _canonical_dataset_ids(category, datasets, base, source) -> list:
             warnings.warn(
                 f"dataset {s!r} is not a stored table id but {canon!r} is - using "
                 f"that spelling (dataset ids are case-sensitive: 'D52', not 'd52')",
-                UserWarning, stacklevel=4)
+                UserWarning, stacklevel=5)
             out.append(canon)
         else:
             out.append(s)
@@ -410,11 +402,11 @@ def _check_methods(wanted: list, present) -> None:
     present = list(present)
     by_lower = {str(m).lower() for m in present}
     for m in wanted:
-        cid = catalog.canonical_id(m)
+        cid = catalog._canonical_id(m)
         if cid.lower() in by_lower:
             continue
         try:
-            catalog.canonical_id(m, strict=True)
+            catalog._canonical_id(m, strict=True)
         except KeyError:
             import difflib
             pool = sorted(set(present) | set(catalog._registry_ids()))
@@ -452,7 +444,7 @@ def _degenerate_rerun_rows(out: pd.DataFrame, base: Path) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=cols)
 
 
-def _warn_degenerate(out: pd.DataFrame, base: Path, stacklevel: int = 4,
+def _warn_degenerate(out: pd.DataFrame, base: Path, stacklevel: int = 5,
                      rerun_version=None) -> None:
     """:class:`DegenerateRerunWarning` for the rows :func:`_degenerate_rerun_rows`
     finds; ``rerun_version`` puts the stamp's version in the message."""
@@ -480,6 +472,22 @@ def _warn_degenerate(out: pd.DataFrame, base: Path, stacklevel: int = 4,
         f"embedding or a wrong label order, not from the method itself. Drop it "
         f"before ranking: df[df.method != {bad.method.iloc[0]!r}].",
         DegenerateRerunWarning, stacklevel=stacklevel)
+
+
+#: what replaces each deprecated keyword of the stored-results functions
+_RETIRED_TABLE_KEYWORDS = {
+    "clustering": "the default, the package's re-run tables",
+    "source": "the default, the package's re-run tables",
+    "result_path": "config.DEFAULT.result_path",
+}
+
+
+def _retired_tables(func: str, stacklevel: int, **values) -> None:
+    """One ``FutureWarning`` per deprecated keyword of ``func`` that was passed."""
+    for name, value in values.items():
+        if value is not None:
+            _compat.deprecated(f"{func}({name}=)", _RETIRED_TABLE_KEYWORDS[name],
+                               stacklevel=stacklevel)
 
 
 def _legacy_load_results_kwargs(kw: dict) -> dict:
@@ -516,7 +524,7 @@ def _legacy_load_results_kwargs(kw: dict) -> dict:
             if name in legacy:
                 _compat.warn(f"load_results({name}=...)", f"metrics={token!r}", stacklevel=4)
     if "metric" in legacy and legacy["metric"] is not None:
-        codes = [catalog.canonical_metric(m) or m for m in _as_list(legacy["metric"])]
+        codes = [catalog._canonical_metric(m) or m for m in _as_list(legacy["metric"])]
         _compat.warn("load_results(metric=...)", f"metrics={codes!r}", stacklevel=4)
         if token not in (None, "all"):
             # as 0.2.x: the codes inside the family
@@ -535,9 +543,9 @@ def load_results(
     dataset: str | list[str] | None = None,
     methods: str | list[str] | None = None,
     metrics=None,
-    clustering: str = "default",
-    source: str = "published",
-    result_path: Path | str | None = None,
+    clustering=None,
+    source=None,
+    result_path=None,
 ) -> pd.DataFrame:
     """Load the stored benchmark metric tables as one long table.
 
@@ -713,6 +721,25 @@ def load_results(
 
     mtb.plot.bubble : plots the frame.
     """
+    _retired_tables("load_results", 5, clustering=clustering, source=source,
+                    result_path=result_path)
+    return _load_results(category, dataset=dataset, methods=methods, metrics=metrics,
+                         clustering=clustering or "default", source=source or "rerun",
+                         result_path=result_path)
+
+
+def _load_results(
+    category: str | None = None,
+    *,
+    dataset: str | list[str] | None = None,
+    methods: str | list[str] | None = None,
+    metrics=None,
+    clustering: str = "default",
+    source: str = "rerun",
+    result_path: Path | str | None = None,
+) -> pd.DataFrame:
+    """:func:`load_results` with the deprecated ``clustering=``, ``source=`` and
+    ``result_path=``, without their warnings."""
     if clustering not in _CLUSTERING_FILES:
         raise ValueError(
             f"unknown clustering {clustering!r}; valid: {sorted(_CLUSTERING_FILES)}"
@@ -795,15 +822,15 @@ def load_results(
             if missing:
                 avail = _list_datasets(category, base, source, clustering)
                 raise FileNotFoundError(_no_dataset_msg(source, category, missing, avail))
-        if source != "both":
+        if source == "published":
             _warn_single_method(out, source, category, datasets, clustering, base)
 
     where = f"{category or 'any category'}/{datasets if datasets else 'any dataset'}"
     if wanted_methods is not None:
         avail = sorted(out["method"].unique())
         _check_methods(wanted_methods, avail)
-        want = {catalog.canonical_id(m).lower() for m in wanted_methods}
-        out = out[out["method"].map(lambda m: catalog.canonical_id(m).lower()).isin(want)]
+        want = {catalog._canonical_id(m).lower() for m in wanted_methods}
+        out = out[out["method"].map(lambda m: catalog._canonical_id(m).lower()).isin(want)]
         if out.empty:
             shown = wanted_methods if len(wanted_methods) > 1 else wanted_methods[0]
             hint = ""
@@ -811,7 +838,7 @@ def load_results(
                 hint = _other_source_hint(category, datasets, wanted_methods, base)
             warnings.warn(
                 f"no {source} rows for method {shown!r} in {where} (available: "
-                f"{avail}){hint}", UserWarning, stacklevel=3)
+                f"{avail}){hint}", UserWarning, stacklevel=4)
     have_metrics = sorted(out["metric"].unique())
     if sel is None:
         sel = catalog.metric_selection(metrics, extra=have_metrics)
@@ -820,15 +847,16 @@ def load_results(
         out = out[out["metric"].isin(sel.codes)]
         if out.empty and sel.explicit:
             warnings.warn(
-                f"metric(s) {sel.codes} not present in {where} (source={source!r}; "
-                f"available: {have_metrics})", UserWarning, stacklevel=3)
+                f"metric(s) {sel.codes} not present in {where} "
+                f"({_SOURCE_WORD.get(source, source)} tables; "
+                f"available: {have_metrics})", UserWarning, stacklevel=4)
         elif out.empty and before:
             tables = " ".join(x for x in (source, category, "tables") if x)
             of = f" of {', '.join(map(str, datasets))}" if datasets else ""
             warnings.warn(
                 f"The {tables}{of} have no {sel.family} scores, so no rows are left. "
                 f"Leave out metrics= to get the scores they have "
-                f"({', '.join(have_metrics)}).", UserWarning, stacklevel=3)
+                f"({', '.join(have_metrics)}).", UserWarning, stacklevel=4)
     out = out[COLUMNS + [c for c in _KEPT_FILE_COLUMNS if c in out.columns]]
     out = out.reset_index(drop=True)
     out.attrs["rerun_version"] = _version_attr(rerun_versions)
@@ -858,7 +886,7 @@ def _other_source_methods(source: str, cats: list, datasets, clustering: str,
 
 
 def _warn_single_method(out: pd.DataFrame, source: str, category, datasets,
-                        clustering: str, base: Path, stacklevel: int = 4) -> None:
+                        clustering: str, base: Path, stacklevel: int = 5) -> None:
     """One ``UserWarning`` when the selection holds one method while the other
     stored source holds more for it."""
     n = out["method"].nunique()
@@ -874,7 +902,7 @@ def _warn_single_method(out: pd.DataFrame, source: str, category, datasets,
     if datasets:          # no dataset filter: the selection is the category
         where += f"/{_and_list(datasets)}"
     names = {"published": "published", "rerun": "re-run"}
-    fix = config.hint(f'Pass source="{other}" or "both".', f"Pass --source {other}.")
+    fix = config.hint("Leave out source= to read them.", "Leave out --source to read them.")
     warnings.warn(
         f"The {names[source]} table for {where} has one method, "
         f"{out['method'].iloc[0]}. Every rank in it is the same. The {names[other]} "
@@ -894,20 +922,19 @@ def _other_source_hint(category, datasets, wanted_methods, base: Path) -> str:
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            cov = results_coverage(category, source="rerun", result_path=base)
+            cov = _results_coverage(category, source="rerun", result_path=base)
     except Exception:
         return ""
-    want = {catalog.canonical_id(m).lower() for m in wanted_methods}
-    cov = cov[cov["method"].map(lambda m: catalog.canonical_id(m).lower()).isin(want)]
+    want = {catalog._canonical_id(m).lower() for m in wanted_methods}
+    cov = cov[cov["method"].map(lambda m: catalog._canonical_id(m).lower()).isin(want)]
     if datasets:
         cov = cov[cov["dataset"].astype(str).isin([str(d) for d in datasets])]
     if cov.empty:
-        return (". results_coverage(source='both') lists no rows for it in any "
-                "source either.")
+        return ". results_coverage() lists no rows for it either."
     ds = sorted(cov["dataset"].astype(str).unique())
     return (f". The re-run tables hold {len(ds)} dataset{'' if len(ds) == 1 else 's'} "
             f"({', '.join(ds)}). "
-            + config.hint("Pass source='rerun' or 'both'.", "Pass --source rerun."))
+            + config.hint("Leave out source= to read them.", "Leave out --source to read them."))
 
 
 def _list_datasets(category, base: Path, source: str, clustering: str) -> list[str]:
@@ -928,65 +955,14 @@ def _list_datasets(category, base: Path, source: str, clustering: str) -> list[s
     return sorted(found)
 
 
-def available_datasets(
+def _available_datasets(
     category: str | None = None,
     *,
-    source: str = "published",
+    source: str = "rerun",
     result_path: Path | str | None = None,
 ) -> list[str]:
-    """Dataset ids that have stored results.
-
-    ``mtb.data.fetchable`` lists the ids that can be downloaded.
-
-    Parameters
-    ----------
-    category : str, optional
-        Integration category; ``None`` = the union over all four.
-    source : {"published", "rerun", "both"}
-        Which stored tables to look at (see ``mtb.load_results``).
-    result_path : path-like
-        Results root; ``None`` = the tables shipped in the package.
-
-    Returns
-    -------
-    list of str
-        Sorted dataset ids.
-
-    Raises
-    ------
-    ValueError
-        Unknown ``category`` or ``source``.
-
-    Examples
-    --------
-    >>> import multibench as mtb
-    >>> mtb.available_datasets()  # ['D11', 'D24', 'D25', 'D28', 'D52']
-    >>> mtb.available_datasets("diagonal")  # ['D24', 'D25', 'D28']
-    >>> mtb.available_datasets(source="rerun")  # ['D11', 'D11s', 'D28', ...]
-
-    Notes
-    -----
-    **Downloadable datasets.** An id listed here but not by
-    ``mtb.data.fetchable()`` has metric tables and no data file to download.
-
-    **What counts.** Published ids are those holding at least one method's
-    default-clustering table (``metric.csv``) - what
-    ``load_results(category, dataset=...)`` loads. A category folder that
-    does not exist (``mosaic`` has no published tables) contributes
-    nothing, without an error. A ``result_path`` that does not exist gives
-    a ``UserWarning`` and ``[]``.
-
-    **Retired keywords.** ``metric_set=`` and ``clustering=`` are not
-    parameters; passing either raises ``TypeError``.
-
-    See Also
-    --------
-    mtb.data.fetchable : the ids ``mtb.data.fetch`` can download.
-
-    mtb.results_coverage : which methods have results for each dataset.
-
-    mtb.load_results : loads the tables behind these ids.
-    """
+    """Sorted dataset ids with stored results for ``source`` (the deprecated
+    ``available_datasets``)."""
     if source not in SOURCES:
         raise ValueError(f"unknown source {source!r}; valid: {list(SOURCES)}")
     base = _base_path(result_path)
@@ -994,11 +970,15 @@ def available_datasets(
         warnings.warn(
             f"result_path {base} does not exist - nothing can be listed "
             f"(default root: {config.DEFAULT.result_path})",
-            UserWarning, stacklevel=2)
+            UserWarning, stacklevel=3)
         return []
     if category is not None:
         config.category_folder(category)
     return _list_datasets(category, base, source, "default")
+
+
+available_datasets = _compat.renamed("available_datasets", "results_coverage",
+                                     _available_datasets)
 
 
 def fetchable() -> list[str]:
@@ -1030,12 +1010,8 @@ def fetchable() -> list[str]:
     return sorted(AVAILABLE, key=catalog._dataset_sort_key)
 
 
-def results_coverage(
-    category: str | None = None,
-    *,
-    source: str = "both",
-    result_path: Path | str | None = None,
-) -> pd.DataFrame:
+def results_coverage(category: str | None = None, *, source=None,
+                     result_path=None) -> pd.DataFrame:
     """Which (category, dataset, method) combinations have results, and where from.
 
     Use it to choose the ``source`` to pass to ``mtb.load_results`` or
@@ -1091,6 +1067,13 @@ def results_coverage(
 
     mtb.load_results : the scores behind each row.
     """
+    _retired_tables("results_coverage", 4, source=source, result_path=result_path)
+    return _results_coverage(category, source=source or "rerun", result_path=result_path)
+
+
+def _results_coverage(category: str | None = None, *, source: str = "rerun",
+                      result_path: Path | str | None = None) -> pd.DataFrame:
+    """:func:`results_coverage` with the deprecated ``source=`` and ``result_path=``."""
     if source not in SOURCES:
         raise ValueError(f"unknown source {source!r}; valid: {list(SOURCES)}")
     cols = ["category", "dataset", "method", "clustering", "source"]
@@ -1107,13 +1090,14 @@ def results_coverage(
             if source in ("published", "both"):
                 for clus in _CLUSTERING_FILES:
                     try:
-                        frames.append(load_results(cat, clustering=clus, result_path=result_path,
-                                                   source="published")[cols])
+                        frames.append(_load_results(cat, clustering=clus,
+                                                    result_path=result_path,
+                                                    source="published")[cols])
                     except FileNotFoundError:
                         pass
             if source in ("rerun", "both"):
                 try:
-                    rr = load_results(cat, result_path=result_path, source="rerun")
+                    rr = _load_results(cat, result_path=result_path, source="rerun")
                     versions.update(_versions_in(rr))
                     frames.append(rr[cols])
                 except FileNotFoundError:
@@ -1185,8 +1169,8 @@ def recommend(
     metrics=None,
     long_df: pd.DataFrame | None = None,
     min_methods: int = 2,
-    source: str = "published",
-    result_path: Path | str | None = None,
+    source=None,
+    result_path=None,
 ) -> pd.DataFrame:
     """Rank methods from stored results, with the share of datasets each was scored on.
 
@@ -1272,7 +1256,7 @@ def recommend(
     **Ranking rules.**
 
     - Only methods this package runs for the category are ranked - the set
-      ``mtb.list_methods(category=...)`` lists. Other package methods in
+      ``mtb.find_methods(category=...)`` lists. Other package methods in
       the table (a vertical method such as scMSI in a cross table) are
       dropped before the within-dataset ranks are taken, and named in the
       warning and in
@@ -1350,6 +1334,25 @@ def recommend(
 
     mtb.plot.bar : plots the same overall score per method.
     """
+    _retired_tables("recommend", 5, source=source, result_path=result_path)
+    return _recommend(category, modalities=modalities, atac=atac, methods=methods,
+                      metrics=metrics, long_df=long_df, min_methods=min_methods,
+                      source=source or "rerun", result_path=result_path)
+
+
+def _recommend(
+    category: str,
+    *,
+    modalities: list[str] | None = None,
+    atac: str | None = None,
+    methods: list[str] | None = None,
+    metrics=None,
+    long_df: pd.DataFrame | None = None,
+    min_methods: int = 2,
+    source: str = "rerun",
+    result_path: Path | str | None = None,
+) -> pd.DataFrame:
+    """:func:`recommend` with the deprecated ``source=`` and ``result_path=``."""
     from ..plot import style
 
     config.category_folder(category)
@@ -1365,12 +1368,12 @@ def recommend(
     long_df_was_none = long_df is None
     if long_df is None:
         # every metric: the "metrics present" error names what the frame holds
-        long_df = load_results(category, source=source, result_path=result_path)
+        long_df = _load_results(category, source=source, result_path=result_path)
     df = long_df.copy()
-    label = f"source={source!r}" if long_df_was_none else "long_df"
     table_noun = {"published": "published table", "rerun": "re-run sweeps",
                   "both": "stored tables"}.get(source, "stored tables") \
         if long_df_was_none else "long_df frame"
+    label = f"the {table_noun}" if long_df_was_none else "long_df"
 
     from ..engine.registry import list_methods
 
@@ -1378,24 +1381,24 @@ def recommend(
     # shape the ranks; a name the registry does not know (the user's own) is kept
     listed = set(list_methods(category=category))
     registry_ids = set(catalog._registry_ids())
-    canon = df["method"].map(catalog.canonical_id)
+    canon = df["method"].map(catalog._canonical_id)
     foreign = sorted({m for m, c in zip(df["method"], canon)
                       if c in registry_ids and c not in listed}, key=str.lower)
     if foreign:
-        df = df[~canon.isin({catalog.canonical_id(m) for m in foreign})]
+        df = df[~canon.isin({catalog._canonical_id(m) for m in foreign})]
         if df.empty:
             raise ValueError(
                 f"every row in {label} belongs to a method this package does "
                 f"not run for {category} ({', '.join(foreign)}); "
-                f"mtb.list_methods(category={category!r}) lists the rankable "
+                f"mtb.find_methods(category={category!r}) lists the rankable "
                 f"ones")
     want_ids: set[str] | None = None
     if methods is not None:
         wanted = _as_list(methods)
         _check_methods(wanted, sorted(df["method"].astype(str).unique()))
-        want_ids = {catalog.canonical_id(m) for m in wanted}
+        want_ids = {catalog._canonical_id(m) for m in wanted}
         want_lower = {w.lower() for w in want_ids}
-        df = df[df["method"].map(lambda m: catalog.canonical_id(m).lower()).isin(want_lower)]
+        df = df[df["method"].map(lambda m: catalog._canonical_id(m).lower()).isin(want_lower)]
         if df.empty:
             raise ValueError(
                 f"none of methods={list(wanted)} has rows in {label} for "
@@ -1424,16 +1427,14 @@ def recommend(
     kept = {ds: mat for ds, mat in parts.items() if ds not in degenerate}
     if not kept:
         hint = ""
-        if long_df_was_none and source != "both":
+        if long_df_was_none and source == "published":
             # cross/D52: one published method, several re-run ones
-            other = "rerun" if source == "published" else "published"
             have = _other_source_methods(source, [category], None, "default",
                                          _base_path(result_path))
             if len(have) >= min_methods:
-                label = "re-run" if other == "rerun" else other
-                hint = (f" The {label} tables have {len(have)} methods for {category}: "
-                        f"{', '.join(sorted(have, key=str.lower))}. Pass "
-                        f'source="{other}" or "both".')
+                hint = (f" The re-run tables have {len(have)} methods for {category}: "
+                        f"{', '.join(sorted(have, key=str.lower))}. Leave out source= "
+                        f"to rank them.")
         sizes = {ds: len(parts[ds].index) for ds in sorted(parts)}
         counts = ", ".join(f"{ds} has {k}" for ds, k in sizes.items())
         one = (" A min-max score over one method is always 1.0."
@@ -1452,7 +1453,7 @@ def recommend(
     keep_methods = list(grand.index)
     if filtered:
         allowed = set(find_methods(category=category, modalities=modalities, atac=atac))
-        keep_methods = [m for m in keep_methods if catalog.canonical_id(m) in allowed]
+        keep_methods = [m for m in keep_methods if catalog._canonical_id(m) in allowed]
         if not keep_methods:
             asked = " and ".join(
                 ([f"consumes modalities {list(modalities)}"] if modalities is not None
@@ -1462,16 +1463,14 @@ def recommend(
                 f"{sorted(grand.index)}; methods matching the selection: "
                 f"{sorted(allowed)}")
 
-    # methods run for the category without rows; the registry's 'clustering' tag
-    # covers every embedding method, its 'batch' tag does not (vertical)
-    wired = find_methods(category=category, task="clustering", modalities=modalities,
-                         atac=atac, runnable=True)
+    # methods run for the category without rows
+    wired = find_methods(category=category, modalities=modalities, atac=atac)
     if want_ids is not None:
         wired = [m for m in wired if m in want_ids]
-    scored_ids = {catalog.canonical_id(m) for m in keep_methods}
+    scored_ids = {catalog._canonical_id(m) for m in keep_methods}
     missing = sorted((m for m in wired if m not in scored_ids), key=str.lower)
     # rows only in dropped datasets is another reason than no rows
-    in_frame = {catalog.canonical_id(m) for m in df["method"].unique()}
+    in_frame = {catalog._canonical_id(m) for m in df["method"].unique()}
     only_dropped = [m for m in missing if m in in_frame]
     no_rows = [m for m in missing if m not in in_frame]
 
@@ -1482,7 +1481,7 @@ def recommend(
     for m in keep_methods + missing:
         scored = m in grand.index
         try:
-            spec = registry.get(catalog.canonical_id(m))
+            spec = registry.get(catalog._canonical_id(m))
         except KeyError:
             spec = None
         if spec is not None:
@@ -1542,7 +1541,7 @@ def recommend(
             f"{_and_list(foreign)} {'has' if one else 'have'} scores in the "
             f"{table_noun}, but this package does not run {it} for {category}, "
             f"so {they} left out of the ranking. "
-            f"mtb.list_methods(category={category!r}) does not list {it}.")
+            f"mtb.find_methods(category={category!r}) does not list {it}.")
     partial = out[(out["coverage"] < 1.0) & out["grand_score"].notna()]
     if not partial.empty:
         notes.append(
@@ -1568,9 +1567,9 @@ def recommend(
                 f"last: {', '.join(no_rows)}")
         notes.append(
             head + "."
-            + (' Try source="rerun".' if source == "published" and long_df_was_none
-               else ""))
+            + (" Leave out source= to rank the re-run tables."
+               if source == "published" and long_df_was_none else ""))
     if notes:
         warnings.warn(f"recommend({category!r}):\n  - " + "\n  - ".join(notes),
-                      UserWarning, stacklevel=3)
+                      UserWarning, stacklevel=4)
     return out

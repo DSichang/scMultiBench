@@ -26,27 +26,19 @@ def check(name):
     return deco
 
 # ---------------- discovery ----------------
-@check("list_methods")
-def _(): 
-    a = mtb.list_methods(); b = mtb.list_methods(category="vertical")
-    assert len(a) == 40 and 0 < len(b) < len(a); return f"{len(a)} all / {len(b)} vertical"
-
-@check("find_methods(runnable=)")
+@check("find_methods")
 def _():
-    r = mtb.find_methods(runnable=True); return f"{len(r)} runnable"
-
-@check("list_tasks")
-def _():
-    t = mtb.list_tasks(); assert t; return t[:5]
+    a = mtb.find_methods(); b = mtb.find_methods(category="vertical")
+    assert 0 < len(b) < len(a); return f"{len(a)} all / {len(b)} vertical"
 
 @check("find_methods(category+modalities)")
 def _():
     m = mtb.find_methods(category="vertical", modalities=["rna", "adt"]); assert len(m) >= 14; return f"{len(m)} methods"
 
-@check("find_methods(task/needs_labels/atac)")
+@check("find_methods(needs_labels/atac)")
 def _():
-    a = mtb.find_methods(task="clustering"); b = mtb.find_methods(needs_labels=True)
-    c = mtb.find_methods(atac="gene_activity"); return f"task={len(a)} labels={len(b)} atac={len(c)}"
+    b = mtb.find_methods(needs_labels=True)
+    c = mtb.find_methods(atac="gene_activity"); return f"labels={len(b)} atac={len(c)}"
 
 @check("method_info")
 def _():
@@ -82,13 +74,9 @@ def _():
 def _():
     l = mtb.labels_for("D11"); assert l; return list(l)
 
-@check("available_datasets(no-arg)")
+@check("results_coverage")
 def _():
-    d = mtb.available_datasets(); return f"{len(d)} datasets"
-
-@check("available_datasets(category)")
-def _():
-    return f"{len(mtb.available_datasets('vertical'))} vertical"
+    return f"{mtb.results_coverage('vertical').dataset.nunique()} vertical datasets"
 
 # ---------------- catalog / config ----------------
 @check("catalog.methods")
@@ -97,10 +85,6 @@ def _(): return f"{mtb.catalog.methods().shape}"
 def _(): return f"{mtb.catalog.datasets().shape}"
 @check("catalog.metrics")
 def _(): return f"{mtb.catalog.metrics().shape}"
-@check("catalog.canonical_id")
-def _(): return mtb.catalog.canonical_id("totalvi")
-@check("catalog.canonical_metric")
-def _(): return mtb.catalog.canonical_metric("ARI")
 @check("config.__all__ (Config, DEFAULT only)")
 def _():
     assert mtb.config.__all__ == ["Config", "DEFAULT"], mtb.config.__all__
@@ -142,29 +126,14 @@ def _():
                          data_path=os.path.join(OUT, "data"), check=True)
     return f"{files} -> {sorted(got)}"
 
-@check("io.normalize_peak_names")
-def _():
-    import h5py
-    src = os.path.join(OUT, "peaks.h5"); dst = os.path.join(OUT, "peaks_norm.h5")
-    with h5py.File(src, "w") as h:
-        g = h.create_group("matrix"); g.create_dataset("data", data=np.random.rand(3, 4))
-        g.create_dataset("features", data=np.array([b"chr1_1_200", b"chr1_300_400", b"chr2_5_9"]))
-    mtb.io.normalize_peak_names(src, dst); return os.path.exists(dst)
-
-# ---------------- env (the five public names) ----------------
+# ---------------- env (the three public names) ----------------
 @check("env.__all__ / dir")
 def _():
-    assert mtb.env.__all__ == ["status", "plan", "install", "doctor", "recipe"], mtb.env.__all__
+    assert mtb.env.__all__ == ["install", "doctor", "recipe"], mtb.env.__all__
     assert "group_for" not in dir(mtb.env) and callable(mtb.env.group_for)   # importable, not advertised
-    return "status, plan, install, doctor, recipe"
+    return "install, doctor, recipe"
 @check("env.recipe")
 def _(): return list(mtb.env.recipe("Matilda"))[:4]
-@check("env.plan")
-def _(): return f"{len(mtb.env.plan())} entries"
-@check("env.plan(as_frame)")
-def _(): return f"{mtb.env.plan(category='vertical', as_frame=True).shape}"
-@check("env.status")
-def _(): return f"{len(mtb.env.status())} entries"
 @check("env.doctor")
 def _():
     d = mtb.env.doctor(); miss = [x for x in d if not x.get("exists", True)]
@@ -257,11 +226,9 @@ def _():
 
 @check("plot.__all__ / dir (render, FamilyBlock importable but unlisted)")
 def _():
-    assert mtb.plot.__all__ == ["bubble", "bar", "build_table", "BubbleTable", "FAMILIES",
-                                "CLUSTERING_METRICS", "BATCH_METRICS",
-                                "CLASSIFICATION_METRICS"], mtb.plot.__all__
+    assert mtb.plot.__all__ == ["bubble", "bar", "build_table", "BubbleTable"], mtb.plot.__all__
     assert "render" not in dir(mtb.plot) and callable(mtb.plot.render)
-    return "eight names"
+    return "four names"
 
 @check("plot.bubble(save=)")
 def _():

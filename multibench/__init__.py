@@ -6,8 +6,7 @@ Quickstart
 
     import multibench as mtb
 
-    mtb.list_categories()            # the four integration scenarios
-    print(mtb.describe_layout())     # how to lay out your dataset
+    print(mtb.describe_layout())     # the four categories and how to lay out your dataset
 
     mtb.scan("MYDATA")               # which methods can run on it (and why not the rest)
 
@@ -17,8 +16,8 @@ Quickstart
     res.plot().savefig("compare.png")
 
 The four ``category`` values are ``vertical``, ``diagonal``, ``mosaic`` and
-``cross`` - see :func:`list_categories` for what each one means, and
-:func:`describe_layout` for the filenames each expects.
+``cross`` - see :func:`describe_layout` for what each one means and the
+filenames each expects.
 """
 
 from . import config
@@ -31,7 +30,7 @@ from .data.results import (load_results, available_datasets, results_coverage, r
 from .eval.pipeline import evaluate, to_long
 from .eval.classify import classify, classification_metrics
 from .engine.runner import run
-from .engine.registry import list_tasks
+from .engine import registry as _registry
 from .engine.schema import AmbiguousVariantError
 from .engine.resolve import inputs_for, labels_for
 from .engine import ingest as io
@@ -39,6 +38,7 @@ from .engine import envs as env
 from .discover import list_methods, find_methods, method_info, params_for, cite
 from .workflow import (scan, run_all, BatchResult, list_categories,
                        describe_layout, load_batch, sweep)
+from . import _compat
 from ._compat import deprecated_alias as _deprecated_alias
 
 # `import multibench.io` / `from multibench.env import plan` work as for a real
@@ -52,10 +52,9 @@ __version__ = "0.3.9"
 
 __all__ = [
     # sub-namespaces
-    "config", "plot", "eval", "catalog", "io", "env", "data",
+    "config", "plot", "catalog", "io", "env", "data",
     # discover
-    "list_methods", "find_methods", "method_info", "params_for", "describe_layout", "cite",
-    "list_tasks", "list_categories",
+    "find_methods", "method_info", "params_for", "describe_layout", "cite",
     # inputs
     "inputs_for", "labels_for",
     # run
@@ -63,7 +62,7 @@ __all__ = [
     # score
     "evaluate", "to_long", "classify", "classification_metrics",
     # compare
-    "load_results", "available_datasets", "results_coverage", "recommend",
+    "load_results", "results_coverage", "recommend",
     "AmbiguousVariantError", "DegenerateRerunWarning", "__version__",
 ]
 
@@ -77,6 +76,9 @@ def _runtime_of(method: str) -> dict:
 plan = _deprecated_alias("plan", "scan", scan)
 plan_commands = _deprecated_alias("plan_commands", "scan", scan)
 runtime_hint = _deprecated_alias("runtime_hint", "method_info(m)['runtime']", _runtime_of)
+
+# deprecated 0.4 names: reachable until 0.5, not in __all__ or dir(mtb)
+list_tasks = _compat.renamed("list_tasks", "category= and metrics=", _registry.list_tasks)
 
 
 def __dir__() -> list[str]:

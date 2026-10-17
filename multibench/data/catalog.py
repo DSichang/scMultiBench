@@ -1,9 +1,5 @@
-"""The benchmark's method, dataset and metric tables, with canonical names.
-
-``mtb.catalog.methods()``, ``datasets()`` and ``metrics()`` return the tables;
-``canonical_id`` and ``canonical_metric`` turn a spelling into the name the
-package uses.
-"""
+"""The benchmark's method, dataset and metric tables: ``mtb.catalog.methods()``,
+``datasets()`` and ``metrics()``."""
 from __future__ import annotations
 
 import re
@@ -11,10 +7,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from .. import config
+from .. import _compat, config
 
-__all__ = ["methods", "datasets", "metrics", "canonical_id", "canonical_metric",
-           "known_metrics", "PAPER_COLUMNS"]
+__all__ = ["methods", "datasets", "metrics"]
 
 
 def __dir__() -> list[str]:
@@ -51,62 +46,11 @@ def _registry_ids() -> list[str]:
     return [s.id for s in registry.load()]
 
 
-def canonical_id(name: str, *, strict: bool = False) -> str:
-    """Return the canonical method id for any known spelling.
-
-    Parameters
-    ----------
-    name : str
-        Any spelling of a method name (``"MOFA+"``, ``"totalvi"``, ``"Seurat(WNN)"``).
-    strict : bool
-        ``True`` = raise for a name that is neither an alias nor a method id;
-        ``False`` = return the folded name.
-
-    Returns
-    -------
-    str
-        The canonical id (an alias target or a method id); for an unknown
-        name, the input with spaces and dots collapsed to ``_``.
-
-    Raises
-    ------
-    KeyError
-        ``strict=True`` and the name is neither an alias nor a method id.
-
-    Examples
-    --------
-    >>> import multibench as mtb
-    >>> mtb.catalog.canonical_id("MOFA+"), mtb.catalog.canonical_id("totalvi")
-    ('MOFA2', 'totalVI')
-    >>> mtb.catalog.canonical_id("my method")          # unknown: separators folded
-    'my_method'
-
-    Notes
-    -----
-    **Resolution order.** The first rule that matches wins:
-
-    1. the alias table, case-insensitive (``"MOFA+"`` -> ``"MOFA2"``,
-       ``"Seurat(WNN)"`` -> ``"Seurat_WNN"``);
-    2. a case-folded match against the method ids, after collapsing spaces
-       and dots to ``_`` (``"totalvi"`` -> ``"totalVI"``, ``"scmomat"`` ->
-       ``"scMoMaT"``);
-    3. for a name the package does not know (a result-directory token, a
-       user's own method name): the input with separators collapsed to
-       ``_``, unchanged in case.
-
-    **Strict mode.** The error is the message ``mtb.method_info`` and
-    ``mtb.scan`` give, e.g. ``"Unknown method Matlida. Did you mean Matilda?
-    mtb.list_methods() shows all methods."``. An
-    alias-table hit is returned without the method-id check, even with
-    ``strict=True``: ``"Seurat v4"`` -> ``"Seurat_v4"``, which is not a
-    method id. The default is lenient: result directories and user
-    frames can hold names the package does not know.
-
-    See Also
-    --------
-    mtb.list_methods : the method ids.
-    mtb.catalog.canonical_metric : the same normalisation for metric codes.
-    """
+def _canonical_id(name: str, *, strict: bool = False) -> str:
+    """The method id for any known spelling (``"MOFA+"`` -> ``"MOFA2"``,
+    ``"totalvi"`` -> ``"totalVI"``): the alias table, then a case-folded match
+    of the ids after collapsing spaces and dots to ``_``; an unknown name comes
+    back folded, or with ``strict=True`` raises the did-you-mean ``KeyError``."""
     key = str(name).strip().lower()
     if key in _ALIASES:
         return _ALIASES[key]
@@ -124,6 +68,15 @@ def canonical_id(name: str, *, strict: bool = False) -> str:
         raise KeyError(registry.unknown_method_message(name, hint[0] if hint else ""))
     return folded
 
+
+#: the metric codes of each ``metrics=`` family, in the paper's order. iASW and iF1
+#: are isolated-label scores, which scIB files under bio conservation: a
+#: single-batch dataset has them and no batch-correction result.
+FAMILY_METRICS = {
+    "clustering": ["ARI", "NMI", "ASW", "iASW", "iF1", "cLISI"],
+    "batch": ["ASW_batch", "ARI_batch", "NMI_batch", "GC", "iLISI", "kBET"],
+    "classification": ["OCA", "ACA", "Spec", "Sens", "F1"],
+}
 
 _METRIC_CANON = {
     "kbet": "kBET",
@@ -153,90 +106,16 @@ _METRIC_CANON = {
 }
 
 
-def known_metrics() -> list[str]:
-    """The canonical metric codes the package knows, in family order.
-
-    Returns
-    -------
-    list of str
-        The clustering / bio-conservation codes (``mtb.plot.CLUSTERING_METRICS``),
-        the batch-correction codes (``mtb.plot.BATCH_METRICS``), then the
-        classification codes (``mtb.plot.CLASSIFICATION_METRICS``): the
-        metrics ``mtb.evaluate`` computes, the rows of ``mtb.catalog.metrics()``.
-
-    Examples
-    --------
-    >>> import multibench as mtb
-    >>> mtb.catalog.known_metrics()
-    ['ARI', 'NMI', 'ASW', 'iASW', 'iF1', 'cLISI', 'ASW_batch', 'ARI_batch',
-     'NMI_batch', 'GC', 'iLISI', 'kBET', 'OCA', 'ACA', 'Spec', 'Sens', 'F1']
-
-    See Also
-    --------
-    mtb.catalog.canonical_metric : maps any spelling to these codes; ``strict=True`` accepts only them.
-    mtb.catalog.metrics : the description of each metric.
-    """
-    seen: list[str] = []
-    for v in _METRIC_CANON.values():
-        if v not in seen:
-            seen.append(v)
-    order = ["ARI", "NMI", "ASW", "iASW", "iF1", "cLISI",
-             "ASW_batch", "ARI_batch", "NMI_batch", "GC", "iLISI", "kBET",
-             "OCA", "ACA", "Spec", "Sens", "F1"]
-    return order + sorted(v for v in seen if v not in order)
+def _known_metrics() -> list[str]:
+    """The metric codes, in family order: the rows of :func:`metrics`."""
+    return [c for codes in FAMILY_METRICS.values() for c in codes]
 
 
-def canonical_metric(code: str, *, strict: bool = False) -> str | None:
-    """Return the canonical code for a metric name (``"ari"`` -> ``"ARI"``).
-
-    Parameters
-    ----------
-    code : str
-        A metric name in any spelling the package or scIB uses
-        (``"kbet"``, ``"isolated_label_f1"``).
-    strict : bool
-        ``True`` = raise for a code not in ``known_metrics()``; ``False`` =
-        return an unknown code unchanged (stripped).
-
-    Returns
-    -------
-    str or None
-        The canonical code; ``None`` for ``None``, an empty string or the
-        string ``"nan"`` (a blank cell, which callers drop).
-
-    Raises
-    ------
-    ValueError
-        ``strict=True`` and the code is not a known metric (the message lists them).
-
-    Examples
-    --------
-    >>> import multibench as mtb
-    >>> mtb.catalog.canonical_metric("kbet")
-    'kBET'
-    >>> mtb.catalog.canonical_metric("isolated_label_f1")
-    'iF1'
-    >>> mtb.catalog.canonical_metric("my_score")        # unknown: kept as given
-    'my_score'
-
-    Notes
-    -----
-    **Spellings.** Matching ignores case and surrounding whitespace:
-    ``"iFI"``, ``"if1"`` and ``"isolated_label_f1"`` all give ``"iF1"``. The
-    raw scIB long names ``"ARI_cluster/label"``, ``"NMI_cluster/label"``,
-    ``"ASW_label"`` and ``"isolated_label_silhouette"`` map to ``ARI``,
-    ``NMI``, ``ASW`` and ``iASW``.
-
-    **Unknown codes.** The default returns an unknown code stripped but
-    otherwise unchanged, so a user frame can carry a metric the package
-    does not know. With ``strict=True`` the error reads ``"unknown metric
-    'nope'; valid: ['ARI', 'NMI', ...]"``.
-
-    See Also
-    --------
-    mtb.catalog.known_metrics : the codes ``strict=True`` accepts.
-    mtb.catalog.canonical_id : the same normalisation for method names.
-    """
+def _canonical_metric(code: str, *, strict: bool = False) -> str | None:
+    """The canonical code for a metric name in any case or scIB spelling
+    (``"kbet"`` -> ``"kBET"``, ``"isolated_label_f1"`` -> ``"iF1"``); ``None``
+    for a blank; an unknown code comes back stripped, or with ``strict=True``
+    raises ``ValueError``."""
     if code is None:
         return None
     key = str(code).strip().lower()
@@ -244,7 +123,7 @@ def canonical_metric(code: str, *, strict: bool = False) -> str | None:
         return None
     out = _METRIC_CANON.get(key, str(code).strip())
     if strict and out not in _METRIC_CANON.values():
-        raise ValueError(f"unknown metric {code!r}; valid: {known_metrics()}")
+        raise ValueError(f"unknown metric {code!r}; valid: {_known_metrics()}")
     return out
 
 
@@ -272,7 +151,7 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
         ``"batch"``, ``"classification"``, ``"all"``) or a list of metric codes (case/alias
         tolerant: ``["ari", "kbet"]`` -> ``ARI, kBET``).
     extra : collection of str
-        Codes accepted on top of :func:`known_metrics` - the metrics present
+        Codes accepted on top of :func:`_known_metrics` - the metrics present
         in a frame, so a user's own metric name in a long file can still be
         selected; they are listed in the error too.
     kw : str
@@ -287,14 +166,13 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
     ValueError
         A string that is not a family token (``"Unknown metrics= token
         ARI. Pass 'all', 'clustering', 'batch' or 'classification', or a list
-        of metric codes ..."``; a :func:`multibench.list_tasks` token gets an extra sentence
+        of metric codes ..."``; a method task token gets an extra sentence
         saying the slot selects a metric family), an unknown code in a list
         (listing the valid codes), an empty list, or a list that names the
         same metric twice after canonicalisation.
     TypeError
         Anything that is neither ``None``, a string nor a collection.
     """
-    from ..plot.bar import FAMILY_METRICS            # families live in plot
     fams = {k: list(v) for k, v in FAMILY_METRICS.items()}
     if metrics is None or (isinstance(metrics, str) and metrics == "all"):
         return MetricSelection("all", None, False)
@@ -304,11 +182,10 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
         hint = ""
         from ..engine.registry import list_tasks
         if metrics in list_tasks():
-            hint = (f" {kw}= selects a metric family, not a task of mtb.list_tasks(). "
-                    f"The tasks dimension_reduction and clustering both use the "
-                    f"clustering family.")
-        elif canonical_metric(metrics) in known_metrics():
-            hint = f" A single code goes in a list: {kw}=[{canonical_metric(metrics)!r}]."
+            hint = (f" {kw}= selects a metric family, not a task. The tasks "
+                    f"dimension_reduction and clustering both use the clustering family.")
+        elif _canonical_metric(metrics) in _known_metrics():
+            hint = f" A single code goes in a list: {kw}=[{_canonical_metric(metrics)!r}]."
         raise ValueError(
             f"Unknown {kw}= token {metrics}. Pass 'all', 'clustering', 'batch' or "
             f"'classification', or a list of metric codes such as {kw}=['ARI', 'NMI'].{hint}")
@@ -322,11 +199,11 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
         raise ValueError(
             f"{kw}=[] selects nothing. Pass None for every metric, a family token, "
             f"or a non-empty list of codes.")
-    valid = list(known_metrics())
+    valid = _known_metrics()
     present = sorted(set(map(str, extra)))
     codes, unknown = [], []
     for m in wanted:
-        c = canonical_metric(m)
+        c = _canonical_metric(m)
         if c is None or (c not in valid and c not in present):
             unknown.append(m)
         else:
@@ -380,8 +257,8 @@ def methods(files_dir: Path | str | None = None) -> pd.DataFrame:
     -----
     **Column reference.**
 
-    - ``method`` - the name as spelled in ``method.csv``;
-    - ``canonical_id`` - the method id (``mtb.catalog.canonical_id``);
+    - ``method`` - the method id, as every function takes it;
+    - ``name`` - the name as the article spells it (``MOFA+``, ``Seurat(WNN)``);
     - ``language`` - ``'python'`` or ``'r'`` (lower-cased);
     - ``deep_learning`` - ``'Yes'`` / ``'No'``, as in the CSV;
     - ``atac`` - ``'peak'``, ``'gene_activity'`` or ``None``;
@@ -397,9 +274,8 @@ def methods(files_dir: Path | str | None = None) -> pd.DataFrame:
 
     See Also
     --------
-    mtb.list_methods : the method ids, optionally per category.
+    mtb.find_methods : the method ids, filtered by category, modalities and more.
     mtb.method_info : everything the package knows about one method.
-    mtb.catalog.canonical_id : the normalisation behind the ``canonical_id`` column.
     """
     if files_dir is None:
         files_dir = config.DEFAULT.files_path
@@ -407,8 +283,8 @@ def methods(files_dir: Path | str | None = None) -> pd.DataFrame:
     cols = {c: c.strip().replace("\n", " ").strip() for c in raw.columns}
     raw = raw.rename(columns=cols)
     out = pd.DataFrame()
-    out["method"] = raw["Methods"].astype(str).str.strip()
-    out["canonical_id"] = out["method"].map(canonical_id)
+    out["name"] = raw["Methods"].astype(str).str.strip()
+    out.insert(0, "method", out["name"].map(_canonical_id))
     out["language"] = raw["Programming Language"].astype(str).str.strip().str.lower()
     out["deep_learning"] = raw["Deep Learning"].astype(str).str.strip()
     out["atac"] = raw["Peak/Gene Activity"].astype(str).str.strip()
@@ -422,7 +298,7 @@ def methods(files_dir: Path | str | None = None) -> pd.DataFrame:
     from ..engine import registry
     specs = {s.id: s for s in registry.load()}
     atac_col = out["atac"].astype(object)
-    for i, cid in enumerate(out["canonical_id"]):
+    for i, cid in enumerate(out["method"]):
         spec = specs.get(cid)
         if spec is None:
             continue
@@ -445,7 +321,7 @@ def _dataset_sort_key(ds: str):
 
 #: descriptive columns of dataset.csv (the paper's dataset table); the shipped
 #: file leaves them empty, and datasets() returns only the filled ones
-PAPER_COLUMNS = ["assay", "tissue", "n_cells", "n_batches", "source"]
+_PAPER_COLUMNS = ["assay", "tissue", "n_cells", "n_batches", "source"]
 
 
 def datasets(files_dir: Path | str | None = None, *,
@@ -483,12 +359,10 @@ def datasets(files_dir: Path | str | None = None, *,
     **Column reference.**
 
     - ``dataset`` - the id (``D11``, ``SD15``, ...);
-    - ``dataset name`` - a duplicate of ``dataset``, kept for one release
-      for older callers;
     - ``simulated`` - bool, ids starting with ``SD``;
     - ``category`` - the integration categories whose stored results
-      (published or re-run) contain the dataset, ``";"``-joined; ``None``
-      when no stored results exist;
+      contain the dataset, ``";"``-joined; ``None`` when no stored results
+      exist;
     - ``has_results`` - bool, a stored metric table (``mtb.load_results``)
       covers it.
 
@@ -530,7 +404,7 @@ def datasets(files_dir: Path | str | None = None, *,
     cat_of: dict[str, list[str]] = {}
     for cat in results._CATEGORIES:
         try:
-            for ds in results.available_datasets(cat, source="both"):
+            for ds in results._available_datasets(cat):
                 cat_of.setdefault(ds, []).append(cat)
         except Exception:       # a broken/absent tree must not break the catalog
             continue
@@ -541,12 +415,11 @@ def datasets(files_dir: Path | str | None = None, *,
 
     out = pd.DataFrame()
     out["dataset"] = raw[name_col].astype(str).str.strip()
-    out["dataset name"] = out["dataset"]
     out["simulated"] = out["dataset"].str.upper().str.startswith("SD")
     out["category"] = out["dataset"].map(lambda d: ";".join(cat_of[d]) if d in cat_of else None)
     out["has_results"] = out["dataset"].isin(cat_of.keys())
 
-    for col in PAPER_COLUMNS:
+    for col in _PAPER_COLUMNS:
         if col in raw.columns and raw[col].notna().any():
             out[col] = raw[col].values
     if category is not None:
@@ -591,4 +464,17 @@ def metrics(files_dir: Path | str | None = None) -> pd.DataFrame:
     if files_dir is None:
         files_dir = config.DEFAULT.files_path
     raw = pd.read_csv(Path(files_dir) / "metric_full.csv")
-    return raw.rename(columns={c: c.strip() for c in raw.columns})
+    raw = raw.rename(columns={c: c.strip() for c in raw.columns})
+    family = {c: f for f, codes in FAMILY_METRICS.items() for c in codes}
+    raw.insert(1, "family", raw["metric"].map(family))
+    return raw
+
+
+__getattr__ = _compat.module_getattr(__name__, "catalog", {
+    "canonical_id": (_canonical_id, "the name as written; every function accepts "
+                                    "any spelling"),
+    "canonical_metric": (_canonical_metric, "the name as written; every function "
+                                            "accepts any spelling"),
+    "known_metrics": (_known_metrics, "catalog.metrics()"),
+    "PAPER_COLUMNS": (_PAPER_COLUMNS, None),
+})

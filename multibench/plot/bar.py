@@ -7,28 +7,21 @@ import numpy as np
 import pandas as pd
 
 from . import style
+from .. import _compat
 from .. import config as _config
+from ..data.catalog import FAMILY_METRICS
 from .style import compute_overall, minmax
 
-# scIB metric families, as eval.scib.compute() groups them (tests/test_metric_groups.py).
-# iASW and iF1 are isolated-label scores, which scIB files under bio conservation:
-# a single-batch dataset has them and no batch-correction result.
-CLUSTERING_METRICS = ["ARI", "NMI", "ASW", "iASW", "iF1", "cLISI"]
-BATCH_METRICS = ["ASW_batch", "ARI_batch", "NMI_batch", "GC", "iLISI", "kBET"]
-# the benchmark's classification scores (mtb.classification_metrics); not scIB
-CLASSIFICATION_METRICS = ["OCA", "ACA", "Spec", "Sens", "F1"]
-
-#: the metric families by their ``metrics=`` / ``group=`` token
-FAMILY_METRICS = {"clustering": CLUSTERING_METRICS, "batch": BATCH_METRICS,
-                  "classification": CLASSIFICATION_METRICS}
-#: the colour ramp of each family that is not blue, as in the paper's figures
-FAMILY_CMAPS = {"batch": "Greens", "classification": "Pinks"}
+CLUSTERING_METRICS = FAMILY_METRICS["clustering"]
+BATCH_METRICS = FAMILY_METRICS["batch"]
+CLASSIFICATION_METRICS = FAMILY_METRICS["classification"]
+#: the colour ramp of each family, as in the paper's figures
+FAMILY_CMAPS = {"clustering": "Blues", "batch": "Greens", "classification": "Pinks"}
 
 
-def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
-        top: int | None = None, title: str | None = None, cmap: str = "Blues",
-        show_datasets: bool = True, save: str | None = None,
-        overall: str = "mean_overall"):
+@_compat.keywords("plot.bar", group="metrics", cmap=None, show_datasets=None)
+def bar(long_df: pd.DataFrame, *, metrics=None, top: int | None = None,
+        title: str | None = None, save: str | None = None, overall: str = "rank"):
     """Draw each method's overall score across datasets as a horizontal bar.
 
     Parameters
@@ -39,27 +32,17 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
         ``mtb.load_results``.
     metrics : str, list of str | None
         Metric codes to score, or a family (``"clustering"``, ``"batch"``,
-        ``"classification"``, ``"all"``); ``None`` = every metric. Ignored
-        when ``group`` is given.
-    group : {None, "clustering", "batch", "classification"}
-        Score one metric family only (the benchmark's summary panels);
-        ``None`` = the ``metrics`` selection.
+        ``"classification"``, ``"all"``) drawn in its colour, as the
+        benchmark's summary panels; ``None`` = every metric.
     top : int | None
         Keep the ``top`` best methods, scored against all of them; ``None``
         = every method.
     title : str | None
-        Figure title; ``None`` = the number of datasets. With ``group``,
-        ``(<group> metrics)`` is appended.
-    cmap : str
-        Matplotlib colormap for the bars; ``group="batch"`` always uses
-        greens and ``group="classification"`` pinks (the paper's family
-        colours).
-    show_datasets : bool
-        Overlay one dot per dataset's score on each bar; drawn only under
-        ``overall="mean_overall"`` with several datasets.
+        Figure title; ``None`` = the number of datasets. With a family,
+        ``(<family> metrics)`` is appended.
     save : str | None
         File to write the figure to (140 dpi, tight bounding box).
-    overall : {"mean_overall", "rank"}
+    overall : {"rank", "mean_overall"}
         Across-dataset *Overall*: ``"rank"`` re-ranks mean ranks (missing
         dataset = rank 0); ``"mean_overall"`` averages per-dataset Overalls
         (missing dataset skipped).
@@ -76,9 +59,9 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
         (``mtb.load_results`` may have returned nothing; see its warning).
     ValueError
         Unknown ``metrics`` code (the error suggests a close match and lists
-        the metrics present), or an invalid ``group`` / ``overall``.
+        the metrics present), or an invalid ``overall``.
     ValueError
-        ``group`` names a family with no metric in the frame: batch metrics
+        ``metrics`` names a family with no metric in the frame: batch metrics
         need a multi-batch dataset, and the stored tables have no
         classification scores.
 
@@ -99,10 +82,8 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
     >>> import multibench as mtb
     >>> # every dataset of the category that has a stored table
     >>> df = mtb.load_results("diagonal")
-    >>> fig = mtb.plot.bar(df, group="clustering", top=10, save="clustering.png")
-    >>> fig = mtb.plot.bar(df, group="batch")
-    >>> fig = mtb.plot.bar(res.long, group="classification")   # res: mtb.run_all
-    >>> fig = mtb.plot.bar(df, overall="rank")       # bubble's default formula
+    >>> fig = mtb.plot.bar(df, metrics="clustering", top=10, save="clustering.png")
+    >>> fig = mtb.plot.bar(res.long, metrics="classification")   # res: mtb.run_all
 
     Notes
     -----
@@ -111,8 +92,7 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
     - Whiskers (``overall="mean_overall"``): the SD of the per-dataset
       scores; a method present in one dataset gets none - there is no spread
       to show.
-    - Dots (``overall="mean_overall"``, ``show_datasets``): one dot per
-      dataset score.
+    - Dots (``overall="mean_overall"``): one dot per dataset score.
     - Under ``overall="rank"`` the bar is not a mean of per-dataset scores,
       so neither whiskers nor dots are drawn.
     - X label: the single dataset, or the formula and the number of
@@ -150,27 +130,24 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
             f"'value']; missing {sorted(need - have)}")
     if len(long_df) == 0:
         raise ValueError(
-            "long_df has no rows to plot. load_results may have returned none. "
-            "Its UserWarning says why, for example a method with no rows under "
-            "source='published'. Then try source='rerun'.")
-    if metrics is not None and not group:
-        from .bubble import _expand_families
-        metrics = _expand_families(metrics, long_df["metric"].dropna().unique().tolist())
-        metrics = _resolve(metrics, long_df["metric"].dropna().unique().tolist(),
-                           "metric", catalog.canonical_metric)
-    if group:
-        if group not in FAMILY_METRICS:
-            raise ValueError(f"group must be 'clustering', 'batch' or 'classification', "
-                             f"got {group!r}")
-        metrics = FAMILY_METRICS[group]
+            "long_df has no rows to plot. load_results may have returned none; "
+            "its UserWarning says why.")
+    family = metrics if isinstance(metrics, str) and metrics in FAMILY_METRICS else None
+    if family:
+        metrics = FAMILY_METRICS[family]
         present = set(long_df["metric"].unique())
         if not (set(metrics) & present):
             why = ("The stored tables have none. "
                    + _config.hint("mtb.evaluate", "multibench evaluate")
-                   + " computes them on multi-batch data." if group == "classification" else
+                   + " computes them on multi-batch data." if family == "classification" else
                    "Batch metrics need a multi-batch dataset - a single-batch design "
                    "has none to compute.")
-            raise ValueError(f"no {group!r} metrics present. Found {sorted(present)}. {why}")
+            raise ValueError(f"no {family!r} metrics present. Found {sorted(present)}. {why}")
+    elif metrics is not None:
+        from .bubble import _expand_families
+        metrics = _expand_families(metrics, long_df["metric"].dropna().unique().tolist())
+        metrics = _resolve(metrics, long_df["metric"].dropna().unique().tolist(),
+                           "metric", catalog._canonical_metric)
     if overall not in style.OVERALL_BASES:
         raise ValueError(
             f"overall must be one of {list(style.OVERALL_BASES)}, got {overall!r}")
@@ -204,9 +181,8 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
     # importing scib (mtb.evaluate) switches them to seaborn's "talk" sizes
     with plt.style.context("default"):
         fig, ax = plt.subplots(figsize=(7.2, max(2.2, 0.34 * n + 1.1)))
-        if group in FAMILY_CMAPS:
-            cmap = FAMILY_CMAPS[group]
-        colors = style.colormap(cmap)(0.35 + 0.55 * minmax(mean.to_numpy()))
+        colors = style.colormap(FAMILY_CMAPS.get(family, "Blues"))(
+            0.35 + 0.55 * minmax(mean.to_numpy()))
         # whisker = SD across datasets; none for a method in one dataset, and none
         # under overall="rank", whose bar is not a mean of per-dataset scores
         if overall == "mean_overall":
@@ -219,7 +195,7 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
                 linewidth=0.6, zorder=2, xerr=xerr,
                 error_kw=dict(ecolor="#333", elinewidth=1.0, capsize=3, capthick=1.0))
 
-        if show_datasets and overall == "mean_overall" and per_ds.shape[1] > 1:
+        if overall == "mean_overall" and per_ds.shape[1] > 1:
             for i, m in enumerate(mean.index):
                 vals = per_ds.loc[m].dropna().to_numpy()
                 ax.scatter(vals, np.full(len(vals), i), s=16, facecolor="white",
@@ -243,8 +219,8 @@ def bar(long_df: pd.DataFrame, *, metrics=None, group: str | None = None,
             ax.spines[side].set_visible(False)
         heading = title or (f"overall — {n_datasets} dataset"
                             + ("s" if n_datasets != 1 else ""))
-        if group:
-            heading += f"  ({group} metrics)"
+        if family:
+            heading += f"  ({family} metrics)"
         ax.set_title(heading, fontsize=11, loc="left")
         fig.tight_layout()
         if save:

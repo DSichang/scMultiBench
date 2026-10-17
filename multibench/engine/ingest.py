@@ -12,7 +12,6 @@ Entry points (exposed as ``mtb.io``):
   (``rna1.h5`` ...) or as unpaired diagonal data. A MuData's modalities can
   be named directly (``rna='rna'``).
 * :func:`read_canonical` - the inverse (canonical ``.h5`` -> AnnData).
-* :func:`normalize_peak_names` - rewrite peak ids to ``chr:start-end``.
 
 Label files are single-column CSVs: a header ``x``, then one label per cell.
 """
@@ -27,10 +26,10 @@ from pathlib import Path
 import h5py
 import numpy as np
 
-from .. import config
+from .. import _compat, config
 from .registry import ATAC_VALUES as _ATAC_KINDS
 
-__all__ = ["export_dataset", "to_canonical", "read_canonical", "normalize_peak_names"]
+__all__ = ["export_dataset", "to_canonical", "read_canonical"]
 
 
 def __dir__() -> list[str]:
@@ -653,6 +652,24 @@ def _check_peak_names(modality, feats, *, rna_feats=None, kind_arg=False):
         warnings.warn(text, UserWarning, stacklevel=3)
 
 
+#: the ATAC role of each ``atac_kind=``
+_ATAC_ROLES = {"peak": "atac_peak", "gene_activity": "atac_gas"}
+
+
+def _atac_role(feats, rna_feats) -> str:
+    """The ATAC role the feature names show, for ``atac_kind=None``: peaks
+    (``chr1:100-200``) or the RNA's gene names; neither raises."""
+    if _peak_fraction(feats) > 0.5:
+        return "atac_peak"
+    genes = set(rna_feats or ())
+    if genes and sum(1 for x in feats if x in genes) > 0.5 * len(feats):
+        return "atac_gas"
+    raise ValueError(
+        "The ATAC feature names are neither peaks such as chr1:100-200 nor the RNA's "
+        "gene names. Pass " + config.hint("atac_kind='peak' or atac_kind='gene_activity'.",
+                                          "--atac-kind peak or --atac-kind gene_activity."))
+
+
 def _write_canonical(out: Path, X, feats, bars, *, dtype, compression, block):
     """Stream ``X`` (cells x features) to ``out`` as features x cells, one
     block of features at a time; CSC makes each block a cheap column slice."""
@@ -994,47 +1011,12 @@ def read_canonical(path: Path | str, sparse: bool | None = None):
     return a
 
 
-def normalize_peak_names(src, dst):
-    """Copy a canonical ``.h5``, rewriting ATAC peak names to ``chr:start-end``.
-
-    Signac's ``CreateChromatinAssay(sep=c(":","-"))`` (Seurat v3 and the
-    other Signac-based methods) expects that spelling. The source file is
-    never modified.
-
-    Parameters
-    ----------
-    src : Path | str
-        Canonical ``.h5`` whose ``matrix/features`` holds the peak ids.
-    dst : Path | str
-        Path of the copy; parent folders are created, an existing file is overwritten.
-
-    Returns
-    -------
-    pathlib.Path
-        ``dst``.
-
-    Examples
-    --------
-    >>> import multibench as mtb
-    >>> mtb.io.normalize_peak_names("data/MYMULTI/atac.h5", "tmp/atac.h5")
-
-    Notes
-    -----
-    **Recognised peaks.** A feature reading ``<chr><sep><start><sep><end>``
-    with two integers, the first separator one of ``_``, ``-``, ``:`` and the
-    second ``_`` or ``-``, is rewritten as ``<chr>:<start>-<end>``. Other
-    features (gene symbols) pass through unchanged, and only
-    ``matrix/features`` is replaced.
-
-    **Inside ``mtb.run``.** ``mtb.run`` applies this itself for GLUE and
-    Seurat_v3, writing a per-run ``<role>_normpeaks.h5`` copy next to the
-    converted inputs. Call it by hand only to prepare a file for a script
-    you run outside the wrapper.
-
-    See Also
-    --------
-    mtb.io.to_canonical : write the canonical file in the first place.
-    """
+def _normalize_peak_names(src, dst):
+    """Copy the canonical ``.h5`` ``src`` to ``dst`` with ATAC peak names rewritten to
+    ``chr:start-end``, the spelling Signac's ``CreateChromatinAssay(sep=c(":","-"))``
+    expects: a name ``<chr><sep><start><sep><end>`` with ``_``/``-``/``:`` then
+    ``_``/``-`` as separators; gene symbols pass unchanged. ``run`` applies it for
+    GLUE and Seurat_v3. Returns ``dst``."""
     src, dst = Path(src), Path(dst)
     dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(src, dst)
@@ -1361,11 +1343,11 @@ def _as_obs_vector(data, spec, *, what, master):
     return vals
 
 
+@_compat.keywords("io.export_dataset", compression=None)
 def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                    adt=None, atac=None,
                    atac_kind: str | None = None, labels=None,
                    batch=None, dtype: str = "float64",
-                   compression: str | None = "gzip",
                    category: str | None = None,
                    adt_names: list | None = None,
                    batch_index: int | None = None,
@@ -1393,10 +1375,11 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         ``'obsm:protein'``); ``None`` = no ADT.
     atac : str, AnnData, DataFrame, array or None
         ATAC matrix, same forms as ``rna`` (e.g. ``'X[feature_types=Peaks]'``);
-        needs ``atac_kind``. ``None`` = no ATAC.
+        ``None`` = no ATAC.
     atac_kind : str or None
         What ``atac`` holds: ``'peak'`` or ``'gene_activity'``; decides the
-        ATAC filename.
+        ATAC filename. ``None`` = read from the feature names: peaks
+        (``chr1:100-200``) or the RNA's gene names.
     labels : str, Series, sequence or None
         Cell-type labels: a column, named ``'obs:<col>'`` or ``'<col>'`` (a
         MuData's global ``.obs``), ``'<mod>:<col>'`` (``mdata[mod].obs``), a
@@ -1407,8 +1390,6 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         needs a batch.
     dtype : str
         Stored dtype of ``matrix/data``, forwarded to ``mtb.io.to_canonical``.
-    compression : str or None
-        h5py compression filter, forwarded to ``mtb.io.to_canonical``.
     category : str or None
         Integration category the folder is for (``vertical``, ``diagonal``,
         ``mosaic`` or ``cross``); sets the ATAC and label filenames (Notes).
@@ -1677,11 +1658,10 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         # a bare modality name selects mdata.mod[name].X; full
         # 'mod:<name>[...]' selectors pass through
         rna, adt, atac = (_mudata_selector(data, x) for x in (rna, adt, atac))
-    if atac is not None and atac_kind not in _ATAC_KINDS:
+    if atac_kind is not None and atac_kind not in _ATAC_KINDS:
         raise ValueError(
-            f"atac={atac!r} needs atac_kind= one of {list(_ATAC_KINDS)} "
-            f"(got {atac_kind!r}): 'peak' -> atac_peak.h5 (+atac.h5), "
-            "'gene_activity' -> atac_gas.h5")
+            f"atac_kind= must be one of {list(_ATAC_KINDS)} (got {atac_kind!r}): "
+            "'peak' -> atac_peak.h5 (+atac.h5), 'gene_activity' -> atac_gas.h5")
     if atac is None and atac_kind is not None:
         raise ValueError("atac_kind= given without atac=")
     if rna is None and adt is None and atac is None and labels is None:
@@ -1700,12 +1680,6 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         raise ValueError(
             "category='diagonal' names the label file after the modality it labels "
             "(rna_cty.csv, atac_cty.csv): pass rna= or atac= together with labels=")
-    if category == "mosaic" and atac is not None and atac_kind == "gene_activity":
-        warnings.warn("Every mosaic method reads peak ATAC. " + config.hint(
-            "Export the ATAC as peaks (atac_kind='peak'), or pass "
-            "allow_atac_mismatch=True to scan and run_all.",
-            "Convert the ATAC as peaks (--atac-kind peak), or pass "
-            "--allow-atac-mismatch to scan and run-all."), UserWarning, stacklevel=2)
     if category in ("mosaic", "cross") and batch is None and batch_index is None:
         warnings.warn(f"category={category!r} methods read numbered files (rna1.h5, "
                       f"cty1.csv, ...): pass batch_index= (this object is one batch) "
@@ -1729,7 +1703,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                 [str(x) for x in data.obs_names] if _is_anndata(data) and not _is_mudata(data)
                 else None)
         a, kw = _as_modality(data, atac, what="atac", master=atac_master)
-        role = "atac_peak" if atac_kind == "peak" else "atac_gas"
+        role = _ATAC_ROLES.get(atac_kind, "atac")     # "atac": from the feature names
         sides["atac" if diagonal else "rna"].append(
             (role, a, kw, "atac", _source_name(atac, "atac")))
     masters = {}
@@ -1809,10 +1783,19 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                     mudata=_is_mudata(data))
                 if repeated:
                     warnings.warn(repeated, UserWarning, stacklevel=2)
-            if role in ("atac_peak", "atac_gas"):
+            if what == "atac":
                 # the RNA is prepared first (side 'rna', then the ATAC)
                 rna_feats = next((f for _, r, _, f, _, _ in prepared if r == "rna"), None)
+                if role == "atac":
+                    role = _atac_role(feats, rna_feats)
                 _check_peak_names(role, feats, rna_feats=rna_feats, kind_arg=True)
+                if category == "mosaic" and role == "atac_gas":
+                    warnings.warn("Every mosaic method reads peak ATAC. " + config.hint(
+                        "Export the ATAC as peaks (atac_kind='peak'), or pass "
+                        "allow_atac_mismatch=True to scan and run_all.",
+                        "Convert the ATAC as peaks (--atac-kind peak), or pass "
+                        "--allow-atac-mismatch to scan and run-all."),
+                        UserWarning, stacklevel=2)
             if role in _COUNT_ROLES:
                 # the command line's --atac-from hands over an object and its selector
                 selector = {"rna": rna, "adt": adt, "atac": atac}[what]
@@ -1881,7 +1864,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         if kind == "matrix":
             sub, feats, sub_bars = payload
             _write_canonical(pth, sub, feats, sub_bars, dtype=dtype,
-                             compression=compression, block=1024)
+                             compression="gzip", block=1024)
         elif kind == "link":
             _link_or_copy(payload, pth)
         else:
@@ -2455,3 +2438,8 @@ def _select_object(obj, spec: str, *, what: str):
         a = b
     a._selector = spec          # for the raw-count hint of export_dataset
     return a
+
+
+__getattr__ = _compat.module_getattr(__name__, "io", {
+    "normalize_peak_names": (_normalize_peak_names, "run, which renames the peaks itself"),
+})

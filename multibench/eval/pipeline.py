@@ -196,7 +196,7 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
             f"'metric' column); got {out['metric'].head(5).tolist()} with columns {cols} "
             f"- read a CSV saved with wide.to_csv(path) back with "
             f"pd.read_csv(path, index_col=0)")
-    out["metric"] = out["metric"].map(catalog.canonical_metric)
+    out["metric"] = out["metric"].map(catalog._canonical_metric)
     out = out.dropna(subset=["metric"])
     if out.empty and len(value_df):
         raise ValueError(
@@ -243,8 +243,7 @@ def _metric_families() -> tuple[list, list, list]:
 def _validate_category(category):
     if category is None:
         return
-    from ..workflow import list_categories  # lazy: workflow imports this module
-    valid = list_categories()
+    from ..workflow import CATEGORIES as valid  # lazy: workflow imports this module
     if category not in valid:
         raise ValueError(
             f"unknown category {category!r}; valid: {sorted(valid)}")
@@ -538,9 +537,9 @@ def _labels_from_dict(d: dict, label_order) -> list:
 
 
 #: the ``multibench evaluate`` flag that fills each argument of evaluate()
-_FLAGS = {"labels": "--labels", "clustering": "--clustering", "batch": "--batch"}
+_FLAGS = {"labels": "--labels", "clusters": "--clusters", "batch": "--batch"}
 #: what one value of each argument is called in the command-line messages
-_UNITS = {"labels": "labels", "clustering": "cluster ids", "batch": "batch ids"}
+_UNITS = {"labels": "labels", "clusters": "cluster ids", "batch": "batch ids"}
 #: the dataset whose label files ``multibench evaluate --dataset`` read, so the
 #: errors name them, not a --labels never typed
 _CLI_LABELS_FROM = contextvars.ContextVar("cli_labels_from", default=None)
@@ -700,17 +699,17 @@ def _count_error(what: str, n: int, n_cells: int, given, category=None) -> str:
     side = _diagonal_side(files) if what == "labels" and n < n_cells else None
     if dataset:
         cli = (f"the label files of {dataset}{names} hold {n:,} labels for "
-               f"{n_cells:,} cells in --output. ")
+               f"{n_cells:,} cells in --embedding. ")
         if side and category == "diagonal":
             cli += (f'{dataset} labels the {side[0]} cells only, see the recipe '
                     f'"No labels" in the docs.')
         else:
-            cli += f"Check that --output holds the embedding of --method on {dataset}."
+            cli += f"Check that --embedding holds the embedding of --method on {dataset}."
         return config.hint(escib.count_error(what, n, n_cells), cli)
     msg = config.hint(
         escib.count_error(what, n, n_cells),
         f"{_FLAGS[what]} gave {n:,} {_UNITS[what]}{names} for {n_cells:,} cells "
-        f"in --output.")
+        f"in --embedding.")
     if what != "labels" or n >= n_cells:
         return msg
     batches = _batch_files(files[0], n_cells) if len(files) == 1 else []
@@ -722,7 +721,7 @@ def _count_error(what: str, n: int, n_cells: int, given, category=None) -> str:
         "For a folder with one label file per batch, pass "
         "mtb.labels_for(dataset, category, method).",
         f"For several label files{order}, repeat --labels in the row order of "
-        f"--output, or pass --dataset, --category and --method.")
+        f"--embedding, or pass --dataset, --category and --method.")
 
 
 def _plan_metrics(metrics, *, has_batch: bool, batch_given: bool):
@@ -907,17 +906,23 @@ def _metrics_spelling(metrics) -> str:
 
 
 def _legacy_evaluate_kwargs(kw: dict) -> dict:
-    """0.2.x keywords of :func:`evaluate`: ``task=`` / ``family=`` / ``only=``
-    become ``metrics=`` with a ``DeprecationWarning``; the removed ones raise."""
+    """Retired keywords of :func:`evaluate`: ``output=`` and ``clustering=`` (0.4)
+    become ``embedding=`` and ``clusters=`` with a ``FutureWarning``; ``task=`` /
+    ``family=`` / ``only=`` (0.2.x) become ``metrics=`` with a
+    ``DeprecationWarning``; the removed ones raise."""
     removed = {
         "slow_metrics": "pass metrics=[...] without cLISI/iLISI (kBET is computed "
                         "only when it is named in that list)",
-        "column": "pass the Series/column itself as labels= / batch= / clustering=",
+        "column": "pass the Series/column itself as labels= / batch= / clusters=",
         "metric_set": "only the scIB metric set exists - drop the argument",
     }
     for name, fix in removed.items():
         if name in kw:
             raise TypeError(f"evaluate() got {name}=, removed in 0.3.0: {fix}")
+    for old, new in (("output", "embedding"), ("clustering", "clusters")):
+        if old in kw:
+            _compat.deprecated(f"evaluate({old}=)", f"{new}=", stacklevel=4)
+            kw[new] = kw.pop(old)
     legacy = {n: kw.pop(n) for n in ("task", "family", "only") if n in kw}
     if not legacy:
         return kw
@@ -939,7 +944,7 @@ def _legacy_evaluate_kwargs(kw: dict) -> dict:
             raise TypeError(
                 f"only= must be a collection of metric names, e.g. only={{{only!r}}}; "
                 f"got the string {only!r} (and only= is deprecated: pass metrics=[...])")
-        codes = [catalog.canonical_metric(m) or m for m in only]
+        codes = [catalog._canonical_metric(m) or m for m in only]
         if isinstance(only, (set, frozenset)):
             codes = sorted(codes)          # a set has no order to preserve
         _compat.warn("evaluate(only=...)", f"metrics={codes!r}", stacklevel=4)
@@ -959,13 +964,13 @@ def _legacy_evaluate_kwargs(kw: dict) -> dict:
 
 @_compat.legacy_kwargs(_legacy_evaluate_kwargs)
 def evaluate(
-    output,
+    embedding,
     labels=None,
     *,
     category: str | None = None,
     batch=None,
     metrics=None,
-    clustering=None,
+    clusters=None,
     obsm: str = "X_emb",
     label_order=None,
     verbose: bool = True,
@@ -979,7 +984,7 @@ def evaluate(
 
     Parameters
     ----------
-    output
+    embedding
         Embedding, cells x dims: array, DataFrame, sparse matrix, AnnData or
         MuData (``.obsm[obsm]``; ``labels``/``batch`` may name ``.obs``
         columns), or a file: ``.h5`` (dataset ``data``, the benchmark's
@@ -990,9 +995,9 @@ def evaluate(
         ``mtb.labels_for`` dict, a 1-D array-like, or an ``.obs`` column
         name, with or without the ``obs:`` prefix (forms in Notes).
     category : str, optional
-        Integration category, one of ``mtb.list_categories()``; validated,
-        otherwise unused (the metrics do not depend on it). Lets a call mirror
-        ``mtb.run``.
+        Integration category: ``vertical``, ``diagonal``, ``mosaic`` or
+        ``cross``. With two or more batches it decides whether the
+        classification metrics are added: not for ``"vertical"``.
     batch
         Batch labels, one per cell, in the forms ``labels`` accepts; needed
         for the batch metrics unless ``labels`` lists two or more files.
@@ -1001,7 +1006,7 @@ def evaluate(
         ``None`` = every applicable metric except kBET; or ``"clustering"``,
         ``"batch"``, ``"classification"``, ``"all"``, or a list of codes such
         as ``["ARI", "NMI"]``.
-    clustering
+    clusters
         Precomputed cluster assignment, in the forms ``labels`` accepts or an
         ``.h5`` path, used for ARI, NMI, ASW, iASW and iF1; ``None`` = Leiden
         clusters, one per cell type.
@@ -1306,26 +1311,26 @@ def evaluate(
         batch_given=batch is not None)
     if want_cls:
         from .classify import _graph_writer, _not_embedding
-        not_embedding = _not_embedding(output)     # a label file or a list
-        graph = _graph_writer(output)              # a file only graph methods write
+        not_embedding = _not_embedding(embedding)  # a label file or a list
+        graph = _graph_writer(embedding)           # a file only graph methods write
 
     # named in the error for a Series that lacks some cells
-    cells = "adata.obs_names" if io._is_anndata(output) else None
-    if isinstance(output, (str, Path)) and Path(output).suffix.lower() == ".h5ad":
+    cells = "adata.obs_names" if io._is_anndata(embedding) else None
+    if isinstance(embedding, (str, Path)) and Path(embedding).suffix.lower() == ".h5ad":
         import anndata as ad      # read once; keeps obs_names and obs
-        output = ad.read_h5ad(output)
-    adata = output if io._is_anndata(output) else None
+        embedding = ad.read_h5ad(embedding)
+    adata = embedding if io._is_anndata(embedding) else None
     table = None
-    if isinstance(output, (str, Path)) and Path(output).suffix.lower() in {".csv", ".tsv"}:
-        file = io._require_file(output, "output")
+    if isinstance(embedding, (str, Path)) and Path(embedding).suffix.lower() in {".csv", ".tsv"}:
+        file = io._require_file(embedding, "embedding")
         emb, ids = io._read_csv_embedding(file)
         if ids is not None and emb.shape[0] != emb.shape[1] \
                 and _n_values(labels, adata) == emb.shape[1]:
             ids = None           # dims x cells: the first column names the dimensions
         table = None if ids is None else _Table(file.name)
     else:
-        ids = _cell_ids(output)
-        emb = np.asarray(io.as_matrix(output, obsm=obsm))
+        ids = _cell_ids(embedding)
+        emb = np.asarray(io.as_matrix(embedding, obsm=obsm))
     if _is_label_path_list(labels):
         ct, origin = _stack_label_files(labels, ids, table=table)
     else:
@@ -1334,25 +1339,25 @@ def evaluate(
     # many run outputs are dims x cells; the label count says which axis holds the cells
     if emb.ndim == 2 and emb.shape[0] != len(ct) and emb.shape[1] == len(ct):
         warnings.warn(
-            f"output was (dims x cells) {emb.shape}; transposed to (cells x dims)")
+            f"embedding was (dims x cells) {emb.shape}; transposed to (cells x dims)")
         emb = emb.T
     if want_cls and not (graph or not_embedding):
         from .classify import _is_neighbour_index
         if emb.ndim == 2 and (emb.shape[0] == emb.shape[1] or _is_neighbour_index(emb)):
             graph = "output"                       # cells x cells, or a kNN index
-    if clustering is None:
+    if clusters is None:
         cl = None
-    elif isinstance(clustering, (str, Path)) \
-            and Path(clustering).suffix.lower() not in io._LABEL_FILE_SUFFIXES \
-            and not (adata is not None and isinstance(clustering, str)
-                     and _obs_column_name(clustering, adata) is not None):
-        if _column_without_obs(clustering, adata) \
-                and Path(clustering).suffix.lower() not in {".h5", ".hdf5", ".hdf"}:
+    elif isinstance(clusters, (str, Path)) \
+            and Path(clusters).suffix.lower() not in io._LABEL_FILE_SUFFIXES \
+            and not (adata is not None and isinstance(clusters, str)
+                     and _obs_column_name(clusters, adata) is not None):
+        if _column_without_obs(clusters, adata) \
+                and Path(clusters).suffix.lower() not in {".h5", ".hdf5", ".hdf"}:
             # "leiden" next to an array; "clusters.h5" keeps the missing-file error
-            raise FileNotFoundError(_no_column_error("clustering", clustering))
-        cl = io.read_clustering(clustering)        # the benchmark's h5 layout
+            raise FileNotFoundError(_no_column_error("clusters", clusters))
+        cl = io.read_clustering(clusters)          # the benchmark's h5 layout
     else:
-        cl = _obs_or_vector(clustering, adata, what="clustering", ids=ids, table=table,
+        cl = _obs_or_vector(clusters, adata, what="clusters", ids=ids, table=table,
                             cells=cells)
     if batch is not None:
         ba = _obs_or_vector(batch, adata, what="batch", ids=ids, table=table,
@@ -1376,7 +1381,7 @@ def evaluate(
 
     from . import scib as escib
     n_cells = emb.shape[0]
-    for what, values, given in (("labels", ct, labels), ("clustering", cl, clustering),
+    for what, values, given in (("labels", ct, labels), ("clusters", cl, clusters),
                                 ("batch", ba, batch)):
         if values is not None and len(values) != n_cells:
             raise ValueError(_count_error(what, len(values), n_cells, given, category))
