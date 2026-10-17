@@ -867,7 +867,10 @@ def test_no_labels_recipe(host, tmp_path, monkeypatch, capsys):
                                           r"`([^`]+)`")
     assert missing == "cty.csv is missing."
     reason = dict(zip(table["method"], table["reason"]))
-    assert reason == {"sciPENN": "", "Matilda": missing}
+    assert reason["Matilda"] == missing
+    # runnable: empty, or the note that the method scripts are not fetched yet
+    assert reason["sciPENN"] == "" or reason["sciPENN"].startswith(
+        "The method scripts are not in ")
     assert f"[scan] Matilda: {missing}" in out
     # the two blocks are those of this tutorial
     _says("recipe-no-labels", "The two blocks below are those of the vertical RNA + ADT "

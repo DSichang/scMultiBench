@@ -88,7 +88,8 @@ def test_strict_table_text_format(no_scripts, capsys):
     assert "method scripts are not fetched" in row
 
 
-def test_without_strict_the_table_and_python_scan_are_unchanged(no_scripts, capsys):
+def test_without_strict_the_table_and_python_scan_keep_the_row_runnable(no_scripts,
+                                                                        capsys):
     assert cli.main(MATILDA) == 0
     df = _table(capsys.readouterr().out)
     assert list(df["runnable"]) == [True] and list(df["reason"]) == [""]
@@ -96,7 +97,9 @@ def test_without_strict_the_table_and_python_scan_are_unchanged(no_scripts, caps
         warnings.simplefilter("ignore")
         row = mtb.scan("D11", "vertical", methods=["Matilda"], modalities=["rna", "adt"],
                        verbose=False).iloc[0]
-    assert row["runnable"] and row["reason"] == ""
+    # 0.4: the one-row-per-method table has no caveat column: its reason says it
+    assert row["runnable"] and row["reason"].startswith("The method scripts are not in ")
+    assert row["reason"].endswith("run multibench fetch --scripts first.")
 
 
 def test_strict_table_unchanged_once_the_scripts_are_present(no_scripts, monkeypatch,

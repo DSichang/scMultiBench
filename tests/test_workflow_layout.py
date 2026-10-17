@@ -31,7 +31,9 @@ def test_one_category_prints_only_that_category(cat):
     assert txt.splitlines()[-1].startswith(f"Next: mtb.scan('MYDATA', '{cat}')")
     assert "multibench env install --methods X --run" in txt
     assert "lockfiles" not in txt and "two gates" not in txt
-    assert "mtb.scan checks the files and the environment for each method" in txt
+    # 0.4: scan's table has one row per method, with runnable and reason
+    assert ("mtb.scan says which methods can run on the folder, and why not the rest "
+            "(columns runnable, reason).") in txt
 
 
 def test_numbered_files_only_where_methods_read_them():

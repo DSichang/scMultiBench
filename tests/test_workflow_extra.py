@@ -227,7 +227,7 @@ def test_describe_layout_export_route():
     for s_ in ("features x cells", "transpose", "single-column CSV",
                "method_info(m)['atac']", "to_canonical"):
         assert s_ in vert
-    assert "files_ok" in vert and "env_ok" in vert
+    assert "runnable" in vert and "reason" in vert       # scan's columns since 0.4
 
 
 def test_method_info_runtime_validates_method_id():

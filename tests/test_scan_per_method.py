@@ -118,9 +118,12 @@ def test_columns_order_and_one_row_per_method(linux, monkeypatch):
     rest = list(pm["method"][2:])
     assert rest == sorted(rest) and not pm["runnable"][2:].any()
     assert list(pm.index) == list(range(len(pm)))
-    # empty when runnable; else the reason of a row of the full table, as it is
+    # when runnable: empty, or the note that the method scripts are not fetched
+    # yet (0.4: the full plan has it in caveat); else the reason of a row of the
+    # full table, as it is
     by = full.set_index("method")["reason"]
-    assert (pm["reason"][:2] == "").all()
+    assert all(r == "" or r.startswith("The method scripts are not in ")
+               for r in pm["reason"][:2])
     for m, reason in zip(pm["method"][2:], pm["reason"][2:]):
         assert reason and reason == by[m]
     assert set(pm.attrs) == {"held", "not_listed", "not_held", "cells"}
@@ -137,9 +140,12 @@ def test_the_example_of_the_tutorials(linux, monkeypatch, tmp_path, capsys):
         "[scan] 2 of 2 methods have their input files in MYCITE. 2 of 2 can run on this "
         "computer. MYCITE holds RNA and ADT.\n"
         "[scan] Cells per file: rna.h5 1,718, adt.h5 1,718.\n")
+    reasons = pm.pop("reason").tolist()
     assert pm.to_dict("list") == {"method": ["Matilda", "totalVI"],
                                   "modalities": ["rna+adt", "rna+adt"],
-                                  "runnable": [True, True], "reason": ["", ""]}
+                                  "runnable": [True, True]}
+    # 0.4: a runnable row says when the method scripts are not fetched yet
+    assert all(r == "" or r.startswith("The method scripts are not in ") for r in reasons)
 
 
 @pytest.mark.parametrize("ds,cat", [("D11", "vertical"), ("D46mini", "mosaic"),
@@ -556,11 +562,13 @@ def test_reason_row_choice(linux, monkeypatch, tmp_path):
 
 
 def test_per_method_without_a_category_is_the_default_scan(tmp_path):
-    # 0.4: one row per method and category is scan's default; per_method= only warns
+    # 0.4: one row per method is scan's default; per_method= only warns; without a
+    # category, a dataset the benchmark scored takes its category (D11: vertical)
     with pytest.warns(FutureWarning, match=r"scan\(per_method=\) is deprecated"):
         pm = mtb.scan("D11", per_method=True, verbose=False)
     pd.testing.assert_frame_equal(pm, mtb.scan("D11", verbose=False))
-    assert pm.columns.tolist() == ["method", "category", "modalities", "runnable", "reason"]
+    pd.testing.assert_frame_equal(pm, mtb.scan("D11", "vertical", verbose=False))
+    assert pm.columns.tolist() == ["method", "modalities", "runnable", "reason"]
     with pytest.raises(FileNotFoundError):
         _quiet(mtb.scan, "NO_SUCH_FOLDER", per_method=True, data_path=tmp_path)
     assert _quiet(mtb.scan, "D11", per_method=False,

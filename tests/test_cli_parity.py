@@ -133,9 +133,11 @@ def test_cli_scan_unknown_column_and_method_errors(capsys):
     assert rc == 1 and "Matilda does not run on diagonal data." in err
 
 
-def test_cli_scan_without_category_scans_every_category(capsys):
-    """`multibench scan D28` = mtb.scan('D28'): all four categories, not exit 2."""
+def test_cli_scan_without_category_takes_the_benchmark_category(capsys, tmp_path):
+    """`multibench scan D28` = mtb.scan('D28'): the benchmark scored D28 as
+    diagonal, so that category; a folder of its own: all four, not exit 2."""
     import io
+    import shutil
     import pandas as pd
     rc = cli.main(["scan", "D28", "--format", "csv"])
     out = capsys.readouterr().out

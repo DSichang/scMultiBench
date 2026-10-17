@@ -323,7 +323,8 @@ def _cmd_scan(args) -> int:
     methods = _csv_list(args.methods)
     for m in methods or []:
         registry.check_method(m)               # did-you-mean KeyError before any I/O
-    df, _ = workflow._scan(args.dataset, args.category, methods=methods,
+    category = args.category or workflow.known_category(args.dataset)
+    df, _ = workflow._scan(args.dataset, category, methods=methods,
                            data_path=args.data_path,
                            modalities=_modalities_arg(args.modalities), verbose=False,
                            assume_gpu=args.assume_gpu,
@@ -331,7 +332,7 @@ def _cmd_scan(args) -> int:
     shown = _strict_table(df) if args.strict else df
     _print_frame(shown, columns=_csv_list(args.columns), fmt=args.format,
                  compact=workflow.compact_columns(df))
-    note = _scan_note(df, args.dataset, args.data_path, args.category)
+    note = _scan_note(df, args.dataset, args.data_path, category)
     code = _EXIT_OK
     if args.strict:
         problem = _strict_problem(df, methods)
@@ -1909,16 +1910,20 @@ def build_parser() -> argparse.ArgumentParser:
     # ---- scan
     ps = sub.add_parser(
         "scan", help="which methods can run on a dataset, and why not the rest (mtb.scan)",
-        description="Print the check table of mtb.scan. It has one row per method "
-                    "variant, with files_ok, env_ok, runnable and reason. The table "
+        description="Print which method variants can run on the dataset: one row "
+                    "per variant, with files_ok, env_ok, runnable and reason (mtb.scan "
+                    "gives one row per method). The table "
                     "shows the main columns and clips long text to "
                     f"{_TRUNCATE_WIDTH} characters. --columns all, or --format csv, "
                     "tsv or json, prints every column of the plan, the table "
                     "mtb.run_all(dry_run=True) returns.")
-    ps.add_argument("dataset", help="dataset id = the folder name under --data-path "
-                                   "(e.g. D11, or MYCITE for your own data)")
-    ps.add_argument("--category", help=_CATEGORY_HELP + " Default: every category, "
-                                                        "as mtb.scan(dataset) does.")
+    ps.add_argument("dataset", help="the dataset folder: its path, or its name under "
+                                   "--data-path, such as D11")
+    ps.add_argument("--category", help=_CATEGORY_HELP + " Default: the benchmark's "
+                                                        "category for a dataset it scored, "
+                                                        "such as vertical for D11, else "
+                                                        "every category, as "
+                                                        "mtb.scan(dataset) does.")
     ps.add_argument("--data-path", dest="data_path",
                     help="folder that contains the dataset folder (default: shown "
                          "by multibench config)")
@@ -2000,7 +2005,8 @@ def build_parser() -> argparse.ArgumentParser:
     pc.add_argument("--adt", help="mode 2: the ADT matrix, as for --rna, e.g. "
                                   "obsm:protein")
     pc.add_argument("--atac", help="mode 2: the ATAC matrix, as for --rna, e.g. "
-                                   "\"X[feature_types=Peaks]\". Needs --atac-kind")
+                                   "\"X[feature_types=Peaks]\". Peaks or gene activity is "
+                                   "read from the feature names, or set by --atac-kind")
     pc.add_argument("--atac-from", dest="atac_from", metavar="PATH",
                     help="mode 2, --category diagonal: another .h5ad or .h5mu with the "
                          "ATAC cells. --atac selects from it, default X")

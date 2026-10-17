@@ -274,8 +274,10 @@ def describe_layout(category: str | None = None) -> str:
               "",
               "Each method runs in its own environment, on Linux. Install one with:",
               "  multibench env install --methods X --run",
-              config.hint("mtb.scan", "multibench scan") + " checks the files and the "
-              "environment for each method (columns files_ok, env_ok).",
+              config.hint("mtb.scan says which methods can run on the folder, and why "
+                          "not the rest (columns runnable, reason).",
+                          "multibench scan checks the files and the environment of each "
+                          "method variant (columns files_ok, env_ok)."),
               config.hint(
                   f"Next: mtb.scan('MYDATA', '{cat}'), then, on Linux, "
                   f"mtb.run_all('MYDATA', '{cat}', out_dir='out/')",
@@ -817,6 +819,17 @@ def _is_wrong_ref(reason) -> "pd.Series | bool":
     return tag in str(reason or "")
 
 
+def _scripts_caveat(caveat) -> str:
+    """The sentences of a scan ``caveat`` that say the method scripts are not
+    fetched yet (:data:`runner.SCRIPTS_NOT_HERE`), else ``""``."""
+    text = str(caveat or "")
+    start = text.find(_runner.SCRIPTS_NOT_HERE)
+    if start < 0:
+        return ""
+    end = _runner._prepared_at(text[start:])
+    return (text[start:][:end] if end >= 0 else text[start:]).rstrip()
+
+
 def _would_run(row) -> bool:
     """Whether the sweep would run this scan row: runnable, or blocked only by its env."""
     return bool(row["files_ok"]) and (not row["reason"]
@@ -1146,7 +1159,8 @@ def scan(dataset: str, category: str | None = None, *,
     dataset : str
         Dataset folder: a name under ``data_path``, or a path.
     category : str | None
-        Integration category to scan; ``None`` = all four.
+        Integration category to scan; ``None`` = the benchmark's category of
+        a dataset it scored (``D11`` is vertical), else all four.
     methods : list[str] | None
         Method ids to include, as a list; ``None`` = every method.
     modalities : list[str] | str | None
@@ -1204,11 +1218,25 @@ def scan(dataset: str, category: str | None = None, *,
                          assume_gpu=assume_gpu, allow_atac_mismatch=allow_atac_mismatch)
 
 
+def known_category(dataset) -> str | None:
+    """The one category the benchmark scored the dataset ``dataset`` names in
+    (``catalog.datasets()``), or ``None`` for a dataset of its own."""
+    from .data import catalog
+    name = _resolve.split_dataset(dataset, None)[0]
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        rows = catalog.datasets()
+    cats = rows.loc[rows["dataset"] == str(name), "category"].dropna()
+    return cats.iloc[0] if len(cats) == 1 and ";" not in cats.iloc[0] else None
+
+
 def _scan_methods(dataset, category=None, *, methods=None, modalities=None, data_path=None,
                   params=None, verbose=True, assume_gpu=False, allow_atac_mismatch=False,
                   per_method=True) -> pd.DataFrame:
     """:func:`scan`, with the deprecated ``per_method``: ``False`` returns the full
     plan of ``run_all(dry_run=True)``."""
+    if category is None:
+        category = known_category(dataset)
     df, private = _scan(dataset, category, methods=methods, modalities=modalities,
                         data_path=data_path, params=params,
                         verbose=verbose and per_method is False, assume_gpu=assume_gpu,
@@ -1436,16 +1464,19 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
     """The frame of ``scan`` (one row per method) from :func:`_scan`'s two frames; with
     ``verbose`` it prints the per-method lines (``nested``: leave out nested rows)."""
     dataset, ds_dir = private.attrs["dataset"], private.attrs["folder"]
-    rows, reasons, n_files = [], [], 0
+    rows, reasons, with_files = [], [], set()
     held = set(df.attrs["held"])
     several = df["category"].nunique() > 1
     for (method, cat), group in df.groupby(["method", "category"], sort=False):
-        n_files += bool(group["files_ok"].any())
+        if group["files_ok"].any():
+            with_files.add(method)
         if group["runnable"].any():
             # the variant run_all runs: the one with the most modalities
             i = max(group.index[group["runnable"].to_numpy().astype(bool)],
                     key=lambda i: len(str(group.at[i, "modalities"]).split("+")))
-            rows.append((method, cat, group.at[i, "modalities"], True, ""))
+            # the first run fetches the scripts: say so where nothing else does
+            rows.append((method, cat, group.at[i, "modalities"], True,
+                         _scripts_caveat(group.at[i, "caveat"])))
             continue
         # the row that speaks for the method: files on disk, families held, fewest missing
         i = min(group.index, key=lambda i: (
@@ -1465,7 +1496,9 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
     out.attrs = {**df.attrs, "cells": cells}
     if not verbose:
         return out
-    n, k = len(out), int(out["runnable"].sum())
+    # methods, not rows: without a category a method has a row per category
+    n, k = out["method"].nunique(), out.loc[out["runnable"], "method"].nunique()
+    n_files = len(with_files)
     holds = _holds_sentence(dataset, ds_dir, df.attrs["held"], private.attrs["category"])
     line = (f"[scan] {n_files} of {n} {'method' if n == 1 else 'methods'} "
             f"{_have_their(n_files, n)} input files in {dataset}. {k} of {n} can run on "
