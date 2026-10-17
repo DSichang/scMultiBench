@@ -2465,12 +2465,14 @@ def _scan_hint(dataset: str, category: str, *, data_path=None, methods=None,
                assume_gpu: bool = False, every: bool = False) -> str:
     """The ``mtb.run_all(..., dry_run=True)`` call (or ``multibench scan`` command)
     that shows the rows of a ``run_all`` call, with every non-default argument as
-    the caller gave it."""
-    py, cli = [repr(dataset), repr(category)], [dataset, "--category", category]
+    the caller gave it. A folder outside the default data path is named by its
+    path, as the docs teach (relative to the working directory when inside it)."""
     if data_path is not None and (os.path.realpath(data_path)
                                   != os.path.realpath(config.DEFAULT.data_path)):
-        py.append(f"data_path={os.fspath(data_path)!r}")
-        cli += ["--data-path", os.fspath(data_path)]
+        folder = os.path.join(os.fspath(data_path), str(dataset))
+        rel = os.path.relpath(folder)
+        dataset = folder if rel.startswith("..") else rel
+    py, cli = [repr(dataset), repr(category)], [dataset, "--category", category]
     if methods:
         py.append(f"methods={list(methods)}")
         cli += ["--methods", ",".join(methods)]
@@ -2523,10 +2525,18 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
             blocked = blocked.loc[held]
             lacking = (f"\n{n} other {'row needs' if n == 1 else 'rows need'} files that "
                        f"{dataset} does not have.")
+    # off Linux with nothing else in the way: the plan is the one thing to look at
+    only_platform = bool(platform) and others is not None and not lacking and not any(
+        others.reindex(blocked.index).fillna(""))
+    if only_platform:
+        head = (f"None of the requested methods ({', '.join(methods)}) can run on "
+                if methods else "No method can run on ") + f"{dataset} ({category})."
+        what = "these rows" if methods else "the listed rows" if note else "every row"
+        return f"{head}\n{platform}" + (f"{note}\n" if note else "") + f"{where} shows {what}."
     if methods:
         head = (f"None of the requested methods ({', '.join(methods)}) can run on "
                 f"{dataset} ({category})")
-        listing = (_other_blocks(blocked, others, requested=True) + lacking
+        listing = ((_other_blocks(blocked, others, requested=True) + lacking).lstrip("\n")
                    if platform and others is not None else
                    f"Blocked, one line per requested {_rows_word(blocked, 1)}:\n"
                    + "\n".join(_line(r) for _, r in blocked.iterrows()) + lacking)
@@ -2535,7 +2545,7 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
                 f"which check failed. {doctor} checks the environments.")
     head = f"No method can run on {dataset} ({category})"
     if platform and others is not None:
-        listing = _other_blocks(blocked, others, requested=False) + lacking
+        listing = (_other_blocks(blocked, others, requested=False) + lacking).lstrip("\n")
     else:
         n, k = len(blocked), min(3, len(blocked))
         rows = _rows_word(blocked, n)
@@ -2556,8 +2566,7 @@ def _other_blocks(blocked: pd.DataFrame, others: pd.Series, *, requested: bool) 
     n, k = len(blocked), len(listed)
     noun = ("requested " if requested else "") + _rows_word(blocked, n)
     if not listed:
-        return (f"Nothing else blocks this {noun}." if n == 1
-                else f"Nothing else blocks these {n} {noun}.")
+        return ""
     count = f"{k} of {n} {noun} {'is' if k == 1 else 'are'} also blocked by something else"
     shown = listed if requested else listed[:3]
     lines = "\n".join(f"  {_row_label(r)}: {text}" for r, text in shown)

@@ -330,19 +330,20 @@ def _plan(**kw):
 
 
 def test_rows_blocked_only_by_the_platform_are_not_listed(macos, mydata):
+    # 0.4: three lines - what is wrong, the platform, and the call that shows the plan
     msg = _nothing_runnable(modalities=["rna", "adt"])
-    n = len(_plan(modalities=["rna", "adt"]))
     lines = msg.splitlines()
     assert lines[0] == "No method can run on MYDATA (vertical)."
     assert lines[1].startswith(MACOS)
-    assert lines[2] == f"Nothing else blocks these {n} methods."
-    assert lines[3].startswith("mtb.run_all('MYDATA', 'vertical', data_path='data', "
-                               "modalities=['rna', 'adt'], dry_run=True) shows every row.")
-    assert len(lines) == 4 and "not on this computer" not in msg
+    assert lines[2] == ("mtb.run_all('data/MYDATA', 'vertical', modalities=['rna', 'adt'], "
+                        "dry_run=True) shows every row.")
+    assert len(lines) == 3 and "not on this computer" not in msg
     msg = _nothing_runnable(modalities=["rna", "adt"], methods=["Matilda", "totalVI"])
-    assert msg.splitlines()[2] == "Nothing else blocks these 2 requested methods."
+    assert msg.splitlines()[2] == ("mtb.run_all('data/MYDATA', 'vertical', methods=['Matilda', "
+                                   "'totalVI'], modalities=['rna', 'adt'], dry_run=True) "
+                                   "shows these rows.")
     msg = _nothing_runnable(modalities=["rna", "adt"], methods=["totalVI"])
-    assert msg.splitlines()[2] == "Nothing else blocks this requested method."
+    assert len(msg.splitlines()) == 3 and "Nothing else blocks" not in msg
 
 
 def test_a_row_that_also_lacks_a_file_is_listed_with_that_reason(macos, mydata):
@@ -356,7 +357,7 @@ def test_a_row_that_also_lacks_a_file_is_listed_with_that_reason(macos, mydata):
                         "which is not in the folder.")
     assert lines[4] == ("  Matilda (rna+adt+atac): Matilda needs peak ATAC (atac.h5), "
                         "which is not in the folder.")
-    assert lines[5].startswith("mtb.run_all('MYDATA', 'vertical', data_path='data', "
+    assert lines[5].startswith("mtb.run_all('data/MYDATA', 'vertical', "
                                "methods=['Matilda', 'totalVI'], modalities=\"all\", dry_run=True) "
                                "shows these rows.")
     assert "not on this computer" not in msg
@@ -369,8 +370,7 @@ def test_without_methods_the_first_3_other_blocks_are_shown(macos, mydata, monke
     lacking = int((~plan["files_ok"]).sum())
     have = plan[plan["files_ok"]]
     lines = msg.splitlines()
-    assert lines[2] == f"Nothing else blocks these {len(have)} methods."
-    assert lines[3] == f"{lacking} rows need files that MYDATA does not have."
+    assert lines[2] == f"{lacking} rows need files that MYDATA does not have."
     # scripts at another commit block every row: the first 3 are listed
     from multibench import config
     monkeypatch.setattr(config, "scripts_ref_problem", lambda repo=None: "Wrong scripts.")
@@ -383,7 +383,7 @@ def test_without_methods_the_first_3_other_blocks_are_shown(macos, mydata, monke
     assert [l.split(" (")[0].strip() for l in listed] == sorted(have["method"])[:3]
     assert all(l.startswith("  ") and "not on this computer" not in l for l in listed)
     assert lines[6] == f"{lacking} rows need files that MYDATA does not have."
-    assert lines[7].startswith("mtb.run_all('MYDATA', 'vertical', data_path='data', "
+    assert lines[7].startswith("mtb.run_all('data/MYDATA', 'vertical', "
                                "modalities=\"all\", dry_run=True) shows every row.")
 
 
@@ -412,7 +412,7 @@ def test_on_linux_the_message_is_todays(no_envs, mydata, monkeypatch):
             f"The first 3 of {len(plan)} blocked methods:\n"
             + "\n".join(f"  {r.method} ({r.modalities}): {r.reason}"
                         for r in order.head(3).itertuples())
-            + "\nmtb.run_all('MYDATA', 'vertical', data_path='data', modalities=['rna', "
+            + "\nmtb.run_all('data/MYDATA', 'vertical', modalities=['rna', "
             "'adt'], dry_run=True) shows every row. Its files_ok and env_ok columns say which check "
             "failed. mtb.env.doctor() checks the environments.")
     assert msg == want

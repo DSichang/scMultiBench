@@ -186,7 +186,7 @@ def _nothing_runnable(**kw):
 def test_the_scan_hint_carries_the_callers_arguments(no_envs, mydata):
     msg = _nothing_runnable(data_path="data", modalities=["rna", "adt"])
     last = msg.splitlines()[-1]
-    call = "mtb.run_all('MYDATA', 'vertical', data_path='data', modalities=['rna', 'adt'], dry_run=True)"
+    call = "mtb.run_all('data/MYDATA', 'vertical', modalities=['rna', 'adt'], dry_run=True)"
     assert last.startswith(f"{call} shows every row. "), last
     # run as printed, from the same directory, it shows the rows the call selected
     shown = eval(call, {"mtb": mtb})                      # noqa: S307 - our own hint
@@ -212,7 +212,7 @@ def test_the_list_header_counts_methods_when_each_has_one_row(no_envs, mydata):
                             modalities=["rna", "adt"])
     assert "\nBlocked, one line per requested method:\n" in msg
     assert msg.splitlines()[-1].startswith(
-        "mtb.run_all('MYDATA', 'vertical', data_path='data', methods=['Matilda', "
+        "mtb.run_all('data/MYDATA', 'vertical', methods=['Matilda', "
         "'totalVI'], modalities=['rna', 'adt'], dry_run=True) shows these rows.")
 
 
@@ -224,7 +224,7 @@ def test_the_hint_names_every_scan_argument_the_call_set():
         "MYDATA", "vertical", blocked, None, data_path=Path("my data"),
         modalities=["rna", "adt"], allow_atac_mismatch=True, assume_gpu=True)
     assert msg.splitlines()[-1].startswith(
-        "mtb.run_all('MYDATA', 'vertical', data_path='my data', modalities=['rna', 'adt'], "
+        "mtb.run_all('my data/MYDATA', 'vertical', modalities=['rna', 'adt'], "
         "allow_atac_mismatch=True, assume_gpu=True, dry_run=True) shows every row.")
     assert "\nThe 2 blocked methods:\n" in msg
     try:
@@ -235,7 +235,7 @@ def test_the_hint_names_every_scan_argument_the_call_set():
     finally:
         config._CLI = False
     assert msg.splitlines()[-1].startswith(
-        "multibench scan MYDATA --category vertical --data-path 'my data' --methods A "
+        "multibench scan 'my data/MYDATA' --category vertical --methods A "
         "--allow-atac-mismatch --assume-gpu shows these rows.")
     assert "\nBlocked, one line per requested method:\n" in msg
 
@@ -245,7 +245,7 @@ def test_the_cli_hint_carries_the_callers_flags(no_envs, mydata, capsys):
                    "--modalities", "rna,adt", "--out-dir", "out"])
     err = capsys.readouterr().err
     assert rc == 1 and "No method can run on MYDATA (vertical)." in err
-    hint = ("multibench scan MYDATA --category vertical --data-path data "
+    hint = ("multibench scan data/MYDATA --category vertical "
             "--modalities rna,adt")
     assert f"\n{hint} shows every row." in err, err
     n = int(re.search(r"The first 3 of (\d+) blocked methods:", err).group(1))
