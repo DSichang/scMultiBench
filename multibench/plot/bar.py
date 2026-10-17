@@ -14,7 +14,7 @@ from .style import compute_overall, minmax
 # iASW and iF1 are isolated-label scores, which scIB files under bio conservation:
 # a single-batch dataset has them and no batch-correction result.
 CLUSTERING_METRICS = ["ARI", "NMI", "ASW", "iASW", "iF1", "cLISI"]
-BATCH_METRICS = ["ASW_batch", "GC", "iLISI", "kBET"]
+BATCH_METRICS = ["ASW_batch", "ARI_batch", "NMI_batch", "GC", "iLISI", "kBET"]
 # the benchmark's classification scores (mtb.classification_metrics); not scIB
 CLASSIFICATION_METRICS = ["OCA", "ACA", "Spec", "Sens", "F1"]
 

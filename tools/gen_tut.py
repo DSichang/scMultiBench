@@ -1176,7 +1176,8 @@ pd.DataFrame(envs)[["env", "methods", "state"]]''')
         f"`run_all` scores it against the cell-type labels of `{ds}`.",
         "The clustering metrics `ARI`, `NMI`, `ASW`, `iASW`, `iF1` and `cLISI` measure "
         "how well the embedding separates the cell types. The batch metrics "
-        "`ASW_batch`, `GC` and `iLISI` measure how well the batches mix. They appear "
+        "`ASW_batch`, `ARI_batch`, `NMI_batch`, `GC` and `iLISI` measure how well the "
+        "batches mix. They appear "
         "only when the data has several batches.",
     ]
     if "scMoMaT" in methods:

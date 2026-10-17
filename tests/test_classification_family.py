@@ -21,7 +21,8 @@ from multibench.data import catalog
 from multibench.plot import bubble as B
 
 CODES = ["OCA", "ACA", "Spec", "Sens", "F1"]
-SCIB = ["ARI", "NMI", "ASW", "iASW", "iF1", "cLISI", "ASW_batch", "GC", "iLISI"]
+SCIB = ["ARI", "NMI", "ASW", "iASW", "iF1", "cLISI", "ASW_batch", "ARI_batch", "NMI_batch",
+        "GC", "iLISI"]
 CENTRES = {"A": [40, 0, 0, 0], "B": [0, 40, 0, 0], "C": [0, 0, 40, 0]}
 
 
@@ -73,8 +74,8 @@ def test_the_family_and_its_codes():
     assert mtb.plot.CLASSIFICATION_METRICS == CODES
     assert "CLASSIFICATION_METRICS" in mtb.plot.__all__
     assert mtb.catalog.known_metrics() == [
-        "ARI", "NMI", "ASW", "iASW", "iF1", "cLISI", "ASW_batch", "GC", "iLISI",
-        "kBET", "OCA", "ACA", "Spec", "Sens", "F1"]         # no PCR since 0.4
+        "ARI", "NMI", "ASW", "iASW", "iF1", "cLISI", "ASW_batch", "ARI_batch",
+        "NMI_batch", "GC", "iLISI", "kBET", "OCA", "ACA", "Spec", "Sens", "F1"]
     assert [catalog.canonical_metric(c) for c in ("oca", "Aca", "SPEC", "sens", "f1",
                                                   "if1")] == CODES + ["iF1"]
 
@@ -347,8 +348,9 @@ def test_bar_scores_the_family_in_pink():
     with pytest.raises(ValueError) as e:
         mtb.plot.bar(_long(SCIB), group="classification")
     assert str(e.value) == (
-        "no 'classification' metrics present. Found ['ARI', 'ASW', 'ASW_batch', 'GC', "
-        "'NMI', 'cLISI', 'iASW', 'iF1', 'iLISI']. The stored tables have none. "
+        "no 'classification' metrics present. Found ['ARI', 'ARI_batch', 'ASW', "
+        "'ASW_batch', 'GC', 'NMI', 'NMI_batch', 'cLISI', 'iASW', 'iF1', 'iLISI']. "
+        "The stored tables have none. "
         "mtb.evaluate computes them on multi-batch data.")
 
 

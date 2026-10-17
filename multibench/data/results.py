@@ -35,6 +35,9 @@ _CLUSTERING_FILES = {
     "kmeans": "metric_kmeans.csv",
 }
 _CORRECTION_FILE = "metric_asw_iasw_if1.csv"
+#: the published ARI_batch and NMI_batch, under the names ARI and NMI, as the
+#: article's figure script reads them
+_BATCH_CLUSTER_FILE = "metric_ari_nmi_batch.csv"
 
 #: the four integration categories
 _CATEGORIES = ("cross", "diagonal", "mosaic", "vertical")
@@ -262,6 +265,12 @@ def _load_published(category: str, datasets: list | None, clustering: str,
         if coalesce and clustering == "default" and corr.exists():
             cdf = _read_metric_csv(corr).set_index("metric")["value"]
             df["value"] = df.apply(lambda r: cdf.get(r["metric"], r["value"]), axis=1)
+        bat = m_dir / _BATCH_CLUSTER_FILE
+        if coalesce and clustering == "default" and bat.exists():
+            bdf = _read_metric_csv(bat)
+            bdf = bdf[bdf["metric"].isin(["ARI", "NMI"])]
+            df = pd.concat([df, bdf.assign(metric=bdf["metric"] + "_batch")],
+                           ignore_index=True)
         df["method"] = method
         df["dataset"] = ds_dir.name
         df["category"] = category
@@ -607,10 +616,15 @@ def load_results(
     - ``"both"`` - the concatenation; the ``source`` column tells the rows
       apart.
 
+    Published rows hold ARI_batch and NMI_batch where the method folder has
+    ``metric_ari_nmi_batch.csv``, as the article's figures read them.
+
     Re-run rows were scored by multibench 0.2.1's ``evaluate`` with the
-    leidenalg backend and every cell type counted as isolated. Set
-    ``mtb.config.DEFAULT.leiden_flavor = "leidenalg"`` to score comparable
-    rows.
+    leidenalg backend, every cell type counted as isolated and an earlier
+    clustering protocol (``mtb.evaluate`` Notes); they have no ARI_batch or
+    NMI_batch. Set
+    ``mtb.config.DEFAULT.leiden_flavor = "leidenalg"`` to cluster with the
+    backend of the stored tables.
 
     **Your own file.** ``result_path`` may be one long CSV with at least the
     columns ``metric, value, method``, e.g. written by ``to_long(...).to_csv``
@@ -1311,7 +1325,8 @@ def recommend(
     - ``"dropped_methods"`` - package methods present in the table but not
       run by this package for the category.
 
-    **Selections.** ``metrics="batch"`` scores ASW_batch, GC, iLISI, kBET;
+    **Selections.** ``metrics="batch"`` scores ASW_batch, ARI_batch,
+    NMI_batch, GC, iLISI, kBET;
     ``"all"`` every metric present. The unscored line of the warning is
     restricted to ``methods``, so a requested method without rows is still
     reported. ``modalities`` and ``atac`` select methods with
@@ -1321,8 +1336,8 @@ def recommend(
     a requested modality the datasets did not measure, dropped methods and
     datasets, partial coverage and the unscored methods. The stored tables
     were clustered with leidenalg. A line also names the ``long_df`` methods
-    clustered with igraph when ARI, NMI or iF1 ranks them against stored
-    rows of their dataset.
+    clustered with igraph when a metric computed on Leiden clusters ranks
+    them against stored rows of their dataset.
 
     **Retired keywords.** ``task=`` / ``family=`` still work as
     ``metrics=<token>``, with a ``DeprecationWarning``.

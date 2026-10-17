@@ -21,17 +21,18 @@ def test_isolated_label_metrics_describe_every_cell_type():
     d = _desc()
     for code in ("iASW", "iF1"):
         assert "rare" not in d[code] and "most isolated" not in d[code], d[code]
-        assert "Every cell type is treated as an isolated label" in d[code]
+    assert "Every cell type is treated as an isolated label" in d["iF1"]
+    assert "Every cluster is treated as an isolated label" in d["iASW"]
 
 
 def test_every_metric_states_direction_and_the_clustering_used():
     d = _desc()
     assert set(d.index) == {"ARI", "NMI", "ASW", "iASW", "iF1", "cLISI",
-                            "ASW_batch", "GC", "iLISI", "kBET",
+                            "ASW_batch", "ARI_batch", "NMI_batch", "GC", "iLISI", "kBET",
                             "OCA", "ACA", "Spec", "Sens", "F1"}
     assert all(text.endswith("higher = better.") for text in d), d.to_dict()
     for code in ("ARI", "NMI"):
-        assert "Leiden clusters from the optimal-resolution sweep" in d[code]
+        assert "Leiden clusters, one per cell type" in d[code]
         assert "Louvain" not in d[code]
 
 

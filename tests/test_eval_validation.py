@@ -386,7 +386,8 @@ def test_label_order_validation_messages(tmp_path):
 
 
 # ------------------------------------ I4: canonical names end to end
-_CANONICAL = ["ARI", "NMI", "ASW", "iASW", "iF1", "cLISI", "ASW_batch", "GC", "iLISI", "kBET",
+_CANONICAL = ["ARI", "NMI", "ASW", "iASW", "iF1", "cLISI", "ASW_batch", "ARI_batch",
+              "NMI_batch", "GC", "iLISI", "kBET",
               "OCA", "ACA", "Spec", "Sens", "F1"]
 
 

@@ -24,7 +24,8 @@ from ..config import _and_list
 # column order within each family, as in the paper's panels
 FAMILIES = [
     ("DR and clustering", ["cLISI", "ARI", "ASW", "iASW", "iF1", "NMI"], "Blues"),
-    ("Batch correction", ["ASW_batch", "GC", "iLISI", "kBET"], "Greens"),
+    ("Batch correction", ["ASW_batch", "ARI_batch", "NMI_batch", "GC", "iLISI", "kBET"],
+     "Greens"),
     ("Classification", ["OCA", "ACA", "Spec", "Sens", "F1"], style.PINKS),
 ]
 

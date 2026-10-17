@@ -137,6 +137,8 @@ _METRIC_CANON = {
     "ilisi": "iLISI",
     "gc": "GC",
     "asw_batch": "ASW_batch",
+    "ari_batch": "ARI_batch",
+    "nmi_batch": "NMI_batch",
     "oca": "OCA",
     "aca": "ACA",
     "spec": "Spec",
@@ -166,8 +168,8 @@ def known_metrics() -> list[str]:
     --------
     >>> import multibench as mtb
     >>> mtb.catalog.known_metrics()
-    ['ARI', 'NMI', 'ASW', 'iASW', 'iF1', 'cLISI', 'ASW_batch', 'GC', 'iLISI',
-     'kBET', 'OCA', 'ACA', 'Spec', 'Sens', 'F1']
+    ['ARI', 'NMI', 'ASW', 'iASW', 'iF1', 'cLISI', 'ASW_batch', 'ARI_batch',
+     'NMI_batch', 'GC', 'iLISI', 'kBET', 'OCA', 'ACA', 'Spec', 'Sens', 'F1']
 
     See Also
     --------
@@ -179,7 +181,8 @@ def known_metrics() -> list[str]:
         if v not in seen:
             seen.append(v)
     order = ["ARI", "NMI", "ASW", "iASW", "iF1", "cLISI",
-             "ASW_batch", "GC", "iLISI", "kBET", "OCA", "ACA", "Spec", "Sens", "F1"]
+             "ASW_batch", "ARI_batch", "NMI_batch", "GC", "iLISI", "kBET",
+             "OCA", "ACA", "Spec", "Sens", "F1"]
     return order + sorted(v for v in seen if v not in order)
 
 
@@ -574,8 +577,8 @@ def metrics(files_dir: Path | str | None = None) -> pd.DataFrame:
 
     Notes
     -----
-    **Rows.** The ten scIB metrics ``ARI, NMI, ASW, iASW, iF1, cLISI,
-    ASW_batch, GC, iLISI, kBET``, then the five classification metrics
+    **Rows.** The twelve scIB metrics ``ARI, NMI, ASW, iASW, iF1, cLISI,
+    ASW_batch, ARI_batch, NMI_batch, GC, iLISI, kBET``, then the five classification metrics
     ``OCA, ACA, Spec, Sens, F1``; header whitespace is stripped. The same
     codes, in this order, are ``mtb.catalog.known_metrics()``.
 
