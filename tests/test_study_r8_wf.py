@@ -336,8 +336,8 @@ def test_rows_blocked_only_by_the_platform_are_not_listed(macos, mydata):
     assert lines[0] == "No method can run on MYDATA (vertical)."
     assert lines[1].startswith(MACOS)
     assert lines[2] == f"Nothing else blocks these {n} methods."
-    assert lines[3].startswith("mtb.scan('MYDATA', 'vertical', data_path='data', "
-                               "modalities=['rna', 'adt']) shows every row.")
+    assert lines[3].startswith("mtb.run_all('MYDATA', 'vertical', data_path='data', "
+                               "modalities=['rna', 'adt'], dry_run=True) shows every row.")
     assert len(lines) == 4 and "not on this computer" not in msg
     msg = _nothing_runnable(modalities=["rna", "adt"], methods=["Matilda", "totalVI"])
     assert msg.splitlines()[2] == "Nothing else blocks these 2 requested methods."
@@ -356,8 +356,8 @@ def test_a_row_that_also_lacks_a_file_is_listed_with_that_reason(macos, mydata):
                         "which is not in the folder.")
     assert lines[4] == ("  Matilda (rna+adt+atac): Matilda needs peak ATAC (atac.h5), "
                         "which is not in the folder.")
-    assert lines[5].startswith("mtb.scan('MYDATA', 'vertical', data_path='data', "
-                               "methods=['Matilda', 'totalVI'], modalities=\"all\") "
+    assert lines[5].startswith("mtb.run_all('MYDATA', 'vertical', data_path='data', "
+                               "methods=['Matilda', 'totalVI'], modalities=\"all\", dry_run=True) "
                                "shows these rows.")
     assert "not on this computer" not in msg
 
@@ -383,8 +383,8 @@ def test_without_methods_the_first_3_other_blocks_are_shown(macos, mydata, monke
     assert [l.split(" (")[0].strip() for l in listed] == sorted(have["method"])[:3]
     assert all(l.startswith("  ") and "not on this computer" not in l for l in listed)
     assert lines[6] == f"{lacking} rows need files that MYDATA does not have."
-    assert lines[7].startswith("mtb.scan('MYDATA', 'vertical', data_path='data', "
-                               "modalities=\"all\") shows every row.")
+    assert lines[7].startswith("mtb.run_all('MYDATA', 'vertical', data_path='data', "
+                               "modalities=\"all\", dry_run=True) shows every row.")
 
 
 def test_a_gpu_block_is_listed_without_the_linux_sentence(macos, mydata, monkeypatch):
@@ -412,8 +412,8 @@ def test_on_linux_the_message_is_todays(no_envs, mydata, monkeypatch):
             f"The first 3 of {len(plan)} blocked methods:\n"
             + "\n".join(f"  {r.method} ({r.modalities}): {r.reason}"
                         for r in order.head(3).itertuples())
-            + "\nmtb.scan('MYDATA', 'vertical', data_path='data', modalities=['rna', "
-            "'adt']) shows every row. Its files_ok and env_ok columns say which check "
+            + "\nmtb.run_all('MYDATA', 'vertical', data_path='data', modalities=['rna', "
+            "'adt'], dry_run=True) shows every row. Its files_ok and env_ok columns say which check "
             "failed. mtb.env.doctor() checks the environments.")
     assert msg == want
     assert "is not installed. Run multibench env install --methods" in msg

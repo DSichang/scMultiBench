@@ -14,13 +14,13 @@ def test_a_family_the_tables_lack_warns_once():
         df = mtb.load_results("vertical", metrics="classification")
     assert df.empty
     msgs = [str(w.message) for w in rec if "no classification scores" in str(w.message)]
-    assert msgs == ["The rerun vertical tables have no classification scores, so no "
+    assert msgs == ["The re-run vertical tables have no classification scores, so no "
                     "rows are left. Leave out metrics= to get the scores they have (ARI, "
                     "ASW, NMI, cLISI, iASW, iF1)."]
 
 
 def test_with_a_dataset_the_message_names_it():
-    with pytest.warns(UserWarning, match=r"^The rerun vertical tables of D11 have no "
+    with pytest.warns(UserWarning, match=r"^The re-run vertical tables of D11 have no "
                                          r"batch scores"):
         mtb.load_results("vertical", dataset="D11", metrics="batch")
 

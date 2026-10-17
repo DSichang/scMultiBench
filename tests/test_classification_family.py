@@ -386,7 +386,7 @@ def test_stored_tables_have_no_classification():
                        metrics="classification")
     # one line says so since 0.4, as for metrics="batch" on a single-batch dataset
     assert df.empty and said == [
-        "The rerun vertical tables of D11 have no classification scores, so no rows "
+        "The re-run vertical tables of D11 have no classification scores, so no rows "
         "are left. Leave out metrics= to get the scores they have (ARI, ASW, NMI, cLISI, "
         "iASW, iF1)."]
 

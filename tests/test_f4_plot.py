@@ -265,9 +265,9 @@ def test_nothing_runnable_tail_is_plain(no_envs, root):
     note = ("D11 holds RNA and ADT. 19 rows that read ATAC are not listed. "
             'modalities="all" lists them.')
     for kw, where, before in (
-            ({}, "mtb.scan('D11', 'vertical') shows the listed rows.", note),
+            ({}, "mtb.run_all('D11', 'vertical', dry_run=True) shows the listed rows.", note),
             ({"methods": ["Matilda"]},
-             "mtb.scan('D11', 'vertical', methods=['Matilda']) shows these rows.", None)):
+             "mtb.run_all('D11', 'vertical', methods=['Matilda'], dry_run=True) shows these rows.", None)):
         with pytest.raises(ValueError) as e:
             mtb.run_all("D11", "vertical", out_dir="/tmp/unused", verbose=False,
                         data_path=root / "data", **kw)

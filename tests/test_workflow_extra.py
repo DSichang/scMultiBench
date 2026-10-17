@@ -151,7 +151,7 @@ def test_run_all_raises_when_nothing_can_run(tmp_path, monkeypatch):
         mtb.run_all("EMPTYDS", "vertical", data_path=tmp_path,
                     out_dir=tmp_path / "out", verbose=False)
     assert str(e.value).startswith("No method can run on EMPTYDS (vertical).\n")
-    assert "mtb.scan" in str(e.value)          # tells you how to diagnose it
+    assert "mtb.run_all" in str(e.value)       # tells you how to diagnose it
 
 
 def test_run_all_missing_dataset_folder_is_filenotfound():

@@ -116,7 +116,7 @@ def test_the_macos_list_counts_only_rows_whose_files_are_present(macos_no_gpu):
     assert lines[2] == f"1 of {have} methods is also blocked by something else:"
     assert lines[3].startswith("  moETM (rna+adt): moETM needs an NVIDIA GPU")
     assert lines[4] == f"{lacking} rows need files that D11 does not have."
-    assert lines[5].startswith("mtb.scan('D11', 'vertical', modalities=\"all\") shows "
+    assert lines[5].startswith("mtb.run_all('D11', 'vertical', modalities=\"all\", dry_run=True) shows "
                                "every row.")
     assert "atac" not in msg
     # with modalities= the rows the folder cannot have are not in the scan

@@ -413,7 +413,7 @@ def _nothing_runnable(**kw):
 
 def test_the_hint_carries_all(no_envs, capsys):
     lines = _nothing_runnable(modalities="all")
-    call = "mtb.scan('D11', 'vertical', modalities=\"all\")"
+    call = "mtb.run_all('D11', 'vertical', modalities=\"all\", dry_run=True)"
     assert lines[-1] == (f"{call} shows every row. Its files_ok and env_ok columns say "
                          f"which check failed. mtb.env.doctor() checks the environments.")
     n = int(re.fullmatch(r"The first 3 of (\d+) blocked rows:", lines[1]).group(1))
@@ -422,7 +422,7 @@ def test_the_hint_carries_all(no_envs, capsys):
     assert "not listed" not in "\n".join(lines)
     # the default call: the rows it lists, the sentence on the others, the same count
     lines = _nothing_runnable()
-    call = "mtb.scan('D11', 'vertical')"
+    call = "mtb.run_all('D11', 'vertical', dry_run=True)"
     assert lines[-1] == (f"{call} shows the listed rows. Its files_ok and env_ok columns "
                          f"say which check failed. mtb.env.doctor() checks the environments.")
     assert lines[-2] == ("D11 holds RNA and ADT. 19 rows that read ATAC are not listed. "
@@ -448,14 +448,14 @@ def test_the_hint_of_the_command_line_carries_all(no_envs, monkeypatch):
 def test_named_methods_keep_the_error_of_0_3_4(no_envs):
     # with methods=, and when every row is listed, the text is unchanged
     lines = _nothing_runnable(methods=["Matilda"])
-    assert lines[-1].startswith("mtb.scan('D11', 'vertical', methods=['Matilda']) shows "
+    assert lines[-1].startswith("mtb.run_all('D11', 'vertical', methods=['Matilda'], dry_run=True) shows "
                                 "these rows. ")
     assert "not listed" not in "\n".join(lines)
     _on_disk("D22mini")
     with pytest.raises(ValueError) as e:
         mtb.run_all("D22mini", "vertical", out_dir="unused_out", verbose=False)
     lines = str(e.value).splitlines()
-    assert lines[-1].startswith("mtb.scan('D22mini', 'vertical') shows every row. ")
+    assert lines[-1].startswith("mtb.run_all('D22mini', 'vertical', dry_run=True) shows every row. ")
     assert "not listed" not in str(e.value)
 
 

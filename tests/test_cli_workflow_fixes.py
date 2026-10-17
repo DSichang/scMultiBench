@@ -42,7 +42,7 @@ def test_nothing_runnable_lists_only_requested_methods(no_envs):
     # nobody else's reason - Concerto/MIRA/MOFA2 were not requested
     for other in ("Concerto", "MIRA", "MOFA2", "scmb_concerto"):
         assert other not in msg
-    assert "mtb.scan('D11', 'vertical', methods=['Matilda'], modalities=\"all\")" in msg
+    assert "mtb.run_all('D11', 'vertical', methods=['Matilda'], modalities=\"all\", dry_run=True)" in msg
 
 
 def test_nothing_runnable_without_methods_says_first_3_of_n(no_envs):

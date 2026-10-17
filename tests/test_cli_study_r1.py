@@ -351,11 +351,11 @@ def test_nothing_runnable_from_the_cli_names_cli_commands(no_envs, tmp_path, cap
     assert "multibench scan D11 --category vertical shows the listed rows" in err
     assert "multibench env doctor checks the environments" in err
     assert "`" not in err
-    assert "mtb.scan(" not in err and "mtb.env.doctor()" not in err
+    assert "mtb.run_all(" not in err and "mtb.env.doctor()" not in err
     assert config._CLI is False                              # reset after the command
     with pytest.raises(ValueError) as e:                     # Python keeps Python spellings
         mtb.run_all("D11", "vertical", out_dir=str(tmp_path), verbose=False)
-    assert "mtb.scan('D11', 'vertical')" in str(e.value) and "mtb.env.doctor()" in str(e.value)
+    assert "mtb.run_all('D11', 'vertical', dry_run=True)" in str(e.value) and "mtb.env.doctor()" in str(e.value)
 
 
 def test_nothing_runnable_lists_rows_with_files_in_place_first(no_envs, tmp_path):

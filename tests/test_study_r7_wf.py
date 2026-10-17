@@ -186,7 +186,7 @@ def _nothing_runnable(**kw):
 def test_the_scan_hint_carries_the_callers_arguments(no_envs, mydata):
     msg = _nothing_runnable(data_path="data", modalities=["rna", "adt"])
     last = msg.splitlines()[-1]
-    call = "mtb.scan('MYDATA', 'vertical', data_path='data', modalities=['rna', 'adt'])"
+    call = "mtb.run_all('MYDATA', 'vertical', data_path='data', modalities=['rna', 'adt'], dry_run=True)"
     assert last.startswith(f"{call} shows every row. "), last
     # run as printed, from the same directory, it shows the rows the call selected
     shown = eval(call, {"mtb": mtb})                      # noqa: S307 - our own hint
@@ -212,8 +212,8 @@ def test_the_list_header_counts_methods_when_each_has_one_row(no_envs, mydata):
                             modalities=["rna", "adt"])
     assert "\nBlocked, one line per requested method:\n" in msg
     assert msg.splitlines()[-1].startswith(
-        "mtb.scan('MYDATA', 'vertical', data_path='data', methods=['Matilda', "
-        "'totalVI'], modalities=['rna', 'adt']) shows these rows.")
+        "mtb.run_all('MYDATA', 'vertical', data_path='data', methods=['Matilda', "
+        "'totalVI'], modalities=['rna', 'adt'], dry_run=True) shows these rows.")
 
 
 def test_the_hint_names_every_scan_argument_the_call_set():
@@ -224,8 +224,8 @@ def test_the_hint_names_every_scan_argument_the_call_set():
         "MYDATA", "vertical", blocked, None, data_path=Path("my data"),
         modalities=["rna", "adt"], allow_atac_mismatch=True, assume_gpu=True)
     assert msg.splitlines()[-1].startswith(
-        "mtb.scan('MYDATA', 'vertical', data_path='my data', modalities=['rna', 'adt'], "
-        "allow_atac_mismatch=True, assume_gpu=True) shows every row.")
+        "mtb.run_all('MYDATA', 'vertical', data_path='my data', modalities=['rna', 'adt'], "
+        "allow_atac_mismatch=True, assume_gpu=True, dry_run=True) shows every row.")
     assert "\nThe 2 blocked methods:\n" in msg
     try:
         config._CLI = True
@@ -262,7 +262,7 @@ def test_a_call_with_default_arguments_keeps_the_hint(no_envs, tmp_path, root):
         with pytest.raises(ValueError) as e:
             mtb.run_all("D11", "vertical", out_dir=tmp_path, verbose=False, **kw)
         assert e.value.args[0].splitlines()[-1].startswith(
-            "mtb.scan('D11', 'vertical') shows the listed rows. ")
+            "mtb.run_all('D11', 'vertical', dry_run=True) shows the listed rows. ")
 
 
 # ============================================================ R7-05
