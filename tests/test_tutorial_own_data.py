@@ -41,6 +41,12 @@ ROOT = Path(__file__).resolve().parent.parent
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 
 
+
+def _ready(reason) -> bool:
+    """A runnable row's reason: empty, or (0.4) the note that the method scripts
+    are not fetched yet, which the test hosts lack."""
+    return reason == "" or reason.startswith("The method scripts are not in ")
+
 def _load_gen_tut():
     spec = importlib.util.spec_from_file_location("gen_tut", ROOT / "tools" / "gen_tut.py")
     mod = importlib.util.module_from_spec(spec)
@@ -224,10 +230,10 @@ def test_section_5_has_the_twelve_cells(key):
     first = src[EXPORT].splitlines()[0]
     assert re.sub(r" {4,}", "   ", first) == f'NAME = "{NAMES[key]}"   {NAME_MARK}'
     assert (first != f'NAME = "{NAMES[key]}"   {NAME_MARK}') == (key == "diagonal_multi")
-    assert src[CHECK] == f'mtb.scan(NAME, "{t["cat"]}", methods=METHODS, data_path="mydata")'
-    assert src[RUN].startswith("mine = mtb.run_all(NAME,")
-    assert src[RUN] == (f'mine = mtb.run_all(NAME, "{t["cat"]}", methods=METHODS, '
-                        f'data_path="mydata",\n'
+    # 0.4: the folder path, as the export cell writes it; no data_path=
+    assert src[CHECK] == f'mtb.scan("mydata/" + NAME, "{t["cat"]}", methods=METHODS)'
+    assert src[RUN].startswith('mine = mtb.run_all("mydata/" + NAME,')
+    assert src[RUN] == (f'mine = mtb.run_all("mydata/" + NAME, "{t["cat"]}", methods=METHODS,\n'
                         f'                   out_dir="out/" + NAME)\n'
                         f'mine.summary')
     assert src[11] == "mine.plot()"
@@ -485,7 +491,7 @@ def test_one_name_drives_the_three_cells(key, linux, tmp_path, monkeypatch, caps
     assert out[1].startswith("[scan] Cells per file: ") and len(out) == 2
     assert set(table.attrs["cells"]) == {p.name for p in new.glob("*.h5")}
     assert sorted(table["method"]) == sorted(t["methods"])
-    assert table["runnable"].all() and (table["reason"] == "").all()
+    assert table["runnable"].all() and table["reason"].map(_ready).all()
 
     _run_cell(src[RUN], ns)
     log = capsys.readouterr().out.splitlines()
@@ -616,7 +622,7 @@ def test_the_documented_batch_call_works(key, linux, tmp_path, monkeypatch):
     ns[obj].obs["donor"] = np.where(np.arange(ns[obj].n_obs) % 2, "donor1", "donor2")
     _run_cell(src[EXPORT], ns)                 # without batch=, as the sentence says
     assert not list((Path("mydata") / NAMES[key]).glob("*[0-9].*"))
-    call = (f'mtb.run_all(NAME, "vertical", methods=METHODS, data_path="mydata", '
+    call = (f'mtb.run_all("mydata/" + NAME, "vertical", methods=METHODS, '
             f'batch={obj}.obs["donor"], dry_run=True, verbose=False)')
     plan = eval(call, ns)
     assert set(plan["method"][plan["runnable"]]) == set(GEN.TASKS[key]["methods"])
@@ -891,8 +897,9 @@ def test_the_check_sentence_covers_the_further_lines(linux, tmp_path, monkeypatc
                                               for i, c in enumerate(n, 1)) + " and 2 more.",
         "[scan] StabMap reads batches 1-3 of 5. Batches 4-5 are not used.",
         "[scan] sciPENN reads batches 1-3 of 5. Batches 4-5 are not used."]
-    assert table.drop(columns="modalities").to_dict("list") == {"method": ["StabMap", "sciPENN"], "runnable": [True] * 2,
-                                     "reason": [""] * 2}
+    assert table["reason"].map(_ready).all()
+    assert table.drop(columns=["modalities", "reason"]).to_dict("list") == {
+        "method": ["StabMap", "sciPENN"], "runnable": [True] * 2}
 
 
 @pytest.mark.parametrize("key", KEYS)

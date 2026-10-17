@@ -128,7 +128,7 @@ class _Recorder:
 
 def test_end_to_end_evaluates_with_the_default_backend(monkeypatch):
     """Section 7 scores with the default Leiden backend (0.4 stops teaching the
-    leidenalg override) and says scores can differ by up to about 0.1."""
+    leidenalg override, now the default) and says a run's scores differ a little."""
     import numpy as np
     import pandas as pd
     import multibench as mtb
@@ -139,7 +139,7 @@ def test_end_to_end_evaluates_with_the_default_backend(monkeypatch):
     exec(_e2e_cell("mtb.evaluate("), ns)
     assert seen == ["igraph"]
     md = " ".join(_markdown(E2E, "## 7. Score").split())
-    assert "can differ from the stored ones by up to about 0.1" in md
+    assert "differ a little from the stored ones" in md
     assert "leidenalg" not in md
 
 

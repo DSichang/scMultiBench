@@ -61,13 +61,13 @@ FENCES = {
                       'ann.index = ann.index + "-1"',
                       'adata = adata[adata.obs["celltype"].notna()].copy()',
                       'kind = adata.var["feature_types"]', 'kind = adata.var["feature_types"]',
-                      'mtb.scan(NAME, "vertical", methods=METHODS, data_path="mydata")'],
+                      'mtb.scan("mydata/" + NAME, "vertical", methods=METHODS)'],
     "recipe-labels-csv": ["import pandas as pd",
                           'ann.index = ann.index + "-1"',
                           'adata = adata[adata.obs["celltype"].notna()].copy()'],
     "recipe-no-labels": ['NAME = "MYDATA"   # <- a name for your data',
-                         'mine = mtb.run_all(NAME, "vertical", methods=METHODS, '
-                         'data_path="mydata",',
+                         'mine = mtb.run_all("mydata/" + NAME, "vertical", '
+                         'methods=METHODS,',
                          'mtb.io.export_dataset(adata, "mydata/" + NAME, rna=None, '
                          'labels="obs:celltype",'],
     "recipe-donors": ['NAME = "MYDONORS"   # <- a name for your data',

@@ -1037,14 +1037,14 @@ def _visible(text):
 @needs_docs
 def test_get_started_pages_keep_the_round2_facts():
     """Quickstart: the laptop tab compares an RNA PCA on 2,000 genes with an
-    ADT PCA, says scores can differ from the stored ones by up to about 0.1, links the
+    ADT PCA, says a new run's scores differ a little from the stored ones, links the
     peaks-only section and defines cell order; the unpaired tab lives on
     tutorials/run only. Installation: the cluster recipe pins the build that
     has --assume-gpu and asks for a GPU only for the GPU method (M05-M07)."""
     docs = _docs_root()
     quick = (docs / "quickstart.md").read_text()
     for fact in ("highly_variable_genes(pc, n_top_genes=2000)", '"ADT PCA"',
-                 "up to about 0.1", "#my-atac-is-peaks-only"):
+                 "differ a little from the stored ones", "#my-atac-is-peaks-only"):
         assert fact in quick, fact
     assert re.search(r"^    cell order\n    :   ", quick, re.M)
     assert '=== "Unpaired RNA + ATAC"' not in quick
@@ -1084,7 +1084,7 @@ def test_each_guide_warning_appears_once_on_the_site():
     docs = _docs_root()
     flat = {p.relative_to(docs).as_posix(): " ".join(p.read_text().split()).lower()
             for p in docs.rglob("*.md")}
-    for phrase, home in (("most methods' scores vary slightly between runs. compare ranks.",
+    for phrase, home in (("slightly different embedding on each run. compare ranks.",
                           "tutorials/evaluate.md"),
                          ("a wrong order gives wrong scores without an error", "tutorials/evaluate.md"),
                          ("only warns, and such a method gives a wrong result", "tutorials/run.md")):
@@ -1970,7 +1970,7 @@ def test_evaluate_guide_names_both_column_spellings_and_the_missing_values():
         run(call[:-1] + ', batch="donor")', donors)
     # scored_with: three parts, and a fourth after cells were left out
     assert ("`mtb.to_long` keeps the first three in its `scored_with` column, such as "
-            "`igraph/search/0.4.0`.") in guide
+            "`leidenalg/search/0.4.0`.") in guide
     (example,) = re.findall(r"When `missing_labels=\"drop\"` left cells out, a fourth part "
                             r"gives the cells scored, such as `([^`]+)`\.", guide)
 

@@ -159,8 +159,8 @@ def test_task_tutorial_installs_and_runs(key):
     mine = [c for c in _code(f"tutorial_{key}") if c.startswith("mine = mtb.run_all(")]
     assert len(mine) == 1
     call = _flat(mine[0])
-    assert call.startswith(_flat(f'mine = mtb.run_all(NAME, "{cat}", methods=METHODS, '
-                                 f'data_path="mydata", out_dir="out/" + NAME)')), call
+    assert call.startswith(_flat(f'mine = mtb.run_all("mydata/" + NAME, "{cat}", '
+                                 f'methods=METHODS, out_dir="out/" + NAME)')), call
     assert code.index("mtb.env.install") < code.index("mtb.run_all")
 
 

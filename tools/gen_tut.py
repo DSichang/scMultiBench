@@ -472,9 +472,8 @@ CROSS_ORDER = ("The batches are numbered in the sorted order of their names, rea
 CROSS_INDEX = ("For one AnnData per batch, call `export_dataset` once per batch with "
                "`batch_index=N` instead of `batch=`, and pass `n_batches=` with the number of "
                "batches in every call.")
-FOLDER_NOTE = ("`NAME` is the dataset name for `scan` and `run_all`, and `mydata` is the "
-               "folder that holds it (`data_path`). With a new value of `NAME`, the folder "
-               "holds the files of your data only.")
+FOLDER_NOTE = ("`\"mydata/\" + NAME` is the dataset folder that `scan` and `run_all` read. "
+               "With a new value of `NAME`, the folder holds the files of your data only.")
 CHECK_NOTE = ("The check lists the methods you name. Without `methods=`, it lists every "
               "method that reads the modalities in the folder. `mtb.run_all(..., "
               "dry_run=True)` has one row per method variant and every column, such as the "
@@ -962,7 +961,7 @@ def check_own(key):
                 exec(compile(own["export"], f"tutorial_{key}: export cell", "exec"), ns)
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                frame = mtb.run_all(own["name"], t["cat"], data_path="mydata",
+                frame = mtb.run_all("mydata/" + own["name"], t["cat"],
                                     dry_run=True, verbose=False)
         finally:
             os.chdir(here)
@@ -1063,9 +1062,9 @@ def own_cells(key):
         ("markdown", write),
         ("code", export),
         ("markdown", check),
-        ("code", f'mtb.scan(NAME, "{cat}", methods=METHODS, data_path="mydata")'),
+        ("code", f'mtb.scan("mydata/" + NAME, "{cat}", methods=METHODS)'),
         ("markdown", f"Run {same} on the folder:"),
-        ("code", f'mine = mtb.run_all(NAME, "{cat}", methods=METHODS, data_path="mydata",\n'
+        ("code", f'mine = mtb.run_all("mydata/" + NAME, "{cat}", methods=METHODS,\n'
                  f'                   out_dir="out/" + NAME)\n'
                  f'mine.summary'),
         ("code", "mine.plot()"),
@@ -1225,8 +1224,8 @@ res.summary''')
                 f"batches 1 and 2 of `{stored_ds}`. `run_all` on `{ds}` runs its three-batch "
                 f"variant.")
         stored_notes.append(
-            "Scores of your runs can differ from the stored ones by up to about 0.1: the "
-            "Leiden clustering behind ARI and NMI depends on the backend.")
+            "Scores of your runs differ a little from the stored ones: most methods give "
+            "a slightly different embedding on each run.")
         md(f"""## {section}. Stored scores
 
 The package ships stored scores for {n_stored} methods on `{stored_ds}`. `load_results` reads them and `mtb.plot.bubble` draws them, without running anything.

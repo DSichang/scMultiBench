@@ -137,7 +137,6 @@ def test_cli_scan_without_category_takes_the_benchmark_category(capsys, tmp_path
     """`multibench scan D28` = mtb.scan('D28'): the benchmark scored D28 as
     diagonal, so that category; a folder of its own: all four, not exit 2."""
     import io
-    import shutil
     import pandas as pd
     rc = cli.main(["scan", "D28", "--format", "csv"])
     out = capsys.readouterr().out
@@ -146,7 +145,9 @@ def test_cli_scan_without_category_takes_the_benchmark_category(capsys, tmp_path
     assert set(df["category"]) == {"diagonal"}
     assert len(df) == len(full_scan("D28", "diagonal", verbose=False))
     own = tmp_path / "MINE"
-    shutil.copytree(multibench.config.DEFAULT.data_path / "D28", own)
+    own.mkdir()
+    for f in (multibench.config.DEFAULT.data_path / "D28").iterdir():
+        (own / f.name).symlink_to(f)
     assert cli.main(["scan", str(own), "--format", "csv"]) == 0
     df = pd.read_csv(io.StringIO(capsys.readouterr().out))
     assert set(df["category"]) == set(full_scan("MINE", data_path=tmp_path,
