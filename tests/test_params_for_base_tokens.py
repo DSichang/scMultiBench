@@ -26,4 +26,4 @@ def test_several_variants_of_those_tokens_are_ambiguous():
 
 def test_tokens_no_variant_reads_still_raise():
     with pytest.raises(KeyError, match="no variant"):
-        mtb.params_for("Multigrate", "cross", ["adt"])
+        mtb.params_for("totalVI", "vertical", ["atac"])

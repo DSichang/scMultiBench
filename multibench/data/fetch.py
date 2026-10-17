@@ -286,8 +286,18 @@ def fetch_outputs(dataset: str, methods=None, *, data_path=None,
         finally:
             _shutil.rmtree(tmp, ignore_errors=True)
     if methods is not None:
+        from ..engine import registry
+        registry.check_id_list(methods, "methods")
         have = _methods_in_tree(dest)
-        unknown = [m for m in methods if m not in have]
+
+        def _id(m):                          # any letter case, or a display name
+            if m in have:
+                return m
+            try:
+                return registry.check_method(m)
+            except KeyError:
+                return m
+        unknown = [m for m in methods if _id(m) not in have]
         if unknown:
             raise KeyError(
                 f"no shipped output for {unknown} in {dataset}; methods in the "

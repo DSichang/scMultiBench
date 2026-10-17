@@ -732,9 +732,11 @@ def params_for(method: str, category: str | None = None,
 
 def _same_types(variants, modalities) -> list:
     """The variants whose inputs are exactly the base types ``modalities`` name
-    (``rna``, ``adt``, ``atac``; numbers and ATAC forms dropped)."""
+    (``rna``, ``adt``, ``atac``; numbers and ATAC forms dropped), else those
+    that read at least them, as ``find_methods`` matches."""
     want = {_base_modality(m) for m in modalities}
-    return [v for v in variants if v.modality_types == want]
+    exact = [v for v in variants if v.modality_types == want]
+    return exact or [v for v in variants if want <= v.modality_types]
 
 
 # ------------------------------------------------------------------ citations
