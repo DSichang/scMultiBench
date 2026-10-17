@@ -1,10 +1,9 @@
-"""Pin our fast isolated-label F1 to scib's own implementation.
+"""Pin the package's isolated-label F1 to scib's own implementation.
 
-We replaced ``scib.metrics.isolated_labels_f1`` with an equivalent that clusters
-each resolution once instead of once per label (scib repeats the identical
-Leiden sweep for every isolated label). That is only acceptable if it returns
-the SAME number, so this compares the two directly rather than trusting the
-argument that they must agree.
+The article's iF1 scores one clustering (the clusters searched to the number of
+cell types). scib's ``isolated_labels_f1`` scores a precomputed clustering when
+``obs[f"{cluster_key}_{resolution}"]`` holds it for every resolution it is
+given; this compares the two directly.
 """
 
 import numpy as np
@@ -26,29 +25,37 @@ def _toy(n_per_label=90, n_labels=5, n_batches=2, dims=8, seed=0):
     return np.vstack(emb), np.array(lab), np.array(bat)
 
 
-def _both(emb, lab, bat):
+def _both(emb, lab, bat, clusters):
     iso = len(set(bat)) + 1        # our convention: every label counts as isolated
-    a1 = escib._build_adata(emb, lab, lab, bat)
-    a2 = escib._build_adata(emb, lab, lab, bat)
-    import scanpy as sc
-    sc.pp.neighbors(a1, use_rep="X_emb")
+    a1 = escib._build_adata(emb, lab, clusters, bat)
+    a2 = escib._build_adata(emb, lab, clusters, bat)
+    a1.obs["cluster_1.0"] = a1.obs["cluster"]          # scib's precomputed layout
     ref = me.isolated_labels_f1(a1, batch_key="batch", label_key="celltype",
-                                embed="X_emb", iso_threshold=iso, verbose=False)
+                                embed="X_emb", cluster_key="cluster", resolutions=[1.0],
+                                iso_threshold=iso, verbose=False)
     fast = escib._isolated_labels_f1(a2, label_key="celltype", batch_key="batch",
-                                     embed="X_emb", iso_threshold=iso)
+                                     cluster_key="cluster", iso_threshold=iso)
     return float(ref), float(fast)
+
+
+def _noisy(lab, seed=1, share=0.2):
+    """The labels with ``share`` of them moved to a random other label."""
+    rng = np.random.default_rng(seed)
+    out = lab.copy()
+    pick = rng.random(len(lab)) < share
+    out[pick] = rng.choice(np.unique(lab), pick.sum())
+    return out
 
 
 def test_fast_isolated_f1_matches_scib():
     emb, lab, bat = _toy()
-    ref, fast = _both(emb, lab, bat)
+    ref, fast = _both(emb, lab, bat, _noisy(lab))
     assert np.isfinite(ref) and np.isfinite(fast)
     assert fast == pytest.approx(ref, abs=1e-9), f"scib={ref!r} fast={fast!r}"
 
 
 def test_fast_isolated_f1_matches_scib_uneven_labels():
-    """Uneven label sizes: the per-label argmax is likelier to pick different
-    resolutions for different labels, which is exactly what must be preserved."""
+    """Uneven label sizes and clusters that merge two labels."""
     rng = np.random.default_rng(3)
     dims = 8
     sizes = [140, 90, 45, 20, 12]
@@ -58,15 +65,16 @@ def test_fast_isolated_f1_matches_scib_uneven_labels():
         emb.append(centres[i] + rng.normal(0, 1.0, size=(n, dims)))
         lab += [f"type{i}"] * n
         bat += [f"b{j % 3}" for j in range(n)]
-    ref, fast = _both(np.vstack(emb), np.array(lab), np.array(bat))
+    lab = np.array(lab)
+    merged = np.where(lab == "type4", "type3", lab)
+    ref, fast = _both(np.vstack(emb), lab, np.array(bat), merged)
     assert fast == pytest.approx(ref, abs=1e-9), f"scib={ref!r} fast={fast!r}"
 
 
 def test_fast_isolated_f1_leaves_no_scratch_columns():
-    """The helper adds one obs column per resolution; it must clean them up."""
     emb, lab, bat = _toy(n_per_label=40, n_labels=3)
     adata = escib._build_adata(emb, lab, lab, bat)
     before = set(adata.obs.columns)
     escib._isolated_labels_f1(adata, label_key="celltype", batch_key="batch",
-                              embed="X_emb", iso_threshold=len(set(bat)) + 1)
+                              cluster_key="cluster", iso_threshold=len(set(bat)) + 1)
     assert set(adata.obs.columns) == before

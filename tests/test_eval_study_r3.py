@@ -268,9 +268,10 @@ def test_sweep_note_is_short_sentences(capsys, monkeypatch):
     mtb.evaluate(emb, labels=lab)
     err = capsys.readouterr().err.strip()
     assert re.fullmatch(
-        r"Clustering 90 cells at 10 resolutions for ARI, NMI and iF1, with the "
+        r"Clustering 90 cells for ARI, NMI, ASW, iASW and iF1 with the "
         r"(igraph|leidenalg) Leiden backend\. This takes from seconds to a few "
-        r"minutes\. To skip it, pass metrics= without ARI, NMI and iF1\.", err), err
+        r"minutes\. To skip it, pass clustering=, or metrics= without ARI, NMI, ASW, "
+        r"iASW and iF1\.", err), err
     assert " - " not in err and ";" not in err and "per 3,000 cells" not in err
 
 
@@ -283,7 +284,7 @@ def test_sweep_note_cli_spelling(tmp_path, capsys, monkeypatch):
     assert cli.main(["evaluate", "--output", str(tmp_path / "emb.npy"), "--labels",
                      str(tmp_path / "cty.csv"), "--metrics", "ARI,NMI"]) == 0
     err = capsys.readouterr().err
-    assert ("for ARI and NMI, with the") in err
+    assert ("for ARI and NMI with the") in err
     assert "To skip it, pass --clustering, or --metrics without ARI and NMI." in err
 
 

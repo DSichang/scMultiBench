@@ -33,10 +33,10 @@ def _flavor():
     return _resolve_flavor(None)
 
 
-def test_evaluate_records_a_sweep():
+def test_evaluate_records_a_search():
     emb, lab = _blobs()
     wide = mtb.evaluate(emb, labels=lab, metrics=["ARI", "ASW"])
-    assert wide.attrs == {"leiden_flavor": _flavor(), "clustering": "sweep",
+    assert wide.attrs == {"leiden_flavor": _flavor(), "clustering": "search",
                           "multibench_version": mtb.__version__,
                           "scib_version": version("scib")}
 
@@ -50,7 +50,7 @@ def test_evaluate_records_user_clusters_and_no_sweep():
 
 def test_evaluate_without_clustering_metrics_records_none():
     emb, lab = _blobs()
-    wide = mtb.evaluate(emb, labels=lab, metrics=["ASW"])
+    wide = mtb.evaluate(emb, labels=lab, metrics=["cLISI"])
     assert wide.attrs == {"leiden_flavor": None, "clustering": None,
                           "multibench_version": mtb.__version__,
                           "scib_version": version("scib")}
@@ -69,10 +69,10 @@ def test_to_long_writes_scored_with_and_keeps_the_attrs():
     wide = mtb.evaluate(emb, labels=lab, metrics=["ARI", "ASW"])
     long = mtb.to_long(wide, method="Mine", dataset="D11", category="vertical")
     assert long.columns.tolist() == pipeline.LONG_COLUMNS + ["scored_with"]
-    assert set(long["scored_with"]) == {f"{_flavor()}/sweep/{mtb.__version__}"}
+    assert set(long["scored_with"]) == {f"{_flavor()}/search/{mtb.__version__}"}
     assert long.attrs == wide.attrs
     # a clustering-free score fills the parts that did not apply with 'none'
-    asw = mtb.to_long(mtb.evaluate(emb, labels=lab, metrics=["ASW"]), method="M")
+    asw = mtb.to_long(mtb.evaluate(emb, labels=lab, metrics=["cLISI"]), method="M")
     assert set(asw["scored_with"]) == {f"none/none/{mtb.__version__}"}
 
 
@@ -128,8 +128,8 @@ def test_scored_with_column_passes_through_the_consumers(tmp_path):
         pipeline.LONG_COLUMNS
 
 
-def test_run_all_scoring_labels_its_internal_sweep_as_sweep():
-    """run_all hands the screening sweep's clusters to evaluate(clustering=);
+def test_run_all_scoring_labels_its_internal_search_as_search():
+    """run_all hands the screening search's clusters to evaluate(clustering=);
     they are not the user's clusters and must not be recorded as such."""
     rng = np.random.default_rng(1)
     emb, lab = _blobs(n_per=50)
@@ -137,5 +137,5 @@ def test_run_all_scoring_labels_its_internal_sweep_as_sweep():
     cands = [(["good.csv"], lab, bat), (["scrambled.csv"], rng.permutation(lab), bat)]
     names, val, _ = W._evaluate_best_order(emb, "vertical", cands)
     assert names == ["good.csv"]
-    assert val.attrs["clustering"] == "sweep"
+    assert val.attrs["clustering"] == "search"
     assert val.attrs["leiden_flavor"] == _flavor()

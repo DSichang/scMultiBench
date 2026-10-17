@@ -213,12 +213,12 @@ def _():
     v = mtb.evaluate(e, category="vertical", metrics="clustering", labels=lab, clustering=cl)
     return f"ARI={float(v['Value']['ARI']):.3f}"
 
-@check("evaluate(metrics=[...]) - list of codes, no Leiden sweep")
+@check("evaluate(metrics=[...]) - list of codes, no Leiden clustering")
 def _():
     e, lab = _emb_and_labels()
-    v = mtb.evaluate(e, category="vertical", metrics=["ASW", "cLISI"], labels=lab)
-    assert list(v.index) == ["ASW", "cLISI"], list(v.index)
-    return f"ASW={float(v['Value']['ASW']):.3f}"
+    v = mtb.evaluate(e, category="vertical", metrics=["cLISI"], labels=lab)
+    assert list(v.index) == ["cLISI"], list(v.index)
+    return f"cLISI={float(v['Value']['cLISI']):.3f}"
 
 @check("evaluate(task=) - the one deliberate deprecated-alias check")
 def _():

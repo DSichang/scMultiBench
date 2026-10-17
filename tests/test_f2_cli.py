@@ -260,8 +260,7 @@ def test_env_status_help_is_one_sentence_and_one_tag_per_line():
 def test_evaluate_and_run_help_texts():
     ev = _sub("evaluate")
     clus = _opt_help(ev, "--clustering")
-    assert "they replace the sweep for ARI and NMI" in clus
-    assert "iF1 still sweeps unless --metrics leaves it out" in clus
+    assert "they replace the Leiden clusters of ARI, NMI, ASW, iASW and iF1" in clus
     meth = _opt_help(ev, "--method")
     assert meth.startswith("package method whose label order is used, or with --labels "
                            "any row name. It is also the row name unless --name is given")

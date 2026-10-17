@@ -2207,7 +2207,7 @@ def build_parser() -> argparse.ArgumentParser:
     pra.add_argument("--batch-column", dest="batch_column", metavar="NAME",
                      help=_BATCH_COLUMN_HELP)
     pra.add_argument("--leiden-flavor", dest="leiden_flavor", choices=["igraph", "leidenalg"],
-                     help="Leiden backend of the clustering sweep when scoring "
+                     help="Leiden backend of the clustering when scoring "
                           "(default: shown by multibench config). leidenalg matches "
                           "both stored tables, published and re-run")
     pra.set_defaults(func=_cmd_run_all, _parser=pra)
@@ -2255,20 +2255,19 @@ def build_parser() -> argparse.ArgumentParser:
                     help=_BATCH_COLUMN_HELP)
     pe.add_argument("--clustering", "--cluster", dest="cluster", metavar="PATH",
                     help="precomputed clusters (CSV, or an .h5 read from "
-                         "/obs/cluster_leiden); they replace the sweep for ARI and NMI "
-                         "(iF1 still sweeps unless --metrics leaves it out). "
-                         "--cluster is an alias")
+                         "/obs/cluster_leiden); they replace the Leiden clusters of "
+                         "ARI, NMI, ASW, iASW and iF1. --cluster is an alias")
     pe.add_argument("--metrics", help="what to compute (mtb.evaluate(metrics=)): a family "
                                       "(clustering | batch | classification | all) or a "
                                       "comma-separated list of metric codes (e.g. "
                                       "ARI,NMI); a list skips everything else, including "
-                                      "the Leiden sweep when no listed metric needs it. "
+                                      "the Leiden clustering when no listed metric needs it. "
                                       "Default: clustering, plus batch when --batch or "
                                       "several --labels are given, plus classification "
                                       "when there are two or more batches and "
                                       "--category is not vertical")
     pe.add_argument("--leiden-flavor", dest="leiden_flavor", choices=["igraph", "leidenalg"],
-                    help="Leiden backend of the clustering sweep (default: shown by "
+                    help="Leiden backend of the clustering (default: shown by "
                          "multibench config). leidenalg matches both stored tables, "
                          "published and re-run")
     pe.add_argument("--missing-labels", dest="missing_labels", choices=["error", "drop"],

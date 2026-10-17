@@ -473,11 +473,11 @@ def test_counts_carry_thousands_separators():
     emb[:600] += 4
     lab[np.arange(0, 1200, 12)] = None              # 100 cells
     with pytest.raises(ValueError) as e:
-        mtb.evaluate(emb, labels=lab, metrics=["ASW"])
+        mtb.evaluate(emb, labels=lab, metrics=["cLISI"])
     assert str(e.value) == (
         'labels: 100 of the 1,200 cells have no label. Pass missing_labels="drop" to '
         "score the other 1,100.")
-    out, said = _drop(emb, labels=lab, metrics=["ASW"])
+    out, said = _drop(emb, labels=lab, metrics=["cLISI"])
     assert said == ["Scored the 1,100 labelled cells of 1,200."]
     assert (out.attrs["cells_scored"], out.attrs["cells_total"]) == (1100, 1200)
     long = mtb.to_long(out, method="M")
@@ -627,19 +627,19 @@ def test_drop_equals_scoring_the_labelled_cells(tmp_path):
 
 
 def test_drop_scores_the_sweep_on_the_labelled_cells():
-    """ARI without clustering=: the Leiden sweep runs on the cells that are
+    """ARI without clustering=: the Leiden search runs on the cells that are
     scored, as it does for a call with those cells only."""
     emb, lab = _cells()
     got, _ = _drop(emb, labels=_gaps(lab, "NA"), metrics=["ARI", "NMI"])
     _same(got, mtb.evaluate(emb[KEEP], labels=lab[KEEP], metrics=["ARI", "NMI"],
                             verbose=False))
-    assert got.attrs["clustering"] == "sweep"
+    assert got.attrs["clustering"] == "search"
 
 
 def test_drop_warns_and_records_the_cell_counts():
     emb, lab = _cells()
     with pytest.warns(UserWarning) as rec:
-        wide = mtb.evaluate(emb, labels=_gaps(lab), metrics=["ASW"], missing_labels="drop")
+        wide = mtb.evaluate(emb, labels=_gaps(lab), metrics=["cLISI"], missing_labels="drop")
     assert _scored(rec) == ["Scored the 270 labelled cells of 300."]
     # the warning points at the line that called evaluate
     assert [Path(w.filename).name for w in rec
@@ -683,7 +683,8 @@ def test_drop_without_gaps_changes_nothing():
     # the value of the released 0.3.4 for these cells
     assert plain.loc["ASW", "Value"] == pytest.approx(ASW_034, abs=1e-9)
     long = mtb.to_long(drop, method="M")
-    assert set(long["scored_with"]) == {f"none/none/{mtb.__version__}"}
+    assert set(long["scored_with"]) == {
+        f"{drop.attrs['leiden_flavor']}/search/{mtb.__version__}"}
     assert list(long.attrs) == list(plain.attrs)
 
 

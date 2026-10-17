@@ -121,7 +121,9 @@ def test_evaluate_recovers_the_blobs_on_either_flavor(flavor, monkeypatch):
     assert float(df.loc["ARI", "Value"]) > 0.95
     assert float(df.loc["iF1", "Value"]) > 0.95
     assert _asked(seen) == {_eff(flavor)}
-    assert len(seen) == 10                       # ONE sweep serves ARI/NMI and iF1
+    steps = len(seen)
+    S.leiden_n_clusters(emb, len(set(lab)))
+    assert len(seen) == 2 * steps                # ONE search serves ARI, NMI and iF1
 
 
 def test_sweep_notice_names_the_flavor(monkeypatch, capsys):
@@ -131,7 +133,7 @@ def test_sweep_notice_names_the_flavor(monkeypatch, capsys):
         monkeypatch.setattr(config.DEFAULT, "leiden_flavor", flavor, raising=False)
         mtb.evaluate(emb, labels=lab, metrics=["ARI"])
         err = capsys.readouterr().err
-        assert re.search(rf"at 10 resolutions for ARI, with the {_eff(flavor)} Leiden "
+        assert re.search(rf"cells for ARI with the {_eff(flavor)} Leiden "
                          rf"backend\.", err)
 
 
@@ -144,23 +146,6 @@ def test_leidenalg_path_does_not_nag_about_igraph(recwarn):
         warnings.simplefilter("always")
         S.leiden_sweep(emb, flavor="leidenalg")
     assert not [x for x in w if "igraph" in str(x.message)]
-
-
-def test_isolated_f1_fallback_sweep_uses_the_flavor(monkeypatch):
-    """Without precomputed keys ``_isolated_labels_f1`` runs its own sweep, on
-    the same backend."""
-    import anndata as ad
-    import pandas as pd
-    seen = _spy_leiden(monkeypatch)
-    emb, lab = _blobs(n_per=25)
-    adata = ad.AnnData(emb.astype(float))
-    adata.obsm["X_emb"] = adata.X
-    adata.obs["celltype"] = pd.Categorical(lab.astype(str))
-    adata.obs["batch"] = pd.Categorical(["b"] * len(lab))
-    v = S._isolated_labels_f1(adata, "celltype", "batch", "X_emb", iso_threshold=2,
-                              flavor="leidenalg")
-    assert 0.0 <= v <= 1.0
-    assert len(seen) == 10 and _asked(seen) == {"leidenalg"}
 
 
 def test_igraph_falls_back_to_leidenalg_on_old_scanpy(monkeypatch):

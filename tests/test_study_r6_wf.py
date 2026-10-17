@@ -258,7 +258,7 @@ def test_a_folder_without_the_saved_batch_warns_once(batched):
     assert caught.count(text) == 1, caught
     rec = failed.results[0]
     assert rec["status"] == "RUN_OK_EVAL_FAILED"
-    assert ("metrics='all' needs batch labels for ASW_batch, GC and iLISI. "
+    assert ("metrics='all' needs batch labels for ASW_batch, ARI_batch, NMI_batch, GC and iLISI. "
             "Pass batch=<vector>, or metrics='clustering'.") in rec["error"]
     for k in ("batch_source", "n_batches", "metrics"):
         assert k not in rec, k
@@ -269,13 +269,13 @@ def test_the_batch_label_errors_are_short_sentences(monkeypatch):
     rng = np.random.default_rng(0)
     emb, ct = rng.normal(size=(60, 4)), np.array(["A", "B"] * 30)
     cases = {
-        "all": ("metrics='all' needs batch labels for ASW_batch, GC and iLISI. "
+        "all": ("metrics='all' needs batch labels for ASW_batch, ARI_batch, NMI_batch, GC and iLISI. "
                 "Pass batch=<vector>, or metrics='clustering'.",
-                "--metrics all needs batch labels for ASW_batch, GC and iLISI. "
+                "--metrics all needs batch labels for ASW_batch, ARI_batch, NMI_batch, GC and iLISI. "
                 "Pass --batch CSV, or --metrics clustering."),
-        "batch": ("metrics='batch' needs batch labels for ASW_batch, GC and iLISI. "
+        "batch": ("metrics='batch' needs batch labels for ASW_batch, ARI_batch, NMI_batch, GC and iLISI. "
                   "Pass batch=<vector>, or labels as a list of two or more files.",
-                  "--metrics batch needs batch labels for ASW_batch, GC and iLISI. "
+                  "--metrics batch needs batch labels for ASW_batch, ARI_batch, NMI_batch, GC and iLISI. "
                   "Pass --batch CSV, or two or more --labels files."),
     }
     for metrics, (py, cli) in cases.items():
@@ -342,14 +342,14 @@ def _cross_run(data, tmp, method, **kw):
 
 def _count_sweeps(monkeypatch, fail=False):
     calls = []
-    real = W._escib.leiden_sweep
+    real = W._escib.leiden_n_clusters
 
     def counted(*a, **k):
         calls.append(1)
         if fail:
-            raise AssertionError("leiden_sweep was called")
+            raise AssertionError("leiden_n_clusters was called")
         return real(*a, **k)
-    monkeypatch.setattr(W._escib, "leiden_sweep", counted)
+    monkeypatch.setattr(W._escib, "leiden_n_clusters", counted)
     return calls
 
 
@@ -382,7 +382,7 @@ def test_rescore_with_a_clustering_metric_ranks_with_one_sweep(cross, tmp_path,
     assert len(new.results[0]["label_order_candidates"]) == 6
     lines = capsys.readouterr().out.splitlines()
     assert lines[0] == ("[rescore] totalVI: ranking 6 label orders on 150 cells with "
-                        "one Leiden sweep ...")
+                        "one Leiden clustering ...")
     assert lines[1].startswith("[rescore] totalVI -> CHAIN_OK")
 
 
@@ -413,7 +413,7 @@ def test_rescore_does_not_warn_about_its_own_file_of_origin_batch(cross, tmp_pat
     with pytest.warns(UserWarning) as caught:
         res.rescore(batch=np.repeat([1, 2], [40, 50]), metrics=["ARI"])
     assert ("batch= changes nothing here, because metrics=['ARI'] has no batch metric. "
-            "Add ASW_batch, GC or iLISI, or pass metrics='all'.") in \
+            "Add ASW_batch, ARI_batch, NMI_batch, GC or iLISI, or pass metrics='all'.") in \
         [str(w.message) for w in caught]
 
 
@@ -425,7 +425,7 @@ def test_the_batch_warning_on_the_command_line(monkeypatch):
         pipeline.evaluate(emb, labels=ct, batch=np.array([1, 2] * 30),
                           metrics=["ARI", "NMI"])
     assert ("--batch changes nothing here, because --metrics ARI,NMI has no batch "
-            "metric. Add ASW_batch, GC or iLISI to --metrics, or pass --metrics all.") in \
+            "metric. Add ASW_batch, ARI_batch, NMI_batch, GC or iLISI to --metrics, or pass --metrics all.") in \
         [str(w.message) for w in caught]
 
 
@@ -448,8 +448,8 @@ def test_docstrings_state_the_new_rules():
         "summary": W.BatchResult.summary, "results": W.BatchResult.results,
         "save": W.BatchResult.save}.items()}
     assert ("With ``labels=None`` and several label files, ``rescore`` ranks the file "
-            "orders by ARI, which needs one Leiden sweep. It keeps the stored order and "
-            "skips the sweep when ``metrics=`` has no ARI, NMI or iF1.") in flat["rescore"]
+            "orders by ARI, which needs one Leiden clustering. It keeps the stored order "
+            "and skips the ranking when ``metrics=`` has no ARI, NMI or iF1.") in flat["rescore"]
     assert "is handed to ``evaluate(metrics=)``" not in flat["rescore"]
     assert ("``None`` = the batch ``run_all`` was given, else each cell's label "
             "file.") in flat["rescore"]

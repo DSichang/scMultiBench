@@ -184,7 +184,7 @@ class Config:
         ``mtb.scan`` and ``mtb.run_all`` use it. Default
         ``$MULTIBENCH_DATA_PATH``, else ``<base>/data``.
     leiden_flavor : str
-        Leiden backend of the scIB clustering sweep in ``mtb.evaluate``:
+        Leiden backend of the scIB clustering in ``mtb.evaluate``:
         ``"igraph"`` (default, faster) or ``"leidenalg"`` (the backend of both
         stored sources).
     envs_dir : pathlib.Path

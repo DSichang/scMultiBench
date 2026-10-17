@@ -188,6 +188,8 @@ def test_no_unsaved_batch_warning_without_a_batch_metric(cite, tmp_path):
     old = mtb.load_batch(tmp_path / "out")
     with warnings.catch_warnings():
         warnings.simplefilter("error")
+        # the toy cells give no resolution with one cluster per cell type
+        warnings.filterwarnings("ignore", message="No Leiden resolution gave")
         new = old.rescore(metrics=["ARI"])
     assert new.results[0]["status"] == "CHAIN_OK"
     with pytest.warns(UserWarning, match="which older versions did not save"):

@@ -1758,7 +1758,8 @@ def _metric_codes(metrics):
         return None
 
 
-#: the metrics that need the Leiden clustering, and so a sweep
+#: the metrics that score the labels against a Leiden clustering: ``rescore``
+#: ranks the label orders (one clustering) only when one is asked for
 _SWEEP_METRICS = ("ARI", "NMI", "iF1")
 
 
@@ -1833,37 +1834,28 @@ def _evaluate_best_order(emb, category, cands, *, metrics=None, user_batch=False
         ari = round(float(val["Value"]["ARI"]), 4) + 0.0 if "ARI" in val.index else None
         return names, val, [{"order": names, "ARI": ari}]
 
-    # The Leiden sweep behind ARI depends on the embedding alone: sweep once, rank
-    # every order on it, and compute the full metric set only for the winner.
+    # The clusters behind ARI depend on the embedding and the number of cell types
+    # alone: cluster once per number, rank every order on it, and compute the full
+    # metric set only for the winner.
+    import anndata as ad
     import scib.metrics
 
     if on_rank is not None:
         on_rank(len(cands), emb.shape[0])
-    try:
-        sweep_adata, sweep_keys = _escib.leiden_sweep(emb)
-    except Exception:
-        sweep_adata = None
-
+    searched = {}                   # number of cell types -> clusters
     scored, last_error = [], ""
     for names, lab, batch in cands:
         try:
-            if sweep_adata is None:      # a self-contained screen per order
-                val = _evaluate(emb, category=category, verbose=False,
-                                labels=lab, metrics=["ARI"])
-                scored.append((float(val["Value"]["ARI"]), names, lab, batch, None))
-                continue
-            sweep_adata.obs["celltype"] = pd.Categorical(
-                np.asarray(lab).astype(str))
-            best_key, best_nmi = None, -1.0
-            for k in sweep_keys:
-                nmi = float(scib.metrics.nmi(sweep_adata, cluster_key=k,
-                                             label_key="celltype"))
-                if nmi > best_nmi:
-                    best_nmi, best_key = nmi, k
-            ari = float(scib.metrics.ari(sweep_adata, cluster_key=best_key,
+            cell_types = np.asarray(lab).astype(str)
+            n = len(set(cell_types.tolist()))
+            if n not in searched:
+                searched[n] = _escib.leiden_n_clusters(emb, n)
+            obs = pd.DataFrame({"celltype": pd.Categorical(cell_types),
+                                "cluster": pd.Categorical(searched[n])},
+                               index=np.arange(len(cell_types)).astype(str))
+            ari = float(scib.metrics.ari(ad.AnnData(obs=obs), cluster_key="cluster",
                                          label_key="celltype"))
-            scored.append((ari, names, lab, batch,
-                           np.asarray(sweep_adata.obs[best_key].values)))
+            scored.append((ari, names, lab, batch, searched[n]))
         except Exception as e:  # noqa: BLE001 - keep screening other orders
             last_error = f"{type(e).__name__}: {e}"
     if not scored:
@@ -1873,10 +1865,9 @@ def _evaluate_best_order(emb, category, cands, *, metrics=None, user_batch=False
     ari, names, lab, batch, clusters = scored[0]
     try:
         val = _full(lab, batch, clustering=clusters)    # reuses the winning clustering
-        if clusters is not None and val.attrs.get("clustering") == "user":
-            # the clusters came from the screening sweep, not from the user
-            val.attrs.update(clustering="sweep",
-                             leiden_flavor=sweep_adata.uns.get("leiden_flavor"))
+        if val.attrs.get("clustering") == "user":
+            # the clusters came from the screening search, not from the user
+            val.attrs.update(clustering="search", leiden_flavor=_escib._resolve_flavor(None))
     except Exception as e:
         raise RuntimeError(
             f"evaluation failed for the winning label order {names}: "
@@ -1949,7 +1940,7 @@ def _rank_line(method):
     """``rescore(verbose=True)``'s line before the label orders are ranked."""
     def say(orders, cells):
         print(f"[rescore] {method}: ranking {orders} label orders on {cells:,} cells "
-              f"with one Leiden sweep ...", flush=True)
+              f"with one Leiden clustering ...", flush=True)
     return say
 
 
@@ -2440,9 +2431,9 @@ class BatchResult:
         ``batch_source='user'``.
 
         **Label order.** With ``labels=None`` and several label files,
-        ``rescore`` ranks the file orders by ARI, which needs one Leiden sweep.
-        It keeps the stored order and skips the sweep when ``metrics=`` has no
-        ARI, NMI or iF1.
+        ``rescore`` ranks the file orders by ARI, which needs one Leiden
+        clustering. It keeps the stored order and skips the ranking when
+        ``metrics=`` has no ARI, NMI or iF1.
 
         **Labels without batch.** Given ``labels`` and no ``batch``, the batch
         that ``run_all(batch=)`` saved is reused; without one, every cell is

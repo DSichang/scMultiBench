@@ -1,17 +1,9 @@
 """scIB metric computation (clustering + batch), after upstream
 ``evaluation_pipelines/scib_metrics/scib_metrics.py``.
 
-The scib calls are the script's, with three differences in what they score:
-
-- ARI and NMI score the Leiden resolution with the best NMI of a
-  10-resolution sweep unless a clustering is passed; the script reads a
-  SINFONIA clustering with as many clusters as cell types;
-- ASW and iASW are silhouettes of the cell-type labels (scIB's definition);
-  the script passes ``label_key="cluster"``;
-- the script's ``ARI_batch`` and ``NMI_batch`` are not computed.
-
-On the benchmark's demo embedding (28,574 cells) that is ARI 0.618 against
-0.512, NMI 0.731 against 0.697, ASW 0.570 against 0.614.
+The protocol is the article's: Leiden clusters searched to the number of cell
+types (and of batches, for ARI_batch and NMI_batch); ASW, iASW and iF1 on those
+clusters.
 """
 from __future__ import annotations
 
@@ -32,9 +24,24 @@ _CXX_CANDIDATES = ("g++", "c++", "clang++")
 #: the flags of the build line in scib's ``knn_graph/README.md``
 _CXX_FLAGS = ("-std=c++11", "-O3")
 
-#: above this many cells the Leiden sweep is announced on stderr (``verbose=None``):
-#: it then takes long enough to look like a hang
+#: above this many cells the Leiden clustering is announced on stderr
+#: (``verbose=None``): it then takes long enough to look like a hang
 _SWEEP_NOTICE_CELLS = 2000
+
+#: ``sinfonia.get_N_clusters``, which the article clusters with: the Leiden
+#: resolution is bisected on this interval for at most this many steps
+_SEARCH_RANGE = (0.0, 3.0)
+_SEARCH_STEPS = 30
+
+#: scanpy's ``settings.N_PCS``: ``sc.pp.neighbors`` without ``use_rep``, as
+#: SINFONIA calls it, runs on the first 50 principal components of a wider ``X``
+_N_PCS = 50
+
+#: the metrics scored on the clusters searched to the number of cell types
+#: (or on the clustering the caller passes)
+_CLUSTER_METRICS = ("ARI", "NMI", "ASW", "iASW", "iF1")
+#: the metrics scored on the clusters searched to the number of batches
+_BATCH_CLUSTER_METRICS = ("ARI_batch", "NMI_batch")
 
 
 def _find_cxx() -> str | None:
@@ -140,12 +147,13 @@ def _lisi_helper_problem() -> str | None:
     return _probe_lisi_binary(exe)
 
 
-#: Leiden backends ``leiden_sweep`` / ``compute`` accept
+#: Leiden backends ``leiden_n_clusters`` / ``compute`` accept
 LEIDEN_FLAVORS = ("igraph", "leidenalg")
 
 #: metrics whose scIB definition is bounded by [0, 1] (scaled LISI, the ASW
 #: family, graph connectivity); ``compute`` clips them to that range
-BOUNDED_METRICS = ("ASW", "iASW", "cLISI", "ASW_batch", "GC", "iLISI")
+BOUNDED_METRICS = ("ASW", "iASW", "cLISI", "ASW_batch", "ARI_batch", "NMI_batch",
+                   "GC", "iLISI")
 
 #: distance from 0 (and, for BOUNDED_METRICS, from 1) below which a value is
 #: floating-point residue and recorded as the bound: an iLISI of 2.2e-16 next to
@@ -223,7 +231,7 @@ def _resolve_flavor(flavor) -> str:
             warnings.warn(
                 f"scanpy {version('scanpy')} cannot run flavor='igraph' "
                 f"(needs scanpy>=1.10 and the igraph package); using leidenalg for "
-                f"this process - same metrics, slower sweep", UserWarning, stacklevel=3)
+                f"this process - same metrics, slower clustering", UserWarning, stacklevel=3)
             _fallback_warned = True
         return "leidenalg"
     return flavor
@@ -271,12 +279,103 @@ def _build_adata(emb, celltype, cluster, batch):
     return adata
 
 
-def leiden_sweep(emb, *, flavor=None):
-    """Run the scIB optimal-resolution Leiden sweep once, for reuse.
+def _clustering_graph(emb):
+    """An AnnData with the kNN graph the article clusters on (SINFONIA.py):
+    NaN read as 0, then ``sc.pp.neighbors`` with scanpy's defaults, which use
+    the first 50 principal components of an embedding wider than 50."""
+    import anndata as ad
+    import scanpy as sc
+    x = np.array(emb)
+    x = x.astype(x.dtype if np.issubdtype(x.dtype, np.floating) else float)
+    x[np.isnan(x)] = 0
+    adata = ad.AnnData(x)
+    rep = "X"
+    if x.shape[1] > _N_PCS:
+        sc.pp.pca(adata, n_comps=_N_PCS)
+        rep = "X_pca"
+    _neighbors(adata, rep)
+    return adata
 
+
+def _search_n_clusters(adata, n: int, key: str, flavor: str) -> bool:
+    """Leiden into ``adata.obs[key]`` at the resolution that gives ``n`` clusters,
+    bisected as ``sinfonia.get_N_clusters`` does. False when no step gave ``n``:
+    the last step's clustering is then kept."""
+    lo, hi = _SEARCH_RANGE
+    with contextlib.redirect_stdout(io.StringIO()), warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for _ in range(_SEARCH_STEPS):
+            res = lo + (hi - lo) / 2
+            _leiden(adata, res, key, flavor)
+            found = adata.obs[key].nunique()
+            if found > n:
+                hi = res
+            elif found < n:
+                lo = res
+            else:
+                return True
+    return False
+
+
+def _n_clusters(graph, n: int, flavor: str, per: str | None = None) -> np.ndarray:
+    """The searched clusters of ``graph`` as strings, with a warning when no
+    resolution gave ``n``; ``per`` names what each cluster stands for."""
+    key = "_mb_search"
+    if not _search_n_clusters(graph, n, key, flavor):
+        got = graph.obs[key].nunique()
+        what = f"{n} clusters" + (f", one per {per}" if per else "")
+        warnings.warn(f"No Leiden resolution gave {what}; using the {got} clusters "
+                      f"of the last try.", UserWarning, stacklevel=3)
+    out = np.asarray(graph.obs[key].astype(str))
+    del graph.obs[key]
+    return out
+
+
+def leiden_n_clusters(emb, n: int, *, flavor=None) -> np.ndarray:
+    """Cluster an embedding with Leiden at the resolution that gives ``n`` clusters.
+
+    The article's clustering: a kNN graph with scanpy's defaults (on the
+    first 50 principal components when the embedding has more than 50
+    dimensions), and the resolution bisected on [0, 3] for at most 30 steps
+    until there are ``n`` clusters, as ``sinfonia.get_N_clusters``.
+
+    Parameters
+    ----------
+    emb : array-like
+        Embedding, cells x dims. NaN counts as 0.
+    n : int
+        Number of clusters wanted, such as the number of cell types.
+    flavor : {None, "igraph", "leidenalg"}
+        Leiden backend. ``None`` (default) reads ``config.DEFAULT.leiden_flavor``
+        (``"igraph"``: scanpy's igraph backend with ``n_iterations=2``,
+        ``directed=False``; ``"leidenalg"``: scanpy's default before 1.10).
+
+    Returns
+    -------
+    numpy.ndarray
+        One cluster id (a string) per cell.
+
+    Raises
+    ------
+    ValueError
+        ``flavor`` is neither ``"igraph"`` nor ``"leidenalg"``.
+
+    Warns
+    -----
+    UserWarning
+        No resolution gave ``n`` clusters; the clusters of the last step are
+        returned.
+    """
+    flavor = _resolve_flavor(flavor)
+    return _n_clusters(_clustering_graph(emb), int(n), flavor)
+
+
+def leiden_sweep(emb, *, flavor=None):
+    """Run the scIB optimal-resolution Leiden sweep once (deprecated).
+
+    Deprecated: use :func:`leiden_n_clusters`, the article's clustering.
     The clustering at each of the 10 resolutions depends only on the
-    embedding; labels enter only through the argmax NMI, so ranking N label
-    orderings needs one sweep, not N.
+    embedding.
 
     Parameters
     ----------
@@ -304,6 +403,8 @@ def leiden_sweep(emb, *, flavor=None):
     """
     from scib.metrics.clustering import get_resolutions
 
+    warnings.warn("leiden_sweep is deprecated and will be removed in 0.5. "
+                  "Use leiden_n_clusters.", FutureWarning, stacklevel=2)
     flavor = _resolve_flavor(flavor)
     import anndata as ad
     adata = ad.AnnData(np.asarray(emb, dtype=float))
@@ -318,58 +419,25 @@ def leiden_sweep(emb, *, flavor=None):
     return adata, keys
 
 
-def _isolated_labels_f1(adata, label_key, batch_key, embed, iso_threshold,
-                        precomputed_keys=None, flavor=None):
-    """scib's isolated-label F1 without its per-label re-clustering.
-
-    scib re-runs the same 10-resolution sweep for every label; the clustering
-    does not depend on the label, so each resolution is clustered once here and
-    each label takes its best F1 over them (pinned to scib's result in
-    ``tests/test_eval_isolated_f1.py``).
-    """
+def _isolated_labels_f1(adata, label_key, batch_key, cluster_key, iso_threshold):
+    """Isolated-label F1 of the clustering ``adata.obs[cluster_key]``: for each
+    isolated label, the best F1 of one cluster, averaged over labels. scib's
+    ``isolated_labels_f1`` with that clustering precomputed (pinned in
+    ``tests/test_eval_isolated_f1.py``)."""
     from sklearn.metrics import f1_score
-    from scib.metrics.clustering import get_resolutions
     from scib.metrics.isolated_labels import get_isolated_labels
 
     labels = get_isolated_labels(adata, label_key, batch_key, iso_threshold,
                                  verbose=False)
     if len(labels) == 0:
         return float("nan")
-
-    if precomputed_keys:
-        # the caller's identical sweep on this adata
-        keys = list(precomputed_keys)
-        owned = False
-    else:
-        flavor = _resolve_flavor(flavor)
-        _neighbors(adata, embed)
-        resolutions = get_resolutions(n=10, max=2)
-        keys = []
-        for res in resolutions:
-            key = f"_mb_isof1_{res}"
-            _leiden(adata, res, key, flavor)
-            keys.append(key)
-        owned = True
-
-    try:
-        scores = []
-        for label in labels:
-            y_true = (adata.obs[label_key] == label).values
-            best = 0.0
-            for key in keys:
-                col = adata.obs[key]
-                for cluster in col.unique():
-                    # the argument order of scib's max_f1
-                    f1 = f1_score((col == cluster).values, y_true)
-                    if f1 > best:
-                        best = f1
-            scores.append(best)
-    finally:
-        if owned:
-            for key in keys:
-                if key in adata.obs:
-                    del adata.obs[key]
-
+    col = adata.obs[cluster_key]
+    scores = []
+    for label in labels:
+        y_true = (adata.obs[label_key] == label).values
+        # the argument order of scib's max_f1
+        scores.append(max([0.0] + [f1_score((col == c).values, y_true)
+                                   for c in col.unique()]))
     return float(np.mean(scores))
 
 
@@ -394,8 +462,8 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
     celltype : array-like
         Cell-type label per cell.
     cluster : array-like or None
-        Precomputed cluster assignment; ``None`` derives one with the scIB
-        optimal-resolution Leiden sweep (10 resolutions, argmax NMI).
+        Precomputed cluster assignment for ARI, NMI, ASW, iASW and iF1;
+        ``None`` derives one with :func:`leiden_n_clusters` (one cluster per cell type).
     batch : array-like
         Batch label per cell (a constant vector is fine for clustering-only).
     group : {"clustering", "batch", "all"}
@@ -403,31 +471,33 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
     slow_metrics : bool
         Also compute kBET (shells out to R).
     only : collection of str, optional
-        Compute only the named metrics, e.g. ``only={"ARI"}``; the Leiden
-        sweep runs only when one of them needs it (ARI, NMI, iF1).
+        Compute only the named metrics, e.g. ``only={"ARI"}``; Leiden runs
+        only when one of them needs it (ARI, NMI, ASW, iASW, iF1, ARI_batch,
+        NMI_batch).
     verbose : bool, keyword-only, optional
-        Print one stderr line when the Leiden sweep starts. ``None``
+        Print one stderr line when the Leiden clustering starts. ``None``
         (default): only for embeddings with more than 2,000 cells; ``True``
         always; ``False`` never.
     flavor : {None, "igraph", "leidenalg"}
-        Leiden backend for the resolution sweep. ``None`` (default) reads
-        ``config.DEFAULT.leiden_flavor``; see :func:`leiden_sweep`.
+        Leiden backend. ``None`` (default) reads
+        ``config.DEFAULT.leiden_flavor``; see :func:`leiden_n_clusters`.
 
     Returns
     -------
     pandas.DataFrame
         ``metric.csv``-shaped: index = metric, one column ``Value``.
-        ``attrs["leiden_flavor"]`` is the sweep's backend (``None`` when no
-        sweep ran); ``attrs["clustering"]`` is where the clusters ARI and
-        NMI scored came from: ``"user"``, ``"sweep"``, or ``None`` without
-        ARI and NMI.
+        ``attrs["leiden_flavor"]`` is the Leiden backend (``None`` when
+        Leiden did not run); ``attrs["clustering"]`` is where the clusters
+        of ARI, NMI, ASW, iASW and iF1 came from: ``"user"``, ``"search"``, or
+        ``None`` without those metrics. ARI_batch and NMI_batch need two or
+        more batches.
 
     Notes
     -----
     Values within ``1e-12`` of 0 are recorded as ``0.0``. The metrics
-    bounded by [0, 1] (``ASW``, ``iASW``, ``cLISI``, ``ASW_batch``, ``GC``,
-    ``iLISI``) are clipped to that range, with values within ``1e-12`` of 1
-    recorded as ``1.0``. An iLISI of ``2.2e-16`` is therefore ``0.0``.
+    bounded by [0, 1] (``ASW``, ``iASW``, ``cLISI``, ``ASW_batch``,
+    ``ARI_batch``, ``NMI_batch``, ``GC``, ``iLISI``) are clipped to that
+    range, with values within ``1e-12`` of 1 recorded as ``1.0``. An iLISI of ``2.2e-16`` is therefore ``0.0``.
     """
     if only is not None:
         only = set(only)
@@ -453,46 +523,43 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
     adata = _build_adata(emb, celltype, cluster, batch)
     _neighbors(adata, "X_emb")
 
-    needs_clustering = only is None or bool(only & {"ARI", "NMI"})
-    needs_isof1 = group in ("clustering", "all") and (only is None or "iF1" in only)
-    sweep_keys = []
-    if group in ("clustering", "all") and (
-            (cluster is None and needs_clustering) or needs_isof1):
-        # one sweep serves the cluster choice (argmax NMI, as
-        # scib.cluster_optimal_resolution) and iF1; scanpy's per-resolution
-        # output is muted
-        from scib.metrics.clustering import get_resolutions
+    want_clu = group in ("clustering", "all")
+    want_bat = group in ("batch", "all")
+
+    def wanted(names):
+        return [m for m in names if only is None or m in only]
+
+    n_batches = int(adata.obs["batch"].nunique())
+    # the article's clusterings: one per cell type, and one per batch for
+    # ARI_batch and NMI_batch (scored only with two or more batches)
+    search_ct = want_clu and cluster is None and bool(wanted(_CLUSTER_METRICS))
+    search_bat = want_bat and n_batches >= 2 and bool(wanted(_BATCH_CLUSTER_METRICS))
+    leiden_ran = search_ct or search_bat
+    if leiden_ran:
         flavor = _resolve_flavor(flavor)
         if verbose or (verbose is None and n > _SWEEP_NOTICE_CELLS):
             import sys
-            needs = [m for m in ("ARI", "NMI")
-                     if cluster is None and (only is None or m in only)] \
-                + (["iF1"] if needs_isof1 else [])
             from .. import config
+            needs = ((wanted(_CLUSTER_METRICS) if search_ct else [])
+                     + (wanted(_BATCH_CLUSTER_METRICS) if search_bat else []))
             names = config._and_list(needs)
-            # clustering= spares the sweep only when iF1 does not need it
-            skip = (config.hint(f"metrics= without {names}",
-                                f"--metrics without {names}")
-                    if "iF1" in needs else
-                    config.hint(f"clustering=, or metrics= without {names}",
-                                f"--clustering, or --metrics without {names}"))
-            print(f"Clustering {n:,} cells at 10 resolutions for {names}, with "
-                  f"the {flavor} Leiden backend. This takes from seconds to a few "
-                  f"minutes. To skip it, pass {skip}.",
-                  file=sys.stderr, flush=True)
-        with contextlib.redirect_stdout(io.StringIO()), warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            for res in get_resolutions(n=10, max=2):
-                key = f"_mb_res_{res}"
-                _leiden(adata, res, key, flavor)
-                sweep_keys.append(key)
-            if cluster is None and needs_clustering:
-                best_key, best_nmi = None, -1.0
-                for k in sweep_keys:
-                    v = float(me.nmi(adata, cluster_key=k, label_key="celltype"))
-                    if v > best_nmi:
-                        best_nmi, best_key = v, k
-                adata.obs["cluster"] = adata.obs[best_key].values
+            # clustering= replaces only the cell-type clusters
+            skip = (config.hint(f"clustering=, or metrics= without {names}",
+                                f"--clustering, or --metrics without {names}")
+                    if set(needs) <= set(_CLUSTER_METRICS) else
+                    config.hint(f"metrics= without {names}",
+                                f"--metrics without {names}"))
+            print(f"Clustering {n:,} cells for {names} with the {flavor} Leiden "
+                  f"backend. This takes from seconds to a few minutes. To skip it, "
+                  f"pass {skip}.", file=sys.stderr, flush=True)
+    if search_ct or search_bat:
+        graph = _clustering_graph(emb)
+        if search_ct:
+            adata.obs["cluster"] = pd.Categorical(_n_clusters(
+                graph, adata.obs["celltype"].nunique(), flavor, "cell type"))
+        if search_bat:
+            adata.obs["batch_cluster"] = pd.Categorical(_n_clusters(
+                graph, n_batches, flavor, "batch"))
     out: dict[str, float] = {}
 
     def _safe(name, fn):
@@ -519,26 +586,24 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
             )
             out[name] = float("nan")
 
-    want_clu = group in ("clustering", "all")
-    want_bat = group in ("batch", "all")
-
     if want_clu:
         _safe("ARI", lambda: me.ari(adata, cluster_key="cluster", label_key="celltype"))
         _safe("NMI", lambda: me.nmi(adata, cluster_key="cluster", label_key="celltype"))
-        _safe("ASW", lambda: me.silhouette(adata, label_key="celltype", embed="X_emb"))
-        # every cell type counts as isolated: scib's default scores none when
-        # every type is in every batch, and n_batches + 1 clears its check
-        iso_threshold = int(adata.obs["batch"].nunique()) + 1
-        _safe("iASW", lambda: me.isolated_labels_asw(adata, batch_key="batch", label_key="celltype",
+        _safe("ASW", lambda: me.silhouette(adata, label_key="cluster", embed="X_emb"))
+        # every label counts as isolated: scib's default scores none when every
+        # one is in every batch, and n_batches + 1 clears its check
+        iso_threshold = n_batches + 1
+        _safe("iASW", lambda: me.isolated_labels_asw(adata, batch_key="batch", label_key="cluster",
                                                      embed="X_emb", iso_threshold=iso_threshold))
         _safe("iF1", lambda: _isolated_labels_f1(adata, label_key="celltype",
-                                                 batch_key="batch", embed="X_emb",
-                                                 iso_threshold=iso_threshold,
-                                                 precomputed_keys=sweep_keys or None,
-                                                 flavor=flavor))
+                                                 batch_key="batch", cluster_key="cluster",
+                                                 iso_threshold=iso_threshold))
         _safe("cLISI", lambda: me.clisi_graph(adata, label_key="celltype", type_="embed", use_rep="X_emb"))
     if want_bat:
         _safe("ASW_batch", lambda: me.silhouette_batch(adata, batch_key="batch", label_key="celltype", embed="X_emb"))
+        if n_batches >= 2:
+            _safe("ARI_batch", lambda: 1 - abs(me.ari(adata, cluster_key="batch_cluster", label_key="batch")))
+            _safe("NMI_batch", lambda: 1 - abs(me.nmi(adata, cluster_key="batch_cluster", label_key="batch")))
         _safe("GC", lambda: me.graph_connectivity(adata, label_key="celltype"))
         _safe("iLISI", lambda: me.ilisi_graph(adata, batch_key="batch", type_="embed", use_rep="X_emb"))
         # opt-in: kBET runs in R and takes hours at 10-30k cells
@@ -546,8 +611,8 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
             _safe("kBET", lambda: me.kBET(adata, batch_key="batch", label_key="celltype", type_="embed", embed="X_emb"))
 
     frame = pd.DataFrame.from_dict(out, orient="index", columns=["Value"])
-    scored_clusters = want_clu and any(m in out for m in ("ARI", "NMI"))
-    frame.attrs["leiden_flavor"] = flavor if sweep_keys else None
+    scored_clusters = want_clu and any(m in out for m in _CLUSTER_METRICS)
+    frame.attrs["leiden_flavor"] = flavor if leiden_ran else None
     frame.attrs["clustering"] = (None if not scored_clusters
-                                 else "user" if cluster is not None else "sweep")
+                                 else "user" if cluster is not None else "search")
     return frame

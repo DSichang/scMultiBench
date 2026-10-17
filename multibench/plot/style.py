@@ -271,8 +271,9 @@ def backend_warning(df: pd.DataFrame) -> str | None:
     """The message for igraph-scored rows plotted next to stored rows, else ``None``.
 
     The stored tables were clustered with leidenalg. A row is affected when
-    its ``scored_with`` starts with ``igraph/`` and its metric came from the
-    sweep: iF1 always, ARI and NMI when the clusters part is ``sweep``.
+    its ``scored_with`` starts with ``igraph/`` and its metric came from
+    Leiden: iF1, ARI_batch and NMI_batch always; ARI, NMI, ASW and iASW when
+    the clusters part is ``search`` (ARI and NMI also ``sweep``, before 0.4).
     Rows without ``scored_with`` (NaN) never trigger it. With a ``dataset``
     column, a row counts only when the frame holds a stored row of the same
     dataset: rows from a dataset with no stored rows are compared with no
@@ -287,9 +288,11 @@ def backend_warning(df: pd.DataFrame) -> str | None:
     parts = df["scored_with"].astype("string").str.split("/")
     flavor = parts.str[0].fillna("")
     clusters = parts.str[1].fillna("")
+    metric = df["metric"]
     hit = (flavor == "igraph") & (
-        (df["metric"] == "iF1")
-        | (df["metric"].isin(["ARI", "NMI"]) & (clusters == "sweep")))
+        metric.isin(["iF1", "ARI_batch", "NMI_batch"])
+        | (metric.isin(["ARI", "NMI", "ASW", "iASW"]) & (clusters == "search"))
+        | (metric.isin(["ARI", "NMI"]) & (clusters == "sweep")))
     if "dataset" in df.columns:
         hit &= df["dataset"].isin(df.loc[stored, "dataset"].dropna().unique())
     if not hit.any():

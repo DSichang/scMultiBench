@@ -41,17 +41,16 @@ def test_only_does_not_change_the_metric_value():
                                                         abs=1e-12)
 
 
-def test_only_skips_the_leiden_sweep_when_nothing_needs_it():
-    """ASW needs no clustering; asking for it alone must not pay for the sweep."""
-    import time
+def test_only_skips_the_leiden_sweep_when_nothing_needs_it(monkeypatch):
+    """cLISI needs no clustering; asking for it alone must not run Leiden."""
     emb, lab, bat = _blobs(n_per=250, n_labels=6, dims=12)
-    t0 = time.time()
-    escib.compute(emb, lab, None, bat, group="clustering", only={"ASW"})
-    t_slim = time.time() - t0
-    t0 = time.time()
+    calls = []
+    real = escib._leiden
+    monkeypatch.setattr(escib, "_leiden", lambda *a, **k: (calls.append(1), real(*a, **k)))
+    escib.compute(emb, lab, None, bat, group="clustering", only={"cLISI"})
+    assert calls == []
     escib.compute(emb, lab, None, bat, group="clustering", only={"ARI"})
-    t_ari = time.time() - t0
-    assert t_slim < t_ari, f"ASW-only ({t_slim:.2f}s) did not skip the sweep ({t_ari:.2f}s)"
+    assert calls
 
 
 def test_best_order_still_returns_the_full_metric_set():

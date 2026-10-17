@@ -41,7 +41,7 @@ def _user_warnings(fn, *args, **kw):
 
 def test_evaluate_records_the_installed_scib():
     emb, lab = _blobs()
-    wide = mtb.evaluate(emb, labels=lab, metrics=["ASW"])
+    wide = mtb.evaluate(emb, labels=lab, metrics=["cLISI"])
     assert wide.attrs["scib_version"] == version("scib")
     long = mtb.to_long(wide, method="M")
     assert long.attrs["scib_version"] == version("scib")
@@ -67,8 +67,9 @@ def test_evaluate_notes_name_each_neighbourhood():
                      "15-neighbour graph") == 2
     assert "nearest by path length on it" not in doc
     assert "k0 = 90 neighbours" not in doc
-    assert ("the Leiden sweep (ARI, NMI, iF1) and GC use scanpy's default neighbour "
-            "graph (15 neighbours)") in doc
+    assert ("the cluster search (ARI, NMI, ASW, iASW, iF1, ARI_batch, NMI_batch) uses "
+            "scanpy's default 15-neighbour graph without ``use_rep``") in doc
+    assert "GC uses the 15-neighbour graph of the embedding" in doc
     assert "ARI can be slightly below 0, which means a random clustering" in doc
     # the table is a fenced block: a trailing '::' rendered as text on the site
     assert not [ln for ln in inspect.getdoc(pipeline.evaluate).splitlines()

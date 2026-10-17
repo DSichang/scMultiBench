@@ -83,15 +83,15 @@ def test_evaluate_takes_the_labels_for_dict_as_is(tmp_path, method, category, fi
     emb = _stacked_dataset(tmp_path, files, order)
     d = mtb.labels_for("SYN", category, method, data_path=tmp_path)
     assert list(d) == order
-    got = mtb.evaluate(emb, labels=d, metrics=["ASW"], verbose=False)
-    ref = mtb.evaluate(emb, labels=[d[k] for k in order], metrics=["ASW"], verbose=False)
+    got = mtb.evaluate(emb, labels=d, metrics=["ARI"], verbose=False)
+    ref = mtb.evaluate(emb, labels=[d[k] for k in order], metrics=["ARI"], verbose=False)
     pd.testing.assert_frame_equal(got, ref)
-    assert float(got.loc["ASW", "Value"]) > 0.9
+    assert float(got.loc["ARI", "Value"]) > 0.9
     # the fixture can tell the orders apart: the default order scores worse
     default = mtb.labels_for("SYN", data_path=tmp_path)
     assert list(default) != order
-    worse = mtb.evaluate(emb, labels=list(default.values()), metrics=["ASW"], verbose=False)
-    assert float(worse.loc["ASW", "Value"]) < float(got.loc["ASW", "Value"]) - 0.1
+    worse = mtb.evaluate(emb, labels=list(default.values()), metrics=["ARI"], verbose=False)
+    assert float(worse.loc["ARI", "Value"]) < float(got.loc["ARI", "Value"]) - 0.1
 
 
 def test_a_copied_or_reordered_dict_is_checked_like_any_dict(tmp_path):

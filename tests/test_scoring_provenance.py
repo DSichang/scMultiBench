@@ -21,7 +21,8 @@ def _doc(obj):
 def test_load_results_says_how_rerun_rows_were_scored():
     doc = _doc(results.load_results)
     assert ("Re-run rows were scored by multibench 0.2.1's ``evaluate`` with the "
-            "leidenalg backend and every cell type counted as isolated") in doc
+            "leidenalg backend, every cell type counted as isolated and an earlier "
+            "clustering protocol") in doc
     assert 'mtb.config.DEFAULT.leiden_flavor = "leidenalg"' in doc
 
 
@@ -34,7 +35,7 @@ def test_evaluate_lists_the_metric_definitions():
     doc = _doc(pipeline.evaluate)
     assert "**Metric definitions.**" in doc
     assert "iso_threshold = number of batches + 1" in doc
-    assert "scanpy's default neighbour graph (15 neighbours)" in doc
+    assert "scanpy's default 15-neighbour graph without ``use_rep``" in doc
     for fn in ("isolated_labels_asw", "clisi_graph", "silhouette_batch",
                "graph_connectivity", "ilisi_graph"):
         assert fn in doc, fn

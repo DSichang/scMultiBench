@@ -62,13 +62,13 @@ def test_exact_column_name_wins():
     a = _adata(emb, **{"x": wrong, "obs:x": lab})
     assert pipeline._obs_column_name("obs:x", a) == "obs:x"
     assert pipeline._obs_column_name("x", a) == "x"
-    good = mtb.evaluate(a, labels="obs:x", metrics=["ASW"])
-    _same(good, mtb.evaluate(emb, labels=lab, metrics=["ASW"]))
-    bad = mtb.evaluate(a, labels="x", metrics=["ASW"])
-    _same(bad, mtb.evaluate(emb, labels=wrong, metrics=["ASW"]))
-    assert good.loc["ASW", "Value"] > bad.loc["ASW", "Value"] + 0.2
+    good = mtb.evaluate(a, labels="obs:x", metrics=["ARI"])
+    _same(good, mtb.evaluate(emb, labels=lab, metrics=["ARI"]))
+    bad = mtb.evaluate(a, labels="x", metrics=["ARI"])
+    _same(bad, mtb.evaluate(emb, labels=wrong, metrics=["ARI"]))
+    assert good.loc["ARI", "Value"] > bad.loc["ARI", "Value"] + 0.2
     # obs:obs:x reaches it too, through the prefix
-    _same(mtb.evaluate(a, labels="obs:obs:x", metrics=["ASW"]), good)
+    _same(mtb.evaluate(a, labels="obs:obs:x", metrics=["ARI"]), good)
     # the obs of a MuData names its columns <modality>:<column>
     m = _adata(emb, **{"rna:celltype": lab, "celltype": wrong, "rna:sample": _donors()})
     got = mtb.evaluate(m, labels="rna:celltype", batch="rna:sample", metrics=METRICS)

@@ -99,21 +99,20 @@ def test_verbose_sweep_notice(capsys, monkeypatch):
     monkeypatch.setattr(mscib, "_SWEEP_NOTICE_CELLS", 0)  # every sweep now counts as long
     evaluate(emb, labels=lab, metrics=["ARI"])            # default verbose=True announces it
     err = capsys.readouterr().err
-    assert re.search(r"Clustering 120 cells at 10 resolutions for ARI, with the "
+    assert re.search(r"Clustering 120 cells for ARI with the "
                      r"(igraph|leidenalg) Leiden backend\.", err)
     assert "To skip it, pass clustering=, or metrics= without ARI." in err
-    # with a clustering given the sweep serves iF1 alone: the notice names
-    # only iF1 and does not suggest the clustering= that was already passed
-    evaluate(emb, labels=lab, clustering=lab)
+    # with batches, the batch clusters are named and clustering= is not offered
+    evaluate(emb, labels=lab, clustering=lab, batch=np.arange(len(lab)) % 2,
+             metrics=["NMI_batch"])
     err = capsys.readouterr().err
-    assert "Clustering 120 cells at 10 resolutions for iF1, with the " in err
-    assert err.rstrip().endswith("To skip it, pass metrics= without iF1.")
-    assert "clustering=" not in err and "ARI" not in err and "NMI" not in err
-    evaluate(emb, labels=lab, clustering=lab, metrics=["ARI", "NMI"])   # nothing left to sweep for
+    assert "Clustering 120 cells for NMI_batch with the " in err
+    assert err.rstrip().endswith("To skip it, pass metrics= without NMI_batch.")
+    evaluate(emb, labels=lab, clustering=lab)               # nothing left to cluster
     assert "Leiden" not in capsys.readouterr().err
     evaluate(emb, labels=lab, metrics=["ARI"], verbose=False)
     assert "Leiden" not in capsys.readouterr().err
-    evaluate(emb, labels=lab, metrics=["ASW"])            # no sweep needed
+    evaluate(emb, labels=lab, metrics=["cLISI"])          # no clustering needed
     assert "Leiden" not in capsys.readouterr().err
 
 
@@ -122,7 +121,7 @@ def test_docstrings_match_the_code():
     assert "is used as it is, in the order ``labels_for`` gave it" in doc
     assert "any other dict goes in as is only in the default order" in doc
     assert "otherwise needs ``label_order=``" in doc
-    assert "Leiden sweep" in doc and "minutes for ~10^4" in doc
+    assert "Leiden clustering" in doc and "minutes for ~10^4" in doc
     assert "v1" not in doc
     assert "verbose" in doc and "2,000 cells" in doc
     import multibench.plot as mplot

@@ -46,7 +46,7 @@ def _scib_version() -> str | None:
 
 
 def _scored_with(attrs) -> str | None:
-    """``"leidenalg/sweep/0.3.2"`` (plus ``"/270 of 300 cells"`` after a drop)
+    """``"leidenalg/search/0.4.0"`` (plus ``"/270 of 300 cells"`` after a drop)
     from evaluate()'s ``attrs``; ``None`` when the frame carries none."""
     if not attrs or attrs.get("multibench_version") is None:
         return None
@@ -133,13 +133,14 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     instead of being scored.
 
     **Provenance.** The ``scored_with`` column of a frame from
-    ``mtb.evaluate`` reads like ``"leidenalg/sweep/0.3.2"``: the Leiden
-    backend, where the clusters came from (``sweep`` or ``user``) and the
+    ``mtb.evaluate`` reads like ``"leidenalg/search/0.4.0"``: the Leiden
+    backend, where the clusters came from (``search`` or ``user``;
+    ``sweep`` before 0.4, the best-NMI resolution of a sweep) and the
     package version; ``none`` fills a part that did not apply. The same
     three values and ``scib_version`` are in ``attrs``.
 
     Scores of the labelled cells only (``missing_labels="drop"`` left cells
-    out) have a fourth part, such as ``"igraph/sweep/0.3.5/270 of 300
+    out) have a fourth part, such as ``"igraph/search/0.4.0/270 of 300
     cells"``, and ``cells_scored`` and ``cells_total`` in ``attrs``.
 
     Any other frame, such as a hand-made one or a wide CSV read back, gets
@@ -1002,7 +1003,8 @@ def evaluate(
         as ``["ARI", "NMI"]``.
     clustering
         Precomputed cluster assignment, in the forms ``labels`` accepts or an
-        ``.h5`` path; ``None`` = derive one with the Leiden sweep.
+        ``.h5`` path, used for ARI, NMI, ASW, iASW and iF1; ``None`` = Leiden
+        clusters, one per cell type.
     obsm : str
         ``.obsm`` key of an AnnData, MuData or ``.h5ad`` ``output``, such as
         ``'X_pca'``; ``'X'`` means ``.X``.
@@ -1011,7 +1013,7 @@ def evaluate(
         subset selects those files. ``None`` works for an unchanged
         ``mtb.labels_for`` dict (Notes).
     verbose : bool
-        ``True`` prints one stderr line when the Leiden sweep starts on more
+        ``True`` prints one stderr line when the Leiden clustering starts on more
         than 2,000 cells, and one when labels, batches or clusters are put
         in the row order of a ``.csv`` / ``.tsv`` output by barcode;
         ``False`` never prints.
@@ -1051,8 +1053,8 @@ def evaluate(
     >>> import multibench as mtb
     >>> labels = mtb.labels_for("D11")                    # {'cty': '.../cty.csv'}
     >>> scores = mtb.evaluate(res.output, labels=labels)  # res = mtb.run(...)
-    >>> # ASW and cLISI need no Leiden sweep
-    >>> mtb.evaluate(res.output, labels=labels, metrics=["ASW", "cLISI"])
+    >>> # cLISI needs no Leiden clustering
+    >>> mtb.evaluate(res.output, labels=labels, metrics=["cLISI"])
     >>> mtb.evaluate(adata, labels="celltype", obsm="X_pca")
     >>> mtb.evaluate(mdata, labels="celltype", batch="sample", obsm="X_joint",
     ...              metrics="all")
@@ -1118,7 +1120,8 @@ def evaluate(
     scored need a batch.
 
     **Metric selection.** ``None`` computes the clustering family (``ARI,
-    NMI, ASW, iASW, iF1, cLISI``), plus ``ASW_batch, GC, iLISI`` when a batch
+    NMI, ASW, iASW, iF1, cLISI``), plus ``ASW_batch, ARI_batch, NMI_batch,
+    GC, iLISI`` when a batch
     vector is available (``batch=`` or a list of label files), plus the
     classification family (``OCA, ACA, Spec, Sens, F1``) when the cells are
     in two or more batches and ``category`` is not ``"vertical"``. kBET is
@@ -1129,25 +1132,27 @@ def evaluate(
       ``"all"`` - all three (``"batch"``, ``"classification"`` and ``"all"``
       need the batch vector or raise);
     - a list of codes - exactly those (case/alias tolerant, ``["ari"]``
-      works); the Leiden sweep runs only when one of them needs it (ARI,
-      NMI, iF1), and ``"kBET"`` in the list turns kBET on.
+      works); Leiden runs only when one of them needs it (ARI, NMI, ASW,
+      iASW, iF1, ARI_batch, NMI_batch), and ``"kBET"`` in the list turns
+      kBET on.
 
     Valid codes: ``mtb.plot.CLUSTERING_METRICS + mtb.plot.BATCH_METRICS +
     mtb.plot.CLASSIFICATION_METRICS``.
     An unknown code raises ``ValueError`` listing the valid ones; a bare
     code string (``metrics="ARI"``) raises and points at the list form.
 
-    **Cost and Leiden backend.** ``ARI``, ``NMI`` and ``iF1`` need the scIB
-    optimal-resolution Leiden sweep (10 resolutions on a kNN graph of the
-    embedding). ``mtb.config.DEFAULT.leiden_flavor`` sets its backend:
-    ``"igraph"`` (default) or ``"leidenalg"``, the classic backend scib
-    itself runs. With ``leidenalg`` the sweep takes tens of seconds for a
-    few thousand cells and minutes for ~10^4; ``igraph`` is several times
+    **Cost and Leiden backend.** The protocol is the article's. ARI, NMI,
+    ASW, iASW and iF1 score Leiden clusters searched to the number of cell
+    types; ARI_batch and NMI_batch, clusters searched to the number of
+    batches. ``mtb.config.DEFAULT.leiden_flavor`` sets the backend:
+    ``"igraph"`` (default) or ``"leidenalg"``, scanpy's default before 1.10.
+    With ``leidenalg`` the clustering takes tens of seconds for a few
+    thousand cells and minutes for ~10^4; ``igraph`` is several times
     faster.
 
     To skip it, name only metrics that do not need it in ``metrics=[...]``
-    (``ASW``, ``iASW``, ``cLISI``, the batch family). ``clustering=``
-    removes the need for ``ARI`` / ``NMI`` only; ``iF1`` always sweeps.
+    (``cLISI``, ``ASW_batch``, ``GC``, ``iLISI``, ``kBET``). ``clustering=``
+    replaces the cell-type clusters only.
 
     **Metric definitions.** All metrics are scaled so that higher is better.
     Most lie between 0 and 1; ARI can be slightly below 0, which means a
@@ -1158,8 +1163,11 @@ def evaluate(
 
     The metrics look at different neighbourhoods:
 
-    - the Leiden sweep (ARI, NMI, iF1) and GC use scanpy's default
-      neighbour graph (15 neighbours);
+    - the cluster search (ARI, NMI, ASW, iASW, iF1, ARI_batch, NMI_batch) uses
+      scanpy's default 15-neighbour graph without ``use_rep``, as the
+      article: the first 50 principal components of an embedding wider than
+      50, NaN read as 0;
+    - GC uses the 15-neighbour graph of the embedding;
     - cLISI and iLISI: scib builds scanpy's 15-neighbour graph from the
       embedding. For each cell it takes the 90 cells with the shortest
       paths on that graph, where the length of an edge is its connectivity
@@ -1168,23 +1176,29 @@ def evaluate(
     - ASW, iASW and ASW_batch use distances in the embedding;
     - kBET builds its own neighbour graph.
 
-    The sweep clusters at 10 resolutions (0.2 to 2.0) and keeps the one with
-    the highest NMI. ``iso_threshold`` = number of batches + 1 counts every
-    cell type as isolated; scib's default counts only types found in few
-    batches.
+    The search bisects the Leiden resolution on [0, 3] for at most 30 steps
+    until it gives the number wanted (``sinfonia.get_N_clusters``); when no
+    step does, the last step's clusters are scored, with a ``UserWarning``.
+    ``iso_threshold`` = number of batches + 1 counts every label as
+    isolated; scib's default counts only labels found in few batches.
 
     The scib call behind each code:
 
     ```text
     code       scib function         arguments
-    ARI, NMI   ari, nmi              Leiden clusters, best sweep resolution
-    ASW        silhouette            cell-type labels; rescaled to 0-1 by scib
-    iASW       isolated_labels_asw   iso_threshold = number of batches + 1
-    iF1        isolated_labels_f1    same threshold; best F1 over the sweep
+    ARI, NMI   ari, nmi              clusters, one per cell type
+    ASW        silhouette            those clusters; rescaled to 0-1 by scib
+    iASW       isolated_labels_asw   those clusters; iso_threshold = number
+                                     of batches + 1
+    iF1        isolated_labels_f1    cell types, same threshold; best F1
+                                     of one of those clusters
     cLISI      clisi_graph           type_="embed"; 90 nearest by path over
                                      the connectivity weights of the
                                      15-neighbour graph; scaled to 0-1
     ASW_batch  silhouette_batch      1 - |batch silhouette| per cell type
+    ARI_batch  ari                   1 - |ARI| of clusters, one per batch,
+                                     against the batches
+    NMI_batch  nmi                   1 - |NMI|, the same way
     GC         graph_connectivity    on the 15-neighbour graph
     iLISI      ilisi_graph           type_="embed"; 90 nearest by path over
                                      the connectivity weights of the
@@ -1197,7 +1211,9 @@ def evaluate(
     B batches.
 
     The re-run tables were scored by multibench 0.2.1's ``evaluate`` with
-    these definitions and the leidenalg backend. The published tables were
+    the leidenalg backend and an earlier protocol: the clusters of the best
+    NMI of a 10-resolution sweep, iF1 over that sweep, ASW and iASW on the
+    cell types, no ARI_batch or NMI_batch. The published tables were
     computed by the benchmark; see the paper's Methods.
 
     **Batch.** When ``labels`` lists two or more files (or a dict of them)
@@ -1241,10 +1257,10 @@ def evaluate(
 
     **Provenance.** ``attrs`` records how the scores were computed:
 
-    - ``leiden_flavor`` - the backend of the Leiden sweep; ``None`` when no
-      sweep ran;
-    - ``clustering`` - where the clusters ARI and NMI scored came from:
-      ``"sweep"`` or ``"user"``; ``None`` without ARI and NMI;
+    - ``leiden_flavor`` - the Leiden backend; ``None`` when Leiden did not
+      run;
+    - ``clustering`` - where the clusters of ARI, NMI, ASW, iASW and iF1 came
+      from: ``"search"`` or ``"user"``; ``None`` without those metrics;
     - ``multibench_version`` and ``scib_version`` - the installed versions.
 
     ``mtb.to_long`` writes the first three to a ``scored_with`` column.
