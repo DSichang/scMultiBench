@@ -179,7 +179,7 @@ Concerto:
 Matilda:
   repo_url: https://github.com/PYangLab/Matilda
   version: "7d71480"
-  summary: "Multi-task VAE for CITE-seq / SHARE-seq / TEA-seq: one latent space serves dimension reduction and feature selection; supervised - needs labels."
+  summary: "Multi-task VAE for CITE-seq / SHARE-seq / TEA-seq: one latent space serves dimension reduction and cell-type classification; supervised - needs labels."
   reference:
     doi: 10.1093/nar/gkad157
     title: Multi-task learning from multimodal single-cell omics with Matilda
