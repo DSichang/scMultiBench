@@ -178,3 +178,12 @@ def _no_stray_envs(request, monkeypatch):
         return
     from multibench.engine import envs
     monkeypatch.setattr(envs, "other_env_prefix", lambda env, conda=None: None)
+
+
+# ---- the full plan behind scan ----------------------------------------------
+def full_scan(*args, **kwargs):
+    """The plan of ``scan``'s checks, one row per method variant with every
+    column: the frame ``run_all(dry_run=True)`` returns, also without a
+    category. ``mtb.scan`` returns one row per method since 0.4."""
+    from multibench import workflow
+    return workflow._scan(*args, stacklevel=3, **kwargs)[0]
