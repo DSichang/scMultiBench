@@ -351,7 +351,7 @@ def inputs_for(dataset: str, category: str, method: str, *,
     Parameters
     ----------
     dataset : str
-        Dataset folder name under ``data_path``, e.g. ``"D11"``.
+        Dataset folder: a name under ``data_path`` such as ``"D11"``, or a path.
     category : str
         Integration category: ``vertical``, ``diagonal``, ``mosaic`` or
         ``cross``.
@@ -405,117 +405,12 @@ def inputs_for(dataset: str, category: str, method: str, *,
      'cty': '/abs/data/D11/cty.csv'}
     >>> inp = mtb.inputs_for("D11", "vertical", "Matilda",
     ...                      modalities=["rna", "adt"])
-    >>> mtb.run("Matilda", "vertical", inputs=inp, out_dir="out/Matilda_D11")
-    >>> mtb.inputs_for("D28", "diagonal", "scBridge")
-    {'data_dir': '/abs/data/D28/'}
-
-    Notes
-    -----
-    **Variant selection.** With ``modalities``, the variant matching
-    ``(category, modalities)`` is used: exact role tokens first, then
-    ``atac`` standing for ``atac_gas`` / ``atac_peak`` when that leaves
-    exactly one variant. In the second case a representation token must
-    match what the method reads (``method_info(m)['atac']``): SCALEX with
-    ``["rna", "peak"]`` raises ``KeyError``.
-
-    Without ``modalities``, the dataset folder decides between several
-    variants: the one whose input files are all present is used (Matilda on
-    a ``rna.h5 + adt.h5`` folder is its rna+adt variant). Of nested modality
-    sets the largest is used: a folder with ``rna.h5``, ``adt.h5`` and
-    ``atac.h5`` gives scMoMaT's rna+adt+atac variant; pass ``modalities=``
-    for a smaller one. When none qualifies, or several that are not nested,
-    ``mtb.AmbiguousVariantError`` lists the modality sets and the folder
-    contents.
-
-    **Modality tokens.** ``method_info(m)['supports']`` lists each variant's
-    tokens.
-
-    - ``protein`` is another spelling of ``adt``;
-    - ``atac`` stands for either ATAC representation role;
-    - the representation tokens ``atac_peak`` (also ``peak``, ``peaks``) and
-      ``atac_gas`` (also ``gas``, ``gene_activity``) name what the method
-      reads; ``method_info(m)['atac']`` says which one that is.
-
-    An unknown token raises ``ValueError`` naming the vocabulary.
-
-    **File resolution.** The dataset tree is flat
-    (``<data_path>/<dataset>/<file>``). Each role resolves to the file present
-    in the folder: the role token or a known alias. Label roles look for
-    ``.csv`` first. When nothing matches, the role falls back to ``<role>.h5``
-    (``<role>.csv`` for a label role), a path that does not exist (see
-    ``check``).
-
-    Label files: the ``cty`` role of paired data reads ``cty.csv``. An older
-    paired folder may name it ``rna_cty.csv``; that file is read when the
-    folder has neither ``cty.csv`` nor ``atac_cty.csv``.
-
-    ATAC files: vertical methods read ``atac.h5``; ``method_info(m)['atac']``
-    says whether it must hold peaks or gene activity. Diagonal methods read
-    ``atac_peak.h5`` (peaks) and ``atac_gas.h5`` (gene activity). Mosaic
-    methods read ``atac<i>.h5`` (peaks). ``peak.h5``, and ``atac.h5`` for gene
-    activity, are accepted as older names, and so is ``atac_peak<i>.h5``.
-
-    Numbered files: an unnumbered role (``rna``) also takes ``rna1.h5`` when
-    the folder holds no ``rna2.h5``. A folder with ``rna1.h5`` and
-    ``rna2.h5`` is per batch: vertical and diagonal roles stay unresolved,
-    and the error says to export without ``batch=``.
-
-    Diagonal data in several batches: a few diagonal methods (see
-    ``method_info(m)['supports']``) read ``rna<i>.h5`` with ``atac_gas<i>.h5``
-    or ``atac_peak<i>.h5``, labelled by ``rna_cty<i>.csv`` and
-    ``atac_cty<i>.csv``. On a folder that holds every file of such a variant
-    the other diagonal methods find no ``rna.h5``, and no error suggests
-    another export.
-
-    A ``data_dir`` role (scBridge) resolves to the first of
-    ``<dataset>/processed/`` and the dataset folder that holds a ``.h5ad``
-    file; when neither does, to ``processed/`` if that folder exists, else to
-    the dataset folder itself.
-
-    **Absolute paths.** A relative ``data_path`` is resolved against the
-    current directory, and a ``data_dir`` value ends with the path
-    separator: ``mtb.run`` executes the method with ``cwd=out_dir``, where a
-    relative path would point at the wrong place.
-
-    **Missing files.** The error (``check=True``) or warning (``check=None``)
-    names an ATAC-family sibling that is present, e.g. ``atac_peak.h5`` when
-    a vertical variant reads ``atac.h5``, and says when the folder holds
-    per-batch files.
-
-    **Content checks** (``check=True``). The same checks ``mtb.scan``
-    reports per row as ``files_ok`` / ``files_reason``:
-
-    - dataset files: ``ValueError`` when a matrix file is a 10x Genomics
-      ``.h5`` under the name of a dataset file, or holds 0 features or 0
-      cells;
-    - orientation: ``ValueError`` when ``matrix/data`` is stored cells x
-      features;
-    - label length: ``ValueError`` when a label CSV has a different number of
-      rows than the modality file it labels, including the numbered
-      ``cty<i>.csv`` of a cross/mosaic batch and the diagonal ``rna_cty.csv``
-      / ``atac_cty.csv``, or ``rna_cty<i>.csv`` / ``atac_cty<i>.csv`` (read
-      by every evaluation, even when the method does not take them);
-    - ``data_dir`` content: ``FileNotFoundError`` when a file scBridge names
-      inside ``data_dir`` (``rna.h5``, ``atac_gas.h5``, the two label CSVs) is
-      absent;
-    - same cells: ``ValueError`` when Seurat_v5's ``rna.h5`` and
-      ``atac_peak.h5`` hold different cells. Seurat_v5 builds its paired
-      bridge from these two files;
-    - ATAC cell order (diagonal): ``ValueError`` when the ``atac_gas.h5`` a
-      method reads holds other cells than ``atac_peak.h5``, or lists them in
-      another order. ``atac_cty.csv`` follows ``atac_peak.h5``. Barcodes that
-      differ only in a ``-1`` / ``-2`` suffix count as the same cell. The
-      same holds per batch for ``atac_gas<i>.h5`` and ``atac_peak<i>.h5``.
 
     See Also
     --------
     mtb.labels_for : the cell-type label CSVs of the same dataset, in the method's cell order.
-
     mtb.run : consumes the returned dict as ``inputs=``.
-
-    mtb.scan : the same resolution for every method at once, with reasons.
-
-    mtb.describe_layout : the folder layout these roles resolve against.
+    mtb.scan : which methods can run on the folder, with reasons.
     """
     _old_order_error("inputs_for", dataset, category, method)
     dataset, data_path = split_dataset(dataset, data_path)
@@ -1403,7 +1298,7 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     Parameters
     ----------
     dataset : str
-        Dataset folder name under ``data_path``, e.g. ``"D28"``.
+        Dataset folder: a name under ``data_path`` such as ``"D28"``, or a path.
     category : str | None
         Integration category: ``vertical``, ``diagonal``, ``mosaic`` or
         ``cross``; with ``method``, selects the variant whose cell order is
@@ -1459,99 +1354,10 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     >>> mtb.labels_for("D52", "cross", "StabMap")
     {'cty3': '/abs/data/D52/cty3.csv', 'cty1': '/abs/data/D52/cty1.csv',
      'cty2': '/abs/data/D52/cty2.csv'}
-    >>> inp = mtb.inputs_for("D52", "cross", "StabMap")
-    >>> res = mtb.run("StabMap", "cross", inputs=inp, out_dir="out/StabMap_D52")
-    >>> mtb.evaluate(res.output, labels=mtb.labels_for("D52", "cross", "StabMap"))
-
-    Notes
-    -----
-    **Which files.** The benchmark stores cell-type labels as ``*cty*.csv`` in
-    the flat dataset folder, under dataset-specific names (``cty.csv``,
-    ``rna_cty.csv``, ``cty1.csv`` ...). All of them are returned except the
-    tool-specific ``*_scjoint*`` reformats.
-
-    One exception: with ``category`` and ``method``, a variant that reads
-    fewer numbered batches than the folder holds gets only the label files
-    of its batches. UINMF's two-batch cross variant, chosen with
-    ``modalities=["rna1", "rna2", "adt1", "adt2"]``, reads batches 1 and 2,
-    so on ``D52`` the dict holds ``cty1`` and ``cty2``.
-
-    An older paired folder may hold ``rna_cty.csv`` instead of ``cty.csv``.
-    With ``category`` and ``method``, a variant that reads ``cty`` gets that
-    file under the key ``cty``, as ``mtb.inputs_for`` returns it.
-
-    **Default order.** Without ``category`` and ``method``, the order is
-    not alphabetical:
-
-    1. ``cty`` (one file, cells already paired) first;
-    2. numbered ``cty1, cty2, ..., cty10``, in numeric order (batch
-       order);
-    3. modality-named files in the order **rna, adt, atac** (``peak_cty``
-       counts as atac), then by number: ``rna_cty1, rna_cty2, atac_cty1,
-       atac_cty2``. The diagonal methods other than uniPort and Seurat_v5
-       emit the RNA cells first;
-    4. any other ``*cty*`` file, alphabetically, last.
-
-    When a method that can run on the folder (of ``category``, when given)
-    puts the cells in another order, the call without ``method`` warns and
-    names it: an embedding of that method scored against the default order
-    gets wrong scores without an error.
-
-    **Per-method order.** With ``category`` and ``method``, each file goes
-    where the cells it labels sit in that variant's output: the order of its
-    inputs, unless the method's cell order differs. uniPort and Seurat_v5
-    put their ATAC cells before their RNA cells.
-
-    StabMap uses a fixed reference batch for each layout: in cross the last
-    batch (batch 3 of three, batch 2 of two), in mosaic batch 1 or batch 2
-    (``method_info('StabMap')['supports'][i]['reference_batch']``).
-    Its cell order starts with that batch (``cty3, cty1, cty2`` on ``D52``).
-    Number the donor you want as reference accordingly.
-
-    The variant is chosen as ``mtb.inputs_for`` does: by ``modalities=``, else
-    the category's only variant or the one whose files the folder holds (of
-    nested ones, the one with the most modalities). If the choice stays
-    ambiguous, as in a folder that holds label files and no data files, the
-    order is the one that every variant reading the folder's batches gives
-    (StabMap's reference batch first), and the default order when they
-    differ. When no label file pairs with the variant's roles, the default
-    order is used. ``labels_for`` does not raise ``mtb.AmbiguousVariantError``.
-
-    **Passing it to evaluate.** The dict is a ``dict`` subclass that remembers
-    its order, so ``mtb.evaluate(labels=...)`` takes it as is. A copy
-    (``dict(d)``) or a dict whose keys were reordered goes in as is only in
-    the default order; otherwise name the order with ``evaluate``'s
-    ``label_order=``. ``list(labels_for(ds).values())`` is the same files as a
-    list, in the same order, which ``evaluate`` also accepts.
-
-    ``category`` and ``method`` are validated whenever given; either one
-    alone changes nothing.
-
-    **Per-batch folders.** A folder written with ``export_dataset(batch=...)``
-    holds ``rna1.h5``, ``rna2.h5`` ... and ``cty1.csv``, ``cty2.csv`` ....
-    Vertical and diagonal methods read one ``rna.h5`` and one label file.
-    With such a ``category``, ``check=None`` warns and ``check=True`` raises.
-    Export without ``batch=`` and pass the batch column itself, such as
-    ``adata.obs["donor"]``, to ``mtb.run_all(batch=...)`` or
-    ``mtb.evaluate(batch=...)``.
-
-    **Diagonal data in several batches.** A folder with ``rna<i>.h5``,
-    ``atac_gas<i>.h5`` or ``atac_peak<i>.h5``, ``rna_cty<i>.csv`` and
-    ``atac_cty<i>.csv`` is what a few diagonal methods read
-    (``method_info(m)['supports']``), so it raises no per-batch warning. Each
-    label file is one batch for the batch metrics, as for every list of
-    label files: three RNA and three ATAC files give six batches. Pass
-    ``batch=`` to ``mtb.evaluate`` or ``mtb.run_all`` for another grouping,
-    such as RNA against ATAC.
-
-    **Paths.** Paths are absolute. The positional order is ``(dataset,
-    category, method)``, like ``mtb.inputs_for``, ``mtb.scan`` and
-    ``mtb.run_all``.
 
     See Also
     --------
     mtb.inputs_for : the modality files of the same dataset.
-
     mtb.evaluate : scores an embedding against these labels.
     """
     if category is not None and (

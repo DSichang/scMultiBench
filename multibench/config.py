@@ -164,8 +164,9 @@ class Config:
     """Resolved filesystem paths; override fields to point at custom locations.
 
     ``mtb.config.DEFAULT`` is the instance every function reads. Set its
-    fields directly, or pass a path explicitly where a function takes
-    ``data_path=`` / ``result_path=``.
+    fields directly, or set ``MULTIBENCH_DATA_PATH``, ``MULTIBENCH_REPO_PATH``
+    and ``MULTIBENCH_ENVS_DIR`` in the shell; ``multibench config`` prints
+    each path and where it came from.
 
     Attributes
     ----------
@@ -184,12 +185,13 @@ class Config:
         ``mtb.scan`` and ``mtb.run_all`` use it. Default
         ``$MULTIBENCH_DATA_PATH``, else ``<base>/data``.
     leiden_flavor : str
-        Leiden backend of the scIB clustering in ``mtb.evaluate``:
-        ``"igraph"`` (default, faster) or ``"leidenalg"`` (the backend of both
-        stored sources).
+        Leiden backend of the clustering in ``mtb.evaluate``: ``"igraph"``
+        (default, faster) or ``"leidenalg"``. Scores can differ by up to about
+        0.1 between the two.
     envs_dir : pathlib.Path
-        Where the method environment prefixes live (``<envs_dir>/<env>``);
-        resolved on first read (order in Notes).
+        Where the method environments live (``<envs_dir>/<env>``). Default
+        ``$MULTIBENCH_ENVS_DIR``, else the first writable envs folder of the
+        conda on ``PATH``, else ``~/.cache/multibench/envs``.
 
     Examples
     --------
@@ -197,54 +199,6 @@ class Config:
     >>> mtb.config.DEFAULT.data_path = "/scratch/data"
     >>> # before mtb.env.install(...)
     >>> mtb.config.DEFAULT.envs_dir = "/scratch/envs"
-    >>> # the backend of both stored sources, not igraph
-    >>> mtb.config.DEFAULT.leiden_flavor = "leidenalg"
-    >>> cfg = mtb.config.Config(data_path="/data/mine")  # a separate instance
-
-    Notes
-    -----
-    **Environment variables.** Set them in the shell, a job script or a
-    module file, and every process that sees them uses the paths. A value
-    assigned in Python wins over the variable. ``multibench config`` prints
-    each resolved path and where it came from. The variables and the fields
-    they set:
-
-    ```text
-    MULTIBENCH_DATA_PATH   data_path
-    MULTIBENCH_REPO_PATH   repo_path
-    MULTIBENCH_ENVS_DIR    envs_dir
-    ```
-
-    **Where ``<base>`` is.** The repository root in a checkout or editable
-    install (``pyproject.toml`` next to the package). For a wheel install it
-    is the per-user cache ``~/.cache/multibench`` (``$XDG_CACHE_HOME``
-    honoured).
-
-    **Assigning paths.** ``data_path``, ``repo_path`` and ``envs_dir``
-    accept a string and store a ``pathlib.Path``; assigning ``None`` returns
-    the field to its default. Assign ``result_path`` and ``files_path`` as
-    ``pathlib.Path`` objects: ``mtb.load_results`` and ``mtb.catalog`` use
-    them as they are.
-
-    **How ``envs_dir`` is resolved.** Lazily, on first read, from the first
-    of:
-
-    1. the ``MULTIBENCH_ENVS_DIR`` environment variable;
-    2. the first writable envs directory of the conda/mamba found on PATH;
-    3. ``~/.cache/multibench/envs`` (``$XDG_CACHE_HOME`` honoured).
-
-    It is what ``mtb.env.install`` unpacks packed archives into and what the
-    runner's prefix mode activates. The first read may run ``conda info
-    --json`` (once per process, not at import); assigning a value skips
-    the probe.
-
-    **Method scripts.** The first run fetches them from GitHub into
-    ``repo_path`` (``multibench fetch --scripts`` does it ahead). Set
-    ``MULTIBENCH_SCRIPTS_REF`` to a commit or tag to fetch that version
-    instead of the default branch; scripts already present must be at that
-    ref, or runs refuse and ``mtb.scan`` blocks every row.
-    ``multibench config`` and every run record show the commit in use
-    (``scripts_commit``).
 
     See Also
     --------

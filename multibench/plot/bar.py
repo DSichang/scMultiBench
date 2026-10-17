@@ -68,50 +68,14 @@ def bar(long_df: pd.DataFrame, *, metrics=None, top: int | None = None,
     Warns
     -----
     UserWarning
-        Several datasets and a method missing from some of them.
-    UserWarning
-        A dataset holds one method, or no method spans two datasets.
-    UserWarning
-        Rows scored with the igraph Leiden backend are shown with stored rows
-        of their dataset.
-    UserWarning
-        Two methods: "With 2 methods each column only shows which is higher."
+        A method missing from some datasets, a dataset with one method, or a
+        figure of two methods.
 
     Examples
     --------
     >>> import multibench as mtb
-    >>> # every dataset of the category that has a stored table
     >>> df = mtb.load_results("diagonal")
     >>> fig = mtb.plot.bar(df, metrics="clustering", top=10, save="clustering.png")
-    >>> fig = mtb.plot.bar(res.long, metrics="classification")   # res: mtb.run_all
-
-    Notes
-    -----
-    **Whiskers, dots and x label.**
-
-    - Whiskers (``overall="mean_overall"``): the SD of the per-dataset
-      scores; a method present in one dataset gets none - there is no spread
-      to show.
-    - Dots (``overall="mean_overall"``): one dot per dataset score.
-    - Under ``overall="rank"`` the bar is not a mean of per-dataset scores,
-      so neither whiskers nor dots are drawn.
-    - X label: the single dataset, or the formula and the number of
-      datasets.
-
-    **Reading the score.** It is rank-based, so it is only meaningful
-    relative to the other methods in the same figure. A method lacking a
-    metric is compared on the metrics it has under ``"mean_overall"``;
-    under ``"rank"`` the missing cell is rank 0 in that dataset.
-
-    **Input.** Concatenate several datasets' frames to summarise across
-    them; ``mtb.to_long`` and the ``BatchResult.long`` property give the same
-    frame for your own runs. ``metrics`` is case- and alias-tolerant
-    (``"ari"`` -> ``"ARI"``).
-
-    **Shared rules.** The Overall formulas, the tie-break shared with
-    ``mtb.plot.bubble`` and the warnings are those of
-    ``mtb.plot.build_table`` with ``aggregate="summary"``; its Notes give
-    them.
 
     See Also
     --------

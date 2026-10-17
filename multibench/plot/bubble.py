@@ -106,24 +106,6 @@ class BubbleTable:
     >>> import multibench as mtb
     >>> tbl = mtb.plot.build_table(mtb.load_results("vertical", dataset="D11"))
     >>> tbl.methods[:3]                  # the best three methods
-    >>> tbl.ranks.loc[tbl.methods[0]]    # the best method's max-rank per metric
-    >>> tbl.blocks[0].overall            # first family's Overall per method
-
-    Notes
-    -----
-    **Ranks.** ``ranks`` and ``FamilyBlock.ranks`` hold per-column
-    max-ranks: ``n`` = best, ties share the higher number (R's
-    ``ties.method="max"``). A method with no value in a column is NaN there,
-    and the column's ``n`` counts only the scored methods.
-
-    **Ties.** Values that agree to 9 decimal places count as equal in
-    ``ranks``, ``norm`` and the Overall scores. An iLISI of ``2.2e-16``
-    therefore ties with ``0.0``.
-
-    **Scaled values.** ``matrix`` and ``norm`` are per-column min-max values
-    in [0, 1]; a constant (or all-NaN) column is all ones, as in the R code.
-    The figure draws a column whose rows all hold one value in grey, not at
-    the ``High`` end of the Score legend.
 
     See Also
     --------
@@ -268,8 +250,8 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     Parameters
     ----------
     long_df : pandas.DataFrame
-        Long table with ``method``, ``metric``, ``value`` columns; optional
-        ``dataset`` column (Notes).
+        Long table with ``method``, ``metric``, ``value`` columns and an
+        optional ``dataset`` column.
     metrics : str, list of str | None
         Metric codes to keep, in this order within each family, or a family
         (``"clustering"``, ``"batch"``, ``"classification"``, ``"all"``, as
@@ -288,8 +270,8 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
         dataset.
     overall : {"rank", "mean_overall"}
         Formula for each family's Overall under ``aggregate="summary"``:
-        ``"rank"`` (the paper's panel rule) or ``"mean_overall"`` (bar's
-        default); formulas in Notes.
+        ``"rank"`` (the paper's panel rule: the rank of the mean ranks) or
+        ``"mean_overall"`` (the mean of the per-dataset Overalls).
     na : {"warn", "skip", "raise"}
         How to report ``n/a`` cells (a method lacking a metric): ``"warn"``,
         ``"skip"`` (silent, nothing is dropped) or ``"raise"``; also stored
@@ -317,86 +299,16 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     Warns
     -----
     UserWarning
-        ``n/a`` cells under ``na="warn"``, or several datasets under
-        ``aggregate="dataset"``.
-    UserWarning
-        ``aggregate="summary"`` on an incomplete method x dataset matrix.
-    UserWarning
-        ``require_complete=True`` dropped methods; each is named with the
-        datasets it lacks.
-    UserWarning
-        A dataset holds one method, or no method spans two datasets.
-    UserWarning
-        A column has the same value in every row, or there is one method.
-    UserWarning
-        Rows scored with the igraph Leiden backend are shown with stored rows
-        of their dataset.
+        ``n/a`` cells under ``na="warn"``, several datasets under
+        ``aggregate="dataset"``, an incomplete method x dataset matrix under
+        ``"summary"``, methods dropped by ``require_complete``, or a column
+        that has the same value in every row.
 
     Examples
     --------
     >>> import multibench as mtb
     >>> tbl = mtb.plot.build_table(mtb.load_results("vertical", dataset="D11"))
     >>> tbl.methods                      # rows, best first
-    >>> tbl.ranks                        # max-ranks per metric (n = best)
-    >>> multi = mtb.load_results("diagonal", dataset=["D24", "D25", "D28"])
-    >>> tbl = mtb.plot.build_table(multi, aggregate="summary",
-    ...                            require_complete=True)
-    >>> tbl.coverage                     # datasets per method
-
-    Notes
-    -----
-    **Missing cells.** A metric not computed for a method is an ``n/a``
-    cell, drawn as a dash.
-
-    - ``aggregate="dataset"``: the family *Overall* averages the ranks of
-      the metrics the method has, and a column's ranks count only the
-      methods scored in it.
-    - ``aggregate="summary"``: the cell is rank 0 in that dataset (the
-      paper's rule), in the metric columns and in the ``overall="rank"``
-      Overall; ``overall="mean_overall"`` skips it.
-
-    ``na`` sets how this is reported. ``na_cells`` lists the cells, e.g.
-    ``"YukiNet: DR and clustering Overall over 3 of 4 metrics (cLISI n/a)"``.
-
-    **Overall formulas.** ``overall=`` sets the family *Overall* under
-    ``aggregate="summary"``; under ``"dataset"`` it is always ``minmax(mean
-    over metrics of max-rank)``. The two can order methods differently on
-    the same frame.
-
-    - ``"rank"`` (bubble's default): ``minmax(mean over metrics of
-      max-rank(mean over datasets of within-dataset max-rank))`` - the
-      per-dataset ranks are averaged per metric, re-ranked across methods,
-      averaged over metrics and min-max scaled. A method absent from a
-      dataset scores rank 0 there (the paper's summary rule), which pulls it
-      down.
-    - ``"mean_overall"`` (bar's default): ``mean over datasets of
-      minmax(mean over metrics of within-dataset max-rank)`` - each dataset
-      gets its own min-max-scaled overall, and these are averaged; a dataset
-      the method lacks is skipped.
-
-    **Row order.** The combined Overall is the mean of the family Overalls,
-    sorted best first with a stable sort, so tied methods keep alphabetical
-    order. Ranks and scores always come from the whole filtered frame;
-    ``order`` only moves rows.
-
-    **Input columns.** Only ``method``, ``metric`` and ``value`` are
-    required.
-
-    - ``dataset`` - groups rows for ``aggregate="summary"`` (absent = one
-      dataset) and is part of the duplicate-row key. A ``"dataset"`` figure
-      that mixes datasets averages them per method and adds a dataset cue to
-      each row label (``Name · D11`` or ``Name · 3 ds``).
-    - Rows whose ``metric`` is NaN are dropped.
-
-    To draw your own runs next to the stored table, concatenate the frames:
-    ``pd.concat([mtb.load_results("vertical", dataset="D11"), res.long])``,
-    with ``res`` from ``mtb.run_all``.
-
-    **Name matching.** ``metrics``, ``methods`` and ``order`` match the
-    frame exactly, by canonical form (``"ari"`` -> ``"ARI"``) or
-    case-insensitively; the frame's own spelling is kept. The family blocks
-    always stay in paper order; metrics outside the three families form a
-    neutral purple "Other" block.
 
     See Also
     --------
@@ -1089,7 +1001,7 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
     long_df : pandas.DataFrame
         Long table with ``method``, ``metric``, ``value`` and optional
         ``dataset`` columns, as from ``mtb.load_results``, ``mtb.to_long`` or
-        the ``BatchResult.long`` property (more in Notes).
+        the ``BatchResult.long`` property.
     metrics : str, list of str | None
         Metric codes to show, in this order within each family, or a family
         (``"clustering"``, ``"batch"``, ``"classification"``, ``"all"``);
@@ -1138,44 +1050,12 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
     >>> df = mtb.load_results("vertical", dataset="D11")
     >>> fig = mtb.plot.bubble(df, metrics=["ARI", "NMI", "ASW"], title="D11",
     ...                       save="d11.pdf")
-    >>> multi = mtb.load_results("diagonal", dataset=["D24", "D25", "D28"])
-    >>> fig = mtb.plot.bubble(multi, aggregate="summary", require_complete=True)
-
-    Notes
-    -----
-    The Notes of ``build_table`` give the Overall formulas, missing cells,
-    row order, input columns and name matching.
-
-    **Reading the figure.** What each mark encodes:
-
-    - Metric circle (``aggregate="dataset"``): radius = within-column rank,
-      ``0.85 * sqrt(rank / n)`` with ``n`` = the methods scored in that column
-      (n/a cells excluded), so the largest is the best; fill = the min-max
-      scaled value on the family's colour ramp. The lightest fill is the
-      lowest value of that column in this figure, not zero.
-    - Metric bar (``aggregate="summary"``): length and fill = the min-max
-      scaled mean rank.
-    - *Score* legend: the colour ramp, labelled "(scaled per column)":
-      ``Low`` and ``High`` are the lowest and highest value of each column.
-    - Family *Overall* bar: length = the family score min-max scaled across
-      the rows; fill = the score itself (the two differ only under
-      ``overall="mean_overall"``).
-    - *Rank* legend: 1 = best, whereas ``BubbleTable.ranks`` /
-      ``FamilyBlock.ranks`` store max-ranks (``n`` = best).
-    - Grey fill: every row of that column holds the same value, or the
-      figure has one method, so there is nothing to compare. With two
-      methods each column holds the higher and the lower one; a
-      ``UserWarning`` says so.
-
-    **Chips.** ``Py`` / ``R`` = language; ``?`` = a name
-    the package does not know, such as your own or a renamed re-run.
 
     See Also
     --------
     mtb.plot.build_table : the numbers behind the figure, to audit first.
     mtb.plot.bar : one bar per method across datasets; same ``overall=`` formulas.
     mtb.to_long : reshape ``mtb.evaluate``'s scores into a long table.
-    mtb.load_results : stored metric tables as a long table.
     """
     tbl = build_table(long_df, metrics=metrics, methods=methods, order=order,
                       aggregate=aggregate, require_complete=require_complete,

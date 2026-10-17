@@ -727,7 +727,7 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     modality : str | None
         ``'rna'``, ``'adt'``, ``'atac'``, ``'atac_peak'`` or ``'atac_gas'``;
         names the file when ``out`` is a directory or ``None``, and enables
-        the ADT / ATAC checks (Notes).
+        the ADT / ATAC checks.
     convert : bool
         ``False`` = never write: pass a canonical ``.h5`` through, raise for
         anything else.
@@ -738,14 +738,14 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     mod : str | None
         MuData modality to convert (``mdata.mod[mod]``); required for a MuData.
     dtype : str
-        Stored dtype of ``matrix/data``; ``'float32'`` halves the file (see Notes).
+        Stored dtype of ``matrix/data``; ``'float32'`` halves the file.
     compression : str | None
         h5py compression filter; ``None`` = uncompressed.
     block : int
         Number of features written per streaming step.
     category : str | None
         Integration category the file is for (``vertical``, ``diagonal``,
-        ``mosaic`` or ``cross``); only changes ATAC filenames (Notes).
+        ``mosaic`` or ``cross``); only changes ATAC filenames.
     feature_names : list | None
         Feature names that override ``var_names`` / ``uns`` / DataFrame
         columns; the way to name a bare ``obsm`` array.
@@ -760,7 +760,8 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     FileNotFoundError
         ``src`` is a path that does not exist.
     ValueError
-        Invalid or conflicting arguments, a non-canonical ``.h5``, or features of several types (full list in Notes).
+        Invalid or conflicting arguments, a non-canonical ``.h5``, or features
+        of several types.
     KeyError
         ``layer``, ``obsm`` or ``mod`` names an entry the object does not have.
     ImportError
@@ -779,93 +780,6 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     >>> # writes data/MYCITE/rna.h5
     >>> mtb.io.to_canonical(adata, "data/MYCITE/", modality="rna")
     >>> mtb.io.to_canonical(adata, "data/MYCITE/", modality="adt", obsm="protein")
-    >>> mtb.io.to_canonical("counts.csv", "rna.h5")  # explicit file name
-    >>> mtb.io.to_canonical(atac, "data/MYMULTI/", modality="peak",
-    ...                     category="vertical")
-
-    Notes
-    -----
-    **Modality aliases and checks.** ``'protein'`` -> ``'adt'``,
-    ``'peak'`` -> ``'atac_peak'``, ``'gas'`` / ``'gene_activity'`` ->
-    ``'atac_gas'``. ``'atac_peak'`` warns when fewer than half of the feature
-    names look like peaks (``chr1:100-200``, ``chr1_100_200``,
-    ``chr1-100-200``), ``'atac_gas'`` when more than half do; plain
-    ``'atac'`` is not checked.
-
-    **ADT matrices.** With ``modality='adt'`` on an AnnData that has
-    ``obsm`` keys, ``obsm=`` or ``layer=`` must say where the protein matrix
-    is; otherwise ``adata.X`` (usually the RNA) would be written as
-    ``adt.h5``, so it raises. Keys that start with ``X_`` (``X_pca``,
-    ``X_umap``) hold embeddings and do not count.
-    The feature names of an ``obsm`` matrix come from the first of:
-
-    1. ``feature_names``;
-    2. the columns, when the ``obsm`` entry is a DataFrame;
-    3. ``adata.uns[f'{obsm}_names']``, when its length matches;
-    4. ``feature_0..``, with a ``UserWarning``: pass ``feature_names`` to
-       keep the protein names.
-
-    **ATAC filenames.** With ``out`` a directory, ``category='vertical'``
-    writes ``atac.h5`` for either representation, the file vertical methods
-    read. Any other ``category``, or none, names the file after the
-    representation: ``atac_peak.h5``, ``atac_gas.h5``, or ``atac.h5`` for
-    the plain ``'atac'`` role. So ``to_canonical(atac, d, modality='peak')``
-    without ``category='vertical'`` writes ``atac_peak.h5``, and
-    ``mtb.scan(d, 'vertical')`` then finds no ATAC method runnable. A file
-    path given as ``out`` is not renamed; for a mosaic batch, pass the
-    numbered file (``'data/MYMOSAIC/atac2.h5'``).
-    The representation is not recorded on disk: ``method_info(m)['atac']``
-    says which kind a method expects.
-
-    **Gene activity next to peaks.** With ``modality='gas'`` (no
-    ``category``, or ``'diagonal'``) and an ``atac_peak.h5`` in the output
-    folder, the rows are written in that file's cell order, because
-    ``atac_cty.csv`` follows it. One line on stderr says so. Gene activity
-    for other cells gives a ``UserWarning``.
-    A canonical ``.h5`` is returned untouched: to reorder an existing
-    ``atac_gas.h5``, pass ``mtb.io.read_canonical(path)`` as ``src``.
-
-    **Raw counts.** Methods normalise the data themselves; give raw counts.
-    For ``modality`` ``'rna'``, ``'adt'`` or ``'atac_peak'``, a
-    ``UserWarning`` says when sampled values are not whole numbers
-    (log-normalised data); ``layer='counts'`` usually holds the counts, and
-    for an ADT matrix taken with ``obsm=``, another ``obsm`` key.
-
-    **One feature type.** One file holds one modality. When
-    ``var['feature_types']`` of the object names several types, as in a 10x
-    Genomics file read with ``gex_only=False``, ``X`` or a layer would be
-    written with genes and peaks together, so it raises. Pass the features
-    of one type, or use ``mtb.io.export_dataset``, whose selectors take a
-    filter.
-
-    **Storage.** Sparse matrices (in memory or inside an ``.h5ad`` /
-    ``.h5mu``) are written ``block`` features at a time, without densifying
-    the whole matrix. ``matrix/data`` is stored dense (features x cells x
-    itemsize): gzip shrinks the file, but every reader densifies it.
-    ``dtype='float32'`` halves it, and h5py, rhdf5 and hdf5r read it (as
-    double in R). The defaults (gzip, ``'float64'``) match the shipped
-    benchmark files. A ``.csv`` / ``.tsv`` is read as cells x features, and
-    a non-numeric first column is used as the cell barcodes.
-
-    **Errors.** ``ValueError`` is raised for:
-
-    - ``out=None`` without ``modality``;
-    - an unknown ``modality`` or ``category``;
-    - ``convert=False`` on a non-canonical input;
-    - an ``.h5`` without ``matrix/data`` (the message lists the keys it does
-      hold - a top-level ``data`` dataset is a method output, not an input);
-    - a 10x Genomics ``.h5`` file;
-    - an unsupported suffix;
-    - ``mod`` missing for a MuData, or given for anything else;
-    - ``layer`` and ``obsm`` together;
-    - ``modality='adt'`` on an AnnData with ``obsm`` keys but no ``obsm=`` /
-      ``layer=``;
-    - ``X`` or a layer with several values in ``var['feature_types']``;
-    - a matrix with 0 features;
-    - a feature-name or barcode count that does not match the matrix.
-
-    The ``FileNotFoundError`` message names the path and the current
-    directory; the ``KeyError`` message lists the entries the object has.
 
     See Also
     --------
@@ -1343,7 +1257,6 @@ def _as_obs_vector(data, spec, *, what, master):
     return vals
 
 
-@_compat.keywords("io.export_dataset", compression=None)
 def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                    adt=None, atac=None,
                    atac_kind: str | None = None, labels=None,
@@ -1352,7 +1265,8 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                    adt_names: list | None = None,
                    batch_index: int | None = None,
                    overwrite: bool = False,
-                   n_batches: int | None = None) -> Path:
+                   n_batches: int | None = None,
+                   compression="gzip") -> Path:
     """Write an AnnData / MuData (or loose objects) as a canonical dataset folder.
 
     Produces the layout ``mtb.describe_layout`` documents (``rna.h5``,
@@ -1369,7 +1283,8 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         ``mtb.run_all``, and its parent their ``data_path``.
     rna : str, AnnData, DataFrame, array or None
         Raw-count matrix for RNA: a selector against ``data`` (``'layer:counts'``,
-        ``'X[feature_types=Gene Expression]'``) or an object (Notes); ``None`` = no RNA.
+        ``'X[feature_types=Gene Expression]'``) or an AnnData, DataFrame or
+        array; ``None`` = no RNA.
     adt : str, AnnData, DataFrame, array or None
         Raw-count matrix for protein (ADT), same forms as ``rna`` (e.g.
         ``'obsm:protein'``); ``None`` = no ADT.
@@ -1392,7 +1307,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         Stored dtype of ``matrix/data``, forwarded to ``mtb.io.to_canonical``.
     category : str or None
         Integration category the folder is for (``vertical``, ``diagonal``,
-        ``mosaic`` or ``cross``); sets the ATAC and label filenames (Notes).
+        ``mosaic`` or ``cross``); sets the ATAC and label filenames.
     adt_names : list or None
         Protein names for the ADT matrix; they override any it carries and
         are needed when it has none.
@@ -1414,7 +1329,8 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     Raises
     ------
     ValueError
-        Missing or conflicting arguments, or cells that do not pair across modalities (Notes).
+        Missing or conflicting arguments, a missing label or batch, or cells
+        that do not pair across modalities.
     KeyError
         A selector names a ``mod``, ``obsm``, ``layer``, ``obs`` or ``var`` column that is absent.
     FileExistsError
@@ -1423,7 +1339,8 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     Warns
     -----
     UserWarning
-        Values that are not whole numbers, feature-name problems, and the other cases in Notes.
+        Values that are not whole numbers, or feature names that are
+        missing, repeated or contradict ``atac_kind``.
 
     Examples
     --------
@@ -1433,215 +1350,6 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     >>> mtb.io.export_dataset(mdata, "data/MYMULTIOME", rna="rna", atac="atac",
     ...                       atac_kind="peak", labels="obs:celltype",
     ...                       category="vertical")
-    >>> mtb.io.export_dataset(rna, "data/LUNG", atac=atac, atac_kind="peak",
-    ...                       labels="obs:cell_type", category="diagonal")
-    >>> mtb.scan("MYCITE", "vertical", data_path="data")
-
-    Notes
-    -----
-    **Modality arguments.** ``rna``, ``adt`` and ``atac`` each accept:
-
-    - a selector string against ``data``: ``'X'``, ``'obsm:<key>'``,
-      ``'layer:<key>'``, ``'mod:<name>'``, ``'mod:<name>.obsm:<key>'`` or
-      ``'mod:<name>.layer:<key>'``;
-    - an AnnData (its ``.X`` is written);
-    - a DataFrame (index = cell barcodes, columns = features);
-    - a 2-D array or sparse matrix already in the master cell order.
-
-    An ``obsm`` matrix takes its feature names as ``mtb.io.to_canonical``
-    does; for the ADT, ``adt_names`` comes first (it applies to no other
-    modality).
-
-    All matrices are cells x features and are written transposed. With
-    ``data=None`` the default ``rna='X'`` means "no RNA": pass
-    ``rna=<AnnData>``. Separate objects are paired by barcode:
-
-    ```python
-    mtb.io.export_dataset(rna_adata, "data/MYMULTI", atac=atac_adata,
-                          atac_kind="peak", labels=rna_adata.obs["celltype"])
-    ```
-
-    **Feature filter.** A selector may end with ``[<var column>=<value>]``.
-    Only the features whose ``adata.var`` column equals the value are
-    written. A 10x Multiome AnnData read with ``gex_only=False`` holds genes
-    and peaks in one ``X``:
-
-    ```python
-    mtb.io.export_dataset(adata, "data/MYARC",
-                          rna="X[feature_types=Gene Expression]",
-                          atac="X[feature_types=Peaks]", atac_kind="peak",
-                          labels="obs:celltype", category="vertical")
-    ```
-
-    **Raw counts.** Methods normalise the data themselves. RNA, ADT and peak
-    values that are not whole numbers warn; ``rna='layer:counts'`` usually
-    selects the counts. A selector reads ``data``: for a modality passed as
-    its own object, put the counts into its ``X`` first
-    (``adt.X = adt.layers["counts"]``). Gene-activity scores are not checked.
-
-    **MuData.** A bare modality name selects ``mdata.mod[name].X``
-    (``rna='rna'``); a full ``'mod:<name>'`` selector works too. The default
-    ``rna='X'`` raises for a MuData: pass ``rna=<mod name>`` or ``rna=None``.
-
-    ``labels`` / ``batch`` read ``'obs:<col>'`` from the global ``mdata.obs``.
-    ``'<mod>:<col>'`` reads ``mdata[mod].obs``, then muon's copy
-    ``mdata.obs['<mod>:<col>']``; ``'mod:<mod>.obs:<col>'`` works too.
-
-    **Column names.** ``"obs:<column>"`` and ``"<column>"`` name a column of
-    the object you pass. ``export_dataset`` and ``evaluate`` take both.
-    ``run_all`` and ``rescore`` are given a folder, not the object, so they
-    take the column itself, for example ``batch=adata.obs["donor"]``.
-
-    **Master cell order.** Every modality is re-indexed by barcode to one
-    order: ``data.obs_names``, or the first modality's ``obs_names`` when
-    ``data`` is not given. A call that writes labels only and is given no
-    object takes its cells from the index of the ``labels`` / ``batch``
-    Series. An index of numbers that names no cell of the folder is taken
-    as row numbers: the values are written row by row, as a list is.
-
-    The same barcodes in another order are reordered. Non-unique barcodes
-    cannot be matched by name, so the cells are paired by position (a
-    different cell count still raises). A bare
-    array has no barcodes, so the order cannot be checked: pass a DataFrame
-    or AnnData when you are not sure of the order.
-
-    **Labels.** ``cty.csv`` holds a header ``x`` and one label per line;
-    ``mtb.labels_for`` finds these files again. A ``labels`` / ``batch``
-    Series is aligned by index to the master barcodes; a plain
-    ``RangeIndex`` of the right length is taken positionally. A column of an
-    ``obs`` whose cell names repeat is taken positionally only when its
-    cells are in the master order; in another order it raises.
-
-    **Diagonal.** ``category='diagonal'`` pairs no barcodes: RNA and ATAC may
-    come from different cells. ``rna`` is written as ``rna.h5`` and ``atac``
-    as ``atac_peak.h5`` or ``atac_gas.h5``. ``labels`` is read from each
-    object's own ``.obs`` into ``rna_cty.csv`` and ``atac_cty.csv``. A call
-    that writes one modality writes only that modality's label file.
-
-    Each side keeps the row order of its own object. When ``rna`` and
-    ``atac`` hold the same cells in two orders, a later paired export of
-    these cells into the same folder (``category='vertical'``, or no
-    ``category``) raises ``ValueError``: write the paired files first, or
-    use another folder.
-
-    Diagonal data in several batches is one call per batch with
-    ``batch_index=N``: ``rna<N>.h5``, ``atac_gas<N>.h5`` or
-    ``atac_peak<N>.h5``, ``rna_cty<N>.csv`` and ``atac_cty<N>.csv``.
-
-    For a MuData, ``labels='<col>'`` or ``'<mod>:<col>'`` reads ``<col>``
-    from each modality's own ``.obs`` (``mdata['rna'].obs`` for the RNA
-    cells, ``mdata['atac'].obs`` for the ATAC cells). When the two columns
-    have different names, export RNA and ATAC in two calls.
-
-    **Batches.** With ``batch``, cells are split per batch value (sorted)
-    and numbered files are written: ``rna1.h5``, ``rna2.h5`` ...,
-    ``adt1.h5`` ..., ``cty1.csv`` ... (the layout of the shipped D52). Only
-    cross and mosaic methods read numbered files. For a vertical folder,
-    export without ``batch`` and pass the batch column itself, such as
-    ``adata.obs["donor"]``, to ``mtb.run_all(batch=...)`` or
-    ``mtb.evaluate(batch=...)``.
-
-    ``batch_index=N`` writes the whole object as batch ``N``. A mosaic
-    delivery of one file per batch (the D46 pattern: CITE-seq, Multiome,
-    RNA only) is one call per file:
-
-    ```python
-    kw = dict(labels="obs:cell_type", category="mosaic")
-    mtb.io.export_dataset(cite, "data/LAB", adt="obsm:protein",
-                          batch_index=1, **kw)
-    mtb.io.export_dataset(multiome, "data/LAB", atac="obsm:atac",
-                          atac_kind="peak", batch_index=2, **kw)
-    mtb.io.export_dataset(rna_only, "data/LAB", batch_index=3, **kw)
-    ```
-
-    ``mtb.describe_layout('mosaic')`` lists the batch patterns the methods
-    read. ``n_batches=3`` in these calls says that the data has three
-    batches: a file of batch 4 in the folder is then refused (*Existing
-    files*).
-
-    **ATAC filenames.** By ``category`` (``mtb.describe_layout`` lists what
-    each category reads):
-
-    - ``'vertical'``: ``atac.h5`` for both kinds;
-    - ``'diagonal'``: ``atac_peak.h5`` or ``atac_gas.h5``;
-    - ``'mosaic'``: ``atac<i>.h5``;
-    - no ``category``: ``atac_peak.h5`` plus a hard-linked ``atac.h5`` (a
-      copy when the file system refuses links), or ``atac_gas.h5`` only.
-      Editing a hard-linked file edits both.
-
-    The representation is not recorded on disk: check that
-    ``method_info(m)['atac']`` is the kind exported. ``mtb.scan`` and
-    ``run_all`` skip a method whose file holds the other representation,
-    unless ``allow_atac_mismatch=True``. ``mtb.run`` only warns, and the
-    method gives a wrong embedding.
-
-    **Existing files.** Every check runs before ``dataset_dir`` is created;
-    a failed call writes nothing. When a file the call would write already
-    exists, ``FileExistsError`` lists it; pass ``overwrite=True`` to replace
-    it. A call also raises ``FileExistsError`` when the folder holds files of
-    other data that it does not write: files with other cells, files of
-    other batch numbers after ``batch=``, and with ``batch_index=`` files of
-    a batch number above ``n_batches``. ``overwrite=True`` does not remove
-    them. Files that are not part of the dataset layout are never touched. A
-    file written for cells that the folder already holds follows the cell
-    order of the files in the folder.
-
-    **Errors.** ``ValueError`` is raised for:
-
-    - nothing to export (``rna``, ``adt``, ``atac`` and ``labels`` all ``None``);
-    - ``atac`` without a valid ``atac_kind``, or ``atac_kind`` without ``atac``;
-    - an unknown ``category``;
-    - a selector string with ``data=None``, a malformed selector, or a
-      feature filter that matches nothing;
-    - ``X`` or a layer with several values in ``var['feature_types']`` and
-      no filter that keeps one;
-    - ``adt`` taking ``X`` of an object that also holds an ``obsm`` matrix
-      under a key that does not start with ``X_``;
-    - two modalities that name the same matrix of the same object
-      (``rna='X', adt='X'``): one file holds one modality;
-    - ``adt_names`` given as a string instead of a list;
-    - data with 0 cells, or a matrix with 0 features;
-    - a bare array whose cell order cannot be checked (no barcodes anywhere)
-      or with the wrong row count;
-    - a modality whose barcodes differ from the master order (the message
-      names the strays);
-    - a ``labels`` / ``batch`` Series missing cells, or a sequence of the
-      wrong length;
-    - ``labels`` / ``batch`` naming a file or a column the object does not
-      have;
-    - a label that is missing (NaN, None, ``''`` or text that a label file
-      reads as missing, such as ``'NA'``): ``mtb.evaluate`` does not score a
-      missing label;
-    - a batch that is missing, by the same definition;
-    - ``batch`` with ``category='vertical'`` or ``'diagonal'``, or together
-      with ``batch_index``;
-    - ``batch_index`` that is not a positive integer, or without
-      ``category='mosaic'`` / ``'cross'`` / ``'diagonal'``;
-    - ``n_batches`` without ``batch_index``, not a positive integer, or
-      smaller than ``batch_index``;
-    - cells that the folder already holds in two different row orders;
-    - ``category='diagonal'`` with labels but no matrix, or with a plain
-      label sequence for both RNA and ATAC.
-
-    The ``KeyError`` message lists the names the object does have.
-
-    **Warnings.** ``UserWarning`` is emitted for:
-
-    - RNA, ADT or peak values that are not whole numbers;
-    - feature names that contradict ``atac_kind``, or none at all
-      (``feature_0..`` is written; for ADT pass ``adt_names``);
-    - feature names that occur more than once in one matrix: they are
-      written as they are, and the message says how to make them unique;
-    - a ``batch`` Series whose index is the row numbers ``0..n-1`` while the
-      cells have barcodes: it is matched by position;
-    - non-unique barcodes (paired positionally);
-    - a dense ``matrix/data`` over 1 GB;
-    - ``batch`` with ``atac`` and no ``category``: only mosaic methods read
-      numbered ATAC files;
-    - ``category='mosaic'`` with ``atac_kind='gene_activity'``: every mosaic
-      method reads peaks;
-    - ``category='mosaic'`` or ``'cross'`` without ``batch`` or
-      ``batch_index``.
 
     See Also
     --------
@@ -1649,6 +1357,8 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     mtb.describe_layout : the layout being produced and the role -> filename mapping.
     mtb.scan : confirm the folder is found and which methods can run on it.
     """
+    if compression != "gzip":
+        _compat.deprecated("io.export_dataset(compression=)", "the default, gzip")
     out = Path(dataset_dir)
     category = _check_category(category)
     if data is None and isinstance(rna, str) and rna == "X":
@@ -1864,7 +1574,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         if kind == "matrix":
             sub, feats, sub_bars = payload
             _write_canonical(pth, sub, feats, sub_bars, dtype=dtype,
-                             compression="gzip", block=1024)
+                             compression=compression, block=1024)
         elif kind == "link":
             _link_or_copy(payload, pth)
         else:

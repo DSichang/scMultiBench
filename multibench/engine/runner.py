@@ -642,14 +642,15 @@ def check_gpu_requirement(spec) -> None:
         raise OSError(spec.requires_gpu_reason)
 
 
-@_compat.keywords("run", task=None, convert=None)
+@_compat.keywords("run", task=None)
 def run(method: str, category: str, *, inputs: dict, out_dir: str,
         params: dict | None = None, cmd_template: str | None = None,
-        dry_run: bool = False, repo_path=None):
+        dry_run: bool = False, convert=None, repo_path=None):
     """Run one method on explicit inputs and load its output.
 
-    Use it for full control over one run; ``mtb.run_all`` runs and scores
-    every method of a category on a dataset.
+    For files outside a dataset folder, or a run on a compute node;
+    ``mtb.run_all(methods=[m])`` runs and scores one method on a dataset
+    folder.
 
     Parameters
     ----------
@@ -711,94 +712,19 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     >>> inp = mtb.inputs_for("D11", "vertical", "Matilda")
     >>> mtb.run("Matilda", "vertical", inputs=inp, out_dir="out/Matilda_D11",
     ...         dry_run=True)
-    >>> res = mtb.run("Matilda", "vertical", inputs=inp, out_dir="out/Matilda_D11",
-    ...               params={"epochs": 20})
-    >>> mtb.evaluate(res.output, labels=mtb.labels_for("D11"))
-    >>> adata.obsm["X_Matilda"] = res.output      # rows match res.obs_names
-
-    Notes
-    -----
-    **Dry run.** ``dry_run=True`` returns the argv the real run would execute
-    (``shlex.join`` it for a shell line), from the same variant selection,
-    input plan and env wrap. It creates nothing: no ``out_dir``, no
-    ``inputs/`` copies, no env check, no fetch of the method scripts. It
-    raises the same input errors and prints to stderr what the real run needs
-    first: the method's ``setup_hint``, method scripts missing here or not at
-    ``MULTIBENCH_SCRIPTS_REF``, files under ``inputs/`` the run writes first,
-    ATAC files ``mtb.scan`` would block (the real run warns and still runs),
-    and a note for an input path that does not exist.
-
-    **Inputs.** Only ``category`` and the modality roles of ``inputs`` select
-    the variant: every key except ``data_dir``, ``source_data``,
-    ``target_data``, ``out_dir`` and the label keys (containing ``cty`` or
-    ``label``), which are passed as given. A ``data_dir`` variant (scBridge)
-    is selected by ``category`` alone. A canonical ``.h5`` passes through;
-    an AnnData or any other file becomes ``<out_dir>/inputs/<role>.h5``, and
-    a peak file the method needs renamed ``<out_dir>/inputs/<role>_normpeaks.h5``.
-    A MuData raises ``ValueError``: pass one modality per role
-    (``mdata.mod["rna"]``) or write the folder with ``mtb.io.export_dataset``.
-    Before anything runs, canonical ``.h5`` inputs get the cell checks of
-    ``mtb.inputs_for(check=True)``: Seurat_v5's ``rna`` and ``atac_peak`` must
-    hold the same cells, and a diagonal ``atac_gas`` file must list the cells
-    of its ``atac_peak`` file (the one given, else the one next to it) in the
-    same order.
-    Relative paths are made absolute, because the method runs in ``out_dir``
-    or in its script's folder.
-
-    **GPU and CPU.** ``cpu_params`` are the flags that turn CUDA off in a
-    script that uses it by default (``method_info(m)['cpu_params']``). On a
-    host without an NVIDIA GPU (``mtb.env.host_has_gpu()`` is False) they are
-    merged into ``params``; a key you pass wins, and the run prints them to
-    stderr. A method whose script needs
-    a GPU (``method_info(m)['requires_gpu']``) raises ``OSError`` there before
-    anything is written; a dry run still returns the argv.
-
-    **Environment.** With ``cmd_template=None`` the method runs in the env
-    ``mtb.method_info(method)['env']`` names: through its prefix when
-    ``mtb.env.env_prefix(env)`` finds it (no conda needed), else with
-    ``conda run -n <env>``. ``MULTIBENCH_RUN_MODE=conda|prefix`` forces one.
-    Method environments are Linux-only: off Linux the run raises ``OSError``.
-    Before anything is written, a missing env raises ``OSError`` naming the
-    install command (when some env is found at all), and so does an env of
-    the same name that multibench did not install, which is never used; a
-    ``{cmd}`` template skips these checks. The
-    method gets ``PYTHONNOUSERSITE=1``, and ``MPLBACKEND=Agg`` unless it sets
-    its own backend; environment variables the method needs are set over yours.
-    A variable made of absolute paths, such as ``LD_PRELOAD``, keeps only the
-    paths that exist on this machine; when none does, it is left as you set
-    it, or unset.
-
-    **Launcher templates.** A ``{cmd}`` template must enter an env itself,
-    for example ``"conda run -n myenv {cmd}"``. A Slurm job step:
-
-    ```python
-    mtb.run("scMoMaT", "mosaic", inputs=mtb.inputs_for("D46", "mosaic", "scMoMaT"),
-            out_dir="runs/scMoMaT", cmd_template="srun --gres=gpu:1 {env_cmd}")
-    ```
-
-    Request a GPU only for a method that uses one;
-    ``mtb.method_info(m)['gpu']`` says which.
-
-    **Failures.** A non-zero exit raises ``RuntimeError`` with the tail of the
-    method's stdout, then of its stderr. An interrupt, such as Ctrl-C or a
-    ``run_all`` timeout, kills the method's whole process tree.
-
-    **Method scripts.** The upstream scripts are never modified. The first
-    run clones them with ``git``; on a host without network, run
-    ``multibench fetch --scripts`` first.
 
     See Also
     --------
     mtb.inputs_for : builds the ``inputs`` dict from a laid-out dataset folder.
-
     mtb.run_all : every runnable method on a dataset, scored, with failures recorded.
-
-    mtb.scan : previews the same command per method, with the file and env checks.
-
-    mtb.evaluate : scores ``RunResult.output``.
+    mtb.params_for : the hyperparameters ``params`` takes.
     """
+    if convert is not None:
+        _compat.deprecated("run(convert=)", "canonical .h5 inputs, which run passes "
+                                            "through unchanged", stacklevel=4)
     if repo_path is not None:
         _compat.deprecated("run(repo_path=)", "config.DEFAULT.repo_path", stacklevel=4)
+    convert = convert is not False
     _check_template(cmd_template)
     method = registry.check_method(method)
     inputs = _rename_old_roles(method, inputs)
@@ -809,8 +735,8 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     mismatch = _atac_mismatch_caveats(method, category, inputs)
     if dry_run:
         argv, notes = preview(method, category, inputs=inputs, out_dir=out_dir,
-                              params=params, cmd_template=cmd_template,
-                              repo_path=repo_path)
+                              params=params, convert=convert,
+                              cmd_template=cmd_template, repo_path=repo_path)
         notes = _missing_input_notes(method, inputs) + notes
         for note in notes + mismatch:
             print(f"# {note}", file=sys.stderr, flush=True)
@@ -862,7 +788,7 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     out = Path(out_str)
     inputs_dir = out / "inputs"
     # every input-format check before anything is written or fetched
-    plan = _plan_inputs(variant, inputs, inputs_dir, convert=True, real=True)
+    plan = _plan_inputs(variant, inputs, inputs_dir, convert=convert, real=True)
     repo = _fetch_scripts(repo_path)
     provide_script_files(spec, variant, repo)
     out.mkdir(parents=True, exist_ok=True)

@@ -270,7 +270,8 @@ def write_example(dataset: str, folder: Path | str = ".", *,
     Returns
     -------
     None
-        The files are on disk; the printed lines name them.
+        The files are on disk, named ``my_*.h5ad``; the printed lines say
+        what each holds. A file of your own with such a name is kept.
 
     Raises
     ------
@@ -283,36 +284,7 @@ def write_example(dataset: str, folder: Path | str = ".", *,
     --------
     >>> import multibench as mtb
     >>> mtb.data.fetch("D11")
-    >>> mtb.data.write_example("D11")
-    >>> import anndata as ad
-    >>> adata = ad.read_h5ad("my_file.h5ad")
-
-    Notes
-    -----
-    **The files.** The names start with ``my_``: ``my_file.h5ad`` holds RNA
-    counts in ``X`` and protein counts in ``obsm["protein"]``, with the
-    protein names in ``uns["protein_names"]``; ``my_rna.h5ad``,
-    ``my_adt.h5ad`` and ``my_atac.h5ad`` hold one modality in ``X``; a
-    number in the name is the batch (``my_rna2.h5ad``). The files of a
-    dataset with batches in one object also have ``obs["batch"]``. Each
-    printed line says what its file holds.
-
-    **A file that is already there.** A file with one of these names is
-    replaced only when it is an example of another dataset or of another
-    multibench version. It is kept, byte for byte, when:
-
-    - it is the example of this dataset, written by this version;
-    - it is a file of your own with that name;
-    - it is an example that you read and saved again with ``write_h5ad``,
-      which makes it a file of your own.
-
-    The printed line says which case it was. An example file that you
-    changed in place is still an example, so the example of another dataset
-    replaces it. Save your own data under another name.
-
-    **No download.** The function reads the dataset from the data root and
-    raises when it is not there. A file is written under a temporary name
-    and then moved into place, so a failed write leaves no partial file.
+    >>> mtb.data.write_example("D11")       # my_file.h5ad: RNA in X, ADT in obsm
 
     See Also
     --------

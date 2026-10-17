@@ -218,27 +218,6 @@ def fetch_outputs(dataset: str, methods=None, *, data_path=None,
     >>> import multibench as mtb
     >>> out = mtb.data.fetch_outputs("D11")
     >>> res = mtb.load_batch(out)
-    >>> res.summary[["method", "status", "ARI", "NMI"]]
-
-    Notes
-    -----
-    **Tree contents.** Exactly what ``mtb.run_all`` writes and
-    ``mtb.load_batch`` reads: ``batch_result.json``, ``long.csv``,
-    ``summary.csv`` and one folder per method holding its ``embedding.h5``.
-
-    **Selecting methods.** ``methods`` only checks the names; the whole tree
-    is downloaded. To restrict what is loaded, use
-    ``mtb.load_batch(out, methods=[...])``.
-
-    **Idempotence.** When ``<data_path>/outputs/<dataset>/batch_result.json``
-    exists nothing is downloaded. An empty leftover folder is replaced. A
-    non-empty one without ``batch_result.json`` raises ``RuntimeError``.
-    Remove it and call again.
-
-    **Atomic extraction.** The archive is unpacked into a temporary folder
-    and then moved into place. The archive may be rooted at the tree itself
-    or at one folder (``outputs-D11/``, ``D11/``); an entry that would write
-    outside the temporary folder raises ``RuntimeError``.
 
     See Also
     --------

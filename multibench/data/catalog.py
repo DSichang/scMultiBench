@@ -243,8 +243,11 @@ def methods(files_dir: Path | str | None = None) -> pd.DataFrame:
     Returns
     -------
     pandas.DataFrame
-        One row per method. Read ``method``, ``needs_labels``, ``atac`` and
-        ``categories``; all columns are listed in Notes.
+        One row per method: ``method`` (the id every function takes),
+        ``name`` (the article's spelling, such as ``MOFA+``), ``language``,
+        ``deep_learning``, ``atac`` (``'peak'`` / ``'gene_activity'`` /
+        ``None``), ``output`` (``'embedding'`` / ``'graph'``),
+        ``needs_labels``, ``categories`` and ``tasks``.
 
     Examples
     --------
@@ -252,25 +255,6 @@ def methods(files_dir: Path | str | None = None) -> pd.DataFrame:
     >>> m = mtb.catalog.methods()
     >>> m[m.needs_labels][["method", "categories"]]
     >>> m[m.categories.map(lambda c: "vertical" in c)].method.tolist()
-
-    Notes
-    -----
-    **Column reference.**
-
-    - ``method`` - the method id, as every function takes it;
-    - ``name`` - the name as the article spells it (``MOFA+``, ``Seurat(WNN)``);
-    - ``language`` - ``'python'`` or ``'r'`` (lower-cased);
-    - ``deep_learning`` - ``'Yes'`` / ``'No'``, as in the CSV;
-    - ``atac`` - ``'peak'``, ``'gene_activity'`` or ``None``;
-    - ``output`` - ``'embedding'`` or ``'graph'``;
-    - ``needs_labels`` - bool, the method needs cell-type labels;
-    - ``categories`` / ``tasks`` - lists of integration categories and tasks.
-
-    **Package values.** For every method id, ``needs_labels``,
-    ``atac``, ``categories`` and ``tasks`` come from the package's method
-    definitions, which ``mtb.method_info`` and ``mtb.scan`` read. A row
-    without a method id keeps the CSV values. ``language``, ``deep_learning`` and
-    ``output`` come from ``method.csv``.
 
     See Also
     --------
@@ -339,8 +323,9 @@ def datasets(files_dir: Path | str | None = None, *,
     Returns
     -------
     pandas.DataFrame
-        One row per dataset id. Read ``dataset``, ``category`` and
-        ``has_results``; all columns are listed in Notes.
+        One row per dataset id: ``dataset``, ``simulated`` (ids starting with
+        ``SD``), ``category`` (the categories whose stored scores hold it,
+        ``;``-joined) and ``has_results``.
 
     Raises
     ------
@@ -352,44 +337,11 @@ def datasets(files_dir: Path | str | None = None, *,
     >>> import multibench as mtb
     >>> ds = mtb.catalog.datasets()
     >>> ds[ds.has_results][["dataset", "category"]]
-    >>> mtb.catalog.datasets(category="vertical").dataset.tolist()
-
-    Notes
-    -----
-    **Column reference.**
-
-    - ``dataset`` - the id (``D11``, ``SD15``, ...);
-    - ``simulated`` - bool, ids starting with ``SD``;
-    - ``category`` - the integration categories whose stored results
-      contain the dataset, ``";"``-joined; ``None`` when no stored results
-      exist;
-    - ``has_results`` - bool, a stored metric table (``mtb.load_results``)
-      covers it.
-
-    A ``dataset.csv`` passed through ``files_dir`` may also fill the
-    descriptive columns ``assay``, ``tissue``, ``n_cells``, ``n_batches`` and
-    ``source``; each one that holds a value is added. The shipped file
-    leaves them empty.
-
-    **Row set.** The rows are the union of ``dataset.csv`` and every id with
-    stored results (``mtb.available_datasets(source="both")``), so
-    ``D11s``/``D28s``/``D45s``/``D52s`` and ``D24`` (published tables only)
-    are listed although ``dataset.csv`` does not name them. Ids missing from
-    the CSV are appended after it, in natural order.
-
-    **Subsamples.** D11s, D28s, D45s and D52s are random subsamples of the
-    full datasets, used for the second re-run sweep; they cannot be fetched.
-    D28s holds 60% of D28's cells.
-
-    **When the columns are computed.** ``category`` and ``has_results`` are
-    derived at each call from ``mtb.available_datasets``; a missing or
-    unreadable result tree leaves them empty instead of raising.
 
     See Also
     --------
-    mtb.available_datasets : dataset ids with stored results, per category.
+    mtb.results_coverage : which methods have stored scores on each dataset.
     mtb.data.fetchable : dataset ids that can be downloaded.
-    mtb.load_results : the stored metric tables themselves.
     """
     if files_dir is None:
         files_dir = config.DEFAULT.files_path
@@ -439,8 +391,9 @@ def metrics(files_dir: Path | str | None = None) -> pd.DataFrame:
     Returns
     -------
     pandas.DataFrame
-        One row per metric, with the CSV's columns (``metric`` and
-        ``description`` in the shipped file).
+        One row per metric code: ``metric``, ``family`` (``clustering``,
+        ``batch`` or ``classification``, the families ``metrics=`` takes) and
+        ``description``.
 
     Examples
     --------
@@ -448,16 +401,8 @@ def metrics(files_dir: Path | str | None = None) -> pd.DataFrame:
     >>> tab = mtb.catalog.metrics()
     >>> tab.set_index("metric").loc["kBET", "description"]
 
-    Notes
-    -----
-    **Rows.** The twelve scIB metrics ``ARI, NMI, ASW, iASW, iF1, cLISI,
-    ASW_batch, ARI_batch, NMI_batch, GC, iLISI, kBET``, then the five classification metrics
-    ``OCA, ACA, Spec, Sens, F1``; header whitespace is stripped. The same
-    codes, in this order, are ``mtb.catalog.known_metrics()``.
-
     See Also
     --------
-    mtb.catalog.known_metrics : the canonical metric codes.
     mtb.evaluate : computes these metrics for an embedding.
     mtb.classification_metrics : the classification metrics of ``mtb.classify``'s predictions.
     """

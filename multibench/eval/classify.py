@@ -81,27 +81,10 @@ def classify(output, labels=None, *, batch=None, reference=None,
     >>> import multibench as mtb
     >>> labels = mtb.labels_for("D52", "cross", "StabMap")
     >>> pred = mtb.classify(res.output, labels=labels)    # res = mtb.run(...)
-    >>> pred.head()
-    >>> mtb.classify(adata, labels="celltype", batch="donor", obsm="X_emb",
-    ...              reference="donor1")
-
-    Notes
-    -----
-    **Network.** One hidden layer of 128 units (ReLU), trained for 10
-    epochs with Adam (learning rate 0.01, batches of 64 cells, shuffled),
-    as in the benchmark's script; scikit-learn's ``MLPClassifier`` runs it.
-
-    **Query cells.** A query cell whose cell type is not in the reference
-    is left out: the network can only predict the reference's types. A
-    cell without a label is left out of the reference and of the query.
-
-    **Cell order.** Cells, labels and batches are matched as in
-    ``mtb.evaluate``.
 
     See Also
     --------
     mtb.labels_for : the label files of a dataset, in the method's cell order.
-
     mtb.evaluate : scores the same embedding with the scIB metrics.
     """
     if labels is None:

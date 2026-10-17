@@ -69,8 +69,7 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     ----------
     value_df : pandas.DataFrame or pandas.Series
         What ``mtb.evaluate`` returns (metrics as the index, one column
-        ``Value``), a Series indexed by metric, or that frame's CSV read back
-        (forms in Notes).
+        ``Value``), a Series indexed by metric, or that frame's CSV read back.
     method : str
         Method id written into every row; your own name is fine.
     dataset : str, optional
@@ -80,11 +79,10 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
         ``"user"``, the value ``load_results`` gives a user file without a
         category column.
     clustering : str
-        Value of the ``clustering`` column. The published tables use
-        ``"louvain"`` / ``"kmeans"`` for their variants.
+        Value of the ``clustering`` column.
     source : str
-        Value of the ``source`` column; ``source="user"`` in
-        ``mtb.load_results`` selects these rows again.
+        Value of the ``source`` column, which tells your rows from the stored
+        ones.
 
     Returns
     -------
@@ -114,52 +112,11 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     >>> wide = mtb.evaluate(emb, labels=labels, metrics=["ARI", "NMI"])
     >>> mine = mtb.to_long(wide, method="MyMethod", dataset="D11",
     ...                    category="vertical")
-    >>> stored = mtb.load_results("vertical", dataset="D11", source="rerun")
-    >>> pd.concat([stored, mine]).to_csv("all.csv", index=False)
-    >>> mtb.load_results(result_path="all.csv", source="user")   # your rows only
-
-    Notes
-    -----
-    **Metric names.** Names are canonicalised (``ari`` -> ``ARI``, ``kbet``
-    -> ``kBET``); rows whose name is blank are dropped, and a name the
-    package does not know is kept as written.
-
-    **CSV read-back.** ``pd.read_csv(path, index_col=0)`` reads
-    ``wide.to_csv(path)`` back. A plain ``pd.read_csv(path)`` works too: its
-    metric column ``Unnamed: 0`` is taken as the names only when the columns
-    are exactly ``Unnamed: 0, Value``, it holds strings and the index none.
-    So does a ``metric`` column (``wide.to_csv(path, index_label="metric")``).
-    Metric names that are not strings, like row numbers ``0, 1, ...``, raise
-    instead of being scored.
-
-    **Provenance.** The ``scored_with`` column of a frame from
-    ``mtb.evaluate`` reads like ``"leidenalg/search/0.4.0"``: the Leiden
-    backend, where the clusters came from (``search`` or ``user``;
-    ``sweep`` before 0.4, the best-NMI resolution of a sweep) and the
-    package version; ``none`` fills a part that did not apply. The same
-    three values and ``scib_version`` are in ``attrs``.
-
-    Scores of the labelled cells only (``missing_labels="drop"`` left cells
-    out) have a fourth part, such as ``"igraph/search/0.4.0/270 of 300
-    cells"``, and ``cells_scored`` and ``cells_total`` in ``attrs``.
-
-    Any other frame, such as a hand-made one or a wide CSV read back, gets
-    ``scored_with = "unknown"`` and a ``UserWarning``. To keep the record,
-    save the long table: ``mtb.to_long(...).to_csv(path, index=False)``.
-
-    The stored tables have no ``scored_with`` column, so it is NaN for their
-    rows after ``pd.concat``. ``load_results(result_path=...)`` keeps the
-    column when it reads the CSV back.
-
-    **Plot chips.** The bubble figure shows ``?`` for a name the package
-    does not know, such as your own or a renamed re-run.
 
     See Also
     --------
     mtb.evaluate : computes the wide frame this function reshapes.
-
     mtb.load_results : the stored scores, in the same long shape.
-
     mtb.plot.bubble : plots a long frame.
     """
     if isinstance(value_df, pd.Series):
@@ -976,315 +933,76 @@ def evaluate(
     verbose: bool = True,
     missing_labels: str = "error",
 ) -> pd.DataFrame:
-    """Compute the benchmark's metrics for a run output (an embedding) against cell-type labels.
+    """Compute the benchmark's metrics for an embedding against cell-type labels.
 
-    Pass the embedding a run produced and one label per cell. Reshape the
-    result with ``mtb.to_long`` to plot it or combine it with
-    ``mtb.load_results``.
+    The protocol is the article's: Leiden clusters searched to the number of
+    cell types for ARI, NMI, ASW, iASW and iF1, and to the number of batches
+    for ARI_batch and NMI_batch. ``mtb.to_long`` reshapes the result for
+    plotting or for ``mtb.load_results``.
 
     Parameters
     ----------
     embedding
-        Embedding, cells x dims: array, DataFrame, sparse matrix, AnnData or
-        MuData (``.obsm[obsm]``; ``labels``/``batch`` may name ``.obs``
-        columns), or a file: ``.h5`` (dataset ``data``, the benchmark's
-        ``embedding.h5``), ``.h5ad``, ``.npy``, ``.csv`` / ``.tsv``. A dims x
-        cells array is transposed against the label count, with a warning.
+        Cells x dims: an array, DataFrame, AnnData or MuData (``.obsm[obsm]``),
+        or a file: ``.h5`` (the benchmark's ``embedding.h5``), ``.h5ad``,
+        ``.npy``, ``.csv`` / ``.tsv``.
     labels
-        Cell types, one per cell (required): CSV path(s), a
-        ``mtb.labels_for`` dict, a 1-D array-like, or an ``.obs`` column
-        name, with or without the ``obs:`` prefix (forms in Notes).
+        One cell type per cell: CSV path(s), a ``mtb.labels_for`` dict, a 1-D
+        array-like, or an ``.obs`` column name (``"celltype"``,
+        ``"obs:celltype"``, ``"rna:celltype"`` for a MuData modality).
     category : str, optional
         Integration category: ``vertical``, ``diagonal``, ``mosaic`` or
         ``cross``. With two or more batches it decides whether the
         classification metrics are added: not for ``"vertical"``.
     batch
-        Batch labels, one per cell, in the forms ``labels`` accepts; needed
-        for the batch metrics unless ``labels`` lists two or more files.
-        Every cell needs a batch.
+        One batch per cell, in the forms ``labels`` takes; needed for the
+        batch metrics unless ``labels`` lists two or more files.
     metrics : None, str or list of str
-        ``None`` = every applicable metric except kBET; or ``"clustering"``,
-        ``"batch"``, ``"classification"``, ``"all"``, or a list of codes such
-        as ``["ARI", "NMI"]``.
+        ``None`` = every metric the inputs allow except kBET; or
+        ``"clustering"``, ``"batch"``, ``"classification"``, ``"all"``, or a
+        list of codes such as ``["ARI", "NMI"]``.
     clusters
-        Precomputed cluster assignment, in the forms ``labels`` accepts or an
-        ``.h5`` path, used for ARI, NMI, ASW, iASW and iF1; ``None`` = Leiden
-        clusters, one per cell type.
+        Your own cluster per cell, in the forms ``labels`` takes or an ``.h5``
+        path; replaces the Leiden clusters of ARI, NMI, ASW, iASW and iF1.
     obsm : str
-        ``.obsm`` key of an AnnData, MuData or ``.h5ad`` ``output``, such as
-        ``'X_pca'``; ``'X'`` means ``.X``.
+        ``.obsm`` key of an AnnData, MuData or ``.h5ad`` embedding; ``'X'``
+        means ``.X``.
     label_order : list of str
-        Keys of a multi-entry ``labels`` dict, in the method's cell order; a
-        subset selects those files. ``None`` works for an unchanged
-        ``mtb.labels_for`` dict (Notes).
+        Keys of a multi-entry ``labels`` dict in the embedding's cell order;
+        not needed for an unchanged ``mtb.labels_for`` dict.
     verbose : bool
-        ``True`` prints one stderr line when the Leiden clustering starts on more
-        than 2,000 cells, and one when labels, batches or clusters are put
-        in the row order of a ``.csv`` / ``.tsv`` output by barcode;
-        ``False`` never prints.
+        ``False`` prints nothing; ``True`` prints a line when the Leiden
+        search starts on more than 2,000 cells or labels are matched by
+        barcode.
     missing_labels : {"error", "drop"}
-        What to do when a cell has no label. ``"error"`` raises. ``"drop"``
-        scores the labelled cells only and warns how many (Notes).
+        A cell without a label raises, or is left out with a warning.
 
     Returns
     -------
     pandas.DataFrame
-        One row per metric, indexed by the canonical metric name (``ARI``,
-        ``NMI``, ...), with one column ``Value``, never empty. ``attrs``
-        records how the scores were computed (Notes). ``mtb.to_long`` makes
-        the long frame (lowercase ``value``) that ``load_results`` returns.
+        One row per metric (``ARI``, ``NMI``, ...), one column ``Value``;
+        ``attrs`` records the Leiden backend, where the clusters came from and
+        the package versions.
 
     Raises
     ------
     ValueError
-        Missing or misaligned labels, an unknown category or metric, or batch
-        or classification metrics without batch labels. A cell without a label (unless
-        ``missing_labels="drop"``), no cell with a label, or a cell without a
-        batch in ``batch``. Also a count that differs from the embedding's
-        cells, a ``missing_labels`` other than ``"error"`` / ``"drop"``,
-        ambiguous label files, a labels dict out of order without
-        ``label_order``, unknown, repeated or no keys in ``label_order``, and
-        an ``.h5`` output without dataset ``data``.
+        Missing or misaligned labels or batches, a count that differs from
+        the embedding's cells, an unknown category or metric, or batch or
+        classification metrics without batch labels.
     FileNotFoundError
-        An ``output`` or label path does not exist (the message names it and
-        the working directory), or a column is named for an ``output`` that
-        has no ``.obs``.
-    TypeError
-        An unsupported input type, ``label_order`` with labels that are not
-        a dict, or a retired keyword (Notes).
+        An embedding or label path that does not exist.
 
     Examples
     --------
     >>> import multibench as mtb
-    >>> labels = mtb.labels_for("D11")                    # {'cty': '.../cty.csv'}
-    >>> scores = mtb.evaluate(res.output, labels=labels)  # res = mtb.run(...)
-    >>> # cLISI needs no Leiden clustering
-    >>> mtb.evaluate(res.output, labels=labels, metrics=["cLISI"])
-    >>> mtb.evaluate(adata, labels="celltype", obsm="X_pca")
-    >>> mtb.evaluate(mdata, labels="celltype", batch="sample", obsm="X_joint",
-    ...              metrics="all")
-
-    Notes
-    -----
-    **Label forms.** ``labels`` may be:
-
-    - a CSV path (header row; column ``x``, the only column, or the last of
-      two when the first is a barcode index);
-    - a list of CSV paths, concatenated in that order (multi-batch datasets:
-      ``[cty1, cty2, cty3]``);
-    - a ``{name: path}`` dict, such as ``mtb.labels_for`` returns (order
-      rules under **Label dicts.**);
-    - a 1-D ``ndarray`` / ``Series`` / ``Categorical`` / list, or a
-      single-column DataFrame;
-    - when ``output`` is an AnnData or MuData, the name of an ``.obs``
-      column, with or without the ``obs:`` prefix (``"celltype"`` or
-      ``"obs:celltype"``); for a MuData also ``"<mod>:<column>"``, a column
-      of one modality (``"rna:celltype"`` = ``mdata["rna"].obs["celltype"]``),
-      as ``export_dataset`` reads it.
-
-    ``"obs:<column>"`` and ``"<column>"`` name a column of the object you
-    pass. ``export_dataset`` and ``evaluate`` take both. ``run_all`` and
-    ``rescore`` are given a folder, not the object, so they take the column
-    itself, for example ``batch=adata.obs["donor"]``.
-
-    A multi-column CSV / DataFrame raises: pass the one column
-    (``df["celltype"]``) itself. ``batch`` and ``clustering`` take the same
-    forms except a multi-entry dict; for ``clustering``, a path that is not
-    ``.csv`` / ``.tsv`` / ``.txt`` is read as an h5 from
-    ``/obs/cluster_leiden``.
-
-    **Label dicts.** A dict with several entries needs a known order:
-
-    - a dict from ``mtb.labels_for``, unchanged, is used as it is, in the
-      order ``labels_for`` gave it (with ``category`` and ``method``, that
-      method's cell order);
-    - any other dict goes in as is only in the default order
-      (``cty1, cty2, ...`` numerically; ``rna`` before ``adt`` before
-      ``atac``) and otherwise needs ``label_order=`` naming its keys;
-    - ``label_order=list(d)`` trusts the dict's own order. A one-entry dict
-      needs no ``label_order``.
-
-    **Missing labels.** A label is missing when it is NaN, ``None``,
-    ``pd.NA``, blank text, or text that a label file reads as missing:
-    ``NA``, ``None``, ``nan``, ``null``, ``N/A`` and the like, with or
-    without blanks around them. A missing label is not a cell type, so it
-    is never scored as one. A cell type that really has such a name needs
-    another name.
-
-    - ``missing_labels="error"`` raises ``ValueError``. The message says
-      how many cells have no label and how the missing values are written;
-    - ``missing_labels="drop"`` leaves those cells out of the embedding,
-      the labels, ``batch`` and ``clustering``, and scores the rest. The
-      scores equal those of a call with the labelled cells only. A
-      ``UserWarning`` gives the two cell counts, and says when the labelled
-      cells come from fewer batches;
-    - when no cell has a label, both raise.
-
-    The values of ``batch`` are missing by the same rule. A missing batch
-    always raises ``ValueError``; with ``"drop"``, only the cells that are
-    scored need a batch.
-
-    **Metric selection.** ``None`` computes the clustering family (``ARI,
-    NMI, ASW, iASW, iF1, cLISI``), plus ``ASW_batch, ARI_batch, NMI_batch,
-    GC, iLISI`` when a batch
-    vector is available (``batch=`` or a list of label files), plus the
-    classification family (``OCA, ACA, Spec, Sens, F1``) when the cells are
-    in two or more batches and ``category`` is not ``"vertical"``. kBET is
-    never included by default: it shells out to R and takes hours on large
-    datasets.
-
-    - ``"clustering"`` / ``"batch"`` / ``"classification"`` - that family;
-      ``"all"`` - all three (``"batch"``, ``"classification"`` and ``"all"``
-      need the batch vector or raise);
-    - a list of codes - exactly those (case/alias tolerant, ``["ari"]``
-      works); Leiden runs only when one of them needs it (ARI, NMI, ASW,
-      iASW, iF1, ARI_batch, NMI_batch), and ``"kBET"`` in the list turns
-      kBET on.
-
-    Valid codes: ``mtb.plot.CLUSTERING_METRICS + mtb.plot.BATCH_METRICS +
-    mtb.plot.CLASSIFICATION_METRICS``.
-    An unknown code raises ``ValueError`` listing the valid ones; a bare
-    code string (``metrics="ARI"``) raises and points at the list form.
-
-    **Cost and Leiden backend.** The protocol is the article's. ARI, NMI,
-    ASW, iASW and iF1 score Leiden clusters searched to the number of cell
-    types; ARI_batch and NMI_batch, clusters searched to the number of
-    batches. ``mtb.config.DEFAULT.leiden_flavor`` sets the backend:
-    ``"igraph"`` (default) or ``"leidenalg"``, scanpy's default before 1.10.
-    With ``leidenalg`` the clustering takes tens of seconds for a few
-    thousand cells and minutes for ~10^4; ``igraph`` is several times
-    faster.
-
-    To skip it, name only metrics that do not need it in ``metrics=[...]``
-    (``cLISI``, ``ASW_batch``, ``GC``, ``iLISI``, ``kBET``). ``clustering=``
-    replaces the cell-type clusters only.
-
-    **Metric definitions.** All metrics are scaled so that higher is better.
-    Most lie between 0 and 1; ARI can be slightly below 0, which means a
-    random clustering.
-
-    Each metric is a scib function on the embedding. The package requires
-    ``scib >= 1.1``; ``attrs["scib_version"]`` records the installed version.
-
-    The metrics look at different neighbourhoods:
-
-    - the cluster search (ARI, NMI, ASW, iASW, iF1, ARI_batch, NMI_batch) uses
-      scanpy's default 15-neighbour graph without ``use_rep``, as the
-      article: the first 50 principal components of an embedding wider than
-      50, NaN read as 0;
-    - GC uses the 15-neighbour graph of the embedding;
-    - cLISI and iLISI: scib builds scanpy's 15-neighbour graph from the
-      embedding. For each cell it takes the 90 cells with the shortest
-      paths on that graph, where the length of an edge is its connectivity
-      weight (``obsp["connectivities"]``), not its distance. Perplexity 30.
-      A cell with fewer than 90 reachable cells counts as one label;
-    - ASW, iASW and ASW_batch use distances in the embedding;
-    - kBET builds its own neighbour graph.
-
-    The search bisects the Leiden resolution on [0, 3] for at most 30 steps
-    until it gives the number wanted (``sinfonia.get_N_clusters``); when no
-    step does, the last step's clusters are scored, with a ``UserWarning``.
-    ``iso_threshold`` = number of batches + 1 counts every label as
-    isolated; scib's default counts only labels found in few batches.
-
-    The scib call behind each code:
-
-    ```text
-    code       scib function         arguments
-    ARI, NMI   ari, nmi              clusters, one per cell type
-    ASW        silhouette            those clusters; rescaled to 0-1 by scib
-    iASW       isolated_labels_asw   those clusters; iso_threshold = number
-                                     of batches + 1
-    iF1        isolated_labels_f1    cell types, same threshold; best F1
-                                     of one of those clusters
-    cLISI      clisi_graph           type_="embed"; 90 nearest by path over
-                                     the connectivity weights of the
-                                     15-neighbour graph; scaled to 0-1
-    ASW_batch  silhouette_batch      1 - |batch silhouette| per cell type
-    ARI_batch  ari                   1 - |ARI| of clusters, one per batch,
-                                     against the batches
-    NMI_batch  nmi                   1 - |NMI|, the same way
-    GC         graph_connectivity    on the 15-neighbour graph
-    iLISI      ilisi_graph           type_="embed"; 90 nearest by path over
-                                     the connectivity weights of the
-                                     15-neighbour graph; scaled to 0-1
-    kBET       kBET                  computed only when named in metrics=[...]
-    ```
-
-    cLISI and iLISI take the median m of the per-cell scores and scale it:
-    cLISI = (L - m)/(L - 1), iLISI = (m - 1)/(B - 1), with L cell types and
-    B batches.
-
-    The re-run tables were scored by multibench 0.2.1's ``evaluate`` with
-    the leidenalg backend and an earlier protocol: the clusters of the best
-    NMI of a 10-resolution sweep, iF1 over that sweep, ASW and iASW on the
-    cell types, no ARI_batch or NMI_batch. The published tables were
-    computed by the benchmark; see the paper's Methods.
-
-    **Batch.** When ``labels`` lists two or more files (or a dict of them)
-    and ``batch`` is omitted, the file of origin (1, 2, ...) serves as the
-    batch, as in ``mtb.run_all``. ``batch=`` with a selection that has no
-    batch metric changes nothing, and a ``UserWarning`` says so.
-
-    **Classification.** The five values are the ``mean`` row of
-    ``mtb.classification_metrics(mtb.classify(...))`` with seed 0: each batch
-    in turn is the reference. They need an embedding and two or more
-    batches: the output of a graph method (its neighbour index, or the UMAP
-    scMoMaT writes) has none. When they cannot be computed,
-    ``"classification"`` or a list of their codes raises ``ValueError``;
-    ``"all"``, and ``None`` with two or more batches, give NaN and one
-    ``UserWarning``. ``Spec`` is NaN, with a ``UserWarning``, when the cells
-    a reference batch predicts are all of one cell type.
-
-    **Cell order.** Arrays, lists and label files without a cell-id column
-    are matched by position to the rows of ``output``. When ``output``
-    carries cell ids (an AnnData, a DataFrame with a non-default index, or a
-    ``.csv`` / ``.tsv`` file whose first column holds text, the barcodes),
-    a ``Series`` / ``DataFrame`` with a non-default index is aligned by id,
-    and so is a CSV whose first column holds cell ids (as
-    ``obs[["batch"]].to_csv(path)`` writes it), or a list of such files. A
-    missing or extra id raises ``ValueError`` naming the first ones (for a
-    ``.csv`` / ``.tsv`` output, their number and one of them), and so does a
-    first column where only some values are cell ids.
-
-    A file, or a Series against a ``.csv`` / ``.tsv`` output, whose ids name
-    none of the cells is matched by position with a ``UserWarning``; such a
-    Series raises for an AnnData. Numbers in a first column, such as R's row
-    numbers, are matched by position unless they are exactly the output's
-    cell ids. A bare-array ``output`` has nothing to align against: the
-    Series, or a CSV with text in its first column, is matched by position
-    with a ``UserWarning``.
-
-    A ``.csv`` / ``.tsv`` output in another row order is matched by barcode,
-    and a line on stderr says so unless ``verbose=False``. Its first column
-    of numbers is left out without a header (row numbers, no ids) and is a
-    column of the embedding with one.
-
-    **Provenance.** ``attrs`` records how the scores were computed:
-
-    - ``leiden_flavor`` - the Leiden backend; ``None`` when Leiden did not
-      run;
-    - ``clustering`` - where the clusters of ARI, NMI, ASW, iASW and iF1 came
-      from: ``"search"`` or ``"user"``; ``None`` without those metrics;
-    - ``multibench_version`` and ``scib_version`` - the installed versions.
-
-    ``mtb.to_long`` writes the first three to a ``scored_with`` column.
-    When ``missing_labels="drop"`` left cells out, ``attrs`` also holds
-    ``cells_scored`` and ``cells_total``, and ``scored_with`` ends with
-    them (``.../270 of 300 cells``).
-
-    **Retired keywords.** ``task=``, ``family=`` and ``only=`` still work
-    as spellings of ``metrics=``, with a ``DeprecationWarning``;
-    ``slow_metrics=``, ``column=`` and ``metric_set=`` raise ``TypeError``
-    naming the replacement. The Changes page lists them.
+    >>> mtb.evaluate(res.output, labels=mtb.labels_for("D11"))   # res = mtb.run(...)
+    >>> mtb.evaluate(adata, labels="celltype", batch="sample", obsm="X_pca")
 
     See Also
     --------
-    mtb.labels_for : the label files of a dataset, in the method's cell order.
-
-    mtb.to_long : reshapes the result into the long results frame.
-
-    mtb.run_all : runs and scores every runnable method on a dataset.
+    mtb.labels_for : the label files of a dataset, in a method's cell order.
+    mtb.to_long : the long results table of these scores.
     """
     if not isinstance(missing_labels, str) or missing_labels not in ("error", "drop"):
         raise ValueError(
