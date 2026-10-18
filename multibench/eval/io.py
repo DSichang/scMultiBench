@@ -685,7 +685,8 @@ def _align_vector(x, ids, *, what: str, column: str | None, cells: str | None):
     extra = x.index.difference(ids, sort=False)
     if len(missing) and len(missing) == len(ids):
         raise ValueError(
-            f"The {what}' cell ids do not match the embedding's (embedding e.g. "
+            f"The {what}{chr(39) if what.endswith('s') else chr(39) + 's'} cell ids do not "
+            f"match the embedding's (embedding e.g. "
             f"{ids[0]}, {what} e.g. {x.index[0]}). Pass {what} indexed like the "
             f"embedding, or {what}.to_numpy() to match by position.")
     if len(missing) or len(extra):
