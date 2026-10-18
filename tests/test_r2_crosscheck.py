@@ -140,3 +140,26 @@ def test_load_batch_reads_a_relative_out_dir_from_the_tree(tmp_path, monkeypatch
         res = mtb.load_batch(tree)
     assert [r["out_dir"] for r in res.records] == [
         str((tree / f"{m}_D11").resolve()) for m in ("Matilda", "MOFA2", "scMoMaT")]
+
+
+# X07: a family counts in the Overall only when every row has it, silently
+def test_a_family_two_rows_have_counts_in_no_overall():
+    import warnings
+    import pandas as pd
+    stored = mtb.load_results("diagonal", dataset="D28")
+    mine = stored[stored["method"].isin(["scJoint", "iNMF"])].assign(
+        method=lambda d: d["method"] + "_rerun", source="user",
+        scored_with="leidenalg/search/0.4.0")
+    cls = pd.DataFrame([{"metric": c, "value": 0.5, "method": m, "dataset": "D28",
+                         "category": "diagonal", "clustering": "default", "source": "user",
+                         "scored_with": "leidenalg/search/0.4.0"}
+                        for m in ("scJoint_rerun", "iNMF_rerun") for c in ("OCA", "F1")])
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        t = mtb.plot.build_table(pd.concat([stored, mine, cls]))
+    order = list(t.methods)
+    for m in ("scJoint", "iNMF"):
+        assert order.index(m + "_rerun") == order.index(m) + 1      # same scores, side by side
+    assert "Classification" in [b.label for b in t.blocks]
+    assert not [x for x in w if "Classification" in str(x.message)
+                or "has no OCA" in str(x.message)]

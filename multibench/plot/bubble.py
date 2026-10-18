@@ -295,8 +295,8 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     -------
     BubbleTable
         Read ``methods`` (row order: best first unless ``order`` is given),
-        ``ranks`` (max-ranks, ``n`` = best) and ``overall``; all fields are
-        under ``mtb.plot.BubbleTable``.
+        ``ranks`` (max-ranks, ``n`` = best) and ``overall`` (over the families
+        every row has); all fields are under ``mtb.plot.BubbleTable``.
 
     Raises
     ------
@@ -314,9 +314,8 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     UserWarning
         ``n/a`` cells (also in ``na_cells``), several datasets under
         ``aggregate="dataset"``, an incomplete method x dataset matrix under
-        ``"summary"``, methods dropped by ``require_complete``, a column
-        that has the same value in every row, or a family only one method
-        has (drawn, but not in the row Overall).
+        ``"summary"``, methods dropped by ``require_complete``, or a column
+        that has the same value in every row.
 
     Examples
     --------
@@ -486,10 +485,9 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=Non
     if not blocks:
         raise ValueError("no known metrics found in long_df")
 
-    # a family only one method has (classification of your own row next to
-    # stored rows without it) is drawn, but does not lift that row's Overall
-    counted = [b for b in blocks if b.raw.notna().any(axis=1).sum() >= 2] or blocks
-    lone_families = [b.label for b in blocks if b not in counted]
+    # a family some rows lack (classification of your rows next to stored rows
+    # without it) is drawn, but counts in no row's Overall
+    counted = [b for b in blocks if b.raw.notna().any(axis=1).all()] or blocks
     combined = pd.concat([b.overall for b in counted], axis=1).mean(axis=1)
     # stable sort: tied methods keep alphabetical order, as in plot.bar
     ranked = combined.sort_values(ascending=False, kind="mergesort").index.tolist()
@@ -506,8 +504,10 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=Non
         b.overall = b.overall.reindex(rows)
 
     na_cells = _na_report(blocks, parts, aggregate)
-    if na_cells and na != "skip":
-        msg = _na_message(_na_missing(blocks, parts, aggregate), df, aggregate, na)
+    # the n/a cells of a family that counts in no Overall need no words
+    missing = _na_missing(blocks if na == "raise" else counted, parts, aggregate)
+    if na_cells and na != "skip" and missing:
+        msg = _na_message(missing, df, aggregate, na)
         if na == "raise":
             raise ValueError(msg)
         _compat.warn(msg, UserWarning)
@@ -515,12 +515,6 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=Non
     drawn = pd.concat([b.raw for b in blocks], axis=1)
     msg = _no_comparison_message(rows, style.constant_columns(drawn), aggregate,
                                  partial=set(drawn.columns[drawn.isna().any()]))
-    if lone_families:
-        one = len(lone_families) == 1
-        tail = (f"{_and_list(lone_families)} {'has' if one else 'have'} a value for "
-                f"one method only, so {'it does' if one else 'they do'} not count in "
-                f"the row Overall.")
-        msg = f"{msg} {tail}" if msg else tail
     if msg:
         _compat.warn(msg, UserWarning)
 

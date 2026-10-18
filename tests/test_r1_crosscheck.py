@@ -127,8 +127,7 @@ def test_x07_a_family_only_your_row_has_does_not_lift_it():
     tbl, msgs = _messages(mtb.plot.build_table, pd.concat([d11, mine, cls]))
     assert tbl.overall["Mine"] == pytest.approx(plain.overall["Mine"])
     assert "Classification" in [b.label for b in tbl.blocks]          # still drawn
-    assert any("Classification has a value for one method only, so it does not count "
-               "in the row Overall." in m for m in msgs), msgs
+    assert not any("Classification" in m for m in msgs), msgs   # the n/a cells show it
     # bar: the lone metrics are left out of the ranks, with one line
     _, msgs = _messages(mtb.plot.bar, pd.concat([d11, mine, cls]))
     assert "F1 and OCA have a value for one method only, so they do not count in " \
