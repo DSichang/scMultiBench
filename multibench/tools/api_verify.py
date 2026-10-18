@@ -42,7 +42,7 @@ def _():
 
 @check("method_info")
 def _():
-    i = mtb.method_info("Matilda", verbose=True); assert i["env"] and "params" in i; return f"env={i['env']} variants={len(i['variants'])}"
+    i = mtb.method_info("Matilda"); assert i["env"] and "params" not in i; return f"env={i['env']} variants={len(i['supports'])}"
 
 @check("method_info()['runtime']")
 def _():
@@ -60,60 +60,26 @@ def _():
     return mtb.params_for(s)["variant"]
 
 # ---------------- data resolution ----------------
-@check("inputs_for(check=True)")
+@check("scan + run_all(dry_run=True)")
 def _():
-    i = mtb.inputs_for("D11", "vertical", "Matilda", modalities=["rna", "adt"], check=True); return list(i)
-
-@check("inputs_for(grouped roles / cross)")
-def _():
-    i = mtb.inputs_for("D52", "cross", "totalVI",
-                       modalities=["rna1","rna2","rna3","adt1","adt2","adt3"], check=True)
-    assert len(i) == 6; return f"{len(i)} roles"
-
-@check("labels_for")
-def _():
-    l = mtb.labels_for("D11"); assert l; return list(l)
-
-@check("results_coverage")
-def _():
-    return f"{mtb.results_coverage('vertical').dataset.nunique()} vertical datasets"
+    t = mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False)
+    plan = mtb.run_all("D52", "cross", methods=["totalVI"], dry_run=True, verbose=False)
+    return f"{list(t.columns)}; {len(plan)} cross row(s)"
 
 # ---------------- catalog / config ----------------
-@check("catalog.methods")
-def _(): return f"{mtb.catalog.methods().shape}"
 @check("catalog.datasets")
 def _(): return f"{mtb.catalog.datasets().shape}"
 @check("catalog.metrics")
 def _(): return f"{mtb.catalog.metrics().shape}"
-@check("config.__all__ (Config, DEFAULT only)")
+@check("config.__all__ (DEFAULT only)")
 def _():
-    assert mtb.config.__all__ == ["Config", "DEFAULT"], mtb.config.__all__
+    assert mtb.config.__all__ == ["DEFAULT"], mtb.config.__all__
     assert "category_folder" not in dir(mtb.config)
     return "category_folder / metric_set_dir hidden (internal-only since 0.3.0)"
 @check("config.DEFAULT")
 def _(): return str(mtb.config.DEFAULT.data_path)
 
 # ---------------- io ----------------
-@check("io.to_canonical + read_canonical")
-def _():
-    import h5py
-    src = os.path.join(OUT, "src.h5")
-    with h5py.File(src, "w") as h:
-        g = h.create_group("matrix"); g.create_dataset("data", data=np.random.rand(6, 5))
-    dst = mtb.io.to_canonical(src, os.path.join(OUT, "canon.h5"))
-    ad = mtb.io.read_canonical(dst)   # returns AnnData (cells x features), not a bare array
-    assert ad.shape == (5, 6), ad.shape
-    return f"round-trip AnnData {ad.shape}"
-
-@check("io.to_canonical sparse AnnData (gzip, features x cells)")
-def _():
-    import anndata as ad, h5py, scipy.sparse as sp
-    a = ad.AnnData(sp.random(300, 200, density=0.08, format="csr", dtype=np.float64))
-    dst = mtb.io.to_canonical(a, os.path.join(OUT, "sparse.h5"))
-    with h5py.File(dst) as h:
-        d = h["matrix/data"]; assert d.shape == (200, 300) and d.compression == "gzip", (d.shape, d.compression)
-    return f"{d.shape} gzip, {os.path.getsize(dst)} bytes"
-
 @check("io.export_dataset + scan on the folder")
 def _():
     import anndata as ad
@@ -122,22 +88,15 @@ def _():
     d = mtb.io.export_dataset(a, os.path.join(OUT, "data", "MYCITE"), rna="X",
                               adt="obsm:protein", labels="obs:ct")
     files = sorted(os.listdir(d)); assert files == ["adt.h5", "cty.csv", "rna.h5"], files
-    got = mtb.inputs_for("MYCITE", "vertical", "Matilda", modalities=["rna", "adt"],
-                         data_path=os.path.join(OUT, "data"), check=True)
-    return f"{files} -> {sorted(got)}"
+    got = mtb.scan(str(d), "vertical", methods=["Matilda"], verbose=False)
+    return f"{files} -> {got.modalities.iloc[0]}"
 
-# ---------------- env (the three public names) ----------------
+# ---------------- env ----------------
 @check("env.__all__ / dir")
 def _():
-    assert mtb.env.__all__ == ["install", "doctor", "recipe"], mtb.env.__all__
+    assert mtb.env.__all__ == ["install"], mtb.env.__all__
     assert "group_for" not in dir(mtb.env) and callable(mtb.env.group_for)   # importable, not advertised
-    return "install, doctor, recipe"
-@check("env.recipe")
-def _(): return list(mtb.env.recipe("Matilda"))[:4]
-@check("env.doctor")
-def _():
-    d = mtb.env.doctor(); miss = d[~d.exists]
-    return f"{len(d)} envs, {len(miss)} missing"
+    return "install"
 @check("env.install(dry_run=True) - the plan, nothing built")
 def _():
     rows = mtb.env.install(["Matilda"], dry_run=True)
@@ -167,27 +126,20 @@ def _emb_and_labels():
 def _():
     e, lab = _emb_and_labels()
     v = mtb.evaluate(e, category="vertical", metrics="clustering", labels=lab)
-    return {k: round(float(x), 3) for k, x in v["Value"].items() if pd.notna(x)}
+    return {r.metric: round(float(r.value), 3) for r in v.itertuples() if pd.notna(r.value)}
 
 @check("evaluate(dims x cells auto-orient)")
 def _():
     e, lab = _emb_and_labels()
     v = mtb.evaluate(e.T, category="vertical", metrics="clustering", labels=lab)
-    return f"ARI={float(v['Value']['ARI']):.3f}"
-
-@check("evaluate(precomputed clustering)")
-def _():
-    e, lab = _emb_and_labels()
-    cl = pd.Series(lab).astype("category").cat.codes.to_numpy()
-    v = mtb.evaluate(e, category="vertical", metrics="clustering", labels=lab, clusters=cl)
-    return f"ARI={float(v['Value']['ARI']):.3f}"
+    return f"ARI={float(v.set_index('metric').value['ARI']):.3f}"
 
 @check("evaluate(metrics=[...]) - list of codes, no Leiden clustering")
 def _():
     e, lab = _emb_and_labels()
     v = mtb.evaluate(e, category="vertical", metrics=["cLISI"], labels=lab)
-    assert list(v.index) == ["cLISI"], list(v.index)
-    return f"cLISI={float(v['Value']['cLISI']):.3f}"
+    assert list(v.metric) == ["cLISI"], list(v.metric)
+    return f"cLISI={float(v.value.iloc[0]):.3f}"
 
 @check("evaluate(task=) - the one deliberate deprecated-alias check")
 def _():
@@ -201,34 +153,24 @@ def _():
     assert any("metrics='clustering'" in m for m in msgs), msgs
     return f"warned: {msgs[0][:60]}"
 
-@check("eval.evaluate / eval.to_long (module aliases)")
+@check("evaluate(dataset=, method=) - the long table")
 def _():
-    e, lab = _emb_and_labels()
-    v = mtb.eval.evaluate(e, category="vertical", metrics="clustering", labels=lab)
-    return f"{mtb.eval.to_long(v, method='M', dataset='D11', category='vertical').shape}"
-
-@check("to_long")
-def _():
-    e, lab = _emb_and_labels()
-    v = mtb.evaluate(e, category="vertical", metrics="clustering", labels=lab)
-    return f"{mtb.to_long(v, method='Matilda', dataset='D11', category='vertical').shape}"
+    e, _ = _emb_and_labels()
+    v = mtb.evaluate(e, dataset="D11", category="vertical", method="Matilda", metrics="ARI")
+    assert list(v.columns)[:3] == ["metric", "value", "method"], list(v.columns)
+    return f"{v.shape}"
 
 # ---------------- plot ----------------
-@check("plot.build_table")
+@check("recommend(long_df=)")
 def _():
     lng = pd.read_csv(f"{RESULTS}/long_all_D11.csv")
-    t = mtb.plot.build_table(lng); return type(t).__name__
-
-@check("plot.BubbleTable")
-def _():
-    lng = pd.read_csv(f"{RESULTS}/long_all_D11.csv")
-    t = mtb.plot.build_table(lng); assert isinstance(t, mtb.plot.BubbleTable); return "instance ok"
+    return list(mtb.recommend("vertical", long_df=lng).method[:3])
 
 @check("plot.__all__ / dir (render, FamilyBlock importable but unlisted)")
 def _():
-    assert mtb.plot.__all__ == ["bubble", "bar", "build_table", "BubbleTable"], mtb.plot.__all__
+    assert mtb.plot.__all__ == ["bubble", "bar"], mtb.plot.__all__
     assert "render" not in dir(mtb.plot) and callable(mtb.plot.render)
-    return "four names"
+    return "two names"
 
 @check("plot.bubble(save=)")
 def _():
@@ -241,11 +183,10 @@ def _():
     lng = pd.read_csv(f"{RESULTS}/long_all_D11.csv")
     fig = mtb.plot.bubble(lng); p = f"{OUT}/bubble.png"; fig.savefig(p); return os.path.getsize(p)
 
-@check("plot.bubble(metrics/methods/order/aggregate)")
+@check("plot.bubble(metrics/methods)")
 def _():
     lng = pd.read_csv(f"{RESULTS}/long_all_D11.csv")
-    fig = mtb.plot.bubble(lng, metrics=["ARI", "NMI"], methods=["Matilda", "totalVI", "scMSI"],
-                          order=["totalVI", "Matilda", "scMSI"], aggregate="dataset")
+    fig = mtb.plot.bubble(lng, metrics=["ARI", "NMI"], methods=["Matilda", "totalVI", "scMSI"])
     p = f"{OUT}/bubble_filtered.png"; fig.savefig(p); return os.path.getsize(p)
 
 @check("plot.style module")
