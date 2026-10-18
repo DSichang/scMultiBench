@@ -696,7 +696,7 @@ def _yes_no(value) -> str:
 def _cmd_info(args) -> int:
     """``multibench info METHOD``: the :func:`multibench.method_info` facts to check
     before a run; ``--format json`` prints the whole dict."""
-    info = discover.method_info(args.method)          # KeyError (did-you-mean)
+    info = discover.method_info(args.method, verbose=True)   # KeyError (did-you-mean)
     if args.format == "json":
         print(json.dumps(info, indent=1, default=str))
         return _EXIT_OK

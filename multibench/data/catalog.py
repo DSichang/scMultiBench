@@ -232,13 +232,13 @@ def _split_multivalue(cell: object) -> list[str]:
     return out
 
 
-def methods(files_dir: Path | str | None = None) -> pd.DataFrame:
-    """Table of the benchmark's methods, one row per method.
+_FILES_DIR = {"files_dir": _compat.use("config.DEFAULT.files_path")}
 
-    Parameters
-    ----------
-    files_dir : Path | str | None
-        Folder holding ``method.csv``; ``None`` = the package's shipped ``files/``.
+
+@_compat.keywords("catalog.methods", private="_methods", kept=_FILES_DIR,
+                  positional=("files_dir",))
+def methods() -> pd.DataFrame:
+    """Table of the benchmark's methods, one row per method.
 
     Returns
     -------
@@ -247,7 +247,7 @@ def methods(files_dir: Path | str | None = None) -> pd.DataFrame:
         ``name`` (the article's spelling, such as ``MOFA+``), ``language``,
         ``deep_learning``, ``atac`` (``'peak'`` / ``'gene_activity'`` /
         ``None``), ``output`` (``'embedding'`` / ``'graph'``),
-        ``needs_labels``, ``categories`` and ``tasks``.
+        ``needs_labels`` and ``categories``.
 
     Examples
     --------
@@ -261,6 +261,12 @@ def methods(files_dir: Path | str | None = None) -> pd.DataFrame:
     mtb.find_methods : the method ids, filtered by category, modalities and more.
     mtb.method_info : everything the package knows about one method.
     """
+    return _methods()
+
+
+def _methods(files_dir: Path | str | None = None) -> pd.DataFrame:
+    """:func:`methods`, with the deprecated ``files_dir=`` (the folder holding
+    ``method.csv``)."""
     if files_dir is None:
         files_dir = config.DEFAULT.files_path
     raw = pd.read_csv(Path(files_dir) / "method.csv")
@@ -277,7 +283,6 @@ def methods(files_dir: Path | str | None = None) -> pd.DataFrame:
         raw["CellType Information Required"].astype(str).str.strip().str.lower().isin(["yes", "y", "true"])
     )
     out["categories"] = raw["Integration Categories"].map(_split_multivalue)
-    out["tasks"] = raw["Task Categories"].map(_split_multivalue)
     # the registry's values win over the CSV prose
     from ..engine import registry
     specs = {s.id: s for s in registry.load()}
@@ -289,7 +294,6 @@ def methods(files_dir: Path | str | None = None) -> pd.DataFrame:
         out.at[i, "needs_labels"] = bool(spec.needs_labels)
         atac_col.at[i] = spec.atac
         out.at[i, "categories"] = list(spec.categories)
-        out.at[i, "tasks"] = list(spec.tasks)
     out["atac"] = atac_col
     out["needs_labels"] = out["needs_labels"].astype(bool)
     return out
@@ -308,14 +312,13 @@ def _dataset_sort_key(ds: str):
 _PAPER_COLUMNS = ["assay", "tissue", "n_cells", "n_batches", "source"]
 
 
-def datasets(files_dir: Path | str | None = None, *,
-             category: str | None = None) -> pd.DataFrame:
+@_compat.keywords("catalog.datasets", private="_datasets", kept=_FILES_DIR,
+                  positional=("files_dir",))
+def datasets(*, category: str | None = None) -> pd.DataFrame:
     """Table of the benchmark's datasets, joined with the stored results.
 
     Parameters
     ----------
-    files_dir : Path | str | None
-        Folder holding ``dataset.csv``; ``None`` = the package's shipped ``files/``.
     category : str | None
         Keep only the datasets the benchmark scored in this integration
         category (``vertical``, ``diagonal``, ``mosaic`` or ``cross``);
@@ -345,6 +348,13 @@ def datasets(files_dir: Path | str | None = None, *,
     mtb.results_coverage : which methods have stored scores on each dataset.
     mtb.data.fetchable : dataset ids that can be downloaded.
     """
+    return _datasets(category=category)
+
+
+def _datasets(files_dir: Path | str | None = None, *,
+              category: str | None = None) -> pd.DataFrame:
+    """:func:`datasets`, with the deprecated ``files_dir=`` (the folder
+    holding ``dataset.csv``)."""
     if files_dir is None:
         files_dir = config.DEFAULT.files_path
     raw = pd.read_csv(Path(files_dir) / "dataset.csv")
@@ -385,13 +395,10 @@ def datasets(files_dir: Path | str | None = None, *,
     return out.reset_index(drop=True)
 
 
-def metrics(files_dir: Path | str | None = None) -> pd.DataFrame:
+@_compat.keywords("catalog.metrics", private="_metrics", kept=_FILES_DIR,
+                  positional=("files_dir",))
+def metrics() -> pd.DataFrame:
     """Table describing the metrics: one row per metric code.
-
-    Parameters
-    ----------
-    files_dir : Path | str | None
-        Folder holding ``metric_full.csv``; ``None`` = the package's shipped ``files/``.
 
     Returns
     -------
@@ -411,6 +418,12 @@ def metrics(files_dir: Path | str | None = None) -> pd.DataFrame:
     mtb.evaluate : computes these metrics for an embedding.
     mtb.classification_metrics : the classification metrics of ``mtb.classify``'s predictions.
     """
+    return _metrics()
+
+
+def _metrics(files_dir: Path | str | None = None) -> pd.DataFrame:
+    """:func:`metrics`, with the deprecated ``files_dir=`` (the folder holding
+    ``metric_full.csv``)."""
     if files_dir is None:
         files_dir = config.DEFAULT.files_path
     raw = pd.read_csv(Path(files_dir) / "metric_full.csv")

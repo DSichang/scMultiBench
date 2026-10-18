@@ -179,11 +179,11 @@ def test_labels_for_names_a_missing_folder_as_scan_does(in_tmp):
     (dict(category="cross", dataset=["D52", "D52s"], source="published"),
      "The published tables of cross hold D52, not D52s."),
     (dict(category="cross", dataset="D99"),
-     "The re-run tables of cross hold D52 and D52s, not D99."),
+     "The re-run tables of cross hold D52, not D99."),
     (dict(category="cross", dataset="D99", source="both"),
      "The published tables of cross hold D52, not D99. The re-run tables of cross hold "
-     "D52 and D52s, not D99."),
-    (dict(dataset="D99"), "The re-run tables hold D11, D11s, "),
+     "D52, not D99."),
+    (dict(dataset="D99"), "The re-run tables hold D11, D28, D45 and D52, not D99."),
 ])
 def test_missing_tables_are_named_in_plain_sentences(kw, start):
     with warnings.catch_warnings():
@@ -203,7 +203,7 @@ def test_the_cli_names_no_result_path_flag(capsys, tmp_path):
                    "--out", str(tmp_path / "x.png")])
     err = capsys.readouterr().err
     assert rc == 1
-    assert "error: The re-run tables of cross hold D52 and D52s, not D53." in err, err
+    assert "error: The re-run tables of cross hold D52, not D53." in err, err
     assert "--result-path" not in err and "result_path=" not in err, err
 
 

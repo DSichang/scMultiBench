@@ -451,8 +451,12 @@ def test_na_warn_default_names_method_and_rule():
 
 
 def test_na_skip_and_raise():
+    # build_table(na=) is deprecated in 0.4.0 (X41) and keeps its effect
+    with pytest.warns(FutureWarning, match=r"plot.build_table\(na=\) is deprecated"):
+        bubble.build_table(_three(), na="skip")
     with warnings.catch_warnings():
         warnings.simplefilter("error")
+        warnings.simplefilter("ignore", FutureWarning)
         tbl = bubble.build_table(_with_gap(), na="skip")
     assert tbl.na_cells == ["B: DR and clustering Overall over 2 of 3 metrics (NMI n/a)"]
     with pytest.raises(ValueError, match=r"Row B \(D1\) has no NMI\."):
@@ -462,6 +466,7 @@ def test_na_skip_and_raise():
     # a complete frame is silent under every policy
     with warnings.catch_warnings():
         warnings.simplefilter("error")
+        warnings.simplefilter("ignore", FutureWarning)
         assert bubble.build_table(_three(), na="raise").na_cells == []
 
 

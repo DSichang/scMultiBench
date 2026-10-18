@@ -148,7 +148,10 @@ def test_result_path_and_clustering_still_work(result_dir):
 
 def test_available_datasets_still_lists_the_published_tables():
     got, msg = _one_warning(mtb.available_datasets)
-    assert got == ["D11", "D24", "D25", "D28", "D52"]          # its 0.3 default
+    # during 0.4.x it lists what results_coverage lists (X59), not 0.3's published ids
+    assert got == sorted(mtb.results_coverage().dataset.unique())
+    got, _ = _one_warning(lambda: mtb.available_datasets(source="published"))
+    assert got == ["D11", "D24", "D25", "D28", "D52"]
     got, _ = _one_warning(lambda: mtb.available_datasets(source="rerun"))
     assert got == sorted(mtb.results_coverage().dataset.unique())
     assert msg == _msg("available_datasets", "results_coverage")
@@ -249,7 +252,9 @@ def test_bar_group_is_metrics_and_the_styling_keywords_keep_their_effect():
     import matplotlib.pyplot as plt
     _, msg = _one_warning(lambda: mtb.plot.bar(_long(), group="clustering"))
     assert msg == _msg("plot.bar(group=)", "metrics=")
-    two = mtb.load_results("vertical")                       # D11 and D11s: dots drawn
+    d11 = mtb.load_results("vertical")                       # one table per category (X04):
+    two = pd.concat([d11, d11.assign(dataset="D11b",          # a second dataset draws dots
+                                     value=d11.value[::-1].to_numpy())])
     plain = _pixels(mtb.plot.bar(two, overall="mean_overall"))
     for kw, value in (("cmap", "Reds"), ("show_datasets", False)):
         fig, msg = _one_warning(lambda: mtb.plot.bar(two, overall="mean_overall",

@@ -23,7 +23,8 @@ def test_bar_returns_a_figure_and_ranks_methods():
 def test_bar_aggregates_across_datasets():
     one = mtb.plot.bar(_long(datasets=("D1",)))
     two = mtb.plot.bar(_long(datasets=("D1", "D2", "D3")))
-    assert "1 dataset" in one.axes[0].get_title(loc="left")
+    # one dataset: the title names it (0.4.0, one stored table per category)
+    assert one.axes[0].get_title(loc="left") == "overall — D1"
     assert "3 datasets" in two.axes[0].get_title(loc="left")
 
 

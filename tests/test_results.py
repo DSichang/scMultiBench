@@ -76,7 +76,8 @@ def test_source_column_and_values(result_dir):
     assert abs(_val(pub, "iNMF", "ARI") - 0.198677) < 1e-6
     rr = results.load_results("diagonal", dataset="D28")
     assert (rr.source == "rerun").all()
-    assert rr.method.nunique() == 12
+    # 11: the degenerate Conos rows left the table in 0.4.0 (X03)
+    assert rr.method.nunique() == 11 and "Conos" not in set(rr.method)
     assert abs(_val(rr, "iNMF", "ARI") - 0.234054) < 1e-6
 
 
@@ -190,7 +191,7 @@ def test_missing_published_error_text(tmp_path):
 
 def test_mosaic_rerun_loads(result_dir):
     m = results.load_results("mosaic")
-    assert set(m.dataset) == {"D45", "D45s"}
+    assert set(m.dataset) == {"D45"}         # one table per category (X04)
     with pytest.raises(FileNotFoundError):
         results.load_results("mosaic", source="published")
     # 'both' on mosaic = rerun only, no error
@@ -220,7 +221,7 @@ def test_dataset_list_and_unknown_dataset(result_dir):
     assert "result_path=" not in str(e.value)
     with pytest.raises(FileNotFoundError, match="The re-run tables of diagonal") as e:
         results.load_results("diagonal", dataset="D999")
-    assert "hold D28 and D28s, not D999" in str(e.value)
+    assert "hold D28, not D999" in str(e.value)
 
 
 # ---------------------------------------------------------------------------
@@ -274,7 +275,7 @@ def test_load_long_csv_fills_nan_provenance(tmp_path):
 def test_dataset_list_validates_every_element(result_dir):
     with pytest.raises(FileNotFoundError, match=r"^The published tables of diagonal hold D24, D25 and D28, not D99\.$") as e:
         results.load_results("diagonal", dataset=["D24", "D99"], source="published")
-    with pytest.raises(FileNotFoundError, match=r"The re-run tables of diagonal hold D28 and D28s, not D98 and D99\."):
+    with pytest.raises(FileNotFoundError, match=r"The re-run tables of diagonal hold D28, not D98 and D99\."):
         _quiet_rerun("diagonal", dataset=["D28", "D98", "D99"])
     # source='both': an id present in ONE source is fine (D24 is published-only)
     both = _quiet_rerun("diagonal", dataset=["D24", "D28"], source="both")
@@ -306,44 +307,40 @@ def test_user_method_name_accepted_in_file(tmp_path):
 
 
 def test_degenerate_rerun_rows_are_flagged(result_dir):
-    with pytest.warns(DegenerateRerunWarning, match=r"Conos/D28 \(re-run 0.4.0, ARI 0.0013\)") as rec:
+    """0.4.0 removed the one shipped degenerate row (Conos/D28, X03), so the
+    stored tables load quietly; a row that has ARI ~0 where the article's run
+    scored well still gets the warning, without the old df[...] advice."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DegenerateRerunWarning)
         rr = results.load_results("diagonal", dataset="D28")
-    assert "Conos" in set(rr.method)          # flagged, never dropped silently
-    msg = str(rec[0].message)
-    assert "df[df.method != 'Conos']" in msg
-    # the message names the trigger and the re-run value, never a score pair
-    assert msg.startswith("This re-run row has ARI below 0.01, while the published "
-                          "table has above 0.2 for the same method and dataset: ")
-    assert " vs " not in msg and " - " not in msg
-    # the detection still reads both sides of the trigger
-    bad = results._degenerate_rerun_rows(rr, result_dir)
+        mtb.recommend("diagonal")
+        mtb.results_coverage("diagonal")
+    assert "Conos" not in set(rr.method)
+    bad_row = pd.DataFrame({"metric": ["ARI"], "value": [0.0013], "method": ["Conos"],
+                            "dataset": ["D28"], "category": ["diagonal"],
+                            "clustering": ["default"], "source": ["rerun"]})
+    bad = results._degenerate_rerun_rows(bad_row, result_dir)
     assert bad[["category", "dataset", "method"]].values.tolist() == [["diagonal", "D28", "Conos"]]
     assert bad.rerun_ARI.iloc[0] < 0.01 and bad.published_ARI.iloc[0] > 0.2
-    # published-only loads and a filter that removes the row are silent
-    with warnings.catch_warnings():
-        warnings.simplefilter("error", DegenerateRerunWarning)
-        results.load_results("diagonal", dataset="D28", source="published")
-        results.load_results("diagonal", dataset="D28", methods="iNMF")
-        results.load_results("diagonal", dataset="D28s")
-    # results_coverage is a WHERE scan and stays quiet
-    with warnings.catch_warnings():
-        warnings.simplefilter("error", DegenerateRerunWarning)
-        mtb.results_coverage("diagonal")
-    # recommend inherits the flag (Conos sits in its ranking)
-    with pytest.warns(DegenerateRerunWarning):
-        mtb.recommend("diagonal")
+    with pytest.warns(DegenerateRerunWarning) as rec:
+        results._warn_degenerate(bad_row, result_dir, "0.4.0")
+    msg = str(rec[0].message)
+    assert msg == ("This re-run row has ARI below 0.01 where the article's run scored "
+                   "above 0.2: Conos/D28 (re-run 0.4.0, ARI 0.0013). It most likely "
+                   "comes from a failed run. Leave it out before ranking.")
+    assert "df[" not in msg and "published table" not in msg
 
 
 def test_catalog_datasets_covers_every_dataset_with_results(result_dir, layout_tree, monkeypatch):
     cat = mtb.catalog.datasets()
     have = set(mtb.results_coverage().dataset)
     assert have <= set(cat.dataset)
-    extra = cat[cat.dataset.isin({"D11s", "D28s", "D45s", "D52s"})]
-    assert len(extra) == 4 and extra.has_results.all()
-    assert extra.set_index("dataset").loc["D11s", "category"] == "vertical"
+    # the subsample tables left in 0.4.0 (X04): no "s" id is listed
+    assert not cat.dataset.str.endswith("s").any()
+    assert cat[cat.dataset.isin(have)].has_results.all()
     # the CSV rows come first, the appended ids after them in natural order
-    tail = cat.dataset.tolist()[-5:]
-    assert tail == ["D11s", "D24", "D28s", "D45s", "D52s"]
+    tail = cat.dataset.tolist()[-1:]
+    assert tail == ["D24"]
     # the article's datasets keep their category; has_results is the re-run tables'
     rows = cat.set_index("dataset")
     assert rows.loc["D24", "category"] == rows.loc["D25", "category"] == "diagonal"
@@ -353,7 +350,6 @@ def test_catalog_datasets_covers_every_dataset_with_results(result_dir, layout_t
     monkeypatch.setattr(mtb.config.DEFAULT, "result_path", layout_tree)
     cat2 = mtb.catalog.datasets()
     assert not cat2.has_results.any()
-    assert "D11s" not in set(cat2.dataset)
 
 
 # ---------------------------------------------------------------------------
@@ -390,8 +386,10 @@ def test_source_column_is_plain_rerun_and_version_in_attrs(result_dir, tmp_path)
     back = results.load_results(result_path=f, source="rerun")
     assert set(back.source) == {"rerun"} and back.attrs["rerun_version"] is None
     # the DegenerateRerunWarning keeps naming the full stamp
+    bad_row = rr.iloc[:1].assign(metric="ARI", value=0.001, method="Conos",
+                                 dataset="D28", category="diagonal")
     with pytest.warns(DegenerateRerunWarning, match=r"Conos/D28 \(re-run 0.4.0, ARI"):
-        results.load_results("diagonal", dataset="D28")
+        results._warn_degenerate(bad_row, result_dir, "0.4.0")
 
 
 def test_single_method_table_warns_when_other_source_has_more(result_dir, layout_tree):
@@ -430,7 +428,7 @@ def test_single_method_table_warns_when_other_source_has_more(result_dir, layout
     # a different FileNotFoundError inside the lookup, the same silence
     import shutil
     shutil.copytree(result_dir / "rerun", layout_tree / "rerun")
-    with pytest.raises(FileNotFoundError, match="The re-run tables of cross hold D52 and D52s, not D54."):
+    with pytest.raises(FileNotFoundError, match="The re-run tables of cross hold D52, not D54."):
         results._load_rerun("cross", ["D54"], layout_tree)
     with warnings.catch_warnings():
         warnings.simplefilter("error", UserWarning)
@@ -449,7 +447,7 @@ def test_fetchable_lists_the_release_assets(result_dir):
     # exactly why they are two functions; the docstring says which is which
     have = set(mtb.results_coverage().dataset)
     assert set(ids) & have and set(ids) != have
-    assert "D46" in ids and "D46" not in have and "D11s" in have and "D11s" not in ids
+    assert "D46" in ids and "D46" not in have
     doc = results.fetchable.__doc__
     assert "Dataset ids ``mtb.data.fetch`` can download." in doc
     assert "``mtb.results_coverage`` lists the datasets with stored scores" in doc
@@ -462,9 +460,10 @@ def test_shipped_tree_is_consistent_across_the_api(result_dir):
            for c in ("vertical", "diagonal", "mosaic", "cross")}
     assert pub == {"vertical": ["D11"], "diagonal": ["D24", "D25", "D28"],
                    "mosaic": [], "cross": ["D52"]}
-    assert results.available_datasets() == ["D11", "D24", "D25", "D28", "D52"]   # 0.3 default
     rr = results.available_datasets(source="rerun")
-    assert rr == ["D11", "D11s", "D28", "D28s", "D45", "D45s", "D52", "D52s"]
+    assert rr == ["D11", "D28", "D45", "D52"]
+    # the deprecated name lists what results_coverage lists (X59)
+    assert results.available_datasets() == rr
     cov = mtb.results_coverage(source="both")
     assert set(cov[cov.source == "published"].dataset) == set(sum(pub.values(), []))
     assert set(cov[cov.source == "rerun"].dataset) == set(rr)

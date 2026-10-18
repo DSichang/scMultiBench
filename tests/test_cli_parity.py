@@ -394,7 +394,7 @@ def test_cli_plot_result_path_reads_another_results_root(tmp_path, layout_tree, 
                    "--out", str(tmp_path / "x.png")])
     err = capsys.readouterr().err
     assert rc == 1
-    assert "error: The re-run tables of cross hold D52 and D52s, not D53." in err
+    assert "error: The re-run tables of cross hold D52, not D53." in err
     assert "--result-path" not in err and "result_path=" not in err
     # a category without published tables: the fact and the flag, in flag spelling
     rc = cli.main(["plot", "bubble", "--category", "mosaic", "--dataset", "D45",

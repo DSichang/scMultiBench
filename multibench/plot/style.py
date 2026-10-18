@@ -79,7 +79,9 @@ def per_dataset_ranks(long_df: pd.DataFrame, metrics=None) -> dict:
     For each dataset the frame is pivoted to method x metric (mean over
     duplicate rows), metrics that dataset never computed are dropped, and
     every remaining column is replaced by its max-rank (1 = worst ... n =
-    best, ties share the maximum rank). A frame without a ``dataset`` column
+    best, ties share the maximum rank). A metric only one of two or more
+    methods has is dropped too (:func:`lone_columns`); ``attrs["lone"]``
+    names it. A frame without a ``dataset`` column
     is treated as one dataset named ``"all"``. Datasets whose pivot is empty
     are skipped.
     """
@@ -97,10 +99,34 @@ def per_dataset_ranks(long_df: pd.DataFrame, metrics=None) -> dict:
         mat = mat.dropna(axis=1, how="all")
         if mat.empty:
             continue
-        out[ds] = mat.apply(lambda col: rank_max(col.to_numpy()), axis=0)
+        # a metric only one method has ranks nothing, as recommend's min-max rule
+        lone = lone_columns(mat)
+        mat = mat.drop(columns=lone)
+        ranked = mat.apply(lambda col: rank_max(col.to_numpy()), axis=0)
+        ranked.attrs["lone"] = lone
+        out[ds] = ranked
     if not out:
         raise ValueError("no dataset had usable metrics")
     return out
+
+
+def lone_columns(mat: pd.DataFrame) -> list:
+    """Columns of a method x metric frame with a value for one method only,
+    when the frame holds two or more methods; ``[]`` otherwise."""
+    if len(mat.index) < 2:
+        return []
+    return [c for c in mat.columns if mat[c].notna().sum() < 2]
+
+
+def lone_message(lone: dict) -> str | None:
+    """The warning for ``{dataset or None: [metric, ...]}`` columns that one
+    method has: they do not count in the Overall."""
+    cols = list(dict.fromkeys(c for cs in lone.values() for c in cs))
+    if not cols:
+        return None
+    one = len(cols) == 1
+    return (f"{_and_list(cols)} {'has' if one else 'have'} a value for one method only, "
+            f"so {'it does' if one else 'they do'} not count in the Overall.")
 
 
 def mean_rank_matrix(parts: dict) -> pd.DataFrame:
@@ -270,19 +296,86 @@ def constant_columns(mat: pd.DataFrame) -> dict:
 TWO_METHODS = "With 2 methods each column only shows which is higher."
 
 
+#: the clusters part of a 0.4.0 ``scored_with``: the article's resolution
+#: search, the user's own clusters, or none (classification only)
+SCORING_PROTOCOLS = ("search", "user", "none")
+#: first package version that scores with :data:`SCORING_PROTOCOL`
+SCORING_VERSION = (0, 4, 0)
+
+
+def _version_tuple(text) -> tuple:
+    """``"0.3.9"`` -> ``(0, 3, 9)``; ``()`` when ``text`` holds no version."""
+    import re
+    m = re.match(r"\s*(\d+)\.(\d+)(?:\.(\d+))?", str(text))
+    return tuple(int(g or 0) for g in m.groups()) if m else ()
+
+
+def old_scoring(scored_with) -> "pd.Series":
+    """True where a ``scored_with`` value is missing or names a scoring older
+    than 0.4.0 (another clustering protocol or version); ``"unknown"`` (a frame
+    without a record, which ``to_long`` warns about) is not flagged."""
+    col = pd.Series(scored_with).astype("string")
+    parts = col.str.split("/")
+
+    def old(p) -> bool:
+        if not isinstance(p, list):
+            return True
+        if p == ["unknown"]:
+            return False
+        if len(p) < 3:
+            return True
+        v = _version_tuple(p[2])
+        return p[1] not in SCORING_PROTOCOLS or not v or v < SCORING_VERSION
+    return parts.map(old).astype(bool)
+
+
+#: the warning for rows scored before 0.4.0 next to the stored tables
+OLD_SCORING = ("The rows for {names} were scored before multibench 0.4.0. "
+               "Score them again to compare them with the stored tables.")
+#: the same for rows that do not record their scoring
+NO_SCORING = ("The rows for {names} do not record how they were scored (no "
+              "scored_with). Score them with multibench 0.4.0 to compare them with "
+              "the stored tables.")
+
+
+def old_scoring_warning(df: pd.DataFrame) -> str | None:
+    """The message for rows of your own, scored before 0.4.0 or with no
+    ``scored_with``, plotted next to the stored rows; else ``None``."""
+    if not {"source", "metric", "method"} <= set(df.columns):
+        return None
+    stored = df["source"].isin(STORED_SOURCES)
+    if not stored.any() or stored.all():
+        return None
+    own = df[~stored]
+    sw = own["scored_with"] if "scored_with" in own.columns \
+        else pd.Series(pd.NA, index=own.index)
+    hit = old_scoring(sw).to_numpy()
+    if not hit.any():
+        return None
+    blank = sw.isna().to_numpy()
+    names = ", ".join(sorted(map(str, own.loc[hit, "method"].unique())))
+    return (NO_SCORING if blank[hit].all() else OLD_SCORING).format(names=names)
+
+
 def backend_warning(df: pd.DataFrame) -> str | None:
     """The message for igraph-scored rows plotted next to stored rows, else ``None``.
+
+    Rows of your own scored before 0.4.0, or without ``scored_with``, get
+    :func:`old_scoring_warning`'s message instead.
 
     The stored tables were clustered with leidenalg. A row is affected when
     its ``scored_with`` starts with ``igraph/`` and its metric came from
     Leiden: iF1, ARI_batch and NMI_batch always; ARI, NMI, ASW and iASW when
     the clusters part is ``search`` (ARI and NMI also ``sweep``, before 0.4).
-    Rows without ``scored_with`` (NaN) never trigger it. With a ``dataset``
+    Rows without ``scored_with`` (NaN) never trigger the igraph check. With a ``dataset``
     column, a row counts only when the frame holds a stored row of the same
     dataset: rows from a dataset with no stored rows are compared with no
     stored score, and the no-overlap warning covers them.
     """
     from .. import config
+    old = old_scoring_warning(df)
+    if old:
+        return old
     if not {"source", "scored_with", "metric", "method"} <= set(df.columns):
         return None
     stored = df["source"].isin(STORED_SOURCES)

@@ -61,9 +61,8 @@ class DegenerateRerunWarning(UserWarning):
     ``mtb.load_results`` and ``mtb.recommend`` emit it when a stored row
     scored ARI below 0.01 while the article's table scored the same method
     on the same dataset above 0.2: most likely a failed run, not the method
-    (in the shipped scores: Conos on D28). The message names the filter that
-    drops the row; ``warnings.simplefilter("ignore", mtb.DegenerateRerunWarning)``
-    silences it.
+    (0.4.0 removed the one such shipped row, Conos on D28).
+    ``warnings.simplefilter("ignore", mtb.DegenerateRerunWarning)`` silences it.
     """
 
 #: ``Concerto_louvain`` is Concerto's louvain variant, not a method id
@@ -453,12 +452,9 @@ def _warn_degenerate(out: pd.DataFrame, base: Path,
                       for r in bad.itertuples())
     head = ("These re-run rows have" if len(bad) > 1 else "This re-run row has")
     _compat.warn(
-        f"{head} ARI below {_DEGENERATE_RERUN_ARI}, while the published table has "
-        f"above {_DEGENERATE_PUBLISHED_ARI} for the same method and dataset: "
-        f"{items}. Such a "
-        f"row most likely comes from a failed re-run, for example a collapsed "
-        f"embedding or a wrong label order, not from the method itself. Drop it "
-        f"before ranking: df[df.method != {bad.method.iloc[0]!r}].",
+        f"{head} ARI below {_DEGENERATE_RERUN_ARI} where the article's run scored above "
+        f"{_DEGENERATE_PUBLISHED_ARI}: {items}. It most likely comes from a failed "
+        f"run. Leave it out before ranking.",
         DegenerateRerunWarning)
 
 
@@ -498,7 +494,7 @@ def load_results(
         Integration category (``vertical``, ``diagonal``, ``mosaic`` or
         ``cross``); ``None`` = every category.
     dataset : str or list of str
-        Dataset id(s), e.g. ``"D11"`` or ``["D11", "D11s"]``; ``None`` = every
+        Dataset id(s), e.g. ``"D11"`` or ``["D11", "D28"]``; ``None`` = every
         dataset of the category. ``mtb.results_coverage`` lists them.
     methods : str or list of str
         Method(s) to keep, in any case or spelling (``"mofa+"`` -> ``MOFA2``);
@@ -535,7 +531,7 @@ def load_results(
     --------
     >>> import multibench as mtb
     >>> long = mtb.load_results("vertical", dataset="D11")
-    >>> mtb.load_results("diagonal", dataset=["D28", "D28s"], metrics="clustering")
+    >>> mtb.load_results("diagonal", dataset="D28", metrics="clustering")
 
     See Also
     --------
@@ -780,11 +776,12 @@ def _list_datasets(category, base: Path, source: str, clustering: str) -> list[s
 def _available_datasets(
     category: str | None = None,
     *,
-    source: str = "published",
+    source: str = "rerun",
     result_path: Path | str | None = None,
 ) -> list[str]:
-    """Sorted dataset ids with stored results for ``source`` (the deprecated
-    ``available_datasets``, whose default was the published tables)."""
+    """Sorted dataset ids with stored results (the deprecated
+    ``available_datasets``): the datasets of :func:`results_coverage` (0.3's
+    default was the published tables; ``source="published"`` lists those)."""
     if source not in SOURCES:
         raise ValueError(f"unknown source {source!r}; valid: {list(SOURCES)}")
     base = _base_path(result_path)
@@ -808,7 +805,7 @@ def fetchable() -> list[str]:
 
     ``mtb.results_coverage`` lists the datasets with stored scores; the two
     sets overlap but are not the same (``D46`` downloads and has no stored
-    scores; ``D11s`` and the other subsamples have scores and no download).
+    scores).
 
     Returns
     -------
@@ -839,7 +836,7 @@ def results_coverage(category: str | None = None) -> pd.DataFrame:
     Returns
     -------
     pandas.DataFrame
-        One sorted row per ``category, dataset, method, clustering, source``;
+        One sorted row per ``category, dataset, method``;
         ``attrs["rerun_version"]`` holds the package version that scored
         the stored rows.
 
@@ -859,7 +856,11 @@ def results_coverage(category: str | None = None) -> pd.DataFrame:
     mtb.load_results : the scores behind each row.
     mtb.data.fetchable : the datasets ``mtb.data.fetch`` can download.
     """
-    return _results_coverage(category)
+    out = _results_coverage(category)
+    # one clustering and one source since 0.4: the constant columns go
+    keep = out[["category", "dataset", "method"]].drop_duplicates().reset_index(drop=True)
+    keep.attrs = dict(out.attrs)
+    return keep
 
 
 def _results_coverage(category: str | None = None, *, source: str = "rerun",
@@ -903,13 +904,16 @@ def _results_coverage(category: str | None = None, *, source: str = "rerun",
     return out
 
 
+#: what a stored row does not show: ``{(category, dataset, method): note}``
+_STORED_CAVEATS = {
+    ("cross", "D52", "UINMF"): "UINMF's stored D52 scores cover batches 1-2 of 3 "
+                               "(its two-batch variant).",
+}
+
 #: the modalities each shipped stored dataset measured, for recommend's error
 _STORED_DATASET_MODALITIES = {
-    "D11": ("rna", "adt"), "D11s": ("rna", "adt"),
-    "D24": ("rna", "atac"), "D25": ("rna", "atac"),
-    "D28": ("rna", "atac"), "D28s": ("rna", "atac"),
-    "D45": ("rna", "atac"), "D45s": ("rna", "atac"),
-    "D52": ("rna", "adt"), "D52s": ("rna", "adt"),
+    "D11": ("rna", "adt"), "D24": ("rna", "atac"), "D25": ("rna", "atac"),
+    "D28": ("rna", "atac"), "D45": ("rna", "atac"), "D52": ("rna", "adt"),
 }
 
 
@@ -948,10 +952,13 @@ def recommend(
 ) -> pd.DataFrame:
     """Rank the methods of a category from the stored scores.
 
-    Within each dataset the methods are ranked on each metric; a method's
+    Within each dataset the methods are ranked on each metric; each
+    per-dataset score is the mean rank over the metrics, min-max scaled
+    within the dataset (1 = best, 0 = worst there). A method's
     ``grand_score`` is the mean of its per-dataset scores, the
-    ``overall="mean_overall"`` score of ``mtb.plot.bar``. Methods the package
-    runs for the category without scores are listed last.
+    ``overall="mean_overall"`` score of ``mtb.plot.bar``; the stored tables
+    hold one dataset per category. Methods the package runs for the category
+    without scores are listed last.
 
     Parameters
     ----------
@@ -984,9 +991,9 @@ def recommend(
     Raises
     ------
     ValueError
-        Nothing left to rank, or ``modalities`` / ``atac`` naming data that
-        none of the ranked datasets measured (pass such scores as
-        ``long_df=``).
+        Nothing left to rank, ``long_df`` repeating stored method/dataset
+        rows, or ``modalities`` / ``atac`` naming data that none of the
+        ranked datasets measured (pass such scores as ``long_df=``).
     KeyError
         Unknown method name in ``methods``, with a did-you-mean hint.
 
@@ -1087,11 +1094,21 @@ def _recommend(
                 raise ValueError(
                     "The stored tables have no classification scores. Score your runs "
                     "with mtb.evaluate and pass them as long_df=.")
+            if long_df_was_none and not sel.explicit and sel.family == "batch":
+                one = ", ".join(sorted(map(str, long_df["dataset"].unique())))
+                raise ValueError(
+                    f"The {category} tables have no batch scores ({one} has one "
+                    f"batch). Use metrics=\"clustering\".")
             raise ValueError(
                 f"no {metrics!r} metrics ({sel.codes}) in the frame; metrics present: "
                 f"{sorted(long_df['metric'].unique())}")
     if "dataset" not in df.columns:
         df["dataset"] = "all"
+    keys = ["method", "metric", "dataset"]
+    from ..plot.bubble import _duplicate_rows_message, _user_repeats
+    repeated = _user_repeats(df, keys)
+    if repeated.any():
+        raise ValueError(_duplicate_rows_message(df[repeated], keys))
 
     parts = style.per_dataset_ranks(df, sel.codes if sel.explicit else None)
     degenerate = sorted(ds for ds, mat in parts.items() if len(mat.index) < min_methods)
@@ -1222,6 +1239,10 @@ def _recommend(
             + ". Check the coverage column before reading the order.")
     if backend:
         notes.append(backend)
+    for (cat, ds, m), text in _STORED_CAVEATS.items():
+        if long_df_was_none and cat == category and ds in per_ds.columns \
+                and m in grand.index and pd.notna(per_ds.loc[m, ds]):
+            notes.append(text)
     if only_dropped:
         one = len(only_dropped) == 1
         notes.append(

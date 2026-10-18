@@ -25,7 +25,7 @@ def test_methods_table_matches_registry(files_dir):
     assert "method" in df.columns
     assert "language" in df.columns
     assert "categories" in df.columns  # list-valued
-    assert "tasks" in df.columns       # list-valued
+    assert "tasks" not in df.columns   # the deprecated task vocabulary left in 0.4.0 (X39)
 
 
 def test_methods_default_files_dir_matches_registry():
@@ -88,12 +88,12 @@ def test_datasets_table_columns_and_registry_derived_category(files_dir):
     # the paper-derived columns are empty in the shipped CSV, so none is returned
     # (study round 1, L56; tests/test_catalog_text.py covers a CSV that fills one)
     assert not set(_paper_columns()) & set(df.columns)
-    # category filter; D45s (the re-run subsample) ships mosaic results too
-    assert set(catalog.datasets(files_dir, category="mosaic").dataset) == {"D45", "D45s"}
+    # category filter: one mosaic table since 0.4.0 (the D45s subsample left, X04)
+    assert set(catalog.datasets(category="mosaic").dataset) == {"D45"}
 
 
 def test_catalog_columns_match_registry(files_dir):
-    """needs_labels / atac / categories / tasks are OVERLAID from the registry
+    """needs_labels / atac / categories are OVERLAID from the registry
     (the CSV hand columns had diverged from it)."""
     df = catalog.methods(files_dir).set_index("method")
     specs = {s.id: s for s in registry.load()}
@@ -102,7 +102,6 @@ def test_catalog_columns_match_registry(files_dir):
         assert bool(row["needs_labels"]) == spec.needs_labels, cid
         assert row["atac"] == spec.atac or (row["atac"] is None and spec.atac is None), cid
         assert list(row["categories"]) == list(spec.categories), cid
-        assert list(row["tasks"]) == list(spec.tasks), cid
     assert df.loc["Matilda", "needs_labels"] == True  # noqa: E712 - derived from its cty role
     assert df.loc["moETM", "atac"] == "peak"
     assert set(df["atac"].dropna()) <= {"peak", "gene_activity"}
@@ -142,8 +141,8 @@ def test_datasets_lists_every_id_with_results(files_dir):
     import multibench as mtb
     df = catalog.datasets(files_dir)
     assert set(mtb.results_coverage().dataset) <= set(df.dataset)
-    assert {"D11s", "D28s", "D45s", "D52s"} <= set(df.dataset)
-    assert df[df.dataset == "D52s"].category.iloc[0] == "cross"
+    assert not {"D11s", "D28s", "D45s", "D52s"} & set(df.dataset)     # X04
+    assert df[df.dataset == "D52"].category.iloc[0] == "cross"
     assert not df.dataset.duplicated().any()
 
 

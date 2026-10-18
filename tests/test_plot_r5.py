@@ -117,11 +117,11 @@ def test_figures_of_five_or_more_metrics_keep_their_size(metrics):
 # --- R5-11 (a): the several-datasets warning -----------------------------------
 
 def test_several_datasets_warning_is_plain():
-    df = pd.concat([_stored("D11", "rerun", "vertical"),
-                    _stored("D11s", "rerun", "vertical")], ignore_index=True)
+    d11 = _stored("D11", "rerun", "vertical")     # a second dataset of the same methods
+    df = pd.concat([d11, d11.assign(dataset="D11b")], ignore_index=True)
     _, msgs = _messages(mtb.plot.build_table, df)
     assert msgs == [
-        "This figure averages each method over 2 datasets, D11 and D11s. Its rows "
+        "This figure averages each method over 2 datasets, D11 and D11b. Its rows "
         "mix datasets. Pass aggregate='summary' for the rank-averaged summary panel, "
         "or filter to one dataset."]
 
@@ -139,11 +139,11 @@ def test_several_datasets_warning_with_a_lone_dataset():
 
 def test_several_datasets_warning_cli_spelling(monkeypatch):
     monkeypatch.setattr(config, "_CLI", True)
-    df = pd.concat([_stored("D11", "rerun", "vertical"),
-                    _stored("D11s", "rerun", "vertical")], ignore_index=True)
+    d11 = _stored("D11", "rerun", "vertical")     # a second dataset of the same methods
+    df = pd.concat([d11, d11.assign(dataset="D11b")], ignore_index=True)
     _, msgs = _messages(mtb.plot.build_table, df)
     assert msgs == [
-        "This figure averages each method over 2 datasets, D11 and D11s. Its rows "
+        "This figure averages each method over 2 datasets, D11 and D11b. Its rows "
         "mix datasets. Pass --aggregate summary for the rank-averaged summary panel, "
         "or filter with --dataset."]
 
@@ -169,8 +169,8 @@ def test_equal_column_warning_is_plain():
     assert msgs == ["cLISI is 1.000 for every method. That column is grey."]
     df = pd.DataFrame(_rows("A", (0.3, 0.4, 1.0)) + _rows("B", (0.3, 0.2, 1.0)))
     _, msgs = _messages(mtb.plot.build_table, df)
-    # columns in figure order: cLISI leads its family
-    assert msgs == ["cLISI is 1.000 and ARI is 0.300 for every method. Those "
+    # columns in figure order, catalog.metrics()'s since 0.4.0 (X87): ARI first
+    assert msgs == ["ARI is 0.300 and cLISI is 1.000 for every method. Those "
                     "columns are grey."]
 
 

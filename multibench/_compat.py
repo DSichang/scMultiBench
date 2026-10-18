@@ -73,9 +73,13 @@ def renamed(old: str, new: str, fn):
 
 def keywords(func: str, *, renamed: dict | None = None, dropped: tuple = (),
              kept: dict | None = None, removed: dict | None = None,
-             private: str | None = None):
+             private: str | None = None, positional: tuple = ()):
     """Decorator for the old keywords of the public function ``func``. None of them
     is in its signature.
+
+    positional : names
+        Old keywords that 0.3 also took by position: extra positional
+        arguments go to these names, in order, and then warn as above.
 
     renamed : ``{old: new}``
         The value goes to ``new``, with ``Use new=.``
@@ -93,8 +97,16 @@ def keywords(func: str, *, renamed: dict | None = None, dropped: tuple = (),
         raise TypeError("keywords(kept=...) needs private=, the implementation's name")
 
     def deco(fn):
+        import inspect
+        n_pos = sum(p.kind in (p.POSITIONAL_ONLY, p.POSITIONAL_OR_KEYWORD)
+                    for p in inspect.signature(fn).parameters.values())
+
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
+            if positional and len(args) > n_pos:
+                extra, args = args[n_pos:], args[:n_pos]
+                for name, value in zip(positional, extra):
+                    kwargs[name] = value
             for name, (since, tail) in removed.items():
                 if name in kwargs:
                     raise TypeError(removed_text(f"{func}({name}=)", since, tail))

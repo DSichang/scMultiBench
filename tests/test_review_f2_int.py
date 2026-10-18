@@ -136,7 +136,7 @@ def test_summary_mode_names_the_tied_mean_rank_not_a_metric_value():
     import matplotlib.pyplot as plt
     tbl, msgs = _messages(mtb.plot.build_table, _trade_places(), aggregate="summary")
     grey = [m for m in msgs if m.endswith("are grey.")]
-    assert grey == ["Every method has mean rank 1.5 in cLISI, ARI, ASW and NMI. "
+    assert grey == ["Every method has mean rank 1.5 in ARI, NMI, ASW and cLISI. "
                     "Those columns are grey."], msgs
     assert not any("same value" in m or "1.500" in m for m in msgs)
     for overall in ("rank", "mean_overall"):
@@ -563,7 +563,8 @@ def test_plot_guide_describes_the_averaged_row_labels():
             "(`Matilda · 2 ds`).") in text
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        fig = mtb.plot.bubble(mtb.load_results("vertical", dataset=["D11", "D11s"]))
+        d11 = mtb.load_results("vertical", dataset="D11")
+        fig = mtb.plot.bubble(pd.concat([d11, d11.assign(dataset="D11b")]))
     labels = {t.get_text() for ax in fig.axes for t in ax.get_yticklabels()}
     labels |= set(_figure_texts(fig))
     assert "Matilda · 2 ds" in labels

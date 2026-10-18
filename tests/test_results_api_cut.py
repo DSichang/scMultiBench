@@ -122,6 +122,9 @@ def test_recommend_default_scores_the_clustering_family(result_dir):
 
 def test_results_coverage_and_degenerate_detection_still_run(result_dir):
     cov = results.results_coverage("diagonal")
-    assert set(cov.source) == {"rerun"}            # the default lists the re-run rows only
+    # category, dataset, method: the constant clustering and source left (X42)
+    assert list(cov.columns) == ["category", "dataset", "method"]
+    d28 = results.load_results("diagonal", dataset="D28")
+    bad = d28.iloc[:1].assign(metric="ARI", value=0.001, method="Conos")
     with pytest.warns(results.DegenerateRerunWarning, match="Conos/D28"):
-        results.load_results("diagonal", dataset="D28")
+        results._warn_degenerate(bad, result_dir)

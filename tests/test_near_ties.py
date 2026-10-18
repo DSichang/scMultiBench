@@ -76,15 +76,14 @@ def _stored_frames():
 def _tables(df, aggregate):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        return mtb.plot.build_table(df, aggregate=aggregate, na="skip")
+        return mtb.plot.build_table(df, aggregate=aggregate)
 
 
 def test_stored_tables_rank_exactly_as_without_the_tolerance(monkeypatch):
     frames = _stored_frames()
     names = {n for n, _, _ in frames}
     # the demo tables the package ships must all be covered
-    for want in ("rerun/D11", "rerun/D11s", "rerun/D28", "rerun/D28s", "rerun/D45",
-                 "rerun/D45s", "rerun/D52", "rerun/D52s", "published/D11",
+    for want in ("rerun/D11", "rerun/D28", "rerun/D45", "rerun/D52", "published/D11",
                  "published/D24", "published/D25", "published/D28", "published/D52"):
         assert want in names, sorted(names)
     new = {n: _tables(df, agg) for n, agg, df in frames}

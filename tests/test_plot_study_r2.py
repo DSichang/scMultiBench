@@ -45,7 +45,7 @@ def _stored(dataset, source="rerun", category="vertical"):
         return mtb.load_results(category, dataset=dataset, source=source)
 
 
-def _mine(method="PCA", dataset="MYCITE", scored_with="igraph/sweep/0.3.1",
+def _mine(method="PCA", dataset="MYCITE", scored_with="igraph/search/0.4.0",
           values=(0.351, 0.5, 0.55, 0.9)):
     return pd.DataFrame([
         {"metric": m, "value": v, "method": method, "dataset": dataset,
@@ -71,7 +71,7 @@ def test_dataset_mode_own_dataset_gets_the_no_overlap_warning():
 def test_dataset_mode_lone_dataset_next_to_shared_ones_gets_no_summary_advice():
     # S3: a stand-in on LUNG added to the three diagonal tables
     diag = _stored(["D24", "D25", "D28"], source="published", category="diagonal")
-    own = _mine(method="PCA_standin", dataset="LUNG", scored_with="leidenalg/sweep/0.3.1")
+    own = _mine(method="PCA_standin", dataset="LUNG", scored_with="leidenalg/search/0.4.0")
     _, msgs = _messages(mtb.plot.build_table, pd.concat([diag, own], ignore_index=True))
     assert not any("aggregate='summary'" in m for m in msgs), msgs
     assert any(m.startswith("This figure averages each method over 4 datasets")
@@ -80,25 +80,30 @@ def test_dataset_mode_lone_dataset_next_to_shared_ones_gets_no_summary_advice():
                for m in msgs), msgs
 
 
+def _pair():
+    """D11 and a second dataset of the same methods (the subsample tables left
+    in 0.4.0, X04): D11's rows under another dataset name."""
+    d11 = _stored("D11")
+    return pd.concat([d11, d11.assign(dataset="D11b")], ignore_index=True)
+
+
 def test_dataset_mode_rerun_pair_still_suggests_the_summary():
-    df = pd.concat([_stored("D11"), _stored("D11s")], ignore_index=True)
-    _, msgs = _messages(mtb.plot.build_table, df)
+    _, msgs = _messages(mtb.plot.build_table, _pair())
     assert msgs == [
-        "This figure averages each method over 2 datasets, D11 and D11s. Its rows "
+        "This figure averages each method over 2 datasets, D11 and D11b. Its rows "
         "mix datasets. Pass aggregate='summary' for the rank-averaged summary panel, "
         "or filter to one dataset."]
 
 
 def test_dataset_mode_advice_uses_the_cli_spelling(monkeypatch):
     monkeypatch.setattr(config, "_CLI", True)
-    _, msgs = _messages(mtb.plot.build_table,
-                        pd.concat([_stored("D11"), _stored("D11s")], ignore_index=True))
+    _, msgs = _messages(mtb.plot.build_table, _pair())
     assert msgs[0].startswith("This figure averages each method over 2 datasets")
     assert "Pass --aggregate summary" in msgs[0] and "aggregate='summary'" not in msgs[0]
 
 
 def test_no_plot_warning_says_by_construction():
-    lone = pd.concat([_stored("D11"), _mine(scored_with="leidenalg/sweep/0.3.1")],
+    lone = pd.concat([_stored("D11"), _mine(scored_with="leidenalg/search/0.4.0")],
                      ignore_index=True)
     calls = [(mtb.plot.build_table, {}),
              (mtb.plot.build_table, {"aggregate": "summary"}),
@@ -158,13 +163,13 @@ def test_constant_column_warns_and_uses_the_neutral_fill():
 
 def test_stored_demo_figures_are_unchanged():
     for source, category, datasets in (
-            ("rerun", "vertical", ["D11", "D11s"]), ("rerun", "diagonal", ["D28", "D28s"]),
-            ("rerun", "mosaic", ["D45", "D45s"]), ("rerun", "cross", ["D52", "D52s"]),
+            ("rerun", "vertical", ["D11"]), ("rerun", "diagonal", ["D28"]),
+            ("rerun", "mosaic", ["D45"]), ("rerun", "cross", ["D52"]),
             ("published", "vertical", ["D11"]),
             ("published", "diagonal", ["D24", "D25", "D28"])):
         for ds in datasets:
             df = _stored(ds, source=source, category=category)
-            tbl, msgs = _messages(B.build_table, df, na="skip")
+            tbl, msgs = _messages(B._build_table, df, na="skip")
             assert not any("is grey" in m or "are grey" in m for m in msgs), (ds, msgs)
             fig = B.render(tbl)
             assert not [p for p in fig.axes[0].patches if p.get_facecolor() == _grey()], ds
@@ -190,7 +195,7 @@ def test_igraph_rows_next_to_stored_rows_warn(fn):
 
 @pytest.mark.parametrize("fn", [mtb.plot.build_table, mtb.plot.bar])
 def test_no_backend_warning_for_leidenalg_or_own_rows(fn):
-    lalg = _mine(method="MyMethod", dataset="D11", scored_with="leidenalg/sweep/0.3.1")
+    lalg = _mine(method="MyMethod", dataset="D11", scored_with="leidenalg/search/0.4.0")
     _, msgs = _messages(fn, pd.concat([_stored("D11"), lalg], ignore_index=True))
     assert not any("igraph Leiden backend" in m for m in msgs), msgs
     own = pd.concat([_mine(method="M1"), _mine(method="M2", values=(0.4, 0.6, 0.5, 0.8))],
@@ -205,10 +210,11 @@ def test_no_backend_warning_for_leidenalg_or_own_rows(fn):
 def test_backend_warning_needs_a_sweep_metric_on_show():
     df = pd.concat([_stored("D11"), _mine(method="MyMethod", dataset="D11")],
                    ignore_index=True)
-    _, msgs = _messages(mtb.plot.build_table, df, metrics=["ASW", "cLISI"])
+    # under the 0.4.0 search ASW reads the Leiden clusters too: cLISI does not
+    _, msgs = _messages(mtb.plot.build_table, df, metrics=["cLISI"])
     assert not any("igraph Leiden backend" in m for m in msgs), msgs
     # clusters from the user: only iF1 depends on the backend
-    user = _mine(method="MyMethod", dataset="D11", scored_with="igraph/user/0.3.1")
+    user = _mine(method="MyMethod", dataset="D11", scored_with="igraph/user/0.4.0")
     _, msgs = _messages(mtb.plot.build_table,
                         pd.concat([_stored("D11"), user], ignore_index=True))
     assert not any("igraph Leiden backend" in m for m in msgs), msgs

@@ -21,12 +21,13 @@ from .. import _compat
 from .. import config as _config
 from ..config import _and_list
 
-# column order within each family, as in the paper's panels
+from ..data.catalog import FAMILY_METRICS as _FAMILY_METRICS
+
+# column order within each family: catalog.metrics()'s
 FAMILIES = [
-    ("DR and clustering", ["cLISI", "ARI", "ASW", "iASW", "iF1", "NMI"], "Blues"),
-    ("Batch correction", ["ASW_batch", "ARI_batch", "NMI_batch", "GC", "iLISI", "kBET"],
-     "Greens"),
-    ("Classification", ["OCA", "ACA", "Spec", "Sens", "F1"], style.PINKS),
+    ("DR and clustering", list(_FAMILY_METRICS["clustering"]), "Blues"),
+    ("Batch correction", list(_FAMILY_METRICS["batch"]), "Greens"),
+    ("Classification", list(_FAMILY_METRICS["classification"]), style.PINKS),
 ]
 
 #: glyph drawn in a cell whose metric was not computed for that method
@@ -34,6 +35,12 @@ NA_MARK = "\u2013"
 
 #: second line of the Score legend title: the fill is scaled within each column
 SCORE_SCALE_NOTE = "(scaled per column)"
+
+#: the same note under a summary table, whose bars are mean ranks
+SUMMARY_SCALE_NOTE = "(mean rank over datasets, scaled per column)"
+
+#: the legend of the chips left of the rows
+LANGUAGE_NOTE = "Py / R: the method's language"
 
 #: fill of a column whose rows all hold the same value (and of every marker in
 #: a one-method figure): the colour ramp would draw it at its "High" end
@@ -81,7 +88,8 @@ class BubbleTable:
         Unscaled matrix (method x metric) in figure order: metric means, or
         mean within-dataset max-ranks under ``"summary"``.
     overall : pandas.Series
-        Combined Overall per method (mean of the family Overalls); it sets
+        Combined Overall per method (mean of the Overalls of the families
+        two or more methods have); it sets
         the row order unless ``order`` is given.
     aggregate : str
         ``"dataset"`` (metric markers are circles) or ``"summary"`` (bars,
@@ -128,6 +136,15 @@ class BubbleTable:
     def norm(self) -> pd.DataFrame:
         """All families' per-column min-max values; an alias of ``matrix``."""
         return self.matrix
+
+    def __repr__(self) -> str:
+        n = len(self.methods)
+        head = ", ".join(map(str, self.methods[:5])) + (", ..." if n > 5 else "")
+        fams = ", ".join(f"{b.label} ({b.raw.shape[1]})" for b in self.blocks)
+        ds = ", ".join(self.datasets) if self.datasets else "one"
+        return (f"BubbleTable: {n} methods ({head}); families {fams}; "
+                f"datasets {ds}; aggregate={self.aggregate!r}, "
+                f"overall={self.overall_basis!r}")
 
     @property
     def ranks(self) -> pd.DataFrame:
@@ -240,9 +257,11 @@ def _expand_families(metrics, available) -> list:
 NA_POLICIES = ("skip", "warn", "raise")
 
 
+@_compat.keywords("plot.build_table", private="_build_table", kept={
+    "na": _compat.note("leave it out for a warning that names the n/a cells")})
 def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None,
                 aggregate: str = "dataset", require_complete: bool = False,
-                overall: str = "rank", na: str = "warn") -> BubbleTable:
+                overall: str = "rank") -> BubbleTable:
     """Compute the ranks, scores and row order behind a bubble figure.
 
     Returns the numbers ``mtb.plot.bubble`` draws, without drawing.
@@ -272,11 +291,6 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
         Formula for each family's Overall under ``aggregate="summary"``:
         ``"rank"`` (the paper's panel rule: the rank of the mean ranks) or
         ``"mean_overall"`` (the mean of the per-dataset Overalls).
-    na : {"warn", "skip", "raise"}
-        How to report ``n/a`` cells (a method lacking a metric): ``"warn"``,
-        ``"skip"`` (silent, nothing is dropped) or ``"raise"``; also stored
-        as ``na_cells``.
-
     Returns
     -------
     BubbleTable
@@ -291,18 +305,18 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
         ``methods`` / ``order`` names an absent value.
     ValueError
         Duplicate ``(method[, dataset], metric)`` rows, or an invalid
-        ``aggregate`` / ``overall`` / ``na``.
+        ``aggregate`` / ``overall``.
     ValueError
-        No method is complete under ``require_complete=True``, or ``n/a``
-        cells under ``na="raise"``.
+        No method is complete under ``require_complete=True``.
 
     Warns
     -----
     UserWarning
-        ``n/a`` cells under ``na="warn"``, several datasets under
+        ``n/a`` cells (also in ``na_cells``), several datasets under
         ``aggregate="dataset"``, an incomplete method x dataset matrix under
-        ``"summary"``, methods dropped by ``require_complete``, or a column
-        that has the same value in every row.
+        ``"summary"``, methods dropped by ``require_complete``, a column
+        that has the same value in every row, or a family only one method
+        has (drawn, but not in the row Overall).
 
     Examples
     --------
@@ -315,6 +329,16 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     mtb.plot.bubble : builds the table and draws the figure in one call.
     mtb.plot.BubbleTable : what is returned, field by field.
     """
+    return _build_table(long_df, metrics=metrics, methods=methods, order=order,
+                        aggregate=aggregate, require_complete=require_complete,
+                        overall=overall)
+
+
+def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None,
+                 aggregate: str = "dataset", require_complete: bool = False,
+                 overall: str = "rank", na: str = "warn") -> BubbleTable:
+    """:func:`build_table`, with the deprecated ``na=`` of 0.3 (``"warn"``,
+    ``"skip"`` or ``"raise"`` for the ``n/a`` cells)."""
     from ..data import catalog
 
     need = {"method", "metric", "value"}
@@ -407,6 +431,10 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
                     "every dataset."),
                 stored=stored):
             _compat.warn(msg, UserWarning)
+        lone = style.lone_message({ds: mat.attrs.get("lone", [])
+                                   for ds, mat in parts.items()})
+        if lone:
+            _compat.warn(lone, UserWarning)
         raw_all = style.mean_rank_matrix(parts)
     else:
         if len(datasets) > 1:
@@ -458,7 +486,11 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     if not blocks:
         raise ValueError("no known metrics found in long_df")
 
-    combined = pd.concat([b.overall for b in blocks], axis=1).mean(axis=1)
+    # a family only one method has (classification of your own row next to
+    # stored rows without it) is drawn, but does not lift that row's Overall
+    counted = [b for b in blocks if b.raw.notna().any(axis=1).sum() >= 2] or blocks
+    lone_families = [b.label for b in blocks if b not in counted]
+    combined = pd.concat([b.overall for b in counted], axis=1).mean(axis=1)
     # stable sort: tied methods keep alphabetical order, as in plot.bar
     ranked = combined.sort_values(ascending=False, kind="mergesort").index.tolist()
     if order is not None:
@@ -483,6 +515,12 @@ def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None
     drawn = pd.concat([b.raw for b in blocks], axis=1)
     msg = _no_comparison_message(rows, style.constant_columns(drawn), aggregate,
                                  partial=set(drawn.columns[drawn.isna().any()]))
+    if lone_families:
+        one = len(lone_families) == 1
+        tail = (f"{_and_list(lone_families)} {'has' if one else 'have'} a value for "
+                f"one method only, so {'it does' if one else 'they do'} not count in "
+                f"the row Overall.")
+        msg = f"{msg} {tail}" if msg else tail
     if msg:
         _compat.warn(msg, UserWarning)
 
@@ -640,6 +678,18 @@ def _na_message(missing: list, df: pd.DataFrame, aggregate: str,
     return " ".join(sentences)
 
 
+def _user_repeats(df, keys):
+    """Rows that repeat ``keys`` where one of the repeats is not a stored row
+    (your rows next to the stored table, or your rows twice); the published
+    and re-run rows of the deprecated ``source="both"`` are left alone."""
+    repeated = df.duplicated(keys, keep=False)
+    if not repeated.any() or "source" not in df.columns:
+        return repeated
+    stored = df["source"].isin(style.STORED_SOURCES)
+    all_stored = stored.groupby([df[k] for k in keys]).transform("all")
+    return repeated & ~all_stored
+
+
 def _duplicate_rows_message(dup, keys) -> str:
     """The error for rows that repeat ``keys``: the fix when your rows collide
     with stored ones, else one example repeat."""
@@ -653,8 +703,10 @@ def _duplicate_rows_message(dup, keys) -> str:
         first = str(mixed["method"].iloc[0])
         return (f"Your rows and the stored table both have "
                 f"{_and_distinct(mixed['method'])}{where}. "
-                f"Give your rows another name, such as {first}_rerun, "
-                + _config.hint("with to_long(method=...).", "with evaluate --name."))
+                + _config.hint(f"Give your rows another name, e.g. "
+                               f"rows.assign(method=\"{first}_rerun\").",
+                               f"Give your rows another name, such as {first}_rerun, "
+                               f"with evaluate --name."))
     what = _and_list(keys)
     example = ", ".join(str(dup[k].iloc[0]) for k in keys)
     return (f"{len(dup)} rows repeat the same {what}, for example {example}. The figure "
@@ -879,8 +931,8 @@ def _draw(tbl, cmap, title, show_language, gaps):
     score_y = -1.1
     ax.text(-0.9, score_y, "Score", fontsize=8, fontweight="bold", va="center",
             gid="legend")
-    ax.text(-0.9, score_y - 0.5, SCORE_SCALE_NOTE, fontsize=6.4, va="center",
-            gid="legend")
+    ax.text(-0.9, score_y - 0.5, SUMMARY_SCALE_NOTE if tbl.aggregate == "summary"
+            else SCORE_SCALE_NOTE, fontsize=6.4, va="center", gid="legend")
     for fi, b in enumerate(tbl.blocks):
         xoff = RAMP_X0 + fi * RAMP_STEP
         for k in range(40):
@@ -908,6 +960,13 @@ def _draw(tbl, cmap, title, show_language, gaps):
 
     # room under the legends: the Rank labels, or the Score legend's note
     y_bottom = -3.4 if tbl.aggregate != "summary" else -2.0
+    if show_language:
+        # what the chips left of the rows mean
+        unknown = any(not _method_language(m) for m in methods)
+        ax.text(-0.9, y_bottom - 0.05, LANGUAGE_NOTE + ("; ?: not a package method"
+                                                        if unknown else ""),
+                fontsize=6.4, va="center", gid="legend")
+        y_bottom -= 0.6
 
     # a figure that mixes datasets gets a dataset cue in each row label
     labels = list(methods)
@@ -1073,9 +1132,9 @@ def _bubble(long_df, *, metrics=None, methods=None, order=None,
             overall="rank", cmap=None, show_language=True, na="warn"):
     """:func:`bubble`, with the deprecated ``cmap``, ``show_language`` and
     ``na`` of 0.3 (``render``'s and ``build_table``'s)."""
-    tbl = build_table(long_df, metrics=metrics, methods=methods, order=order,
-                      aggregate=aggregate, require_complete=require_complete,
-                      overall=overall, na=na)
+    tbl = _build_table(long_df, metrics=metrics, methods=methods, order=order,
+                       aggregate=aggregate, require_complete=require_complete,
+                       overall=overall, na=na)
     if len(tbl.methods) == 2:
         _compat.warn(style.TWO_METHODS, UserWarning)
     fig = render(tbl, cmap=cmap, title=title, show_language=show_language)

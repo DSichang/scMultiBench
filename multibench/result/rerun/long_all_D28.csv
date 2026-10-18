@@ -1,15 +1,4 @@
 metric,value,method,dataset,category,source
-ARI,0.0012980376681632,Conos,D28,diagonal,rerun-0.4.0
-NMI,0.0086378793819011,Conos,D28,diagonal,rerun-0.4.0
-ASW,0.6938683503936695,Conos,D28,diagonal,rerun-0.4.0
-iASW,0.7160955394169238,Conos,D28,diagonal,rerun-0.4.0
-iF1,0.0546325852221423,Conos,D28,diagonal,rerun-0.4.0
-cLISI,0.8167637231432023,Conos,D28,diagonal,rerun-0.4.0
-ASW_batch,0.860937319151399,Conos,D28,diagonal,rerun-0.4.0
-GC,0.0815475068275123,Conos,D28,diagonal,rerun-0.4.0
-iLISI,0.6369968722993742,Conos,D28,diagonal,rerun-0.4.0
-ARI_batch,0.9931763869249424,Conos,D28,diagonal,rerun-0.4.0
-NMI_batch,0.9928932365441056,Conos,D28,diagonal,rerun-0.4.0
 ARI,0.3146782953811959,Portal,D28,diagonal,rerun-0.4.0
 NMI,0.5497276122159936,Portal,D28,diagonal,rerun-0.4.0
 ASW,0.538844065827503,Portal,D28,diagonal,rerun-0.4.0

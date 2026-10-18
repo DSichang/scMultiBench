@@ -91,9 +91,9 @@ def test_inputs_for_default_no_warning_when_present(tmp_path):
 def test_available_datasets_warns_on_missing_root(tmp_path, result_dir):
     with pytest.warns(UserWarning, match="does not exist"):
         assert mtb.available_datasets("vertical", result_path=tmp_path / "nope") == []
-    # the deprecated function keeps its 0.3 default, the published tables
-    assert mtb.available_datasets("mosaic") == []
-    assert mtb.available_datasets("mosaic", source="rerun") == ["D45", "D45s"]
+    # the deprecated function lists the stored (re-run) datasets in 0.4.x (X59)
+    assert mtb.available_datasets("mosaic") == ["D45"]
+    assert mtb.available_datasets("mosaic", source="published") == []
     assert "D28" in mtb.available_datasets()
     assert "D28" in mtb.available_datasets("diagonal")
 
@@ -131,12 +131,12 @@ def test_recommend_ranks_with_coverage(result_dir):
     sb = r[r.method == "scBridge"].iloc[0]
     assert sb.needs_labels is True or sb.needs_labels == True   # noqa: E712
     assert sb.runtime_tier in {"fast", "medium", "slow", "very_slow", "unknown"}
-    # the re-run sweep scores 12 of the 14 on D28/D28s: source='both' makes
-    # the matrix incomplete and the warning says so
-    with pytest.warns(UserWarning, match="scores on only part of the datasets"):
+    # source='both': the re-run D28 rows join the published D28 ones (one
+    # table per category since 0.4.0, X04), so every method has 3 datasets
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
         rb = recommend("diagonal", source="both")
-    assert (rb.n_datasets <= rb.n_datasets_total).all() and (rb.coverage < 1.0).any()
-    assert (rb.n_datasets_total == 4).all()
+    assert (rb.n_datasets_total == 3).all()
     assert rb.grand_score.dropna().is_monotonic_decreasing
     # scored rows precede the NaN (unscored) tail
     assert rb.grand_score.notna().tolist() == sorted(rb.grand_score.notna().tolist(), reverse=True)
@@ -200,9 +200,9 @@ def test_recommend_single_dataset_category_names_the_other_source(result_dir):
             "scMoMaT, StabMap, totalVI, UINMF. Leave out source= to rank them.") in msg
     assert "meaningless" not in msg and ">=" not in msg and "(s)" not in msg
     assert msg.endswith("Otherwise pass long_df= with more methods, or lower min_methods.")
-    # that source ranks them on D52 + D52s, nothing dropped
+    # that source ranks them on D52, nothing dropped
     r, m = _rec("cross")
-    assert r.grand_score.notna().sum() == 8 and (r.n_datasets_total == 2).all()
+    assert r.grand_score.notna().sum() == 8 and (r.n_datasets_total == 1).all()
     assert "dropped" not in m
     # a single-dataset category with several methods ranks (vertical: D11)
     r2, _ = _rec("vertical", source="published")
@@ -268,8 +268,10 @@ def test_recommend_lists_unscored_methods(result_dir):
     # (the single published vertical dataset scores its 6 methods completely;
     # diagonal source='both' lacks GLUE / Seurat_v5 in the re-run rows)
     assert "only part of the datasets" not in msg
-    _, msg_b = _rec("diagonal", source="both")
-    assert "Some methods have scores on only part of the datasets: " in msg_b
+    d28 = mtb.load_results("diagonal")
+    part = pd.concat([d28, d28[d28.method != "iNMF"].assign(dataset="D28b")])
+    _, msg_b = _rec("diagonal", long_df=part)
+    assert "Some methods have scores on only part of the datasets: iNMF 1 of 2" in msg_b
     assert "Check the coverage column before reading the order." in msg_b
 
 
@@ -366,7 +368,9 @@ def test_recommend_task_error_names_real_metrics(result_dir):
     from multibench.data.results import recommend
     # vertical ships no batch metrics; the error must list what IS there,
     # not "metrics present: []" (the loader used to pre-filter by task)
-    with pytest.raises(ValueError, match=r"metrics present: \['ARI'"):
+    # the family on a single-batch category says so (X89)
+    with pytest.raises(ValueError, match=r'^The vertical tables have no batch scores '
+                                         r'\(D11 has one batch\)\. Use metrics="clustering"\.$'):
         recommend("vertical", metrics="batch")
     with pytest.raises(ValueError, match=r"metrics present: \['ARI'"):
         recommend("vertical", metrics=["GC", "iLISI"])

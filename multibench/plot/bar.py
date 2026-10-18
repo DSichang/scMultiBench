@@ -40,8 +40,8 @@ def bar(long_df: pd.DataFrame, *, metrics=None, top: int | None = None,
         Keep the ``top`` best methods, scored against all of them; ``None``
         = every method.
     title : str | None
-        Figure title; ``None`` = the number of datasets. With a family,
-        ``(<family> metrics)`` is appended.
+        Figure title; ``None`` = the dataset, or the number of datasets. With
+        a family, ``(<family> metrics)`` is appended.
     save : str | None
         File to write the figure to (140 dpi, tight bounding box).
     overall : {"rank", "mean_overall"}
@@ -57,8 +57,9 @@ def bar(long_df: pd.DataFrame, *, metrics=None, top: int | None = None,
     Raises
     ------
     ValueError
-        ``long_df`` lacks ``method`` / ``metric`` / ``value``, or is empty
-        (``mtb.load_results`` may have returned nothing; see its warning).
+        ``long_df`` lacks ``method`` / ``metric`` / ``value``, is empty
+        (``mtb.load_results`` may have returned nothing; see its warning), or
+        repeats a ``(method, dataset, metric)`` row.
     ValueError
         Unknown ``metrics`` code (the error suggests a close match and lists
         the metrics present), or an invalid ``overall``.
@@ -70,8 +71,9 @@ def bar(long_df: pd.DataFrame, *, metrics=None, top: int | None = None,
     Warns
     -----
     UserWarning
-        A method missing from some datasets, a dataset with one method, or a
-        figure of two methods.
+        A method missing from some datasets, a dataset with one method, a
+        metric only one method has (it does not count), rows scored before
+        0.4.0, or a figure of two methods.
 
     Examples
     --------
@@ -127,7 +129,16 @@ def _bar(long_df: pd.DataFrame, *, metrics=None, top: int | None = None,
         raise ValueError(
             f"overall must be one of {list(style.OVERALL_BASES)}, got {overall!r}")
 
+    from .bubble import _duplicate_rows_message, _user_repeats
+    keys = ["method", "metric"] + (["dataset"] if "dataset" in long_df.columns else [])
+    picked = long_df if not metrics else long_df[long_df["metric"].isin(metrics)]
+    repeated = _user_repeats(picked, keys)
+    if repeated.any():
+        raise ValueError(_duplicate_rows_message(picked[repeated], keys))
     parts = style.per_dataset_ranks(long_df, metrics)
+    lone = style.lone_message({ds: mat.attrs.get("lone", []) for ds, mat in parts.items()})
+    if lone:
+        _compat.warn(lone, UserWarning)
     # bar always ranks within each dataset: the checks of bubble(aggregate="summary")
     for msg in style.coverage_warnings(
             parts, basis=overall,
@@ -166,8 +177,10 @@ def _bar(long_df: pd.DataFrame, *, metrics=None, top: int | None = None,
             xerr = np.where(n_scored.to_numpy() > 1, sd.to_numpy(), np.nan)
         else:
             xerr = np.full(n, np.nan)
+        # no whisker artist at all when no method has a spread (one dataset)
         ax.barh(range(n), mean.to_numpy(), color=colors, edgecolor="#333",
-                linewidth=0.6, zorder=2, xerr=xerr,
+                linewidth=0.6, zorder=2,
+                xerr=xerr if np.isfinite(xerr).any() else None,
                 error_kw=dict(ecolor="#333", elinewidth=1.0, capsize=3, capthick=1.0))
 
         if show_datasets and overall == "mean_overall" and per_ds.shape[1] > 1:
@@ -192,8 +205,8 @@ def _bar(long_df: pd.DataFrame, *, metrics=None, top: int | None = None,
         ax.grid(axis="x", color="#e8e8e8", zorder=0)
         for side in ("top", "right", "left"):
             ax.spines[side].set_visible(False)
-        heading = title or (f"overall — {n_datasets} dataset"
-                            + ("s" if n_datasets != 1 else ""))
+        heading = title or (f"overall — {per_ds.columns[0]}" if n_datasets == 1
+                            else f"overall — {n_datasets} datasets")
         if family:
             heading += f"  ({family} metrics)"
         ax.set_title(heading, fontsize=11, loc="left")

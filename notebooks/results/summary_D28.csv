@@ -1,5 +1,4 @@
 method,status,run_sec,output_kind,label_order,n_batches,ARI,NMI,ASW,iASW,iF1,cLISI,ASW_batch,GC,iLISI,ARI_batch,NMI_batch
-Conos,CHAIN_OK,712.5,embedding,rna_cty.csv+atac_cty.csv,2.0,0.0013,0.0086,0.6939,0.7161,0.0546,0.8168,0.8609,0.0815,0.637,0.9932,0.9929
 MultiMAP,CHAIN_OK,2040.2,embedding,rna_cty.csv+atac_cty.csv,2.0,0.231,0.4951,0.6835,0.7164,0.3959,0.981,0.624,0.6619,0.6734,0.9988,0.9996
 Portal,CHAIN_OK,400.4,embedding,rna_cty.csv+atac_cty.csv,2.0,0.3147,0.5497,0.5388,0.5528,0.474,0.9743,0.8319,0.8606,0.652,0.9978,0.9997
 SCALEX,CHAIN_OK,2232.3,embedding,rna_cty.csv+atac_cty.csv,2.0,0.2491,0.5075,0.5593,0.5649,0.4118,0.9764,0.7994,0.8654,0.3437,0.9972,0.9994

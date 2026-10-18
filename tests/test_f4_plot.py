@@ -205,9 +205,11 @@ def test_recommend_unscored_methods_line_is_plain(result_dir):
 
 def test_recommend_coverage_and_dropped_lines_are_plain(result_dir, layout_tree_foreign):
     layout_tree = layout_tree_foreign
-    _, msg = _recommend("diagonal", source="both")
-    assert ("Some methods have scores on only part of the datasets: Seurat_v5 3 of 4, "
-            "GLUE 3 of 4. Check the coverage column before reading the order.") in msg
+    d28 = mtb.load_results("diagonal")
+    part = pd.concat([d28, d28[~d28.method.isin(["iNMF", "SCALEX"])].assign(dataset="D28b")])
+    _, msg = _recommend("diagonal", long_df=part)
+    assert ("Some methods have scores on only part of the datasets: SCALEX 1 of 2, "
+            "iNMF 1 of 2. Check the coverage column before reading the order.") in msg
     _no_log_joins(msg)
     _, msg = _recommend("cross", source="published", result_path=layout_tree)
     assert ("scMoMaT has scores only on datasets left out of the ranking, "
@@ -222,13 +224,15 @@ def test_recommend_coverage_and_dropped_lines_are_plain(result_dir, layout_tree_
 # --- R4-13 (c): DegenerateRerunWarning ----------------------------------------
 
 def test_degenerate_rerun_warning_head_is_a_sentence(result_dir):
+    from multibench.data import results
+    d28 = mtb.load_results("diagonal", dataset="D28")
+    bad = d28.iloc[:1].assign(metric="ARI", value=0.0013, method="Conos")
     with pytest.warns(mtb.DegenerateRerunWarning) as rec:
-        mtb.load_results("diagonal", dataset="D28")
+        results._warn_degenerate(bad, result_dir, "0.4.0")
     msg = str(rec[0].message)
     assert msg.startswith(
-        "This re-run row has ARI below 0.01, while the published table has above 0.2 "
-        "for the same method and dataset: Conos/D28 (re-run 0.4.0, ARI 0.0013). Such a "
-        "row most likely comes from a failed re-run")
+        "This re-run row has ARI below 0.01 where the article's run scored above 0.2: "
+        "Conos/D28 (re-run 0.4.0, ARI 0.0013). It most likely comes from a failed run.")
     _no_log_joins(msg)
 
 

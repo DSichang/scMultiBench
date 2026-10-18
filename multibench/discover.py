@@ -183,6 +183,28 @@ def _reference_batch(variant):
     return int(ref[4:]) if ref.startswith("data") and ref[4:].isdigit() else None
 
 
+#: the keys ``method_info`` returns by default: what a user reads before a run
+_INFO_KEYS = ("id", "language", "notes", "categories", "env", "atac", "needs_labels",
+              "supports", "runtime", "gpu", "requires_gpu", "cpu_params",
+              "setup_hint", "repo_url", "reference")
+
+
+class _Info(dict):
+    """``method_info``'s dict: a key that only ``verbose=True`` adds says so."""
+
+    def __missing__(self, key):
+        if key in _VERBOSE_KEYS:
+            raise KeyError(f"{key!r} is in method_info({self.get('id')!r}, "
+                           f"verbose=True)")
+        raise KeyError(key)
+
+
+#: the keys ``verbose=True`` adds (the maintainer's)
+_VERBOSE_KEYS = ("status", "variants", "driver", "scripts_url", "version", "params",
+                 "fixed_in_script", "upstream_knobs", "upstream_url", "gpu_evidence",
+                 "notes_long")
+
+
 def method_info(method: str, *, verbose: bool = False) -> dict:
     """Return everything known about one method as a flat dict.
 
@@ -191,7 +213,11 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     method : str
         Method id, e.g. ``"Matilda"``; see ``mtb.find_methods()``.
     verbose : bool
-        ``True`` adds ``notes_long``, the long upstream-audit notes.
+        ``True`` adds the maintainer's keys: ``params`` (per variant, as
+        ``mtb.params_for``), ``status``, ``variants``, ``driver``,
+        ``scripts_url``, ``version``, ``fixed_in_script``,
+        ``upstream_knobs``, ``upstream_url``, ``gpu_evidence`` and
+        ``notes_long``.
 
     Returns
     -------
@@ -200,19 +226,18 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
 
         ```text
         id, language, notes     the method id, 'python' or 'R', a summary
+        categories              the integration categories it runs in
         env                     the conda env run executes it in
         atac                    'peak' / 'gene_activity' / None
         needs_labels            any variant reads cell-type labels
         supports                one entry per variant: category, modalities,
                                 output_kind, n_tunable, needs_labels, labels,
                                 reference_batch
-        params                  per variant 'category:mods': defaults,
-                                tunable, effective (mtb.params_for)
         runtime                 tier, worst_sec, observed, host, note
         gpu, requires_gpu       'required' / 'used when present' / 'not used'
         cpu_params              the flags that turn CUDA off on a CPU host
         setup_hint              a step to take before the first run, or ''
-        repo_url, version       the upstream code the benchmark ran
+        repo_url                the upstream code the benchmark ran
         reference               {doi, title, authors, journal, year}
         ```
 
@@ -241,7 +266,7 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     ref = s.reference
     info = {
         "id": s.id, "language": s.language, "categories": s.categories,
-        "tasks": s.tasks, "env": envs.group_for(s.id), "atac": s.atac,
+        "env": envs.group_for(s.id), "atac": s.atac,
         "needs_labels": s.needs_labels, "status": s.status,
         "setup_hint": s.setup_hint,
         "variants": list(dict.fromkeys(v.entrypoint for v in s.variants)),
@@ -276,9 +301,9 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     info["cpu_params"] = dict(s.cpu_params)
     info["requires_gpu"] = bool(s.requires_gpu)
     info["gpu_evidence"] = s.gpu_evidence or None
-    if verbose:
-        info["notes_long"] = up["notes"]
-    return info
+    info["notes_long"] = up["notes"]
+    keys = _INFO_KEYS + (_VERBOSE_KEYS if verbose else ())
+    return _Info((k, info[k]) for k in keys)
 
 
 # ------------------------------------------------------------ observed runtimes

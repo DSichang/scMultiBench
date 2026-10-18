@@ -42,7 +42,7 @@ def _():
 
 @check("method_info")
 def _():
-    i = mtb.method_info("Matilda"); assert i["env"] and "params" in i; return f"env={i['env']} variants={len(i['variants'])}"
+    i = mtb.method_info("Matilda", verbose=True); assert i["env"] and "params" in i; return f"env={i['env']} variants={len(i['variants'])}"
 
 @check("method_info()['runtime']")
 def _():

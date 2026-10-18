@@ -29,8 +29,8 @@ dataset.csv - dataset ids from the benchmark's dataset tree (SD* = simulated).
   category, has_results
                From multibench.available_datasets(category, source='both'):
                which category's published / re-run metric tables contain the
-               dataset. Ids with stored results but no CSV row (D24, D11s,
-               ...) are appended.
+               dataset. Ids with stored results but no CSV row (D24, D25)
+               are appended.
 
 metric_full.csv - one row per metric of the clustering, batch and
   classification families, with a short description that states the range
