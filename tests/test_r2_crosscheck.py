@@ -499,3 +499,14 @@ def test_cli_convert_atac_only_mosaic_batch(tmp_path, capsys):
     err = capsys.readouterr().err
     assert rc == 0, err
     assert "No RNA written" not in err
+
+
+# Y50: scan without a category names the one category whose rows have their files
+def test_scan_names_the_category_that_fits():
+    import pandas as pd
+    from multibench import workflow
+    df = pd.DataFrame({"category": ["mosaic", "cross", "vertical"],
+                       "files_ok": [True, False, False]})
+    assert workflow._category_hint(df, None) == 'The files fit mosaic: pass category="mosaic".'
+    assert workflow._category_hint(df, "mosaic") == ""
+    assert workflow._category_hint(df.assign(files_ok=True), None) == ""

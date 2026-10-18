@@ -1242,6 +1242,19 @@ def _batch_listed(df: "pd.DataFrame", ds_dir: Path, keep, methods=None) -> list:
     return flags
 
 
+def _category_hint(df: "pd.DataFrame", category: str | None) -> str:
+    """Without a category: when only one category's rows have their files, the
+    call that names it; ``""`` otherwise."""
+    if category is not None or "category" not in df.columns or df.empty:
+        return ""
+    fit = set(df.loc[df["files_ok"].astype(bool), "category"])
+    if len(fit) != 1 or df["category"].nunique() < 2:
+        return ""
+    (cat,) = fit
+    return (f"The files fit {cat}: pass "
+            + config.hint(f'category="{cat}"', f"--category {cat}") + ".")
+
+
 def _scan_note(df: "pd.DataFrame", dataset: str, data_path=None,
                category: str | None = None) -> str:
     """:func:`_not_listed_note` from a scan frame and the dataset as typed (the
@@ -1654,6 +1667,9 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
     if gone:
         lack = [f for f in registry._BASE_MODALITIES if any(f in v for v in gone.values())]
         line += f" {_unlisted_sentence(lack)} {_all_spelling()} lists them."
+    fit = _category_hint(df, private.attrs["category"])
+    if fit:
+        line += f" {fit}"
     installed = _installed_envs()
     if _runner.linux_only_sentence():
         line += f" {LINUX_ONLY_CHECK}"

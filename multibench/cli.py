@@ -341,6 +341,9 @@ def _cmd_scan(args) -> int:
             code = _EXIT_ERROR
     if note:
         print(f"# {note}", file=sys.stderr)
+    fit = workflow._category_hint(df, category)
+    if fit:
+        print(f"# {fit}", file=sys.stderr)
     return code
 
 
