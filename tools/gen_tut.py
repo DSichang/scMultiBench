@@ -89,6 +89,7 @@ def stored_on_fewer_batches(dataset):
 
 
 def _gb(rows):
+    rows = rows.to_dict("records") if hasattr(rows, "to_dict") else rows
     known = [r["archive_bytes"] for r in rows if r["archive_bytes"]]
     # a layer several of the envs share is downloaded once
     shared = mtb.env.layers_for([mtb.env.archive_key(r["env"], r["flavor"]) for r in rows],
@@ -101,8 +102,9 @@ def env_size_text(category=None, methods=None):
     """``"<n> envs, <x> GB to download on a CPU host, <y> GB on a GPU host"``
     for a category / method set, from the dry-run plans ``mtb.env.install(...)``
     returns at generation time for each archive flavour."""
-    # dry_run=True (the default): nothing is built
-    rows = {f: mtb.env.install(methods, category=category, flavor=f) for f in ("cpu", "gpu")}
+    # dry_run=True: nothing is built
+    rows = {f: mtb.env.install(methods, category=category, flavor=f, dry_run=True)
+            for f in ("cpu", "gpu")}
     n = len(rows["cpu"])
     return (f"{n} env{'s' if n != 1 else ''}, {_gb(rows['cpu'])} to download on a CPU "
             f"host, {_gb(rows['gpu'])} on a GPU host")
@@ -112,8 +114,8 @@ def env_download_sentence(methods):
     """The visible download-size sentence of section 2. The GPU builds carry
     the CUDA libraries, so the two flavours differ unless every env has one
     archive only."""
-    cpu = _gb(mtb.env.install(methods, flavor="cpu"))
-    gpu = _gb(mtb.env.install(methods, flavor="gpu"))
+    cpu = _gb(mtb.env.install(methods, flavor="cpu", dry_run=True))
+    gpu = _gb(mtb.env.install(methods, flavor="gpu", dry_run=True))
     if cpu == gpu:
         return f"The download is {cpu}."
     return f"The download is {cpu} on a computer without a GPU and {gpu} on one with a GPU."
@@ -206,7 +208,7 @@ TASKS = {
  ),
  "vertical_rna_atac": dict(
    cat="vertical", label="RNA + ATAC", ds="D27mini_vertical",
-   variants=[["rna", "atac"], ["rna", "atac_gas"]], methods=["scMM", "VIMCCA"],
+   variants=[["rna", "atac"]], methods=["scMM", "VIMCCA"],
    blurb=("Vertical integration combines modalities measured in the same cells. "
           "This tutorial is for RNA and ATAC, as in 10x Multiome. It runs {methods} "
           "on `D27mini_vertical`, 5,000 cells of the benchmark dataset `D27`, and "
@@ -1154,19 +1156,19 @@ def build_tutorial(key):
 
 """ + details(
         "`state` is `PACKED` for an environment downloaded now and `have` for one that "
-        "was already there. Without `dry_run=False`, `mtb.env.install` downloads "
+        "was already there. With `dry_run=True`, `mtb.env.install` downloads "
         "nothing and returns the plan with its sizes.",
         "Environments go to `mtb.config.DEFAULT.envs_dir`. To use another disk, set it "
         "before this cell.",
-        f"From a terminal, `multibench env install --methods {','.join(methods)} --run` "
+        f"From a terminal, `multibench env install --methods {','.join(methods)}` "
         f"does the same."))
     code(f'''import pandas as pd
 import multibench as mtb
 
 mtb.data.fetch("{ds}")''')
     code(f'''METHODS = {json.dumps(methods)}
-envs = mtb.env.install(METHODS, dry_run=False)
-pd.DataFrame(envs)[["env", "methods", "state"]]''')
+envs = mtb.env.install(METHODS)
+envs[["env", "methods", "state"]]''')
 
     run_notes = [
         f"Each method writes an embedding: a table of numbers with one row per cell. "
@@ -1336,8 +1338,8 @@ mtb.data.fetch("{ds}")''')
         cur += piece
     lines.append(cur.rstrip(", ") + "]")
     code("\n".join(lines) + '''
-envs = mtb.env.install(METHODS, dry_run=False)
-pd.DataFrame(envs)[["env", "methods", "state"]]''')
+envs = mtb.env.install(METHODS)
+envs[["env", "methods", "state"]]''')
     graphs = graph_methods(key)
     note = ""
     if graphs:
@@ -1389,15 +1391,13 @@ keys = ("id", "language", "env", "needs_labels", "notes", "repo_url", "reference
 The package ships stored results, so these figures draw without running anything.
 
 """ + details(
-        "The stored results are the package's own runs of the methods.",
-        "`aggregate=\"summary\"` ranks the methods over both datasets. `D28s` is a "
-        "random 60% subsample of `D28`'s cells. `require_complete=True` keeps only "
-        "the methods with results on both."))
+        "The stored results are the package's own runs of the methods, one dataset "
+        "per category: D11, D28, D45 and D52.",
+        "`mtb.plot.bar` draws each method's overall score on the dataset as one bar, "
+        "best on top."))
     code("""long = mtb.load_results("vertical", dataset="D11")
 mtb.plot.bubble(long)""")
-    code("""pair = mtb.load_results("diagonal", dataset=["D28", "D28s"])
-mtb.plot.bubble(pair, aggregate="summary", require_complete=True,
-                title="Summary of 2 diagonal datasets")""")
+    code("""mtb.plot.bar(mtb.load_results("diagonal", dataset="D28"))""")
     md("## Next steps\n\n- The integration tutorials install the environments, run methods "
        "and repeat the run on your own data: "
        + ", ".join(f"[{t['cat']} {t['label']}]({COLAB}tutorial_{k}.ipynb)" for k, t in TASKS.items())
