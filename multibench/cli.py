@@ -937,6 +937,31 @@ def _rename_clashes(stored: pd.DataFrame, own: list) -> list:
     return out
 
 
+def _rename_repeats(own: list, inputs: list) -> list:
+    """The rows of a later ``--input`` whose method and dataset an earlier one
+    has, renamed ``<method>_<its folder or file name>``, with one line on stderr."""
+    keys = ["method", "dataset"]
+    seen: set = set()
+    out, said = [], []
+    for f, path in zip(own, inputs):
+        if set(keys) <= set(f.columns):
+            pairs = [tuple(k) for k in f[keys].astype(str).to_numpy()]
+            hit = [k in seen for k in pairs]
+            if any(hit):
+                tag = Path(path).stem
+                f = f.copy()
+                names = sorted(set(f.loc[hit, "method"].astype(str)))
+                f.loc[hit, "method"] = f.loc[hit, "method"].astype(str) + f"_{tag}"
+                said.append(f"{_and_list(names)} of {path} as "
+                            f"{_and_list([m + '_' + tag for m in names])}")
+            seen |= set(map(tuple, f[keys].astype(str).to_numpy()))
+        out.append(f)
+    if said:
+        print(f"# Drawn {'; '.join(said)}: an earlier --input has the same method and "
+              f"dataset.", file=sys.stderr)
+    return out
+
+
 def _cmd_plot(args) -> int:
     """``multibench plot {bubble,bar}``: draw the ``--input`` rows, the stored table
     of ``--category`` (:func:`multibench.load_results`), or both concatenated."""
@@ -955,7 +980,7 @@ def _cmd_plot(args) -> int:
             raise FileNotFoundError(_cli_spelling(str(e))) from e
     own_rows = 0
     loaded = [_load_long_input(path) for path in inputs]
-    for own in _filter_own_rows(loaded, args):
+    for own in _rename_repeats(_filter_own_rows(loaded, args), inputs):
         own_rows += len(own)
         frames.append(own)
     if args.category is not None and len(frames) > 1:

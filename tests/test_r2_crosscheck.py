@@ -457,3 +457,17 @@ def test_scan_names_data_folder_here(tmp_path, monkeypatch):
     with pytest.raises(FileNotFoundError, match=r"data/CITE exists here: pass 'data/CITE'\."):
         mtb.scan("CITE", "vertical")
     assert "mtb.scan('data/MYDATA', 'vertical')" in mtb.describe_layout("vertical")
+
+
+# Y23: two --input trees of the same methods are drawn side by side
+def test_cli_plot_two_inputs_of_the_same_methods(tmp_path, capsys):
+    import pandas as pd
+    from multibench import cli
+    stored = mtb.load_results("vertical", dataset="D11")
+    for name in ("a", "b"):
+        stored.assign(source="user").to_csv(tmp_path / f"{name}.csv", index=False)
+    rc = cli.main(["plot", "bubble", "--input", str(tmp_path / "a.csv"), "--input",
+                   str(tmp_path / "b.csv"), "--out", str(tmp_path / "x.png")])
+    err = capsys.readouterr().err
+    assert rc == 0, err
+    assert "_b: an earlier --input has the same method and dataset." in err
