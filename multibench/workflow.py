@@ -1619,11 +1619,13 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
             rows.append((method, cat, group.at[i, "modalities"], True,
                          _scripts_caveat(group.at[i, "caveat"])))
             continue
-        # the row that speaks for the method: files on disk, families held, fewest missing
+        # the row that speaks for the method: files on disk, families held, fewest
+        # missing, then the most modalities, as run_all runs
         i = min(group.index, key=lambda i: (
             not _inputs_on_disk(group.loc[i], dataset, data_path),
             len(_row_families(group.at[i, "modalities"]) - held),
-            _missing_inputs(group.loc[i], dataset, data_path), i))
+            _missing_inputs(group.loc[i], dataset, data_path),
+            -len(str(group.at[i, "modalities"]).split("+")), i))
         rows.append((method, cat, group.at[i, "modalities"], False, group.at[i, "reason"]))
         reasons.append((method, private.at[i, "_other"]))
     out = pd.DataFrame(rows, columns=["method", "category", "modalities", "runnable",

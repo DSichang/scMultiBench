@@ -359,3 +359,9 @@ def test_sweep_in_run_order():
     with pytest.raises(TypeError, match=r"sweep takes \(dataset, category, method, param, "
                                         r"values\)\."):
         mtb.sweep("Matilda", "D11", "vertical", "epochs", [5, 10], out_dir="/o")
+
+
+# X68: scan shows the variant run_all runs
+def test_scan_shows_the_variant_run_all_runs():
+    s = mtb.scan("D52mini", "cross", verbose=False)
+    assert s.set_index("method").at["UINMF", "modalities"] == "rna1+rna2+rna3+adt1+adt2+adt3"
