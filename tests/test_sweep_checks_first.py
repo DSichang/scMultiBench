@@ -48,3 +48,21 @@ def test_dry_run_returns_one_plan_per_setting(tmp_path, capsys):
     assert "[sweep] Dry run: 2 settings of lr for Matilda on D11 (vertical). Nothing was " \
            "run." in capsys.readouterr().out
     assert not (tmp_path / "sw").exists()
+
+
+def test_sweep_argument_mistakes_get_one_sentence():
+    # Y16 (r3): run's argument order, and a scalar for values
+    with pytest.raises(TypeError, match=r"^sweep takes \(dataset, category, method, "
+                                        r"param, values\)\.$"):
+        mtb.sweep("Matilda", "vertical", "D11", "epochs", [5], out_dir="x")
+    with pytest.raises(TypeError, match=r"^values takes a list, e\.g\. \[5\]\.$"):
+        mtb.sweep("D11", "vertical", "Matilda", "epochs", 5, out_dir="x")
+
+
+def test_a_dry_run_sweep_needs_no_out_dir():
+    # Z30 (r3): as run_all(dry_run=True)
+    plan = mtb.sweep("D11", "vertical", "Matilda", "epochs", [1, 2], dry_run=True,
+                     modalities=["rna", "adt"], verbose=False)
+    assert list(plan["epochs"]) == [1, 2]
+    with pytest.raises(TypeError, match="needs out_dir= for a real run"):
+        mtb.sweep("D11", "vertical", "Matilda", "epochs", [1])

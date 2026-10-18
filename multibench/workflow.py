@@ -3773,7 +3773,7 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
 
 
 def sweep(dataset: str, category: str, method: str, param: str, values, *,
-          out_dir, modalities=None, data_path=None, timeout=None,
+          out_dir=None, modalities=None, data_path=None, timeout=None,
           verbose: bool = True, dry_run: bool = False) -> pd.DataFrame:
     """Run one method once per value of one hyperparameter, each in its own folder.
 
@@ -3787,10 +3787,11 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
         Method id, e.g. ``"Matilda"``.
     param : str
         Hyperparameter to vary; ``mtb.params_for`` lists them.
-    values : iterable
+    values : list
         The values to try; each is one ``mtb.run_all``.
-    out_dir : path
-        Root folder; each value runs under ``<out_dir>/<param>_<value>/``.
+    out_dir : path | None
+        Root folder; each value runs under ``<out_dir>/<param>_<value>/``;
+        required unless ``dry_run=True``.
     modalities : list[str] | None
         Modality tokens of the variant, when the method has several in
         ``category``.
@@ -3828,11 +3829,23 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
     mtb.params_for : the hyperparameters of the variant.
     mtb.run_all : what each value runs through.
     """
-    if method in config._CATEGORY_FOLDERS:
+    def _is_method(name) -> bool:
+        try:
+            registry.check_method(name)
+            return True
+        except (KeyError, TypeError):
+            return False
+    if method in config._CATEGORY_FOLDERS or (_is_method(dataset) and not _is_method(method)):
         raise TypeError("sweep takes (dataset, category, method, param, values).")
+    if isinstance(values, (str, bytes)) or not hasattr(values, "__iter__"):
+        raise TypeError("values takes a list, e.g. [5].")
+    if out_dir is None and not dry_run:
+        raise TypeError("sweep() needs out_dir= for a real run (dry_run=True plans "
+                        "without one)")
     dataset, data_path = _resolve.split_dataset(dataset, data_path)
     method = registry.check_method(method)
     values = list(values)
+    out_dir = OUT_DIR_PLACEHOLDER if out_dir is None else out_dir
 
     def plan(v):
         tag = str(v).replace(".", "p").replace("-", "m")

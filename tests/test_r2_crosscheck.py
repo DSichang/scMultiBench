@@ -506,6 +506,18 @@ def test_cli_convert_atac_only_mosaic_batch(tmp_path, capsys):
     err = capsys.readouterr().err
     assert rc == 0, err
     assert "No RNA written" not in err
+    # Y27 (r3): nor when the folder already holds the RNA
+    r = ad.AnnData(np.ones((6, 4)), obs=a.obs.copy())
+    r.var_names = [f"g{i}" for i in range(4)]
+    r.write_h5ad(tmp_path / "rna.h5ad")
+    assert cli.main(["convert", str(tmp_path / "rna.h5ad"), str(tmp_path / "DIAG"), "--rna", "X",
+                     "--category", "diagonal"]) == 0
+    capsys.readouterr()
+    rc = cli.main(["convert", str(tmp_path / "b3.h5ad"), str(tmp_path / "DIAG"), "--atac", "X",
+                   "--atac-kind", "peak", "--category", "diagonal"])
+    err = capsys.readouterr().err
+    assert rc == 0, err
+    assert "No RNA written" not in err and "already in the folder: rna.h5" in err
 
 
 # Y50: scan without a category names the one category whose rows have their files

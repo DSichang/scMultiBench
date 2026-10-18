@@ -245,7 +245,7 @@ def _write_marked(adata, target: Path, mark: str) -> None:
 
 
 def write_example(dataset: str, folder: Path | str = ".", *,
-                  data_path=None, quiet: bool = False) -> None:
+                  data_path=None, quiet: bool = False) -> Path:
     """Write the example files of a tutorial dataset as .h5ad files.
 
     The files hold a part of the dataset in the shape that your own data
@@ -269,9 +269,9 @@ def write_example(dataset: str, folder: Path | str = ".", *,
 
     Returns
     -------
-    None
-        The files are on disk, named ``my_*.h5ad``; the printed lines say
-        what each holds. A file of your own with such a name is kept.
+    pathlib.Path
+        ``folder``, which holds the files, named ``my_*.h5ad``; the printed
+        lines say what each holds. A file of your own with such a name is kept.
 
     Raises
     ------
@@ -345,3 +345,4 @@ def write_example(dataset: str, folder: Path | str = ".", *,
             line = f"wrote {target}: {a.n_obs:,} cells. {', '.join(parts)}."
         if not quiet:
             print(line)
+    return folder

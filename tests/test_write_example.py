@@ -95,7 +95,7 @@ def test_files_and_contents(ds, tmp_path, monkeypatch):
         exec(compile(OLD[TASK[ds]]["data"], f"0.3.4 {TASK[ds]}", "exec"), ns)
     with warnings.catch_warnings(record=True) as seen:
         warnings.simplefilter("always")
-        assert mtb.data.write_example(ds, quiet=True) is None
+        assert mtb.data.write_example(ds, quiet=True) == Path(".")       # Y24 (r3): the folder
     # the cell of the tutorial shows the reader no warning of the package or of anndata
     ours = [str(w.message) for w in seen if "multibench" in (w.filename or "")
             or issubclass(w.category, UserWarning)]
@@ -391,3 +391,12 @@ def test_import_multibench_stays_light():
     src = (ROOT / "multibench" / "data" / "examples.py").read_text()
     top = [ln for ln in src.splitlines() if re.match(r"(import|from) ", ln)]
     assert top == ["from __future__ import annotations", "import os", "from pathlib import Path"]
+
+
+def test_write_example_returns_the_folder(tmp_path):
+    # Y24 (r3)
+    import multibench as mtb
+    if not (mtb.config.DEFAULT.data_path / "D11").is_dir():
+        pytest.skip("D11 is not in the data root")
+    out = mtb.data.write_example("D11", tmp_path / "ex", quiet=True)
+    assert out == tmp_path / "ex" and (out / "my_file.h5ad").is_file()

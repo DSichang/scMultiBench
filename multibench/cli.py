@@ -612,8 +612,9 @@ def _cmd_convert(args) -> int:
         print(f"wrote dataset folder {p} (files: {', '.join(wrote)})")
         # a batch of a mosaic or cross folder may hold no RNA by design
         one_batch = category in ("mosaic", "cross") and args.batch_index is not None
-        if args.rna is None and not one_batch and (args.adt is not None or args.atac is not None
-                                                   or args.atac_from is not None):
+        has_rna = any(re.fullmatch(r"rna\d*\.h5", n) for n in after)
+        if args.rna is None and not one_batch and not has_rna and (
+                args.adt is not None or args.atac is not None or args.atac_from is not None):
             print("# No RNA written: pass --rna X (or a layer) to write it.",
                   file=sys.stderr)
         if kept:
@@ -1274,7 +1275,12 @@ def _evaluate_labels(args, stack):
     files = list(args.labels or [])
     if not files and args.method is None and args.dataset is not None \
             and args.category is not None:
-        labels = multibench.labels_for(args.dataset, args.category, data_path=args.data_path)
+        with warnings.catch_warnings():
+            if args.name is not None:
+                # your own method: the order of a registry method's output is not yours
+                warnings.filterwarnings("ignore", message=r"labels_for\(.*default order")
+            labels = multibench.labels_for(args.dataset, args.category,
+                                           data_path=args.data_path)
         if not labels:
             raise ValueError(f"{args.dataset} has no label file. Pass one with --labels.")
         print(f"# labels: {', '.join(Path(v).name for v in labels.values())} from "
@@ -2237,8 +2243,7 @@ def build_parser() -> argparse.ArgumentParser:
                     help="what to do when a label is missing. error (default) stops. "
                          "drop scores the labelled cells only and says how many")
     pe.add_argument("--obsm", help="for .h5ad input: the .obsm key holding the "
-                                   "embedding (default X_emb, or the only key; "
-                                   "'X' = .X)")
+                                   "embedding (default: the only .obsm key; X = .X)")
     pe.add_argument("--column", metavar="NAME",
                     help="the column to read in each --labels CSV when a file has "
                          "several columns")

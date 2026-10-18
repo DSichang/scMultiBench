@@ -130,3 +130,21 @@ def test_docstrings_match_the_code():
     assert "Parameters" in pipeline.to_long.__doc__
     assert pipeline.to_long.__doc__.strip().splitlines()[0] == \
         "Reshape ``mtb.evaluate``'s scores into the long table of ``mtb.load_results``."
+
+
+def test_a_wrong_batch_column_gets_its_error_without_the_unused_batch_warning(tmp_path):
+    # Z23 (r3): the batch is read before the "changes nothing" warning
+    import warnings
+    import anndata as ad
+    import numpy as np
+    import pandas as pd
+    import multibench as mtb
+    rng = np.random.default_rng(0)
+    a = ad.AnnData(np.zeros((40, 3)), obs=pd.DataFrame({"celltype": ["A", "B"] * 20},
+                                                      index=[f"c{i}" for i in range(40)]))
+    a.obsm["X_emb"] = rng.normal(size=(40, 4))
+    with warnings.catch_warnings(record=True) as rec:
+        warnings.simplefilter("always")
+        with pytest.raises(ValueError, match="batch='Donor' is neither an obs column"):
+            mtb.evaluate(a, labels="celltype", batch="Donor", metrics=["ARI"])
+    assert not [w for w in rec if "changes nothing" in str(w.message)]

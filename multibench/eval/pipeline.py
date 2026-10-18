@@ -731,7 +731,7 @@ def _count_error(what: str, n: int, n_cells: int, given, category=None) -> str:
         f"--embedding, or pass --dataset, --category and --method.")
 
 
-def _plan_metrics(metrics, *, has_batch: bool, batch_given: bool):
+def _plan_metrics(metrics, *, has_batch: bool):
     """``(group, only, slow, cls)`` for ``scib.compute`` from ``metrics=``.
 
     ``group`` is ``"clustering"`` / ``"batch"`` / ``"all"`` or ``None`` (no scIB
@@ -796,16 +796,19 @@ def _plan_metrics(metrics, *, has_batch: bool, batch_given: bool):
         group, only, slow = "clustering", None, False
     if want_cls and want_cls[0] == "explicit" and not has_batch:
         raise ValueError(_classification_error(metrics, "no batch"))
-    if group == "clustering" and batch_given and not want_cls:
-        _compat.warn(
-            config.hint("batch= changes nothing here, because ",
-                        "--batch changes nothing here, because ")
-            + f"{_metrics_spelling(metrics)} has no batch metric. Add "
-            + _and_list(family_bat, "or")
-            + config.hint(", or pass metrics='all'.",
-                          " to --metrics, or pass --metrics all."),
-            UserWarning)
     return group, only, slow, want_cls
+
+
+def _unused_batch_warning(metrics) -> None:
+    """The warning for a batch that no selected metric uses."""
+    _compat.warn(
+        config.hint("batch= changes nothing here, because ",
+                    "--batch changes nothing here, because ")
+        + f"{_metrics_spelling(metrics)} has no batch metric. Add "
+        + _and_list([c for c in _metric_families()[1] if c != "kBET"], "or")
+        + config.hint(", or pass metrics='all'.",
+                      " to --metrics, or pass --metrics all."),
+        UserWarning)
 
 
 def _classification_error(metrics, why: str, what: str = "output") -> str:
@@ -1031,8 +1034,7 @@ def evaluate(
             f"instead")
     batch_from_files = batch is None and _is_label_path_list(labels) and len(labels) > 1
     group, only, slow, want_cls = _plan_metrics(
-        metrics, has_batch=batch is not None or batch_from_files,
-        batch_given=batch is not None)
+        metrics, has_batch=batch is not None or batch_from_files)
     if want_cls:
         from .classify import _graph_writer, _not_embedding
         not_embedding = _not_embedding(embedding)  # a label file or a list
@@ -1086,6 +1088,9 @@ def evaluate(
     if batch is not None:
         ba = _obs_or_vector(batch, adata, what="batch", ids=ids, table=table,
                             cells=cells)
+        if group == "clustering" and not want_cls:
+            # after the batch is read: a wrong column gets its error alone
+            _unused_batch_warning(metrics)
     elif batch_from_files and group in {"batch", "all"}:
         # the label file of each cell (1, 2, ...), as run_all
         ba = origin
