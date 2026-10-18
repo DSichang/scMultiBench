@@ -81,9 +81,9 @@ class BubbleTable:
         clustering (blues), batch correction (greens), classification
         (pinks), then "Other" (purples) for metrics outside the three. Each
         has its own ``raw``, ``norm``, ``ranks`` and ``overall``.
-    matrix : pandas.DataFrame
+    norm : pandas.DataFrame
         Per-column min-max values (method x metric) of all families, in
-        figure order; the same object as ``norm``.
+        figure order.
     raw : pandas.DataFrame
         Unscaled matrix (method x metric) in figure order: metric means, or
         mean within-dataset max-ranks under ``"summary"``.
@@ -122,7 +122,7 @@ class BubbleTable:
     """
     methods: list
     blocks: list
-    matrix: pd.DataFrame
+    norm: pd.DataFrame
     raw: pd.DataFrame
     overall: pd.Series
     aggregate: str = "dataset"
@@ -133,9 +133,10 @@ class BubbleTable:
     na_cells: object = None
 
     @property
-    def norm(self) -> pd.DataFrame:
-        """All families' per-column min-max values; an alias of ``matrix``."""
-        return self.matrix
+    def matrix(self) -> pd.DataFrame:
+        """Deprecated: ``norm``."""
+        _compat.deprecated("BubbleTable.matrix", _compat.use("BubbleTable.norm"))
+        return self.norm
 
     def __repr__(self) -> str:
         n = len(self.methods)
@@ -520,7 +521,7 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=Non
 
     return BubbleTable(
         methods=rows, blocks=blocks,
-        matrix=pd.concat([b.norm for b in blocks], axis=1),
+        norm=pd.concat([b.norm for b in blocks], axis=1),
         raw=pd.concat([b.raw for b in blocks], axis=1),
         overall=combined.loc[rows],
         aggregate=aggregate,
@@ -1078,7 +1079,8 @@ def bubble(long_df, *, metrics=None, methods=None, order=None,
         within-dataset ranks averaged across datasets, drawn as bars (the
         paper's panel c).
     title : str | None
-        Figure title; ``None`` = no title.
+        Figure title; ``None`` = ``"<category> <dataset>"`` when the table
+        holds one of each, as the command line; ``""`` = no title.
     save : str or path-like | None
         File to write the figure to (tight bounding box); the suffix picks
         the format, e.g. ``.pdf``, ``.png``, ``.svg``.
@@ -1132,7 +1134,11 @@ def _bubble(long_df, *, metrics=None, methods=None, order=None,
     tbl = _build_table(long_df, metrics=metrics, methods=methods, order=order,
                        aggregate=aggregate, require_complete=require_complete,
                        overall=overall, na=na)
-    fig = render(tbl, cmap=cmap, title=title, show_language=show_language)
+    if title is None and isinstance(long_df, pd.DataFrame):
+        one = [str(long_df[c].iloc[0]) for c in ("category", "dataset")
+               if c in long_df.columns and long_df[c].nunique() == 1]
+        title = " ".join(one) if len(one) == 2 else None
+    fig = render(tbl, cmap=cmap, title=title or None, show_language=show_language)
     if save is not None:
         fig.savefig(save, bbox_inches="tight")
     return fig

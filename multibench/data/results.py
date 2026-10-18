@@ -467,7 +467,7 @@ _REMOVED_METRIC_KEYWORDS = {"task": ("0.4", _compat.use("metrics=")),
                             "family": ("0.4", _compat.use("metrics="))}
 
 
-@_compat.keywords("load_results", private="_load_results", kept={
+@_compat.keywords("load_results", private="_load_results_kept", kept={
     **_TABLE_KEYWORDS,
     "clustering": _compat.note("it picks the clustering variant of the published tables")},
     removed={**_REMOVED_METRIC_KEYWORDS,
@@ -539,8 +539,16 @@ def load_results(
     mtb.to_long : turns ``mtb.evaluate`` scores into this shape.
     mtb.plot.bubble : draws the table.
     """
-    out = _load_results(category, dataset=dataset, methods=methods, metrics=metrics)
-    return out.drop(columns="clustering")     # one value in the stored tables
+    return _load_results_kept(category, dataset=dataset, methods=methods, metrics=metrics)
+
+
+def _load_results_kept(*args, **kwargs) -> pd.DataFrame:
+    """:func:`_load_results` without the ``clustering`` column when it holds only
+    ``"default"``, as in the re-run tables; the deprecated published variants keep it."""
+    out = _load_results(*args, **kwargs)
+    if (out["clustering"] == "default").all():
+        out = out.drop(columns="clustering")
+    return out
 
 
 def _load_results(
@@ -1165,16 +1173,14 @@ def _recommend(
             spec = None
         if spec is not None:
             in_category = [v for v in spec.variants if v.when.get("category") == category]
-            kinds = [v.output.kind for v in in_category or spec.variants]
             env = envs.group_for(spec.id)
             # a method may be supervised in one category only
             needs = any(v.needs_labels for v in in_category) if in_category \
                 else bool(spec.needs_labels)
-            okind = kinds[0] if kinds else None
             runtime = method_info(spec.id)["runtime"]
             tier, worst = runtime.get("tier"), runtime.get("worst_sec")
         else:
-            env, needs, okind, tier, worst = None, None, None, None, None
+            env, needs, tier, worst = None, None, None, None
         rows.append({
             "method": m,
             "grand_score": float(grand.loc[m]) if scored else float("nan"),
@@ -1185,7 +1191,6 @@ def _recommend(
             "runtime_tier": tier,
             "worst_sec": worst,
             "env": env,
-            "output_kind": okind,
             "datasets": ", ".join(sorted((str(d) for d in per_ds.columns
                                           if pd.notna(per_ds.loc[m, d])),
                                          key=catalog._dataset_sort_key)) if scored else "",

@@ -60,7 +60,8 @@ import pytest
 
 import multibench as mtb
 
-COLS = ["metric", "value", "method", "dataset", "category", "clustering", "source"]
+# Y39 (r3): clustering only for a deprecated published variant other than the default
+COLS = ["metric", "value", "method", "dataset", "category", "source"]
 
 
 def _val(df, method, metric):
@@ -72,7 +73,7 @@ def _val(df, method, metric):
 def test_source_column_and_values(result_dir):
     pub = results.load_results("diagonal", dataset="D28", source="published")
     assert list(pub.columns) == COLS
-    assert (pub.source == "published").all() and (pub.clustering == "default").all()
+    assert (pub.source == "published").all() and "clustering" not in pub
     assert abs(_val(pub, "iNMF", "ARI") - 0.198677) < 1e-6
     rr = results.load_results("diagonal", dataset="D28")
     assert (rr.source == "rerun").all()
@@ -243,7 +244,7 @@ def test_concat_to_csv_reload_keeps_provenance(tmp_path, result_dir):
     pd.concat([rr, mine]).to_csv(f, index=False)
     back = results.load_results(result_path=f)            # default keeps every row
     assert len(back) == len(rr) + 2
-    assert back.clustering.notna().all() and back.source.notna().all()
+    assert back.source.notna().all()
     assert set(back.source) == {"rerun", "user"}
     user = results.load_results(result_path=f, source="user")
     assert set(user.method) == {"MyMethod"} and len(user) == 2

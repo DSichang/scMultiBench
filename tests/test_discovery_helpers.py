@@ -125,7 +125,7 @@ def test_recommend_ranks_with_coverage(result_dir):
         r = recommend("diagonal", source="published")
     assert list(r.columns) == ["method", "grand_score", "n_datasets", "n_datasets_total",
                                "coverage", "needs_labels", "runtime_tier", "worst_sec",
-                               "env", "output_kind", "datasets"]
+                               "env", "datasets"]     # Y26 (r3): no output_kind
     assert (r.n_datasets == r.n_datasets_total).all() and (r.coverage == 1.0).all()
     assert (r.n_datasets_total == 3).all() and r.grand_score.notna().all()
     scored = r.grand_score.dropna()
@@ -257,7 +257,7 @@ def test_recommend_lists_unscored_methods(result_dir):
     # column list (datasets appended in study round 1); scored rows first
     assert list(r.columns) == ["method", "grand_score", "n_datasets", "n_datasets_total",
                                "coverage", "needs_labels", "runtime_tier", "worst_sec",
-                               "env", "output_kind", "datasets"]
+                               "env", "datasets"]     # Y26 (r3): no output_kind
     assert r.grand_score.iloc[: len(r) - len(nan_rows)].notna().all()
     assert r.attrs["family"] == "clustering" and r.attrs["metrics"] == "clustering"
     assert r.attrs["source"] == "published"

@@ -19,7 +19,7 @@ def test_d56_is_visible_everywhere(layout_tree):
     pub = dict(source="published", result_path=layout_tree)
     assert "D56" in results.available_datasets("cross", **pub)
     df = results.load_results("cross", dataset="D56", **pub)
-    assert set(df.method) == {"MOFA2"} and (df.clustering == "default").all()
+    assert set(df.method) == {"MOFA2"} and "clustering" not in df      # Y39 (r3)
     assert abs(float(df[df.metric == "ARI"].value.iloc[0]) - 0.28) < 1e-9
     km = results.load_results("cross", dataset="D56", clustering="kmeans", **pub)
     assert set(km.method) == {"MOFA2"} and (km.clustering == "kmeans").all()

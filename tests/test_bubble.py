@@ -20,17 +20,17 @@ def _toy_long():
 
 def test_build_table_pivots_and_adds_overall():
     tbl = bubble.build_table(_toy_long(), metrics=["ARI", "NMI"])
-    assert set(tbl.matrix.columns) == {"ARI", "NMI"}
-    assert set(tbl.matrix.index) == {"A", "B"}
+    assert set(tbl.norm.columns) == {"ARI", "NMI"}
+    assert set(tbl.norm.index) == {"A", "B"}
     # B dominates both metrics -> higher overall
     assert tbl.overall["B"] > tbl.overall["A"]
     # rows sorted by overall descending by default
-    assert list(tbl.matrix.index) == ["B", "A"]
+    assert list(tbl.norm.index) == ["B", "A"]
 
 
 def test_build_table_respects_method_filter():
     tbl = bubble.build_table(_toy_long(), metrics=["ARI"], methods=["A"])
-    assert list(tbl.matrix.index) == ["A"]
+    assert list(tbl.norm.index) == ["A"]
 
 
 def test_render_returns_figure_with_circles(tmp_path):
@@ -377,7 +377,7 @@ def test_table_ranks_concatenates_blocks_in_figure_order():
     long = pd.concat([long, pd.DataFrame({"method": ["A", "B", "C"], "metric": "GC",
                                           "value": [0.3, 0.9, 0.6], "dataset": "D1"})])
     tbl = bubble.build_table(long, metrics=["NMI", "ARI", "GC"])
-    assert list(tbl.ranks.columns) == list(tbl.matrix.columns) == ["NMI", "ARI", "GC"]
+    assert list(tbl.ranks.columns) == list(tbl.norm.columns) == ["NMI", "ARI", "GC"]
     assert tbl.ranks.index.tolist() == tbl.methods
     for b in tbl.blocks:
         for c in b.ranks.columns:
@@ -395,19 +395,19 @@ def test_table_ranks_are_max_ranks():
 
 def test_table_norm_is_matrix():
     tbl = bubble.build_table(_three())
-    assert tbl.norm.equals(tbl.matrix) and tbl.norm.index.tolist() == tbl.methods
+    assert tbl.norm.index.tolist() == tbl.methods
 
 
 def test_table_ranks_summary_mode():
     tbl = bubble.build_table(_three(datasets=("D1", "D2")), aggregate="summary")
     assert tbl.ranks.index.tolist() == tbl.methods
-    assert list(tbl.ranks.columns) == list(tbl.matrix.columns)
+    assert list(tbl.ranks.columns) == list(tbl.norm.columns)
 
 
 def test_bubble_table_properties_are_not_dataclass_fields():
     import dataclasses
     names = {f.name for f in dataclasses.fields(bubble.BubbleTable)}
-    assert "ranks" not in names and "norm" not in names
+    assert "ranks" not in names and "matrix" not in names     # Z29 (r3): norm is the field
     assert "ranks" in bubble.BubbleTable.__doc__ and "n" in bubble.BubbleTable.ranks.__doc__
 
 
@@ -518,3 +518,14 @@ def test_circles_of_values_tied_by_rounding_have_one_size():
     radii = {round(c.radius, 6) for c in B.render(tbl).axes[0].patches
              if isinstance(c, Circle) and c.center[0] == x_ilisi}
     assert len(radii) == 1
+
+
+def test_python_bubble_titles_its_one_category_and_dataset():
+    # X86 (r3): the command line's default title
+    import warnings
+    import multibench as mtb
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        long = mtb.load_results("vertical", dataset="D11")
+        assert mtb.plot.bubble(long).axes[0].get_title() == "vertical D11"
+        assert mtb.plot.bubble(long, title="").axes[0].get_title() == ""

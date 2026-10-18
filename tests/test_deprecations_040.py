@@ -448,3 +448,14 @@ def test_cli_fetch_outputs_is_hidden_and_warns_once(monkeypatch, tmp_path):
     assert code == 0 and calls == ["D11"]
     assert err.strip() == ("warning: --outputs is deprecated and will be removed in 0.5; "
                            "use multibench plot for the stored scores.")
+
+
+def test_bubble_table_matrix_is_norm():
+    # Z29 (r3)
+    long = pd.DataFrame([{"method": m, "metric": k, "value": v, "dataset": "D"}
+                         for m, v in (("A", 0.9), ("B", 0.5), ("C", 0.1))
+                         for k in ("ARI", "NMI")])
+    tbl = mtb.plot.build_table(long)
+    got, msg = _one_warning(lambda: tbl.matrix)
+    assert got is tbl.norm
+    assert msg == _msg("BubbleTable.matrix", "BubbleTable.norm")
