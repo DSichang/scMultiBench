@@ -192,7 +192,7 @@ def test_leiden_flavor_help_names_both_stored_tables(cmd, capsys):
     with pytest.raises(SystemExit):
         cli.main([cmd, "--help"])
     text = " ".join(capsys.readouterr().out.split())
-    assert "Scores can differ by up to about 0.1 between the two" in text
+    assert "keep it to compare with the stored tables" in text           # X98
     assert "leidenalg matches both stored tables" not in text
     assert "backend of the published tables" not in text
 

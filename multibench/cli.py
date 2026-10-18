@@ -1800,9 +1800,9 @@ def _status_epilog() -> str:
 _CATEGORY_HELP = ("vertical, diagonal, mosaic or cross (multibench layout explains "
                   "them).")
 _METHODS_HELP = "comma-separated method ids, as printed by multibench find"
-_LEIDEN_HELP = ("Leiden backend of the clustering: leidenalg (the article's) or igraph "
-                "(faster). Scores can differ by up to about 0.1 between the two "
-                "(default: shown by multibench config)")
+_LEIDEN_HELP = ("Leiden backend of the clustering: leidenalg, the article's (keep it to "
+                "compare with the stored tables), or igraph, faster (default: shown by "
+                "multibench config)")
 _FLAVOR_HELP = ("which packed archive to take per env: 'cpu' = the '<env>-cpu' archive "
                 "(the same env without the CUDA libraries, 3-4x smaller) where "
                 "published, else the '<env>' archive with a warning, 'gpu' = the "
@@ -1932,10 +1932,8 @@ def build_parser() -> argparse.ArgumentParser:
     pfe.add_argument("--scripts", action="store_true",
                      help="fetch the method scripts (PYangLab/scMultiBench, with git) "
                           "into repo_path, or report them present; prints the commit")
-    pfe.add_argument("--ref", metavar="REF",
-                     help="with --scripts: fetch this commit or tag instead of the "
-                          "default branch (default: $MULTIBENCH_SCRIPTS_REF). Scripts "
-                          "already present must be at that commit or tag.")
+    # a maintainer switch, as MULTIBENCH_SCRIPTS_REF: not in --help
+    pfe.add_argument("--ref", metavar="REF", help=argparse.SUPPRESS)
     pfe.add_argument("--data-path", dest="data_path",
                      help="data root to download into (default: the configured "
                           "data_path, shown by multibench config)")
@@ -2146,9 +2144,9 @@ def build_parser() -> argparse.ArgumentParser:
     pp.add_argument("--aggregate", choices=["dataset", "summary"], default="dataset",
                     help="bubble only: dataset = one dataset's raw values (default); "
                          "summary = across-dataset rank panel")
+    # only a frame of several datasets can tell the two apart: not in --help
     pp.add_argument("--overall", choices=["rank", "mean_overall"], default="rank",
-                    help="how the Overall score is formed: rank (default) ranks the "
-                         "mean ranks; mean_overall averages the per-dataset scores")
+                    help=argparse.SUPPRESS)
     pp.add_argument("--require-complete", dest="require_complete", action="store_true",
                     help="bubble --aggregate summary: keep only methods present in "
                          "every dataset instead of warning")
@@ -2335,8 +2333,9 @@ def build_parser() -> argparse.ArgumentParser:
                                       "several --labels are given, plus classification "
                                       "when there are two or more batches and "
                                       "--category is not vertical")
-    pe.add_argument("--leiden-flavor", dest="leiden_flavor", choices=["igraph", "leidenalg"],
-                    help=_LEIDEN_HELP)
+    pe.add_argument_group("advanced").add_argument(
+        "--leiden-flavor", dest="leiden_flavor", choices=["igraph", "leidenalg"],
+        help=_LEIDEN_HELP)
     pe.add_argument("--missing-labels", dest="missing_labels", choices=["error", "drop"],
                     default="error",
                     help="what to do when a label is missing. error (default) stops. "

@@ -324,3 +324,17 @@ def test_install_plan_lists_the_shared_layer():
     assert list(layer["env"]) == ["torch-2.8.0-cu12-py39 (shared)"]
     assert list(layer["methods"].iloc[0]) == ["scMoMaT"]
     assert round(plan["archive_bytes"].sum() / 1e9, 1) == 5.4     # the CLI's total
+
+
+# Y36 / Y37 / X98: maintainer and multi-dataset flags leave --help; leiden flavor is advanced
+def test_help_leaves_out_ref_and_overall(capsys):
+    from multibench import cli
+    for cmd, flag in ((["fetch"], "--ref"), (["plot", "bubble"], "--overall")):
+        with pytest.raises(SystemExit):
+            cli.main([*cmd, "--help"])
+        assert flag not in capsys.readouterr().out
+    with pytest.raises(SystemExit):
+        cli.main(["evaluate", "--help"])
+    out = capsys.readouterr().out
+    assert "--leiden-flavor {" in out.split("advanced:", 1)[1]
+    assert "0.1" not in out

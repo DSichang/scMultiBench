@@ -398,8 +398,7 @@ def test_help_texts_put_the_object_first_and_end_in_plain_sentences():
     assert _help(["scan"], "--assume-gpu") == (
         "skip this host's GPU test. On a login node without a GPU, it checks a job for "
         "a GPU node. Python: assume_gpu=True")
-    assert _help(["fetch"], "--ref").endswith(
-        "Scripts already present must be at that commit or tag.")
+    assert _help(["fetch"], "--ref") == "==SUPPRESS=="          # hidden since 0.4.0 (Y36)
     doc = " ".join(mtb.scan.__doc__.split())
     assert ("``True`` = skip this host's GPU test, to check a job for a GPU node from a "
             "login node.") in doc

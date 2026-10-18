@@ -428,7 +428,8 @@ def test_docs_pages_carry_the_colab_speed_round(path):
             assert "multibench.config.Config" in directives
             assert "MULTIBENCH_ENVS_DIR" in text and "MULTIBENCH_RUN_MODE" in text
         if path.name == "env.md":
-            assert "multibench.engine.envs.env_prefix" in directives
+            # hidden names leave the reference (0.4.0, Y32)
+            assert "multibench.engine.envs.env_prefix" not in directives
     if path.name == "run.md" and path.parent.name == "tutorials":
         assert "## How the environment is entered: prefix and conda modes" in text
         assert "MULTIBENCH_RUN_MODE" in text and "activate.d" in text
