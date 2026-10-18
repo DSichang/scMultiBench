@@ -96,6 +96,7 @@ def load_batch(out_dir, *, methods=None, data_path=None) -> "BatchResult":
     ``BatchResult.long`` is rebuilt from the records' rounded ``metrics``.
     ``methods=`` only filters: records keep the order the tree ran them.
 
+    A relative ``out_dir`` is read from the folder of ``batch_result.json``.
     A record whose ``out_dir`` does not exist, or that has none, is pointed at
     the folder of the same name (``<method>_<dataset>``) next to
     ``batch_result.json``. The dataset folder is looked up
@@ -129,9 +130,13 @@ def load_batch(out_dir, *, methods=None, data_path=None) -> "BatchResult":
     for r in records:
         # a tree copied from another host: the output folder sits next to the JSON;
         # an older record without out_dir: the folder run_all names
-        saved = r.get("out_dir") or f"{r.get('method')}_{blob['dataset']}"
-        if not Path(saved).exists() and (folder / Path(saved).name).is_dir():
-            r["out_dir"] = str((folder / Path(saved).name).resolve())
+        saved = Path(r.get("out_dir") or f"{r.get('method')}_{blob['dataset']}")
+        if not saved.is_absolute():
+            saved = folder / saved            # relative to the tree's folder
+        if not saved.exists() and (folder / saved.name).is_dir():
+            saved = folder / saved.name
+        if saved.exists() and str(saved) != str(r.get("out_dir")):
+            r["out_dir"] = str(saved.resolve())
         # left as recorded when no root holds the dataset; rescore then names the roots
         root, found = _dataset_root(r, blob["dataset"], data_path)
         if found and root is not None:
@@ -139,7 +144,10 @@ def load_batch(out_dir, *, methods=None, data_path=None) -> "BatchResult":
     long_path = folder / "long.csv"
     long_table = pd.read_csv(long_path) if long_path.exists() else None
     if _scored_before_040(long_table, records):
-        _compat.warn(OLD_TREE, UserWarning)
+        from .data.fetch import _output_urls
+        stored = folder.parent.name == "outputs" and folder.name in _output_urls()
+        _compat.warn(OLD_TREE_STORED.format(folder.name) if stored else OLD_TREE,
+                     UserWarning)
     for r in records:
         rows = [] if long_table is None else long_table[long_table["method"] == r.get("method")]
         r["_long"] = rows if len(rows) else None
@@ -152,6 +160,9 @@ def load_batch(out_dir, *, methods=None, data_path=None) -> "BatchResult":
 #: load_batch's warning for a folder scored before 0.4.0
 OLD_TREE = ("These scores come from multibench 0.3.x. res.rescore() scores them as "
             "0.4.0 does.")
+#: the same for a ``fetch_outputs`` tree
+OLD_TREE_STORED = ("These are the 0.3.x stored outputs. mtb.data.fetch_outputs({!r}) "
+                   "gets the 0.4.0 ones.")
 
 
 def _scored_before_040(long_table, records) -> bool:

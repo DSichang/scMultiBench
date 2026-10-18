@@ -80,3 +80,63 @@ def test_a_package_set_key_is_refused():
 def test_tunable_default_is_what_a_run_uses():
     t = mtb.params_for("scMM", "vertical", ["rna", "atac"])["tunable"]["no_cuda"]
     assert t["default"] is True and t["script_default"] is False
+
+
+# Y02: a tree records its source URL; a new manifest URL fetches it again
+from test_fetch_outputs import F, _write_tree, served  # noqa: E402,F401
+
+
+def test_a_tree_of_another_url_is_fetched_again(served, monkeypatch, capsys):  # noqa: F811
+    data, calls = served
+    out = mtb.data.fetch_outputs("D11", data_path=data, quiet=True)
+    assert (out / ".source").read_text().strip() == F._output_urls()["D11"]
+    (out / "mine.txt").write_text("x")
+    new = {**F._output_urls(), "D11": "https://example.org/new/outputs-D11.tar.gz"}
+    monkeypatch.setattr(F, "_output_urls", lambda: new)
+    out = mtb.data.fetch_outputs("D11", data_path=data)
+    old = data / "outputs" / "D11.old"
+    assert calls[-1] == new["D11"] and (old / "mine.txt").is_file()
+    assert (out / ".source").read_text().strip() == new["D11"]
+    assert f"(the earlier tree moves to {old})" in capsys.readouterr().out
+
+
+def test_a_tree_without_a_source_is_fetched_again(served):  # noqa: F811
+    data, calls = served
+    _write_tree(data / "outputs" / "D11")           # a 0.3.x cache: no .source
+    mtb.data.fetch_outputs("D11", data_path=data, quiet=True)
+    assert len(calls) == 1 and (data / "outputs" / "D11.old").is_dir()
+
+
+def test_a_stored_tree_of_0_3_says_to_fetch_again(tmp_path):
+    tree = tmp_path / "outputs" / "D11"
+    _write_tree(tree)                               # long.csv without scored_with
+    with pytest.warns(UserWarning, match=r"These are the 0\.3\.x stored outputs\. "
+                      r"mtb\.data\.fetch_outputs\('D11'\) gets the 0\.4\.0 ones\."):
+        mtb.load_batch(tree)
+
+
+# Y40: a second dataset is refused before any download
+def test_fetch_outputs_takes_one_dataset(served):  # noqa: F811
+    data, calls = served
+    with pytest.raises(TypeError, match="fetch_outputs takes one dataset; call it once "
+                                        "per dataset."):
+        mtb.data.fetch_outputs("D11", "D28", data_path=data)
+    assert calls == []
+
+
+# load_batch reads a relative out_dir from the tree's folder
+def test_load_batch_reads_a_relative_out_dir_from_the_tree(tmp_path, monkeypatch):
+    import json
+    tree = tmp_path / "trees" / "D11"
+    _write_tree(tree)
+    blob = json.loads((tree / "batch_result.json").read_text())
+    for r in blob["records"]:
+        r["out_dir"] = f"{r['method']}_D11"
+    (tree / "batch_result.json").write_text(json.dumps(blob))
+    elsewhere = tmp_path / "cwd"
+    (elsewhere / "Matilda_D11").mkdir(parents=True)   # must not be picked
+    monkeypatch.chdir(elsewhere)
+    with pytest.warns(UserWarning):
+        res = mtb.load_batch(tree)
+    assert [r["out_dir"] for r in res.records] == [
+        str((tree / f"{m}_D11").resolve()) for m in ("Matilda", "MOFA2", "scMoMaT")]

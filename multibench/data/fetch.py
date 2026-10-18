@@ -203,7 +203,9 @@ def fetch_outputs(dataset: str, methods=None, *, data_path=None,
     Returns
     -------
     pathlib.Path
-        ``<data_path>/outputs/<dataset>`` - pass it to ``mtb.load_batch``.
+        ``<data_path>/outputs/<dataset>`` - pass it to ``mtb.load_batch``. A
+        tree of an earlier release is fetched again, and the earlier one
+        moves to ``outputs/<dataset>.old``.
 
     Raises
     ------
@@ -236,21 +238,32 @@ def fetch_outputs(dataset: str, methods=None, *, data_path=None,
         raise ValueError(
             f"{dataset!r} has no shipped run_all outputs; available: "
             f"{', '.join(sorted(urls))}")
+    if methods is not None:
+        if isinstance(methods, str) and methods in urls:
+            raise TypeError("fetch_outputs takes one dataset; call it once per dataset.")
+        from ..engine import registry
+        registry.check_id_list(methods, "methods")
     root = Path(data_path) if data_path is not None else config.DEFAULT.data_path
     outputs = root / "outputs"
     dest = outputs / dataset
-    if not (dest / "batch_result.json").is_file():
-        if dest.is_dir():
+    url = urls[dataset]
+    have_tree = (dest / "batch_result.json").is_file()
+    # the tree records the URL it came from: a new manifest URL fetches it again
+    source = dest / ".source"
+    if not (have_tree and source.is_file() and source.read_text().strip() == url):
+        old = outputs / f"{dataset}.old" if have_tree else None
+        if dest.is_dir() and not have_tree:
             if any(dest.iterdir()):
                 raise RuntimeError(
                     f"{dest} exists without batch_result.json - remove it and "
                     f"the outputs will be fetched fresh")
             dest.rmdir()                     # empty leftover
         if not quiet:
-            print(f"downloading run_all outputs for {dataset} from {urls[dataset]} ...",
-                  flush=True)
+            print(f"downloading run_all outputs for {dataset} from {url} ..."
+                  + (f" (the earlier tree moves to {old})" if old else ""), flush=True)
         tgz = _download_or_explain(
-            urls[dataset], f"the stored outputs of {dataset}",
+            url, f"the stored outputs of {dataset}",
+            f"pass the tree you have, {dest}, to mtb.load_batch." if old else
             f"download the file by hand and unpack it into {dest}, so that "
             f"{dest / 'batch_result.json'} exists.")
         outputs.mkdir(parents=True, exist_ok=True)
@@ -264,12 +277,14 @@ def fetch_outputs(dataset: str, methods=None, *, data_path=None,
             if found is None:
                 raise RuntimeError(
                     f"downloaded archive for {dataset} did not contain batch_result.json")
+            (found / ".source").write_text(url + "\n")
+            if old is not None:
+                _shutil.rmtree(old, ignore_errors=True)
+                dest.rename(old)
             found.rename(dest)
         finally:
             _shutil.rmtree(tmp, ignore_errors=True)
     if methods is not None:
-        from ..engine import registry
-        registry.check_id_list(methods, "methods")
         have = _methods_in_tree(dest)
 
         def _id(m):                          # any letter case, or a display name
