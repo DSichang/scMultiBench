@@ -884,6 +884,40 @@ def layers_for(keys, *, layers: dict | None = None, envs_dir=None,
             and not (missing_only and (root / name / LAYER_INFO).is_file())}
 
 
+def plan_totals(rows, sizes: dict | None = None, *, layers: dict | None = None
+                ) -> tuple[dict, str]:
+    """``(totals, line)`` for the envs in ``rows``, each shared library layer counted
+    once. ``totals``: ``total_download_bytes``, ``total_disk_bytes`` (``None`` when
+    an env is not measured) and ``shared_layers`` (``{name: {archive_bytes,
+    unpacked_bytes, envs}}``); ``line``: ``"2 envs: 5.4 GB to download, 5.6 GB on
+    disk"``. The install plan and ``multibench env install --dry-run`` both use it."""
+    sizes = packed_sizes() if sizes is None else sizes
+    keys = [archive_key(r["env"], r.get("flavor")) for r in rows]
+    layers = layers_for(keys) if layers is None else layers
+    shared = {name: {"archive_bytes": e.get("archive_bytes"),
+                     "unpacked_bytes": e.get("unpacked_bytes"),
+                     "envs": [r["env"] for r, k in zip(rows, keys)
+                              if k in set(e.get("envs", ()))]}
+              for name, e in layers.items()}
+
+    def total(part):
+        known = [v for v in ((sizes.get(k) or {}).get(part) for k in keys) if v is not None]
+        return (sum(known) + sum(e[part] or 0 for e in shared.values()),
+                len(known) == len(keys), bool(known))
+
+    dl, dl_all, dl_any = total("archive_bytes")
+    disk, disk_all, disk_any = total("unpacked_bytes")
+    n = len(rows)
+    line = f"{n} env{'s' if n != 1 else ''}: " + (
+        f"{_gb(dl)} to download" if dl_all else
+        f"at least {_gb(dl)} to download" if dl_any else "download size not recorded")
+    if disk_any:
+        line += f", {'' if disk_all else 'at least '}{_gb(disk)} on disk"
+    return ({"total_download_bytes": dl if dl_all else None,
+             "total_disk_bytes": disk if disk_all else None,
+             "shared_layers": shared}, line)
+
+
 def _ensure_layer(name: str, info: dict, envs_root: Path) -> Path:
     """``<envs_root>/.layers/<name>``, downloaded and unpacked on first use;
     ``RuntimeError`` when its digest is not the one ``info`` names."""
@@ -1403,9 +1437,22 @@ def _install(methods=None, *, category=None, build: bool = False, packed=None,
     and the hidden ``force=`` (try a real install off Linux)."""
     if packed is not None:
         build = not packed
-    return _frame(_install_rows(methods, category=category, packed=not build,
-                                dry_run=dry_run, conda=conda, force=force,
-                                flavor=flavor), _INSTALL_FIRST)
+    rows = _install_rows(methods, category=category, packed=not build, dry_run=dry_run,
+                         conda=conda, force=force, flavor=flavor)
+    plan = _frame(rows, _INSTALL_FIRST)
+    if dry_run and not build:
+        todo = to_download(rows)
+        totals, line = plan_totals(todo)
+        plan.attrs.update(totals)
+        if todo:
+            print(f"[env] {line}", flush=True)
+    return plan
+
+
+def to_download(rows) -> list[dict]:
+    """The rows of an install plan whose archive would be downloaded."""
+    return [r for r in rows if not r["exists"] and r.get("packed_url")
+            and r["state"] != "name taken"]
 
 
 def _install_rows(methods: list[str] | None = None, *, category: str | None = None,

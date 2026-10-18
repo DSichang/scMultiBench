@@ -290,11 +290,9 @@ def test_env_install_packed_dry_run_shows_sizes_url_and_total(monkeypatch, capsy
     assert "? dl" in lines["mystery"] and "? disk" in lines["mystery"]
     assert "dl" not in lines["have_it"]
     # unknowns are counted per column: the row printing '? disk' is a disk unknown
-    assert ("# total for 2 envs: at least 0.9 GB to download\n# Both envs have a single "
-            "build (the same archive for CPU and GPU hosts).\n# The download size of "
-            "mystery is not recorded.\n# 3.1 GB on disk for scmb_torch. mystery is not "
-            "measured.\n# Unpacked envs are larger than the download. Check with du "
-            "after the first install.") in cap.err
+    # Z27 (r3): one total line; an unknown size makes the figure a lower bound
+    assert "# 2 envs: at least 0.9 GB to download, at least 3.1 GB on disk\n" in cap.err
+    assert "not measured" not in cap.err and "single build" not in cap.err
     assert not any(l.startswith("#") for l in cap.out.splitlines())
 
 
@@ -311,12 +309,12 @@ def test_env_plan_shows_sizes_and_total(monkeypatch, capsys):
     # "X GB download" when every size is known, "at least X GB download" and a
     # line counting the unmeasured envs when some are still unmeasured
     assert cap.err.startswith("warning: multibench env plan is deprecated")
-    assert cap.err.splitlines()[1].startswith("# total") and "download" in cap.err
-    # counts depend on the recorded sizes; the disk count must equal the '? disk' rows
+    assert cap.err.splitlines()[1].startswith("# 3 envs: ") and "download" in cap.err
+    # a '? disk' row makes the disk figure a lower bound
     from tests.test_env_cli_consistency import total_unknowns
     n, dl, disk = total_unknowns(cap.err)
-    assert disk == sum("? disk" in l for l in cap.out.splitlines())
-    assert dl == sum("? dl" in l for l in cap.out.splitlines())
+    assert disk == any("? disk" in l for l in cap.out.splitlines())
+    assert dl == any("? dl" in l for l in cap.out.splitlines())
     assert lines["scmb_r"].endswith("<- UINMF")
 
 

@@ -215,27 +215,16 @@ def test_install_refusal_is_plain_on_the_cli(off_linux, monkeypatch, capsys):
 
 
 def test_env_plan_fallback_line_agrees_in_number(monkeypatch):
-    monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
+    # Z27 (r3): no builds line; the total sums the archive each row takes
     sizes = {"a": {"archive_bytes": 10**9, "unpacked_bytes": 2 * 10**9},
-             "b": {"archive_bytes": 10**9, "unpacked_bytes": 2 * 10**9}}
-    single = "a single build (the same archive for CPU and GPU hosts)."
-    kw = dict(flavor="cpu", manifest={"b-cpu": "u"})       # only b has a CPU build
-    one = cli._size_total_line([{"env": "a", "flavor": "gpu"}], sizes, **kw)
-    assert one.splitlines()[1] == f"# This env has {single}"
-    two = cli._size_total_line([{"env": "a", "flavor": "gpu"}, {"env": "c", "flavor": "gpu"}],
-                               sizes, **kw)
-    assert two.splitlines()[1] == f"# Both envs have {single}"
-    some = cli._size_total_line([{"env": "a", "flavor": "gpu"}, {"env": "b", "flavor": "cpu"},
-                                 {"env": "c", "flavor": "gpu"}], sizes, **kw)
-    assert some.splitlines()[1] == f"# 1 of 3 envs has the CPU build. 2 envs have {single}"
-    some = cli._size_total_line([{"env": "a", "flavor": "gpu"}, {"env": "b", "flavor": "cpu"}],
-                                sizes, **kw)
-    assert some.splitlines()[1] == f"# 1 of 2 envs has the CPU build. 1 env has {single}"
-    # a CPU build listed but not published yet: that env gets its GPU build
-    late = cli._size_total_line([{"env": "a", "flavor": "gpu"}], sizes, flavor="cpu",
-                                manifest={"a-cpu": "u"})
-    assert late.splitlines()[1] == ("# 1 env gets the GPU build, because its CPU build is "
-                                    "not published yet.")
+             "b": {"archive_bytes": 4 * 10**9, "unpacked_bytes": 8 * 10**9},
+             "b-cpu": {"archive_bytes": 10**9, "unpacked_bytes": 2 * 10**9}}
+    rows = [{"env": "a", "flavor": "gpu"}, {"env": "b", "flavor": "cpu"}]
+    assert envs.plan_totals(rows, sizes, layers={})[1] == \
+        "2 envs: 2.0 GB to download, 4.0 GB on disk"
+    rows = [{"env": "a", "flavor": "any"}, {"env": "b", "flavor": "gpu"}]
+    assert envs.plan_totals(rows, sizes, layers={})[1] == \
+        "2 envs: 5.0 GB to download, 10.0 GB on disk"
 
 
 def test_env_status_help_is_one_sentence_and_one_tag_per_line():

@@ -203,9 +203,8 @@ def test_auto_flavour_on_a_cpu_host_says_how_to_get_gpu_builds(linux, monkeypatc
     # to get the GPU builds once
     assert cli.main(["env", "plan", "--methods", "scMoMaT"]) == 0
     err = capsys.readouterr().err
-    assert "# This env has the CPU build, because this host has no NVIDIA GPU." in err
     assert "# for jobs on GPU nodes, pass --flavor gpu" in err
-    assert err.count("NVIDIA GPU") == 1 and err.count("--flavor gpu") == 1
+    assert err.count("--flavor gpu") == 1
     assert cli.main(["env", "install", "--packed", "--methods", "scMoMaT", "--dry-run"]) == 0
     err = capsys.readouterr().err
     # a dry run says what it would install (X29)
@@ -217,8 +216,6 @@ def test_auto_flavour_on_a_cpu_host_says_how_to_get_gpu_builds(linux, monkeypatc
                  ["env", "install", "--packed", "--methods", "StabMap", "--dry-run"]):
         assert cli.main(argv) == 0
         err = capsys.readouterr().err
-        assert ("# This env has a single build (the same archive for CPU and GPU "
-                "hosts).") in err, argv
         assert "GPU build" not in err, argv
         assert "--flavor gpu" not in err and "CPU builds" not in err, argv
     for argv in (["env", "plan", "--methods", "StabMap", "--flavor", "cpu"],
@@ -307,15 +304,11 @@ def test_total_line_does_not_sum_an_incomplete_column_as_a_total():
     rows = [{"env": e} for e in "abcdef"]
     sizes = {e: {"archive_bytes": 2_000_000_000, "unpacked_bytes": None} for e in "abcdef"}
     sizes["a"]["unpacked_bytes"] = sizes["b"]["unpacked_bytes"] = 2_050_000_000
-    line = cli._size_total_line(rows, sizes)
-    assert line.splitlines() == [
-        "# total for 6 envs: 12.0 GB download",
-        "# 4.1 GB on disk for a and b. 4 envs are not measured.",
-        "# Unpacked envs are larger than the download. Check with du after the first "
-        "install."]
-    assert "packed_sizes.json" not in line and "on disk," not in line
-    assert "# The size on disk of 6 envs is not measured." in cli._size_total_line(
-        rows, {e: {"archive_bytes": 1} for e in "abcdef"})
+    totals, line = envs.plan_totals(rows, sizes, layers={})
+    assert line == "6 envs: 12.0 GB to download, at least 4.1 GB on disk"
+    assert totals["total_disk_bytes"] is None and "packed_sizes.json" not in line
+    assert envs.plan_totals(rows, {e: {"archive_bytes": 1} for e in "abcdef"},
+                            layers={})[1] == "6 envs: 0.0 GB to download"
 
 
 # ================================================================ L28 scan --strict

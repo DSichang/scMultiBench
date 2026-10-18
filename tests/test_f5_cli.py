@@ -21,6 +21,7 @@ import pytest
 
 import multibench as mtb
 from multibench import cli, config
+from multibench.engine import envs
 from multibench.data import results as R
 from tests.test_f4_cli import _diag_folder
 from tests.conftest import full_scan
@@ -375,17 +376,11 @@ def test_strict_counts_are_labelled(monkeypatch, capsys):
 
 
 def test_env_plan_size_lines_name_the_envs():
+    # Z27 (r3): one total line; an unmeasured env makes the disk figure a lower bound
     sizes = {"scmb_torch": {"archive_bytes": 9 * 10**8, "unpacked_bytes": 26 * 10**8},
              "scmb_r": {"archive_bytes": 9 * 10**8}}
-    text = cli._size_total_line([{"env": "scmb_torch"}, {"env": "scmb_r"}], sizes, layers={})
-    assert text.splitlines()[1:] == [
-        "# 2.6 GB on disk for scmb_torch. scmb_r is not measured.",
-        "# Unpacked envs are larger than the download. Check with du after the first "
-        "install."]
-    gpu = cli._size_total_line([{"env": "a", "flavor": "gpu"}],
-                               {"a": {"archive_bytes": 1, "unpacked_bytes": 1}},
-                               flavor="gpu", manifest={"a": "u", "a-cpu": "u"})
-    assert gpu.splitlines()[1] == "# This env has the GPU build."
+    _, text = envs.plan_totals([{"env": "scmb_torch"}, {"env": "scmb_r"}], sizes, layers={})
+    assert text == "2 envs: 1.8 GB to download, at least 2.6 GB on disk"
 
 
 def test_fetch_progress_line_is_a_sentence(tmp_path, monkeypatch, capsys):

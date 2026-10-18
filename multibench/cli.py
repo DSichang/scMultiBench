@@ -1478,132 +1478,6 @@ def _cmd_evaluate(args) -> int:
     return _EXIT_OK
 
 
-def _size_total_line(rows, sizes: dict, what: str = "download", *,
-                     flavor: str | None = None, manifest: dict | None = None,
-                     layers: dict | None = None) -> str:
-    """The ``# total`` lines (stderr) for ``rows``: download and on-disk sums, a line
-    naming the builds when ``flavor`` is given, the envs without a size, the shared layers."""
-    dl = disk = 0
-    n = n_dl = n_disk = 0
-    n_cpu = n_gpu = n_single = 0
-    no_dl, no_disk, disk_known = [], [], []
-    manifest = envs.packed_manifest() if manifest is None else manifest
-    keys = []
-    for r in rows:
-        n += 1
-        key = envs.archive_key(r["env"], r.get("flavor"))
-        keys.append(key)
-        sz = sizes.get(key) or {}
-        a, u = sz.get("archive_bytes"), sz.get("unpacked_bytes")
-        if a is not None:
-            n_dl += 1
-            dl += a
-        else:
-            no_dl.append(r["env"])
-        if u is not None:
-            n_disk += 1
-            disk += u
-            disk_known.append(r["env"])
-        else:
-            no_disk.append(r["env"])
-        if r.get("flavor") == "cpu":
-            n_cpu += 1
-        elif envs._single_build(r["env"], manifest=manifest):
-            n_single += 1
-        else:
-            n_gpu += 1
-
-    layers = envs.layers_for(keys) if layers is None else layers
-    disk_envs = disk                # the envs' own size, as each row shows it
-    for entry in layers.values():
-        dl += entry.get("archive_bytes") or 0
-        disk += entry.get("unpacked_bytes") or 0
-
-    def _envs(k: int) -> str:
-        return f"{k} env{'s' if k != 1 else ''}"
-
-    def _which(k: int) -> str:
-        if n == 1:
-            return "this env"
-        if k == n:
-            return "both envs" if n == 2 else f"all {n} envs"
-        return f"{k} of {n} envs"
-
-    lines = [f"# total for {_envs(n)}"]
-    if n_dl == n:
-        lines[0] += f": {envs._gb(dl)} {what}"
-    elif n_dl:
-        lines[0] += f": at least {envs._gb(dl)} {what}"
-    else:
-        lines[0] += ": download size not recorded"
-    if n_disk == n:
-        lines[0] += f", {envs._gb(disk)} on disk"
-    if flavor is not None and n:
-        lines.append(_builds_line(envs.resolve_flavor(flavor), flavor, n_cpu, n_gpu,
-                                  n_single, _envs, _which))
-    if 0 < n_dl < n:            # none known: the first line already says so
-        lines.append(f"# The download size of {_named(no_dl)} is not recorded.")
-    if n_disk < n:
-        # the known part is a lower bound, e.g. for a storage-quota request
-        not_measured = f"{_named(no_disk)} {'is' if len(no_disk) == 1 else 'are'} not measured."
-        lines.append(f"# {envs._gb(disk_envs)} on disk for {_named(disk_known)}. {not_measured}"
-                     if n_disk else f"# The size on disk of {_named(no_disk)} is not measured.")
-        lines.append("# Unpacked envs are larger than the download. Check with du after "
-                     "the first install.")
-    for name, entry in layers.items():
-        k = len(set(keys) & set(entry.get("envs", ())))
-        lines.append(f"# The total includes {name} ({envs._gb(entry.get('archive_bytes'))}), "
-                     f"the libraries {_envs(k)} here share{'s' if k == 1 else ''}. "
-                     "It is downloaded once.")
-    return "\n".join(lines)
-
-
-def _named(env_names) -> str:
-    """``scmb_r``, ``scmb_r and scmb_x``, ``a, b and c``; ``N envs`` for more than three."""
-    names = list(dict.fromkeys(env_names))
-    if len(names) > 3:
-        return f"{len(names)} envs"
-    return _and_list(names)
-
-
-_SINGLE_BUILD = "a single build (the same archive for CPU and GPU hosts)"
-
-
-def _builds_line(eff: str, flavor: str, n_cpu: int, n_gpu: int, n_single: int,
-                 _envs, _which) -> str:
-    """The ``# ...`` line naming the builds :func:`_size_total_line` summed; ``eff`` is
-    the flavour ``flavor`` resolved to on this host."""
-    n = n_cpu + n_gpu + n_single
-
-    def _has(k: int) -> str:
-        return "has" if k == 1 else "have"
-
-    if n_single == n:
-        return f"# {_which(n).capitalize()} {_has(n)} {_SINGLE_BUILD}."
-    because = ""
-    if flavor == "auto":
-        because = (", because this host has no NVIDIA GPU" if eff == "cpu"
-                   else ", because this host has an NVIDIA GPU")
-    parts = []
-    if eff == "cpu":
-        if n_cpu:
-            parts.append(f"{_which(n_cpu).capitalize()} {_has(n_cpu)} the CPU build"
-                         f"{because}.")
-        if n_gpu:
-            whose = "its CPU build is" if n_gpu == 1 else "their CPU builds are"
-            parts.append(f"{_envs(n_gpu)} {'gets' if n_gpu == 1 else 'get'} the GPU "
-                         f"build, because {whose} not published yet.")
-    else:
-        if n_gpu:
-            parts.append(f"{_which(n_gpu).capitalize()} {_has(n_gpu)} the GPU build"
-                         f"{because}.")
-        if n_cpu:                     # an installed CPU build listed with the rest
-            parts.append(f"{_envs(n_cpu)} {_has(n_cpu)} the CPU build.")
-    if n_single:
-        parts.append(f"{_envs(n_single)} {_has(n_single)} {_SINGLE_BUILD}.")
-    return "# " + " ".join(parts)
-
-
 def _flavor_token(flavor, env: str | None = None) -> str:
     """`` flavor=cpu`` for a row whose installed flavour is recorded and whose env has
     two builds, else ``''``."""
@@ -1619,8 +1493,7 @@ def _cmd_env(args) -> int:
     """``multibench env ...``: environment recipes, preflight and installation."""
     cmd = args.env_cmd
     # an install off Linux stops with the error alone
-    refusing = cmd == "install" and not args.dry_run and not args.force
-    if cmd in ("status", "plan", "doctor", "install") and not refusing:
+    if cmd in ("status", "plan", "doctor"):
         _platform_note()
     if cmd == "status":
         methods = _csv_list(args.methods)
@@ -1668,8 +1541,7 @@ def _cmd_env(args) -> int:
                   f"{_flavor_token(p.get('flavor'), p['env'])}")
         plan_layers = envs.layers_for(
             [envs.archive_key(p["env"], p["flavor"]) for p in summed], missing_only=False)
-        print(_size_total_line(summed, sizes, flavor=flavor, manifest=manifest,
-                               layers=plan_layers), file=sys.stderr)
+        print("# " + envs.plan_totals(summed, sizes, layers=plan_layers)[1], file=sys.stderr)
         note = envs.auto_flavor_note(flavor, planning=True)
         if note and any(p["flavor"] == "cpu" for p in summed):
             print(note, file=sys.stderr)
@@ -1717,21 +1589,14 @@ def _cmd_env(args) -> int:
                   "(multibench env doctor shows where)", file=sys.stderr)
         if args.dry_run and any(not r["exists"] and r["state"] != "name taken"
                                 for r in rows):
+            todo = envs.to_download(rows) if packed else []
+            if todo:
+                print("# " + envs.plan_totals(todo)[1], file=sys.stderr)
             print("# dry run - run it without --dry-run on a Linux machine"
                   if envs.host_platform_problem() else
                   "# dry run - leave out --dry-run to create the missing envs"
                   + (" (packed archives first, lockfile build otherwise)"
                      if packed else " from their lockfiles"), file=sys.stderr)
-            if packed:
-                todo = [r for r in rows if not r["exists"] and r.get("packed_url")
-                        and r["state"] != "name taken"]
-                # mtb.env.install printed why 'auto' took the CPU builds; the
-                # total then names the builds without repeating the reason
-                said = envs.auto_flavor_note(flavor) is not None
-                print(_size_total_line(todo, envs.packed_sizes(), what="to download",
-                                       flavor=envs.resolve_flavor(flavor) if said
-                                       else flavor, manifest=envs.packed_manifest()),
-                      file=sys.stderr)
         return _EXIT_OK
     if cmd == "freeze":
         if args.all:

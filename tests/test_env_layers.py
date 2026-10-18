@@ -106,11 +106,13 @@ def test_total_line_adds_the_layer_once(published):
     sizes = {e: {"archive_bytes": 2_000_000_000, "unpacked_bytes": 3_000_000_000}
              for e in ("env_a", "env_b")}
     layers["L"].update(archive_bytes=4_000_000_000, unpacked_bytes=6_000_000_000)
-    text = cli._size_total_line([{"env": "env_a"}, {"env": "env_b"}], sizes, layers=layers)
-    assert text.splitlines()[0] == "# total for 2 envs: 8.0 GB download, 12.0 GB on disk"
-    assert text.splitlines()[-1] == ("# The total includes L (4.0 GB), the libraries 2 envs "
-                                     "here share. It is downloaded once.")
-    assert "includes" not in cli._size_total_line([{"env": "env_a"}], sizes, layers={})
+    totals, text = envs.plan_totals([{"env": "env_a"}, {"env": "env_b"}], sizes, layers=layers)
+    assert text == "2 envs: 8.0 GB to download, 12.0 GB on disk"
+    assert totals["shared_layers"] == {"L": {"archive_bytes": 4_000_000_000,
+                                             "unpacked_bytes": 6_000_000_000,
+                                             "envs": ["env_a", "env_b"]}}
+    assert envs.plan_totals([{"env": "env_a"}], sizes, layers={})[1] == \
+        "1 env: 2.0 GB to download, 3.0 GB on disk"
 
 
 def test_size_tool_names_a_layer_not_published_at_its_size():

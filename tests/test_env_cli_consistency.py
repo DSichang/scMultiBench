@@ -30,20 +30,14 @@ def _count_named(named: str) -> int:
     return int(m.group(1)) if m else len(re.split(r", | and ", named))
 
 
-def total_unknowns(text: str) -> tuple[int, int, int]:
-    """``(n envs, unknown downloads, unknown disks)`` parsed from the ``# total``
-    line and the lines after it that name the envs without a size."""
-    n = int(re.search(r"# total for (\d+) envs?", text).group(1))
-
-    def unknown(pattern):
-        m = re.search(pattern, text)
-        return _count_named(m.group(1)) if m else 0
-    # none known: the first line says so, and no later line repeats it
-    dl = n if re.search(r"# total for [^\n]*: download size not recorded", text) \
-        else unknown(r"# The download size of (.+?) is not recorded\.")
-    disk = (unknown(r"# The size on disk of (.+?) is not measured\.")
-            or unknown(r"GB on disk for .+?\. (.+?) (?:is|are) not measured\."))
-    return n, dl, disk
+def total_unknowns(text: str) -> tuple[int, bool, bool]:
+    """``(n envs, a download unknown, a disk size unknown)`` from the total line:
+    a column with an unknown size reads "at least" or "not recorded" (Z27, r3)."""
+    m = re.search(r"# (\d+) envs?: ([^\n]*)", text)
+    rest = m.group(2)
+    dl = "not recorded" in rest or rest.startswith("at least")
+    disk = "on disk" not in rest or "at least" in rest.split(",", 1)[-1]
+    return int(m.group(1)), dl, disk
 
 
 def test_size_total_counts_unknowns_per_column():
@@ -51,20 +45,16 @@ def test_size_total_counts_unknowns_per_column():
     sizes = {"a": {"archive_bytes": 1_000_000_000, "unpacked_bytes": 2_000_000_000},
              "b": {"archive_bytes": 1_000_000_000, "unpacked_bytes": None},
              "c": {"archive_bytes": 1_000_000_000}}
-    line = cli._size_total_line(rows, sizes)
-    assert total_unknowns(line) == (3, 0, 2)
+    totals, line = envs.plan_totals(rows, sizes, layers={})
+    assert total_unknowns("# " + line) == (3, False, True)
     # a partly known column is never printed as a plain total; the known part
     # stays as a lower bound (the figure a storage-quota request needs)
-    assert line.splitlines() == [
-        "# total for 3 envs: 3.0 GB download",
-        "# 2.0 GB on disk for a. b and c are not measured.",
-        "# Unpacked envs are larger than the download. Check with du after the first "
-        "install."]
-    assert ";" not in line
-    assert "on disk" not in line.splitlines()[0]
-    full = cli._size_total_line(rows[:1], sizes)
-    assert total_unknowns(full) == (1, 0, 0)
-    assert full == "# total for 1 env: 1.0 GB download, 2.0 GB on disk"
+    assert line == "3 envs: 3.0 GB to download, at least 2.0 GB on disk"
+    assert totals["total_download_bytes"] == 3_000_000_000
+    assert totals["total_disk_bytes"] is None
+    totals, full = envs.plan_totals(rows[:1], sizes, layers={})
+    assert full == "1 env: 1.0 GB to download, 2.0 GB on disk"
+    assert totals["total_disk_bytes"] == 2_000_000_000
 
 
 def test_env_plan_summary_matches_the_question_marks_in_the_rows(capsys):
@@ -74,8 +64,8 @@ def test_env_plan_summary_matches_the_question_marks_in_the_rows(capsys):
     n, dl, disk = total_unknowns(cap.err)
     rows = [l for l in cap.out.splitlines() if l.strip()]
     assert n == len(rows)
-    assert dl == sum("? dl" in l for l in rows)
-    assert disk == sum("? disk" in l for l in rows)
+    assert dl == any("? dl" in l for l in rows)
+    assert disk == any("? disk" in l for l in rows)
 
 
 # ----------------------------------------------------------------- recipe
@@ -196,3 +186,18 @@ def test_scan_reports_the_mira_helper_when_the_checkout_lacks_it(tmp_path, monke
     row = full_scan("D11", "vertical", methods=["MIRA"]).iloc[0]
     assert not row["files_ok"] and "logger.py" in row["files_reason"]
     assert "logger.py" in row["reason"]
+
+
+def test_python_and_cli_install_plans_give_one_total(capsys):
+    # X29 (r3): one row per env; the totals, shared layer counted, come from one helper
+    plan = mtb.env.install(["StabMap", "scMoMaT"], dry_run=True, flavor="gpu")
+    out = capsys.readouterr().out.strip()
+    assert list(plan["env"]) == ["scmb_r", "scmb_torch"]
+    layers = plan.attrs["shared_layers"]
+    assert layers and all(e["envs"] == ["scmb_torch"] for e in layers.values())
+    assert plan.attrs["total_download_bytes"] == (
+        plan["archive_bytes"].sum() + sum(e["archive_bytes"] for e in layers.values()))
+    assert out.startswith("[env] 2 envs: ")
+    assert cli.main(["env", "install", "--methods", "StabMap,scMoMaT", "--flavor", "gpu",
+                     "--dry-run"]) == 0
+    assert "# " + out[len("[env] "):] in capsys.readouterr().err
