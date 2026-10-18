@@ -327,11 +327,11 @@ def old_scoring(scored_with) -> "pd.Series":
 
 #: the warning for rows scored before 0.4.0 next to the stored tables
 OLD_SCORING = ("The rows for {names} were scored before multibench 0.4.0. "
-               "Score them again to compare them with the stored tables.")
+               "Score them again to compare them with the stored results.")
 #: the same for rows that do not record their scoring
 NO_SCORING = ("The rows for {names} do not record how they were scored (no "
               "scored_with). Score them with multibench 0.4.0 to compare them with "
-              "the stored tables.")
+              "the stored results.")
 
 
 def old_scoring_warning(df: pd.DataFrame) -> str | None:
@@ -391,7 +391,7 @@ def backend_warning(df: pd.DataFrame) -> str | None:
         return None
     names = ", ".join(sorted(map(str, df.loc[hit, "method"].unique())))
     return (f"The rows for {names} were clustered with the igraph Leiden backend. "
-            f"The stored tables used leidenalg, which can move ARI by up to "
+            f"The stored results used leidenalg, which can move ARI by up to "
             f"about 0.1. " + config.hint(
                 "Set mtb.config.DEFAULT.leiden_flavor = 'leidenalg' before "
                 "evaluate to compare them.",

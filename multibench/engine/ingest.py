@@ -471,7 +471,7 @@ def _check_one_feature_type(adata, *, arg, spec, role=None) -> None:
             flags += " --atac-kind " + ("gene_activity" if role == "atac_gas" else "peak")
         raise ValueError(f"The matrix holds {head} " + config.hint(
             f"Pass one type, as {subset}.",
-            f"Write a dataset folder, as multibench convert SRC OUT {flags}."))
+            f"Write a dataset folder, as multibench export SRC OUT {flags}."))
     if spec is not None and _split_var_filter(spec)[1] is None:
         filtered = f"{spec}[feature_types={one}]"
         filtered = config.hint(f"{arg}='{filtered}'", f'--{arg} "{filtered}"')
@@ -1899,7 +1899,7 @@ def _row_order(out: Path, units, *, diagonal) -> dict:
                 raise ValueError(
                     f"{ref} and {name} of {out} hold the same cells in different orders. "
                     + config.hint("Export this data again in one call, into a new folder.",
-                                  "Convert this data again in one command, into a new "
+                                  "Export this data again in one command, into a new "
                                   "folder."))
         kind, idx = _cell_order(units[unit][0], first)
         if kind == "order":

@@ -1,16 +1,15 @@
-"""Load benchmark metric tables into one long table (a DataFrame).
+"""The stored results as one long table (a DataFrame), and their ranking.
 
-The user-facing tables are the package's re-run sweeps
+The stored results are the package's own runs,
 ``multibench/result/rerun/long_all_<dataset>.csv``, whose rows are stamped
-``rerun-<package version>``. The article's scIB tables
+``rerun-<package version>`` (``source`` ``"stored"`` in the long table). The article's scIB tables
 ``scib_metric/<category>/<dataset>/<method>/metric*.csv`` (a table one level
 deeper, in a run-configuration folder, is read too; ``kbet/`` folders hold raw
 kBET output) are read through the deprecated ``source=`` and for
 :class:`DegenerateRerunWarning`.
 
 Every frame has the columns ``metric, value, method, dataset, category,
-clustering, source``, so frames of either source and of
-:func:`multibench.to_long` concatenate.
+clustering, source``, so they concatenate with :func:`multibench.evaluate`'s.
 """
 from __future__ import annotations
 
@@ -161,7 +160,7 @@ def _category_unpublished(category: str) -> bool:
 def _unpublished_msg(category: str) -> str:
     """The error for a category without published tables."""
     return (f"{category} has no published tables. Leave out source= to load the "
-            f"package's re-run tables.")
+            f"stored results.")
 
 
 def _published_missing_msg(root: Path, base: Path, category: str) -> str:
@@ -299,7 +298,7 @@ def _load_rerun(category: str | None, datasets: list | None, base: Path) -> pd.D
     root = base / _RERUN_DIR
     if not files:
         raise FileNotFoundError(
-            f"no re-run sweeps ({_RERUN_GLOB}) under {root}. They ship inside the "
+            f"no stored results ({_RERUN_GLOB}) under {root}. They ship inside the "
             f"multibench wheel at multibench/result/rerun; check "
             f"mtb.config.DEFAULT.result_path (currently {base}).")
     frames = []
@@ -339,7 +338,7 @@ def _load_long_csv(path: Path) -> pd.DataFrame:
             f"{path} is not a long results CSV: missing column(s) {missing}; "
             f"need at least {need} (plus optional dataset/category/clustering/"
             f"source). Found columns: {list(df.columns)}. Write such a file "
-            f"with mtb.to_long(...).to_csv(path, index=False) or "
+            f"with mtb.evaluate(...).to_csv(path, index=False) or "
             f"BatchResult.save().")
     df = df.copy()
     df["metric"] = df["metric"].map(catalog._canonical_metric)
@@ -374,7 +373,7 @@ def _canonical_dataset_ids(category, datasets, base, source) -> list:
         canon = by_lower.get(s.lower())
         if canon is not None and canon != s and s not in have:
             _compat.warn(
-                f"dataset {s!r} is not a stored table id but {canon!r} is - using "
+                f"dataset {s!r} is not in the stored results but {canon!r} is - using "
                 f"that spelling (dataset ids are case-sensitive: 'D52', not 'd52')",
                 UserWarning)
             out.append(canon)
@@ -459,7 +458,7 @@ def _warn_degenerate(out: pd.DataFrame, base: Path,
 
 
 #: the deprecated keywords of the stored-results functions, which keep their effect
-_READ_RERUN = _compat.note("leave it out to read the re-run tables")
+_READ_RERUN = _compat.note("leave it out to read the stored results")
 _TABLE_KEYWORDS = {"source": _READ_RERUN,
                    "result_path": _compat.use("config.DEFAULT.result_path")}
 #: the 0.2 keywords, removed in 0.4
@@ -482,9 +481,9 @@ def load_results(
     methods: str | list[str] | None = None,
     metrics=None,
 ) -> pd.DataFrame:
-    """Load the package's stored scores as one long table.
+    """Load the stored results as one long table.
 
-    The stored scores are the package's own runs of its methods on the
+    The stored results are the package's own runs of its methods on the
     benchmark datasets, scored with ``mtb.evaluate``. The table concatenates
     with ``mtb.to_long`` rows of your own.
 
@@ -514,7 +513,7 @@ def load_results(
     Raises
     ------
     FileNotFoundError
-        No stored scores for a requested category or dataset; the message
+        No stored results for a requested category or dataset; the message
         names the datasets there are.
     KeyError
         Unknown method name in ``methods``, with a did-you-mean hint.
@@ -525,7 +524,7 @@ def load_results(
     -----
     UserWarning
         The selection leaves no rows, for example ``metrics="classification"``:
-        the stored scores have none.
+        the stored results have none.
 
     Examples
     --------
@@ -747,7 +746,7 @@ _ONE_METHOD_WARNING = r"The (published|re-run) table for .+? has one method, "
 
 
 def _other_source_hint(category, datasets, wanted_methods, base: Path) -> str:
-    """``". The re-run tables hold N datasets (...). Pass source=..."`` when the
+    """``". The stored results hold N datasets (...). Pass source=..."`` when the
     re-run sweeps hold rows for the methods, else a pointer to
     ``results_coverage``."""
     try:
@@ -763,7 +762,7 @@ def _other_source_hint(category, datasets, wanted_methods, base: Path) -> str:
     if cov.empty:
         return ". results_coverage() lists no rows for it either."
     ds = sorted(cov["dataset"].astype(str).unique())
-    return (f". The re-run tables hold {len(ds)} dataset{'' if len(ds) == 1 else 's'} "
+    return (f". The stored results hold {len(ds)} dataset{'' if len(ds) == 1 else 's'} "
             f"({', '.join(ds)}). "
             + config.hint("Leave out source= to read them.", "Leave out --source to read them."))
 
@@ -1083,7 +1082,7 @@ def _recommend(
             if long_df_was_none and result_path is None \
                     and set(sel.codes) <= set(CLASSIFICATION_METRICS):
                 raise ValueError(
-                    "The stored tables have no classification scores. Score your runs "
+                    "The stored results have no classification scores. Score your runs "
                     "with mtb.evaluate and pass them as long_df=.")
             if long_df_was_none and not sel.explicit and sel.family == "batch":
                 one = ", ".join(sorted(map(str, long_df["dataset"].unique())))
@@ -1111,7 +1110,7 @@ def _recommend(
             have = _other_source_methods(source, [category], None, "default",
                                          _base_path(result_path))
             if len(have) >= min_methods:
-                hint = (f" The re-run tables have {len(have)} methods for {category}: "
+                hint = (f" The stored results have {len(have)} methods for {category}: "
                         f"{', '.join(sorted(have, key=str.lower))}. Leave out source= "
                         f"to rank them.")
         sizes = {ds: len(parts[ds].index) for ds in sorted(parts)}
@@ -1233,7 +1232,7 @@ def _recommend(
                 f"last: {', '.join(no_rows)}")
         notes.append(
             head + "."
-            + (" Leave out source= to rank the re-run tables."
+            + (" Leave out source= to rank the stored results."
                if source == "published" and long_df_was_none else ""))
     if notes:
         _compat.warn(f"recommend({category!r}):\n  - " + "\n  - ".join(notes),

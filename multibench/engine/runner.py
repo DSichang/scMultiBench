@@ -962,11 +962,10 @@ def _prepared_note(plan: dict, out_str: str, method: str) -> str | None:
         return None
     that = "that file" if len(files) == 1 else "those files"
     return f"{method} reads {', '.join(files)}. " + config.hint(
-        f"mtb.run writes {that} first, so start {method} with mtb.run or "
-        f"mtb.run_all. The printed command alone fails in a job script.",
-        f"multibench run writes {that} first, so start {method} with "
-        f"multibench run or multibench run-all. The printed command alone "
-        f"fails in a job script.")
+        f"mtb.run_all writes {that} first, so start {method} with mtb.run_all. "
+        f"The printed command alone fails in a job script.",
+        f"multibench run-all writes {that} first, so start {method} with "
+        f"multibench run-all. The printed command alone fails in a job script.")
 
 
 def _fetch_scripts(repo_path) -> Path:

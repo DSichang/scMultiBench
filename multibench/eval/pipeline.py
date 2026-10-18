@@ -492,9 +492,8 @@ def _labels_from_dict(d: dict, label_order) -> list:
         else:
             where = "are not in the default order"
         raise ValueError(
-            f"The label keys {_and_list(keys)} {where}. Pass the dict from "
-            f"mtb.labels_for(dataset, category, method) unchanged, a list of "
-            f"paths in cell order, or label_order=[...]. The default order is "
+            f"The label keys {_and_list(keys)} {where}. Pass a list of paths in "
+            f"cell order, or dataset=, category= and method=. The default order is "
             f"cty1, cty2, ... by number, with rna before adt before atac. It is "
             f"not alphabetical.")
     if isinstance(label_order, str) or not isinstance(label_order, (list, tuple)):
@@ -607,9 +606,10 @@ def _no_label_error(shown, miss, given) -> str:
     if n == n_cells:
         return (f"{head}: none of the {n_cells:,} cells has a label{example}. Pass the "
                 f"column or file that holds the cell types.")
-    drop = config.hint('missing_labels="drop"', "--missing-labels drop")
-    return (f"{head}: {n:,} of the {n_cells:,} cells have no label{example}. Pass {drop} "
-            f"to score the other {n_cells - n:,}.")
+    keep = config.hint("Score the other cells only, as adata[adata.obs[col].notna()].",
+                       "Score the other cells only: leave the unlabelled ones out of "
+                       "the embedding and the label file.")
+    return (f"{head}: {n:,} of the {n_cells:,} cells have no label{example}. {keep}")
 
 
 def _no_batch_error(shown, miss, given) -> str:
@@ -734,8 +734,8 @@ def _count_error(what: str, n: int, n_cells: int, given, category=None) -> str:
                 f'"No labels" in the docs.')
     order = f" ({', '.join(f.name for f in batches)})" if batches else ""
     return msg + " " + config.hint(
-        "For a folder with one label file per batch, pass "
-        "mtb.labels_for(dataset, category, method).",
+        "For a folder with one label file per batch, pass dataset=, category= "
+        "and method=.",
         f"For several label files{order}, repeat --labels in the row order of "
         f"--embedding, or pass --dataset, --category and --method.")
 

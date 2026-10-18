@@ -457,10 +457,6 @@ def by_id_column(values, first, ids, *, what: str, name: str, target: str,
     missing = ids.difference(keys, sort=False)
     if len(missing):
         mark = ""
-        if drop:
-            from .. import config
-            how = config.hint('missing_labels="drop"', "--missing-labels drop")
-            mark = f" A row with an empty label and {how} leaves a cell out."
         raise ValueError(
             f"{what}: {name} has no row for {len(missing):,} of the {len(ids):,} "
             f"cells of {target} (first: {_first(missing, 3)}). Give a row for every "
@@ -588,19 +584,18 @@ def as_vector(x, *, what: str = "labels", column: str | None = None,
 def _multi_dict_message(what: str, d: dict, *, label_order_hint: bool) -> str:
     """The error for a ``{name: path}`` dict with several entries: a dict fixes
     no cell order, and a wrong order invalidates every score without an error."""
+    from .. import config
     keys = [str(k) for k in d]
-    fix = (f"pass label_order=[...] with these keys in that order (label_order="
-           f"list(d) trusts the dict's order)" if label_order_hint
-           else "pass the paths as a list in that order")
     return (
         f"{what}: got a dict with {len(d)} label files {keys}; a dict does not "
         f"fix the cell order, and the order must be the method's cell order "
         f"(the order in which the method concatenated its input cells, which "
         f"is not alphabetical; for most methods numbered files ascending, cty1, "
-        f"cty2, ..., and rna before atac). "
-        f"{fix}, or a list of paths in cell order. "
-        f"mtb.labels_for(dataset, method=<method>, category=<category>) returns "
-        f"the files in that order.")
+        f"cty2, ..., and rna before atac). Pass the paths as a list in that order, "
+        f"or "
+        + config.hint("dataset=, category= and method=, which read them in that order.",
+                      "--dataset, --category and --method, which read them in that "
+                      "order."))
 
 
 def _first(ix, n: int = 5) -> list:
@@ -704,10 +699,7 @@ def _align_vector(x, ids, *, what: str, column: str | None, cells: str | None):
     if len(missing) or len(extra):
         hint = ""
         if what == "labels" and not len(extra):
-            hint = (f" For cells without a label, pass labels.reindex({cells}) "
-                    'and missing_labels="drop".' if cells else
-                    " For cells without a label, give them the label NaN and pass "
-                    'missing_labels="drop".')
+            hint = " Score the cells that have a label only."
         raise ValueError(
             f"{what}: cannot align by cell id - {len(missing)} of the output's "
             f"{len(ids)} cells are missing from {what} (first: {_first(missing)}) "

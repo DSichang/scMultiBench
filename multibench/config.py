@@ -60,7 +60,7 @@ _CLI = False
 
 def hint(py: str, cli: str) -> str:
     """The ``cli`` spelling while the command line runs a command, else ``py``,
-    e.g. ``hint("mtb.env.doctor()", "multibench env doctor")``."""
+    e.g. ``hint("mtb.env.install(dry_run=True)", "multibench env install --dry-run")``."""
     return cli if _CLI else py
 
 
@@ -188,7 +188,7 @@ class Config:
         ``$MULTIBENCH_DATA_PATH``, else ``<base>/data``.
     leiden_flavor : str
         Leiden backend of the clustering in ``mtb.evaluate``: ``"leidenalg"``
-        (default, the article's and the stored tables') or ``"igraph"``
+        (default, the article's and the stored results') or ``"igraph"``
         (faster).
     envs_dir : pathlib.Path
         Where the method environments live (``<envs_dir>/<env>``). Default

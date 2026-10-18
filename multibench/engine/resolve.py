@@ -597,7 +597,7 @@ def _check_matrix_files(method, dataset, resolved):
                 f'See the recipe "A 10x .h5 file" in the docs.')
         sniff = _sniff_h5(str(p), p.stat().st_mtime_ns)
         if sniff is not None and 0 in sniff[1:]:
-            again = config.hint("mtb.io.export_dataset", "multibench convert")
+            again = config.hint("mtb.io.export_dataset", "multibench export")
             raise ValueError(
                 f"{method} reads {p.name} of {dataset}, which holds 0 "
                 f"{'features' if sniff[1] == 0 else 'cells'}. Write the folder again "
@@ -622,8 +622,9 @@ def _check_orientation(method, dataset, resolved):
                 f"{method} reads {p.name} of {dataset}, which stores matrix/data as "
                 f"cells x features, shape {shape}. The file lists {n_feat} features "
                 f"and {n_cell} cells. Its matrix/data needs features x cells, shape "
-                f"({n_feat}, {n_cell}). Re-export it with "
-                f"mtb.io.to_canonical(src, dst), or transpose matrix/data."
+                f"({n_feat}, {n_cell}). Export it again with "
+                + config.hint("mtb.io.export_dataset", "multibench export")
+                + ", or transpose matrix/data."
             )
 
 
@@ -1010,8 +1011,8 @@ def _check_atac_gas_cells(method, dataset, resolved) -> None:
         if kind == "order":
             raise ValueError(GAS_OTHER_ORDER_REASON.format(
                 method=method, dataset=dataset, gas=gas.name, peak=peak.name,
-                write=config.hint("mtb.io.to_canonical(..., modality='gas')",
-                                  "multibench convert SRC DIR --modality gas")
+                write=config.hint("mtb.io.export_dataset(..., atac_kind='gene_activity')",
+                                  "multibench export SRC DIR --atac-kind gene_activity")
             ).replace("atac_cty.csv", f"atac_cty{digits}.csv"))
 
 

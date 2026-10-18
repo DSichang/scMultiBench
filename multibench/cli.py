@@ -884,10 +884,10 @@ def _unpublished_plot_msg(category: str, inputs) -> str:
     """``plot``'s error for a category without published tables (mosaic)."""
     if inputs:
         return (f"{category} has no published tables. Leave out --source to plot your "
-                f"rows with the package's re-run tables, or drop --category to plot "
+                f"rows with the stored results, or drop --category to plot "
                 f"your rows alone.")
     return (f"{category} has no published tables. Leave out --source to plot the "
-            f"package's re-run tables.")
+            f"stored results.")
 
 
 def _names(values) -> str:
@@ -991,7 +991,7 @@ def _rename_repeats(own: list, inputs: list) -> list:
 
 
 def _cmd_plot(args) -> int:
-    """``multibench plot {bubble,bar}``: draw the ``--input`` rows, the stored table
+    """``multibench plot {bubble,bar}``: draw the ``--input`` rows, the stored results
     of ``--category`` (:func:`multibench.load_results`), or both concatenated."""
     inputs = _csv_list(args.input) or []
     if not inputs and args.category is None:
@@ -1611,11 +1611,11 @@ def _cmd_env(args) -> int:
     expected = envs.default_env_name(method)      # KeyError (did-you-mean) on a typo
     name = args.name or expected
     if name == expected:
-        banner = (f"# env {name!r} is the name scan/run/env doctor expect for {method} "
+        banner = (f"# env {name!r} is the name scan/run-all/env install expect for {method} "
                   f"(multibench info {method} shows it). multibench env create "
                   f"{method} builds the same env from its lockfile.")
     else:
-        banner = (f"# env {name!r} is a custom --name: scan/run/env doctor expect "
+        banner = (f"# env {name!r} is a custom --name: scan/run-all/env install expect "
                   f"{expected!r} for {method} and will not find this one")
     if cmd == "recipe":
         print(banner)
@@ -1688,7 +1688,7 @@ _METHODS_HELP = "comma-separated method ids, as printed by multibench find"
 #: the tail of the deprecated ``--leiden-flavor`` of run-all and evaluate
 _LEIDEN_TAIL = _compat.use("the default (the article's leidenalg)")
 _LEIDEN_HELP = ("Leiden backend of the clustering: leidenalg, the article's (keep it to "
-                "compare with the stored tables), or igraph, faster (default: shown by "
+                "compare with the stored results), or igraph, faster (default: shown by "
                 "multibench config)")
 _FLAVOR_HELP = ("cpu or gpu build of each env; auto (default) = gpu when this computer "
                 "has an NVIDIA GPU (on a login node for GPU jobs, pass gpu). In the "
@@ -1854,7 +1854,7 @@ def build_parser() -> argparse.ArgumentParser:
                      help="dataset ids, space- or comma-separated (the fetchable column "
                           "of mtb.catalog.datasets())")
     pfe.add_argument("--outputs", action=_Retired, nargs=0, default=False,
-                     tail=_compat.note("use multibench plot for the stored scores"))
+                     tail=_compat.note("use multibench plot for the stored results"))
     # the cluster page: compute nodes without network fetch the scripts first
     pfe.add_argument("--scripts", action="store_true", help=argparse.SUPPRESS)
     # a maintainer switch, as MULTIBENCH_SCRIPTS_REF: not in --help
@@ -1973,7 +1973,7 @@ def build_parser() -> argparse.ArgumentParser:
                                       "selects the stored results, with --input "
                                       "filters the rows")
     pp.add_argument("--source", choices=["published", "rerun"], action=_Retired,
-                    tail=_compat.note("leave it out to plot the re-run tables"))
+                    tail=_compat.note("leave it out to plot the stored results"))
     pp.add_argument("--result-path", dest="result_path", action=_Retired,
                     tail=_compat.use("--input"))
     pp.add_argument("--input", action="append", metavar="LONG_CSV_OR_DIR",
@@ -2189,7 +2189,7 @@ def build_parser() -> argparse.ArgumentParser:
                      **_retired_command("env groups", "env doctor"))
     _NAME_HELP = ("environment name. The default is the environment the package "
                   "uses for METHOD, shown in the env column of multibench scan and "
-                  "used by run, env doctor and env create. For example, Matilda uses "
+                  "used by run-all, env install and env create. For example, Matilda uses "
                   "matilda and UINMF uses scmb_r")
     # maintainer commands: no help=, so env --help does not list them
     er = ev.add_parser("recipe",

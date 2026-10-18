@@ -100,7 +100,7 @@ def _bar(long_df: pd.DataFrame, *, metrics=None, methods=None, top: int | None =
         metrics = FAMILY_METRICS[family]
         present = set(long_df["metric"].unique())
         if not (set(metrics) & present):
-            why = ("The stored tables have none. "
+            why = ("The stored results have none. "
                    + _config.hint("mtb.evaluate", "multibench evaluate")
                    + " computes them on multi-batch data." if family == "classification" else
                    "Batch metrics need a multi-batch dataset - a single-batch design "

@@ -285,12 +285,11 @@ def describe_layout(category: str | None = None) -> str:
               "AnnData.X),"]
     lines += [config.hint("matrix/features and matrix/barcodes. mtb.io.export_dataset "
                           "writes the whole folder",
-                          "matrix/features and matrix/barcodes. multibench convert "
+                          "matrix/features and matrix/barcodes. multibench export "
                           "writes the whole folder"),
-              config.hint("from an AnnData or MuData. mtb.io.to_canonical writes one "
-                          "file.",
-                          "from an .h5ad or .h5mu file, or one file. multibench convert "
-                          "--help has examples."),
+              config.hint("from an AnnData or MuData.",
+                          "from an .h5ad or .h5mu file. multibench export --help has "
+                          "examples."),
               "A label file is a single-column CSV: one header line, then one label "
               "per cell.",
               "",
@@ -389,13 +388,8 @@ def _atac_lines(category: str) -> list[str]:
             "embedding."]
     # method_info(m)['atac'] names one representation, so it cannot tell a method
     # that reads both files
-    check = ("the list above" if category == "diagonal" else _check_atac_call())
-    out += config.hint(
-        ["mtb.scan and mtb.run_all skip such a method unless allow_atac_mismatch=True.",
-         f"mtb.run only warns, so check {check} first."],
-        ["multibench scan and run-all skip such a method unless --allow-atac-mismatch "
-         "is given.",
-         f"multibench run only warns, so check {check} first."])
+    out += config.hint(["mtb.scan and mtb.run_all skip such a method."],
+                       ["multibench scan and run-all skip such a method."])
     if category == "diagonal":
         out.append(OLDER_NAMES)
     return out
@@ -420,7 +414,7 @@ _CONVERT_LABELS = {"h5ad": "obs:cell_type", "h5mu": "rna:cell_type"}
 
 
 def _batch_recipe(category: str, patterns) -> list[str]:
-    """One ``multibench convert`` line per batch of the most varied pattern,
+    """One ``multibench export`` line per batch of the most varied pattern,
     plus the ``export_dataset`` form of the first batch."""
     from .engine.schema import _batch_of, base_modality
 
@@ -439,7 +433,7 @@ def _batch_recipe(category: str, patterns) -> list[str]:
     same = len(set(batches.values())) == 1
     for b, ms in batches.items():
         ext, flags = _CONVERT_FLAGS[ms]
-        lines.append(f"  multibench convert batch{b}.{ext} data/MYDATA {flags} "
+        lines.append(f"  multibench export batch{b}.{ext} data/MYDATA {flags} "
                      f"--labels {_CONVERT_LABELS[ext]} --category {category} "
                      f"--batch-index {b}")
         if same:
@@ -3113,8 +3107,7 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
     if not config._CLI and _eio._names_no_file(x):
         # the name of a column: the command line says so before it reads --batch
         raise FileNotFoundError(_column_name_error(what, x))
-    order = order or config.hint(f"the order of mtb.labels_for({dataset!r})",
-                                 f"the order of the label files of {dataset}")
+    order = order or f"the order of the label files of {dataset}"
     folder = _dataset_folder(dataset, data_path)
     if not folder.is_dir():
         why = _folder_missing(dataset, tried or [data_path])
