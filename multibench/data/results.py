@@ -130,7 +130,8 @@ def _base_path(result_path) -> Path:
 
 
 #: how the "no table for <dataset>" errors name each ``source=``
-_SOURCE_WORD = {"published": "published", "rerun": "re-run", "both": "published or re-run"}
+_SOURCE_WORD = {"published": "published tables", "rerun": "stored results",
+                "both": "published tables or stored results"}
 
 
 def _no_dataset_msg(source: str, category, missing, have) -> str:
@@ -138,7 +139,7 @@ def _no_dataset_msg(source: str, category, missing, have) -> str:
     of = f" of {category}" if category else ""
     held = (f"hold {_and_list(have)}" if have else "hold no dataset") + (
         f", not {_and_list(missing)}." if missing else ".")
-    return f"The {_SOURCE_WORD.get(source, source)} tables{of} {held}"
+    return f"The {_SOURCE_WORD.get(source, source + ' tables')}{of} {held}"
 
 
 def _joined_errors(errors) -> str:
@@ -638,7 +639,7 @@ def _load_results(
             avail = _list_datasets(None, base, source, clustering) if datasets else []
             raise FileNotFoundError(
                 _no_dataset_msg(source, None, datasets, avail) if avail else
-                f"No {_SOURCE_WORD.get(source, source)} tables under {base}. "
+                f"No {_SOURCE_WORD.get(source, source + ' tables')} under {base}. "
                 + _joined_errors(errors))
         out = pd.concat(frames, ignore_index=True)
         if datasets:
@@ -677,12 +678,12 @@ def _load_results(
         if out.empty and sel.explicit:
             _compat.warn(
                 f"metric(s) {sel.codes} not present in {where} "
-                f"({_SOURCE_WORD.get(source, source)} tables; "
+                f"({_SOURCE_WORD.get(source, source + ' tables')}; "
                 f"available: {have_metrics})", UserWarning)
         elif out.empty and before:
-            tables = " ".join(x for x in (_SOURCE_WORD.get(source, source), category,
-                                          "tables") if x)
-            of = f" of {', '.join(map(str, datasets))}" if datasets else ""
+            tables = _SOURCE_WORD.get(source, source + " tables")
+            of = " of " + ", ".join(x for x in [category, *map(str, datasets or ())] if x) \
+                if category or datasets else ""
             _compat.warn(
                 f"The {tables}{of} have no {sel.family} scores, so no rows are left. "
                 f"Leave out metrics= to get the scores they have "

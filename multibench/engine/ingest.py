@@ -1886,7 +1886,7 @@ def _leftover_message(out: Path, found, *, n_batches, held=()) -> str:
             "To add labels, run the convert command that wrote the folder again with "
             "--labels and --overwrite.")
     else:
-        how = config.hint("Export to a new folder.", "Convert into a new folder.")
+        how = config.hint("Export to a new folder.", "Export into a new folder.")
     return f"{out} holds {what}. {how}"
 
 
