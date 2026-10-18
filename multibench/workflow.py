@@ -1447,7 +1447,8 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
                                                GPU_NODE_CAVEAT.format(method=spec.id)])
             else:
                 rec["env_ok"] = False
-                gpu_hint = spec.requires_gpu_reason or ""
+                # off Linux the platform already blocks the method
+                gpu_hint = "" if off_linux else spec.requires_gpu_reason or ""
         rec["env_reason"] = " ".join(r for r in (env_hint, gpu_hint) if r)
         rec["runnable"] = bool(rec["files_ok"] and rec["env_ok"] and not wrong_atac
                                and not wrong_ref)
@@ -3645,6 +3646,14 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
         raise _no_variant_error(category, methods, modalities)
     if dry_run:
         batch_vec = None if batch is None else _batch_vector(batch, dataset, data_path)
+        nested_notes = []
+        if modalities is None:
+            # the rows a real run leaves out: another row of the method holds their files
+            would = plan_df[[_would_run(r) for _, r in plan_df.iterrows()]]
+            nested, nested_notes = _nested_rows(would)
+            keep = ~plan_df.index.isin(nested)
+            plan_df = plan_df[keep].reset_index(drop=True)
+            private = private[keep].reset_index(drop=True)
         if verbose:
             k, n = int(plan_df["runnable"].sum()), len(plan_df)
             msg = (f"[run_all] Dry run: {k} of {n} requested {_rows_word(plan_df, n)} "
@@ -3661,11 +3670,8 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
                 print(f"[run_all] {scripts}", flush=True)
             for _method, caveat in lines:
                 print(f"[run_all] {caveat}", flush=True)
-            if modalities is None:
-                # the rows a run on a host with the envs would start, as the caveats
-                would = plan_df[[_would_run(r) for _, r in plan_df.iterrows()]]
-                for note in _nested_rows(would)[1]:
-                    print(f"[run_all] {note}", flush=True)
+            for note in nested_notes:
+                print(f"[run_all] {note}", flush=True)
             if batch_vec is not None:
                 bad = _batch_length_problem(plan_df, batch_vec, dataset, category,
                                             data_path)
@@ -3674,8 +3680,6 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
             gaps = _label_gaps(dataset, data_path)
             if gaps:
                 would = plan_df[[_would_run(r) for _, r in plan_df.iterrows()]]
-                if modalities is None:
-                    would = would.drop(index=_nested_rows(would)[0])
                 unlabelled = _missing_labels_problem(
                     dataset, gaps, _label_readers(would, private, gaps),
                     evaluate=evaluate)

@@ -30,6 +30,9 @@ FAMILIES = [
     ("Classification", list(_FAMILY_METRICS["classification"]), style.PINKS),
 ]
 
+#: the suffix that tells your rows from stored results of the same method
+THIS_RUN = " (this run)"
+
 #: glyph drawn in a cell whose metric was not computed for that method
 NA_MARK = "\u2013"
 
@@ -628,12 +631,12 @@ def _duplicate_rows_message(dup, keys) -> str:
     if len(mixed):
         where = f" on {_and_distinct(mixed['dataset'])}" if "dataset" in keys else ""
         first = str(mixed["method"].iloc[0])
-        return (f"Your rows and the stored table both have "
+        return (f"Your rows and the stored results both have "
                 f"{_and_distinct(mixed['method'])}{where}. "
-                + _config.hint("Give your rows another name, e.g. "
-                               "rows.assign(method=rows.method + \"_rerun\").",
-                               f"Give your rows another name, such as {first}_rerun, "
-                               f"with evaluate --name."))
+                + _config.hint(f"Give your rows another name, e.g. "
+                               f"rows.assign(method=rows.method + {THIS_RUN!r}).",
+                               f"Give your rows another name, such as "
+                               f"\"{first}{THIS_RUN}\", with evaluate --method."))
     what = _and_list(keys)
     example = ", ".join(str(dup[k].iloc[0]) for k in keys)
     return (f"{len(dup)} rows repeat the same {what}, for example {example}. The figure "

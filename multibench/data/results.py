@@ -73,22 +73,22 @@ _RERUN_DIR = "rerun"
 _RERUN_GLOB = "long_all_*.csv"
 
 
-#: ``source`` of every re-run row; the stamp's version goes to
-#: ``attrs["rerun_version"]``. An unstamped file gets no version, not the
-#: running one, which did not produce its numbers
-_RERUN_SOURCE = "rerun"
+#: ``source`` of every row of the stored results (the files say ``rerun-<version>``);
+#: the stamp's version goes to ``attrs["rerun_version"]``. An unstamped file gets
+#: no version, not the running one, which did not produce its numbers
+_RERUN_SOURCE = "stored"
 
 #: a stamped re-run provenance value: ``rerun-<version>``
 _RERUN_TAG_RE = re.compile(r"^rerun-(.+)$")
 
 
 def _split_rerun_tag(source: pd.Series) -> tuple[pd.Series, set[str]]:
-    """Fold ``rerun-<version>`` values to ``"rerun"``; return them and the
-    versions seen."""
+    """Fold ``rerun-<version>`` and ``rerun`` values to ``"stored"``; return them
+    and the versions seen."""
     col = source.astype(str)
     m = col.str.extract(_RERUN_TAG_RE, expand=False)
     versions = set(m.dropna().unique())
-    out = source.where(m.isna(), _RERUN_SOURCE)
+    out = source.where(m.isna() & (col != "rerun"), _RERUN_SOURCE)
     return out, versions
 
 
@@ -443,14 +443,14 @@ def _warn_degenerate(out: pd.DataFrame, base: Path,
         if src != _RERUN_SOURCE:
             return str(src)
         if rerun_version is None:
-            return "re-run"
+            return "stored"
         if isinstance(rerun_version, tuple):
-            return "re-run " + "/".join(rerun_version)
-        return f"re-run {rerun_version}"
+            return "stored " + "/".join(rerun_version)
+        return f"stored {rerun_version}"
 
     items = ", ".join(f"{r.method}/{r.dataset} ({_stamp(r.source)}, ARI {r.rerun_ARI:.4f})"
                       for r in bad.itertuples())
-    head = ("These re-run rows have" if len(bad) > 1 else "This re-run row has")
+    head = ("These stored rows have" if len(bad) > 1 else "This stored row has")
     _compat.warn(
         f"{head} ARI below {_DEGENERATE_RERUN_ARI} where the article's run scored above "
         f"{_DEGENERATE_PUBLISHED_ARI}: {items}. It most likely comes from a failed "

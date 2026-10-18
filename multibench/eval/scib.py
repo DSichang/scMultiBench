@@ -536,15 +536,8 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
             needs = ((wanted(_CLUSTER_METRICS) if search_ct else [])
                      + (wanted(_BATCH_CLUSTER_METRICS) if search_bat else []))
             names = config._and_list(needs)
-            # clusters= replaces only the cell-type clusters
-            skip = (config.hint(f"clusters=, or metrics= without {names}",
-                                f"--clusters, or --metrics without {names}")
-                    if set(needs) <= set(_CLUSTER_METRICS) else
-                    config.hint(f"metrics= without {names}",
-                                f"--metrics without {names}"))
             print(f"Clustering {n:,} cells for {names} with the {flavor} Leiden "
-                  f"backend. To skip it, "
-                  f"pass {skip}.", file=sys.stderr, flush=True)
+                  f"backend.", file=sys.stderr, flush=True)
     if search_ct or search_bat:
         graph = _clustering_graph(emb)
         if search_ct:

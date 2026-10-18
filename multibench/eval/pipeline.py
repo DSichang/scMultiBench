@@ -1048,7 +1048,8 @@ def _dataset_labels(dataset, category, method, data_path):
         warnings.filterwarnings("ignore", message=resolve.DEFAULT_ORDER_WARNING)
         labels = resolve.labels_for(dataset, category, own, data_path=data_path)
     if not labels:
-        raise ValueError(f"{dataset} has no label file. Pass labels=.")
+        raise ValueError(f"{dataset} has no label file. "
+                         + config.hint("Pass labels=.", "Pass --labels."))
     near = registry.closest_method(method) if own is None and category else None
     if near:
         with warnings.catch_warnings():

@@ -912,6 +912,11 @@ def plan_totals(rows, sizes: dict | None = None, *, layers: dict | None = None
         f"at least {_gb(dl)} to download" if dl_any else "download size not recorded")
     if disk_any:
         line += f", {'' if disk_all else 'at least '}{_gb(disk)} on disk"
+    if shared:
+        # the rows show each env's own archive; the layer is in the total only
+        line += (" (with the shared layer " + ", ".join(
+            f"{name}, {_gb(e['archive_bytes'])}" for name, e in shared.items())
+            + ", downloaded once)")
     return ({"total_download_bytes": dl if dl_all else None,
              "total_disk_bytes": disk if disk_all else None,
              "shared_layers": shared}, line)

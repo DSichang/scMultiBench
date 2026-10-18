@@ -157,7 +157,7 @@ def coverage(parts: dict) -> pd.Series:
 
 
 #: ``source`` values of the stored tables (``mtb.load_results``)
-STORED_SOURCES = ("published", "rerun")
+STORED_SOURCES = ("published", "stored", "rerun")
 
 
 def stored_datasets(df: pd.DataFrame) -> tuple:
