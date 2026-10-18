@@ -37,8 +37,9 @@ def test_cli_params_prints_every_variant_without_a_selector(capsys):
     rc = cli.main(["params", "Matilda"])
     out = capsys.readouterr().out
     assert rc == 0
-    assert "# Matilda vertical:rna+adt: 10 tunable" in out
-    assert "# Matilda vertical:rna+atac: 10 tunable" in out
+    # r3 (X64): device is the package's, so 9
+    assert "# Matilda vertical:rna+adt: 9 tunable" in out
+    assert "# Matilda vertical:rna+atac: 9 tunable" in out
     header = next(l for l in out.splitlines() if l.strip().startswith("key"))
     assert header.split() == ["key", "type", "default", "script_default"]
     assert "epochs" in out and "z_dim" in out and "--param KEY=VALUE" in out
@@ -73,7 +74,7 @@ def test_cli_params_formats(capsys):
     rc = cli.main(["params", "Matilda", "--format", "csv"])
     out = capsys.readouterr().out
     assert rc == 0 and out.splitlines()[0] == "variant,key,type,default,script_default"
-    assert out.count("\n") == 1 + n * 10   # header + 3 variants x 10 keys
+    assert out.count("\n") == 1 + n * 9    # header + 3 variants x 9 keys (no device, r3)
 
 
 def test_cli_params_errors(capsys):

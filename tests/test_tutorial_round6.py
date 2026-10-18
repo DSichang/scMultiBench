@@ -44,11 +44,8 @@ def test_scan_prints_one_count_line_on_the_tutorial_dataset(key, capsys):
 #: modalities the folder holds)
 # diagonal_rna_atac: the rows for numbered batches of its one-batch folder are not
 # listed since 0.4.0 (X80)
-# r3 (X68): UINMF's two-batch row is left out of the default plan, so the two
-# cross tasks of two modalities list one row per method too
 ONE_ROW_PER_METHOD = {"vertical_rna_adt": 14, "vertical_rna_atac": 14, "mosaic_rna_adt": 3,
-                      "mosaic_rna_atac": 6, "cross_adt_atac": 5, "diagonal_rna_atac": 14,
-                      "cross_rna_adt": 10, "cross_rna_atac": 8}
+                      "mosaic_rna_atac": 6, "cross_adt_atac": 5, "diagonal_rna_atac": 14}
 
 
 @pytest.mark.parametrize("key", KEYS)

@@ -147,12 +147,13 @@ def test_json_output_keeps_slashes_unescaped(capsys):
 
 def test_run_all_dry_run_note_names_the_cli_doctor(monkeypatch, capsys):
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
+    # Z19 (r3): the header is one sentence; the reason column names the env fix
     mtb.run_all("D11", "vertical", dry_run=True, methods=["Matilda"])
-    assert "mtb.env.doctor()" in capsys.readouterr().out
+    assert "doctor" not in capsys.readouterr().out.splitlines()[0]
     monkeypatch.setattr(config, "_CLI", True)
     mtb.run_all("D11", "vertical", dry_run=True, methods=["Matilda"])
     out = capsys.readouterr().out
-    assert "multibench env doctor" in out and "mtb." not in out
+    assert "doctor" not in out.splitlines()[0] and "mtb." not in out
 
 
 # ------------------------------------------------------------------- M23

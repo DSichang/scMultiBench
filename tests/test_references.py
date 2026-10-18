@@ -73,12 +73,14 @@ def test_method_info_keeps_existing_keys():
 
 
 def test_effective_merges_wrapper_defaults_over_upstream():
+    # r3 (Y38): effective is the value of every tunable key in a run
     p = mtb.params_for("scMDC", "vertical", ["rna", "adt"])
-    assert "nbatch" not in p["tunable"]                  # set from the folder
-    assert p["effective"]["nbatch"] == 1                 # what the wrapper really runs
-    assert p["effective"]["lr"] == 1.0
+    assert "nbatch" not in p["tunable"] and "nbatch" not in p["effective"]   # from the folder
+    assert p["effective"] == {k: t["default"] for k, t in p["tunable"].items()}
+    m = mtb.params_for("Multigrate", "vertical", ["rna", "adt"])
+    assert m["effective"]["epochs"] == 200             # the wrapper's value over the script's
     eff = mtb.method_info("scMDC", verbose=True)["params"]["vertical:rna+adt"]["effective"]
-    assert eff["nbatch"] == 1 and eff["lr"] == 1.0
+    assert eff == p["effective"]
 
 
 def test_cite_bibtex_and_text():

@@ -78,9 +78,10 @@ def test_a_name_that_is_no_column(tmp_path):
         "labels='nope' is not a column of data.obs. Columns: celltype, donor.")
     assert _value_error(tmp_path, a, rna="X", batch="sample", category="cross") == (
         "batch='sample' is not a column of data.obs. Columns: celltype, donor.")
-    # no column is guessed from the spelling: the columns are listed
+    # Y19 (r3): a spelling that differs only in case or underscores gets a did-you-mean
     assert _value_error(tmp_path, a, rna="X", labels="cell_type") == (
-        "labels='cell_type' is not a column of data.obs. Columns: celltype, donor.")
+        "labels='cell_type' is not a column of data.obs. Columns: celltype, donor. "
+        "Did you mean 'celltype'?")
     # a column of the list, as it is written there
     out = ingest.export_dataset(a, tmp_path / "LISTED", rna="X", labels="celltype")
     assert pd.read_csv(out / "cty.csv")["x"].tolist() == list(a.obs["celltype"])

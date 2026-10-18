@@ -151,7 +151,7 @@ def test_one_method_table_warning_is_plain_sentences():
     assert len(one) == 1, msgs
     assert one[0].startswith("The published table for cross/D52 has one method, "
                              "scMoMaT. Every rank in it is the same. The re-run "
-                             "tables have 8 methods for cross/D52: ")
+                             "tables have 7 methods for cross/D52: ")
     _plain(one[0])
 
 

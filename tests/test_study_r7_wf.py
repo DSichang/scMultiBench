@@ -277,14 +277,14 @@ def test_long_names_every_column_it_returns():
     assert "scored_with" in res.long.columns
     for col in res.long.columns:
         assert col in doc, col
-    # rebuilt from the metrics dict, or empty: the first seven columns
+    # rebuilt from the metrics dict, or empty: the first six columns (no clustering, r3)
     rebuilt = W.BatchResult([{"method": "Matilda", "status": "CHAIN_OK",
                               "metrics": {"ARI": 0.5}}], "D11", "vertical").long
     empty = W.BatchResult([], "D11", "vertical").long
-    assert list(rebuilt.columns) == list(empty.columns) == list(attached.columns)[:7]
+    assert list(rebuilt.columns) == list(empty.columns) == list(attached.columns)[:6]
     summary = doc.splitlines()[0]
     assert summary == "The scores as a long table, for plotting."
-    assert "Empty, with the first seven columns, when no method produced metrics." \
+    assert "Empty, with the first six columns, when no method produced metrics." \
         in " ".join(doc.split())
 
 

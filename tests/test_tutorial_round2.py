@@ -88,13 +88,11 @@ def test_uinmf_reads_every_batch_of_d52_and_its_two_batch_variant_says_what_it_s
     two = ["rna1", "rna2", "adt1", "adt2"]
     assert list(mtb.labels_for("D52", "cross", "UINMF")) == ["cty1", "cty2", "cty3"]
     assert list(mtb.labels_for("D52", "cross", "UINMF", modalities=two)) == ["cty1", "cty2"]
-    # r3 (X68): the default plan leaves the two-batch row out; every combination shows it
-    sc = full_scan("D52", "cross", methods=["UINMF"], modalities="all", verbose=False)
+    sc = full_scan("D52", "cross", methods=["UINMF"], verbose=False)
     sc = sc[sc.files_ok].set_index("modalities")
-    # the three-batch row runs instead, and the two-batch row says so (X68)
+    # the dry run's one line says the three-batch row runs instead (X68, r3)
     assert sc.at["+".join(two), "caveat"] == (
-        "UINMF reads batches 1-2 of 3. Batch 3 is not used. UINMF runs on "
-        "rna1+rna2+rna3+adt1+adt2+adt3 instead, so this row is not run.")
+        "UINMF reads batches 1-2 of 3. Batch 3 is not used.")
     assert not sc.at["rna1+rna2+rna3+adt1+adt2+adt3", "caveat"]
 
 

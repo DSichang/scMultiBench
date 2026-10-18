@@ -122,15 +122,13 @@ def test_x68_size_error_names_the_label_files_that_fit(tmp_path):
         mtb.evaluate(emb, labels=labels, category="cross", metrics=["ARI"])
 
 
-def test_x68_dry_run_marks_the_nested_variant():
-    # r3: the default plan leaves the nested row out; with every combination it is marked
-    plan = mtb.run_all("D52mini", "cross", methods=["UINMF"], dry_run=True, verbose=False)
-    assert "rna1+rna2+adt1+adt2" not in set(plan["modalities"])
-    plan = mtb.run_all("D52mini", "cross", methods=["UINMF"], modalities="all",
-                       dry_run=True, verbose=False)
+def test_x68_dry_run_marks_the_nested_variant(capsys):
+    # r3: the row keeps its own caveat; the dry run says once which row runs
+    plan = mtb.run_all("D52mini", "cross", methods=["UINMF"], dry_run=True)
     row = plan.set_index("modalities").loc["rna1+rna2+adt1+adt2"]
-    assert "UINMF runs on rna1+rna2+rna3+adt1+adt2+adt3 instead, so this row is not " \
-           "run." in row.caveat
+    assert "so this row is not run" not in row.caveat
+    assert ("[run_all] UINMF runs on rna1+rna2+rna3+adt1+adt2+adt3, not on "
+            "rna1+rna2+adt1+adt2") in capsys.readouterr().out
 
 
 def test_x80_one_batch_folder_lists_no_batched_variant(capsys):

@@ -379,7 +379,8 @@ def test_several_label_files_are_not_ranked(tmp_path, host, monkeypatch):
         bars = [f"d{b}c{i}" for i in range(40)]
         _h5(d / f"rna{b}.h5", [f"g{i}" for i in range(30)], bars)
         _h5(d / f"adt{b}.h5", [f"p{i}" for i in range(6)], bars)
-        _write(d / f"cty{b}.csv", (["A"] * 20 + ["B"] * 20))
+        # r3 (Y12): files that differ, so that there are several orders to rank
+        _write(d / f"cty{b}.csv", (["A"] * (20 + b) + ["B"] * (20 - b)))
     kw = dict(data_path=tmp_path / "data", verbose=False)
     res = _quiet(mtb.run_all, "DONORS", "cross", tmp_path / "out", methods=["totalVI"], **kw)
     (rec,) = res.records

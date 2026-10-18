@@ -56,11 +56,8 @@ def test_every_size_hint_is_checked_on_the_data():
     assert not any(v.size_hint for v in registry.get("scMVP").variants)
 
 
-def test_the_plan_leaves_out_a_variant_inside_a_larger_one():
-    # X68 (r3): run_all runs UINMF's three-batch row, so the plan lists only that
+def test_a_variant_inside_a_larger_one_is_named_once():
+    # X68 (r3): the dry run's one line says which row runs; no row repeats it
     plan = mtb.run_all("D52mini", "cross", methods=["UINMF"], dry_run=True, verbose=False)
-    assert list(plan["modalities"]) == ["rna1+rna2+rna3+adt1+adt2+adt3"]
+    assert "rna1+rna2+adt1+adt2" in set(plan["modalities"])
     assert not plan["caveat"].str.contains("so this row is not run").any()
-    every = mtb.run_all("D52mini", "cross", methods=["UINMF"], modalities="all",
-                        dry_run=True, verbose=False)
-    assert "rna1+rna2+adt1+adt2" in set(every["modalities"])

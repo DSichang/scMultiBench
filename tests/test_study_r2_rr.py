@@ -373,15 +373,14 @@ def test_labels_for_uinmf_returns_the_batches_it_reads(root):
 
 
 def test_scan_caveat_names_the_unused_batch(root):
-    # r3 (X68): the two-batch row is listed with every combination
-    df = full_scan("D52", "cross", data_path=root / "data", modalities="all", verbose=False)
+    df = full_scan("D52", "cross", data_path=root / "data", verbose=False)
     df = df[df.files_ok]
     by = df.set_index(["method", "modalities"])["caveat"]
-    # the two-batch row also says that the three-batch row runs instead (X68)
+    # r3 (X68): the dry run's one line says the three-batch row runs instead; the
+    # row itself keeps only its own caveat
     two = by[("UINMF", "+".join(TWO_BATCHES))]
     assert two.startswith("UINMF reads batches 1-2 of 3. Batch 3 is not used.")
-    assert two.endswith("UINMF runs on rna1+rna2+rna3+adt1+adt2+adt3 instead, so this "
-                        "row is not run.")
+    assert "so this row is not run" not in two
     others = [k for k in by.index if k != ("UINMF", "+".join(TWO_BATCHES))]
     assert ("UINMF", "rna1+rna2+rna3+adt1+adt2+adt3") in others
     assert not any("reads batches" in by[k] for k in others)

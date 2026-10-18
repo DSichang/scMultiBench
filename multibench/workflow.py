@@ -1514,20 +1514,6 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
     if not all(keep):
         df = df[keep].reset_index(drop=True)
         private = private[keep].reset_index(drop=True)
-    if every or modalities is None:
-        # a smaller combination of a method next to a larger one whose files are
-        # there too is not run: left out of the plan, or with every combination
-        # its row says so, whatever this host can run
-        with_files = df[df["files_ok"].astype(bool)]
-        nested = _nested_rows(with_files)[0]
-        if not every and nested:
-            df = df.drop(index=nested).reset_index(drop=True)
-            private = private.drop(index=nested).reset_index(drop=True)
-        for i in nested if every else ():
-            note = (f"{df.at[i, 'method']} runs on {_nested_full(with_files, i)} "
-                    f"instead, so this row is not run.")
-            old = str(df.at[i, "caveat"] or "")
-            df.at[i, "caveat"] = f"{old} {note}".strip()
     df.attrs.update(held=held, not_listed=len(left_out), not_listed_batch=n_batch_out,
                     # the methods with no listed row, as scan's own line counts them
                     not_listed_methods=len({m for m, _ in left_out} - set(df["method"])),
@@ -3284,17 +3270,6 @@ def _nested_rows(plan: "pd.DataFrame") -> tuple[list, list[str]]:
     return drop, notes
 
 
-def _nested_full(plan: "pd.DataFrame", i) -> str:
-    """The largest modality combination of row ``i``'s method that holds row
-    ``i``'s modalities."""
-    rows = plan[plan["method"] == plan.at[i, "method"]]
-    if "category" in plan.columns:
-        rows = rows[rows["category"] == plan.at[i, "category"]]
-    mine = set(str(plan.at[i, "modalities"]).split("+"))
-    bigger = [str(m) for m in rows["modalities"] if mine < set(str(m).split("+"))]
-    return max(bigger, key=lambda m: len(m.split("+")))
-
-
 def _batch_length_problem(plan, batch, dataset, category, data_path) -> str:
     """A dry run's note when ``batch`` fits neither the dataset's label files nor
     some row the sweep would run; "" when it fits."""
@@ -3601,7 +3576,9 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
             for _method, caveat in lines:
                 print(f"[run_all] {caveat}", flush=True)
             if modalities is None:
-                for note in _nested_rows(plan_df[plan_df["runnable"]])[1]:
+                # the rows a run on a host with the envs would start, as the caveats
+                would = plan_df[[_would_run(r) for _, r in plan_df.iterrows()]]
+                for note in _nested_rows(would)[1]:
                     print(f"[run_all] {note}", flush=True)
             if batch_vec is not None:
                 bad = _batch_length_problem(plan_df, batch_vec, dataset, category,
