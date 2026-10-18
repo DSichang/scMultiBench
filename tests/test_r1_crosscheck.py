@@ -468,7 +468,9 @@ def test_x49_evaluate_takes_the_only_obsm_key():
                         obsm="X_pca")
     pd.testing.assert_frame_equal(got, want)
     a.obsm["X_umap"] = a.obsm["X_pca"][:, :2]
-    with pytest.raises(ValueError, match=r"obsm='X_emb' not found"):
+    # round 2 (X49): the message names the keys, not an obsm= the user did not pass
+    with pytest.raises(ValueError, match=r"^The AnnData has 2 obsm keys \(X_pca, X_umap\): "
+                                         r"pass obsm=, or obsm='X' for \.X\.$"):
         mtb.evaluate(a, labels=np.repeat(["a", "b", "c"], 20), metrics=["cLISI"])
 
 
@@ -650,7 +652,7 @@ def test_x17_x18_x53_x95_x97_x98_help_texts():
     assert ("--method METHOD a package method: read the dataset's label files in its "
             "batch order") in ev
     assert "or with --labels any row name" not in ev
-    assert "leidenalg (the article's) or igraph (faster)" in ev
+    assert "leidenalg, the article's (keep it to compare with the stored tables)" in ev
     assert "so a later call cannot leave a stale batch file from an earlier export" in \
         _help("convert")
 

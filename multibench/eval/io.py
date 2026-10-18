@@ -740,6 +740,7 @@ def _labels_look_measured(values) -> tuple[str, int, int] | None:
 
 
 def _anndata_matrix(adata, obsm: str | None) -> np.ndarray:
+    given = obsm is not None
     if obsm is None:
         # X_emb, the package's own key, else the only key there is (an
         # AnnData's: a MuData's obsm also holds its modalities)
@@ -753,9 +754,14 @@ def _anndata_matrix(adata, obsm: str | None) -> np.ndarray:
         X = adata.obsm[obsm]
     except KeyError:
         kind = type(adata).__name__            # AnnData, or MuData for a MuData
+        keys = sorted(adata.obsm.keys())
+        if not given and keys:
+            raise ValueError(
+                f"The {kind} has {len(keys)} obsm keys ({', '.join(map(str, keys))}): "
+                f"pass obsm=, or obsm='X' for .X.") from None
         raise ValueError(
             f"obsm={obsm!r} not found in the {kind}; available obsm keys: "
-            f"{sorted(adata.obsm.keys())} (or obsm='X' for .X)") from None
+            f"{keys} (or obsm='X' for .X)") from None
     X = X.toarray() if hasattr(X, "toarray") else X
     return np.asarray(X, dtype=float)
 
