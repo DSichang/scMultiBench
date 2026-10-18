@@ -465,7 +465,6 @@ REFERENCE = {
     "mtb.load_results": ("compare.md", "multibench.data.results.load_results"),
     "mtb.results_coverage": ("compare.md", "multibench.data.results.results_coverage"),
     "mtb.recommend": ("compare.md", "multibench.data.results.recommend"),
-    "mtb.DegenerateRerunWarning": ("compare.md", "multibench.data.results.DegenerateRerunWarning"),
     "mtb.AmbiguousVariantError": ("config.md", "multibench.engine.schema.AmbiguousVariantError"),
     "mtb.env.install": ("env.md", "multibench.engine.envs.install"),
     "mtb.env.doctor": ("env.md", "multibench.engine.envs.doctor"),
@@ -1073,7 +1072,7 @@ def test_guides_keep_the_round2_facts_visible():
     assert "### Try it with a PCA of D11" in plot and "mtb.config.DEFAULT.data_path" in plot
     assert "release_43.html" in run and "`multibench config` prints `repo_path`" in run
     assert "{env_cmd}" in run and '=== "Slurm job step"' in run
-    assert 'mtb.find_methods("diagonal", atac="peak")' in run
+    assert 'mtb.find_methods("diagonal", modalities=["atac_peak"])' in run
     assert "mtb.to_long(metrics" in evaluate and 'metrics.to_csv("metric.csv")' not in evaluate
     assert "How few cell types" not in evaluate
     assert "`grand_score` compares a category's methods" in discover

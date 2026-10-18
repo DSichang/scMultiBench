@@ -248,7 +248,8 @@ def test_h5mu_requires_mod_and_reads_mod(tmp_path):
     m.write(p)
     with pytest.raises(ValueError) as e:
         ingest.to_canonical(p, out=tmp_path / "x.h5")
-    assert "pass mod=" in str(e.value) and "rna" in str(e.value)
+    # 0.4.0 (X96): mod= is deprecated; the error names the modality to pass
+    assert "pass one, e.g. mdata['rna']." in str(e.value)
     out = ingest.to_canonical(p, out=tmp_path / "rna.h5", mod="rna")
     data, _, _, feats, _ = _read(out)
     assert data.shape == (3, 4) and feats == ["g0", "g1", "g2"]

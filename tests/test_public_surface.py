@@ -23,7 +23,7 @@ MTB_ALL = {
     "scan", "run", "run_all", "sweep", "load_batch", "BatchResult",
     "evaluate", "to_long", "classify", "classification_metrics",
     "load_results", "results_coverage", "recommend",
-    "AmbiguousVariantError", "DegenerateRerunWarning", "__version__",
+    "AmbiguousVariantError", "__version__",      # DegenerateRerunWarning: 0.4.0 (Y35)
 }
 PLOT_ALL = {"bubble", "bar", "build_table", "BubbleTable"}
 IO_ALL = {"export_dataset", "to_canonical", "read_canonical"}

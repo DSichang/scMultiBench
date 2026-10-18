@@ -498,3 +498,65 @@ def test_scan_names_the_category_that_fits():
     assert workflow._category_hint(df, None) == 'The files fit mosaic: pass category="mosaic".'
     assert workflow._category_hint(df, "mosaic") == ""
     assert workflow._category_hint(df.assign(files_ok=True), None) == ""
+
+
+# X96 / X44: deprecated keywords and flags warn once, keep working, leave the signature
+@pytest.mark.parametrize("call, msg", [
+    (lambda: mtb.find_methods("diagonal", atac="peak"),
+     'find_methods(atac=) is deprecated and will be removed in 0.5. Use '
+     'modalities=["atac_peak"] or ["atac_gas"].'),
+    (lambda: mtb.recommend("diagonal", atac="peak"),
+     'recommend(atac=) is deprecated and will be removed in 0.5. Use '
+     'modalities=["atac_peak"] or ["atac_gas"].'),
+])
+def test_atac_keyword_is_deprecated(call, msg):
+    import warnings
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        got = call()
+    assert [str(x.message) for x in w if x.category is FutureWarning] == [msg]
+    assert len(got)
+
+
+def test_atac_and_mod_leave_the_signatures():
+    import inspect
+    assert "atac" not in inspect.signature(mtb.find_methods).parameters
+    assert "atac" not in inspect.signature(mtb.recommend).parameters
+    assert "mod" not in inspect.signature(mtb.io.to_canonical).parameters
+    assert mtb.find_methods("diagonal", atac="peak") == mtb.find_methods(
+        "diagonal", modalities=["atac_peak"])
+
+
+def test_to_canonical_mod_is_deprecated(tmp_path):
+    import numpy as np
+    ad = pytest.importorskip("anndata")
+    a = ad.AnnData(np.ones((3, 2)))
+    with pytest.warns(FutureWarning, match=r"^io\.to_canonical\(mod=\) is deprecated and "
+                                           r"will be removed in 0\.5\. Use the modality "
+                                           r"itself"):
+        with pytest.raises(ValueError, match="only applies to MuData"):
+            mtb.io.to_canonical(a, tmp_path / "x.h5", mod="rna")
+
+
+def test_cli_find_atac_and_convert_mod_are_hidden(capsys):
+    from multibench import cli
+    with pytest.raises(SystemExit):
+        cli.main(["find", "--help"])
+    assert "--atac" not in capsys.readouterr().out
+    with pytest.raises(SystemExit):
+        cli.main(["convert", "--help"])
+    assert "--mod " not in capsys.readouterr().out
+    assert cli.main(["find", "--category", "diagonal", "--atac", "peak"]) == 0
+    out = capsys.readouterr()
+    assert "warning: --atac is deprecated and will be removed in 0.5. Use --modalities " \
+           "atac_peak or atac_gas." in out.err
+    assert out.out.split() == mtb.find_methods("diagonal", modalities=["atac_peak"])
+
+
+# Y35: mtb.DegenerateRerunWarning leaves the surface and still works
+def test_degenerate_rerun_warning_is_deprecated():
+    from multibench.data.results import DegenerateRerunWarning
+    assert "DegenerateRerunWarning" not in mtb.__all__ and "DegenerateRerunWarning" not in dir(mtb)
+    with pytest.warns(FutureWarning, match=r"^DegenerateRerunWarning is deprecated and will "
+                                           r"be removed in 0\.5; nothing raises it\.$"):
+        assert mtb.DegenerateRerunWarning is DegenerateRerunWarning

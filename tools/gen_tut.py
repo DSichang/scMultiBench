@@ -134,11 +134,11 @@ def and_list(items):
 
 def atac_forms(cat):
     """``(gene_activity, peak_only, both)``: the methods of a category by the
-    ATAC form they read, from ``find_methods(cat, atac=...)`` and each
+    ATAC form they read, from ``find_methods(cat, modalities=...)`` and each
     variant's modalities at generation time. ``both`` read peaks and gene
     activity together (``atac_peak`` and ``atac_gas`` in one variant)."""
-    gas = sorted(mtb.find_methods(cat, atac="gene_activity"))
-    peak = sorted(mtb.find_methods(cat, atac="peak"))
+    gas = sorted(mtb.find_methods(cat, modalities=["atac_gas"]))
+    peak = sorted(mtb.find_methods(cat, modalities=["atac_peak"]))
     both = [m for m in peak
             if any(v["category"] == cat and {"atac_peak", "atac_gas"} <= set(v["modalities"])
                    for v in mtb.method_info(m)["supports"])]
@@ -378,7 +378,7 @@ def check_task(key):
         if len(mtb.labels_for(t["ds"], t["cat"], m)) < n:
             raise SystemExit(f"{m} reads only some batches of {t['ds']}: reword the notebooks")
     # the vertical, mosaic and cross texts say that ATAC is a peak matrix
-    gas = mtb.find_methods(t["cat"], atac="gene_activity")
+    gas = mtb.find_methods(t["cat"], modalities=["atac_gas"])
     if t["cat"] != "diagonal" and gas:
         raise SystemExit(f"{and_list(gas)} read gene activity in {t['cat']}: reword the "
                          f"{t['cat']} blurbs and own-data sections")

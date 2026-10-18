@@ -25,8 +25,8 @@ from . import plot
 from . import eval
 from . import data
 from .data import catalog
-from .data.results import (load_results, available_datasets, results_coverage, recommend,
-                           DegenerateRerunWarning)
+from .data.results import load_results, available_datasets, results_coverage, recommend
+from .data import results as _results
 from .eval.pipeline import evaluate, to_long
 from .eval.classify import classify, classification_metrics
 from .engine.runner import run
@@ -62,7 +62,7 @@ __all__ = [
     "evaluate", "to_long", "classify", "classification_metrics",
     # compare
     "load_results", "results_coverage", "recommend",
-    "AmbiguousVariantError", "DegenerateRerunWarning", "__version__",
+    "AmbiguousVariantError", "__version__",
 ]
 
 
@@ -70,7 +70,11 @@ __all__ = [
 list_tasks = _compat.renamed("list_tasks", "category= and metrics=", _registry.list_tasks)
 
 # the 0.2 names, removed in 0.4 as their warnings said
-__getattr__ = _compat.module_getattr(__name__, "", removed={
+__getattr__ = _compat.module_getattr(__name__, "", old={
+    # nothing raises it since the Conos rows left the stored tables
+    "DegenerateRerunWarning": (_results.DegenerateRerunWarning,
+                               _compat.note("nothing raises it")),
+}, removed={
     "plan": ("0.4", _compat.use("mtb.run_all(..., dry_run=True)")),
     "plan_commands": ("0.4", _compat.use("mtb.run_all(..., dry_run=True)")),
     "runtime_hint": ("0.4", _compat.use("mtb.method_info(method)['runtime']")),

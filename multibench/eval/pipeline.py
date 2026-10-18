@@ -86,10 +86,9 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     -------
     pandas.DataFrame
         One row per metric, with the columns ``metric, value, method,
-        dataset, category, clustering, source, scored_with``: ``clustering``
-        is ``"default"`` and ``source`` ``"user"``, which tells your rows from
-        the stored ones. ``scored_with`` is ``"unknown"`` for a frame not
-        from ``mtb.evaluate``.
+        dataset, category, source, scored_with``: ``source`` is ``"user"``,
+        which tells your rows from the stored ones. ``scored_with`` is
+        ``"unknown"`` for a frame not from ``mtb.evaluate``.
 
     Raises
     ------

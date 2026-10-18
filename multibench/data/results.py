@@ -508,8 +508,8 @@ def load_results(
     -------
     pandas.DataFrame
         One row per score: ``metric, value, method, dataset, category,
-        clustering, source``. ``attrs["rerun_version"]`` holds the package
-        version that scored the stored rows.
+        source``. ``attrs["rerun_version"]`` holds the package version that
+        scored the stored rows.
 
     Raises
     ------
@@ -938,13 +938,12 @@ def _unmeasured_note(category: str, datasets, wanted: set[str], stored: bool) ->
             f"Pass scores on such data as long_df=.")
 
 
-@_compat.keywords("recommend", private="_recommend", kept=_TABLE_KEYWORDS,
-                  removed=_REMOVED_METRIC_KEYWORDS)
+@_compat.keywords("recommend", private="_recommend", kept={
+    **_TABLE_KEYWORDS, "atac": _compat.use('modalities=["atac_peak"] or ["atac_gas"]')}, removed=_REMOVED_METRIC_KEYWORDS)
 def recommend(
     category: str,
     *,
     modalities: list[str] | None = None,
-    atac: str | None = None,
     methods: list[str] | None = None,
     metrics=None,
     long_df: pd.DataFrame | None = None,
@@ -967,9 +966,6 @@ def recommend(
     modalities : list of str
         Keep only methods that read all of these modalities, e.g.
         ``["rna", "adt"]``, as in ``mtb.find_methods``; ``None`` = no filter.
-    atac : str
-        Keep only methods that read this ATAC representation: ``"peak"`` or
-        ``"gene_activity"``; ``None`` = no filter.
     methods : list of str
         Rank only these methods, among themselves; ``None`` = every method.
     metrics : None, str or list of str
@@ -992,8 +988,8 @@ def recommend(
     ------
     ValueError
         Nothing left to rank, ``long_df`` repeating stored method/dataset
-        rows, or ``modalities`` / ``atac`` naming data that none of the
-        ranked datasets measured (pass such scores as ``long_df=``).
+        rows, or ``modalities`` naming data that none of the ranked datasets
+        measured (pass such scores as ``long_df=``).
     KeyError
         Unknown method name in ``methods``, with a did-you-mean hint.
 
@@ -1006,14 +1002,14 @@ def recommend(
     --------
     >>> import multibench as mtb
     >>> mtb.recommend("vertical", modalities=["rna", "adt"])
-    >>> mtb.recommend("diagonal", atac="peak", metrics="all")
+    >>> mtb.recommend("diagonal", modalities=["atac_peak"], metrics="all")
 
     See Also
     --------
     mtb.load_results : the stored scores it ranks.
     mtb.plot.bar : the same score as bars.
     """
-    return _recommend(category, modalities=modalities, atac=atac, methods=methods,
+    return _recommend(category, modalities=modalities, methods=methods,
                       metrics=metrics, long_df=long_df, min_methods=min_methods)
 
 
@@ -1034,7 +1030,7 @@ def _recommend(
     from ..plot import style
 
     config.category_folder(category)
-    from ..discover import _modality_filter, find_methods
+    from ..discover import _find_methods as find_methods, _modality_filter
 
     want_mods, atac = _modality_filter(modalities, atac)
     filtered = want_mods is not None or atac is not None

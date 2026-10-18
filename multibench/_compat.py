@@ -164,6 +164,6 @@ def module_getattr(module: str, prefix: str, *, old: dict | None = None,
         if name not in old:
             raise AttributeError(f"module {module!r} has no attribute {name!r}")
         value, tail = old[name]
-        deprecated(f"{prefix}.{name}", tail)
+        deprecated(f"{prefix}.{name}" if prefix else name, tail)
         return value
     return __getattr__

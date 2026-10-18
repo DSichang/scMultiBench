@@ -38,7 +38,7 @@ def _():
 @check("find_methods(needs_labels/atac)")
 def _():
     b = mtb.find_methods(needs_labels=True)
-    c = mtb.find_methods(atac="gene_activity"); return f"labels={len(b)} atac={len(c)}"
+    c = mtb.find_methods(modalities=["atac_gas"]); return f"labels={len(b)} atac={len(c)}"
 
 @check("method_info")
 def _():

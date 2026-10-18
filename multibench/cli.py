@@ -642,9 +642,9 @@ def _cmd_convert(args) -> int:
                else "byte copy, dtype unchanged")
         print(f"copied {src} -> {out} (already canonical; {how})")
         return _EXIT_OK
-    p = ingest.to_canonical(args.src, args.out, modality=args.modality,
-                            layer=args.layer, obsm=args.obsm, mod=args.mod,
-                            dtype=args.dtype, category=category)
+    p = ingest._to_canonical(args.src, args.out, modality=args.modality,
+                             layer=args.layer, obsm=args.obsm, mod=args.mod,
+                             dtype=args.dtype, category=category)
     print(f"wrote {p}")
     return _EXIT_OK
 
@@ -1880,23 +1880,23 @@ def build_parser() -> argparse.ArgumentParser:
 
     # ---- find
     pf = sub.add_parser(
-        "find", help="find methods by category/modalities/labels/ATAC (mtb.find_methods)",
+        "find", help="find methods by category/modalities/labels (mtb.find_methods)",
         description="Print method ids matching all given filters, one per line. "
                     "Every filter is optional; with none, every method is listed.")
     pf.add_argument("--category", help=_CATEGORY_HELP)
     pf.add_argument("--task", action=_Retired, tail=_compat.note("it has no replacement"))
     pf.add_argument("--modalities",
                     help="comma-separated modalities the method must consume, e.g. "
-                         "rna,adt or rna,atac ('protein' is accepted for adt)")
+                         "rna,adt or rna,atac_peak ('protein' is accepted for adt; "
+                         "atac_peak and atac_gas select the ATAC form)")
     pf.add_argument("--needs-labels", nargs="?", const="true", choices=["true", "false"],
                     metavar="{true,false}",
                     help="true (or the bare flag): only methods that consume cell-type "
                          "labels (supervised); false: only label-free methods; absent: "
                          "no filter. Note: the optional value must come right after "
                          "the flag")
-    pf.add_argument("--atac", choices=["peak", "gene_activity"],
-                    help="filter by the ATAC representation the method consumes: "
-                         "peak (chr:start-end matrix) or gene_activity (gene scores)")
+    pf.add_argument("--atac", choices=["peak", "gene_activity"], action=_Retired,
+                    tail=_compat.use("--modalities atac_peak or atac_gas"))
     pf.add_argument("--runnable", action=_Retired, nargs=0, default=False,
                     tail=_compat.use("multibench scan"))
     pf.add_argument("--tunable", nargs="?", const="true", choices=["true", "false"],
@@ -2055,7 +2055,7 @@ def build_parser() -> argparse.ArgumentParser:
                     "the data themselves.",
         epilog=_CONVERT_EPILOG, formatter_class=_HelpFormatter)
     pc.add_argument("src", help="input file: .h5ad, .h5mu, .csv, .tsv, .loom or .h5. "
-                               "A .h5mu file needs --mod or a mod: selector. A .csv "
+                               "A .h5mu file needs a mod: selector. A .csv "
                                "or .tsv file has one row per cell. A canonical .h5 "
                                "is copied to OUT with --dtype applied.")
     pc.add_argument("out", help="mode 1: the output .h5 file. With --modality it may "
@@ -2073,7 +2073,8 @@ def build_parser() -> argparse.ArgumentParser:
                                     "instead of .X")
     pc.add_argument("--obsm", help="mode 1: take the matrix from adata.obsm[OBSM] "
                                    "(e.g. protein for CITE-seq ADT)")
-    pc.add_argument("--mod", help="mode 1: for .h5mu input, the modality to export")
+    pc.add_argument("--mod", action=_Retired, tail=_compat.use("--rna, --adt or --atac "
+                                                               "mod:<name>"))
     pc.add_argument("--rna", help="mode 2: where the raw-count RNA matrix lives: X, "
                                   "obsm:<key>, layer:<key> or mod:<name>. Without it, no "
                                   "RNA is written. Append [<var column>=<value>] to keep "

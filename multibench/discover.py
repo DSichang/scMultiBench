@@ -69,16 +69,16 @@ def _variant_matches(v, category, want, needs_labels, atac) -> bool:
 
 
 @_compat.keywords("find_methods", private="_find_methods", kept={
-    "task": _compat.note("it has no replacement"), "runnable": _compat.use("scan")})
+    "task": _compat.note("it has no replacement"), "runnable": _compat.use("scan"),
+    "atac": _compat.use('modalities=["atac_peak"] or ["atac_gas"]')})
 def find_methods(category: str | None = None, *,
                  needs_labels: bool | None = None,
-                 atac: str | None = None,
                  modalities: list[str] | set[str] | None = None,
                  tunable: bool | None = None) -> list[str]:
     """Return the method ids that match every filter you pass.
 
     A method matches when one of its variants meets ``category``,
-    ``modalities``, ``needs_labels`` and ``atac`` together.
+    ``modalities`` and ``needs_labels`` together.
 
     Parameters
     ----------
@@ -88,9 +88,6 @@ def find_methods(category: str | None = None, *,
     needs_labels : bool | None
         ``True`` = a matching variant needs cell-type labels; ``False`` = one
         runs without them; ``None`` = no filter.
-    atac : str | None
-        ATAC representation the script expects: ``"peak"`` or
-        ``"gene_activity"``; ``None`` = no filter.
     modalities : list[str] | set[str] | None
         Modalities a variant must consume, e.g. ``["rna", "adt"]``;
         ``"atac_peak"`` / ``"atac_gas"`` also select by ATAC representation.
@@ -108,8 +105,7 @@ def find_methods(category: str | None = None, *,
     Raises
     ------
     ValueError
-        Unknown ``category``, ``atac`` or modality token, or a
-        token that contradicts ``atac``.
+        Unknown ``category`` or modality token.
     TypeError
         ``modalities`` is a bare string, not a list.
 
@@ -124,8 +120,8 @@ def find_methods(category: str | None = None, *,
     mtb.method_info : the per-variant ``supports`` table these filters are read from.
     mtb.scan : which of these methods can actually run on a given dataset.
     """
-    return _find_methods(category, needs_labels=needs_labels, atac=atac,
-                         modalities=modalities, tunable=tunable)
+    return _find_methods(category, needs_labels=needs_labels, modalities=modalities,
+                         tunable=tunable)
 
 
 def _find_methods(category: str | None = None, *, task: str | None = None,

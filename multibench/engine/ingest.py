@@ -706,10 +706,11 @@ def _write_canonical(out: Path, X, feats, bars, *, dtype, compression, block):
 @_compat.keywords("io.to_canonical", private="_to_canonical", positional=("convert",), kept={
     "convert": _compat.note("leave it out: a canonical .h5 is passed through as it is"),
     "compression": _compat.note("leave it out for gzip"),
-    "block": _compat.note("leave it out")})
+    "block": _compat.note("leave it out"),
+    "mod": _compat.use('the modality itself, to_canonical(mdata["<name>"])')})
 def to_canonical(src, out: Path | str | None = None, modality: str | None = None, *,
                  layer: str | None = None, obsm: str | None = None,
-                 mod: str | None = None, dtype: str = "float64",
+                 dtype: str = "float64",
                  category: str | None = None,
                  feature_names: list | None = None) -> Path:
     """Convert one matrix to a canonical scMultiBench ``.h5`` and return its path.
@@ -720,10 +721,10 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
 
     Parameters
     ----------
-    src : AnnData, MuData, Path or str
-        Matrix to convert: an AnnData, a MuData (with ``mod``), or a path to
-        ``.h5ad`` / ``.h5mu`` / ``.csv`` / ``.tsv`` (cells x features) /
-        ``.loom`` / canonical ``.h5``.
+    src : AnnData, Path or str
+        Matrix to convert: an AnnData (for a MuData, ``mdata["<name>"]``), or a
+        path to ``.h5ad`` / ``.csv`` / ``.tsv`` (cells x features) / ``.loom``
+        / canonical ``.h5``.
     out : Path | str | None
         Output file, or a directory (existing or ending in ``/``) that gets
         the ``modality`` filename; ``None`` = that filename in the current
@@ -736,8 +737,6 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
         Take the matrix from ``adata.layers[layer]`` instead of ``adata.X``.
     obsm : str | None
         Take the matrix from ``adata.obsm[obsm]`` (e.g. ``'protein'`` for CITE-seq).
-    mod : str | None
-        MuData modality to convert (``mdata.mod[mod]``); required for a MuData.
     dtype : str
         Stored dtype of ``matrix/data``; ``'float32'`` halves the file.
     category : str | None
@@ -760,7 +759,7 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
         Invalid or conflicting arguments, a non-canonical ``.h5``, or features
         of several types.
     KeyError
-        ``layer``, ``obsm`` or ``mod`` names an entry the object does not have.
+        ``layer`` or ``obsm`` names an entry the object does not have.
     ImportError
         ``.h5mu`` without ``mudata``, or ``.loom`` without ``loompy``.
 
@@ -784,7 +783,7 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     mtb.io.read_canonical : the inverse, canonical ``.h5`` -> AnnData.
     mtb.describe_layout : the folder layout and the role -> filename mapping.
     """
-    return _to_canonical(src, out, modality, layer=layer, obsm=obsm, mod=mod,
+    return _to_canonical(src, out, modality, layer=layer, obsm=obsm,
                          dtype=dtype, category=category, feature_names=feature_names)
 
 
@@ -822,8 +821,10 @@ def _to_canonical(src, out: Path | str | None = None, modality: str | None = Non
     adata = _to_anndata(src)
     if _is_mudata(adata):
         if mod is None:
+            first = next(iter(adata.mod), "rna")
             raise ValueError(
-                f"MuData given; pass mod=<name> to choose the modality (found: {list(adata.mod)})")
+                f"A MuData holds the modalities {list(adata.mod)}: pass one, "
+                + config.hint(f"e.g. mdata[{first!r}].", f"e.g. --rna mod:{first}."))
         if mod not in adata.mod:
             raise KeyError(f"mod {mod!r} not in MuData; found: {list(adata.mod)}")
         adata = adata.mod[mod]

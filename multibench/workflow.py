@@ -381,10 +381,10 @@ def batch_patterns(category: str) -> list[tuple[tuple, list[str]]]:
 
 def _atac_lines(category: str) -> list[str]:
     """The ATAC part of one category's layout: which representation each
-    method needs, from the registry (``find_methods(category, atac=...)``)."""
+    method needs, from the registry."""
     from .discover import find_methods
-    peak = find_methods(category, atac="peak")
-    gas = find_methods(category, atac="gene_activity")
+    peak = find_methods(category, modalities=["atac_peak"])
+    gas = find_methods(category, modalities=["atac_gas"])
     if not peak and not gas:
         return []
     out = []
