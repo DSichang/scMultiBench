@@ -2516,7 +2516,12 @@ def main(argv=None) -> int:
     stderr and returns 1 (``MULTIBENCH_DEBUG=1`` re-raises it); warnings print as
     ``warning: <message>``. While it runs, ``config.hint`` names shell commands.
     """
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args, extra = parser.parse_known_args(argv)
+    if extra:
+        # the usage of the command that was given, not the top-level one
+        (getattr(args, "_parser", None) or parser).error(
+            f"unrecognized arguments: {' '.join(extra)}")
     prev_show, prev_cli = warnings.showwarning, config._CLI
     config._CLI = True
 

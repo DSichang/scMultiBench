@@ -471,3 +471,13 @@ def test_cli_plot_two_inputs_of_the_same_methods(tmp_path, capsys):
     err = capsys.readouterr().err
     assert rc == 0, err
     assert "_b: an earlier --input has the same method and dataset." in err
+
+
+# Y25: an unknown option shows the usage of the command it was given to
+def test_unknown_option_shows_the_command_usage(capsys):
+    from multibench import cli
+    with pytest.raises(SystemExit) as e:
+        cli.main(["scan", "D11", "--foo"])
+    err = capsys.readouterr().err
+    assert e.value.code == 2 and err.startswith("usage: multibench scan ")
+    assert "unrecognized arguments: --foo" in err
