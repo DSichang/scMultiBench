@@ -314,18 +314,6 @@ class _Ser:
         return ["0"] * 3
 
 
-# X29: the Python plan lists the shared layer, so its sizes add up
-def test_install_plan_lists_the_shared_layer():
-    import warnings
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        plan = mtb.env.install(["StabMap", "scMoMaT"], dry_run=True, flavor="gpu")
-    layer = plan[plan["state"] == "shared layer"]
-    assert list(layer["env"]) == ["torch-2.8.0-cu12-py39 (shared)"]
-    assert list(layer["methods"].iloc[0]) == ["scMoMaT"]
-    assert round(plan["archive_bytes"].sum() / 1e9, 1) == 5.4     # the CLI's total
-
-
 # Y36 / Y37 / X98: maintainer and multi-dataset flags leave --help; leiden flavor is advanced
 def test_help_leaves_out_ref_and_overall(capsys):
     from multibench import cli

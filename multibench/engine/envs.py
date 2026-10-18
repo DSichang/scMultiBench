@@ -1360,8 +1360,7 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
         (``'any'`` for an env with one archive for CPU and GPU hosts),
         ``cmds`` (the lockfile build it runs; empty when the archive is
         unpacked) and ``fallback_cmds`` (the lockfile build of an env with an
-        archive). A dry run ends with one row per shared library layer to
-        download (``state`` ``'shared layer'``).
+        archive).
 
     Raises
     ------
@@ -1404,30 +1403,9 @@ def _install(methods=None, *, category=None, build: bool = False, packed=None,
     and the hidden ``force=`` (try a real install off Linux)."""
     if packed is not None:
         build = not packed
-    rows = _install_rows(methods, category=category, packed=not build, dry_run=dry_run,
-                         conda=conda, force=force, flavor=flavor)
-    if dry_run and not build:
-        rows += _layer_rows(rows)
-    return _frame(rows, _INSTALL_FIRST)
-
-
-def _layer_rows(rows: list[dict]) -> list[dict]:
-    """One plan row per shared layer the archives to download need, so the
-    sizes of the plan add up to the download."""
-    fetch = [r for r in rows if r["state"] == "packed archive published"]
-    out = []
-    for name, entry in layers_for([archive_key(r["env"], r.get("flavor")) for r in fetch]
-                                  ).items():
-        users = [r for r in fetch if archive_key(r["env"], r.get("flavor"))
-                 in set(entry.get("envs", ()))]
-        out.append({"env": f"{name} (shared)",
-                    "methods": [m for r in users for m in r.get("methods", [])],
-                    "state": "shared layer", "exists": False, "has_lock": False,
-                    "cmds": [], "packed_url": _first_url(entry.get("urls")),
-                    "archive_bytes": entry.get("archive_bytes"),
-                    "unpacked_bytes": entry.get("unpacked_bytes"),
-                    "flavor": None, "fallback_cmds": []})
-    return out
+    return _frame(_install_rows(methods, category=category, packed=not build,
+                                dry_run=dry_run, conda=conda, force=force,
+                                flavor=flavor), _INSTALL_FIRST)
 
 
 def _install_rows(methods: list[str] | None = None, *, category: str | None = None,
