@@ -988,8 +988,8 @@ def _cmd_plot(args) -> int:
     if title is None:
         title = " ".join(x for x in (args.category, args.dataset) if x) or None
     metrics = _csv_list(args.metrics)
-    if metrics is not None and len(metrics) == 1 and metrics[0] in _METRIC_FAMILIES:
-        metrics = metrics[0]
+    if metrics is not None and len(metrics) == 1 and metrics[0].lower() in _METRIC_FAMILIES:
+        metrics = metrics[0].lower()
     with _quiet_stdout():
         if args.kind == "bubble":
             kw = dict(metrics=metrics, methods=methods, aggregate=args.aggregate,
@@ -1412,8 +1412,8 @@ def _cmd_evaluate(args) -> int:
             raise KeyError(_unknown_method_message(args.method, name,
                                                    args.labels or ())) from None
     metrics = _csv_list(args.metrics)
-    if metrics is not None and len(metrics) == 1 and metrics[0] in _METRIC_FAMILIES:
-        metrics = metrics[0]
+    if metrics is not None and len(metrics) == 1 and metrics[0].lower() in _METRIC_FAMILIES:
+        metrics = metrics[0].lower()
     if args.task is not None and metrics is None:     # an older spelling of --metrics
         metrics = args.task
     with contextlib.ExitStack() as stack:

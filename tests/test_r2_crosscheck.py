@@ -365,3 +365,15 @@ def test_sweep_in_run_order():
 def test_scan_shows_the_variant_run_all_runs():
     s = mtb.scan("D52mini", "cross", verbose=False)
     assert s.set_index("method").at["UINMF", "modalities"] == "rna1+rna2+rna3+adt1+adt2+adt3"
+
+
+# X76: the command line takes the family names in any letter case
+def test_cli_metrics_family_any_case(tmp_path, capsys):
+    import numpy as np
+    from multibench import cli
+    emb = tmp_path / "e.npy"
+    np.save(emb, np.random.default_rng(0).normal(size=(40, 4)))
+    lab = tmp_path / "l.csv"
+    lab.write_text("x\n" + "\n".join("ab"[i % 2] for i in range(40)) + "\n")
+    assert cli.main(["evaluate", str(emb), "--labels", str(lab), "--metrics",
+                     "Clustering"]) == 0

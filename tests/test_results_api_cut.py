@@ -50,7 +50,7 @@ def test_metric_selection_is_one_vocabulary():
     lst = metric_selection(["ari", "kbet"])
     assert lst.codes == ["ARI", "kBET"] and lst.family == "all" and lst.explicit
     assert metric_selection(["gc"]).family == "batch"
-    with pytest.raises(ValueError, match=r"unknown metric\(s\) \['nope'\]; valid codes: \['ARI'"):
+    with pytest.raises(ValueError, match=r"unknown metric\(s\) \['nope'\]; valid: clustering, batch, classification, all, or the codes \['ARI'"):
         metric_selection(["ARI", "nope"])
     with pytest.raises(ValueError, match="present in this frame: \\['MyScore'\\]"):
         metric_selection(["MyScore", "nope"], extra=["MyScore"])

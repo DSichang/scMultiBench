@@ -212,7 +212,8 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
             codes.append(c)
     if unknown:
         raise ValueError(
-            f"unknown metric(s) {unknown}; valid codes: {valid}"
+            f"unknown metric(s) {unknown}; valid: clustering, batch, classification, "
+            f"all, or the codes {valid}"
             + (f"; present in this frame: {present}" if present else ""))
     dup = sorted({c for c in codes if codes.count(c) > 1})
     if dup:

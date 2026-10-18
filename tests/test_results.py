@@ -124,7 +124,7 @@ def test_zero_row_filter_warns(result_dir):
         df = results.load_results("vertical", dataset="D11", metrics=["kBET"])
     assert len(df) == 0
     # an UNKNOWN metric code is a typo: ValueError listing both vocabularies
-    with pytest.raises(ValueError, match=r"unknown metric\(s\) \['ZZZ'\]; valid codes: \['ARI'") as e:
+    with pytest.raises(ValueError, match=r"unknown metric\(s\) \['ZZZ'\]; valid: clustering, batch, classification, all, or the codes \['ARI'") as e:
         results.load_results("vertical", dataset="D11", metrics=["ZZZ"])
     assert "present in this frame: ['ARI'" in str(e.value)
     with pytest.raises(ValueError, match=r"unknown metric\(s\) \['NOPE'\]"):

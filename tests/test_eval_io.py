@@ -342,7 +342,7 @@ def test_evaluate_metrics_rejects_unknown_metric_and_bare_code_string():
     with pytest.raises(ValueError) as exc:
         evaluate(emb, labels=ct, metrics=["ARI", "XYZ"])
     msg = str(exc.value)
-    assert "unknown metric(s) ['XYZ']" in msg and "valid codes" in msg
+    assert "unknown metric(s) ['XYZ']" in msg and "or the codes" in msg
     assert "ARI" in msg and "kBET" in msg
     with pytest.raises(ValueError) as exc:
         evaluate(emb, labels=ct, metrics="ARI")      # a code is not a family token

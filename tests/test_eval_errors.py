@@ -49,7 +49,7 @@ def test_metrics_folds_case_like_the_other_metric_arguments():
     emb, lab = _blobs()
     out = evaluate(emb, labels=lab, metrics=["asw"])
     assert out.index.tolist() == ["ASW"]
-    with pytest.raises(ValueError, match=r"unknown metric\(s\) \['nope'\]; valid codes: \['ARI'"):
+    with pytest.raises(ValueError, match=r"unknown metric\(s\) \['nope'\]; valid: clustering, batch, classification, all, or the codes \['ARI'"):
         evaluate(emb, labels=lab, metrics=["asw", "nope"])
 
 
