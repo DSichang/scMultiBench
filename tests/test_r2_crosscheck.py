@@ -287,3 +287,28 @@ def test_rank_key_says_best_and_worst():
         fig = mtb.plot.bubble(mtb.load_results("mosaic"))
     texts = [t.get_text() for t in fig.axes[0].texts if t.get_gid() == "legend"]
     assert "best" in texts and "worst" in texts
+
+
+# Y11: in rescore, the Leiden search warning names its method
+def test_rescore_leiden_warning_names_the_method(monkeypatch):
+    import numpy as np
+    from multibench import workflow
+    from multibench.eval import scib
+
+    class G:
+        obs = {}
+    monkeypatch.setattr(scib, "_search_n_clusters",
+                        lambda g, n, key, flavor: g.obs.update({key: _Ser()}) or False)
+    with pytest.warns(UserWarning, match=r"^No Leiden resolution gave 13 clusters, one per "
+                                         r"cell type, for scMM; using the 12 clusters"):
+        with workflow._named_leiden_warnings("scMM"):
+            scib._n_clusters(G(), 13, "leidenalg", per="cell type")
+    assert scib.FOR_METHOD.get() is None
+
+
+class _Ser:
+    def nunique(self):
+        return 12
+
+    def astype(self, t):
+        return ["0"] * 3

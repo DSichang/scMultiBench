@@ -14,6 +14,7 @@ length alone cannot tell: every candidate order is scored and the best is kept.
 """
 from __future__ import annotations
 
+import contextlib
 import itertools
 import json
 import os
@@ -155,6 +156,16 @@ def load_batch(out_dir, *, methods=None, data_path=None) -> "BatchResult":
     for r in records:
         res._batch_text(r.get("batch_file"))       # loads the saved batch, when present
     return res
+
+
+@contextlib.contextmanager
+def _named_leiden_warnings(method: str):
+    """The Leiden search warnings raised inside the block name ``method``."""
+    token = _escib.FOR_METHOD.set(method)
+    try:
+        yield
+    finally:
+        _escib.FOR_METHOD.reset(token)
 
 
 #: load_batch's warning for a folder scored before 0.4.0
@@ -2440,12 +2451,14 @@ class BatchResult:
                     # the recorded label order is reused: ranking the orders again
                     # clusters the cells once per order and picks the same files
                     keep = rec.get("labels_used") if labels is None else None
-                    _score_record(rec, emb, self.dataset, self.category, root, variant,
-                                  batch=batch_ids, labels=label_ids, metrics=metrics,
-                                  labels_by_cell=labels_by_cell, batch_by_cell=batch_by_cell,
-                                  keep_order=keep, batch_given=batch is not None,
-                                  on_rank=_rank_line(method) if verbose else None,
-                                  tried=tried[root])
+                    with _named_leiden_warnings(method):
+                        _score_record(rec, emb, self.dataset, self.category, root, variant,
+                                      batch=batch_ids, labels=label_ids, metrics=metrics,
+                                      labels_by_cell=labels_by_cell,
+                                      batch_by_cell=batch_by_cell,
+                                      keep_order=keep, batch_given=batch is not None,
+                                      on_rank=_rank_line(method) if verbose else None,
+                                      tried=tried[root])
             except Exception as e:  # noqa: BLE001 - one bad record must not abort the rest
                 _drop_scores(rec)
                 rec["status"] = "RUN_OK_EVAL_FAILED"

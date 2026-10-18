@@ -8,6 +8,7 @@ clusters.
 from __future__ import annotations
 
 import contextlib
+import contextvars
 import functools
 import io
 import warnings
@@ -319,19 +320,27 @@ def _search_n_clusters(adata, n: int, key: str, flavor: str) -> bool:
     return False
 
 
+#: the method whose output is scored, for the search warnings (``rescore``)
+FOR_METHOD: contextvars.ContextVar = contextvars.ContextVar("multibench_method",
+                                                            default=None)
+
+
 def _n_clusters(graph, n: int, flavor: str, per: str | None = None) -> np.ndarray:
     """The searched clusters of ``graph`` as strings, with a warning when no
     resolution gave ``n``; ``per`` names what each cluster stands for."""
     key = "_mb_search"
     if not _search_n_clusters(graph, n, key, flavor):
         got = graph.obs[key].nunique()
+        method = FOR_METHOD.get()
+        of = f" for {method}" if method else ""
         if per == "batch":
             # what it affects, and that the scores stand
             _compat.warn(f"ARI_batch and NMI_batch use {got} clusters: no resolution "
-                         f"gave {n}. Nothing to do.", UserWarning)
+                         f"gave {n}{of}. Nothing to do.", UserWarning)
         else:
             what = f"{n} clusters" + (f", one per {per}" if per else "")
-            _compat.warn(f"No Leiden resolution gave {what}; using the {got} clusters "
+            of = f"{',' if per and method else ''}{of}"
+            _compat.warn(f"No Leiden resolution gave {what}{of}; using the {got} clusters "
                          f"of the last try.", UserWarning)
     out = np.asarray(graph.obs[key].astype(str))
     del graph.obs[key]
