@@ -2319,7 +2319,7 @@ class BatchResult:
         No method is re-run. Each record's embedding is read back from its
         ``out_dir``. With more than 4,096 cells scanpy's neighbour search is approximate, so the
         same embedding can score a few hundredths differently on another machine or
-        library version: compare ranks, not third decimals.
+        library version.
 
         Parameters
         ----------

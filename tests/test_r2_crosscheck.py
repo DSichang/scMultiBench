@@ -207,3 +207,25 @@ def test_mosaic_batches_numbered_wrong_say_renumber_in_the_reason(tmp_path, caps
     cli.main(["scan", str(d), "--category", "mosaic", "--methods", "Cobolt",
               "--format", "csv"])
     assert hint in capsys.readouterr().out
+
+
+# X43: config --get takes only the settings it prints
+def test_config_get(capsys):
+    from multibench import cli
+    assert cli.main(["config", "--get", "leiden_flavor"]) == 0
+    assert capsys.readouterr().out.strip() == str(mtb.config.DEFAULT.leiden_flavor)
+    with pytest.raises(SystemExit):
+        cli.main(["config", "--get", "result_path"])
+
+
+# X19: the --output warning names what replaces it
+def test_evaluate_output_says_pass_the_embedding_first(tmp_path, capsys):
+    import numpy as np
+    from multibench import cli
+    emb = tmp_path / "e.npy"
+    np.save(emb, np.random.default_rng(0).normal(size=(30, 4)))
+    lab = tmp_path / "l.csv"
+    lab.write_text("x\n" + "\n".join("ab"[i % 2] for i in range(30)) + "\n")
+    cli.main(["evaluate", "--output", str(emb), "--labels", str(lab), "--metrics", "cLISI"])
+    assert ("--output is deprecated and will be removed in 0.5. Pass the embedding as "
+            "the first argument.") in capsys.readouterr().err

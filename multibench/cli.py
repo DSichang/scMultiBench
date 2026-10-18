@@ -1937,14 +1937,13 @@ def build_parser() -> argparse.ArgumentParser:
     # ---- config
     pco = sub.add_parser(
         "config", help="the resolved paths and where each came from (mtb.config.DEFAULT)",
-        description="Print data_path, envs_dir, repo_path, result_path and "
-                    "leiden_flavor with the source of each value: an environment "
+        description="Print data_path, envs_dir, repo_path and leiden_flavor "
+                    "with the source of each value: an environment "
                     "variable (MULTIBENCH_DATA_PATH, MULTIBENCH_ENVS_DIR, "
                     "MULTIBENCH_REPO_PATH), the conda probe or the default. "
                     "scripts_commit is the commit of the method scripts in "
                     "repo_path.")
-    pco.add_argument("--get", choices=["data_path", "envs_dir", "repo_path", "result_path",
-                                       "leiden_flavor"],
+    pco.add_argument("--get", choices=["data_path", "envs_dir", "repo_path", "leiden_flavor"],
                      help="print only this value, e.g. DATA=$(multibench config --get "
                           "data_path)")
     pco.add_argument("--format", choices=["text", "json"], default="text",
@@ -2285,7 +2284,7 @@ def build_parser() -> argparse.ArgumentParser:
     # the 0.4.0 spelling, kept as a hidden alias of EMBEDDING (both work)
     pe.add_argument("--embedding", help=argparse.SUPPRESS)
     pe.add_argument("--output", dest="embedding", action=_Retired,
-                    tail=_compat.use("--embedding"))
+                    tail=". Pass the embedding as the first argument.")
     pe.add_argument("--category", help=_CATEGORY_HELP + " Required with --method or "
                                                         "--dataset.")
     pe.add_argument("--task", choices=["clustering", "batch", "all"], action=_Retired,

@@ -2,7 +2,7 @@ metric,description
 ARI,"Adjusted Rand Index between Leiden clusters, one per cell type, and the cell-type labels; about 0 = random, 1 = identical; higher = better."
 NMI,"Normalized Mutual Information between Leiden clusters, one per cell type, and the cell-type labels; 0-1; higher = better."
 ASW,"Average silhouette width of the Leiden clusters (one per cell type) on the embedding, rescaled to 0-1; higher = better."
-iASW,"Isolated-label silhouette: the silhouette of each Leiden cluster (one per cell type) against all other cells, averaged over clusters. Every cluster is treated as an isolated label (scib's default counts only labels found in few batches); 0-1; higher = better."
+iASW,"Isolated-label silhouette: the silhouette of each cell (distance to the nearest other Leiden cluster), averaged per cluster and then over clusters. Every cluster is treated as an isolated label (scib's default counts only labels found in few batches); 0-1; higher = better."
 iF1,"Isolated-label F1: for each cell type, the best F1 of one Leiden cluster (one per cell type), averaged over cell types. Every cell type is treated as an isolated label (scib's default counts only types found in few batches); 0-1; higher = better."
 cLISI,"Cell-type LISI: how much each cell's neighbours share its cell type on the embedding; the median over cells, scaled to 0-1; higher = better."
 ASW_batch,"Batch silhouette: 1 minus the absolute batch silhouette within each cell type, averaged over cell types; 0-1; higher = better."

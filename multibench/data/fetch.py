@@ -185,7 +185,7 @@ def fetch_outputs(dataset: str, methods=None, *, data_path=None,
     laptop. ``evaluate`` and ``plot`` then run on the stored outputs.
     With more than 4,096 cells scanpy's neighbour search is approximate, so the
     same embedding can score a few hundredths differently on another machine or
-    library version: compare ranks, not third decimals.
+    library version.
 
     Parameters
     ----------
