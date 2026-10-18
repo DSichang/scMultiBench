@@ -772,9 +772,8 @@ _WRONG_ATAC_RE = re.compile(r"^\S+ " + _WRONG_ATAC_BODY)
 PEAK_NAMES_REASON = "reads peak names such as "
 _PEAK_NAMES_RE = re.compile(r"^\S+ " + re.escape(PEAK_NAMES_REASON)
                             + r"(\S+)\. (\S+) holds other names")
-#: The override every blocking-ATAC reason names (Python, CLI); what
-#: :func:`_is_wrong_atac` looks for.
-_ATAC_OVERRIDE = ("allow_atac_mismatch=True", "--allow-atac-mismatch")
+#: What every blocking-ATAC reason says; what :func:`_is_wrong_atac` looks for.
+_ATAC_MARKS = ("Export the ATAC as ", PEAK_NAMES_REASON)
 
 
 def _blocking_caveats(caveats) -> list[str]:
@@ -786,15 +785,13 @@ def _blocking_caveats(caveats) -> list[str]:
 def _wrong_atac_reason(method: str, caveats) -> str:
     """The ``reason`` of a row whose ATAC file the method cannot read (the other
     representation, or peak names it cannot parse), or ""; the override comes last."""
-    anyway = (", or pass " + config.hint(_ATAC_OVERRIDE[0], _ATAC_OVERRIDE[1])
-              + f" to run {method} anyway.")
     for text in _blocking_caveats(caveats):
         m = _WRONG_ATAC_RE.match(text)
         if m:
             as_ = "gene activity" if m.group(1) == "gene-activity" else "peaks"
             return (f"{method} needs {m.group(1)} ATAC, and {m.group(2)} holds "
-                    f"{m.group(3)}. Export the ATAC as {as_}" + anyway)
-        return text.rstrip(".") + anyway
+                    f"{m.group(3)}. Export the ATAC as {as_}.")
+        return text
     return ""
 
 
@@ -802,9 +799,9 @@ def _is_wrong_atac(reason) -> "pd.Series | bool":
     """Whether a scan ``reason`` (or a Series of them) carries :func:`_wrong_atac_reason`."""
     if isinstance(reason, pd.Series):
         text = reason.astype(str)
-        return text.str.contains(_ATAC_OVERRIDE[0], regex=False) | text.str.contains(
-            _ATAC_OVERRIDE[1], regex=False)
-    return any(o in str(reason or "") for o in _ATAC_OVERRIDE)
+        return text.str.contains(_ATAC_MARKS[0], regex=False) | text.str.contains(
+            _ATAC_MARKS[1], regex=False)
+    return any(o in str(reason or "") for o in _ATAC_MARKS)
 
 
 def _atac_mismatch_caveats(method: str, category: str, inputs) -> list[str]:

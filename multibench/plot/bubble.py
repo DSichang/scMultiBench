@@ -357,10 +357,8 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=Non
         for msg in style.coverage_warnings(
                 parts, basis=overall,
                 incomplete_fix=_config.hint(
-                    "Pass require_complete=True to keep only the methods scored "
-                    "on every dataset.",
-                    "Pass --require-complete to keep only the methods scored on "
-                    "every dataset."),
+                    "Pass methods= with the methods scored on every dataset.",
+                    "Pass --methods with the methods scored on every dataset."),
                 stored=stored):
             _compat.warn(msg, UserWarning)
         lone = style.lone_message({ds: mat.attrs.get("lone", [])

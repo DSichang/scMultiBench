@@ -266,10 +266,10 @@ def dataset_mode_warnings(parts: dict, *, stored=()) -> list:
            "Its rows mix datasets. ")
     if (coverage(parts) >= 2).all() and not lone:
         msg += config.hint(
-            "Pass aggregate='summary' for the rank-averaged summary panel, or "
-            "filter to one dataset.",
-            "Pass --aggregate summary for the rank-averaged summary panel, or "
-            "filter with --dataset.")
+            "mtb.plot.bar ranks the methods within each dataset; or filter to one "
+            "dataset.",
+            "multibench plot bar ranks the methods within each dataset; or filter "
+            "with --dataset.")
     else:
         msg += config.hint("Plot each dataset on its own.",
                            "Plot each dataset on its own with --dataset.")

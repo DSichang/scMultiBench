@@ -595,7 +595,8 @@ def _load_results(
         _, rerun_versions = _split_rerun_tag(out["source"])
         if source not in ("published", "both"):
             col = out["source"].astype(str)
-            mask = col.str.startswith("rerun") if source == "rerun" else col == source
+            mask = (col.str.startswith("rerun") | (col == "stored")) if source == "rerun" \
+                else col == source
             if not mask.any():
                 raise ValueError(
                     f"source {source!r} not in {base}; present: "
@@ -816,7 +817,7 @@ available_datasets = _compat.renamed("available_datasets", "mtb.catalog.datasets
 def fetchable() -> list[str]:
     """Dataset ids ``mtb.data.fetch`` can download.
 
-    ``mtb.results_coverage`` lists the datasets with stored scores; the two
+    ``mtb.results_coverage`` lists the datasets with stored results; the two
     sets overlap but are not the same (``D46`` downloads and has no stored
     scores).
 
@@ -839,7 +840,7 @@ def fetchable() -> list[str]:
 
 @_compat.keywords("results_coverage", private="_results_coverage", kept=_TABLE_KEYWORDS)
 def results_coverage(category: str | None = None) -> pd.DataFrame:
-    """Which (category, dataset, method) combinations have stored scores.
+    """Which (category, dataset, method) combinations have stored results.
 
     Parameters
     ----------
@@ -939,7 +940,7 @@ def _unmeasured_note(category: str, datasets, wanted: set[str], stored: bool) ->
         groups.setdefault(_STORED_DATASET_MODALITIES[d], []).append(d)
     where = "; ".join(f"{', '.join(ds)} ({'+'.join(mods)})" for mods, ds in groups.items())
     data = "+".join(m.upper() for m in _BASE_MODALITIES if m in wanted)
-    head = f"Stored {category} scores" if stored else f"The {category} scores in long_df"
+    head = f"The stored results of {category}" if stored else f"The {category} scores in long_df"
     return (f"{head} come from {where}. None of these datasets measured "
             f"{' or '.join(missing)}, so they cannot rank methods for {data} data. "
             f"Pass scores on such data as long_df=.")
