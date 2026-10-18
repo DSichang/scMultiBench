@@ -82,7 +82,7 @@ def test_changes_say_how_a_csv_embedding_is_matched(tmp_path, capsys, monkeypatc
                      metrics=["ARI"])
     ad = pytest.importorskip("anndata")
     adata = ad.AnnData(np.zeros((30, 4)), obs=pd.DataFrame(index=bars))
-    with pytest.raises(ValueError, match="cannot align by cell id"):
+    with pytest.raises(ValueError, match="cell ids do not match the embedding's"):
         mtb.evaluate(adata, labels=pd.Series(types, index=other), obsm="X", metrics=["ARI"])
     pd.DataFrame(np.zeros((30, 4)), index=bars[:1] + bars[:-1]).to_csv(tmp_path / "twice.csv")
     with pytest.raises(ValueError, match=r"pass labels.to_numpy\(\) to match positionally"):

@@ -169,7 +169,9 @@ def test_labels_series_missing_or_extra_ids_raise_naming_them():
         evaluate(df, labels=extra, metrics=["ARI"])
     assert "1 id(s) the output lacks" in str(exc.value) and "ghost" in str(exc.value)
     # a dims x cells DataFrame has row ids that are not cells: disjoint sets -> hint
-    with pytest.raises(ValueError, match="is the output transposed"):
+    with pytest.raises(ValueError, match=r"^The labels' cell ids do not match the "
+                                         r"embedding's \(embedding e\.g\. d0, labels e\.g\. "
+                                         r"cell0\)\."):
         evaluate(pd.DataFrame(emb.T, columns=ids, index=[f"d{i}" for i in range(5)]),
                  labels=ser, metrics=["ARI"])
     # same rule for batch=

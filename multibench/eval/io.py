@@ -683,12 +683,14 @@ def _align_vector(x, ids, *, what: str, column: str | None, cells: str | None):
             f"{what}.to_numpy() to match positionally")
     missing = ids.difference(x.index, sort=False)
     extra = x.index.difference(ids, sort=False)
+    if len(missing) and len(missing) == len(ids):
+        raise ValueError(
+            f"The {what}' cell ids do not match the embedding's (embedding e.g. "
+            f"{ids[0]}, {what} e.g. {x.index[0]}). Pass {what} indexed like the "
+            f"embedding, or {what}.to_numpy() to match by position.")
     if len(missing) or len(extra):
         hint = ""
-        if len(missing) == len(ids):
-            hint = (" The two id sets are disjoint: is the output transposed "
-                    "(evaluate expects cells x dims), or indexed differently?")
-        elif what == "labels" and not len(extra):
+        if what == "labels" and not len(extra):
             hint = (f" For cells without a label, pass labels.reindex({cells}) "
                     'and missing_labels="drop".' if cells else
                     " For cells without a label, give them the label NaN and pass "
