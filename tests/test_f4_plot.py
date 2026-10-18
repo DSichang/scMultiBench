@@ -266,7 +266,7 @@ def no_envs(monkeypatch):
 def test_nothing_runnable_tail_is_plain(no_envs, root):
     # D11 holds no ATAC file: the rows that read one are not listed, and the
     # line before the tail says so
-    note = ("D11 holds RNA and ADT. 19 rows that read ATAC are not listed. "
+    note = ("D11 holds RNA and ADT. Methods and variants that read ATAC are not listed. "
             'modalities="all" lists them.')
     for kw, where, before in (
             ({}, "mtb.run_all('D11', 'vertical', dry_run=True) shows the listed rows.", note),

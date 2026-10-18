@@ -21,7 +21,7 @@ from multibench.engine import envs, registry
 
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 # the command line's table has a row per variant: the methods are counted too (X23)
-NOTE = ("# D11 holds RNA and ADT. 19 rows (4 methods) that read ATAC are not listed. "
+NOTE = ("# D11 holds RNA and ADT. Methods and variants that read ATAC are not listed. "
         "--modalities all lists them.")
 
 
@@ -308,7 +308,7 @@ def test_run_all_nothing_runnable_names_the_listed_rows(no_envs, tmp_path, capsy
     lines = err.splitlines()
     assert rc == 1 and lines[0] == "error: No method can run on D11 (vertical)."
     # the error's note counts rows only; the scan table's note counts methods too
-    assert lines[-3] == ("D11 holds RNA and ADT. 19 rows that read ATAC are not listed. "
+    assert lines[-3] == ("D11 holds RNA and ADT. Methods and variants that read ATAC are not listed. "
                          "--modalities all lists them.")
     assert lines[-2].startswith("multibench scan D11 --category vertical shows the listed "
                                 "rows. ")

@@ -265,3 +265,15 @@ def test_default_order_warning_once():
         mtb.labels_for("D52mini", "cross")
         mtb.labels_for("D52mini", "cross")
     assert len([x for x in w if "default order" in str(x.message)]) == 1
+
+
+# X23: scan, run_all and the command line say the same, without counts
+def test_hidden_rows_one_sentence(capsys):
+    from multibench import cli
+    said = "D11 holds RNA and ADT. Methods and variants that read ATAC are not listed."
+    mtb.scan("D11", "vertical")
+    assert said in capsys.readouterr().out
+    mtb.run_all("D11", "vertical", out_dir="/o", dry_run=True)
+    assert said in capsys.readouterr().out
+    cli.main(["scan", "D11", "--category", "vertical"])
+    assert said in capsys.readouterr().out

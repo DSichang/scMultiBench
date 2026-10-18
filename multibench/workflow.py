@@ -1192,26 +1192,21 @@ def _lacking(families) -> str:
 
 
 def _not_listed_note(df: "pd.DataFrame", dataset: str, ds_dir: Path,
-                     category: str | None = None, *, count_methods: bool = False) -> str:
-    """What the folder holds, how many rows are not listed, and how to list them;
-    ``count_methods`` adds how many methods have no listed row (the command
-    line's table, one row per variant, next to scan's count of methods)."""
-    d, one = df.attrs["not_listed"], df.attrs["not_listed"] == 1
-    b = df.attrs.get("not_listed_batch", 0)
+                     category: str | None = None) -> str:
+    """What the folder holds, what is not listed, and how to list it (the same
+    words in ``scan``, ``run_all`` and on the command line)."""
     parts = []
-    if d:
-        k = df.attrs.get("not_listed_methods", d) if count_methods else 0
-        of = f" ({k} {'method' if k == 1 else 'methods'})" if 0 < k != d else ""
-        parts.append(f"{d} {'row' if one else 'rows'}{of} that "
-                     f"{'reads' if one else 'read'} {_lacking(df.attrs['not_held'])} "
-                     f"{'is' if one else 'are'} not listed.")
-    if b:
-        parts.append(f"{b} {'row' if b == 1 else 'rows'} for numbered batches "
-                     f"{'is' if b == 1 else 'are'} not listed.")
-    every = d + b
+    if df.attrs["not_listed"]:
+        parts.append(_unlisted_sentence(df.attrs["not_held"]))
+    if df.attrs.get("not_listed_batch", 0):
+        parts.append("Variants for numbered batches are not listed.")
     return (f"{_holds_sentence(dataset, ds_dir, df.attrs['held'], category)} "
-            + " ".join(parts)
-            + f" {_all_spelling()} lists {'it' if every == 1 else 'them'}.")
+            + " ".join(parts) + f" {_all_spelling()} lists them.")
+
+
+def _unlisted_sentence(lacking) -> str:
+    """``Methods and variants that read ATAC are not listed.``"""
+    return f"Methods and variants that read {_lacking(lacking)} are not listed."
 
 
 def _batch_listed(df: "pd.DataFrame", ds_dir: Path, keep, methods=None) -> list:
@@ -1247,7 +1242,7 @@ def _scan_note(df: "pd.DataFrame", dataset: str, data_path=None,
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")       # scan warned about the spelling
         dataset = _resolve.canonical_dataset(base, dataset)
-    return _not_listed_note(df, dataset, base / dataset, category, count_methods=True)
+    return _not_listed_note(df, dataset, base / dataset, category)
 
 
 @_compat.keywords("scan", private="_scan_methods", dropped=("out_dir",),
@@ -1644,11 +1639,8 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
         if m not in listed:
             gone.setdefault(m, set()).update(lack)
     if gone:
-        one = len(gone) == 1
-        lack = _lacking([f for f in registry._BASE_MODALITIES if any(f in v for v in gone.values())])
-        line += (f" {len(gone)} {'method that needs' if one else 'methods that need'} "
-                 f"{lack} {'is' if one else 'are'} not listed. {_all_spelling()} lists "
-                 f"{'it' if one else 'them'}.")
+        lack = [f for f in registry._BASE_MODALITIES if any(f in v for v in gone.values())]
+        line += f" {_unlisted_sentence(lack)} {_all_spelling()} lists them."
     installed = _installed_envs()
     if _runner.linux_only_sentence():
         line += f" {LINUX_ONLY_CHECK}"

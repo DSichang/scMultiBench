@@ -1415,9 +1415,12 @@ def test_changes_page_quotes_the_live_0_3_5_texts(tmp_path, capsys, monkeypatch)
     assert (int(rows), int(rows_all), int(left_out)) == (
         len(table), len(every), table.attrs["not_listed"])
     count = "14 of 14 methods have their input files."
+    # 0.4.0 says it without the count (X23); the 0.3.5 section quotes 0.3.5
     note = ('D11 holds RNA and ADT. 19 rows that read ATAC are not listed. modalities="all" '
             'lists them.')
-    assert first.startswith(f"[scan] {count} ") and f" {note}" in first
+    assert first.startswith(f"[scan] {count} ")
+    assert ('D11 holds RNA and ADT. Methods and variants that read ATAC are not listed. '
+            'modalities="all" lists them.') in first
     assert f"`{count}`" in changed and f"`{note}`" in changed
     # "Only rows whose input files are missing are left out."
     key = ["method", "modalities"]

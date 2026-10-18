@@ -317,7 +317,7 @@ def test_x80_one_batch_folder_lists_no_batched_variant(capsys):
     plan = mtb.run_all("D27mini", "diagonal", methods=["iNMF", "online_iNMF"],
                        dry_run=True)
     assert set(plan.modalities) == {"rna+atac_gas"}
-    assert "2 rows for numbered batches are not listed." in capsys.readouterr().out
+    assert "Variants for numbered batches are not listed." in capsys.readouterr().out
     every = mtb.run_all("D27mini", "diagonal", methods=["iNMF"], dry_run=True,
                         modalities="all", verbose=False)
     assert len(every) == 2
@@ -647,8 +647,8 @@ def test_x17_x18_x53_x95_x97_x98_help_texts():
     assert "vertical, diagonal, mosaic or cross (multibench layout explains them)" in \
         _help("scan")
     ev = _help("evaluate")
-    assert ("--method METHOD the package method: picks its label order, and is the "
-            "default row name.") in ev
+    assert ("--method METHOD a package method: read the dataset's label files in its "
+            "batch order") in ev
     assert "or with --labels any row name" not in ev
     assert "leidenalg (the article's) or igraph (faster)" in ev
     assert "so a later call cannot leave a stale batch file from an earlier export" in \

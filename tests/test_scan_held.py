@@ -311,7 +311,7 @@ def test_count_line_names_what_is_not_listed(no_envs, capsys, monkeypatch):
     full_scan("D11", "vertical")
     assert capsys.readouterr().out == (
         "[scan] 14 of 14 methods have their input files. 0 of 14 have their environment "
-        "installed. D11 holds RNA and ADT. 19 rows that read ATAC are not listed. "
+        "installed. D11 holds RNA and ADT. Methods and variants that read ATAC are not listed. "
         'modalities="all" lists them. mtb.env.doctor() checks the environments.\n')
     # every modality held: the line of 0.3.4, word for word
     _on_disk("D22mini")
@@ -328,8 +328,8 @@ def test_count_line_names_what_is_not_listed(no_envs, capsys, monkeypatch):
     full_scan("D11", "vertical", methods=["totalVI", "Seurat_WNN"])
     assert capsys.readouterr().out == (
         "[scan] 2 of 2 methods have their input files. 0 of 2 have their environment "
-        "installed. D11 holds RNA and ADT. 1 row that reads ATAC is not listed. "
-        "--modalities all lists it. multibench env doctor checks the environments.\n")
+        "installed. D11 holds RNA and ADT. Methods and variants that read ATAC are not listed. "
+        "--modalities all lists them. multibench env doctor checks the environments.\n")
 
 
 def test_count_line_off_linux_and_with_batches(monkeypatch, capsys):
@@ -340,8 +340,8 @@ def test_count_line_off_linux_and_with_batches(monkeypatch, capsys):
     full_scan("D52mini", "cross")
     assert capsys.readouterr().out == (
         "[scan] 11 of 11 rows have their input files. 0 of 11 have their environment "
-        "installed. D52mini holds RNA and ADT, in batches 1-3. 19 rows that read ATAC are "
-        f'not listed. modalities="all" lists them. {W.LINUX_ONLY_SUMMARY}\n')
+        "installed. D52mini holds RNA and ADT, in batches 1-3. Methods and variants that "
+        f'read ATAC are not listed. modalities="all" lists them. {W.LINUX_ONLY_SUMMARY}\n')
 
 
 def test_two_families_can_be_lacking(tmp_path, no_envs, capsys):
@@ -355,7 +355,7 @@ def test_two_families_can_be_lacking(tmp_path, no_envs, capsys):
     assert _core(df.attrs) == {"held": ["rna"], "not_listed": 96, "not_held": ["adt", "atac"]}
     assert line == (
         "[scan] 0 of 1 method has its input files. 0 of 1 has its environment installed. "
-        "RNA_ONLY holds RNA. 96 rows that read ADT or ATAC are not listed. "
+        "RNA_ONLY holds RNA. Methods and variants that read ADT or ATAC are not listed. "
         'modalities="all" lists them. mtb.env.doctor() checks the environments.\n')
 
 
@@ -431,7 +431,7 @@ def test_the_hint_carries_all(no_envs, capsys):
     call = "mtb.run_all('D11', 'vertical', dry_run=True)"
     assert lines[-1] == (f"{call} shows the listed rows. Its files_ok and env_ok columns "
                          f"say which check failed. mtb.env.doctor() checks the environments.")
-    assert lines[-2] == ("D11 holds RNA and ADT. 19 rows that read ATAC are not listed. "
+    assert lines[-2] == ("D11 holds RNA and ADT. Methods and variants that read ATAC are not listed. "
                          'modalities="all" lists them.')
     n = int(re.fullmatch(r"The first 3 of (\d+) blocked methods:", lines[1]).group(1))
     shown = eval(call, {"mtb": mtb})                      # noqa: S307 - our own hint
@@ -447,7 +447,7 @@ def test_the_hint_of_the_command_line_carries_all(no_envs, monkeypatch):
     lines = _nothing_runnable()
     assert lines[-1].startswith("multibench scan D11 --category vertical shows the listed "
                                 "rows. ")
-    assert lines[-2] == ("D11 holds RNA and ADT. 19 rows that read ATAC are not listed. "
+    assert lines[-2] == ("D11 holds RNA and ADT. Methods and variants that read ATAC are not listed. "
                          "--modalities all lists them.")
 
 
@@ -470,8 +470,8 @@ def test_dry_run_prints_the_note_after_its_count_line(no_envs, capsys):
     out = capsys.readouterr().out.splitlines()
     assert out[0].startswith("[run_all] Dry run: 0 of 14 requested methods can run on D11 "
                              "(vertical). 14 are blocked. ")
-    assert out[1] == ("[run_all] D11 holds RNA and ADT. 19 rows that read ATAC are not "
-                      'listed. modalities="all" lists them.')
+    assert out[1] == ("[run_all] D11 holds RNA and ADT. Methods and variants that read ATAC "
+                      'are not listed. modalities="all" lists them.')
     mtb.run_all("D11", "vertical", dry_run=True, modalities="all")
     out = capsys.readouterr().out
     assert out.startswith("[run_all] Dry run: 0 of 33 requested rows can run on D11 ")
