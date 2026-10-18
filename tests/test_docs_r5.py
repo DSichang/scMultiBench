@@ -50,8 +50,11 @@ def test_quickstart_cli_block_runs_and_plots_without_label_files():
 def test_evaluate_page_comparability_sentence_is_plain():
     visible = " ".join(_visible(_read("tutorials/evaluate.md")).split())
     assert "compare ranks, not decimals" not in visible
-    assert ("most methods give a slightly different embedding on each run. Compare ranks."
-            in visible)
+    # Y07 (r3): no "Compare ranks."; one true sentence on why the same embedding moves
+    assert "most methods give a slightly different embedding on each run." in visible
+    assert "Compare ranks." not in visible and "4,096" not in visible
+    assert ("The Leiden clusters depend on the cell order and the machine, so the same "
+            "embedding can score a few hundredths differently.") in visible
 
 
 @needs_docs

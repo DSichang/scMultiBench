@@ -16,8 +16,8 @@ from tests.test_f4_cli import _diag_folder
 def test_quickstart_cli_details_give_the_own_method_route(tmp_path):
     text = _flat("quickstart.md").split("### From the command line", 1)[1]
     bullet = ("`evaluate --method` sets the label order. `--name` sets the row name. "
-              "For your own method, give only `--name` and repeat `--labels` once per "
-              "file, in your embedding's cell order.")
+              "For your own method, give `--name` with `--dataset` and `--category`, "
+              "and repeat `--labels` once per file, in your embedding's cell order.")
     assert bullet in text
     assert "`--method` is then only the row name" not in text
     # the route itself: --name, no --method, two label files in the embedding's order

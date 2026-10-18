@@ -1050,7 +1050,7 @@ def test_get_started_pages_keep_the_round2_facts():
     assert re.search(r"^    cell order\n    :   ", quick, re.M)
     assert '=== "Unpaired RNA + ATAC"' not in quick
     install = (docs / "installation.md").read_text()
-    for fact in ("multibench-sc>=0.3.2", "--assume-gpu", "sbatch --gres=gpu:1 job.sh scMoMaT"):
+    for fact in ("multibench-sc>=0.4.0", "--assume-gpu", "sbatch --gres=gpu:1 job.sh scMoMaT"):
         assert fact in install, fact
     assert "#SBATCH --gres" not in install
 
@@ -1085,7 +1085,7 @@ def test_each_guide_warning_appears_once_on_the_site():
     docs = _docs_root()
     flat = {p.relative_to(docs).as_posix(): " ".join(p.read_text().split()).lower()
             for p in docs.rglob("*.md")}
-    for phrase, home in (("slightly different embedding on each run. compare ranks.",
+    for phrase, home in (("slightly different embedding on each run.",
                           "tutorials/evaluate.md"),
                          ("a wrong order gives wrong scores without an error", "tutorials/evaluate.md"),
                          ("only warns, and such a method gives a wrong result", "tutorials/run.md")):
