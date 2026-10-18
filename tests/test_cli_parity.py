@@ -476,7 +476,7 @@ def test_cli_evaluate_npy_only_method_dataset(monkeypatch, tmp_path, capsys):
     assert captured["embedding"] == str(emb)
     df = pd.read_csv(out)
     # the fake evaluate frame carries no scoring record
-    assert list(df.columns) == ['metric', 'value', 'method', 'dataset', 'category', 'clustering',
+    assert list(df.columns) == ['metric', 'value', 'method', 'dataset', 'category',
                                 'source', 'scored_with']
     assert set(df["scored_with"]) == {"unknown"}
     assert set(df["method"]) == {"M"} and set(df["dataset"]) == {"D"}

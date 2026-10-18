@@ -2027,7 +2027,7 @@ def build_parser() -> argparse.ArgumentParser:
     pp.add_argument("--result-path", dest="result_path", action=_Retired,
                     tail=_compat.use("--input"))
     pp.add_argument("--input", action="append", metavar="LONG_CSV_OR_DIR",
-                    help="a long results CSV (metric,value,method,dataset,category[,clustering,source]) or "
+                    help="a long results CSV (metric,value,method,dataset,category[,source]) or "
                          "a run_all output directory; repeatable. Alone: the table to "
                          "plot. With --category: concatenated onto the stored table "
                          "(a '# Added your ...' note on stderr says how many rows came "
@@ -2175,7 +2175,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Compute the benchmark's metrics for one embedding file. Prints "
                     "the metric table (or writes it with --out). With --method or --name, "
                     "--dataset and --category the table is written in the long "
-                    "format (metric,value,method,dataset,category,clustering,source,"
+                    "format (metric,value,method,dataset,category,source,"
                     "scored_with) that multibench plot --input reads.")
     pe.add_argument("embedding_arg", nargs="?", metavar="EMBEDDING",
                     help="the embedding, cells x dims: .h5 (dataset 'data', "

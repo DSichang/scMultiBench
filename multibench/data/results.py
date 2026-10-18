@@ -539,7 +539,8 @@ def load_results(
     mtb.to_long : turns ``mtb.evaluate`` scores into this shape.
     mtb.plot.bubble : draws the table.
     """
-    return _load_results(category, dataset=dataset, methods=methods, metrics=metrics)
+    out = _load_results(category, dataset=dataset, methods=methods, metrics=metrics)
+    return out.drop(columns="clustering")     # one value in the stored tables
 
 
 def _load_results(

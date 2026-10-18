@@ -438,7 +438,7 @@ def test_x36_to_long_clustering_and_source_are_deprecated():
     with pytest.warns(FutureWarning, match=r"^to_long\(source=\) is deprecated and will "
                                            r"be removed in 0\.5; it has no effect\.$"):
         out = mtb.to_long(wide, method="M", source="rerun", clustering="mine")
-    assert out[["clustering", "source"]].iloc[0].tolist() == ["default", "user"]
+    assert "clustering" not in out and out["source"].iloc[0] == "user"     # Y39 (r3)
 
 
 def test_x37_to_canonical_keywords_are_deprecated(tmp_path):

@@ -2207,8 +2207,8 @@ class BatchResult:
         -------
         pandas.DataFrame
             Columns ``metric``, ``value``, ``method``, ``dataset``,
-            ``category``, ``clustering`` and ``source``. When the scores carry
-            ``scored_with``, so does the table. Empty, with the first seven
+            ``category`` and ``source``. When the scores carry
+            ``scored_with``, so does the table. Empty, with the first six
             columns, when no method produced metrics.
 
         Examples
@@ -2234,7 +2234,7 @@ class BatchResult:
             if r.get("_long") is not None:
                 frames.append(r["_long"])
             elif r.get("metrics"):
-                # through to_long, for the same seven columns as an attached frame
+                # through to_long, for the columns of an attached frame
                 wide = pd.DataFrame({"Value": list(r["metrics"].values())},
                                     index=list(r["metrics"]))
                 frame = _to_long(wide, method=r.get("method"),
@@ -2247,7 +2247,9 @@ class BatchResult:
                 frames.append(frame)
         if not frames:
             return pd.DataFrame(columns=_LONG_COLUMNS)
-        return pd.concat(frames, ignore_index=True)
+        # a long.csv written before 0.4.0 has the constant clustering column
+        return pd.concat(frames, ignore_index=True).drop(columns="clustering",
+                                                         errors="ignore")
 
     def __getattr__(self, name):
         # the deprecated ``results`` (not a property: dir() leaves it out)

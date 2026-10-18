@@ -39,7 +39,7 @@ def test_to_long_exposed_top_level():
     wide = pd.DataFrame({"Value": [0.5, 0.6]}, index=["ARI", "NMI"])
     long = mtb.to_long(wide, method="M", dataset="D", category="vertical")
     assert list(long.columns) == ["metric", "value", "method", "dataset", "category",
-                                  "clustering", "source", "scored_with"]
+                                  "source", "scored_with"]
 
 
 def test_namespace_all_hygiene():
@@ -106,7 +106,7 @@ def test_results_coverage(result_dir, layout_tree):
     assert list(cov.columns) == ["category", "dataset", "method", "clustering", "source"]
     d52 = cov[cov.dataset == "D52"]
     assert set(d52[d52.source == "published"].method) == {"scMoMaT"}
-    assert d52[d52.source == "rerun"].method.nunique() == 8
+    assert d52[d52.source == "rerun"].method.nunique() == 7      # UINMF's rows left (r3)
     # clustering variants surface: a louvain-only Concerto_louvain directory
     # (vertical D3 of the layout tree) shows up under clustering='louvain'
     allc = results_coverage(source="published", result_path=layout_tree)
@@ -188,7 +188,7 @@ def test_recommend_drops_singleton_datasets_and_warns(layout_tree):
 def test_recommend_single_dataset_category_names_the_other_source(result_dir):
     """The shipped published cross table holds one method (scMoMaT on D52):
     nothing can be ranked, and the error must point at the re-run sweeps,
-    which hold eight methods for it."""
+    which hold seven methods for it."""
     import warnings
     from multibench.data.results import recommend
     with pytest.raises(ValueError, match=r"^No cross dataset has 2 or more methods\. D52 has "
@@ -198,13 +198,13 @@ def test_recommend_single_dataset_category_names_the_other_source(result_dir):
             warnings.simplefilter("ignore", UserWarning)
             recommend("cross", source="published")
     msg = str(e.value)
-    assert ("The re-run tables have 8 methods for cross: Concerto, sciPENN, scMDC, scMM, "
-            "scMoMaT, StabMap, totalVI, UINMF. Leave out source= to rank them.") in msg
+    assert ("The re-run tables have 7 methods for cross: Concerto, sciPENN, scMDC, scMM, "
+            "scMoMaT, StabMap, totalVI. Leave out source= to rank them.") in msg
     assert "meaningless" not in msg and ">=" not in msg and "(s)" not in msg
     assert msg.endswith("Otherwise pass long_df= with more methods, or lower min_methods.")
     # that source ranks them on D52, nothing dropped
     r, m = _rec("cross")
-    assert r.grand_score.notna().sum() == 8 and (r.n_datasets_total == 1).all()
+    assert r.grand_score.notna().sum() == 7 and (r.n_datasets_total == 1).all()
     assert "dropped" not in m
     # a single-dataset category with several methods ranks (vertical: D11)
     r2, _ = _rec("vertical", source="published")

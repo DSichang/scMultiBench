@@ -297,7 +297,7 @@ def test_several_variants_errors_are_sentences(tmp_path, monkeypatch):
 def test_long_names_when_scored_with_is_there():
     res = mtb.load_batch(ROOT / "data" / "outputs" / "D11")
     assert list(res.long.columns) == ["metric", "value", "method", "dataset", "category",
-                                      "clustering", "source"]
+                                      "source"]
     doc = _doc(W.BatchResult.long)
     assert "When the scores carry ``scored_with``, so does the table." in doc
     assert "fetch_outputs" not in doc

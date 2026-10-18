@@ -15,7 +15,8 @@ from ..config import _and_list
 from ..data import catalog
 from ..data.results import COLUMNS as _RESULT_COLUMNS
 
-LONG_COLUMNS = list(_RESULT_COLUMNS)  # own copy: a caller that edits one list must not change the other
+#: the long table's columns; the stored tables' constant ``clustering`` is not written
+LONG_COLUMNS = [c for c in _RESULT_COLUMNS if c != "clustering"]
 
 #: the ``attrs`` keys evaluate() sets and to_long() joins into ``scored_with``
 PROVENANCE_ATTRS = ("leiden_flavor", "clustering", "multibench_version")
@@ -160,7 +161,6 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     out["method"] = method
     out["dataset"] = "all" if dataset is None else dataset
     out["category"] = "user" if category is None else category
-    out["clustering"] = "default"
     out["source"] = "user"
     stamp = _scored_with(getattr(value_df, "attrs", None))
     out["scored_with"] = UNKNOWN_SCORING if stamp is None else stamp

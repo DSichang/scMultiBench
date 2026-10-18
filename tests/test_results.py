@@ -402,7 +402,7 @@ def test_single_method_table_warns_when_other_source_has_more(result_dir, layout
     assert set(df.method) == {"scMoMaT"}          # a warning, never an error
     msgs = [str(w.message) for w in rec if "has one method" in str(w.message)]
     assert len(msgs) == 1
-    assert "The re-run tables have 8 methods for cross/D52: Concerto, " in msgs[0]
+    assert "The re-run tables have 7 methods for cross/D52: Concerto, " in msgs[0]
     assert msgs[0].endswith("Leave out source= to read them.")
     assert "meaningful" not in msgs[0] and " - " not in msgs[0] and ";" not in msgs[0]
     # without a dataset filter the selection is named as the category
