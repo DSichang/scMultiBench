@@ -197,8 +197,8 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
     if isinstance(metrics, (bytes, dict)) or not hasattr(metrics, "__iter__"):
         got = type(metrics).__name__
         raise TypeError(
-            f"{kw}= takes None, 'all', 'clustering', 'batch', 'classification' or "
-            f"a list of metric codes. It got {'an' if got[:1] in 'aeiou' else 'a'} {got}.")
+            f"{kw}= takes None, a family ('all', 'clustering', 'batch', 'classification'), "
+            f"a metric code, or a list of them. It got {'an' if got[:1] in 'aeiou' else 'a'} {got}.")
     wanted = list(metrics)
     if not wanted:
         raise ValueError(

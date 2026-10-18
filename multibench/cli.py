@@ -2264,8 +2264,8 @@ def build_parser() -> argparse.ArgumentParser:
     ei = ev.add_parser(
         "install", help="unpack or build every needed env (mtb.env.install)",
         description="Install the environments the selected methods need, from the "
-                    "published archives (a lockfile build where none is published); "
-                    "installed ones are skipped. With --dry-run it prints one line per "
+                    "published archives (a lockfile build where none is published). "
+                    "Installed ones are skipped. With --dry-run it prints one line per "
                     "environment instead: 'have', 'packed archive published' with the "
                     "archive's download size, unpacked size and URL, or 'no archive - "
                     "lockfile build'. '?' means not measured. A '# total' line goes "

@@ -281,10 +281,11 @@ def missing_dataset_message(base, dataset: str) -> str:
              f"{base} holds no folders." if base.is_dir() else
              f"{base} does not exist either.")
     return (f"The folder {base / dataset} does not exist. {holds} "
-            + config.hint("dataset= is the folder name, and data_path= the folder that "
-                          "holds it. mtb.describe_layout() shows the layout.",
-                          "DATASET is the folder name, and --data-path the folder that "
-                          "holds it. multibench layout shows the layout."))
+            + config.hint("dataset= is the folder's path, or its name under "
+                          "mtb.config.DEFAULT.data_path. mtb.describe_layout() shows the "
+                          "layout.",
+                          "DATASET is the folder's path, or its name under the data root "
+                          "(multibench config). multibench layout shows the layout."))
 
 
 def _note_local_folder(base: Path, name: str) -> None:
