@@ -341,7 +341,7 @@ def test_rows_blocked_only_by_the_platform_are_not_listed(macos, mydata):
     msg = _nothing_runnable(modalities=["rna", "adt"], methods=["Matilda", "totalVI"])
     assert msg.splitlines()[2] == ("mtb.run_all('data/MYDATA', 'vertical', methods=['Matilda', "
                                    "'totalVI'], modalities=['rna', 'adt'], dry_run=True) "
-                                   "shows these rows.")
+                                   "shows the plan.")                      # Y22
     msg = _nothing_runnable(modalities=["rna", "adt"], methods=["totalVI"])
     assert len(msg.splitlines()) == 3 and "Nothing else blocks" not in msg
 

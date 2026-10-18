@@ -2714,7 +2714,7 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
     if only_platform:
         head = (f"None of the requested methods ({', '.join(methods)}) can run on "
                 if methods else "No method can run on ") + f"{dataset} ({category})."
-        what = "these rows" if methods else "the listed rows" if note else "every row"
+        what = "the plan" if methods else "the listed rows" if note else "every row"
         return f"{head}\n{platform}" + (f"{note}\n" if note else "") + f"{where} shows {what}."
     if methods:
         head = (f"None of the requested methods ({', '.join(methods)}) can run on "
