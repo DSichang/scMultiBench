@@ -185,10 +185,15 @@ def _check_one_matrix_each(data, specs, given) -> None:
         else:
             # the filter is shown only for a file whose features have that type
             types = getattr(data, "var", {}).get("feature_types", ())
+            tenx = _TENX_TYPE[what] in set(map(str, types))
             how = config.hint(
+                f"Name where the ATAC is, as {what}=\"X[feature_types={_TENX_TYPE[what]}]\"."
+                if tenx else
+                "For an ATAC-only file pass rna=None." if first == "rna" and _peak_fraction(
+                    [str(x) for x in getattr(data, "var_names", ())]) > 0.5 else
                 "Pass the ATAC as its own object, as atac=<AnnData>.",
                 f"Name where the ATAC is, as --atac \"X[feature_types={_TENX_TYPE[what]}]\"."
-                if _TENX_TYPE[what] in set(map(str, types)) else
+                if tenx else
                 "Name where the ATAC is in SRC, with --atac.")
         raise ValueError(f"{pair} name the same matrix. {how}")
 

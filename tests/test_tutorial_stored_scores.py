@@ -141,13 +141,9 @@ def test_stored_summaries_record_the_order_labels_for_returns():
         == ["cty3", "cty1", "cty2"]
     assert list(mtb.labels_for("D28", "diagonal", "uniPort")) == stored("D28", "uniPort") \
         == ["atac_cty", "rna_cty"]
-    # the stored UINMF run is its two-batch variant; the variant the folder
-    # rule picks on D52 today reads all three, and the tutorial says so
-    assert list(mtb.labels_for("D52", "cross", "UINMF",
-                               modalities=["rna1", "rna2", "adt1", "adt2"])) \
-        == stored("D52", "UINMF") == ["cty1", "cty2"]
-    assert list(mtb.labels_for("D52", "cross", "UINMF")) == ["cty1", "cty2", "cty3"]
+    # UINMF's two-batch rows left the stored table (owner, round 3), and the
+    # tutorial's sentence about them went with them
+    assert "UINMF" not in set(pd.read_csv(RESULTS / "summary_D52.csv").method)
     nb = json.loads((ROOT / "notebooks" / "tutorial_cross_rna_adt.ipynb").read_text())
     text = "\n".join("".join(c["source"]) for c in nb["cells"])
-    assert ("The stored scores of UINMF are from its two-batch variant, which read batches "
-            "1 and 2 of `D52`. `run_all` on `D52mini` runs its three-batch variant.") in text
+    assert "two-batch variant" not in text

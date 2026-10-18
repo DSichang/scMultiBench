@@ -533,3 +533,24 @@ def test_to_canonical_keeps_its_text_and_ignores_embeddings(tmp_path):
         "obsm='<key>' (or layer=) to select the protein matrix, otherwise adata.X (usually "
         "the RNA) would be written as adt.h5")
     assert not (tmp_path / "adt.h5").exists()
+
+
+def test_an_atac_only_batch_with_rna_left_at_x_is_told_rna_none(tmp_path):
+    # Z04 (r3): peak names and no feature types: the file is ATAC-only
+    import anndata as ad
+    import numpy as np
+    import pandas as pd
+    from multibench.engine import ingest
+    x = np.random.default_rng(0).poisson(1.0, size=(20, 30)).astype("float32")
+    b3 = ad.AnnData(x, obs=pd.DataFrame({"celltype": ["A", "B"] * 10},
+                                        index=[f"c{i}" for i in range(20)]),
+                    var=pd.DataFrame(index=[f"chr1:{i * 100}-{i * 100 + 50}"
+                                            for i in range(30)]))
+    with pytest.raises(ValueError) as e:
+        ingest.export_dataset(b3, tmp_path / "MOSX", atac="X", labels="obs:celltype",
+                              category="mosaic", batch_index=3, n_batches=3)
+    assert str(e.value) == ("rna='X' and atac='X' name the same matrix. For an ATAC-only "
+                            "file pass rna=None.")
+    ingest.export_dataset(b3, tmp_path / "MOSX", rna=None, atac="X", labels="obs:celltype",
+                          category="mosaic", batch_index=3, n_batches=3)
+    assert (tmp_path / "MOSX" / "atac3.h5").is_file()
