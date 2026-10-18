@@ -14,6 +14,8 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+# the table behind a bubble figure: mtb.plot.build_table is deprecated in 0.4.0
+from multibench.plot.bubble import _build_table  # noqa: E402
 from multibench import cli, config
 
 B = importlib.import_module("multibench.plot.bubble")
@@ -55,7 +57,7 @@ def _mycite():
 
 # --- R3-06 -------------------------------------------------------------------
 
-@pytest.mark.parametrize("fn", [mtb.plot.build_table, mtb.plot.bubble, mtb.plot.bar])
+@pytest.mark.parametrize("fn", [_build_table, mtb.plot.bubble, mtb.plot.bar])
 def test_own_dataset_rows_get_the_no_overlap_warning_alone(fn):
     df = pd.concat([_stored("D11"), _mycite()], ignore_index=True)
     _, msgs = _messages(fn, df)
@@ -63,7 +65,7 @@ def test_own_dataset_rows_get_the_no_overlap_warning_alone(fn):
     assert not any("igraph Leiden backend" in m for m in msgs), msgs
 
 
-@pytest.mark.parametrize("fn", [mtb.plot.build_table, mtb.plot.bubble, mtb.plot.bar])
+@pytest.mark.parametrize("fn", [_build_table, mtb.plot.bubble, mtb.plot.bar])
 def test_same_dataset_igraph_row_still_warns(fn):
     df = pd.concat([_stored("D11"), _mine("PriyaNet", "D11"), _mycite()],
                    ignore_index=True)
@@ -108,7 +110,7 @@ def test_recommend_long_df_warns_about_igraph_rows_of_a_stored_dataset():
     assert "PriyaNet_ig" in set(r["method"])
     (msg,) = [m for m in msgs if m.startswith("recommend('vertical'):")]
     assert ("\n  - The rows for PriyaNet_ig were clustered with the igraph Leiden backend. "
-            "The stored tables used leidenalg") in msg
+            "The stored results used leidenalg") in msg
     assert "mtb.config.DEFAULT.leiden_flavor = 'leidenalg'" in msg
 
 
@@ -154,7 +156,7 @@ def _d28_with_mine():
 
 
 def test_na_warning_names_the_stored_row_in_short_sentences():
-    _, msgs = _messages(mtb.plot.build_table, _d28_with_mine())
+    _, msgs = _messages(_build_table, _d28_with_mine())
     (msg,) = [m for m in msgs if "has no" in m]
     # Y29 (r3): the sentence after the gaps is what to do about them
     tail = " Pass metrics= without ASW, iASW and ASW_batch to compare on the same metrics."
@@ -163,7 +165,7 @@ def test_na_warning_names_the_stored_row_in_short_sentences():
     assert "hide this message" not in msg
     assert " - the family Overall" not in msg and "LiNet" not in msg
     with pytest.raises(ValueError) as e:
-        mtb.plot.build_table(_d28_with_mine(), na="raise")
+        _build_table(_d28_with_mine(), na="raise")
     # R4-12: the error names na='warn' instead of offering to hide itself
     # R5-11: and leaves out the Overall sentence, since no figure is drawn
     assert str(e.value) == (msg.replace(tail, "")
@@ -173,7 +175,7 @@ def test_na_warning_names_the_stored_row_in_short_sentences():
 def test_na_warning_names_your_row():
     df = _d28_with_mine()
     df = df[~((df["method"] == "LiNet") & (df["metric"] == "GC"))]
-    _, msgs = _messages(mtb.plot.build_table, df)
+    _, msgs = _messages(_build_table, df)
     (msg,) = [m for m in msgs if "has no" in m]
     assert "Your row LiNet (D28) has no GC." in msg
     assert msg.endswith("Pass metrics= without ASW, iASW, ASW_batch and GC to compare on "
@@ -185,7 +187,7 @@ def test_na_warning_stops_after_three_rows():
     for i, m in enumerate("ABCDE"):
         rows = _mine(m, "X", base=0.1 * i)
         frames.append(rows[rows["metric"] != "NMI"] if m != "E" else rows)
-    _, msgs = _messages(mtb.plot.build_table, pd.concat(frames, ignore_index=True))
+    _, msgs = _messages(_build_table, pd.concat(frames, ignore_index=True))
     (msg,) = [m for m in msgs if "has no" in m]
     assert msg.count("has no NMI.") == 3
     assert "... and 1 more row." in msg
@@ -196,7 +198,7 @@ def test_na_warning_in_summary_mode():
     df = pd.concat([_mine("A", "X"), _mine("B", "X", base=0.6),
                     _mine("A", "Y"), _mine("B", "Y", base=0.6)], ignore_index=True)
     df = df[~((df["method"] == "B") & (df["metric"] == "NMI") & (df["dataset"] == "Y"))]
-    _, msgs = _messages(mtb.plot.build_table, df, aggregate="summary")
+    _, msgs = _messages(_build_table, df, aggregate="summary")
     (msg,) = [m for m in msgs if "has no" in m]
     assert msg.startswith("Your row B has no NMI on Y. In the summary, a missing "
                           "value counts as the lowest rank on that dataset.")
@@ -214,7 +216,7 @@ def test_na_warning_cli_spelling(tmp_path, capsys):
 
 
 def test_na_cells_keep_their_per_family_lines():
-    tbl, _ = _messages(mtb.plot.build_table, _d28_with_mine())
+    tbl, _ = _messages(_build_table, _d28_with_mine())
     assert tbl.na_cells == [
         "Conos: DR and clustering Overall over 4 of 6 metrics (ASW, iASW n/a)",
         "Conos: Batch correction Overall over 5 of 6 metrics (ASW_batch n/a)"]

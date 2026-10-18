@@ -132,13 +132,14 @@ def test_to_canonical_rejects_h5_without_matrix_data(tmp_path):
 def test_to_canonical_warns_above_dense_size_threshold(tmp_path, monkeypatch):
     a = ad.AnnData(np.ones((40, 30)))
     monkeypatch.setattr(ingest, "DENSE_WARN_BYTES", 40 * 30 * 8 - 1)
+    # io.to_canonical is deprecated in 0.4.0: the implementation it wraps
     with pytest.warns(UserWarning, match="stored dense") as rec:
-        ingest.to_canonical(a, tmp_path / "big.h5")
+        ingest._to_canonical(a, tmp_path / "big.h5")
     msg = str(rec[0].message)
     assert "30 x 40 x 8 B" in msg and "float32" in msg and "highly-variable" in msg
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        ingest.to_canonical(a, tmp_path / "small.h5", dtype="float32")   # 4 B: under the limit
+        ingest._to_canonical(a, tmp_path / "small.h5", dtype="float32")  # 4 B: under the limit
     assert ingest.DENSE_WARN_BYTES == 40 * 30 * 8 - 1
     monkeypatch.undo()
     assert ingest.DENSE_WARN_BYTES == 10 ** 9

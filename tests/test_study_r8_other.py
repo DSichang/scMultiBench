@@ -128,21 +128,24 @@ def _two(values):
 
 
 def test_grey_column_warnings_are_plain_sentences():
-    _, msgs = _warned(mtb.plot.build_table, _two([(1.0, 0.0, 0.3), (1.0, 0.0, 0.6)]))
+    # plot.build_table is deprecated: its implementation, as bubble calls it
+    _, msgs = _warned(B._build_table, _two([(1.0, 0.0, 0.3), (1.0, 0.0, 0.6)]))
     assert msgs == [_plain("cLISI is 1.000 and iLISI is 0.000 for every method. "
-                           "Those columns are grey.", lead="cLISI")]
-    _, msgs = _warned(mtb.plot.build_table, _two([(1.0, 0.1, 0.3), (1.0, 0.0, 0.6)]))
-    assert msgs == [_plain("cLISI is 1.000 for every method. That column is grey.",
+                           "Those columns are grey. Leave them out with metrics=.",
                            lead="cLISI")]
+    _, msgs = _warned(B._build_table, _two([(1.0, 0.1, 0.3), (1.0, 0.0, 0.6)]))
+    assert msgs == [_plain("cLISI is 1.000 for every method. That column is grey. "
+                           "Leave it out with metrics=.", lead="cLISI")]
     rows = []
     for ds, (a, b) in (("D1", (0.9, 0.1)), ("D2", (0.1, 0.9))):
         rows += [{"method": "A", "dataset": ds, "metric": "ARI", "value": a},
                  {"method": "B", "dataset": ds, "metric": "ARI", "value": b},
                  {"method": "A", "dataset": ds, "metric": "NMI", "value": 0.5},
                  {"method": "B", "dataset": ds, "metric": "NMI", "value": 0.4}]
-    _, msgs = _warned(mtb.plot.build_table, pd.DataFrame(rows), aggregate="summary")
-    grey = [m for m in msgs if m.endswith("grey.")]
-    assert grey == [_plain("Every method has mean rank 1.5 in ARI. That column is grey.")]
+    _, msgs = _warned(B._build_table, pd.DataFrame(rows), aggregate="summary")
+    grey = [m for m in msgs if "grey." in m]
+    assert grey == [_plain("Every method has mean rank 1.5 in ARI. That column is grey. "
+                           "Leave it out with metrics=.")]
 
 
 def test_one_method_table_warning_is_plain_sentences():
@@ -185,7 +188,8 @@ def test_label_order_errors_are_plain_sentences():
     with pytest.raises(ValueError) as e:
         P._labels_from_dict(d, None)
     assert str(e.value).startswith("The label keys atac_cty and rna_cty are not in the "
-                                   "default order. Pass the dict from mtb.labels_for(")
+                                   "default order. Pass a list of paths in cell order, "
+                                   "or dataset=, category= and method=.")
     _plain(str(e.value), "label_order=[...]")
     cases = {
         "rna_cty": (TypeError, "label_order= takes a list of keys of the labels dict, "
@@ -247,8 +251,9 @@ def _subparser(name):
 
 
 def _help_texts():
-    scan, conv = _subparser("scan"), _subparser("convert")
-    texts = {"scan": scan.description, "convert": conv.description}
+    # 0.4.0: export replaces convert (a hidden deprecated alias)
+    scan, conv = _subparser("scan"), _subparser("export")
+    texts = {"scan": scan.description, "export": conv.description}
     for a in conv._actions:
         if a.dest in ("src", "out"):
             texts[a.dest] = a.help
@@ -263,9 +268,9 @@ def _depth(text):
     return deepest
 
 
-def test_scan_and_convert_help_are_short_sentences():
+def test_scan_and_export_help_are_short_sentences():
     texts = _help_texts()
-    assert set(texts) == {"scan", "convert", "src", "out"}
+    assert set(texts) == {"scan", "export", "src", "out"}
     for name, text in texts.items():
         assert ";" not in text, (name, text)
         assert _depth(text) <= 1, (name, text)
@@ -273,7 +278,7 @@ def test_scan_and_convert_help_are_short_sentences():
         assert not re.search(r"[\w.]/[-.\w]", text), (name, text)
     # the option help printed under the descriptions follows the same rules;
     # matrix/data is the path inside a .h5 file, not a slash list
-    for name in ("scan", "convert"):
+    for name in ("scan", "export"):
         for a in _subparser(name)._actions:
             if a.help and a.dest != "help":
                 text = a.help.replace("matrix/data", "")
@@ -281,7 +286,6 @@ def test_scan_and_convert_help_are_short_sentences():
                 assert not re.search(r"[\w.]/[-.\w]", text), (name, a.dest, text)
                 assert " | " not in text, (name, a.dest, text)
     assert "preflight" not in texts["scan"]
-    assert f"{cli._TRUNCATE_WIDTH} characters" in texts["scan"]
-    # the modes the other convert options refer to are still named
-    assert "Mode 1" in texts["convert"] and "Mode 2" in texts["convert"]
-    assert "Give raw counts." in texts["convert"]
+    # 0.4.0: scan prints mtb.scan's table, as its help says
+    assert "as mtb.scan returns it" in texts["scan"]
+    assert "Give raw counts" in texts["export"]

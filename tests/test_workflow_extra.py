@@ -14,9 +14,9 @@ def test_list_categories_names_all_four():
 def test_describe_layout_names_files_and_flags_the_atac_trap():
     txt = mtb.describe_layout("vertical")
     assert "rna.h5" in txt and "adt.h5" in txt and "cty.csv" in txt
-    # vertical reads atac.h5, and the method decides what it must hold (L34):
-    # a peak matrix in atac.h5 is wrong only for the gene-activity methods
-    assert "atac.h5" in txt and "method_info(m)['atac']" in txt
+    # vertical reads atac.h5, and the method decides what it must hold (L34);
+    # 0.4.0: scan and run_all skip a method whose file holds the other one
+    assert "atac.h5" in txt and "mtb.scan and mtb.run_all skip such a method." in txt
     # assert the SUBSTANCE of the warning, not one word of its phrasing: the
     # text must say which representation each method needs, and that feeding
     # the wrong one does not raise.
@@ -216,7 +216,7 @@ def test_describe_layout_rejects_typo():
     assert mtb.describe_layout(None)            # None still prints everything
 
 
-def test_describe_layout_export_route():
+def test_describe_layout_export_route(monkeypatch):
     txt = mtb.describe_layout("cross")
     # the export route per batch file; the storage dtype / compression are
     # export_dataset's own parameters, no longer repeated here (L33)
@@ -224,9 +224,16 @@ def test_describe_layout_export_route():
     # the vertical text keeps every needed fact, in plain case (L61)
     vert = mtb.describe_layout("vertical")
     for s_ in ("features x cells", "transpose", "single-column CSV",
-               "method_info(m)['atac']", "to_canonical"):
+               "mtb.io.export_dataset writes the whole folder"):
         assert s_ in vert
+    assert "to_canonical" not in vert                    # deprecated in 0.4.0
     assert "runnable" in vert and "reason" in vert       # scan's columns since 0.4
+    # 0.4.0: the command line's route is multibench export (convert is deprecated)
+    from multibench import config
+    monkeypatch.setattr(config, "_CLI", True)
+    cli_vert = mtb.describe_layout("vertical")
+    assert "multibench export writes the whole folder" in cli_vert
+    assert "convert" not in cli_vert
 
 
 def test_method_info_runtime_validates_method_id():

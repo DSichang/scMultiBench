@@ -62,7 +62,7 @@ def test_evaluate_requires_labels_and_clustering(tmp_path):
     from multibench.eval import pipeline
     with pytest.raises(ValueError):
         pipeline.evaluate(embedding="x.h5", category="vertical", metrics="clustering",
-                          labels=None, clusters=None)
+                          labels=None)
 
 
 def test_evaluate_requires_batch_for_batch_task():
@@ -73,7 +73,7 @@ def test_evaluate_requires_batch_for_batch_task():
     ct = cl.copy()
     with pytest.raises(ValueError) as exc:
         pipeline.evaluate(embedding=emb, category="vertical", metrics="batch",
-                          labels=ct, clusters=cl, batch=None)
+                          labels=ct, batch=None)
     assert "metrics='batch' needs batch labels" in str(exc.value)
 
 
@@ -129,10 +129,14 @@ def _toy(n_per=45, seed=0):
     return emb, ct, bat
 
 
-def _ari(**kw):
+def _value(df, metric):
+    """One value of evaluate's long table."""
+    return float(df.set_index("metric").loc[metric, "value"])
+
+
+def _ari(output, **kw):
     from multibench.eval.pipeline import evaluate
-    df = evaluate(metrics=["ARI"], **kw)
-    return float(df.loc["ARI", "Value"])
+    return _value(evaluate(output, metrics=["ARI"], **kw), "ARI")
 
 
 def test_evaluate_accepts_series_categorical_list_dataframe_labels():
@@ -222,8 +226,8 @@ def test_evaluate_anndata_labels_as_obs_key():
     a.obs["celltype"] = pd.Categorical(ct)
     a.obs["sample"] = bat
     df = evaluate(a, labels="celltype", batch="sample", metrics=["ARI", "GC"])
-    assert float(df.loc["ARI", "Value"]) == pytest.approx(1.0)
-    assert float(df.loc["GC", "Value"]) == pytest.approx(1.0)
+    assert _value(df, "ARI") == pytest.approx(1.0)
+    assert _value(df, "GC") == pytest.approx(1.0)
     with pytest.raises(ValueError) as exc:
         evaluate(a, labels="cell_type", metrics=["ARI"])
     assert "neither an obs column" in str(exc.value) and "celltype" in str(exc.value)
@@ -275,8 +279,10 @@ def test_evaluate_dict_with_several_label_files_raises_listing_keys(tmp_path):
     assert "The label keys cty2 and cty1 " in msg
     assert "list of paths in cell order" in msg
     # 0.3.x: the hint must no longer recommend the alphabetical order; it names
-    # the cell-order rule and the label_order= escape hatch instead
-    assert "label_order=" in msg and "are not in the default order" in msg
+    # the cell-order rule and (0.4.0) dataset=, category= and method=, not the
+    # deprecated label_order=
+    assert "dataset=, category= and method=" in msg and "are not in the default order" in msg
+    assert "label_order=" not in msg
     assert "not alphabetical" in msg
     assert "list(d.values())" not in msg
 
@@ -344,9 +350,9 @@ def test_evaluate_metrics_rejects_unknown_metric_and_bare_code_string():
     msg = str(exc.value)
     assert "unknown metric(s) ['XYZ']" in msg and "or the codes" in msg
     assert "ARI" in msg and "kBET" in msg
-    with pytest.raises(ValueError) as exc:
-        evaluate(emb, labels=ct, metrics="ARI")      # a code is not a family token
-    assert "A single code goes in a list: metrics=['ARI']." in str(exc.value)
+    # 0.4.0: one code is accepted as it is, as in a list
+    pd.testing.assert_frame_equal(evaluate(emb, labels=ct, metrics="ARI"),
+                                  evaluate(emb, labels=ct, metrics=["ARI"]))
 
 
 def test_evaluate_rejects_unknown_category_and_allows_none():
@@ -357,8 +363,9 @@ def test_evaluate_rejects_unknown_category_and_allows_none():
         evaluate(emb, category="bogus", labels=ct, metrics=["ARI"])
     msg = str(exc.value)
     assert "unknown category 'bogus'" in msg and "valid:" in msg and "vertical" in msg
-    assert float(evaluate(emb, labels=ct, metrics=["ARI"]).loc["ARI", "Value"]) == pytest.approx(1.0)
-    assert float(evaluate(emb, ct, category="vertical", metrics=["ARI"]).loc["ARI", "Value"]) == pytest.approx(1.0)
+    assert _value(evaluate(emb, labels=ct, metrics=["ARI"]), "ARI") == pytest.approx(1.0)
+    assert _value(evaluate(emb, ct, category="vertical", metrics=["ARI"]), "ARI") == \
+        pytest.approx(1.0)
 
 
 def test_evaluate_warns_on_transpose():
@@ -377,31 +384,32 @@ def test_evaluate_warns_on_transpose():
 
 
 def test_evaluate_clustering_accepts_csv_and_arraylike(tmp_path):
+    # clustering= is deprecated since 0.4: its implementation, without the warning
     pytest.importorskip("scib")
-    from multibench.eval.pipeline import evaluate
+    from multibench.eval.pipeline import _evaluate
     emb, ct, _ = _toy()
     p = tmp_path / "cluster.csv"; _write_cty(p, ct)
-    ref = evaluate(emb, labels=ct, clusters=ct, metrics=["ARI"])
-    assert float(ref.loc["ARI", "Value"]) == pytest.approx(1.0)
+    ref = _evaluate(emb, labels=ct, clustering=ct, metrics=["ARI"])
+    assert _value(ref, "ARI") == pytest.approx(1.0)
     for cl in (p, pd.Series(ct), list(ct)):
-        got = evaluate(emb, labels=ct, clusters=cl, metrics=["ARI"])
-        assert float(got.loc["ARI", "Value"]) == float(ref.loc["ARI", "Value"])
+        got = _evaluate(emb, labels=ct, clustering=cl, metrics=["ARI"])
+        assert _value(got, "ARI") == _value(ref, "ARI")
 
 
 def test_evaluate_clustering_h5_path_reads_like_the_str(tmp_path):
     # the suffix decides how a clustering= path is read, not its type: a
     # pathlib.Path to an .h5 goes to read_clustering, exactly as the str does
     pytest.importorskip("scib")
-    from multibench.eval.pipeline import evaluate
+    from multibench.eval.pipeline import _evaluate
     emb, ct, _ = _toy()
     p = tmp_path / "x.h5"
     with h5py.File(p, "w") as f:
         f.create_group("obs").create_dataset(
             "cluster_leiden", data=np.repeat([0, 1], len(ct) // 2))
-    as_str = evaluate(emb, labels=ct, clusters=str(p), metrics=["ARI"])
-    as_path = evaluate(emb, labels=ct, clusters=p, metrics=["ARI"])
-    assert float(as_str.loc["ARI", "Value"]) == pytest.approx(1.0)
-    assert float(as_path.loc["ARI", "Value"]) == float(as_str.loc["ARI", "Value"])
+    as_str = _evaluate(emb, labels=ct, clustering=str(p), metrics=["ARI"])
+    as_path = _evaluate(emb, labels=ct, clustering=p, metrics=["ARI"])
+    assert _value(as_str, "ARI") == pytest.approx(1.0)
+    assert _value(as_path, "ARI") == _value(as_str, "ARI")
 
 
 def test_read_labels_reads_benchmark_style_files(tmp_path):

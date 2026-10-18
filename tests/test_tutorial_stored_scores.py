@@ -1,7 +1,7 @@
-"""The stored scores the tutorials draw, checked against the live package.
+"""The stored results the tutorials draw, checked against the live package.
 
-Section 6 of a task tutorial whose task has stored scores reads the package's
-stored re-run scores;
+Section 6 of a task tutorial whose task has stored results ("Stored results"
+since 0.4.0) reads the package's stored results;
 ``notebooks/results`` holds a second copy of the same tables. These tests pin
 the counts the section states, that no ``load_results`` call names the
 deprecated ``source=``, and the agreement of the two copies.
@@ -75,11 +75,11 @@ def test_no_load_results_call_names_a_source(name):
 
 def test_the_stored_scores_section_follows_the_task():
     """A tutorial has the section only when its task names a stored dataset,
-    and the four benchmark datasets with stored scores each have one."""
+    and the four benchmark datasets with stored results each have one."""
     for key in KEYS:
         heads = [src.splitlines()[0] for kind, src in _cells(f"tutorial_{key}")
-                 if kind == "markdown" and "Stored scores" in src.splitlines()[0]]
-        assert heads == (["## 6. Stored scores"] if key in STORED else []), key
+                 if kind == "markdown" and "Stored" in src.splitlines()[0]]
+        assert heads == (["## 6. Stored results"] if key in STORED else []), key
     assert sorted(GEN.TASKS[k]["stored_ds"] for k in STORED) == ["D11", "D28", "D45", "D52"]
 
 
@@ -90,25 +90,26 @@ def test_stored_scores_section_states_the_measured_counts(key):
     cat, ds, shown = t["cat"], t["stored_ds"], t["ds"]
     cells = _cells(f"tutorial_{key}")
     md = next(src for kind, src in cells
-              if kind == "markdown" and src.startswith("## 6. Stored scores"))
+              if kind == "markdown" and src.startswith("## 6. Stored results"))
     md = " ".join(md.split())
     code = "\n".join(src for kind, src in cells if kind == "code")
     assert f'mtb.load_results("{cat}", dataset="{ds}")' in code
-    cov = mtb.results_coverage(cat)
+    stored = _quiet(mtb.load_results, cat)
     if ds != shown:
         # a tutorial-size subset: its own scores are never stored
-        assert cov[cov.dataset == shown].empty
+        assert shown not in set(stored.dataset)
         if ds in shown:
-            assert (f"The stored scores are for the full `{ds}`, the benchmark dataset "
+            assert (f"The stored results are for the full `{ds}`, the benchmark dataset "
                     f"`{shown}` is drawn from.") in md
         else:
-            assert (f"There are no stored scores for `{shown}`. `{ds}` is another "
+            assert (f"There are no stored results for `{shown}`. `{ds}` is another "
                     f"benchmark dataset of the same task.") in md
-    cov = cov[cov.dataset == ds]
     rerun = _quiet(mtb.load_results, cat, dataset=ds)
-    assert f"stored scores for {rerun.method.nunique()} methods on `{ds}`" in md
-    assert cov.method.nunique() == rerun.method.nunique()
-    assert "The stored scores are the package's own runs of the methods." in md
+    assert (f"The package ships stored results for {rerun.method.nunique()} methods "
+            f"on `{ds}`.") in md
+    assert stored[stored.dataset == ds].method.nunique() == rerun.method.nunique()
+    assert set(rerun.source) == {"stored"}
+    assert "The stored results are the package's own runs of the methods." in md
     assert "published" not in md and "source=" not in md
 
 
@@ -132,14 +133,17 @@ def test_the_package_rerun_tables_match_the_results_folder(ds):
 def test_stored_summaries_record_the_order_labels_for_returns():
     """The label_order column of the stored summaries agrees with
     labels_for(dataset, category, method), also for a method that reads only
-    some batches."""
+    some batches. (mtb.labels_for is deprecated in 0.4.0; the internal one,
+    which evaluate(dataset=, method=) and gen_tut.py use, is checked.)"""
+    from multibench.engine.resolve import labels_for
+
     def stored(ds, method):
         df = pd.read_csv(RESULTS / f"summary_{ds}.csv")
         return [Path(f).stem for f in df.set_index("method").at[method, "label_order"].split("+")]
 
-    assert list(mtb.labels_for("D52", "cross", "StabMap")) == stored("D52", "StabMap") \
+    assert list(labels_for("D52", "cross", "StabMap")) == stored("D52", "StabMap") \
         == ["cty3", "cty1", "cty2"]
-    assert list(mtb.labels_for("D28", "diagonal", "uniPort")) == stored("D28", "uniPort") \
+    assert list(labels_for("D28", "diagonal", "uniPort")) == stored("D28", "uniPort") \
         == ["atac_cty", "rna_cty"]
     # UINMF's two-batch rows left the stored table (owner, round 3), and the
     # tutorial's sentence about them went with them

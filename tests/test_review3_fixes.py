@@ -74,7 +74,8 @@ def _warned(fn, *a, **kw):
 
 
 def _dense(path):
-    return np.asarray(ingest.read_canonical(path, sparse=False).X)
+    x = ingest.read_canonical(path).X
+    return np.asarray(x.toarray() if hasattr(x, "toarray") else x)
 
 
 def _bytes(folder):
@@ -216,11 +217,11 @@ def test_the_refusal_on_the_command_line(tmp_path, monkeypatch):
                     atac_kind="peak").endswith("Name where the ATAC is in SRC, with --atac.")
 
 
-def test_convert_refuses_one_matrix_twice_and_writes_nothing(tmp_path, capsys):
+def test_export_refuses_one_matrix_twice_and_writes_nothing(tmp_path, capsys):
     src = tmp_path / "rna.h5ad"
     _rna(log=False).write_h5ad(src)
     out = tmp_path / "OUT"
-    assert cli.main(["convert", str(src), str(out), "--rna", "X", "--adt", "X"]) == 1
+    assert cli.main(["export", str(src), str(out), "--rna", "X", "--adt", "X"]) == 1
     assert capsys.readouterr().err == (
         "error: --rna X and --adt X name the same matrix. Name where the ADT is, as "
         "--adt obsm:<key>.\n" + DEBUG)
@@ -466,7 +467,7 @@ def test_a_side_without_any_column_keeps_the_one_sentence(tmp_path):
 
 
 def test_the_command_line_converts_each_side_with_its_own_labels(tmp_path, capsys):
-    """The message of ``multibench convert`` says to convert each side with
+    """The message of ``multibench export`` says to convert each side with
     its own command and its own ``--labels``. It does not print the two
     commands; the two below follow it, and they write the folder with the
     labels of each side on its own cells."""
@@ -474,13 +475,13 @@ def test_the_command_line_converts_each_side_with_its_own_labels(tmp_path, capsy
     rna.write_h5ad(tmp_path / "rna.h5ad")
     atac.write_h5ad(tmp_path / "atac.h5ad")
     out = tmp_path / "DIAG"
-    assert cli.main(["convert", str(tmp_path / "rna.h5ad"), str(out), "--rna", "X",
+    assert cli.main(["export", str(tmp_path / "rna.h5ad"), str(out), "--rna", "X",
                      "--atac-from", str(tmp_path / "atac.h5ad"), "--atac-kind",
                      "gene_activity", "--labels", "obs:cell_type", "--category",
                      "diagonal"]) == 1
-    first = ("multibench convert RNA_FILE OUT --rna X --labels obs:cell_type --category "
+    first = ("multibench export RNA_FILE OUT --rna X --labels obs:cell_type --category "
              "diagonal")
-    second = ("multibench convert ATAC_FILE OUT --atac X --atac-kind gene_activity --labels "
+    second = ("multibench export ATAC_FILE OUT --atac X --atac-kind gene_activity --labels "
               "obs:<its column> --category diagonal --overwrite")
     assert capsys.readouterr().err == (
         "error: --labels obs:cell_type: column 'cell_type' not in obs of the ATAC object "

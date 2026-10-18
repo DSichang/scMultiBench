@@ -66,7 +66,12 @@ def _caught(fn, *a, **kw):
 
 
 def _reference(emb, paths):
-    return mtb.classification_metrics(mtb.classify(emb, labels=paths)).loc["mean"]
+    return _quiet(mtb.classification_metrics, _quiet(mtb.classify, emb, labels=paths)).loc["mean"]
+
+
+def _values(df):
+    """evaluate's long table as a Series of values indexed by metric."""
+    return df.set_index("metric")["value"]
 
 
 # ---------------------------------------------------------------- vocabulary
@@ -90,29 +95,29 @@ def test_metrics_selects_the_family():
         catalog.metric_selection("classifcation")
     assert str(e.value) == (
         "Unknown metrics= token classifcation. Pass 'all', 'clustering', 'batch' or "
-        "'classification', or a list of metric codes such as metrics=['ARI', 'NMI'].")
+        "'classification', or metric codes such as metrics=['ARI', 'NMI'].")
 
 
 # ---------------------------------------------------------------- evaluate
 def test_explicit_classification_is_the_mean_row_of_classify(three):
     emb, paths = three
     df = mtb.evaluate(emb, labels=paths, metrics="classification")
-    assert list(df.index) == CODES
+    assert df["metric"].tolist() == CODES
     ref = _reference(emb, paths)
-    assert all(df.loc[c, "Value"] == ref[c] for c in CODES)
+    assert all(_values(df)[c] == ref[c] for c in CODES)
     assert df.attrs["leiden_flavor"] is None and df.attrs["clustering"] is None
     sub = mtb.evaluate(emb, labels=paths, metrics=["f1", "OCA"])
-    assert list(sub.index) == ["OCA", "F1"]
-    assert sub.loc["F1", "Value"] == ref["F1"]
+    assert sub["metric"].tolist() == ["OCA", "F1"]
+    assert _values(sub)["F1"] == ref["F1"]
 
 
 @pytest.mark.parametrize("category", [None, "mosaic"])
 def test_default_adds_the_family_for_several_batches(three, category):
     emb, paths = three
     df, said = _caught(mtb.evaluate, emb, labels=paths, category=category, verbose=False)
-    assert list(df.index) == SCIB + CODES
+    assert df["metric"].tolist() == SCIB + CODES
     ref = _reference(emb, paths)
-    assert all(df.loc[c, "Value"] == ref[c] for c in CODES)
+    assert all(_values(df)[c] == ref[c] for c in CODES)
     assert not [m for m in said if "OCA" in m]
 
 
@@ -120,9 +125,9 @@ def test_default_leaves_it_out_for_vertical_and_one_batch(three):
     emb, paths = three
     df, said = _caught(mtb.evaluate, emb, labels=paths, category="vertical",
                        verbose=False)
-    assert list(df.index) == SCIB
+    assert df["metric"].tolist() == SCIB
     one, said1 = _caught(mtb.evaluate, emb[:30], labels=paths[0], verbose=False)
-    assert list(one.index) == SCIB[:6]
+    assert one["metric"].tolist() == SCIB[:6]
     assert not [m for m in said + said1 if "OCA" in m]
 
 
@@ -144,7 +149,7 @@ def test_all_with_one_batch_gives_nan_and_one_warning(three):
     emb, paths = three
     df, said = _caught(mtb.evaluate, emb[:30], labels=paths[0], batch=["d1"] * 30,
                        metrics="all", verbose=False)
-    assert list(df.index)[-5:] == CODES and df.loc[CODES, "Value"].isna().all()
+    assert df["metric"].tolist()[-5:] == CODES and _values(df)[CODES].isna().all()
     mine = [m for m in said if "OCA" in m]
     assert mine == ["OCA, ACA, Spec, Sens and F1 are NaN: every cell is in one batch. "
                     "Pass batch= with two or more batches."]
@@ -160,13 +165,13 @@ def test_a_graph_output(three, tmp_path):
     assert str(e.value) == ("scMoMaT writes a graph, not an embedding, so it has no "
                             "classification scores. Pass metrics='clustering'.")
     df, said = _caught(mtb.evaluate, graph, labels=paths, metrics="all", verbose=False)
-    assert df.loc[CODES, "Value"].isna().all()
+    assert _values(df)[CODES].isna().all()
     assert [m for m in said if "OCA" in m] == [
         "scMoMaT writes a graph, not an embedding, so OCA, ACA, Spec, Sens and F1 are "
         "NaN. Pass metrics='clustering' to leave them out."]
     # cells x cells, by default
     df, said = _caught(mtb.evaluate, np.eye(90), labels=paths, verbose=False)
-    assert df.loc[CODES, "Value"].isna().all()
+    assert _values(df)[CODES].isna().all()
     assert [m for m in said if "OCA" in m] == [
         "output is a graph, not an embedding, so OCA, ACA, Spec, Sens and F1 are NaN. "
         "Pass metrics='clustering' to leave them out."]
@@ -189,7 +194,7 @@ def test_every_form_of_a_graph_output_is_treated_alike(three, tmp_path):
     for output, who in ((knn, "output is a graph"), (knn + 1.0, "output is a graph"),
                         (umap, "scMoMaT writes a graph")):
         df, said = _caught(mtb.evaluate, output, labels=paths, verbose=False)
-        assert df.loc[CODES, "Value"].isna().all()
+        assert _values(df)[CODES].isna().all()
         assert [m for m in said if "OCA" in m] == [
             f"{who}, not an embedding, so OCA, ACA, Spec, Sens and F1 are NaN. "
             f"Pass metrics='clustering' to leave them out."]
@@ -199,13 +204,13 @@ def test_every_form_of_a_graph_output_is_treated_alike(three, tmp_path):
                                 f"scores. Pass metrics='clustering'.")
     # the scIB rows of the array are what 0.3.7 gave
     scib = _quiet(mtb.evaluate, knn, labels=paths, metrics="clustering", verbose=False)
-    assert list(scib.index) == SCIB[:6]
+    assert scib["metric"].tolist() == SCIB[:6]
 
 
 def test_an_embedding_is_never_taken_for_a_graph(three):
     emb, paths = three
     df, said = _caught(mtb.evaluate, emb, labels=paths, verbose=False)
-    assert not df.loc[CODES, "Value"].isna().any()
+    assert not _values(df)[CODES].isna().any()
     assert not [m for m in said if "graph" in m]
 
 
@@ -213,7 +218,7 @@ def test_spec_nan_for_a_query_of_one_cell_type_is_said(tmp_path):
     # with cty1 as the reference only A is shared; with cty2, only A too
     emb, paths = _write(tmp_path, {"cty1": ("AB", 40), "cty2": ("AC", 40)})
     df, said = _caught(mtb.evaluate, emb, labels=paths, verbose=False)
-    assert np.isnan(df.loc["Spec", "Value"]) and df.loc["OCA", "Value"] == 1.0
+    assert np.isnan(_values(df)["Spec"]) and _values(df)["OCA"] == 1.0
     assert [m for m in said if "Spec" in m] == [
         "Spec is NaN: when batch cty1 or cty2 is the reference, the cells it predicts "
         "are all of one cell type. Compare methods on the other metrics."]
@@ -229,7 +234,7 @@ def test_no_batch_to_learn_from(tmp_path):
         "metrics='classification' found no batch to learn from: each needs two cell "
         "types that another batch has. Check labels and batch.")
     df, said = _caught(mtb.evaluate, emb, labels=paths, metrics="all", verbose=False)
-    assert df.loc[CODES, "Value"].isna().all()
+    assert _values(df)[CODES].isna().all()
     # one warning, not classify's one per skipped batch
     assert [m for m in said if "OCA" in m or "skipped" in m] == [
         "OCA, ACA, Spec, Sens and F1 are NaN: no batch has two cell types that another "
@@ -242,7 +247,7 @@ def test_batch_with_classification_only_is_used_not_warned(three):
     labels = sum((pd.read_csv(p)["x"].tolist() for p in paths), [])
     df, said = _caught(mtb.evaluate, emb, labels=labels, batch=batch,
                        metrics="classification")
-    assert list(df.index) == CODES
+    assert df["metric"].tolist() == CODES
     assert not [m for m in said if "changes nothing" in m]
 
 
@@ -350,7 +355,7 @@ def test_bar_scores_the_family_in_pink():
     assert str(e.value) == (
         "no 'classification' metrics present. Found ['ARI', 'ARI_batch', 'ASW', "
         "'ASW_batch', 'GC', 'NMI', 'NMI_batch', 'cLISI', 'iASW', 'iF1', 'iLISI']. "
-        "The stored tables have none. "
+        "The stored results have none. "
         "mtb.evaluate computes them on multi-batch data.")
 
 
@@ -371,14 +376,15 @@ def test_bubble_grey_columns_with_a_method_without_values():
     grey = [m for m in said if "grey" in m]
     # the family only M1 has counts in no Overall (0.4.0, X07); its n/a cells show it
     assert len(grey) == 1 and grey[0].endswith(
-        "for every method with a value. Those columns are grey.")
+        "for every method with a value. Those columns are grey. "
+        "Leave them out with metrics=.")
     assert "for every method." not in grey[0]
 
 
 def test_recommend_without_classification_scores():
     with pytest.raises(ValueError) as e:
         _quiet(mtb.recommend, "cross", metrics="classification")
-    assert str(e.value) == ("The stored tables have no classification scores. Score "
+    assert str(e.value) == ("The stored results have no classification scores. Score "
                             "your runs with mtb.evaluate and pass them as long_df=.")
 
 
@@ -387,7 +393,7 @@ def test_stored_tables_have_no_classification():
                        metrics="classification")
     # one line says so since 0.4, as for metrics="batch" on a single-batch dataset
     assert df.empty and said == [
-        "The re-run vertical tables of D11 have no classification scores, so no rows "
+        "The stored results of vertical, D11 have no classification scores, so no rows "
         "are left. Leave out metrics= to get the scores they have (ARI, ASW, NMI, cLISI, "
         "iASW, iF1)."]
 

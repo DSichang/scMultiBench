@@ -12,7 +12,7 @@ pytestmark = pytest.mark.filterwarnings(
 
 def test_available_datasets_lists_diagonal(result_dir):
     with pytest.warns(FutureWarning, match=r"available_datasets is deprecated .* "
-                                           r"Use results_coverage\."):
+                                           r"Use mtb\.catalog\.datasets\(\)\."):
         ds = mtb.available_datasets("diagonal")
     assert isinstance(ds, list) and "D28" in ds
     # mosaic has no published results -> empty list (not an error)
@@ -47,9 +47,10 @@ def test_namespace_all_hygiene():
     # recipe left __all__ in 0.4.0 (X34); it stays importable
     assert "recipe" not in mtb.env.__all__ and "subprocess" not in mtb.env.__all__
     assert callable(mtb.env.recipe)
-    assert "Config" in mtb.config.__all__ and "Path" not in mtb.config.__all__
+    # config.Config and io.to_canonical are deprecated in 0.4.0: out of __all__
+    assert mtb.config.__all__ == ["DEFAULT"]
     assert "category_folder" not in mtb.config.__all__      # internal token map
-    assert "to_canonical" in mtb.io.__all__
+    assert sorted(mtb.io.__all__) == ["export_dataset", "read_canonical"]
 
 
 # --- P12: inputs_for(check=None) warns about phantom paths; the default is silent
@@ -106,7 +107,7 @@ def test_results_coverage(result_dir, layout_tree):
     assert list(cov.columns) == ["category", "dataset", "method", "clustering", "source"]
     d52 = cov[cov.dataset == "D52"]
     assert set(d52[d52.source == "published"].method) == {"scMoMaT"}
-    assert d52[d52.source == "rerun"].method.nunique() == 7      # UINMF's rows left (r3)
+    assert d52[d52.source == "stored"].method.nunique() == 7      # UINMF's rows left (r3)
     # clustering variants surface: a louvain-only Concerto_louvain directory
     # (vertical D3 of the layout tree) shows up under clustering='louvain'
     allc = results_coverage(source="published", result_path=layout_tree)
@@ -123,22 +124,20 @@ def test_recommend_ranks_with_coverage(result_dir):
     with warnings.catch_warnings():
         warnings.simplefilter("error", UserWarning)
         r = recommend("diagonal", source="published")
-    assert list(r.columns) == ["method", "grand_score", "n_datasets", "n_datasets_total",
-                               "coverage", "needs_labels", "runtime_tier", "worst_sec",
-                               "env", "datasets"]     # Y26 (r3): no output_kind
-    assert (r.n_datasets == r.n_datasets_total).all() and (r.coverage == 1.0).all()
-    assert (r.n_datasets_total == 3).all() and r.grand_score.notna().all()
+    # 0.4.0: no n_datasets, n_datasets_total, coverage or datasets columns
+    assert list(r.columns) == ["method", "grand_score", "needs_labels", "runtime_tier",
+                               "worst_sec", "env"]
+    assert r.grand_score.notna().all()
     scored = r.grand_score.dropna()
     assert scored.is_monotonic_decreasing
     sb = r[r.method == "scBridge"].iloc[0]
     assert sb.needs_labels is True or sb.needs_labels == True   # noqa: E712
     assert sb.runtime_tier in {"fast", "medium", "slow", "very_slow", "unknown"}
-    # source='both': the re-run D28 rows join the published D28 ones (one
-    # table per category since 0.4.0, X04), so every method has 3 datasets
+    # source='both': the stored D28 rows join the published D28 ones (one
+    # table per category since 0.4.0, X04)
     with warnings.catch_warnings():
         warnings.simplefilter("error", UserWarning)
         rb = recommend("diagonal", source="both")
-    assert (rb.n_datasets_total == 3).all()
     assert rb.grand_score.dropna().is_monotonic_decreasing
     # scored rows precede the NaN (unscored) tail
     assert rb.grand_score.notna().tolist() == sorted(rb.grand_score.notna().tolist(), reverse=True)
@@ -154,12 +153,10 @@ def test_recommend_drops_singleton_datasets_and_warns(layout_tree):
     # filtered5/metric.csv). The singleton datasets must be dropped, so
     # scMoMaT (D52/D58/D59 alone), Concerto (D54) and MOFA2 (D56) cannot score
     # 1.0 on the strength of singleton min-max
-    assert (r.n_datasets_total == 2).all()       # D53 and D57 hold >= 2 methods
-    assert set(r.datasets.str.split(", ").explode()) - {""} == {"D53", "D57"}
     # scMoMaT has rows only in the dropped singleton datasets: it is LISTED
     # (wired for cross) but unscored, and the warning says why
     smt = r[r.method == "scMoMaT"].iloc[0]
-    assert pd.isna(smt.grand_score) and smt.n_datasets == 0 and smt.coverage == 0.0
+    assert pd.isna(smt.grand_score)
     assert "scMoMaT" in r.attrs["not_scored"]
     assert ("scMoMaT has scores only on datasets left out of the "
             "ranking, so it is listed last.") in str(rec[0].message)
@@ -167,8 +164,6 @@ def test_recommend_drops_singleton_datasets_and_warns(layout_tree):
     # (sciPENN on D53, UINMF over MOFA2 on D57), never a singleton artefact:
     # every scored method sits in a dataset that holds another method
     assert {"UINMF", "MOFA2"} <= set(r.method)
-    assert (r[r.grand_score == 1.0].n_datasets == 1).all()
-    assert r.set_index("method").at["MOFA2", "datasets"] == "D53, D57"     # not D56
     msg = str(rec[0].message)
     # D56's only published table is MOFA2's: a singleton, left out and named
     assert "Datasets D52, D54, D56, D58 and D59 have fewer than 2 methods" in msg
@@ -179,15 +174,11 @@ def test_recommend_drops_singleton_datasets_and_warns(layout_tree):
     assert msg.splitlines()[1].strip().startswith(
         "- Datasets D52, D54, D56, D58 and D59 have fewer than 2 methods and are left "
         "out of the ranking.")
-    with pytest.raises(ValueError, match=r"No cross dataset has 50 or more methods\. D52 "
-                                         r"has 1, D53 has 6") as e:
-        recommend("cross", min_methods=50, source="published", result_path=layout_tree)
-    assert "pass source=" not in str(e.value)       # that tree has no other source
 
 
 def test_recommend_single_dataset_category_names_the_other_source(result_dir):
     """The shipped published cross table holds one method (scMoMaT on D52):
-    nothing can be ranked, and the error must point at the re-run sweeps,
+    nothing can be ranked, and the error must point at the stored results,
     which hold seven methods for it."""
     import warnings
     from multibench.data.results import recommend
@@ -198,17 +189,17 @@ def test_recommend_single_dataset_category_names_the_other_source(result_dir):
             warnings.simplefilter("ignore", UserWarning)
             recommend("cross", source="published")
     msg = str(e.value)
-    assert ("The re-run tables have 7 methods for cross: Concerto, sciPENN, scMDC, scMM, "
+    assert ("The stored results have 7 methods for cross: Concerto, sciPENN, scMDC, scMM, "
             "scMoMaT, StabMap, totalVI. Leave out source= to rank them.") in msg
     assert "meaningless" not in msg and ">=" not in msg and "(s)" not in msg
-    assert msg.endswith("Otherwise pass long_df= with more methods, or lower min_methods.")
+    assert msg.endswith("Otherwise pass long_df= with more methods.")   # no min_methods
     # that source ranks them on D52, nothing dropped
     r, m = _rec("cross")
-    assert r.grand_score.notna().sum() == 7 and (r.n_datasets_total == 1).all()
+    assert r.grand_score.notna().sum() == 7
     assert "dropped" not in m
     # a single-dataset category with several methods ranks (vertical: D11)
     r2, _ = _rec("vertical", source="published")
-    assert (r2.n_datasets_total == 1).all() and r2.grand_score.notna().sum() == 6
+    assert r2.grand_score.notna().sum() == 6
 
 
 def test_recommend_unknown_result_id_and_modalities(result_dir):
@@ -251,13 +242,10 @@ def test_recommend_lists_unscored_methods(result_dir):
     nan_rows = r[r.grand_score.isna()]
     assert set(nan_rows.method) == {"Concerto", "Matilda", "MOFA2", "Seurat_WNN", "UINMF",
                                     "VIMCCA", "scMDC", "totalVI"}
-    assert (nan_rows.n_datasets == 0).all() and (nan_rows.coverage == 0.0).all()
-    assert (nan_rows.n_datasets_total == r.n_datasets_total.iloc[0]).all()
     assert nan_rows.env.notna().all() and nan_rows.runtime_tier.notna().all()
-    # column list (datasets appended in study round 1); scored rows first
-    assert list(r.columns) == ["method", "grand_score", "n_datasets", "n_datasets_total",
-                               "coverage", "needs_labels", "runtime_tier", "worst_sec",
-                               "env", "datasets"]     # Y26 (r3): no output_kind
+    # column list (0.4.0: no coverage columns); scored rows first
+    assert list(r.columns) == ["method", "grand_score", "needs_labels", "runtime_tier",
+                               "worst_sec", "env"]
     assert r.grand_score.iloc[: len(r) - len(nan_rows)].notna().all()
     assert r.attrs["family"] == "clustering" and r.attrs["metrics"] == "clustering"
     assert r.attrs["source"] == "published"
@@ -265,7 +253,7 @@ def test_recommend_lists_unscored_methods(result_dir):
     import re
     assert re.search(rf"These {len(nan_rows)} methods have no published scores and "
                      r"are listed last: .*totalVI", msg)
-    assert msg.endswith("Leave out source= to rank the re-run tables.")
+    assert msg.endswith("Leave out source= to rank the stored results.")
     # the coverage line appears only where the matrix IS incomplete
     # (the single published vertical dataset scores its 6 methods completely;
     # diagonal source='both' lacks GLUE / Seurat_v5 in the re-run rows)
@@ -274,14 +262,14 @@ def test_recommend_lists_unscored_methods(result_dir):
     part = pd.concat([d28, d28[d28.method != "iNMF"].assign(dataset="D28b")])
     _, msg_b = _rec("diagonal", long_df=part)
     assert "Some methods have scores on only part of the datasets: iNMF 1 of 2" in msg_b
-    assert "Check the coverage column before reading the order." in msg_b
+    assert "coverage column" not in msg_b        # that column left in 0.4.0
 
 
 def test_recommend_rerun_missing_only_seurat_wnn(result_dir):
     r, msg = _rec("vertical", modalities=["rna", "adt"])
     assert set(r[r.grand_score.isna()].method) == {"Seurat_WNN"}
     assert r.attrs["source"] == "rerun" and r.attrs["not_scored"] == ["Seurat_WNN"]
-    assert "Seurat_WNN has no re-run scores and is listed last." in msg
+    assert "Seurat_WNN has no stored results and is listed last." in msg
     assert 'Try source="rerun"' not in msg
 
 

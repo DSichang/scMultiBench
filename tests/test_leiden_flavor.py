@@ -94,7 +94,7 @@ def test_shipped_default_is_leidenalg():
     """0.4: ``config.DEFAULT.leiden_flavor`` defaults to ``"leidenalg"``, the
     article's backend and the stored tables'; igraph stays selectable."""
     assert config.DEFAULT.leiden_flavor == "leidenalg"
-    assert config.Config().leiden_flavor == "leidenalg"
+    assert config._Config().leiden_flavor == "leidenalg"   # config.Config is deprecated
     assert S._resolve_flavor(None) == "leidenalg"
     assert S._resolve_flavor("igraph") == _eff("igraph")
 
@@ -119,9 +119,9 @@ def test_evaluate_recovers_the_blobs_on_either_flavor(flavor, monkeypatch):
     monkeypatch.setattr(config.DEFAULT, "leiden_flavor", flavor, raising=False)
     seen = _spy_leiden(monkeypatch)
     emb, lab = _blobs()
-    df = mtb.evaluate(emb, labels=lab, metrics=["ARI", "NMI", "iF1"])
-    assert float(df.loc["ARI", "Value"]) > 0.95
-    assert float(df.loc["iF1", "Value"]) > 0.95
+    df = mtb.evaluate(emb, labels=lab, metrics=["ARI", "NMI", "iF1"]).set_index("metric")
+    assert float(df.loc["ARI", "value"]) > 0.95
+    assert float(df.loc["iF1", "value"]) > 0.95
     assert _asked(seen) == {_eff(flavor)}
     steps = len(seen)
     S.leiden_n_clusters(emb, len(set(lab)))

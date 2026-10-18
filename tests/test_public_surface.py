@@ -1,7 +1,7 @@
-"""The public surface (the 0.3.0 cut and the 0.4 deprecations), pinned.
+"""The public surface (the 0.3.0 cut and the 0.4.0 core API), pinned.
 
-``__all__`` of ``mtb``, ``mtb.plot``, ``mtb.io``, ``mtb.env`` and
-``mtb.config`` are EXACTLY the contract's sets; ``dir()`` of those namespaces
+``__all__`` of ``mtb`` (19 names), ``mtb.plot``, ``mtb.io``, ``mtb.env``,
+``mtb.config``, ``mtb.catalog`` and ``mtb.data`` are EXACTLY the contract's sets; ``dir()`` of those namespaces
 leaks no import; every deprecated alias warns and forwards; every removed
 name / keyword fails loudly with the contract's message; every ``--help``
 line that names a Python function names one that exists.
@@ -16,19 +16,19 @@ import multibench as mtb
 from multibench import cli
 from multibench.engine import envs, ingest
 
-MTB_ALL = {
+MTB_ALL = {                                       # the 0.4.0 core API (TARGET.txt)
     "config", "plot", "catalog", "io", "env", "data",
-    "find_methods", "method_info", "params_for", "describe_layout", "cite",
-    "inputs_for", "labels_for",
-    "scan", "run", "run_all", "sweep", "load_batch", "BatchResult",
-    "evaluate", "to_long", "classify", "classification_metrics",
-    "load_results", "results_coverage", "recommend",
-    "AmbiguousVariantError", "__version__",      # DegenerateRerunWarning: 0.4.0 (Y35)
+    "find_methods", "method_info", "params_for", "cite",
+    "scan", "run_all", "load_batch", "BatchResult",
+    "evaluate", "load_results", "recommend",
+    "describe_layout", "__version__",
 }
-PLOT_ALL = {"bubble", "bar", "build_table", "BubbleTable"}
-IO_ALL = {"export_dataset", "to_canonical", "read_canonical"}
-ENV_ALL = {"install", "doctor"}          # recipe left __all__ in 0.4.0 (X34)
-CONFIG_ALL = {"Config", "DEFAULT"}
+PLOT_ALL = {"bubble", "bar"}
+IO_ALL = {"export_dataset", "read_canonical"}
+ENV_ALL = {"install"}                    # recipe left __all__ in 0.4.0 (X34)
+CONFIG_ALL = {"DEFAULT"}
+CATALOG_ALL = {"datasets", "metrics"}
+DATA_ALL = {"fetch", "write_example"}
 
 
 def _leaks(ns) -> set:
@@ -39,7 +39,7 @@ def _leaks(ns) -> set:
 
 # ------------------------------------------------------------------ __all__ sets
 def test_top_level_all_is_exactly_the_contract():
-    assert set(mtb.__all__) == MTB_ALL
+    assert set(mtb.__all__) == MTB_ALL and len(MTB_ALL) == 19
     assert len(mtb.__all__) == len(MTB_ALL)                 # no duplicates
     assert all(hasattr(mtb, n) for n in MTB_ALL)
     assert _leaks(mtb) == set()
@@ -70,11 +70,57 @@ def test_config_all_is_exactly_the_contract():
     assert "category_folder" not in dir(mtb.config) and "metric_set_dir" not in dir(mtb.config)
 
 
+def test_catalog_and_data_all_are_exactly_the_contract():
+    assert set(mtb.catalog.__all__) == CATALOG_ALL and _leaks(mtb.catalog) == set()
+    assert set(mtb.data.__all__) == DATA_ALL and _leaks(mtb.data) == set()
+
+
 def test_plot_all_is_exactly_the_contract():
     assert set(mtb.plot.__all__) == PLOT_ALL
     assert _leaks(mtb.plot) == set()
     # render / FamilyBlock stay importable but are not advertised
     assert callable(mtb.plot.render) and mtb.plot.FamilyBlock is not None
+
+
+# ------------------------------------------------------------------ 0.4.0 deprecations
+def _one_future_warning(call):
+    """``(result, message)`` of ``call()``, which must emit exactly one FutureWarning."""
+    with warnings.catch_warnings(record=True) as rec:
+        warnings.simplefilter("always")
+        out = call()
+    future = [str(w.message) for w in rec if issubclass(w.category, FutureWarning)]
+    assert len(future) == 1, future
+    return out, future[0]
+
+
+def test_sweep_warns_once_and_still_loops_over_run_all(monkeypatch, tmp_path):
+    import pandas as pd
+    from types import SimpleNamespace
+    from multibench import workflow
+    seen = []
+
+    def fake_run_all(dataset, category, **kw):
+        seen.append((kw["params"], kw.get("dry_run", False)))
+        return SimpleNamespace(summary=pd.DataFrame({"method": ["Matilda"]}),
+                               long=pd.DataFrame())
+    monkeypatch.setattr(workflow, "_run_all", fake_run_all)
+    out, msg = _one_future_warning(lambda: mtb.sweep("D11", "vertical", "Matilda", "epochs",
+                                                     [1, 2], out_dir=tmp_path, verbose=False))
+    assert msg == ("sweep is deprecated and will be removed in 0.5. Use a loop over "
+                   "mtb.run_all(params=...).")
+    assert list(out["epochs"]) == [1, 2]
+    assert seen == [({"Matilda": {"epochs": 1}}, True), ({"Matilda": {"epochs": 1}}, False),
+                    ({"Matilda": {"epochs": 2}}, False)]
+
+
+def test_to_canonical_warns_once_and_still_writes(tmp_path):
+    import anndata as ad
+    import numpy as np
+    a = ad.AnnData(np.ones((4, 3), dtype=np.float32))
+    a.var_names = ["g1", "g2", "g3"]
+    out, msg = _one_future_warning(lambda: mtb.io.to_canonical(a, tmp_path / "rna.h5"))
+    assert msg.startswith("io.to_canonical is deprecated and will be removed in 0.5. Use ")
+    assert mtb.io.read_canonical(out).shape == (4, 3)
 
 
 # ------------------------------------------------------------------ deprecated aliases
@@ -212,8 +258,8 @@ def test_env_install_is_the_cli_code_path(monkeypatch):
     # 0.4.0: build= replaces packed= (X25), installing is the default (X27), force= is
     # hidden (X33)
     sig = inspect.signature(mtb.env.install)
-    assert list(sig.parameters) == ["methods", "category", "build", "dry_run", "conda",
-                                    "flavor"]
+    # 0.4.0: conda= is deprecated (kept, hidden from the signature)
+    assert list(sig.parameters) == ["methods", "category", "dry_run", "flavor", "build"]
     assert sig.parameters["dry_run"].default is False and sig.parameters["build"].default is False
 
 

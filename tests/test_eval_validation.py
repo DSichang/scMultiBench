@@ -22,7 +22,8 @@ import pandas as pd
 import pytest
 
 from multibench.eval import io
-from multibench.eval.pipeline import evaluate, to_long
+from multibench.eval import pipeline
+from multibench.eval.pipeline import LONG_COLUMNS, evaluate
 from tests.test_study_r4_wf import N as N_CITE, _quiet, cite  # noqa: F401
 
 pytest.importorskip("scib")
@@ -40,7 +41,12 @@ def _toy(n_per=45, seed=0):
 
 
 def _ari(df):
-    return float(df.loc["ARI", "Value"])
+    """ARI from evaluate's long table."""
+    return float(df.set_index("metric").loc["ARI", "value"])
+
+
+def _metrics(df):
+    return df["metric"].tolist()
 
 
 def _no_alignment_warning(rec):
@@ -69,24 +75,24 @@ def test_metrics_none_computes_every_applicable_family():
     from multibench.plot import BATCH_METRICS, CLASSIFICATION_METRICS, CLUSTERING_METRICS
     emb, ct, bat, _ = _toy()
     clu = evaluate(emb, labels=ct)                       # no batch: clustering family
-    assert set(clu.index) == set(CLUSTERING_METRICS)
+    assert set(_metrics(clu)) == set(CLUSTERING_METRICS)
     # batches given: the batch family, and classification (no category: any)
     both = evaluate(emb, labels=ct, batch=bat)
-    assert set(both.index) == (set(CLUSTERING_METRICS) | (set(BATCH_METRICS) - {"kBET"})
+    assert set(_metrics(both)) == (set(CLUSTERING_METRICS) | (set(BATCH_METRICS) - {"kBET"})
                                | set(CLASSIFICATION_METRICS))
 
 
 def test_kbet_is_computed_only_when_named():
     emb, ct, bat, _ = _toy()
-    assert "kBET" not in evaluate(emb, labels=ct, batch=bat, metrics="batch").index
-    assert "kBET" not in evaluate(emb, labels=ct, batch=bat, metrics=["GC"]).index
-    assert list(evaluate(emb, labels=ct, batch=bat, metrics=["kBET"]).index) == ["kBET"]
+    assert "kBET" not in _metrics(evaluate(emb, labels=ct, batch=bat, metrics="batch"))
+    assert "kBET" not in _metrics(evaluate(emb, labels=ct, batch=bat, metrics=["GC"]))
+    assert _metrics(evaluate(emb, labels=ct, batch=bat, metrics=["kBET"])) == ["kBET"]
 
 
 def test_only_valid_requests_still_work_and_unknown_lists_valid_names():
     emb, ct, bat, _ = _toy()
     df = evaluate(emb, labels=ct, batch=bat, metrics=["GC", "ARI"])
-    assert set(df.index) == {"GC", "ARI"}
+    assert set(_metrics(df)) == {"GC", "ARI"}
     assert _ari(df) == pytest.approx(1.0)
     with pytest.raises(ValueError) as exc:
         evaluate(emb, labels=ct, metrics=["XYZ"])
@@ -98,7 +104,7 @@ def test_batch_under_clustering_task_warns_instead_of_silently_ignoring():
     with pytest.warns(UserWarning, match=r"batch= changes nothing here, because "
                                          r"metrics=\['ASW'\] has no batch metric"):
         df = evaluate(emb, labels=ct, batch=bat, metrics=["ASW"])
-    assert list(df.index) == ["ASW"]
+    assert _metrics(df) == ["ASW"]
     # no such warning when batch is used
     with warnings.catch_warnings(record=True) as rec:
         warnings.simplefilter("always")
@@ -146,12 +152,14 @@ def test_labels_series_aligned_by_obs_names_against_anndata_output():
     got = evaluate(a, labels="celltype", batch=shuffled_batch,
                    metrics=["GC", "ASW_batch"])
     pd.testing.assert_frame_equal(got.sort_index(), ref.sort_index())
-    # clustering= too (and an obs column name works for clustering, like labels)
+    # clustering= too (and an obs column name works for clustering, like labels);
+    # deprecated since 0.4: its implementation, without the warning
     a.obs["leiden"] = pd.Categorical(ct)
-    c1 = evaluate(a, labels="celltype", clusters="leiden", metrics=["ARI"])
-    c2 = evaluate(a, labels="celltype",
-                  clustering=pd.Series(ct, index=ids).sample(frac=1, random_state=3),
-                  metrics=["ARI"])
+    c1 = pipeline._evaluate(a, labels="celltype", clustering="leiden", metrics=["ARI"])
+    c2 = pipeline._evaluate(
+        a, labels="celltype",
+        clustering=pd.Series(ct, index=ids).sample(frac=1, random_state=3),
+        metrics=["ARI"])
     assert _ari(c1) == pytest.approx(1.0) and _ari(c2) == pytest.approx(1.0)
 
 
@@ -183,7 +191,9 @@ def test_labels_series_missing_or_extra_ids_raise_naming_them():
 def test_labels_for_some_cells_say_how_to_mark_the_others(tmp_path, capsys):
     """A cell without an entry is not a cell with a missing label, so labels
     for some of the output's cells are refused whatever missing_labels is.
-    Both errors say how to mark the other cells, and both ways score."""
+    0.4.0: the Series error says to score the labelled cells only (no
+    deprecated missing_labels= in the advice); the file error gives no advice
+    about it. The deprecated missing_labels="drop" still scores both ways."""
     ad = pytest.importorskip("anndata")
     from multibench import cli
     emb, ct, _, ids = _toy()
@@ -193,6 +203,8 @@ def test_labels_for_some_cells_say_how_to_mark_the_others(tmp_path, capsys):
     a.obs["celltype"] = ct
     some = pd.Series(ct, index=ids).iloc[:60]
     kw = dict(metrics=["ASW"], missing_labels="drop")
+    # missing_labels= is deprecated since 0.4: its implementation, without the warning
+    evaluate = pipeline._evaluate
     series = ("{0}: cannot align by cell id - 30 of the output's 90 cells are missing "
               "from {0} (first: ['cell60', 'cell61', 'cell62', 'cell63', 'cell64']) and "
               "{0} has 0 id(s) the output lacks (first: []). Pass {0} for exactly the "
@@ -200,30 +212,26 @@ def test_labels_for_some_cells_say_how_to_mark_the_others(tmp_path, capsys):
     with pytest.raises(ValueError) as exc:
         evaluate(a, labels=some, **kw)
     assert str(exc.value) == series.format("labels") + (
-        " For cells without a label, pass labels.reindex(adata.obs_names) and "
-        "missing_labels=\"drop\".")
+        " Score the cells that have a label only.")
     # an output that is no AnnData object: the caller has no adata to name
     a.write_h5ad(tmp_path / "named.h5ad")
     for output in (pd.DataFrame(emb, index=ids), str(tmp_path / "named.h5ad")):
         with pytest.raises(ValueError) as exc:
             evaluate(output, labels=some, obsm="X_emb", **kw)
         assert str(exc.value) == series.format("labels") + (
-            " For cells without a label, give them the label NaN and pass "
-            "missing_labels=\"drop\".")
+            " Score the cells that have a label only.")
     file = ("{}: some.csv has no row for 30 of the 90 cells of the embedding (first: "
             "['cell60', 'cell61', 'cell62']). Give a row for every cell.")
-    row = " A row with an empty label and {} leaves a cell out."
     some.rename("x").to_frame().to_csv(tmp_path / "some.csv")
     with pytest.raises(ValueError) as exc:
         evaluate(a, labels=str(tmp_path / "some.csv"), **kw)
-    assert str(exc.value) == file.format("labels") + row.format('missing_labels="drop"')
+    assert str(exc.value) == file.format("labels")
     # the command line names its own flag
     a.write_h5ad(tmp_path / "emb.h5ad")
     assert cli.main(["evaluate", "--embedding", str(tmp_path / "emb.h5ad"), "--labels",
                      str(tmp_path / "some.csv"), "--metrics", "ASW",
                      "--missing-labels", "drop"]) == 1
-    assert ("error: " + file.format("labels") + row.format("--missing-labels drop")
-            + "\n") in capsys.readouterr().err
+    assert ("error: " + file.format("labels") + "\n") in capsys.readouterr().err
     # both ways out score the 60 labelled cells, also for a DataFrame output
     some.reindex(ids).rename("x").to_frame().to_csv(tmp_path / "every.csv")
     frame = pd.DataFrame(emb, index=ids)
@@ -328,13 +336,14 @@ def test_multi_entry_dict_error_names_keys_and_the_stacking_rule(tmp_path):
     msg = str(exc.value)
     assert msg.startswith("The label keys atac_cty and rna_cty are not in "
                           "the default order. ")
-    assert "label_order=" in msg
+    # 0.4.0: evaluate's own keywords, not the deprecated label_order= / labels_for
+    assert "Pass a list of paths in cell order, or dataset=, category= and method=." in msg
+    assert "label_order=" not in msg and "labels_for" not in msg
     assert "The default order is cty1, cty2, ... by number" in msg
     assert "rna before adt before atac" in msg
     assert "not alphabetical" in msg
-    assert "mtb.labels_for(dataset, category, method)" in msg
     # R4-13: short sentences, no parenthesis holding clauses
-    assert "(" not in msg.split("mtb.labels_for")[0] and ";" not in msg
+    assert "(" not in msg and ";" not in msg
     # the same rule reaches as_vector() directly (batch= given as a dict)
     with pytest.raises(ValueError, match="batch: got a dict with 2 label files"):
         io.as_vector(d, what="batch")
@@ -344,6 +353,8 @@ def test_multi_entry_dict_error_names_keys_and_the_stacking_rule(tmp_path):
 
 
 def test_label_order_fixes_the_dict_order_and_feeds_the_file_batch(tmp_path):
+    # label_order= is deprecated since 0.4: its implementation, without the warning
+    evaluate = pipeline._evaluate
     emb, ct, _, _ = _toy()
     p_rna, p_atac = tmp_path / "rna_cty.csv", tmp_path / "atac_cty.csv"
     _write_cty(p_rna, ct[:60]); _write_cty(p_atac, ct[60:])
@@ -397,20 +408,21 @@ def test_evaluate_emits_canonical_metric_names_only():
     from multibench.data import catalog
     emb, ct, bat, _ = _toy()
     df = evaluate(emb, metrics="all", labels=ct, batch=bat)
-    assert set(df.index) <= set(_CANONICAL), sorted(df.index)
-    assert all(catalog.canonical_metric(m) == m for m in df.index)
-    assert list(df.columns) == ["Value"]
+    assert set(_metrics(df)) <= set(_CANONICAL), sorted(_metrics(df))
+    assert all(catalog.canonical_metric(m) == m for m in _metrics(df))
+    assert list(df.columns) == LONG_COLUMNS + ["scored_with"]
 
 
-def test_evaluate_to_long_concat_with_published_builds_the_bubble_table():
+def test_evaluate_concat_with_published_builds_the_bubble_table():
     import matplotlib
     matplotlib.use("Agg")
     import multibench as mtb
     from multibench import plot as mplot
 
     emb, ct, bat, _ = _toy()
-    mine_wide = evaluate(emb, metrics="all", labels=ct, batch=bat)
-    mine = to_long(mine_wide, method="MyMethod", dataset="D52", category="cross")
+    # 0.4.0: evaluate returns the long table itself
+    mine = evaluate(emb, metrics="all", labels=ct, batch=bat, method="MyMethod",
+                    dataset="D52", category="cross")
     published = mtb.load_results("cross", dataset="D52")
     both = pd.concat([published, mine], ignore_index=True)
     # one spelling per metric after canonicalisation - no duplicate columns
@@ -421,4 +433,4 @@ def test_evaluate_to_long_concat_with_published_builds_the_bubble_table():
     assert "MyMethod" in tab.methods
     wide = both.pivot_table(index="method", columns="metric", values="value")
     assert len(wide.columns) == len(set(published["metric"]) | set(mine["metric"]))
-    assert wide.loc["MyMethod", "ARI"] == pytest.approx(float(mine_wide.loc["ARI", "Value"]))
+    assert wide.loc["MyMethod", "ARI"] == pytest.approx(_ari(mine))

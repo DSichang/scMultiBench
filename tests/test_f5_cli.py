@@ -44,7 +44,7 @@ def test_mosaic_error_starts_with_the_category_and_the_fix():
         _published("mosaic")
     msg = str(e.value)
     assert msg == ("mosaic has no published tables. Leave out source= to load the "
-                   "package's re-run tables.")
+                   "stored results.")
     assert " - " not in msg and "package sweeps" not in msg
     assert "multibench/result/scib_metric" not in msg          # not an install problem
 
@@ -83,7 +83,7 @@ def test_plot_overlay_on_mosaic_names_source_rerun_first(tmp_path, capsys):
     assert rc == 1
     assert (
         "\nerror: mosaic has no published tables. Leave out --source to plot your rows "
-        "with the package's re-run tables, or drop --category to plot your rows alone.") in err
+        "with the stored results, or drop --category to plot your rows alone.") in err
     assert "--result-path" not in err and "scib_metric" not in err
 
 
@@ -93,7 +93,7 @@ def test_plot_stored_mosaic_without_input_names_source_rerun(tmp_path, capsys):
     err = capsys.readouterr().err
     assert rc == 1
     assert ("\nerror: mosaic has no published tables. Leave out --source to plot the "
-            "package's re-run tables.") in err
+            "stored results.") in err
 
 
 def test_plot_wrong_result_path_keeps_the_flag_advice(tmp_path, capsys):
@@ -176,10 +176,11 @@ def test_evaluate_help_names_both_flags():
     sub = next(a for a in parser._actions if a.__class__.__name__ == "_SubParsersAction")
     pe = sub.choices["evaluate"]
     helps = {a.option_strings[0]: a.help for a in pe._actions if a.option_strings}
-    # one job per flag since 0.4.0 (X95)
+    # 0.4.0: --method fills the method column; --name is its hidden deprecated alias
+    import argparse
     assert helps["--method"].startswith(
-        "a package method: read the dataset's label files in its batch order")
-    assert helps["--name"].startswith("the row name in the long table (default: --method)")
+        "fills the method column: a package method id, or your own name.")
+    assert helps["--name"] == argparse.SUPPRESS
 
 
 # ====================================================================== R5-10
@@ -254,14 +255,14 @@ def _plan(*files):
 
 def test_prepared_note_starts_with_the_method(monkeypatch):
     py = runner._prepared_note(_plan("inputs/atac_peak_normpeaks.h5"), "/o", "GLUE")
-    assert py == ("GLUE reads inputs/atac_peak_normpeaks.h5. mtb.run writes that file first, "
-                  "so start GLUE with mtb.run or mtb.run_all. The printed command alone "
+    assert py == ("GLUE reads inputs/atac_peak_normpeaks.h5. mtb.run_all writes that file "
+                  "first, so start GLUE with mtb.run_all. The printed command alone "
                   "fails in a job script.")
     monkeypatch.setattr(config, "_CLI", True)
     cli_note = runner._prepared_note(_plan("inputs/atac_peak_normpeaks.h5"), "/o", "GLUE")
-    assert cli_note == ("GLUE reads inputs/atac_peak_normpeaks.h5. multibench run writes "
-                        "that file first, so start GLUE with multibench run or multibench "
-                        "run-all. The printed command alone fails in a job script.")
+    assert cli_note == ("GLUE reads inputs/atac_peak_normpeaks.h5. multibench run-all "
+                        "writes that file first, so start GLUE with multibench run-all. "
+                        "The printed command alone fails in a job script.")
     # the matchers find it at the start of a caveat or after another sentence
     counts = "GLUE needs raw counts. rna.h5 holds non-integer values."
     assert runner._prepared_at(cli_note) == 0
@@ -292,13 +293,13 @@ def test_scan_reason_is_sentences_with_their_own_subjects(tmp_path, monkeypatch)
     sc = _quiet(full_scan, "LUNG_ids", "diagonal", methods=["GLUE"], data_path=root,
                 verbose=False).iloc[0]
     assert sc["reason"] == (
-        f"Environment {sc['env']} runs only on Linux, not on this computer. GLUE reads peak names such as chr1:100-200. atac_peak.h5 holds other "
-        f"names, for example peak_0. Rename them to chr:start-end, or pass "
-        f"allow_atac_mismatch=True to run GLUE anyway.")
+        f"Environment {sc['env']} runs only on Linux, not on this computer. GLUE reads peak "
+        f"names such as chr1:100-200. atac_peak.h5 holds other names, for example peak_0. "
+        f"Rename them to chr:start-end.")        # 0.4.0: no deprecated override offered
     moetm = _quiet(full_scan, "D11", "vertical", methods=["moETM"], verbose=False).iloc[0]
+    # 0.4.0: off Linux the GPU sentence is left out (the OS already blocks)
     assert moetm["reason"] == (
-        f"Environment {moetm['env']} runs only on Linux, not on this computer. moETM needs an "
-        f"NVIDIA GPU, and this computer has none.")
+        f"Environment {moetm['env']} runs only on Linux, not on this computer.")
     assert ";" not in moetm["reason"]
 
 
@@ -323,7 +324,8 @@ def test_count_lines_say_rows_without_plural_brackets(monkeypatch, capsys, tmp_p
     out = capsys.readouterr().out
     n, k = len(df), int(df["files_ok"].sum())
     assert out == (f"[scan] {k} of {n} rows have their input files. 0 of {n} have their "
-                   f"environment installed. mtb.env.doctor() checks the environments.\n")
+                   f"environment installed. mtb.env.install(dry_run=True) checks the "
+                   f"environments.\n")
     mtb.run_all("D11", "vertical", out_dir=tmp_path, dry_run=True, modalities="all")
     line = next(l for l in capsys.readouterr().out.splitlines() if "Dry run" in l)
     assert line == (f"[run_all] Dry run: 0 of {n} requested rows can run on D11 "
@@ -342,14 +344,13 @@ def test_cli_dry_run_headers_are_sentences(monkeypatch, capsys, tmp_path):
                    "--modalities", "rna,adt", "--dry-run"])
     cap = capsys.readouterr()
     assert rc == 0
+    # 0.4.0: one sentence, as the Python dry run says it
     assert cap.err.startswith(
-        "# Dry run. Nothing was executed. 0 of 1 method can run on D11 (vertical). The "
-        "commands below are what multibench run would execute. A method whose input "
-        "files are missing has no command.\n")
+        "# Dry run: 0 of 1 method can run on D11 (vertical); the reason column says why.\n")
     # Z18 (r3): a mark is explained only when a row carries it
     assert ("# Commands of the 1 method whose input files are in place. [env missing] marks "
             "a method whose environment is not installed.\n") in cap.out
-    assert "[use multibench run]" not in cap.out
+    assert "[use multibench run" not in cap.out
     for text in (cap.out, cap.err):
         assert "`" not in text and "(s)" not in text
 
@@ -369,8 +370,9 @@ def test_strict_counts_are_labelled(monkeypatch, capsys):
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
     rc = cli.main(["scan", "D45", "--category", "mosaic", "--methods", "SMILE,Cobolt",
                    "--strict"])
-    first = capsys.readouterr().err.splitlines()[0]
+    warn, first = capsys.readouterr().err.splitlines()[:2]
     assert rc == 1
+    assert warn.startswith("warning: scan --strict is deprecated")      # 0.4.0
     assert first.startswith("error: --strict: 0 of 2 rows are runnable. Rows whose "
                             "environment is not ready: 2. Rows that need a GPU this host "
                             "lacks: 1.")

@@ -13,7 +13,7 @@ import pytest
 
 import multibench as mtb
 from multibench import cli, config, workflow
-from multibench.engine import envs, resolve
+from multibench.engine import envs, ingest, resolve
 from tests.conftest import full_scan
 
 PEAKS = [f"chr1:{i * 1000}-{i * 1000 + 200}" for i in range(40)]
@@ -185,7 +185,7 @@ def test_to_canonical_gas_follows_the_peak_order(tmp_path, capsys):
     gas = _gas_adata(shuffled)
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        out = mtb.io.to_canonical(gas, d, modality="gas")
+        out = ingest._to_canonical(gas, d, modality="gas")   # io.to_canonical, deprecated
     assert out == d / "atac_gas.h5"
     assert _barcodes(out) == atac
     back = mtb.io.read_canonical(out, sparse=False)
@@ -347,13 +347,16 @@ def test_compact_cli_table_keeps_expects_gene_activity(tmp_path, capsys, monkeyp
     _h5(d / "rna.h5", GENES, cells)
     _h5(d / "atac.h5", PEAKS, cells)
     _labels(d / "cty.csv", 30)
-    rc = cli.main(["scan", "MYMULTIOME", "--category", "vertical", "--data-path", str(tmp_path),
-                   "--modalities", "rna,atac"])
-    out = capsys.readouterr().out
+    rc = cli.main(["scan", str(d), "--category", "vertical", "--modalities", "rna,atac"])
+    cap = capsys.readouterr()
     assert rc == 0
-    line = next(ln for ln in out.splitlines() if ln.strip().startswith("Matilda"))
-    assert "Matilda needs gene-activity ATAC" in line
-    assert "resolved to a peak matrix" not in out
+    # 0.4.0: scan prints mtb.scan's per-method table, whose reason column is
+    # clipped; the [scan] line on stderr gives the ATAC reason in full
+    line = next(ln for ln in cap.out.splitlines() if ln.strip().startswith("Matilda"))
+    assert line.split()[:3] == ["Matilda", "rna+atac", "False"]
+    line = next(ln for ln in cap.err.splitlines() if ln.startswith("[scan] Matilda: "))
+    assert "Matilda needs gene-activity ATAC, and atac.h5 holds peaks." in line
+    assert "resolved to a peak matrix" not in cap.out + cap.err
 
 
 # --- M31: a variant that reads fewer batches than the folder holds ------------
@@ -411,9 +414,9 @@ def test_read_canonical_missing_path_names_the_data_path(tmp_path, monkeypatch):
 
 def test_read_canonical_example_builds_the_path_from_data_path():
     doc = mtb.io.read_canonical.__doc__
-    assert 'd = mtb.config.DEFAULT.data_path / "D11"' in doc
-    assert 'rna = mtb.io.read_canonical(d / "rna.h5")' in doc
-    assert 'adt = mtb.io.read_canonical(d / "adt.h5", sparse=False)' in doc
+    assert 'rna = mtb.io.read_canonical(mtb.config.DEFAULT.data_path / "D11" / "rna.h5")' \
+        in doc
+    assert "sparse=" not in doc                    # deprecated in 0.4.0
     assert '"data/D11/rna.h5"' not in doc
 
 

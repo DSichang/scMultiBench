@@ -6,7 +6,6 @@ Every test needs the docs source (SCMULTIBENCH_DOCS=<docs dir>) and is
 skipped without it.
 """
 import os
-import warnings
 from pathlib import Path
 
 import pytest
@@ -79,19 +78,17 @@ def test_step1_names_both_routes_for_citeseq_donors():
     routes visible and moves the counts to the Step 1 Details block."""
     step1 = _flat("quickstart.md").split("## Step 1:", 1)[1].split("```", 1)[0]
     whole = _flat("quickstart.md").split("## Step 1:", 1)[1].split("## Step 2:", 1)[0]
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        n_v = len(mtb.find_methods("vertical", modalities=["rna", "adt"]))
-        n_c = len(mtb.find_methods("cross", modalities=["rna", "adt"]))
-        assert "D11" in set(mtb.results_coverage("vertical").dataset)
-        assert "D52" in set(mtb.results_coverage("cross").dataset)
+    n_v = len(mtb.find_methods("vertical", modalities=["rna", "adt"]))
+    n_c = len(mtb.find_methods("cross", modalities=["rna", "adt"]))
+    stored = mtb.catalog.datasets().query("has_results").set_index("dataset").category
+    assert stored["D11"] == "vertical" and stored["D52"] == "cross"
     assert "CITE-seq donors: use `vertical` in the same way." in step1
     assert ("The `cross` category integrates the donors as batches and reads a fixed number "
             "of them, three for RNA + ADT: see the "
             "[One file per batch](tutorials/run.md#one-file-per-batch) tab. With another "
             "number of donors, use `vertical`, as in the recipe "
             "[Another number of donors](tutorials/run.md#recipe-donors).") in step1
-    assert f"the `vertical` category has {n_v} RNA + ADT methods and stored scores on D11" in whole
+    assert f"the `vertical` category has {n_v} RNA + ADT methods and stored results on D11" in whole
     # cross has tasks without RNA + ADT since the article's 13 tasks: the
     # sentence counts the methods that read the CITE-seq donors
     assert (f"The `cross` category has {n_c} RNA + ADT methods, which integrate the donors as "
@@ -115,7 +112,8 @@ def test_quickstart_batch_lines_name_run_all_as_the_guides_do():
 
 @needs_docs
 def test_cluster_recipe_pins_scripts_and_reads_strict():
-    """R3-26: both blocks can pin the scripts; the scan line says what exit 1 means."""
+    """R3-26: both blocks can pin the scripts. The scan line no longer passes
+    --strict (deprecated in 0.4.0: scan prints mtb.scan's table)."""
     install = _read("installation.md")
     cluster = install.split("## On a cluster with offline compute nodes", 1)[1].split("\n## ", 1)[0]
     # commented out: a bare <commit> is a bash redirection (review of f3_int)
@@ -123,8 +121,7 @@ def test_cluster_recipe_pins_scripts_and_reads_strict():
     assert cluster.count(line) == 2 and len(line) <= 80
     login = cluster.split('```bash title="login node"', 1)[1].split("```", 1)[0]
     assert login.index(line) < login.index("multibench fetch --scripts")
-    assert login.index("# --strict: exit 1 when any method in --methods has no runnable row") \
-        < login.index("multibench scan LAB")
+    assert "--strict" not in cluster and "multibench scan LAB" in login
     assert "Check it with `du` after the first install." in cluster
 
 
@@ -173,7 +170,8 @@ def test_strict_pages_name_both_exit_rules():
 def test_api_page_run_all_batch_and_off_linux_refusal():
     api = _flat("api.md")
     assert "The message names the install command. On macOS and Windows it first says" not in api
-    assert "Methods run only on Linux: elsewhere `mtb.run` raises `OSError`." in api
+    assert "Methods run only on Linux: elsewhere `mtb.run` raises `OSError`." not in api
+    assert "## 2. Run (Linux)" in _read("api.md")
 
 
 @needs_docs

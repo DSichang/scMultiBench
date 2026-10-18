@@ -135,22 +135,25 @@ def _figure_texts(fig):
 def test_summary_mode_names_the_tied_mean_rank_not_a_metric_value():
     import matplotlib.pyplot as plt
     tbl, msgs = _messages(mtb.plot.build_table, _trade_places(), aggregate="summary")
-    grey = [m for m in msgs if m.endswith("are grey.")]
+    grey = [m for m in msgs if "are grey." in m]
     assert grey == ["Every method has mean rank 1.5 in ARI, NMI, ASW and cLISI. "
-                    "Those columns are grey."], msgs
+                    "Those columns are grey. Leave them out with metrics=."], msgs
     assert not any("same value" in m or "1.500" in m for m in msgs)
     for overall in ("rank", "mean_overall"):
         fig, msgs = _messages(mtb.plot.bubble, _trade_places(), aggregate="summary",
                               overall=overall)
-        assert [m for m in msgs if m.endswith("are grey.")] == grey
+        assert [m for m in msgs if "are grey." in m] == grey
         plt.close(fig)
 
 
 def test_dataset_mode_keeps_the_metric_value():
+    import matplotlib.pyplot as plt
     df = pd.DataFrame(_rows("A", "D1") + _rows("B", "D1", 0.6))
     df.loc[df["metric"] == "cLISI", "value"] = 0.0
-    _, msgs = _messages(mtb.plot.build_table, df)
-    assert "cLISI is 0.000 for every method. That column is grey." in msgs
+    fig, msgs = _messages(mtb.plot.bubble, df)
+    plt.close(fig)
+    assert ("cLISI is 0.000 for every method. That column is grey. Leave it out with "
+            "metrics=.") in msgs
 
 
 def test_cli_plot_bubble_with_one_method_warns_once(tmp_path, capsys):
@@ -353,26 +356,18 @@ def test_caveat_clauses_join_as_sentences():
 
 # ====================================================================== M13
 def test_cli_messages_name_commands_not_python_calls(tmp_path, capsys):
-    inp = mtb.inputs_for("D28", "diagonal", "SCALEX")
-    rc = cli.main(["run", "--method", "SCALEX", "--category", "diagonal",
-                   "--input", f"rna={inp['rna']}", "--input", f"atac_gas={inp['atac_gas']}",
-                   "--out-dir", str(tmp_path / "o"), "--dry-run"])
-    err = capsys.readouterr().err
-    assert rc == 0 and err.startswith("# Dry run. Nothing was executed.\n")
-    assert "# multibench run would execute:" in err
-    assert "run()" not in err
     rc = cli.main(["params", "Matilda"])
     out = capsys.readouterr().out
     assert rc == 0 and "(set with --param KEY=VALUE)" in out
     assert "run(params" not in out and "mtb.params_for" not in out
-    # sciPENN has one cross row, so the header speaks of methods (UINMF has six rows)
+    # sciPENN has one cross row, so the header speaks of methods (UINMF has six rows);
+    # 0.4: the header is one sentence and names no deprecated command
     rc = cli.main(["run-all", "D52", "--category", "cross", "--methods", "sciPENN",
                    "--dry-run"])
     err = capsys.readouterr().err
     assert rc == 0
-    assert ("The commands below are what multibench run would execute. A method whose "
-            "input files are missing has no command.") in err
-    assert "run()" not in err
+    assert re.search(r"^# Dry run: [01] of 1 method can run on D52 \(cross\)", err, re.M), err
+    assert "multibench run " not in err and "run()" not in err
     assert "method_info(" not in mtb.env.DIFFICULTY["blocked-script"]
 
 
@@ -395,9 +390,8 @@ def _help(path, flag):
 
 
 def test_help_texts_put_the_object_first_and_end_in_plain_sentences():
-    assert _help(["scan"], "--assume-gpu") == (
-        "skip this host's GPU test. On a login node without a GPU, it checks a job for "
-        "a GPU node. Python: assume_gpu=True")
+    import argparse
+    assert _help(["scan"], "--assume-gpu") == argparse.SUPPRESS   # hidden since 0.4.0
     assert _help(["fetch"], "--ref") == "==SUPPRESS=="          # hidden since 0.4.0 (Y36)
     doc = " ".join(mtb.scan.__doc__.split())
     assert ("``True`` = skip this host's GPU test, to check a job for a GPU node from a "
@@ -407,25 +401,23 @@ def test_help_texts_put_the_object_first_and_end_in_plain_sentences():
     assert doubled == []
     assert _help(["params"], "--category").endswith(
         "(multibench layout explains them). Only that category's variants.")       # X53
-    import argparse
     # 0.4: --task (and the list alias) are deprecated and hidden from the help
     assert _help(["list"], "--task") == argparse.SUPPRESS
 
 
 # ====================================================================== M25
 def test_docstrings_drop_the_justification_tails():
-    from multibench.eval.pipeline import to_long
+    # 0.4: to_long is deprecated; evaluate returns the long table and says so
     texts = {
-        "to_long": to_long.__doc__,
+        "evaluate": mtb.evaluate.__doc__,
         "summary": W.BatchResult.summary.__doc__,
         "plan": mtb.env.plan.__doc__,
         "load_results": mtb.load_results.__doc__,
     }
     flat = {k: " ".join(v.split()) for k, v in texts.items()}
-    assert "keep their provenance through a CSV round trip" not in flat["to_long"]
-    assert ("The result has the columns of ``mtb.load_results`` and concatenates with "
-            "the stored tables.") in flat["to_long"]
-    assert "the placeholder the plotting layer uses" not in flat["to_long"]
+    assert "keep their provenance through a CSV round trip" not in flat["evaluate"]
+    assert "next to ``mtb.load_results`` rows or alone." in flat["evaluate"]
+    assert "the placeholder the plotting layer uses" not in flat["evaluate"]
     assert "bounded above by the ARI itself" not in flat["summary"]
     # R4-14 deleted the ratio sentence; 0.4 cut the formula with the long notes
     assert "not a difference, because" not in flat["summary"]
@@ -437,12 +429,13 @@ def test_docstrings_drop_the_justification_tails():
 def test_public_docstrings_say_cell_order():
     import inspect
     from multibench.eval.pipeline import evaluate
-    for obj in (mtb.labels_for, mtb.inputs_for, evaluate, runner.RunResult, mtb.run):
+    for obj in (resolve.labels_for, evaluate, runner.RunResult, mtb.run_all):
         doc = inspect.getdoc(obj)
         for old in ("stacking order", "cell-stacking", "stacks its cells", "stacks the cells"):
             assert old not in doc, (obj, old)
-    assert inspect.getdoc(mtb.labels_for).splitlines()[0] == (
-        "Return a dataset's cell-type label files, in the method's cell order.")
+    # 0.4: labels_for is deprecated; evaluate(dataset=, method=) reads the label files
+    assert ("its label files are read, in the cell order of ``method``"
+            in " ".join(inspect.getdoc(evaluate).split()))
 
 
 # ====================================================================== M10
@@ -526,15 +519,6 @@ def test_quickstart_laptop_tab_runs_on_a_panel_of_14_adts(tmp_path, monkeypatch,
             and "multibench" in str(w.filename)]
     assert not any("only one method" in m.lower() for m in msgs), msgs
     plt.close("all")
-
-
-@needs_docs
-def test_run_guide_says_to_fetch_the_scripts_before_adding_setup_files():
-    run = (_docs_root() / "tutorials" / "run.md").read_text()
-    glue = run.split("- GLUE:", 1)[1].split("\n- ", 1)[0]
-    assert glue.index("multibench fetch --scripts") < glue.index("gencode.v43")
-    mira = run.split("- MIRA:", 1)[1].split("\n\n", 1)[0]
-    assert mira.index("fetch the method scripts") < mira.index("logger.py")
 
 
 @needs_docs

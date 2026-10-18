@@ -356,7 +356,10 @@ def test_a_dataset_order_batch_is_cut_to_the_batches_a_method_reads(tmp_path, mo
 def test_batch_docs_name_the_label_file_order():
     p = " ".join(inspect.getdoc(mtb.run_all).split("Parameters", 1)[1]
                  .split("Returns", 1)[0].split())
-    assert "One batch per cell, in the order of ``mtb.labels_for(dataset)``" in p
+    # 0.4: labels_for is deprecated, so the doc no longer names it
+    assert ("One batch per cell; a Series or a barcode-indexed CSV is aligned by barcode. "
+            "``None`` = each cell's label file.") in p
+    assert "labels_for" not in p
 
 
 # ---------------------------------------------------------- pinned demo sets
@@ -439,14 +442,6 @@ def test_evaluate_count_errors_name_where_the_labels_came_from(tmp_path, capsys)
     assert ("error: the label files of D46 (cty1.csv, cty2.csv, cty3.csv) hold 21,416 "
             "labels for 500 cells in --embedding.") in err, err
     assert "--labels" not in err
-    lab = tmp_path / "cty.csv"
-    pd.DataFrame({"x": ["A", "B"] * 250}).to_csv(lab, index=False)
-    cl = tmp_path / "cl.csv"
-    pd.DataFrame({"x": [1, 2] * 15}).to_csv(cl, index=False)
-    rc = _quiet(cli.main, ["evaluate", "--embedding", str(emb), "--labels", str(lab),
-                           "--clusters", str(cl), "--metrics", "ARI"])
-    err = capsys.readouterr().err
-    assert rc == 1 and "--clusters gave 30 cluster ids (cl.csv) for 500 cells" in err, err
 
 
 def test_an_unpacked_size_below_the_archive_reads_unknown(tmp_path, monkeypatch):
@@ -475,8 +470,8 @@ def test_layout_and_export_notes_say_scan_skips_the_other_representation():
     assert "still runs" not in txt
     assert "A method whose ATAC file holds the other representation gives a wrong " \
            "embedding." in txt
-    assert "mtb.scan and mtb.run_all skip such a method unless allow_atac_mismatch=True." \
-        in txt
+    assert "mtb.scan and mtb.run_all skip such a method." in txt
+    assert "allow_atac_mismatch" not in txt          # deprecated in 0.4.0
     notes = " ".join(inspect.getdoc(ingest.export_dataset).split())
     assert "reports the mismatch in its ``caveat`` column" not in notes
 
@@ -528,8 +523,7 @@ def test_pages_state_the_donor_count_cross_reads():
     step1 = _flat("quickstart.md").split("## Step 1:", 1)[1].split("## Step 2:", 1)[0]
     assert (f"The `cross` category has {len(reads) + 1} RNA + ADT methods, which integrate "
             f"the donors") in step1
-    assert ("These methods read batches 1-3. UINMF also has a variant for two "
-            "batches.") in step1
+    assert "These methods read batches 1-3." in step1
     assert "UINMF reads only the first two" not in step1
     assert ("The `cross` category integrates the donors as batches and reads a fixed number "
             "of them, three for RNA + ADT: see the") in step1

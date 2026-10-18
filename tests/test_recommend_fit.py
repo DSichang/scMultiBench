@@ -42,17 +42,13 @@ def test_no_modality_warning_when_the_data_measured_it():
         assert not any("datasets measured" in m for m in msgs), msgs
 
 
-def test_datasets_column_names_where_each_score_comes_from():
+def test_recommend_has_the_six_columns():
+    # 0.4.0 dropped n_datasets, n_datasets_total, coverage and datasets: with one
+    # stored dataset per category they were constant (the error above names it)
     r, _ = _quiet(mtb.recommend, "vertical")
-    assert list(r.columns[:5]) == ["method", "grand_score", "n_datasets",
-                                   "n_datasets_total", "coverage"]
-    assert "datasets" in r.columns
-    scored = r[r.grand_score.notna()]
-    assert len(scored) > 0
-    for row in scored.itertuples():
-        ids = row.datasets.split(", ")
-        assert set(ids) <= {"D11", "D11s"} and len(ids) == row.n_datasets, row
-    assert (r[r.grand_score.isna()].datasets == "").all()
+    assert list(r.columns) == ["method", "grand_score", "needs_labels", "runtime_tier",
+                               "worst_sec", "env"]
+    assert r.grand_score.notna().any()
 
 
 def test_every_stored_dataset_has_its_measured_modalities():

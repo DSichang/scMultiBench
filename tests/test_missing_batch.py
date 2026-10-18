@@ -20,7 +20,7 @@ from multibench import config
 from multibench.eval import io as eio
 from multibench.eval import pipeline
 from tests.test_missing_labels import (GAPS, KEEP, N, _adata, _cells, _donors, _drop,
-                                       _gaps, _same, _silent)
+                                       _gaps, _same, _silent, _value)
 
 pytest.importorskip("scib")
 
@@ -148,13 +148,13 @@ def test_a_complete_batch_changes_nothing(tmp_path):
                           (a, "donor"), (a, "obs:donor"), (emb, str(path))):
         for kw in ({}, {"missing_labels": "drop"}):
             _same(_silent(output, labels=lab, batch=batch, metrics=METRICS, **kw), want)
-    assert want["Value"].to_dict() == pytest.approx(SCORES_034, abs=1e-9)
+    assert want.set_index("metric")["value"].to_dict() == pytest.approx(SCORES_034, abs=1e-9)
     assert list(want.attrs) == ["leiden_flavor", "clustering", "multibench_version",
                                 "scib_version"]
     # batch names that only look like the missing words are batches
     odd = pd.Series(bat).map({"d1": "na", "d2": "none", "d3": "0"}).to_numpy()
     got = mtb.evaluate(emb, labels=lab, batch=odd, metrics=METRICS)
-    assert got["Value"].to_dict() == pytest.approx(SCORES_034, abs=1e-9)
+    assert got.set_index("metric")["value"].to_dict() == pytest.approx(SCORES_034, abs=1e-9)
 
 
 def test_docstring_says_every_cell_needs_a_batch():
@@ -183,8 +183,8 @@ def test_drop_checks_the_batch_of_the_cells_it_keeps():
             mtb.evaluate(emb, labels=nan, batch=_gaps(bat, None, at=labelled),
                          missing_labels="drop", **kw)
     assert str(e.value) == _bv1(n=4, total=270)
-    # nothing was scored, so nothing says "Scored"
-    assert [str(w.message) for w in rec] == []
+    # nothing was scored, so nothing says "Scored"; only the deprecated keyword warns
+    assert [str(w.message) for w in rec if not issubclass(w.category, FutureWarning)] == []
 
 
 def test_drop_names_the_words_of_the_cells_it_keeps(tmp_path):
@@ -221,7 +221,7 @@ def test_the_file_of_origin_is_not_checked(tmp_path, monkeypatch):
     # the batch is the label file of each cell: evaluate made it, only the labels are checked
     out = mtb.evaluate(emb, labels=[str(p) for p in files], metrics=["ASW", "ASW_batch"])
     assert checked == [lab.tolist()]
-    assert out.loc["ASW_batch", "Value"] > 0.9
+    assert _value(out, "ASW_batch") > 0.9
     # no batch at all: the placeholder is not checked either
     del checked[:]
     mtb.evaluate(emb, labels=lab, metrics=["ASW"])

@@ -202,11 +202,12 @@ def test_env_tables_as_frame(monkeypatch):
 
 def test_env_docstrings_have_parameters_and_returns():
     import inspect
-    # env.plan / env.status are deprecated: a one-line docstring naming the new name
-    for fn in (envs.doctor, envs.create_all, envs.create_env,
+    # env.plan / env.status / env.doctor are deprecated: a one-line docstring
+    # naming the new name
+    assert "mtb.env.install(methods, dry_run=True)" in inspect.getdoc(envs.doctor)
+    for fn in (envs.create_all, envs.create_env,
                envs.create, envs.create_group, envs.install_packed, envs.packed_sizes,
                envs.host_platform_problem):
         doc = inspect.getdoc(fn)
         assert doc and "Returns" in doc, fn.__name__
         assert doc.splitlines()[0].strip().endswith((".", "?")), fn.__name__
-    assert "``mtb.env.install`` installs" in " ".join(inspect.getdoc(envs.doctor).split())

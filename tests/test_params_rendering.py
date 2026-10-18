@@ -79,9 +79,10 @@ def test_a_package_set_key_is_refused():
 
 # Y38: one default, the one a run uses
 def test_tunable_default_is_what_a_run_uses():
-    # r3 (X64): no_cuda is the package's switch and left tunable; epochs keeps both
+    # r3 (X64): no_cuda is the package's switch and left tunable; 0.4.0: one
+    # default per key, no script_default copy
     t = mtb.params_for("scMM", "vertical", ["rna", "atac"])["tunable"]
-    assert "no_cuda" not in t and t["epochs"]["default"] == t["epochs"]["script_default"]
+    assert "no_cuda" not in t and set(t["epochs"]) == {"type", "default"}
 
 
 # Y14 / Y15 / Y16: params and argument-order mistakes get one plain sentence

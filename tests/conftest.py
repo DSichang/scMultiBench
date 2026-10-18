@@ -210,5 +210,4 @@ def _no_archive_download(monkeypatch):
 @_pytest.fixture(autouse=True)
 def _fresh_session_notes(monkeypatch):
     from multibench.engine import resolve
-    monkeypatch.setattr(resolve, "_SHADOW_NOTED", set())
     monkeypatch.setattr(resolve, "_ORDER_NOTED", set())

@@ -136,7 +136,10 @@ def test_the_command_line_names_its_options(tmp_path, capsys, monkeypatch):
     err = capsys.readouterr().err
     assert err.splitlines()[-1] == (
         f"warning: --labels (obs.csv) has 60 different labels for 60 cells. {CHECK}")
-    assert "--column" not in err
+    # 0.4.0: --column is hidden and deprecated; only its own warning names it
+    deprecated = "warning: evaluate --column is deprecated and will be removed in 0.5."
+    assert [line for line in err.splitlines() if "--column" in line] == [
+        deprecated + " Use a one-column --labels CSV."]
     assert config._CLI is False
     assert cli.main(["evaluate", "--embedding", str(emb), "--labels", str(obs), "--column",
                      "celltype", "--metrics", "ARI"]) == 0

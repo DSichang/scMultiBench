@@ -1,5 +1,8 @@
-"""mtb.classify: the predicted cell type of each query cell, one batch as
-the reference (the benchmark's MLP classification step)."""
+"""classify: the predicted cell type of each query cell, one batch as the
+reference (the benchmark's MLP classification step). Since 0.4 mtb.classify and
+mtb.classification_metrics are deprecated (mtb.evaluate(metrics="classification")
+reports the mean row); the tests below call the implementation, one test the
+deprecated names."""
 import warnings
 
 import anndata as ad
@@ -9,6 +12,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+from multibench.eval.classify import classification_metrics, classify
 
 COLUMNS = ["reference", "batch", "cell", "label", "predicted"]
 #: far apart, so 10 epochs on a few cells already tell the types apart
@@ -43,7 +47,7 @@ def three(tmp_path):
 
 def test_return_frame(three):
     emb, labels, paths = three
-    out = mtb.classify(emb, labels=list(paths.values()))
+    out = classify(emb, labels=list(paths.values()))
     assert list(out.columns) == COLUMNS
     assert isinstance(out.index, pd.RangeIndex)
     first = out[out["reference"] == "cty1"]
@@ -56,7 +60,7 @@ def test_return_frame(three):
 
 def test_every_batch_is_the_reference_in_turn(three):
     emb, labels, paths = three
-    out = mtb.classify(emb, labels=list(paths.values()))
+    out = classify(emb, labels=list(paths.values()))
     assert out["reference"].unique().tolist() == ["cty1", "cty2", "cty3"]
     assert out.groupby("reference").size().to_dict() == {"cty1": 40, "cty2": 60, "cty3": 60}
     assert not (out["reference"] == out["batch"]).any()
@@ -64,14 +68,14 @@ def test_every_batch_is_the_reference_in_turn(three):
 
 def test_one_reference(three):
     emb, labels, paths = three
-    out = mtb.classify(emb, labels=list(paths.values()), reference="cty2")
+    out = classify(emb, labels=list(paths.values()), reference="cty2")
     assert set(out["reference"]) == {"cty2"} and len(out) == 60
     assert out["batch"].tolist() == ["cty1"] * 30 + ["cty3"] * 30
 
 
 def test_query_cells_of_a_type_not_in_the_reference_are_left_out(three):
     emb, labels, paths = three
-    out = mtb.classify(emb, labels=list(paths.values()), reference="cty1")
+    out = classify(emb, labels=list(paths.values()), reference="cty1")
     assert "C" not in set(out["label"]) and "C" not in set(out["predicted"])
     assert len(out) == 40
 
@@ -82,7 +86,7 @@ def test_cells_without_a_label_are_left_out(three, tmp_path):
     d.loc[[0, 1], "x"] = np.nan
     d.to_csv(paths["cty2"], index=False)
     with pytest.warns(UserWarning) as rec:
-        out = mtb.classify(emb, labels=list(paths.values()))
+        out = classify(emb, labels=list(paths.values()))
     assert [str(w.message) for w in rec] == [
         "2 of the 90 cells have no label; they are left out."]
     assert not out["cell"].isin([30, 31]).any()
@@ -95,7 +99,7 @@ def test_labels_and_batch_as_obs_columns(three):
     a.obs_names = [f"c{i}" for i in range(90)]
     a.obs["celltype"] = labels
     a.obs["donor"] = ["d1"] * 30 + ["d2"] * 30 + ["d3"] * 30
-    out = mtb.classify(a, labels="celltype", batch="donor", reference="d3")
+    out = classify(a, labels="celltype", batch="donor", reference="d3")
     assert out["cell"].tolist() == [f"c{i}" for i in range(60)]
     assert out["label"].tolist() == labels[:60]
     assert set(out["batch"]) == {"d1", "d2"}
@@ -105,7 +109,7 @@ def test_one_batch_is_an_error(three):
     emb, labels, paths = three
     for labels in ({"cty1": paths["cty1"]}, [paths["cty1"]]):
         with pytest.raises(ValueError) as e:
-            mtb.classify(emb[:30], labels=labels)
+            classify(emb[:30], labels=labels)
         assert str(e.value) == ("classify needs at least two batches; every cell is in "
                                 "batch cty1. Pass batch= with two or more batches.")
 
@@ -113,9 +117,9 @@ def test_one_batch_is_an_error(three):
 def test_no_batch_is_an_error(three):
     emb, labels, paths = three
     with pytest.raises(ValueError) as e:
-        mtb.classify(emb, labels=labels)
+        classify(emb, labels=labels)
     with pytest.raises(ValueError) as e2:
-        mtb.classify(emb[:30], labels=paths["cty1"])
+        classify(emb[:30], labels=paths["cty1"])
     assert str(e.value) == str(e2.value) == (
         "classify needs the batch of each cell. Pass batch=, or "
         "labels=mtb.labels_for(dataset, category, method).")
@@ -127,19 +131,19 @@ def test_a_graph_or_label_output_is_an_error(three, tmp_path):
     with h5py.File(graph, "w") as f:
         f["data"] = np.tile(np.arange(20), (90, 1))
     with pytest.raises(ValueError) as e:
-        mtb.classify(graph, labels=list(paths.values()))
+        classify(graph, labels=list(paths.values()))
     assert str(e.value) == ("scMoMaT writes a graph, not an embedding, so it has no "
                             "classification scores. Score it with "
                             "mtb.evaluate(metrics='clustering').")
     with pytest.raises(ValueError) as e:
-        mtb.classify(labels, labels=list(paths.values()))          # predicted labels
+        classify(labels, labels=list(paths.values()))          # predicted labels
     assert str(e.value) == ("classify needs an embedding; output is not one. "
                             "Pass the method's embedding file.")
     # cells x cells, and a kNN index matrix as mtb.run returns it for scMoMaT
     knn = np.stack([np.roll(np.arange(90), -i)[:20] for i in range(90)])
     for output in (np.eye(90), knn, knn.astype(float), knn + 1, knn.T):
         with pytest.raises(ValueError) as e:
-            mtb.classify(output, labels=list(paths.values()))
+            classify(output, labels=list(paths.values()))
         assert str(e.value) == ("output is a graph, not an embedding, so it has no "
                                 "classification scores. Score it with "
                                 "mtb.evaluate(metrics='clustering').")
@@ -152,7 +156,7 @@ def test_the_umap_of_a_graph_method_is_a_graph_output(three, tmp_path):
     with h5py.File(umap, "w") as f:
         f["data"] = emb[:, :2]
     with pytest.raises(ValueError) as e:
-        mtb.classify(umap, labels=list(paths.values()))
+        classify(umap, labels=list(paths.values()))
     assert str(e.value).startswith("scMoMaT writes a graph, not an embedding")
 
 
@@ -174,14 +178,14 @@ def test_the_neighbour_index_rule():
 def test_unknown_reference_is_an_error(three):
     emb, labels, paths = three
     with pytest.raises(ValueError) as e:
-        mtb.classify(emb, labels=list(paths.values()), reference="cty4")
+        classify(emb, labels=list(paths.values()), reference="cty4")
     assert str(e.value) == "reference='cty4' is not a batch. Pass one of cty1, cty2 or cty3."
 
 
 def test_a_reference_with_one_cell_type_is_skipped(tmp_path):
     emb, labels, paths = _write(tmp_path, {"cty1": ("A", 20), "cty2": ("AB", 20)})
     with pytest.warns(UserWarning) as rec:
-        out = mtb.classify(emb, labels=list(paths.values()))
+        out = classify(emb, labels=list(paths.values()))
     assert [str(w.message) for w in rec] == ["Reference batch cty1 has one cell type; skipped."]
     assert set(out["reference"]) == {"cty2"} and len(out) == 20
 
@@ -190,8 +194,8 @@ def test_same_seed_same_predictions(tmp_path):
     # overlapping types, so the predictions depend on the fit
     emb, labels, paths = _write(tmp_path, {"cty1": ("ABC", 60), "cty2": ("ABC", 60)})
     emb = emb * 0.05
-    a = mtb.classify(emb, labels=list(paths.values()), seed=3)
-    b = mtb.classify(emb, labels=list(paths.values()), seed=3)
+    a = classify(emb, labels=list(paths.values()), seed=3)
+    b = classify(emb, labels=list(paths.values()), seed=3)
     pd.testing.assert_frame_equal(a, b)
 
 
@@ -204,19 +208,19 @@ def test_labels_for_dict_in_a_method_order(tmp_path):
                                      "cty2": ("ABC", 25)})
     d = mtb.labels_for("DS", "cross", "StabMap", data_path=tmp_path)
     assert list(d) == ["cty3", "cty1", "cty2"]
-    out = mtb.classify(emb, labels=d, reference="cty3")
+    out = classify(emb, labels=d, reference="cty3")
     assert out["batch"].tolist() == ["cty1"] * 20 + ["cty2"] * 25
     assert out["label"].tolist() == labels[30:]
     assert (out["label"] == out["predicted"]).all()
     # the same files in another order need label_order=, as for evaluate
     plain = {k: d[k] for k in ("cty1", "cty3", "cty2")}
     with pytest.raises(ValueError) as e:
-        mtb.classify(emb, labels=plain)
+        classify(emb, labels=plain)
     with pytest.raises(ValueError) as e2, warnings.catch_warnings():
         warnings.simplefilter("ignore")
         mtb.evaluate(emb, labels=plain)
     assert str(e.value) == str(e2.value)
-    out2 = mtb.classify(emb, labels=plain, label_order=["cty3", "cty1", "cty2"],
+    out2 = classify(emb, labels=plain, label_order=["cty3", "cty1", "cty2"],
                         reference="cty3")
     pd.testing.assert_frame_equal(out, out2)
 
@@ -253,7 +257,7 @@ def _pred(refs):
 
 
 def test_metrics_equal_the_r_code():
-    out = mtb.classification_metrics(_pred(["r1", "r2", "r3"]))
+    out = classification_metrics(_pred(["r1", "r2", "r3"]))
     assert list(out.columns) == METRICS and out.index.name == "reference"
     assert out.index.tolist() == ["r1", "r2", "r3", "mean"]
     for r in ("r1", "r2", "r3"):
@@ -262,13 +266,13 @@ def test_metrics_equal_the_r_code():
 
 
 def test_mean_row_is_the_mean_over_references():
-    out = mtb.classification_metrics(_pred(["r2", "r1"]))
+    out = classification_metrics(_pred(["r2", "r1"]))
     assert out.index.tolist() == ["r2", "r1", "mean"]    # input order
     np.testing.assert_allclose(
         out.loc["mean"].to_numpy(float),
         np.mean([R_CASES["r1"][2], R_CASES["r2"][2]], axis=0), rtol=0, atol=1e-12)
     # a NaN of one reference is not averaged away
-    out = mtb.classification_metrics(_pred(["r1", "r3"]))
+    out = classification_metrics(_pred(["r1", "r3"]))
     assert np.isnan(out.loc["mean", "Spec"]) and not out.loc["mean"].drop("Spec").isna().any()
 
 
@@ -276,7 +280,7 @@ def test_a_frame_without_reference_gives_one_row():
     # labels that are numbers, as the R code reads them: 1, 2, 3, 10
     pred = pd.DataFrame({"label": [1, 2, 10, 2, 1, 10, 3],
                          "predicted": [1, 10, 10, 2, 2, 10, 1]})
-    out = mtb.classification_metrics(pred)
+    out = classification_metrics(pred)
     assert list(out.columns) == METRICS and len(out) == 1
     np.testing.assert_allclose(out.iloc[0].to_numpy(float),
                                [0.5714285714285714, 0.5, 0.85000000000000009, 0.5,
@@ -285,17 +289,33 @@ def test_a_frame_without_reference_gives_one_row():
 
 def test_metrics_of_classify(three):
     emb, labels, paths = three
-    out = mtb.classification_metrics(mtb.classify(emb, labels=list(paths.values())))
+    out = classification_metrics(classify(emb, labels=list(paths.values())))
     assert out.index.tolist() == ["cty1", "cty2", "cty3", "mean"]
     assert (out == 1.0).all().all()                      # well separated types
 
 
 def test_missing_column_is_an_error():
     with pytest.raises(ValueError) as e:
-        mtb.classification_metrics(pd.DataFrame({"label": ["A"]}))
+        classification_metrics(pd.DataFrame({"label": ["A"]}))
     assert str(e.value) == ("predictions has no predicted column. "
                             "Pass the frame mtb.classify returns.")
     with pytest.raises(ValueError) as e:
-        mtb.classification_metrics(pd.DataFrame({"cell": [0]}))
+        classification_metrics(pd.DataFrame({"cell": [0]}))
     assert str(e.value) == ("predictions has no label and no predicted column. "
                             "Pass the frame mtb.classify returns.")
+
+
+def test_the_deprecated_names_warn_once_and_still_work(three):
+    emb, labels, paths = three
+    tail = ("is deprecated and will be removed in 0.5. "
+            "Use mtb.evaluate(..., metrics='classification').")
+    for name, call in (
+            ("classify", lambda: mtb.classify(emb, labels=list(paths.values()))),
+            ("classification_metrics",
+             lambda: mtb.classification_metrics(_pred(["r1", "r2"])))):
+        with warnings.catch_warnings(record=True) as rec:
+            warnings.simplefilter("always")
+            out = call()
+        future = [str(w.message) for w in rec if issubclass(w.category, FutureWarning)]
+        assert future == [f"{name} {tail}"]
+        assert not out.empty

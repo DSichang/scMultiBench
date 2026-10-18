@@ -358,7 +358,10 @@ def test_requires_gpu_dry_run_still_previews(tmp_path, no_gpu):
 
 
 def test_run_docstring_documents_the_contract():
-    doc = mtb.run.__doc__ or ""
+    # mtb.run is deprecated in 0.4.0 (its docstring names run_all); the
+    # contract stays on the implementation it wraps
+    assert "mtb.run_all(" in mtb.run.__doc__
+    doc = mtb.run.__wrapped__.__doc__ or ""
     assert "OSError" in doc and "needs a GPU this host lacks" in " ".join(doc.split())
 
 

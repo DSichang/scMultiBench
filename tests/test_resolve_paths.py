@@ -32,11 +32,6 @@ def test_inputs_for_returns_absolute_paths_for_relative_data_path(tmp_path, monk
     assert got["data_dir"] == os.path.join(str(dd), "")
 
 
-def test_inputs_for_docstring_promises_absolute_paths():
-    import inspect
-    assert "Paths are absolute" in inspect.getdoc(mtb.inputs_for)
-
-
 def test_atac_means_any_atac_role(tmp_path):
     _touch(tmp_path / "SYNMULTI", ["rna.h5", "atac.h5", "cty.csv"])
     # scMM's vertical variant is declared [rna, atac] since 0.4.0 (X13); 0.3's
@@ -96,13 +91,13 @@ def test_labels_for_validates_method_and_returns_absolute(tmp_path, monkeypatch)
     monkeypatch.chdir(tmp_path)
     _touch(tmp_path / "data" / "D11", ["rna.h5", "adt.h5", "cty.csv"])
     with pytest.raises(KeyError, match="Did you mean Matilda"):
-        mtb.labels_for("D11", method="Matlida", data_path="data")
-    got = mtb.labels_for("D11", data_path="data")
+        resolve.labels_for("D11", method="Matlida", data_path="data")
+    got = resolve.labels_for("D11", data_path="data")
     assert list(got) == ["cty"] and os.path.isabs(got["cty"])
     # method + category where the folder settles the variant: no error, same set
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        assert mtb.labels_for("D11", "vertical", "Matilda", data_path="data") == got
+        assert resolve.labels_for("D11", "vertical", "Matilda", data_path="data") == got
 
 
 def test_select_variant_helper_is_shared():

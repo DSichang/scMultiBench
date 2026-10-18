@@ -231,8 +231,9 @@ def test_env_plan_fallback_line_agrees_in_number(monkeypatch):
 
 def test_env_status_help_is_one_sentence_and_one_tag_per_line():
     p = _sub("env", "status")
-    assert p.description == ("Deprecated: use multibench env doctor. One line per method: "
-                             "installed or not, the environment name and a difficulty tag.")
+    assert p.description == ("Deprecated: use multibench env install --dry-run. One line "
+                             "per method: installed or not, the environment name and a "
+                             "difficulty tag.")
     text = p.format_help()
     assert "without surprises" not in text
     for tag in envs.DIFFICULTY:
@@ -242,27 +243,29 @@ def test_env_status_help_is_one_sentence_and_one_tag_per_line():
 # ====================================================================== M27
 def test_evaluate_and_run_help_texts():
     ev = _sub("evaluate")
-    clus = _opt_help(ev, "--clusters")
-    assert "they replace the Leiden clusters of ARI, NMI, ASW, iASW and iF1" in clus
     meth = _opt_help(ev, "--method")
-    # X95: one job per flag
-    assert meth.startswith("a package method: read the dataset's label files in its "
-                           "batch order")
+    # 0.4.0: --method names the rows; a package method also sets the label order
+    assert meth == ("fills the method column: a package method id, or your own name. A "
+                    "package method also reads --dataset's label files in its cell order")
     assert "registry" not in meth
     dry = _opt_help(_sub("run"), "--dry-run")
     assert "environment activation included" in dry and "conda run -n" not in dry
 
 
-def test_evaluate_unknown_method_on_the_dataset_route_names_labels(tmp_path, capsys):
+def test_evaluate_own_method_name_on_the_dataset_route_reads_the_labels(tmp_path, capsys):
+    """0.4.0: --method takes any name; the dataset's label files are read in the
+    folder's order, and a count that does not fit names them."""
     emb = tmp_path / "emb.npy"
     np.save(emb, np.zeros((10, 3)))
     rc = cli.main(["evaluate", "--embedding", str(emb), "--dataset", "D11", "--category",
                    "vertical", "--method", "PriyaNet"])
     err = capsys.readouterr().err
     assert rc == 1
-    assert "PriyaNet is not a package method." in err
-    assert ("For your own method, pass --name and the label files with --labels, once "
-            "per file, in your embedding's cell order.") in err
+    assert "is not a package method" not in err
+    assert err.splitlines()[:2] == [
+        "# labels: cty.csv from D11, in that order",
+        "error: the label files of D11 (cty.csv) hold 2,864 labels for 10 cells in "
+        "--embedding. Check that --embedding holds the embedding of --method on D11."]
 
 
 def test_evaluate_names_the_mudata_type():

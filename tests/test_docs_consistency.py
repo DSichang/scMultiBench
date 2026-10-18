@@ -400,7 +400,9 @@ def test_docs_pages_carry_the_colab_speed_round(path):
     _fetch = importlib.import_module("multibench.data.fetch")
     assert _fetch.OUTPUT_MANIFEST.is_file() and "D11" in _fetch._output_urls()
     assert "output_urls.json" not in (_fetch.fetch_outputs.__doc__ or "")
-    assert {"envs_dir", "leiden_flavor"} <= {f.name for f in dataclasses.fields(mtb.config.Config)}
+    # 0.4.0: config.Config is deprecated; the reference documents the class of DEFAULT
+    assert {"envs_dir", "leiden_flavor"} <= {f.name for f in dataclasses.fields(
+        type(mtb.config.DEFAULT))}
     text = path.read_text()
     if path.name == "installation.md":
         assert "### Google Colab" in text
@@ -417,7 +419,7 @@ def test_docs_pages_carry_the_colab_speed_round(path):
         # overview keeps the prose and links every entry point there
         assert "fetch_outputs" not in text
         assert "reference/run.md#multibench.workflow.load_batch" in text
-        assert "reference/config.md#multibench.config.Config" in text
+        assert "](reference/config.md)" in text
     if path.parent.name == "reference":
         directives = _directives(text)
         if path.name == "data.md":
@@ -425,7 +427,7 @@ def test_docs_pages_carry_the_colab_speed_round(path):
         if path.name == "run.md" and path.parent.name == "tutorials":
             assert "multibench.workflow.load_batch" in directives
         if path.name == "config.md":
-            assert "multibench.config.Config" in directives
+            assert directives.get("multibench.config._Config") == "mtb.config.DEFAULT"
             assert "MULTIBENCH_ENVS_DIR" in text and "MULTIBENCH_RUN_MODE" in text
         if path.name == "env.md":
             # hidden names leave the reference (0.4.0, Y32)
@@ -444,44 +446,30 @@ def test_docs_pages_carry_the_colab_speed_round(path):
 # dotted name is also a module) with the heading set to the public spelling.
 # This table is the docstring contract's canonical-path table.
 REFERENCE = {
-    # public name: (reference page, ``:::`` path)
+    # public name: (reference page, ``:::`` path). 0.4.0: the deprecated names
+    # left __all__ and the reference pages (inputs.md is gone); config.DEFAULT
+    # is an instance, documented on config.md through its class.
     "mtb.find_methods": ("discover.md", "multibench.discover.find_methods"),
     "mtb.method_info": ("discover.md", "multibench.discover.method_info"),
     "mtb.params_for": ("discover.md", "multibench.discover.params_for"),
     "mtb.describe_layout": ("discover.md", "multibench.workflow.describe_layout"),
     "mtb.cite": ("discover.md", "multibench.discover.cite"),
-    "mtb.inputs_for": ("inputs.md", "multibench.engine.resolve.inputs_for"),
-    "mtb.labels_for": ("inputs.md", "multibench.engine.resolve.labels_for"),
     "mtb.scan": ("run.md", "multibench.workflow.scan"),
-    "mtb.run": ("run.md", "multibench.engine.runner.run"),
     "mtb.run_all": ("run.md", "multibench.workflow.run_all"),
-    "mtb.sweep": ("run.md", "multibench.workflow.sweep"),
     "mtb.load_batch": ("run.md", "multibench.workflow.load_batch"),
     "mtb.BatchResult": ("run.md", "multibench.workflow.BatchResult"),
     "mtb.evaluate": ("score.md", "multibench.eval.pipeline.evaluate"),
-    "mtb.to_long": ("score.md", "multibench.eval.pipeline.to_long"),
-    "mtb.classify": ("score.md", "multibench.eval.classify.classify"),
-    "mtb.classification_metrics": ("score.md", "multibench.eval.classify.classification_metrics"),
     "mtb.load_results": ("compare.md", "multibench.data.results.load_results"),
-    "mtb.results_coverage": ("compare.md", "multibench.data.results.results_coverage"),
     "mtb.recommend": ("compare.md", "multibench.data.results.recommend"),
-    "mtb.AmbiguousVariantError": ("config.md", "multibench.engine.schema.AmbiguousVariantError"),
     "mtb.env.install": ("env.md", "multibench.engine.envs.install"),
-    "mtb.env.doctor": ("env.md", "multibench.engine.envs.doctor"),
     "mtb.io.export_dataset": ("io.md", "multibench.engine.ingest.export_dataset"),
-    "mtb.io.to_canonical": ("io.md", "multibench.engine.ingest.to_canonical"),
     "mtb.io.read_canonical": ("io.md", "multibench.engine.ingest.read_canonical"),
     "mtb.plot.bubble": ("plot.md", "multibench.plot.bubble.bubble"),
     "mtb.plot.bar": ("plot.md", "multibench.plot.bar.bar"),
-    "mtb.plot.build_table": ("plot.md", "multibench.plot.bubble.build_table"),
-    "mtb.plot.BubbleTable": ("plot.md", "multibench.plot.bubble.BubbleTable"),
     "mtb.data.fetch": ("data.md", "multibench.data.fetch.fetch"),
-    "mtb.data.fetchable": ("data.md", "multibench.data.results.fetchable"),
     "mtb.data.write_example": ("data.md", "multibench.data.examples.write_example"),
-    "mtb.catalog.methods": ("catalog.md", "multibench.data.catalog.methods"),
     "mtb.catalog.datasets": ("catalog.md", "multibench.data.catalog.datasets"),
     "mtb.catalog.metrics": ("catalog.md", "multibench.data.catalog.metrics"),
-    "mtb.config.Config": ("config.md", "multibench.config.Config"),
 }
 #: on the reference pages, not on the API overview (maintainer tools)
 MAINTAINER_NAMES: set = set()      # mtb.env.recipe left __all__ in 0.4.0 (X34)
@@ -686,11 +674,15 @@ def test_api_overview_links_every_entry_point_to_its_reference_anchor():
     for name, (page, path) in REFERENCE.items():
         if name in MAINTAINER_NAMES:
             continue
-        link = f"[`{name}`](reference/{page}#{path})"
-        assert link in text, f"api.md does not link {name} as {link}"
+        # 0.4.0: the link text may carry the call's main arguments, mtb.scan(dataset, category)
+        link = re.compile(rf"\[`{re.escape(name)}(\([^`]*\))?`\]\(reference/{re.escape(page)}#{re.escape(path)}\)")
+        assert link.search(text), f"api.md does not link {name} to reference/{page}#{path}"
     for page, anchor in re.findall(r"\]\(reference/(\w+\.md)#([^)]+)\)", text):
         assert (page, anchor) in directives, f"api.md links reference/{page}#{anchor}, which no directive renders"
-    assert "```python\nmtb." not in text, "api.md carries a hand-written signature block; the reference pages own them"
+    # the examples are calls; a hand-written signature block (annotations) is not
+    for block in re.findall(r"```python[^\n]*\n(.*?)```", text, flags=re.S):
+        assert not re.search(r"^mtb\.[\w.]+\([^)]*\b\w+: \w", block, re.M), \
+            "api.md carries a hand-written signature block; the reference pages own them"
 
 
 # ---- the summary table atop each reference page ------------------------------
@@ -1059,9 +1051,10 @@ def test_get_started_pages_keep_the_round2_facts():
 def test_guides_keep_the_round2_facts_visible():
     """The facts a reader copies sit in the visible text of the guides: the
     D11 panel scores with the default backend, a scanpy baseline loads D11 from
-    data_path, the run guide shows the setup steps, {env_cmd} and a Slurm
-    tab, evaluate saves the long table, discover explains grand_score and the
-    Seurat_v5 bridge (M04, M09, M10, M11)."""
+    data_path, evaluate saves the long table it returns, discover explains
+    grand_score and the Seurat_v5 bridge (M04, M09, M10, M11). 0.4.0: the run
+    guide is run_all-centred; its manual GLUE/MIRA setup steps and the
+    cmd_template section ({env_cmd}, the Slurm tab) are gone on purpose."""
     docs = _docs_root()
     plot, run, evaluate, discover = (
         _visible((docs / "tutorials" / name).read_text())
@@ -1069,10 +1062,10 @@ def test_guides_keep_the_round2_facts_visible():
     panel = plot.split('```python title="d11_panel.py"', 1)[1].split("```", 1)[0]
     assert "leidenalg" not in panel
     assert "### Try it with a PCA of D11" in plot and "mtb.config.DEFAULT.data_path" in plot
-    assert "release_43.html" in run and "`multibench config` prints `repo_path`" in run
-    assert "{env_cmd}" in run and '=== "Slurm job step"' in run
+    assert "{env_cmd}" not in run and "cmd_template" not in run
     assert 'mtb.find_methods("diagonal", modalities=["atac_peak"])' in run
-    assert "mtb.to_long(metrics" in evaluate and 'metrics.to_csv("metric.csv")' not in evaluate
+    assert 'scores.to_csv("mine.csv", index=False)' in evaluate
+    assert "mtb.to_long(" not in evaluate and 'metrics.to_csv("metric.csv")' not in evaluate
     assert "How few cell types" not in evaluate
     assert "`grand_score` compares a category's methods" in discover
     assert "cannot run on unpaired data" in discover
@@ -1087,8 +1080,7 @@ def test_each_guide_warning_appears_once_on_the_site():
             for p in docs.rglob("*.md")}
     for phrase, home in (("slightly different embedding on each run.",
                           "tutorials/evaluate.md"),
-                         ("a wrong order gives wrong scores without an error", "tutorials/evaluate.md"),
-                         ("only warns, and such a method gives a wrong result", "tutorials/run.md")):
+                         ("a wrong order gives wrong scores without an error", "tutorials/evaluate.md")):
         found = {page: text.count(phrase) for page, text in flat.items() if phrase in text}
         assert found == {home: 1}, (phrase, found)
 
@@ -1238,7 +1230,7 @@ def linux_host(monkeypatch, tmp_path):
 
 
 @needs_docs
-def test_changes_page_lists_0_3_5():
+def test_changes_page_lists_0_3_5(tmp_path):
     """The page names what 0.3.5 adds by the spelling a reader types, and
     each name exists. Its behaviour changes cover the nine groups, and it
     says plainly what 0.3.5 does not solve."""
@@ -1255,10 +1247,22 @@ def test_changes_page_lists_0_3_5():
                  '`"obs:<column>"` or `"<column>"`', "`multibench-sc>=0.3.5`"):
         assert name in new, name
     assert callable(mtb.data.write_example)
+    # deprecated in 0.4: out of the signature, still taken
     for fn, keyword in ((mtb.evaluate, "missing_labels"),
                         (mtb.io.export_dataset, "n_batches")):
-        assert keyword in inspect.signature(fn).parameters, keyword
-    # deprecated in 0.4: out of the signature, still taken
+        assert keyword not in inspect.signature(fn).parameters, keyword
+    import anndata as ad
+    import numpy as np
+    rng = np.random.default_rng(0)
+    with pytest.warns(FutureWarning, match=r"evaluate\(missing_labels=\) is deprecated"):
+        mtb.evaluate(rng.normal(size=(40, 4)), labels=np.array(["A", "B"] * 20),
+                     missing_labels="drop", metrics="cLISI", verbose=False)
+    a = ad.AnnData(rng.poisson(1, (20, 5)).astype("float32"))
+    a.obs_names = [f"c{i}" for i in range(20)]
+    a.obs["ct"] = ["A", "B"] * 10
+    with pytest.warns(FutureWarning, match=r"export_dataset\(n_batches=\) is deprecated"):
+        mtb.io.export_dataset(a, tmp_path / "OUT", rna="X", category="cross", labels="obs:ct",
+                              batch_index=1, n_batches=3)
     with pytest.warns(FutureWarning, match=r"scan\(per_method=\) is deprecated"):
         mtb.scan("D11", "vertical", per_method=True, verbose=False)
     parser = cli.build_parser()
@@ -1521,8 +1525,9 @@ def test_changes_page_missing_values_are_those_of_the_package(tmp_path):
     with pytest.raises(ValueError) as unlabelled:
         mtb.evaluate(emb, labels=cells.obs["celltype"].to_numpy(), verbose=False)
     assert str(unlabelled.value) == (
-        "labels: 40 of the 120 cells have no label, for example 'NA'. Pass "
-        'missing_labels="drop" to score the other 80.')
+        # 0.4.0: the hint no longer suggests the deprecated missing_labels=
+        "labels: 40 of the 120 cells have no label, for example 'NA'. Score the other "
+        "cells only, as adata[adata.obs[col].notna()].")
     # as a batch
     assert ("`mtb.io.export_dataset(batch=...)` raises `ValueError` when a cell has no "
             "batch.") in changed
@@ -1918,10 +1923,12 @@ def test_changes_page_names_the_files_without_features_and_the_10x_files(
 # ---- 0.3.5: the sentences added to the guides ----
 @needs_docs
 def test_evaluate_guide_names_both_column_spellings_and_the_missing_values():
-    """The guide says that a column is named with or without ``obs:``, what
-    ``evaluate`` does on a missing label and on a missing batch, and how
-    ``scored_with`` ends after ``missing_labels="drop"``. Its own call, with
-    the spellings it gives, does that."""
+    """The guide says that a column is named with or without ``obs:``, that
+    ``evaluate`` raises on a missing label and on a missing batch, how to
+    score the labelled cells, and what ``scored_with`` records. Its own call,
+    with the spellings it gives, does that. (0.4.0: the guide no longer
+    teaches the deprecated ``missing_labels="drop"``; ``evaluate`` returns the
+    long table.)"""
     pytest.importorskip("anndata")
     import numpy as np
     import multibench as mtb
@@ -1930,68 +1937,40 @@ def test_evaluate_guide_names_both_column_spellings_and_the_missing_values():
     assert f"\n{call}\n" in (_docs_root() / "tutorials" / "evaluate.md").read_text()
     (prefixed,) = re.findall(r"A column is named with or without `obs:`, so "
                              r"`(labels=\"obs:celltype\")` is the same\.", guide)
-    (drop,) = re.findall(
-        r"A missing label is not a cell type\. `evaluate` raises when a label is missing\. "
-        r"`(missing_labels=\"\w+\")` scores the labelled cells only and says how many it "
-        r"scored\. When a whole modality or batch has no labels, these scores do not show "
-        r"where its cells are\. A missing batch raises as well\.", guide)
+    (subset,) = re.findall(
+        r"A missing label is not a cell type: `evaluate` raises when a label is missing, "
+        r"and so does a missing batch\. Score the labelled cells, as `([^`]+)`\.", guide)
+    assert "missing_labels" not in guide
     adata = _own_cells(300)
     adata.obsm["X_pca"] = np.random.default_rng(0).normal(size=(300, 4))
 
     def run(code, cells):
         return eval(code, {"mtb": mtb, "adata": cells})
     plain = run(call, adata)
-    assert plain["Value"].notna().all()
+    assert plain["value"].notna().all()
     assert run(call.replace('labels="celltype"', prefixed), adata).equals(plain)
-    # a missing label: an error, or the scores of the labelled cells
+    # a missing label: an error; the guide's subset scores the labelled cells
     gaps = adata.copy()
     gaps.obs["celltype"] = gaps.obs["celltype"].astype(object)
     gaps.obs.loc[gaps.obs_names[:30], "celltype"] = np.nan
     with pytest.raises(ValueError, match=r"^labels: 30 of the 300 cells have no label\. "):
         run(call, gaps)
-    dropping = call[:-1] + f", {drop})"
-    with pytest.warns(UserWarning, match=r"^Scored the 270 labelled cells of 300\.$"):
-        dropped = run(dropping, gaps)
-    assert dropped.equals(run(call, gaps[30:].copy())) and not dropped.equals(plain)
-    # a whole batch without labels: the scores are the same wherever its
-    # cells are, and with the batches named the warning says so
-    sides = adata.copy()
-    sides.obs["side"] = ["rna"] * 150 + ["atac"] * 150
-    sides.obs["celltype"] = sides.obs["celltype"].astype(object)
-    sides.obs.loc[sides.obs_names[150:], "celltype"] = np.nan
-    moved = sides.copy()
-    moved.obsm["X_pca"] = sides.obsm["X_pca"] + np.repeat([0.0, 100.0], 150)[:, None]
-    with pytest.warns(UserWarning, match=r"^Scored the 150 labelled cells of 300\.$"):
-        there = run(dropping, sides)
-    with pytest.warns(UserWarning, match=r"^Scored the 150 labelled cells of 300\.$"):
-        elsewhere = run(dropping, moved)
-    assert there.equals(elsewhere) and there["Value"].notna().all()
-    with pytest.warns(UserWarning, match=r"^Scored the 150 labelled cells of 300, all in one "
-                                         r"batch of 2\.$"):
-        run(dropping[:-1] + ', batch="side")', sides)
+    labelled = run(call.replace("(adata,", f"({subset},"), gaps)
+    assert labelled.equals(run(call, gaps[30:].copy())) and not labelled.equals(plain)
     # a missing batch
     donors = adata.copy()
     donors.obs["donor"] = np.array([np.nan] * 7 + ["A"] * 143 + ["B"] * 150, dtype=object)
     with pytest.raises(ValueError, match=r"^batch: 7 of the 300 cells have no batch\. Give "
                                          r"every cell a batch\.$"):
         run(call[:-1] + ', batch="donor")', donors)
-    # scored_with: three parts, and a fourth after cells were left out
-    assert ("`mtb.to_long` keeps the first three in its `scored_with` column, such as "
-            "`leidenalg/search/0.4.0`.") in guide
-    (example,) = re.findall(r"When `missing_labels=\"drop\"` left cells out, a fourth part "
-                            r"gives the cells scored, such as `([^`]+)`\.", guide)
-
-    def scored_with(scores):
-        (value,) = set(mtb.to_long(scores, method="mine", dataset="D",
-                                   category="vertical")["scored_with"])
-        return value.split("/")
-    assert scored_with(plain) == [plain.attrs["leiden_flavor"], plain.attrs["clustering"],
-                                  mtb.__version__]
-    assert scored_with(dropped) == scored_with(plain) + [example]
-    # nothing was left out: no fourth part
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        assert scored_with(run(dropping, adata)) == scored_with(plain)
+    # scored_with: the Leiden backend, where the clusters came from, the version
+    (example,) = re.findall(r"The `scored_with` column records how the scores were "
+                            r"computed: the Leiden backend, where the clusters came from and "
+                            r"the multibench version, such as `([^`]+)`\.", guide)
+    assert len(example.split("/")) == 3
+    (value,) = set(plain["scored_with"])
+    assert value.split("/") == [plain.attrs["leiden_flavor"], plain.attrs["clustering"],
+                                mtb.__version__]
 
 
 @needs_docs
@@ -2031,9 +2010,13 @@ def test_discover_guide_says_which_rows_scan_lists(tmp_path, monkeypatch):
 @needs_docs
 def test_api_overview_describes_write_example_as_its_docstring_does():
     """The row of ``mtb.data.write_example`` on the API overview is written
-    by hand. It says what the first line of the docstring says."""
+    by hand. It says what the first line of the docstring says (0.4.0: the
+    overview's rows are short third-person summaries, so the facts are
+    compared, not the wording)."""
     import multibench as mtb
-    (said,) = re.findall(r"^\| \[`mtb\.data\.write_example`\]\([^)]+\) \| (.+) \|$",
+    (said,) = re.findall(r"^\| \[`mtb\.data\.write_example\(dataset\)`\]\([^)]+\) \| (.+) \|$",
                          (_docs_root() / "api.md").read_text(), re.M)
     first = inspect.getdoc(mtb.data.write_example).splitlines()[0]
-    assert said.replace("`", "") == first.replace("`", "")
+    assert said == "Writes a tutorial's example `.h5ad` files."
+    for fact in ("tutorial", "example", ".h5ad"):
+        assert fact in first, fact

@@ -150,8 +150,13 @@ def test_changes_say_what_the_new_warnings_leave_open(tmp_path):
         a.var_names_make_unique()
         ingest.export_dataset(a, tmp_path / "OUT", rna="X", category="cross",
                               labels=pd.Series(["T", "B"] * 10), batch="obs:donor")
-    assert [str(w.message) for w in rec
-            if "feature name" in str(w.message) or "Series" in str(w.message)] == []
+    assert [str(w.message) for w in rec if "feature name" in str(w.message)] == []
+    # 0.4.0 closes the second gap: export_dataset warns on a labels Series without barcodes
+    assert [str(w.message) for w in rec if "Series" in str(w.message)] == [
+        "labels is a Series without barcodes and is matched to the cells by position. "
+        "To match by barcode, pass a Series indexed by barcode."]
+    assert ("warns when a `labels` Series without barcodes is matched by position."
+            in _flat("changes.md"))
 
 
 def test_the_quickstart_tab_names_batch_for_donors():

@@ -64,7 +64,7 @@ def test_transposed_matrix_is_rejected_with_an_actionable_message(tmp_path):
     msg = str(e.value)
     assert "cells x features" in msg, msg
     assert "features x cells" in msg, msg
-    assert "to_canonical" in msg, "the message must say how to fix it"
+    assert "mtb.io.export_dataset" in msg, "the message must say how to fix it"
 
 
 def test_square_matrix_is_left_alone(tmp_path):
@@ -354,4 +354,4 @@ def test_a_matrix_file_without_features_fails_the_file_check(ready, tmp_path, ca
     with pytest.raises(ValueError) as e:
         mtb.inputs_for("ZERO", "vertical", "VIMCCA", data_path=tmp_path, check=True)
     assert str(e.value) == ("VIMCCA reads rna.h5 of ZERO, which holds 0 cells. Write the "
-                            "folder again with multibench convert.")
+                            "folder again with multibench export.")

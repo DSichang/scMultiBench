@@ -13,9 +13,10 @@ def test_params_for_returns_defaults_and_tunable():
     r = mtb.params_for("Multigrate", "vertical", ["rna", "adt"])
     assert r["method"] == "Multigrate"
     assert r["variant"] == "vertical:rna+adt"
-    # the default is what the package actually emits (Y38: no separate 'defaults')
-    assert r["tunable"]["epochs"]["default"] == r["effective"]["epochs"] == 200
-    assert "defaults" not in r
+    # the default is what the package actually emits (Y38: no separate 'defaults';
+    # 0.4.0: no 'effective' copy either)
+    assert r["tunable"]["epochs"] == {"type": "int", "default": 200}
+    assert "defaults" not in r and "effective" not in r
     # tunable is documentation harvested from the upstream argparse
     assert set(r["tunable"]) >= {"epochs", "lr"}
 
@@ -30,6 +31,17 @@ def test_params_for_tunable_carries_default_and_type():
     # scMDC's lr is declared but never read (X64, r3): gamma stands in
     spec = mtb.params_for("scMDC", "vertical", ["rna", "adt"])["tunable"]
     assert spec["gamma"]["type"] == "float" and "lr" not in spec
+
+
+def test_params_for_lists_choices_and_a_value_outside_them_is_refused():
+    # 0.4.0: an argparse choices= list is recorded and checked before a run
+    from multibench.engine import runner
+    acc = mtb.params_for("MIRA", "vertical", ["rna", "atac"])["tunable"]["acc"]
+    assert set(acc) == {"type", "default", "choices"} and acc["default"] in acc["choices"]
+    v = registry.get("MIRA").select("vertical", {"rna", "atac"})
+    runner.check_param_types("MIRA", v, {"acc": "cpu"})
+    with pytest.raises(ValueError, match=r"^MIRA: acc takes cpu, gpu, .* or auto, got 'banana'\.$"):
+        runner.check_param_types("MIRA", v, {"acc": "banana"})
 
 
 def test_params_for_requires_disambiguation_when_multiple_variants():
@@ -48,10 +60,13 @@ def test_params_for_single_variant_needs_no_selector():
 
 
 def test_method_info_exposes_params_per_variant():
-    info = mtb.method_info("Multigrate", verbose=True)
+    # verbose= is deprecated in 0.4.0 (one FutureWarning) and still adds params
+    assert "params" not in mtb.method_info("Multigrate")
+    with pytest.warns(FutureWarning, match=r"method_info\(verbose=\) is deprecated"):
+        info = mtb.method_info("Multigrate", verbose=True)
     assert "vertical:rna+adt" in info["params"]
     # Y38 (r3): no 'defaults' block; the tunable default is the value a run uses
-    assert set(info["params"]["vertical:rna+adt"]) == {"tunable", "effective"}
+    assert set(info["params"]["vertical:rna+adt"]) == {"tunable"}
     assert info["params"]["vertical:rna+adt"]["tunable"]["bs"]["default"] == 256
 
 
@@ -156,7 +171,7 @@ def test_the_keys_left_out_are_script_arguments():
 
 def test_host_switches_and_dead_knobs_are_not_tunable():
     assert "index" not in mtb.params_for("UnitedNet", "vertical", ["rna", "atac"])["tunable"]
-    assert "UnitedNet" not in mtb.find_methods(tunable=True)
+    assert not any(v.tunable for v in registry.get("UnitedNet").variants)
     gone = {("scMDC", "vertical", ("rna", "adt")): {"device", "run"},
             ("scMM", "vertical", ("rna", "atac")): {"no_cuda", "print_freq"},
             ("Matilda", "vertical", ("rna", "adt")): {"device"},
@@ -165,9 +180,7 @@ def test_host_switches_and_dead_knobs_are_not_tunable():
                 "center_weight"}}
     for (m, cat, mods), keys in gone.items():
         p = mtb.params_for(m, cat, list(mods))
-        assert not keys & set(p["tunable"]) and not keys & set(p["effective"]), m
-        assert set(p["effective"]) == set(p["tunable"])
-        assert all(t["default"] == p["effective"][k] for k, t in p["tunable"].items())
+        assert not keys & set(p["tunable"]), m
     # the package still turns CUDA off on a CPU host
     plan = mtb.run_all("D52mini", "cross", methods=["scMDC"], dry_run=True, verbose=False)
     assert " --device cpu" in plan.command.iloc[0] or envs_has_gpu()

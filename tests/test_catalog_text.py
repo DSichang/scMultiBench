@@ -56,7 +56,8 @@ def test_datasets_drops_the_always_empty_columns():
         paper_columns = catalog.PAPER_COLUMNS
     for col in paper_columns:
         assert col not in df.columns, col
-    assert list(df.columns) == ["dataset", "simulated", "category", "has_results"]
+    # 0.4.0: the demo subsets join the rows, with a fetchable column
+    assert list(df.columns) == ["dataset", "category", "simulated", "fetchable", "has_results"]
 
 
 def test_datasets_keeps_a_descriptive_column_a_csv_fills(tmp_path):

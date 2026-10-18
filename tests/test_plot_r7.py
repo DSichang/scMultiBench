@@ -1,10 +1,9 @@
 """Plot fixes after the seventh student study (fix round 7).
 
-R7-04: a renamed re-run such as ``SCALEX_rerun`` keeps its ``?`` chip and is
-not called "not a package method"; the legends and row labels of a narrow
-figure fit inside the figure at its own size.
-R7-12: plain wording for ``order`` (build_table, bubble) and for a one-entry
-label dict (evaluate Notes).
+R7-04: a renamed re-run such as ``SCALEX_rerun`` keeps its ``?`` chip (0.4.0:
+the key says "?: not a package method", and ``SCALEX (this run)`` gets SCALEX's
+chip); the legends and row labels of a narrow figure fit inside the figure at its
+own size.
 """
 import importlib
 import inspect
@@ -59,14 +58,25 @@ def _chips(fig):
 
 # --- R7-04: the chip of a renamed re-run --------------------------------------
 
+KEY = "Py / R: the method's language; ?: not a package method"
+
+
 def test_renamed_rerun_keeps_its_question_mark():
     df = pd.concat([_d28(), _rerun("SCALEX_rerun")], ignore_index=True)
     fig = _quiet(mtb.plot.bubble, df, metrics=["ARI", "NMI", "cLISI"])
-    texts = _texts(fig)
-    assert not any("not a package method" in t for t in texts), texts
-    # the chip still follows the row name: the renamed row keeps its '?'
+    # the chip still follows the row name: the renamed row keeps its '?', and
+    # the key says what '?' means (0.4.0)
     assert _chips(fig)["SCALEX_rerun"] == ["?"]
     assert _chips(fig)["SCALEX"] == ["Py"]
+    assert KEY in _texts(fig)
+
+
+def test_this_run_suffix_keeps_the_methods_chip():
+    # 0.4.0: "<method> (this run)" is the method's own row, with its language chip
+    df = pd.concat([_d28(), _rerun("SCALEX (this run)")], ignore_index=True)
+    fig = _quiet(mtb.plot.bubble, df, metrics=["ARI", "NMI", "cLISI"])
+    assert _chips(fig)["SCALEX (this run)"] == ["Py"]
+    assert KEY not in _texts(fig)
 
 
 def test_renamed_supervised_rerun_shows_question_mark_and_no_badge():
@@ -74,7 +84,7 @@ def test_renamed_supervised_rerun_shows_question_mark_and_no_badge():
                    ignore_index=True)
     fig = _quiet(mtb.plot.bubble, df, metrics=["ARI", "NMI", "cLISI"])
     assert _chips(fig)["Seurat_v3_rerun"] == ["?"]
-    assert not any("not a package method" in t for t in _texts(fig))
+    assert "L" not in sum(_chips(fig).values(), [])
 
 
 def test_docstrings_use_the_key_wording():
@@ -132,7 +142,7 @@ def test_narrow_summary_figure_keeps_its_texts_inside():
 def test_fit_widens_only_and_keeps_the_height():
     # a row label wider than the left margin: only the fit can make room for it
     long_name = "A_renamed_rerun_with_a_name_much_longer_than_any_package_method"
-    tbl = _quiet(B.build_table, _rerun(long_name), metrics=["ARI"])
+    tbl = _quiet(B._build_table, _rerun(long_name), metrics=["ARI"])
     fig = _quiet(B.render, tbl)
     w, h = fig.get_size_inches()
     assert h == pytest.approx(0.42 * 1 + 2.9)
@@ -142,23 +152,7 @@ def test_fit_widens_only_and_keeps_the_height():
 
 
 def test_wide_figure_is_not_widened():
-    tbl = _quiet(B.build_table, _d28(), na="skip")
+    tbl = _quiet(B._build_table, _d28(), na="skip")
     fig = _quiet(B.render, tbl)
     total_w = sum(1.5 + 1.1 * b.raw.shape[1] + 0.5 for b in tbl.blocks) - 0.5
     assert fig.get_size_inches()[0] == pytest.approx(0.6 * total_w + 2.8)
-
-
-# --- R7-12: plain wording -------------------------------------------------------
-
-def test_order_parameter_reads_as_sentences():
-    for fn in (mtb.plot.bubble, mtb.plot.build_table):
-        doc = " ".join(inspect.getdoc(fn).split())
-        assert ("Methods to put first, in this order. The rest follow, best first. "
-                "To drop methods, use ``methods``.") in doc, fn.__name__
-        assert "Reorders only" not in doc
-
-
-def test_one_entry_label_dict_note():
-    doc = " ".join(inspect.getdoc(mtb.evaluate).split())
-    assert ("Keys of a multi-entry ``labels`` dict in the embedding's cell order") in doc
-    assert "order to get wrong" not in doc

@@ -183,11 +183,15 @@ def test_run_all_with_modalities_runs_the_smaller_variant(tmp_path, all_envs, mo
     assert calls == [("scMoMaT", ["adt", "rna"])]
 
 
-def test_dry_run_keeps_the_frame_and_names_the_row_that_runs(tmp_path, all_envs, capsys):
+def test_dry_run_leaves_out_the_nested_rows_and_names_the_row_that_runs(tmp_path, all_envs,
+                                                                         capsys):
     _tri(tmp_path)
     plan = mtb.run_all("TRI", "vertical", methods=["scMoMaT", "VIMCCA"], data_path=tmp_path,
                        dry_run=True)
-    assert len(plan) == 5 and plan["runnable"].all()
+    # 0.4.0: scMoMaT's rna+adt and rna+atac rows are left out, as a run leaves them out
+    assert plan["runnable"].all()
+    assert list(plan.loc[plan.method == "scMoMaT", "modalities"]) == ["rna+adt+atac"]
+    assert (plan.method == "VIMCCA").sum() == 2
     out = capsys.readouterr().out
     assert "[run_all] scMoMaT runs on rna+adt+atac, not on rna+adt and rna+atac" in out
     assert "[run_all] VIMCCA runs on" not in out       # its two rows are not nested

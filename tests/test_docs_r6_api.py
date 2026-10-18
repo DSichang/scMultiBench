@@ -62,6 +62,10 @@ def test_changes_page_run_dry_run_lines_follow_the_cli(tmp_path, monkeypatch, ca
                      "--input", "rna=data/LUNG/rna.h5", "--input", f"atac_gas={missing}",
                      "--out", "runs/SCALEX", "--dry-run"]) == 0
     err = capsys.readouterr().err.splitlines()
+    # run is deprecated in 0.4.0: one warning line, then the dry-run lines as before
+    assert err[0].startswith("warning: multibench run is deprecated")
+    assert sum("deprecated" in line for line in err) == 1
+    err = err[1:]
     note = f"SCALEX reads {missing}, which does not exist."
     assert err[0] == "# Dry run. Nothing was executed."
     assert any(line.startswith(f"# {note}") for line in err), err

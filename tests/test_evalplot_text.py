@@ -47,12 +47,15 @@ def test_score_legend_says_the_fill_is_scaled_per_column():
 
 def test_evaluate_examples_show_the_anndata_and_mudata_calls():
     doc = pipeline.evaluate.__doc__
-    assert ('>>> mtb.evaluate(adata, labels="celltype", batch="sample", obsm="X_pca")'
-            in doc)
     flat = " ".join(doc.split())
+    # 0.4.0: the example names its row with method=
+    assert ('>>> mtb.evaluate(adata, labels="celltype", batch="sample", obsm="X_pca", '
+            '... method="PCA")') in flat
     assert "AnnData or MuData (``.obsm[obsm]``)" in flat
-    assert ("``mtb.to_long`` reshapes the result for plotting or for "
-            "``mtb.load_results``") in flat
+    # 0.4.0: evaluate returns the long table (to_long is deprecated)
+    assert ("The long table: ``metric, value, method, dataset, category, source, "
+            "scored_with``, one row per metric. ``mtb.plot.bubble`` draws it, next "
+            "to ``mtb.load_results`` rows or alone.") in flat
 
 
 def test_evaluate_takes_a_mudata_with_obs_keys():
@@ -70,7 +73,7 @@ def test_evaluate_takes_a_mudata_with_obs_keys():
     m.obsm["X_joint"] = rng.normal(size=(n, 5)) + pd.Categorical(ct).codes[:, None] * 4
     out = mtb.evaluate(m, labels="celltype", batch="sample", obsm="X_joint",
                        metrics=["ASW", "ASW_batch"])
-    assert list(out.index) == ["ASW", "ASW_batch"]
+    assert out["metric"].tolist() == ["ASW", "ASW_batch"]
 
 
 # words written in capitals to shout; acronyms and code names are not flagged

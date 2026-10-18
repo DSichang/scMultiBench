@@ -346,7 +346,7 @@ def test_evaluate_aligns_a_barcode_csv_to_the_obs_names(tmp_path):
     kw = dict(labels="celltype", metrics=["ASW_batch", "iLISI"])
     by_obs = mtb.evaluate(a, batch="sample", **kw)
     by_csv = mtb.evaluate(a, batch=str(shuf), **kw)
-    assert by_obs.loc["ASW_batch", "Value"] < 0.5
+    assert by_obs.set_index("metric").loc["ASW_batch", "value"] < 0.5
     pd.testing.assert_frame_equal(by_obs, by_csv)
     # the command line reads the same file against an .h5ad
     a.write_h5ad(tmp_path / "mine.h5ad")

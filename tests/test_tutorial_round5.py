@@ -68,19 +68,22 @@ def _two_files(tmp_path):
 
 def test_evaluate_refuses_a_dict_out_of_the_default_order(tmp_path):
     """The sentence on the live package: a dict built in the default order is
-    scored, the same dict reordered raises, and ``label_order=`` names any
-    other order."""
+    scored, the same dict reordered raises, and a list of paths gives any
+    other order (0.4.0: the message names the list, not the deprecated
+    ``label_order=``)."""
     import multibench as mtb
     paths, emb = _two_files(tmp_path)
     built = {"cty1": paths["cty1"], "cty2": paths["cty2"]}
-    assert "ASW" in _quiet(mtb.evaluate, emb, labels=built, metrics=["ASW"], verbose=False).index
+    scored = mtb.evaluate(emb, labels=built, metrics=["ASW"], verbose=False)
+    assert "ASW" in set(scored.metric)
     reordered = {"cty2": paths["cty2"], "cty1": paths["cty1"]}
     with pytest.raises(ValueError, match=re.escape(
-            "The label keys cty2 and cty1 are not in the default order.")):
-        _quiet(mtb.evaluate, emb, labels=reordered, metrics=["ASW"], verbose=False)
-    got = _quiet(mtb.evaluate, emb, labels=reordered, label_order=["cty2", "cty1"],
-                 metrics=["ASW"], verbose=False)
-    assert "ASW" in got.index
+            "The label keys cty2 and cty1 are not in the default order. Pass a list of "
+            "paths in cell order, or dataset=, category= and method=.")):
+        mtb.evaluate(emb, labels=reordered, metrics=["ASW"], verbose=False)
+    got = mtb.evaluate(emb, labels=[paths["cty2"], paths["cty1"]], metrics=["ASW"],
+                       verbose=False)
+    assert "ASW" in set(got.metric)
 
 
 # --------------------------------------- R5-03: guard for Troubleshooting

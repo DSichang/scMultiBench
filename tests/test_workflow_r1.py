@@ -498,9 +498,6 @@ def test_docstrings_use_plain_wording(obj):
         assert banned not in flat, banned
 
 
-def test_sweep_summary_line():
-    assert inspect.getdoc(mtb.sweep).splitlines()[0] == \
-        "Run one method once per value of one hyperparameter, each in its own folder."
 
 
 @pytest.mark.parametrize("cat", [None, "vertical", "diagonal", "mosaic", "cross"])

@@ -25,15 +25,15 @@ def _toy(n_per=45, seed=0):
 # ---------------------------------------------------------------- signature
 def test_evaluate_signature_is_the_contract():
     params = inspect.signature(evaluate).parameters
-    assert list(params) == ["embedding", "labels", "category", "batch", "metrics",
-                            "clusters", "obsm", "label_order", "verbose",
-                            "missing_labels"]
+    # 0.4.0: dataset= and method= fill the long table; clustering=, label_order=
+    # and missing_labels= are deprecated and left out of the signature
+    assert list(params) == ["embedding", "labels", "dataset", "method", "category",
+                            "batch", "metrics", "obsm", "verbose"]
     assert params["labels"].kind is inspect.Parameter.POSITIONAL_OR_KEYWORD
-    for name in ("category", "batch", "metrics", "clusters", "obsm", "label_order", "verbose",
-                 "missing_labels"):
+    for name in list(params)[2:]:
         assert params[name].kind is inspect.Parameter.KEYWORD_ONLY, name
     assert params["metrics"].default is None and params["verbose"].default is True
-    assert params["missing_labels"].default == "error"
+    assert params["dataset"].default is None and params["method"].default == "embedding"
     assert "metrics" in evaluate.__doc__ and "kBET" in evaluate.__doc__
 
 
@@ -53,7 +53,7 @@ def test_to_long_signature_is_the_contract():
     ("slow_metrics", True, "evaluate(slow_metrics=) was removed in 0.3.0; pass "
                            "metrics=[...] without cLISI and iLISI."),
     ("column", "celltype", "evaluate(column=) was removed in 0.3.0; pass the column itself "
-                           "as labels=, batch= or clusters=."),
+                           "as labels= or batch=."),
     ("metric_set", "scib", "evaluate(metric_set=) was removed in 0.3.0; only the scIB "
                            "metric set exists, so drop it."),
 ])

@@ -74,7 +74,7 @@ def test_shared_sweep_gives_the_standard_protocol_ari():
     cluster_optimal_resolution would have produced per candidate - otherwise the
     ranking is on a different quantity than the one reported.
     """
-    from multibench.eval.pipeline import evaluate as _evaluate
+    from multibench.eval.pipeline import evaluate
 
     emb, lab, bat = _blobs()
     rng = np.random.default_rng(0)
@@ -84,11 +84,11 @@ def test_shared_sweep_gives_the_standard_protocol_ari():
 
     by_order = {tuple(d["order"]): d["ARI"] for d in spread}
     for order, labels in ((["good.csv"], lab), (["scrambled.csv"], wrong)):
-        ref = _evaluate(emb, category="vertical", metrics="clustering", labels=labels)
-        assert by_order[tuple(order)] == pytest.approx(
-            round(float(ref["Value"]["ARI"]), 4), abs=1e-4), (
+        ref = evaluate(emb, category="vertical", metrics="clustering", labels=labels)
+        ari = float(ref.set_index("metric")["value"]["ARI"])
+        assert by_order[tuple(order)] == pytest.approx(round(ari, 4), abs=1e-4), (
             f"{order}: shared-sweep ARI {by_order[tuple(order)]} != "
-            f"per-candidate ARI {float(ref['Value']['ARI'])}")
+            f"per-candidate ARI {ari}")
 
 
 def test_leiden_sweep_is_reusable_across_label_vectors():
@@ -104,18 +104,18 @@ def test_best_order_single_candidate_skips_screening():
     """One candidate has nothing to disambiguate; it must not pay for two passes."""
     emb, lab, bat = _blobs()
     calls = []
-    real = W._evaluate
+    real = W._scores            # evaluate's wide scores, which run_all uses (0.4.0)
 
     def counting(*a, **k):
         calls.append(k.get("only"))
         return real(*a, **k)
 
-    W._evaluate = counting
+    W._scores = counting
     try:
         names, val, spread = W._evaluate_best_order(emb, "vertical",
                                                     [(["only.csv"], lab, bat)])
     finally:
-        W._evaluate = real
+        W._scores = real
     assert len(calls) == 1, f"single candidate triggered {len(calls)} evaluations"
     assert calls[0] is None, "single candidate should go straight to full metrics"
     assert names == ["only.csv"] and len(spread) == 1

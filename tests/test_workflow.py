@@ -63,14 +63,18 @@ def test_run_all_dry_run_respects_method_filter():
 
 
 def test_run_all_dry_run_is_the_scan_frame():
-    """Holds on every host: dry_run == scan(dataset, category), row for row."""
+    """Holds on every host: dry_run == scan(dataset, category), row for row, less
+    the rows a run leaves out (0.4.0): a row whose files are part of another row
+    of its method."""
+    from multibench import workflow as W
     for ds, cat in [("D11", "vertical"), ("D52", "cross"), ("D45", "mosaic")]:
         if not _has_dataset(ds):
             continue
         plan = mtb.run_all(ds, cat, out_dir="/tmp/unused", dry_run=True, verbose=False)
         assert list(plan.columns)[-1] == "command"      # the CLI csv's column, in scan too
-        pd.testing.assert_frame_equal(
-            plan, full_scan(ds, cat, out_dir="/tmp/unused", verbose=False))
+        scan = full_scan(ds, cat, out_dir="/tmp/unused", verbose=False)
+        nested = W._nested_rows(scan[[W._would_run(r) for _, r in scan.iterrows()]])[0]
+        pd.testing.assert_frame_equal(plan, scan.drop(index=nested).reset_index(drop=True))
 
 
 @pytest.mark.skipif(not (_envs_installed("vertical") and _envs_installed("cross")

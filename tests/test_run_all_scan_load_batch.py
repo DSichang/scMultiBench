@@ -122,11 +122,10 @@ def test_x68_size_error_names_the_label_files_that_fit(tmp_path):
         mtb.evaluate(emb, labels=labels, category="cross", metrics=["ARI"])
 
 
-def test_x68_dry_run_marks_the_nested_variant(capsys):
-    # r3: the row keeps its own caveat; the dry run says once which row runs
+def test_x68_dry_run_leaves_out_the_nested_variant(capsys):
+    # 0.4.0: the plan leaves out the row a run leaves out, and says once which runs
     plan = mtb.run_all("D52mini", "cross", methods=["UINMF"], dry_run=True)
-    row = plan.set_index("modalities").loc["rna1+rna2+adt1+adt2"]
-    assert "so this row is not run" not in row.caveat
+    assert list(plan.modalities) == ["rna1+rna2+rna3+adt1+adt2+adt3"]
     assert ("[run_all] UINMF runs on rna1+rna2+rna3+adt1+adt2+adt3, not on "
             "rna1+rna2+adt1+adt2") in capsys.readouterr().out
 
@@ -167,8 +166,6 @@ def test_x79_scan_names_the_batch_renumbering(tmp_path, capsys, monkeypatch):
 
 
 def test_x11_a_local_folder_shadowed_by_the_data_path_is_named(tmp_path, monkeypatch):
-    from multibench.engine import resolve
-    monkeypatch.setattr(resolve, "_SHADOW_NOTED", set())
     (tmp_path / "D11").mkdir()
     monkeypatch.chdir(tmp_path)
     _, msgs = _messages(mtb.inputs_for, "D11", "vertical", "Matilda")
@@ -176,7 +173,7 @@ def test_x11_a_local_folder_shadowed_by_the_data_path_is_named(tmp_path, monkeyp
             "'./D11' for it.")
     assert msgs.count(want) == 1, msgs
     _, msgs = _messages(mtb.inputs_for, "D11", "vertical", "Matilda")
-    assert want not in msgs                                  # once a session
+    assert msgs.count(want) == 1, msgs                       # every call (R-4)
 
 
 def test_x13_vertical_peak_methods_read_the_atac_role():
@@ -274,29 +271,27 @@ def test_load_batch_reads_a_relative_out_dir_from_the_tree(tmp_path, monkeypatch
         str((tree / f"{m}_D11").resolve()) for m in ("Matilda", "MOFA2", "scMoMaT")]
 
 
-# Y02: a tree records its source URL; a new manifest URL fetches it again
+# Y02 (0.4.0): a tree in place is used as it is; fetch_outputs never moves it
 from test_fetch_outputs import F, _write_tree, served  # noqa: E402,F401
 
 
-def test_a_tree_of_another_url_is_fetched_again(served, monkeypatch, capsys):  # noqa: F811
+def test_a_tree_of_another_url_is_kept(served, monkeypatch):  # noqa: F811
     data, calls = served
     out = F.fetch_outputs("D11", data_path=data, quiet=True)
     assert (out / ".source").read_text().strip() == F._output_urls()["D11"]
     (out / "mine.txt").write_text("x")
     new = {**F._output_urls(), "D11": "https://example.org/new/outputs-D11.tar.gz"}
     monkeypatch.setattr(F, "_output_urls", lambda: new)
-    out = F.fetch_outputs("D11", data_path=data)
-    old = data / "outputs" / "D11.old"
-    assert calls[-1] == new["D11"] and (old / "mine.txt").is_file()
-    assert (out / ".source").read_text().strip() == new["D11"]
-    assert f"(the earlier tree moves to {old})" in capsys.readouterr().out
+    assert F.fetch_outputs("D11", data_path=data, quiet=True) == out
+    assert len(calls) == 1 and (out / "mine.txt").is_file()
+    assert not (data / "outputs" / "D11.old").exists()
 
 
-def test_a_tree_without_a_source_is_fetched_again(served):  # noqa: F811
+def test_a_tree_without_a_source_is_kept(served):  # noqa: F811
     data, calls = served
     _write_tree(data / "outputs" / "D11")           # a 0.3.x cache: no .source
     F.fetch_outputs("D11", data_path=data, quiet=True)
-    assert len(calls) == 1 and (data / "outputs" / "D11.old").is_dir()
+    assert calls == [] and not (data / "outputs" / "D11.old").exists()
 
 
 def test_a_stored_tree_of_0_3_says_to_rescore(tmp_path):
@@ -306,19 +301,6 @@ def test_a_stored_tree_of_0_3_says_to_rescore(tmp_path):
     with pytest.warns(UserWarning, match=r"^These scores come from multibench 0\.3\.x\. "
                       r"res\.rescore\(\) scores them as 0\.4\.0 does\.$"):
         mtb.load_batch(tree)
-
-
-def test_an_earlier_old_tree_is_kept(served, capsys):  # noqa: F811
-    # Z28: a second refetch moves the tree to the first free name, deleting none
-    import shutil
-    data, calls = served
-    for _ in range(2):
-        _write_tree(data / "outputs" / "D11")       # a tree without .source
-        F.fetch_outputs("D11", data_path=data)
-        shutil.rmtree(data / "outputs" / "D11")
-    assert (data / "outputs" / "D11.old").is_dir() and (data / "outputs" / "D11.old-2").is_dir()
-    assert f"(the earlier tree moves to {data / 'outputs' / 'D11.old-2'})" in \
-        capsys.readouterr().out
 
 
 # Y40: a second dataset is refused before any download

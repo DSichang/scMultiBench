@@ -41,19 +41,22 @@ def fake_conda(tmp_path, monkeypatch):
     envs._conda_prefixes.cache_clear()
 
 
-def test_a_method_id_is_refused_and_the_message_names_doctor():
-    with pytest.raises(ValueError, match=r"mtb\.env\.doctor\(methods=\['Matilda'\]\)"):
+def test_a_method_id_is_refused_and_the_message_names_install():
+    # env.doctor is deprecated in 0.4.0: the message names env.install(dry_run=True)
+    with pytest.raises(ValueError,
+                       match=r"mtb\.env\.install\(\['Matilda'\], dry_run=True\)"):
         mtb.env.status("Matilda")
 
 
 def test_a_method_id_in_another_case_names_the_registry_id():
-    with pytest.raises(ValueError, match=r"mtb\.env\.doctor\(methods=\['StabMap'\]\)"):
+    with pytest.raises(ValueError,
+                       match=r"mtb\.env\.install\(\['StabMap'\], dry_run=True\)"):
         mtb.env.status("stabmap")
 
 
-def test_a_list_of_method_ids_is_refused_and_the_message_names_doctor():
+def test_a_list_of_method_ids_is_refused_and_the_message_names_install():
     with pytest.raises(TypeError,
-                       match=r"mtb\.env\.doctor\(methods=\['StabMap', 'Matilda'\]\)"):
+                       match=r"mtb\.env\.install\(\['StabMap', 'Matilda'\], dry_run=True\)"):
         mtb.env.status(["StabMap", "Matilda"])
 
 

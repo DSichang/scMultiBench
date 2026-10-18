@@ -45,12 +45,20 @@ STALE = {
     r"list_methods\([^)]*\b(task|runnable)=": "find_methods(category, task=/runnable=)",
     r"cite\([^)]*\bmethods=": "cite(*ids) or cite([ids])",
     r"needs_labels=True": "to_long() lost needs_labels; add the column to the frame",
-    r"\b(evaluate|load_results|recommend|rescore)\([^)]*\b(task|family|only|method|metric)=": "metrics= / methods=",
+    # 0.4.0: evaluate(method=) names the rows again, so only the other calls refuse it
+    r"\b(evaluate|load_results|recommend|rescore)\([^)]*\b(task|family|only|metric)=": "metrics= / methods=",
+    r"\b(load_results|recommend|rescore)\([^)]*\bmethod=": "methods=",
     r"\b(inputs_for|labels_for)\(\s*(\"D\d+s?\"|DATASET)\s*,\s*\"(?!vertical|diagonal|mosaic|cross)\w+\"":
         "(dataset, category, method) order",
     r"17 columns|18 columns\b(?! - )|plan_commands adds": "scan's frame is SCAN_COLUMNS + command",
     # Colab speed round: the packed archives run without a conda binary
     r"(?i)\bcondacolab\b": "no condacolab: mtb.env.install(..., packed=True, dry_run=False) needs no conda binary",
+    # 0.4.0 core API: the deprecated names (they work until 0.5, the text teaches the kept ones)
+    r"\bmtb\.(run|inputs_for|labels_for|to_long|sweep|classify|classification_metrics|"
+    r"results_coverage|available_datasets)\(": "run_all(methods=[m]) / evaluate(dataset=, method=) / catalog.datasets()",
+    r"\bmtb\.(env\.(doctor|status)|io\.to_canonical|plot\.(build_table|BubbleTable)|"
+    r"config\.Config|catalog\.methods|data\.fetchable)\b": "env.install(dry_run=True) / io.export_dataset / recommend(long_df=) / config.DEFAULT",
+    r"\bmultibench convert\b": "multibench export",
 }
 
 
@@ -88,7 +96,7 @@ def _mtb_tokens(text):
 # helpers the overview and the env reference page explain).
 DOCUMENTED_HIDDEN = {"mtb.env.env_prefix", "mtb.env.host_has_gpu"}
 
-REFERENCE_PAGES = ["reference/discover.md", "reference/inputs.md", "reference/run.md",
+REFERENCE_PAGES = ["reference/discover.md", "reference/run.md",
                    "reference/score.md", "reference/compare.md", "reference/env.md",
                    "reference/io.md", "reference/plot.md", "reference/data.md",
                    "reference/catalog.md", "reference/config.md"]

@@ -173,28 +173,30 @@ def test_the_hints_of_a_mudata_keep_the_modality(tmp_path):
 
 
 # ------------------------------------------------ 1: the command line
-def _convert(capsys, *argv):
-    assert cli.main(["convert", *map(str, argv)]) == 0
+def _export(capsys, *argv):
+    assert cli.main(["export", *map(str, argv)]) == 0
     return [line for line in capsys.readouterr().err.splitlines() if "whole numbers" in line]
 
 
-def test_convert_names_the_obsm_entry_and_quotes_the_filter(tmp_path, capsys):
+def test_export_names_the_obsm_entry_and_quotes_the_filter(tmp_path, capsys):
     _cite().write_h5ad(tmp_path / "cite.h5ad")
     _tenx("kind").write_h5ad(tmp_path / "tenx.h5ad")
-    lines = _convert(capsys, tmp_path / "cite.h5ad", tmp_path / "A", "--rna", "layer:counts",
+    lines = _export(capsys, tmp_path / "cite.h5ad", tmp_path / "A", "--rna", "layer:counts",
                      "--atac", "obsm:peaks", "--atac-kind", "peak")
     assert lines == ["warning: " + _in_obsm("atac", "--atac obsm:<key>")]
-    lines = _convert(capsys, tmp_path / "tenx.h5ad", tmp_path / "B", "--adt",
+    lines = _export(capsys, tmp_path / "tenx.h5ad", tmp_path / "B", "--adt",
                      "X[kind=Antibody Capture]")
     assert len(lines) == 1 and lines[0].endswith(
         NOT_COUNTS.format(what="adt") + "Export raw counts, for example with "
         "--adt \"layer:counts[kind=Antibody Capture]\".")
-    assert _convert(capsys, tmp_path / "tenx.h5ad", tmp_path / "C", "--adt",
-                    "layer:counts[kind=Antibody Capture]") == []
+    # export reads the RNA from X unless --adt reads X: name the counts for it too
+    assert _export(capsys, tmp_path / "tenx.h5ad", tmp_path / "C", "--adt",
+                    "layer:counts[kind=Antibody Capture]", "--rna",
+                    "layer:counts[kind=Gene Expression]") == []
     assert np.array_equal(_dense(tmp_path / "C" / "adt.h5"), _adt().layers["counts"])
 
 
-def test_convert_follows_the_selector_of_the_atac_file(tmp_path, capsys):
+def test_export_follows_the_selector_of_the_atac_file(tmp_path, capsys):
     """``--atac`` is the selector for the ``--atac-from`` file: the hint
     follows it as it does for SRC."""
     other = [f"o{i}" for i in range(N)]
@@ -211,7 +213,7 @@ def test_convert_follows_the_selector_of_the_atac_file(tmp_path, capsys):
             "diagonal", "--atac-from"]
 
     def run(name, *rest):
-        return _convert(capsys, *[tmp_path / name if a is None else a for a in base], *rest)
+        return _export(capsys, *[tmp_path / name if a is None else a for a in base], *rest)
 
     lines = run("A", tmp_path / "holder.h5ad", "--atac", "obsm:peaks")
     assert lines == ["warning: " + _in_obsm("atac", "--atac obsm:<key>")]
@@ -257,13 +259,13 @@ def test_adt_names_names_a_uns_key_only_when_the_string_is_one(tmp_path):
             head.format(names, shown))
 
 
-# ------------------------------- 3(c): the diagonal label error of convert
-def test_convert_names_the_labels_flag(tmp_path, capsys):
+# -------------------------------- 3(c): the diagonal label error of export
+def test_export_names_the_labels_flag(tmp_path, capsys):
     rna, atac = _two_cohorts()
     atac.obs = atac.obs[[]]
     rna.write_h5ad(tmp_path / "rna.h5ad")
     atac.write_h5ad(tmp_path / "atac.h5ad")
-    assert cli.main(["convert", str(tmp_path / "rna.h5ad"), str(tmp_path / "OUT"), "--rna",
+    assert cli.main(["export", str(tmp_path / "rna.h5ad"), str(tmp_path / "OUT"), "--rna",
                      "X", "--atac-from", str(tmp_path / "atac.h5ad"), "--atac-kind",
                      "gene_activity", "--labels", "obs:cell_type", "--category",
                      "diagonal"]) == 1

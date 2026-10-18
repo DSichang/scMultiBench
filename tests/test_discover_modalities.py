@@ -83,8 +83,9 @@ def test_params_for_dataset_disambiguates_by_folder(tmp_path):
     # missing folder settles nothing
     with pytest.raises(ValueError):
         mtb.params_for("Matilda", dataset="D99", data_path=tmp_path)
+    # dataset= is deprecated in 0.4.0: it keeps its effect and is out of the docs
     doc = mtb.params_for.__doc__
-    assert "dataset" in doc and "Returns" in doc and "Raises" in doc
+    assert "dataset" not in doc and "Returns" in doc and "Raises" in doc
 
 
 def test_cite_is_variadic_and_keeps_the_list_form():

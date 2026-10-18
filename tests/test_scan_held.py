@@ -176,7 +176,12 @@ def test_scan_and_dry_run_are_one_table(ds, cat, mods, capsys):
     _on_disk(ds)
     scan = _quiet(full_scan, ds, cat, modalities=mods, verbose=False)
     plan = _quiet(mtb.run_all, ds, cat, modalities=mods, dry_run=True, verbose=False)
-    pd.testing.assert_frame_equal(scan, plan)
+    # 0.4.0: the plan leaves out the rows a run leaves out, a row whose files are
+    # part of another row of its method (UINMF's 2-batch row on D52)
+    would = scan[[W._would_run(r) for _, r in scan.iterrows()]]
+    nested = W._nested_rows(would)[0]
+    assert set(scan.loc[nested, "method"]) == ({"UINMF"} if ds == "D52" else set())
+    pd.testing.assert_frame_equal(scan.drop(index=nested).reset_index(drop=True), plan)
     assert scan.attrs == plan.attrs
     assert capsys.readouterr().out == ""
 
@@ -257,7 +262,7 @@ def test_nothing_held_means_no_filter(tmp_path, no_envs, capsys):
     assert len(df) == 33 and _core(df.attrs) == {"held": [], "not_listed": 0, "not_held": []}
     assert capsys.readouterr().out == (
         "[scan] 0 of 33 rows have their input files. 0 of 33 have their environment "
-        "installed. mtb.env.doctor() checks the environments.\n")
+        "installed. mtb.env.install(dry_run=True) checks the environments.\n")
     # five batches scanned as vertical: rna.h5 is not there, rna1.h5 ... are
     _donors(tmp_path, "FIVE", 5)
     df = _quiet(full_scan, "FIVE", "vertical", data_path=tmp_path, verbose=False)
@@ -311,24 +316,24 @@ def test_count_line_names_what_is_not_listed(no_envs, capsys, monkeypatch):
     assert capsys.readouterr().out == (
         "[scan] 14 of 14 methods have their input files. 0 of 14 have their environment "
         "installed. D11 holds RNA and ADT. Methods and variants that read ATAC are not listed. "
-        'modalities="all" lists them. mtb.env.doctor() checks the environments.\n')
+        'modalities="all" lists them. mtb.env.install(dry_run=True) checks the environments.\n')
     # every modality held: the line of 0.3.4, word for word
     _on_disk("D22mini")
     full_scan("D22mini", "vertical")
     assert capsys.readouterr().out == (
         "[scan] 33 of 33 rows have their input files. 0 of 33 have their environment "
-        "installed. mtb.env.doctor() checks the environments.\n")
+        "installed. mtb.env.install(dry_run=True) checks the environments.\n")
     full_scan("D11", "vertical", modalities="all")
     assert capsys.readouterr().out == (
         "[scan] 14 of 33 rows have their input files. 0 of 33 have their environment "
-        "installed. mtb.env.doctor() checks the environments.\n")
+        "installed. mtb.env.install(dry_run=True) checks the environments.\n")
     # one row, and the command-line spelling
     monkeypatch.setattr(config, "_CLI", True)
     full_scan("D11", "vertical", methods=["totalVI", "Seurat_WNN"])
     assert capsys.readouterr().out == (
         "[scan] 2 of 2 methods have their input files. 0 of 2 have their environment "
         "installed. D11 holds RNA and ADT. Methods and variants that read ATAC are not listed. "
-        "--modalities all lists them. multibench env doctor checks the environments.\n")
+        "--modalities all lists them. multibench env install --dry-run checks the environments.\n")
 
 
 def test_count_line_off_linux_and_with_batches(monkeypatch, capsys):
@@ -355,7 +360,7 @@ def test_two_families_can_be_lacking(tmp_path, no_envs, capsys):
     assert line == (
         "[scan] 0 of 1 method has its input files. 0 of 1 has its environment installed. "
         "RNA_ONLY holds RNA. Methods and variants that read ADT or ATAC are not listed. "
-        'modalities="all" lists them. mtb.env.doctor() checks the environments.\n')
+        'modalities="all" lists them. mtb.env.install(dry_run=True) checks the environments.\n')
 
 
 def test_attrs():
@@ -420,7 +425,7 @@ def test_the_hint_carries_all(no_envs, capsys):
     lines = _nothing_runnable(modalities="all")
     call = "mtb.run_all('D11', 'vertical', modalities=\"all\", dry_run=True)"
     assert lines[-1] == (f"{call} shows every row. Its files_ok and env_ok columns say "
-                         f"which check failed. mtb.env.doctor() checks the environments.")
+                         f"which check failed. mtb.env.install(dry_run=True) checks the environments.")
     n = int(re.fullmatch(r"The first 3 of (\d+) blocked rows:", lines[1]).group(1))
     shown = eval(call, {"mtb": mtb})                      # noqa: S307 - our own hint
     assert len(shown) == n == 33
@@ -429,7 +434,7 @@ def test_the_hint_carries_all(no_envs, capsys):
     lines = _nothing_runnable()
     call = "mtb.run_all('D11', 'vertical', dry_run=True)"
     assert lines[-1] == (f"{call} shows the listed rows. Its files_ok and env_ok columns "
-                         f"say which check failed. mtb.env.doctor() checks the environments.")
+                         f"say which check failed. mtb.env.install(dry_run=True) checks the environments.")
     assert lines[-2] == ("D11 holds RNA and ADT. Methods and variants that read ATAC are not listed. "
                          'modalities="all" lists them.')
     n = int(re.fullmatch(r"The first 3 of (\d+) blocked methods:", lines[1]).group(1))

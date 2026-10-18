@@ -245,16 +245,6 @@ def test_demo_datasets_have_no_row_blocked_by_the_atac_kind(dataset, category):
         W._is_wrong_atac(df["reason"]), ["method", "reason"]]
 
 
-def test_run_all_notes_say_it_skips_the_other_representation():
-    flat = " ".join(inspect.getdoc(mtb.run_all).split())
-    assert ("``True`` = also run a method whose ATAC file holds the other representation "
-            "or peak names it cannot read.") in flat
-    assert "runs without an error and gives a wrong embedding; ``mtb.scan``" not in flat
-    flat = " ".join(inspect.getdoc(mtb.scan).split())
-    assert ("``True`` = keep a method runnable when its ATAC file holds the other "
-            "representation or peak names it cannot read.") in flat
-
-
 # ----------------------------------------------------------------- R3-17
 def test_generated_sounding_passages_are_rewritten():
     import importlib

@@ -39,7 +39,11 @@ from tests.test_docs_r4 import _flat, needs_docs
 from tests.test_study_r4_wf import ALL_ENVS, _h5, _quiet, _Res, cite  # noqa: F401
 from tests.test_study_r6_msg import (_cli, _lung_ids, needs_git, pinned,  # noqa: F401
                                      wrong_ref)
-from tests.test_study_r6_wf import KW, MOVED, _shuffled_labels, rel  # noqa: F401
+from tests.test_study_r6_wf import KW, _shuffled_labels, rel  # noqa: F401
+
+#: 0.4: data_path= of load_batch is deprecated, so the fix names the config
+MOVED = ("Set mtb.config.DEFAULT.data_path to the folder that holds it, or run rescore "
+         "from the folder where run_all ran.")
 from tests.conftest import full_scan
 
 pytest.importorskip("scib")
@@ -154,7 +158,7 @@ def test_a_data_path_that_does_not_hold_the_dataset_raises(rel):
     with pytest.raises(ValueError, match=r"^\S+nowhere/MYCITE is not a folder\. "
                                          r"data_path= is the folder that holds MYCITE\.$"):
         mtb.load_batch("out", data_path=root / "nowhere")
-    assert "ValueError" in inspect.getdoc(mtb.load_batch)
+    # 0.4: data_path= is deprecated, so the docstring no longer lists this error
 
 
 def test_the_folder_found_is_recorded_as_an_absolute_path(rel, monkeypatch):
@@ -349,16 +353,19 @@ def test_the_dry_run_commands_header_counts_methods(monkeypatch, capsys):
     rc, out, err = _cli(["run-all", "D52", "--category", "cross", "--dry-run", "--methods",
                          "sciPENN,totalVI,Concerto"], capsys)
     assert rc == 0
-    assert "0 of 3 methods can run on D52 (cross)." in err
-    assert "A method whose input files are missing has no command." in err
+    # 0.4: the header is one sentence
+    assert ("# Dry run: 0 of 3 methods can run on D52 (cross); the reason column says "
+            "why.") in err
     assert re.search(r"^# Commands of the 3 methods whose input files are in place\. "
                      r"\[env missing\] marks a method whose environment", out, re.M), out
     # the whole category: several methods have more than one row, so it counts rows
     rc, out, err = _cli(["run-all", "D52", "--category", "cross", "--dry-run",
                          "--modalities", "all"], capsys)
     n = len(list(W._variant_rows("cross")))
-    assert rc == 0 and f"0 of {n} rows can run on D52 (cross)." in err
-    assert "A row whose input files are missing has no command." in err
+    # the plan leaves out UINMF's two-batch row, as a run does
+    n -= 1
+    assert rc == 0 and (f"# Dry run: 0 of {n} rows can run on D52 (cross); the reason "
+                        "column says why.") in err
     assert re.search(r"^# Commands of the \d+ rows whose input files are in place\. "
                      r"\[env missing\] marks a row whose environment", out, re.M), out
     # UINMF's two-batch row is inside its three-batch row, which is the one
@@ -393,7 +400,8 @@ def test_docstrings_quote_the_current_texts():
     assert "all four files" not in flat["save"]
     assert "every file in the list above is rewritten from the merged set" in flat["save"]
     assert "see its Notes" not in flat["rescore"]
-    assert "the one found is recorded as an absolute path" in flat["load_batch"]
+    assert ("each record's output folder is looked for next to ``batch_result.json`` when "
+            "its recorded path is gone") in flat["load_batch"]
 
 
 # ============================================================ docs pages

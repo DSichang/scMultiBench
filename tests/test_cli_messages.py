@@ -73,23 +73,25 @@ def test_x15_cli_plot_renames_your_clashing_rows(tmp_path, capsys):
                        "--category", "vertical", "--dataset", "D11",
                        "--out", str(tmp_path / "x.png")], capsys)
     assert rc == 0, err
-    assert ("# Your rows of scMM are drawn as scMM_rerun: the stored table has the same "
-            "method and dataset.") in err
+    assert ("# Your rows of scMM are drawn as scMM (this run): the stored results have "
+            "the same method and dataset.") in err
 
 
 def test_x17_x18_x53_x95_x97_x98_help_texts():
     assert "as printed by multibench find" in _help("run")
-    assert "the dataset folder name under --data-path, or its path" in _help("run-all")
+    assert ("the dataset folder: its path, or its name under the data root "
+            "(multibench config)") in _help("run-all")
+    assert "--data-path" not in _help("run-all")
     assert "integration category: vertical (several" not in _help("scan")
     assert "vertical, diagonal, mosaic or cross (multibench layout explains them)" in \
         _help("scan")
     ev = _help("evaluate")
-    assert ("--method METHOD a package method: read the dataset's label files in its "
-            "batch order") in ev
+    assert ("--method METHOD fills the method column: a package method id, or your own "
+            "name. A package method also reads --dataset's label files in its cell "
+            "order") in ev
     assert "or with --labels any row name" not in ev
-    assert "leidenalg, the article's (keep it to compare with the stored tables)" in ev
-    assert "so a later call cannot leave a stale batch file from an earlier export" in \
-        _help("convert")
+    assert "--leiden-flavor" not in ev                    # hidden in 0.4.0
+    assert "--n-batches" not in _help("export")           # hidden in 0.4.0
 
 
 def test_x19_cli_evaluate_takes_the_embedding_first(tmp_path, capsys):
@@ -115,9 +117,9 @@ def test_x20_x24_cli_run_dry_run(capsys):
                          "--input", "rna=a.h5", "--input", "adt=b.h5", "--dry-run",
                          "--runner", "srun {env_cmd}"], capsys)
     assert rc == 0 and out.startswith("srun ") and "<out_dir>" in out
-    assert ("--runner is deprecated and will be removed in 0.5. Use --cmd-template."
-            in err)
-    assert "--cmd-template" in _help("run") and "--runner" not in _help("run")
+    assert ("warning: run --runner is deprecated and will be removed in 0.5. Use a job "
+            "script that calls multibench run-all." in err)
+    assert "--cmd-template" not in _help("run") and "--runner" not in _help("run")
 
 
 def test_x21_x22_cli_params_tokens_and_int_defaults(capsys):
@@ -125,7 +127,7 @@ def test_x21_x22_cli_params_tokens_and_int_defaults(capsys):
                          "rna,adt"], capsys)
     assert rc == 0, err
     assert "cross:rna1+rna2+rna3+adt1+adt2+adt3" in out
-    assert "256.000" not in out and " 256 " in out
+    assert "256.000" not in out and " 256\n" in out
 
 
 def test_x27_x31_x33_cli_env_install(monkeypatch, capsys):
@@ -182,12 +184,15 @@ def test_evaluate_output_says_pass_the_embedding_first(tmp_path, capsys):
 def test_cli_evaluate_dataset_without_method_reads_its_labels(tmp_path, capsys):
     import numpy as np
     from multibench import cli
-    n = sum(len(open(p).read().splitlines()) - 1
-            for p in mtb.labels_for("D52mini", "cross").values())
+    from multibench.engine.resolve import labels_for      # mtb.labels_for is deprecated
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")                    # its default-order note
+        files = labels_for("D52mini", "cross")
+    n = sum(len(open(p).read().splitlines()) - 1 for p in files.values())
     emb = tmp_path / "e.npy"
     np.save(emb, np.random.default_rng(0).normal(size=(n, 5)))
     rc = cli.main(["evaluate", str(emb), "--dataset", "D52mini", "--category", "cross",
-                   "--name", "mine", "--metrics", "cLISI"])
+                   "--method", "mine", "--metrics", "cLISI"])
     out = capsys.readouterr()
     assert rc == 0 and "mine" in out.out
     assert "# labels: cty1.csv, cty2.csv, cty3.csv from D52mini, in that order" in out.err
@@ -198,8 +203,9 @@ def test_cli_evaluate_help_gives_each_flag_one_job(capsys):
     with pytest.raises(SystemExit):
         cli.main(["evaluate", "--help"])
     text = " ".join(capsys.readouterr().out.split())
-    assert "the row name in the long table (default: --method)" in text
-    assert "a package method: read the dataset's label files in its batch order" in text
+    assert "--name" not in text                           # a hidden alias of --method
+    assert ("fills the method column: a package method id, or your own name. A package "
+            "method also reads --dataset's label files in its cell order") in text
 
 
 # Y36 / Y37 / X98: maintainer and multi-dataset flags leave --help; leiden flavor is advanced
@@ -212,7 +218,7 @@ def test_help_leaves_out_ref_and_overall(capsys):
     with pytest.raises(SystemExit):
         cli.main(["evaluate", "--help"])
     out = capsys.readouterr().out
-    assert "--leiden-flavor {" in out.split("advanced:", 1)[1]
+    assert "--leiden-flavor" not in out                   # hidden in 0.4.0
     assert "0.1" not in out
 
 

@@ -1,9 +1,12 @@
-"""The plot side's public surface: ``mtb.plot.__all__`` is four names,
-``plot_bubble`` is removed (0.4) with an error naming ``bubble``, ``render`` /
-``FamilyBlock`` stay importable but leave the listing, and every selector of
-``bubble`` / ``bar`` / ``build_table`` is keyword-only after ``long_df``.
+"""The plot side's public surface: ``mtb.plot.__all__`` is ``bubble`` and
+``bar`` (0.4.0; ``build_table`` / ``BubbleTable`` are deprecated for
+``mtb.recommend(category, long_df=...)``), ``plot_bubble`` is removed (0.4) with
+an error naming ``bubble``, ``render`` / ``FamilyBlock`` stay importable but
+leave the listing, and ``bubble`` / ``bar`` take the same keyword-only
+selectors after ``long_df``.
 """
 import inspect
+import warnings
 
 import matplotlib
 matplotlib.use("Agg")
@@ -25,7 +28,7 @@ def _toy_long():
 
 
 def test_plot_all_and_dir_are_the_contract():
-    assert mtb.plot.__all__ == ["bubble", "bar", "build_table", "BubbleTable"]
+    assert mtb.plot.__all__ == ["bubble", "bar"]
     listed = [n for n in dir(mtb.plot) if not n.startswith("__")]
     assert sorted(listed) == sorted(mtb.plot.__all__)
     # deprecated in 0.4 (catalog.metrics() has the family column): importable, warn
@@ -46,18 +49,23 @@ def test_plot_bubble_is_removed_naming_bubble():
         from multibench.plot import plot_bubble   # noqa: F401
 
 
-def test_bubble_bar_build_table_are_keyword_only_after_long_df():
-    for fn in (mtb.plot.bubble, mtb.plot.bar, mtb.plot.build_table):
+def test_bubble_and_bar_are_keyword_only_after_long_df():
+    for fn in (mtb.plot.bubble, mtb.plot.bar):
         params = list(inspect.signature(fn).parameters.values())
-        assert params[0].name == "long_df"
+        assert [p.name for p in params] == ["long_df", "metrics", "methods", "title", "save"]
         assert all(p.kind is inspect.Parameter.KEYWORD_ONLY for p in params[1:]), fn.__name__
-    # today's defaults are kept
-    sig = inspect.signature(mtb.plot.bubble).parameters
-    assert sig["aggregate"].default == "dataset" and sig["overall"].default == "rank"
-    assert "na" not in sig and "show_language" not in sig          # deprecated in 0.4
-    # build_table(na=) is deprecated since 0.4.0 (X41), as bubble(na=)
-    assert "na" not in inspect.signature(mtb.plot.build_table).parameters
+
+
+def test_build_table_warns_once_and_still_builds_the_table():
     with pytest.raises(TypeError):
         mtb.plot.build_table(_toy_long(), ["ARI"])
-    tbl = mtb.plot.build_table(_toy_long(), metrics=["ARI"])
-    assert isinstance(tbl, mtb.plot.BubbleTable)
+    with warnings.catch_warnings(record=True) as rec:
+        warnings.simplefilter("always")
+        tbl = mtb.plot.build_table(_toy_long(), metrics=["ARI"])
+        is_table = isinstance(tbl, mtb.plot.BubbleTable)
+    assert [str(w.message) for w in rec if issubclass(w.category, FutureWarning)] == [
+        "plot.build_table is deprecated and will be removed in 0.5. Use "
+        "mtb.recommend(category, long_df=...).",
+        "plot.BubbleTable is deprecated and will be removed in 0.5. Use "
+        "mtb.recommend(category, long_df=...)."]
+    assert is_table and tbl.methods == ["B", "A"]

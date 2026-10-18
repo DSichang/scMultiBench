@@ -264,7 +264,8 @@ def test_an_integer_index_is_named_as_row_numbers(mycite):
     msg = str(e.value)
     assert msg.startswith("batch: the index holds row numbers (first: [0, 2, 4]), not "
                           "cell barcodes. "), msg
-    assert "only when batch is already in the order of mtb.labels_for('MYCITE')" in msg
+    assert msg.endswith("only when batch is already in the order of the label files of "
+                        "MYCITE."), msg      # 0.4: labels_for is deprecated
 
 
 def test_missing_and_foreign_ids_get_their_own_fix(mycite):
@@ -365,5 +366,6 @@ def test_no_user_visible_text_says_registry(monkeypatch, capsys):
 
 def test_cite_example_cites_only_the_methods_that_finished():
     ex = inspect.getdoc(mtb.cite).split("Examples\n--------\n")[1].split("\n\n")[0]
-    assert "status not in ['SKIPPED', 'FAIL', 'TIMEOUT']" in ex
+    # 0.4: cite takes the BatchResult and cites the methods that ran
+    assert 'mtb.cite(mtb.load_batch("out/"), format="bibtex")' in ex
     assert "list(res.summary.method)" not in ex

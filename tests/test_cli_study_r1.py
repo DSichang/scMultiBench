@@ -17,7 +17,8 @@ import pytest
 import multibench
 import multibench as mtb
 from multibench import cli, config, workflow
-from multibench.engine import envs, ingest, runner
+from multibench.engine import envs, ingest, registry, resolve, runner
+from multibench.eval import pipeline
 
 
 def _sub(name):
@@ -101,7 +102,7 @@ def test_fetch_wraps_data_fetch(monkeypatch, tmp_path, capsys):
     mod = importlib.import_module("multibench.data.fetch")
     calls = []
 
-    def fake_fetch(*ids, data_path=None, quiet=False):
+    def fake_fetch(*ids, data_path=None, quiet=False, verbose=True):
         calls.append(("fetch", ids, data_path))
         print("downloading ...")              # library progress: must reach stderr
         return tmp_path
@@ -109,9 +110,9 @@ def test_fetch_wraps_data_fetch(monkeypatch, tmp_path, capsys):
     def fake_outputs(ds, methods=None, *, data_path=None, quiet=False):
         calls.append(("outputs", ds, data_path))
         return tmp_path / "outputs" / ds
-    monkeypatch.setattr(mod, "fetch", fake_fetch)
+    monkeypatch.setattr(mod, "_fetch", fake_fetch)       # the command calls the internal one
     monkeypatch.setattr(mod, "fetch_outputs", fake_outputs)
-    rc = cli.main(["fetch", "D11", "D46,D52", "--data-path", str(tmp_path)])
+    rc = cli.main(["fetch", "D11", "D46,D52"])
     cap = capsys.readouterr()
     assert rc == 0
     assert [c[1] for c in calls] == [("D11",), ("D46",), ("D52",)]
@@ -285,16 +286,16 @@ def test_env_cmd_keeps_the_env_preflight(tmp_path, monkeypatch):
 
 
 def test_cli_runner_help_and_dry_run(tmp_path, capsys):
-    # --cmd-template since 0.4.0 (X24), the name of mtb.run's argument
-    act = next(a for a in _sub("run")._actions if "--cmd-template" in a.option_strings)
-    assert "{env_cmd}" in act.help and "no env activation" in act.help
-    assert "srun --gres=gpu:1 {env_cmd}" in act.help
+    # 0.4.0: run --cmd-template is gone; the hidden --runner warns and keeps its effect
+    assert not any("--cmd-template" in a.option_strings for a in _sub("run")._actions)
     rc = cli.main(["run", "--method", "Matilda", "--category", "vertical",
                    "--input", "rna=/d/rna.h5", "--input", "adt=/d/adt.h5",
                    "--input", "cty=/d/cty.csv",
-                   "--out-dir", str(tmp_path), "--dry-run", "--cmd-template",
+                   "--out-dir", str(tmp_path), "--dry-run", "--runner",
                    "srun {env_cmd}"])
-    out = capsys.readouterr().out
+    cap = capsys.readouterr()
+    out = cap.out
+    assert "warning: run --runner is deprecated" in cap.err
     assert rc == 0 and re.match(r"srun \S*conda run -n matilda python ", out)
     assert "{env_cmd}" in runner.run.__doc__
 
@@ -319,12 +320,14 @@ def test_scan_strict_exits_1_when_nothing_is_runnable(no_envs, capsys):
     rc = cli.main(["scan", "D11", "--category", "vertical", "--strict"])
     cap = capsys.readouterr()
     assert rc == 1 and "Matilda" in cap.out                  # the table is still printed
-    assert cap.err.startswith("error: --strict: 0 of ")
+    warn, err = cap.err.split("\n", 1)                        # --strict is deprecated (0.4.0)
+    assert warn.startswith("warning: scan --strict is deprecated and will be removed in 0.5.")
+    assert err.startswith("error: --strict: 0 of ")
     assert "Rows whose environment is not ready: " in cap.err
 
 
 def test_scan_strict_names_a_requested_method_without_a_runnable_row(monkeypatch, capsys):
-    every = frozenset(envs.group_for(m) for m in mtb.list_methods())
+    every = frozenset(envs.group_for(m) for m in registry.list_methods())
     monkeypatch.setattr(workflow, "_installed_envs", lambda: every)
     monkeypatch.setattr(workflow.envs, "host_has_gpu", lambda: True)
     rc = cli.main(["scan", "D11", "--category", "vertical", "--strict",
@@ -335,8 +338,9 @@ def test_scan_strict_names_a_requested_method_without_a_runnable_row(monkeypatch
     err = capsys.readouterr().err
     assert rc == 1 and "No runnable row for MIRA" in err and "  MIRA: " in err
     assert "Matilda:" not in err
+    import argparse
     act = next(a for a in _sub("scan")._actions if a.dest == "strict")
-    assert "multibench scan DS --category C --strict && sbatch" in act.help
+    assert act.help == argparse.SUPPRESS                     # hidden in 0.4.0
 
 
 # ================================================================ L29 CLI spellings in messages
@@ -345,13 +349,14 @@ def test_nothing_runnable_from_the_cli_names_cli_commands(no_envs, tmp_path, cap
     err = capsys.readouterr().err
     assert rc == 1 and "No method can run on D11 (vertical)." in err
     assert "multibench scan D11 --category vertical shows the listed rows" in err
-    assert "multibench env doctor checks the environments" in err
+    assert "multibench env install --dry-run checks the environments" in err
     assert "`" not in err
-    assert "mtb.run_all(" not in err and "mtb.env.doctor()" not in err
+    assert "mtb.run_all(" not in err and "mtb.env.install(" not in err
     assert config._CLI is False                              # reset after the command
     with pytest.raises(ValueError) as e:                     # Python keeps Python spellings
         mtb.run_all("D11", "vertical", out_dir=str(tmp_path), verbose=False)
-    assert "mtb.run_all('D11', 'vertical', dry_run=True)" in str(e.value) and "mtb.env.doctor()" in str(e.value)
+    assert "mtb.run_all('D11', 'vertical', dry_run=True)" in str(e.value)
+    assert "mtb.env.install(dry_run=True)" in str(e.value)
 
 
 def test_nothing_runnable_lists_rows_with_files_in_place_first(no_envs, tmp_path):
@@ -387,7 +392,8 @@ def test_evaluate_hints_use_flag_names(tmp_path, capsys):
 
 # ================================================================ L32 compact scan view
 def test_compact_view_adds_atac_and_caveat_when_they_apply(capsys):
-    rc = cli.main(["scan", "D28", "--category", "diagonal"])
+    # 0.4.0: scan prints mtb.scan's table; the compact plan view is run-all --dry-run's
+    rc = cli.main(["run-all", "D28", "--category", "diagonal", "--dry-run"])
     out = capsys.readouterr().out
     header = out.splitlines()[0].split()
     assert rc == 0
@@ -395,7 +401,8 @@ def test_compact_view_adds_atac_and_caveat_when_they_apply(capsys):
                       "runtime_tier", "reason", "caveat"]
     glue = next(l for l in out.splitlines() if l.strip().startswith("GLUE"))
     assert "GLUE reads the GENCODE" in glue and "peak names" not in glue
-    rc = cli.main(["scan", "D11", "--category", "vertical", "--modalities", "rna,adt"])
+    rc = cli.main(["run-all", "D11", "--category", "vertical", "--modalities", "rna,adt",
+                   "--dry-run"])
     header = capsys.readouterr().out.splitlines()[0].split()
     assert rc == 0 and header == workflow.COMPACT_COLUMNS    # no ATAC row, no caveat
 
@@ -425,7 +432,8 @@ def fake_eval(monkeypatch):
         if isinstance(lab, list) and all(Path(p).is_file() for p in lab):
             seen["label_rows"] = [pd.read_csv(p)["x"].tolist() for p in lab]
         return pd.DataFrame({"Value": [0.5]}, index=pd.Index(["ARI"]))
-    monkeypatch.setattr(multibench, "evaluate", _fake)
+    # the command scores with the internal wide frame, then prints the long table
+    monkeypatch.setattr(pipeline, "_scores", _fake)
     return seen
 
 
@@ -438,22 +446,23 @@ def test_evaluate_repeated_labels_and_python_default_metrics(fake_eval, tmp_path
     assert rc == 0 and fake_eval["labels"] == "a.csv"
 
 
-def test_evaluate_column_applies_to_every_labels_file(fake_eval, tmp_path):
+def test_evaluate_column_applies_to_every_labels_file(fake_eval, tmp_path, capsys):
     for name, vals in (("a.csv", ["A", "B"]), ("b.csv", ["C"])):
         pd.DataFrame({"bc": [f"c{i}" for i in range(len(vals))], "x": ["?"] * len(vals),
                       "ct": vals}).to_csv(tmp_path / name, index=False)
     rc = cli.main(["evaluate", "--embedding", "e.h5", "--labels", str(tmp_path / "a.csv"),
                    "--labels", str(tmp_path / "b.csv"), "--column", "ct"])
     assert rc == 0 and fake_eval["label_rows"] == [["A", "B"], ["C"]]
-    act = next(a for a in _sub("evaluate")._actions if a.dest == "column")
-    assert "each --labels CSV" in act.help and "mtb.evaluate" not in act.help
+    # 0.4.0: --column is hidden and deprecated, and keeps its effect
+    assert ("warning: evaluate --column is deprecated and will be removed in 0.5."
+            in capsys.readouterr().err)
 
 
 def test_evaluate_reads_labels_for_without_labels(fake_eval, capsys):
     rc = cli.main(["evaluate", "--embedding", "e.h5", "--dataset", "D28", "--method", "GLUE",
-                   "--category", "diagonal", "--data-path", str(config.DEFAULT.data_path)])
+                   "--category", "diagonal"])
     assert rc == 0
-    want = mtb.labels_for("D28", "diagonal", "GLUE")
+    want = resolve.labels_for("D28", "diagonal", "GLUE")      # mtb.labels_for is deprecated
     assert dict(fake_eval["labels"]) == dict(want)
     assert list(fake_eval["labels"]) == list(want)
     assert "# labels: " in capsys.readouterr().err
@@ -466,12 +475,15 @@ def test_evaluate_leiden_flavor_and_task_deprecation(fake_eval, capsys):
     before = config.DEFAULT.leiden_flavor
     rc = cli.main(["evaluate", "--embedding", "e.h5", "--labels", "a.csv",
                    "--leiden-flavor", "leidenalg"])
-    assert rc == 0 and fake_eval["leiden"] == "leidenalg"
+    assert rc == 0 and fake_eval["leiden"] == "leidenalg"     # hidden + deprecated, kept
+    assert ("warning: evaluate --leiden-flavor is deprecated and will be removed in 0.5."
+            in capsys.readouterr().err)
     assert config.DEFAULT.leiden_flavor == before                # restored
     rc = cli.main(["evaluate", "--embedding", "e.h5", "--labels", "a.csv", "--task", "batch"])
     err = capsys.readouterr().err
     assert rc == 0 and fake_eval["metrics"] == "batch"
-    assert "warning: --task is deprecated and will be removed in 0.5. Use --metrics batch." in err
+    assert ("warning: evaluate --task is deprecated and will be removed in 0.5. Use "
+            "--metrics batch.") in err
     with pytest.raises(SystemExit) as e:
         cli.main(["evaluate", "--embedding", "e.h5", "--labels", "a.csv",
                   "--task", "dimension_reduction"])
@@ -488,13 +500,13 @@ def test_evaluate_two_label_files_score_the_batch_family(tmp_path, capsys):
     np.save(tmp_path / "e.npy", emb)
     pd.DataFrame({"x": labels[:60]}).to_csv(tmp_path / "l1.csv", index=False)
     pd.DataFrame({"x": labels[60:]}).to_csv(tmp_path / "l2.csv", index=False)
-    pd.DataFrame({"x": labels}).to_csv(tmp_path / "clu.csv", index=False)
+    # 0.4.0: --clusters is gone (it never shipped); the CSV is the long table
     rc = cli.main(["evaluate", "--embedding", str(tmp_path / "e.npy"),
                    "--labels", str(tmp_path / "l1.csv"), "--labels", str(tmp_path / "l2.csv"),
-                   "--clusters", str(tmp_path / "clu.csv"), "--out", str(tmp_path / "m.csv")])
+                   "--out", str(tmp_path / "m.csv")])
     assert rc == 0
-    got = pd.read_csv(tmp_path / "m.csv", index_col=0)
-    assert {"ARI", "ASW_batch", "iLISI"} <= set(got.index)
+    got = pd.read_csv(tmp_path / "m.csv")
+    assert {"ARI", "ASW_batch", "iLISI"} <= set(got["metric"])
 
 
 def test_find_task_help_has_no_default():
@@ -509,9 +521,11 @@ def _long(method, dataset="MYCITE", n=3):
 
 
 def test_plot_input_rows_all_removed_by_dataset_is_an_error(tmp_path, monkeypatch, capsys):
-    from multibench import plot as plot_ns
-    monkeypatch.setattr(multibench, "load_results", lambda **kw: _long("A", "D11"))
-    monkeypatch.setattr(plot_ns, "bubble", lambda df, **kw: pytest.fail("must not draw"))
+    monkeypatch.setattr(multibench.data.results, "_load_results",
+                        lambda *a, **kw: _long("A", "D11"))
+    # the command draws with the internal _bubble (plot.bubble shadows its module)
+    monkeypatch.setattr(importlib.import_module("multibench.plot.bubble"), "_bubble",
+                        lambda df, **kw: pytest.fail("must not draw"))
     mine = tmp_path / "mine.csv"
     pd.concat([_long("Mine"), _long("Mine")]).to_csv(mine, index=False)
     rc = cli.main(["plot", "bubble", "--input", str(mine), "--category", "vertical",
@@ -523,11 +537,11 @@ def test_plot_input_rows_all_removed_by_dataset_is_an_error(tmp_path, monkeypatc
 
 
 def test_plot_input_rows_partly_removed_warns(tmp_path, monkeypatch, capsys):
-    from multibench import plot as plot_ns
     seen = {}
     monkeypatch.setattr(multibench.data.results, "_load_results",
                         lambda *a, **kw: _long("A", "D11"))
-    monkeypatch.setattr(plot_ns, "bubble", lambda df, **kw: seen.update(df=df))
+    monkeypatch.setattr(importlib.import_module("multibench.plot.bubble"), "_bubble",
+                        lambda df, **kw: seen.update(df=df))
     mine = tmp_path / "mine.csv"
     pd.concat([_long("Mine", "D11"), _long("Other", "MYCITE")]).to_csv(mine, index=False)
     rc = cli.main(["plot", "bubble", "--input", str(mine), "--category", "vertical",
@@ -552,31 +566,31 @@ def test_convert_batch_index_is_passed_through(tmp_path, monkeypatch, capsys):
         seen.update(kw)
         Path(out).mkdir(parents=True, exist_ok=True)
         return Path(out)
-    monkeypatch.setattr(ingest, "export_dataset", fake_export)
-    rc = cli.main(["convert", "B.h5ad", str(tmp_path / "LAB"), "--rna", "X",
+    monkeypatch.setattr(ingest, "_export_dataset", fake_export)   # export replaces convert
+    rc = cli.main(["export", "B.h5ad", str(tmp_path / "LAB"), "--rna", "X",
                    "--category", "mosaic", "--batch-index", "2"])
     assert rc == 0 and seen["batch_index"] == 2 and seen["batch"] is None
     seen.clear()
-    rc = cli.main(["convert", "B.h5ad", str(tmp_path / "LAB"), "--rna", "X"])
+    rc = cli.main(["export", "B.h5ad", str(tmp_path / "LAB"), "--rna", "X"])
     assert rc == 0 and "batch_index" not in seen
     for argv, msg in ((["--batch", "obs:b", "--category", "mosaic", "--batch-index", "1"],
                        "mutually exclusive"),
                       (["--category", "vertical", "--batch-index", "1"], "mosaic or"),
                       (["--category", "cross", "--batch-index", "0"], "counts from 1")):
         with pytest.raises(SystemExit) as e:
-            cli.main(["convert", "B.h5ad", str(tmp_path / "LAB"), "--rna", "X"] + argv)
+            cli.main(["export", "B.h5ad", str(tmp_path / "LAB"), "--rna", "X"] + argv)
         assert e.value.code == 2 and msg in capsys.readouterr().err
 
 
 def test_convert_help_shows_the_per_batch_recipe(capsys):
     with pytest.raises(SystemExit):
-        cli.main(["convert", "--help"])
+        cli.main(["export", "--help"])
     out = capsys.readouterr().out
     lines = [l.strip() for l in out.splitlines()]
     for i in (1, 2, 3):
-        assert any(l.startswith("multibench convert") and l.endswith(f"--batch-index {i}")
+        assert any(l.startswith("multibench export") and l.endswith(f"--batch-index {i}")
                    for l in lines), i
-    assert "multibench scan LAB --category mosaic --data-path data" in lines
+    assert "multibench scan data/LAB --category mosaic" in lines    # no --data-path
 
 
 # ================================================================ L61 CLI text

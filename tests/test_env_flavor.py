@@ -155,7 +155,7 @@ def test_host_has_gpu_is_importable_but_not_in_all():
     assert callable(envs.host_has_gpu) and callable(mtb.env.host_has_gpu)
     assert "host_has_gpu" not in mtb.env.__all__ and "host_has_gpu" not in dir(mtb.env)
     assert "env_prefix" not in dir(mtb.env)
-    assert set(mtb.env.__all__) == {"install", "doctor"}
+    assert set(mtb.env.__all__) == {"install"}      # doctor is deprecated in 0.4.0
 
 
 # ---------------------------------------------------------------- archive_for: published, placeholder, none
@@ -408,7 +408,7 @@ def test_install_signature_and_docs():
                envs.archive_for, envs.installed_flavor, envs.check_flavor):
         doc = inspect.getdoc(fn)
         assert doc and "Returns" in doc, fn.__name__
-    assert "flavor" in inspect.getdoc(envs.install) and "flavor" in inspect.getdoc(envs.doctor)
+    assert "flavor" in inspect.getdoc(envs.install)    # doctor is deprecated in 0.4.0
 
 
 # ---------------------------------------------------------------- plan / doctor / status show the record
@@ -471,10 +471,7 @@ def test_cli_install_help_explains_auto(capsys):
         # round 2 (Y34): one short sentence
         assert "auto (default) = gpu when this computer has an NVIDIA GPU" in out
         assert "any = one build serves both" in out and "mtb.env.host_has_gpu" not in out
-    with pytest.raises(SystemExit):
-        cli.main(["env", "install", "--help"])
-    out = " ".join(capsys.readouterr().out.split()).replace("CPU- only", "CPU-only")
-    assert "--flavor picks the CPU-only or the CUDA archive" in out   # argparse wraps at "-"
+    # 0.4.0: install's description leaves --flavor to the option's own help
 
 
 def test_cli_install_dry_run_total_names_the_flavour(cli_linux, plan_rows, monkeypatch, capsys):

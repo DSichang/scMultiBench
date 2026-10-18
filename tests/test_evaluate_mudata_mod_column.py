@@ -26,6 +26,11 @@ def mdata():
     return m
 
 
+def _values(df):
+    """evaluate's long table as {metric: value}."""
+    return df.set_index("metric")["value"].round(6).to_dict()
+
+
 def test_mod_column_labels_and_batch(mdata):
     got = mtb.evaluate(mdata, labels="rna:celltype", batch="rna:donor",
                        metrics=["ARI", "iLISI"], verbose=False)
@@ -33,7 +38,7 @@ def test_mod_column_labels_and_batch(mdata):
                        labels=mdata["rna"].obs["celltype"].to_numpy(),
                        batch=mdata["rna"].obs["donor"].to_numpy(),
                        metrics=["ARI", "iLISI"], verbose=False)
-    assert got["Value"].round(6).to_dict() == ref["Value"].round(6).to_dict()
+    assert _values(got) == _values(ref)
 
 
 def test_an_unknown_column_lists_the_mod_columns(mdata):

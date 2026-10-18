@@ -107,7 +107,8 @@ def test_total_line_adds_the_layer_once(published):
              for e in ("env_a", "env_b")}
     layers["L"].update(archive_bytes=4_000_000_000, unpacked_bytes=6_000_000_000)
     totals, text = envs.plan_totals([{"env": "env_a"}, {"env": "env_b"}], sizes, layers=layers)
-    assert text == "2 envs: 8.0 GB to download, 12.0 GB on disk"
+    assert text == ("2 envs: 8.0 GB to download, 12.0 GB on disk "
+                    "(with the shared layer L, 4.0 GB, downloaded once)")
     assert totals["shared_layers"] == {"L": {"archive_bytes": 4_000_000_000,
                                              "unpacked_bytes": 6_000_000_000,
                                              "envs": ["env_a", "env_b"]}}

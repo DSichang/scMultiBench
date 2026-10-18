@@ -56,17 +56,19 @@ def test_x40_method_info_default_keys_and_the_verbose_hint():
     assert set(info) == {"id", "language", "notes", "categories", "env", "atac",
                          "needs_labels", "supports", "runtime", "gpu", "requires_gpu",
                          "cpu_params", "setup_hint", "repo_url", "reference"}
-    with pytest.raises(KeyError, match=r"'params' is in method_info\('Matilda', "
-                                       r"verbose=True\)"):
+    # 0.4.0: method_info(verbose=) is deprecated; the hint names params_for
+    with pytest.raises(KeyError, match=r"'params' is in mtb\.params_for\('Matilda', "
+                                       r"category, modalities\)"):
         info["params"]
     full = mtb.method_info("Matilda", verbose=True)
     assert {"params", "scripts_url", "notes_long", "upstream_knobs"} <= set(full)
 
 
-def test_x41_build_table_na_is_deprecated():
-    with pytest.warns(FutureWarning, match=r"^plot\.build_table\(na=\) is deprecated and "
-                                           r"will be removed in 0\.5; leave it out"):
-        mtb.plot.build_table(_d11(), na="skip")
+def test_x41_build_table_is_deprecated_and_its_na_adds_no_second_warning():
+    # 0.4.0: build_table as a whole is deprecated (mtb.recommend(category, long_df=...))
+    _, msgs = _messages(mtb.plot.build_table, _d11(), na="skip")
+    assert msgs == ["plot.build_table is deprecated and will be removed in 0.5. Use "
+                    "mtb.recommend(category, long_df=...)."]
     import inspect
     assert "na" not in inspect.signature(mtb.plot.build_table).parameters
 
@@ -126,17 +128,17 @@ def test_to_canonical_mod_is_deprecated(tmp_path):
             mtb.io.to_canonical(a, tmp_path / "x.h5", mod="rna")
 
 
-def test_cli_find_atac_and_convert_mod_are_hidden(capsys):
+def test_cli_find_atac_and_export_mod_are_hidden(capsys):
     from multibench import cli
     with pytest.raises(SystemExit):
         cli.main(["find", "--help"])
     assert "--atac" not in capsys.readouterr().out
     with pytest.raises(SystemExit):
-        cli.main(["convert", "--help"])
+        cli.main(["export", "--help"])          # export replaces convert (0.4.0)
     assert "--mod " not in capsys.readouterr().out
     assert cli.main(["find", "--category", "diagonal", "--atac", "peak"]) == 0
     out = capsys.readouterr()
-    assert "warning: --atac is deprecated and will be removed in 0.5. Use --modalities " \
+    assert "warning: find --atac is deprecated and will be removed in 0.5. Use --modalities " \
            "atac_peak or atac_gas." in out.err
     assert out.out.split() == mtb.find_methods("diagonal", modalities=["atac_peak"])
 

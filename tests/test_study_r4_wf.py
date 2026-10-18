@@ -18,6 +18,7 @@ rule of scan names what atac_peak alone keeps.
 The env probe is pinned where a verdict depends on it; ``_run`` is faked in
 the real-run tests.
 """
+import argparse
 import inspect
 import json
 import re
@@ -282,18 +283,14 @@ def test_layout_lines_name_the_override_in_short_sentences(monkeypatch):
     txt = mtb.describe_layout("mosaic")
     lines = txt.splitlines()
     i = lines.index(head)
-    assert lines[i + 1:i + 3] == [
-        "mtb.scan and mtb.run_all skip such a method unless allow_atac_mismatch=True.",
-        "mtb.run only warns, so check method_info(m)['atac'] first."]
+    # 0.4.0: no deprecated override and no mtb.run line
+    assert lines[i + 1:i + 3] == ["mtb.scan and mtb.run_all skip such a method.", ""]
     assert "Named in" not in txt
     monkeypatch.setattr(config, "_CLI", True)
     lines = mtb.describe_layout("vertical").splitlines()
     i = lines.index(head)
-    assert lines[i + 1:i + 3] == [
-        "multibench scan and run-all skip such a method unless --allow-atac-mismatch "
-        "is given.",
-        "multibench run only warns, so check multibench info METHOD first."]
-    assert not any("`" in l or ";" in l for l in lines[i:i + 3])
+    assert lines[i + 1:i + 3] == ["multibench scan and run-all skip such a method.", ""]
+    assert not any("`" in l or ";" in l for l in lines[i:i + 2])
 
 
 def test_docstrings_name_the_override_not_methods():
@@ -302,15 +299,18 @@ def test_docstrings_name_the_override_not_methods():
         flat = " ".join(inspect.getdoc(fn).split())
         assert "name it in" not in flat and "Name the method in" not in flat
         assert "named in ``methods=``, or given" not in flat
+    # 0.4.0: allow_atac_mismatch= is deprecated, out of the docs and the signature;
+    # the CLI flag still parses, hidden from --help
     for fn in (mtb.scan, mtb.run_all):
-        assert "allow_atac_mismatch" in " ".join(inspect.getdoc(fn).split()), fn.__name__
-        assert "allow_atac_mismatch" in inspect.signature(fn).parameters
+        assert "allow_atac_mismatch" not in " ".join(inspect.getdoc(fn).split()), fn.__name__
+        assert "allow_atac_mismatch" not in inspect.signature(fn).parameters
     for sub in ("scan", "run-all"):
         parser = cli.build_parser()
         action = next(a for a in parser._actions if hasattr(a, "choices") and a.choices
                       and sub in a.choices)
-        assert any("--allow-atac-mismatch" in a.option_strings
-                   for a in action.choices[sub]._actions), sub
+        flag = next(a for a in action.choices[sub]._actions
+                    if "--allow-atac-mismatch" in a.option_strings)
+        assert flag.help == argparse.SUPPRESS, sub
 
 
 # ======================================================================= R4-02

@@ -130,9 +130,10 @@ def test_a_matrix_without_features_is_refused(tmp_path):
         assert _value_error(tmp_path, rna, rna="X", atac=none, atac_kind="peak",
                             labels="obs:ct", category="diagonal") \
             == NO_FEATURES.format(what="atac ") + TYPE
+        # io.to_canonical is deprecated in 0.4.0: its guard is pinned on the implementation
         for modality in ("atac_peak", "rna", None):
             with pytest.raises(ValueError) as e:
-                ingest.to_canonical(none, tmp_path / "OUT" / "atac_peak.h5", modality=modality)
+                ingest._to_canonical(none, tmp_path / "OUT" / "atac_peak.h5", modality=modality)
             assert str(e.value) == NO_FEATURES.format(what="") + TYPE
         assert not (tmp_path / "OUT").exists()
     # a folder that is there keeps every file as it was
@@ -143,7 +144,7 @@ def test_a_matrix_without_features_is_refused(tmp_path):
                               overwrite=True)
     assert str(e.value) == NO_FEATURES.format(what="atac ") + TYPE
     with pytest.raises(ValueError) as e:
-        ingest.to_canonical(none, out, modality="atac_peak")
+        ingest._to_canonical(none, out, modality="atac_peak")
     assert str(e.value) == NO_FEATURES.format(what="") + TYPE
     assert {p.name: p.read_bytes() for p in out.iterdir()} == before
     # one feature is a matrix to write
@@ -198,8 +199,8 @@ def test_a_nameless_matrix_without_features_gets_no_line_about_its_names(tmp_pat
             == NO_FEATURES.format(what="adt ") + WHY
         assert _value_error(tmp_path, rna, rna="X", adt="obsm:protein") \
             == NO_FEATURES.format(what="adt ") + WHY
-        with pytest.raises(ValueError) as e:
-            ingest.to_canonical(rna, tmp_path / "OUT" / "adt.h5", modality="adt", obsm="protein")
+        with pytest.raises(ValueError) as e:     # io.to_canonical is deprecated in 0.4.0
+            ingest._to_canonical(rna, tmp_path / "OUT" / "adt.h5", modality="adt", obsm="protein")
         assert str(e.value) == NO_FEATURES.format(what="") + WHY
     assert not (tmp_path / "OUT").exists()
     # with columns to name, the warning is the one of before
@@ -220,12 +221,15 @@ def test_a_matrix_without_features_on_the_command_line(tmp_path, capsys):
     assert ad.read_h5ad(tmp_path / "none.h5ad").var["feature_types"].value_counts().sum() == 0
     src, out = str(tmp_path / "rna.h5ad"), str(tmp_path / "OUT")
     for argv, what in (
-            (["convert", str(tmp_path / "none.h5ad"), out, "--rna", "X"], "rna "),
-            (["convert", src, out, "--rna", "X", "--atac-from", str(tmp_path / "none.h5ad"),
+            (["export", str(tmp_path / "none.h5ad"), out, "--rna", "X"], "rna "),
+            (["export", src, out, "--rna", "X", "--atac-from", str(tmp_path / "none.h5ad"),
               "--atac-kind", "peak", "--category", "diagonal"], "atac "),
-            (["convert", str(tmp_path / "none.h5ad"), out + "/", "--modality", "atac_peak"], "")):
+            (["export", str(tmp_path / "none.h5ad"), out + "/", "--modality", "atac_peak"], "")):
         with warnings.catch_warnings():
             warnings.simplefilter("error")
+            # 0.4.0: export replaces convert; --modality is a deprecated hidden flag
+            warnings.filterwarnings("ignore", r".* is deprecated and will be removed in 0\.5",
+                                    FutureWarning)
             rc = cli.main(argv)
         err = capsys.readouterr().err
         assert rc == 1 and not (tmp_path / "OUT").exists()
@@ -476,7 +480,8 @@ def test_adt_in_x_with_an_embedding(tmp_path):
                 assert (a / f).read_bytes() == (b / f).read_bytes()
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        assert ingest.to_canonical(rich, tmp_path / "adt.h5", modality="adt").exists()
+        # io.to_canonical is deprecated in 0.4.0: the implementation it wraps
+        assert ingest._to_canonical(rich, tmp_path / "adt.h5", modality="adt").exists()
 
 
 def test_adt_in_x_next_to_a_protein_matrix(tmp_path):

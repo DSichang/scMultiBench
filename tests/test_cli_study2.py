@@ -41,7 +41,7 @@ def test_cli_params_prints_every_variant_without_a_selector(capsys):
     assert "# Matilda vertical:rna+adt: 9 tunable" in out
     assert "# Matilda vertical:rna+atac: 9 tunable" in out
     header = next(l for l in out.splitlines() if l.strip().startswith("key"))
-    assert header.split() == ["key", "type", "default", "script_default"]
+    assert header.split() == ["key", "type", "default"]      # 0.4.0: no script_default
     assert "epochs" in out and "z_dim" in out and "--param KEY=VALUE" in out
     tun = multibench.params_for("Matilda", "vertical", ["rna", "adt"])["tunable"]
     for k in tun:
@@ -70,10 +70,11 @@ def test_cli_params_formats(capsys):
     rows = json.loads(capsys.readouterr().out)
     n = len(multibench.method_info("Matilda")["supports"])      # one row per variant
     assert rc == 0 and len(rows) == n == 3
-    assert set(rows[0]) >= {"method", "variant", "tunable", "effective", "fixed_in_script"}
+    assert set(rows[0]) >= {"method", "variant", "tunable", "fixed_in_script"}
+    assert "effective" not in rows[0]                           # 0.4.0: dropped
     rc = cli.main(["params", "Matilda", "--format", "csv"])
     out = capsys.readouterr().out
-    assert rc == 0 and out.splitlines()[0] == "variant,key,type,default,script_default"
+    assert rc == 0 and out.splitlines()[0] == "variant,key,type,default"
     assert out.count("\n") == 1 + n * 9    # header + 3 variants x 9 keys (no device, r3)
 
 
@@ -92,8 +93,9 @@ def test_param_help_points_at_the_params_command():
         act = next(a for a in _sub(name)._actions if a.dest == "param")
         assert "multibench params METHOD" in act.help
         assert "mtb.params_for(METHOD) or" not in act.help
+    import argparse
     act = next(a for a in _sub("find")._actions if a.dest == "tunable")
-    assert "multibench params METHOD" in act.help
+    assert act.help == argparse.SUPPRESS                        # 0.4.0: find --tunable hidden
 
 
 # ----------------------------------------------------------------- convert
@@ -183,11 +185,13 @@ def _long(method, n=3):
 
 
 def test_cli_plot_input_with_category_concatenates_onto_stored(tmp_path, monkeypatch, capsys):
-    from multibench import plot as plot_ns
+    import importlib
     seen = {}
     monkeypatch.setattr(multibench.data.results, "_load_results",
                         lambda *a, **kw: pd.concat([_long("A"), _long("B")], ignore_index=True))
-    monkeypatch.setattr(plot_ns, "bubble", lambda df, **kw: seen.update(df=df, kw=kw))
+    # the command draws with the internal _bubble (plot.bubble shadows its module)
+    monkeypatch.setattr(importlib.import_module("multibench.plot.bubble"), "_bubble",
+                        lambda df, **kw: seen.update(df=df, kw=kw))
     mine = tmp_path / "mine.csv"
     _long("Mine").to_csv(mine, index=False)
     rc = cli.main(["plot", "bubble", "--category", "vertical", "--dataset", "D1",
@@ -195,15 +199,15 @@ def test_cli_plot_input_with_category_concatenates_onto_stored(tmp_path, monkeyp
     cap = capsys.readouterr()
     assert rc == 0
     assert sorted(seen["df"]["method"].unique()) == ["A", "B", "Mine"]
-    assert ("# Added your 3 rows (Mine) to the stored vertical table, which has "
-            "6 rows (source rerun).") in cap.err
+    assert "# Added your 3 rows (Mine) to the 6 stored results of vertical." in cap.err
     assert "Added your" not in cap.out
 
 
 def test_cli_plot_input_is_repeatable_and_dataset_filters_inputs(tmp_path, monkeypatch, capsys):
-    from multibench import plot as plot_ns
+    import importlib
     seen = {}
-    monkeypatch.setattr(plot_ns, "bar", lambda df, **kw: seen.update(df=df))
+    monkeypatch.setattr(importlib.import_module("multibench.plot.bar"), "_bar",
+                        lambda df, **kw: seen.update(df=df))
     a, b = tmp_path / "a.csv", tmp_path / "b.csv"
     _long("A").to_csv(a, index=False)
     other = _long("B"); other["dataset"] = "D2"
@@ -215,7 +219,7 @@ def test_cli_plot_input_is_repeatable_and_dataset_filters_inputs(tmp_path, monke
     assert sorted(df["method"].unique()) == ["A", "B"] and set(df["dataset"]) == {"D1"}
     assert len(df) == 6
     act = next(x for x in _sub("plot")._actions if x.dest == "input")
-    assert "repeatable" in act.help and "concatenated" in act.help
+    assert "repeatable" in act.help and "added to the stored results" in act.help
     assert "replaces" not in act.help
 
 

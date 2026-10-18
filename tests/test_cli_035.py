@@ -1,10 +1,12 @@
 """The command line of 0.3.5: --missing-labels, --modalities all, --n-batches.
 
-``multibench evaluate --missing-labels drop``, ``multibench scan`` and
-``run-all`` with ``--modalities all`` and their note on stderr for the rows
-that are not listed, ``run-all --batch`` given a column name, and
-``multibench convert --n-batches``.
+``multibench evaluate --missing-labels drop`` (deprecated in 0.4.0),
+``multibench scan`` and ``run-all`` with ``--modalities all`` and their note
+on stderr for the rows that are not listed, ``run-all --batch`` given a column
+name, and ``multibench export --n-batches`` (deprecated in 0.4.0); ``convert``
+is the deprecated name of ``export``.
 """
+import argparse
 import contextlib
 import io
 import warnings
@@ -58,6 +60,11 @@ def _help(name, flag):
     return next(a.help for a in _sub(name)._actions if flag in a.option_strings)
 
 
+def _not_warnings(err):
+    """The lines of ``err`` that are not ``warning: ...`` lines."""
+    return [l for l in err.splitlines() if not l.startswith("warning: ")]
+
+
 @pytest.fixture
 def no_envs(monkeypatch):
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
@@ -86,38 +93,46 @@ def _embedding(tmp_path, n=300, gaps=30):
             str(tmp_path / "labels.csv"), "--metrics", "ASW"]
 
 
+MISSING = ("evaluate --missing-labels is deprecated and will be removed in 0.5. Use label "
+           "files without missing labels.")
+
+
 def test_evaluate_missing_labels_flag(tmp_path, capsys):
     base = _embedding(tmp_path)
     told = ("error: --labels (labels.csv): 30 of the 300 cells have no label, for example "
-            "'NA'. Pass --missing-labels drop to score the other 270.")
-    for argv in (base, base + ["--missing-labels", "error"]):
-        rc, out, err = _cli(argv, capsys)
-        assert rc == 1 and out == "" and err.splitlines()[0] == told
+            "'NA'. Score the other cells only: leave the unlabelled ones out of the "
+            "embedding and the label file.")
+    rc, out, err = _cli(base, capsys)
+    assert rc == 1 and out == "" and err.splitlines()[0] == told
+    rc, out, err = _cli(base + ["--missing-labels", "error"], capsys)
+    assert rc == 1 and out == "" and err.splitlines()[:2] == [f"warning: {MISSING}", told]
+    # the deprecated flag still drops, with its warning once
     rc, out, err = _cli(base + ["--missing-labels", "drop"], capsys)
-    assert rc == 0 and out.splitlines()[0].split() == ["Value"] and "ASW" in out
-    assert err.splitlines() == ["warning: Scored the 270 labelled cells of 300."]
+    assert rc == 0 and out.splitlines()[0].split()[:2] == ["metric", "value"]
+    assert "ASW" in out
+    assert err.splitlines() == [f"warning: {MISSING}",
+                                "warning: Scored the 270 labelled cells of 300."]
     # complete labels: the flag changes nothing
     pd.DataFrame({"x": ["A"] * 150 + ["B"] * 150}).to_csv(tmp_path / "labels.csv",
                                                          index=False)
     plain = _cli(base, capsys)
     assert plain[0] == 0 and plain[2] == ""
-    assert _cli(base + ["--missing-labels", "drop"], capsys) == plain
+    rc, out, err = _cli(base + ["--missing-labels", "drop"], capsys)
+    assert (rc, out, err) == (0, plain[1], f"warning: {MISSING}\n")
     # another value is a usage error
     with pytest.raises(SystemExit) as e:
         cli.main(base + ["--missing-labels", "skip"])
     assert e.value.code == 2
     assert "invalid choice: 'skip' (choose from" in capsys.readouterr().err
-    assert _help("evaluate", "--missing-labels") == (
-        "what to do when a label is missing. error (default) stops. drop scores the "
-        "labelled cells only and says how many")
+    assert _help("evaluate", "--missing-labels") == argparse.SUPPRESS
 
 
 def test_evaluate_drop_reaches_the_long_table(tmp_path, capsys):
-    base = _embedding(tmp_path) + ["--name", "mine", "--dataset", "MYDATA", "--category",
+    base = _embedding(tmp_path) + ["--method", "mine", "--dataset", "MYDATA", "--category",
                                    "vertical", "--out", str(tmp_path / "long.csv"),
                                    "--missing-labels", "drop"]
     rc, _, err = _cli(base, capsys)
-    assert rc == 0 and err.startswith("warning: Scored the 270 labelled cells of 300.")
+    assert rc == 0 and "warning: Scored the 270 labelled cells of 300." in err.splitlines()
     long = pd.read_csv(tmp_path / "long.csv")
     assert set(long["scored_with"].str.rsplit("/", n=1).str[-1]) == {"270 of 300 cells"}
 
@@ -134,7 +149,8 @@ def test_evaluate_column_names_the_word_of_the_sheet(tmp_path, capsys):
     (told,) = [l for l in err.splitlines() if l.startswith("error: ")]
     assert rc == 1 and told == (
         "error: --labels (labels.csv): 4 of the 300 cells have no label, for example "
-        "'None'. Pass --missing-labels drop to score the other 296.")
+        "'None'. Score the other cells only: leave the unlabelled ones out of the "
+        "embedding and the label file.")
     rc, _, err = _cli(base + ["--column", "celltype", "--missing-labels", "drop"], capsys)
     assert rc == 0 and "warning: Scored the 296 labelled cells of 300." in err.splitlines()
 
@@ -162,14 +178,13 @@ def test_evaluate_dataset_without_label_files(category, method, files, named, tm
             f["matrix/barcodes"] = np.array([f"{name}{i}" for i in range(30)], dtype="S16")
     cells = 30 if category == "vertical" else 60        # the cells of the folder
     np.save(tmp_path / "emb.npy", np.random.default_rng(0).normal(size=(cells, 5)))
-    argv = ["evaluate", "--embedding", str(tmp_path / "emb.npy"), "--dataset", "NOLAB",
-            "--method", method, "--category", category, "--data-path", str(tmp_path),
-            "--metrics", "ASW"]
+    argv = ["evaluate", "--embedding", str(tmp_path / "emb.npy"), "--dataset", str(d),
+            "--method", method, "--category", category, "--metrics", "ASW"]
     for extra in ([], ["--missing-labels", "drop"], ["--column", "celltype"]):
         rc, out, err = _cli(argv + extra, capsys)
         assert rc == 1 and out == ""
-        assert err.splitlines() == [
-            "error: NOLAB has no label file. Pass one with --labels.",
+        assert _not_warnings(err) == [
+            "error: NOLAB has no label file. Pass --labels.",
             "(set MULTIBENCH_DEBUG=1 for the full traceback)"]
     # with its label files the folder is read as before
     stems = {"vertical": ["cty"], "diagonal": ["rna_cty", "atac_cty"]}.get(
@@ -181,33 +196,44 @@ def test_evaluate_dataset_without_label_files(category, method, files, named, tm
 
 
 # ------------------------------------------------------------------ scan
+SCAN_COLUMNS = ["method", "modalities", "runnable", "reason"]
+
+
+def _scan_rows(out):
+    """The method column of the scan table on stdout."""
+    lines = out.splitlines()
+    assert lines[0].split() == SCAN_COLUMNS
+    return [l.split()[0] for l in lines[1:]]
+
+
 def test_scan_modalities_all_and_the_stderr_note(no_envs, capsys):
+    # mtb.scan's table, one row per method, on stdout; its [scan] lines on stderr
     rc, out, err = _cli(["scan", "D11", "--category", "vertical"], capsys)
-    assert rc == 0 and len(out.splitlines()) == 1 + 14
-    assert out.splitlines()[0].split() == W.COMPACT_COLUMNS      # no atac column
-    assert err.splitlines() == [NOTE]
+    assert rc == 0 and len(_scan_rows(out)) == 14
+    assert all(l.startswith("[scan] ") for l in err.splitlines())
+    assert NOTE[2:] in err.splitlines()[0]
     rc, lines = _one_stream(["scan", "D11", "--category", "vertical"])
-    assert rc == 0 and lines[-1] == NOTE and len(lines) == 16              # after the table
+    head = lines.index(out.splitlines()[0])
+    assert rc == 0 and NOTE[2:] in lines[0] and len(lines) == head + 1 + 14  # before the table
+    assert all(l.startswith("[scan] ") for l in lines[:head])
     rc, out, err = _cli(["scan", "D11", "--category", "vertical", "--modalities", "all"],
                         capsys)
-    assert rc == 0 and len(out.splitlines()) == 1 + 33 and err == ""
-    assert "atac" in out.splitlines()[0].split()
-    # machine formats: the table on stdout is the data, the note stays on stderr
+    rows = _scan_rows(out)
+    assert rc == 0 and len(rows) == 18 and "MIRA" in rows and "not listed" not in err
+    # the deprecated --format prints the plan: the data on stdout, the note on stderr
     rc, out, err = _cli(["scan", "D11", "--category", "vertical", "--format", "csv"], capsys)
-    assert rc == 0 and len(pd.read_csv(io.StringIO(out))) == 14 and err.splitlines() == [NOTE]
-    rc, out, err = _cli(["scan", "D11", "--category", "vertical", "--format", "csv",
-                         "--modalities", "all"], capsys)
-    assert len(pd.read_csv(io.StringIO(out))) == 33 and err == ""
+    assert rc == 0 and len(pd.read_csv(io.StringIO(out))) == 14
+    assert _not_warnings(err) == [NOTE]
     # a list of tokens selects as before, and names nothing
-    rc, out, err = _cli(["scan", "D11", "--category", "vertical", "--modalities", "rna,atac",
-                         "--format", "csv"], capsys)
+    rc, out, err = _cli(["scan", "D11", "--category", "vertical", "--modalities", "rna,atac"],
+                        capsys)
     # the vertical peak methods read the atac role since 0.4.0 (X13)
-    assert set(pd.read_csv(io.StringIO(out))["modalities"]) == {"rna+atac"}
-    assert err == ""
+    assert set(l.split()[1] for l in out.splitlines()[1:]) == {"rna+atac"}
+    assert "not listed" not in err
     # every modality held: nothing to say
     _on_disk("D22mini")
     rc, out, err = _cli(["scan", "D22mini", "--category", "vertical"], capsys)
-    assert rc == 0 and len(out.splitlines()) == 1 + 33 and err == ""
+    assert rc == 0 and len(_scan_rows(out)) == 18 and "not listed" not in err
 
 
 def test_all_is_one_token_of_its_own(no_envs, capsys):
@@ -227,25 +253,27 @@ def test_the_help_of_modalities():
         assert "atac_peak and atac_gas select by what the method reads" in text
         assert text.endswith(end), name
         assert "`" not in text
-    assert _help("convert", "--overwrite") == (
-        "mode 2: replace files already in OUT (default: refuse and list them). Files of "
+    assert _help("export", "--overwrite") == (
+        "replace files already in DATASET_DIR (default: refuse and list them). Files of "
         "other data that the call does not write are refused either way")
-    assert _help("convert", "--n-batches") == (
-        "mode 2, with --batch-index: how many batches the dataset has. Files of a higher "
-        "batch number in OUT are refused, so a later call cannot leave a stale batch file "
-        "from an earlier export")                              # X97: says why
+    assert _help("export", "--n-batches") == argparse.SUPPRESS    # deprecated in 0.4.0
 
 
 def test_the_note_follows_the_strict_error(no_envs, capsys):
+    # --strict is deprecated in 0.4.0: it warns, and keeps its effect
     rc, lines = _one_stream(["scan", "D11", "--category", "vertical", "--strict"])
     assert rc == 1
     strict = next(i for i, l in enumerate(lines) if l.startswith("error: --strict: "))
     assert lines[strict].startswith("error: --strict: 0 of 14 rows are runnable. ")
     assert lines.index(NOTE) == len(lines) - 1 > strict
     rc, _, err = _cli(["scan", "D11", "--category", "vertical", "--strict"], capsys)
+    assert err.splitlines()[0] == ("warning: scan --strict is deprecated and will be removed "
+                                   "in 0.5. Use the exit code of multibench run-all.")
+    err = "\n".join(_not_warnings(err))
     assert err.startswith("error: --strict: 0 of ") and err.splitlines()[-1] == NOTE
     rc, _, err = _cli(["scan", "D11", "--category", "vertical", "--strict", "--modalities",
                        "all"], capsys)
+    err = "\n".join(_not_warnings(err))
     assert rc == 1 and err.startswith("error: --strict: 0 of 33 rows are runnable. Rows with "
                                       "missing input files: 19. ")
     assert "not listed" not in err
@@ -284,21 +312,20 @@ def test_strict_exit_codes_are_unchanged(folder, tmp_path, monkeypatch, capsys):
 def test_run_all_dry_run_header(no_envs, capsys):
     rc, out, err = _cli(["run-all", "D11", "--category", "vertical", "--dry-run"], capsys)
     assert rc == 0 and err.splitlines()[:2] == [
-        "# Dry run. Nothing was executed. 0 of 14 methods can run on D11 (vertical). The "
-        "commands below are what multibench run would execute. A method whose input files "
-        "are missing has no command.", NOTE]
+        "# Dry run: 0 of 14 methods can run on D11 (vertical); the reason column says why.",
+        NOTE]
     assert sum(l.startswith("# Commands of the 14 methods") for l in out.splitlines()) == 1
     rc, out, err = _cli(["run-all", "D11", "--category", "vertical", "--dry-run",
                          "--modalities", "all"], capsys)
     assert rc == 0 and "not listed" not in err
-    assert err.startswith("# Dry run. Nothing was executed. 0 of 33 rows can run on D11 ")
+    assert err.startswith("# Dry run: 0 of 33 rows can run on D11 (vertical); ")
     assert "# Commands of the 14 rows whose input files are in place." in out
     # the plan is the scan table, in both forms
     for extra, n in (([], 14), (["--modalities", "all"], 33)):
         rc, plan, _ = _cli(["run-all", "D11", "--category", "vertical", "--dry-run",
                             "--format", "csv", *extra], capsys)
         rc, scan, _ = _cli(["scan", "D11", "--category", "vertical", "--format", "csv",
-                            *extra], capsys)
+                            *extra], capsys)               # deprecated: prints the plan
         assert plan == scan and len(pd.read_csv(io.StringIO(plan))) == n
 
 
@@ -328,7 +355,7 @@ def test_run_all_batch_column_name(tmp_path, capsys, no_envs, monkeypatch):
         for extra in (["--dry-run"], ["--out-dir", str(tmp_path / "out")],
                       ["--dry-run", "--batch-column", "donor"]):
             rc, out, err = _cli(base + ["--batch", given, *extra], capsys)
-            assert rc == 1 and out == "" and err.splitlines()[0] == told, extra
+            assert rc == 1 and out == "" and _not_warnings(err)[0] == told, extra
     assert not (tmp_path / "out").exists()
     # a name that looks like a file keeps the file error
     rc, _, err = _cli(base + ["--batch", "missing.csv", "--dry-run"], capsys)
@@ -340,7 +367,7 @@ def test_run_all_batch_column_name(tmp_path, capsys, no_envs, monkeypatch):
     assert rc == 0, err
 
 
-# ------------------------------------------------------------------ convert
+# ------------------------------------------------------------------ export
 def _adata(n, tag, seed=0):
     rng = np.random.default_rng(seed)
     a = ad.AnnData(rng.poisson(1.0, (n, 30)).astype(float))
@@ -350,7 +377,27 @@ def _adata(n, tag, seed=0):
     return a
 
 
-def test_convert_n_batches(tmp_path, capsys):
+CONVERT = ("warning: multibench convert is deprecated and will be removed in 0.5. Use "
+           "multibench export.")
+
+
+def test_convert_is_the_deprecated_name_of_export(tmp_path, capsys):
+    _adata(40, "ME", seed=9).write_h5ad(tmp_path / "me.h5ad")
+    flags = ["--rna", "X", "--labels", "obs:celltype", "--category", "vertical"]
+    rc, out, err = _cli(["convert", str(tmp_path / "me.h5ad"), str(tmp_path / "C")] + flags,
+                        capsys)
+    assert rc == 0 and err.splitlines() == [CONVERT]                # one warning
+    assert out.startswith(f"wrote dataset folder {tmp_path / 'C'} (files: cty.csv, rna.h5)")
+    rc, _, err = _cli(["export", str(tmp_path / "me.h5ad"), str(tmp_path / "E")] + flags,
+                      capsys)
+    assert rc == 0 and err == ""
+    for name in ("cty.csv", "rna.h5"):
+        assert (tmp_path / "C" / name).read_bytes() == (tmp_path / "E" / name).read_bytes()
+    assert "convert" not in cli.build_parser().format_help()        # hidden
+
+
+def test_export_n_batches(tmp_path, capsys):
+    # --n-batches is deprecated in 0.4.0: it warns, and keeps its effect
     out = tmp_path / "DONORS"
     for b in (1, 2, 3):
         _adata(40, f"EX{b}", seed=b).write_h5ad(tmp_path / f"ex{b}.h5ad")
@@ -359,7 +406,7 @@ def test_convert_n_batches(tmp_path, capsys):
     def convert(src, *extra):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            return _cli(["convert", str(tmp_path / src), str(out), "--rna", "X", "--labels",
+            return _cli(["export", str(tmp_path / src), str(out), "--rna", "X", "--labels",
                          "obs:celltype", "--category", "cross", *extra], capsys)
     for b in (1, 2, 3):
         assert convert(f"ex{b}.h5ad", "--batch-index", str(b), "--n-batches", "3")[0] == 0
@@ -370,7 +417,7 @@ def test_convert_n_batches(tmp_path, capsys):
     # nothing is written
     rc, stdout, err = convert("me.h5ad", "--batch-index", "1", "--n-batches", "2",
                               "--overwrite")
-    assert rc == 1 and stdout == "" and err.splitlines()[0] == (
+    assert rc == 1 and stdout == "" and _not_warnings(err)[0] == (
         f"error: {out} holds rna3.h5 and 1 more file of batch 3, above --n-batches 2. "
         "Convert into a new folder.")
     assert {p.name: p.read_bytes() for p in out.iterdir()} == before
@@ -387,33 +434,36 @@ def test_convert_n_batches(tmp_path, capsys):
              "error: --batch-index 3 is larger than --n-batches 2."),
             (["--batch-index", "1", "--n-batches", "0"],
              "error: --n-batches must be a positive integer, got 0")):
-        rc, _, err = _cli(["convert", str(tmp_path / "me.h5ad"), str(new), "--rna", "X",
+        rc, _, err = _cli(["export", str(tmp_path / "me.h5ad"), str(new), "--rna", "X",
                            "--category", "cross", *extra], capsys)
-        assert rc == 1 and err.splitlines()[0] == told
+        assert rc == 1 and err.splitlines() == [
+            "warning: export --n-batches is deprecated and will be removed in 0.5. Use a "
+            "new dataset folder.", told, "(set MULTIBENCH_DEBUG=1 for the full traceback)"]
+    # without --rna the RNA is read from X, as export_dataset(rna="X")
+    rc, _, err = _cli(["export", str(tmp_path / "me.h5ad"), str(new), "--n-batches", "2"],
+                      capsys)
+    assert rc == 1 and _not_warnings(err)[0] == (
+        "error: --n-batches goes with --batch-index only. Leave --n-batches out.")
     assert not new.exists()
-    # it selects the dataset export, and takes a whole number
+    # it takes a whole number
     with pytest.raises(SystemExit) as e:
-        cli.main(["convert", str(tmp_path / "me.h5ad"), str(new), "--n-batches", "2"])
-    assert e.value.code == 2
-    assert "dataset export needs at least one of --rna" in capsys.readouterr().err
-    with pytest.raises(SystemExit) as e:
-        cli.main(["convert", str(tmp_path / "me.h5ad"), str(new), "--rna", "X",
+        cli.main(["export", str(tmp_path / "me.h5ad"), str(new), "--rna", "X",
                   "--n-batches", "two"])
     assert e.value.code == 2
     capsys.readouterr()
 
 
-def test_convert_help_says_which_file_takes_mod_col():
+def test_export_help_says_which_file_takes_mod_col():
     """'<mod>:<col>' next to 'the global obs' read as a spelling for an
     .h5ad file, where every string is the name of an obs column."""
-    assert _help("convert", "--labels") == (
-        "mode 2: cell-type column: obs:<col>, or <mod>:<col> for a modality of a .h5mu "
+    assert _help("export", "--labels") == (
+        "cell-type column: obs:<col>, or <mod>:<col> for a modality of a .h5mu "
         "file. Written to cty.csv, for diagonal to rna_cty.csv and atac_cty.csv")
-    folded = " ".join(_sub("convert").format_help().split())
+    folded = " ".join(_sub("export").format_help().split())
     assert "<mod>:<col> for a modality of a .h5mu file" in folded
 
 
-def test_convert_refuses_a_10x_file(tmp_path, capsys):
+def test_export_refuses_a_10x_file(tmp_path, capsys):
     import scipy.sparse as sp
     src = tmp_path / "filtered_feature_bc_matrix.h5"
     m = sp.random(20, 12, density=0.3, format="csc", random_state=0)
@@ -429,10 +479,12 @@ def test_convert_refuses_a_10x_file(tmp_path, capsys):
     told = (f'error: {src} is a 10x Genomics file. See the recipe "A 10x .h5 file" in the '
             'docs.')
     out = tmp_path / "OUT"
-    for argv in (["convert", str(src), f"{out}/", "--modality", "rna"],
-                 ["convert", str(src), str(out / "rna.h5")],
-                 ["convert", str(src), str(out), "--rna", "X"]):
+    for argv in (["export", str(src), str(out)],
+                 ["export", str(src), str(out), "--rna", "X"],
+                 # the deprecated one-file form
+                 ["export", str(src), f"{out}/", "--modality", "rna"],
+                 ["convert", str(src), str(out / "rna.h5")]):
         rc, stdout, err = _cli(argv, capsys)
-        assert rc == 1 and stdout == "" and err.splitlines()[0] == told, argv
+        assert rc == 1 and stdout == "" and _not_warnings(err)[0] == told, argv
         assert not out.exists()
     assert sorted(p.name for p in tmp_path.iterdir()) == [src.name]

@@ -300,8 +300,7 @@ def test_workflow_passages_read_as_plain_sentences():
     cls = inspect.getdoc(W.BatchResult).splitlines()[0]
     assert cls == "The result of ``mtb.run_all``: its summary table, long table and figure."
     load = _flat(mtb.load_batch)
-    assert ("data_path : path-like | None Folder that holds the dataset folder; "
-            "``None`` = the path each record saved.") in load
+    assert "data_path :" not in load                     # 0.4.0: deprecated keyword
     summary = _flat(W.BatchResult.summary)
     rescore = _flat(W.BatchResult.rescore)
     for old in ("Outcome of", "Data root for re-scoring", "finds moved folders",

@@ -34,9 +34,9 @@ def test_compare_signatures_are_the_contract():
     rc = inspect.signature(results.results_coverage).parameters
     assert list(rc) == ["category"]
     re_ = inspect.signature(results.recommend).parameters
-    # atac= is deprecated since 0.4.0 (X44): modalities=["atac_peak"] does the same
-    assert list(re_) == ["category", "modalities", "methods", "metrics", "long_df",
-                         "min_methods"]
+    # atac= is deprecated since 0.4.0 (X44): modalities=["atac_peak"] does the same;
+    # min_methods= is deprecated in 0.4.0 (it had no effect)
+    assert list(re_) == ["category", "modalities", "methods", "metrics", "long_df"]
     assert all(re_[n].kind is inspect.Parameter.KEYWORD_ONLY for n in list(re_)[1:])
     assert "Parameters" in results.load_results.__doc__
     assert "Parameters" in results.recommend.__doc__
@@ -60,8 +60,12 @@ def test_metric_selection_is_one_vocabulary():
         metric_selection([])
     with pytest.raises(ValueError, match="names the same metric twice"):
         metric_selection(["ARI", "ari"])
-    with pytest.raises(ValueError, match="A single code goes in a list: metrics=\\[.ARI.\\]"):
-        metric_selection("ARI")
+    # 0.4.0: one code is accepted alone, and families go inside a list
+    one = metric_selection("ARI")
+    assert one.codes == ["ARI"] and one.explicit
+    assert metric_selection(["clustering", "ARI"]).codes == clu.codes
+    mixed = metric_selection(["clustering", "kBET"])
+    assert mixed.codes == clu.codes + ["kBET"] and mixed.family == "all"
     with pytest.raises(TypeError, match="takes None, 'all', 'clustering', 'batch', "
                                         "'classification' or a list"):
         metric_selection(3)

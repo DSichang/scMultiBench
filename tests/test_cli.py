@@ -34,8 +34,8 @@ def test_cli_run_builds_and_calls(monkeypatch, tmp_path):
         class R: output = None; out_dir = tmp_path; cmd = ["conda"]
         return R()
 
-    import multibench
-    monkeypatch.setattr(multibench, "run", fake_run)
+    # the deprecated command calls the runner, not the deprecated mtb.run
+    monkeypatch.setattr(cli, "_run", fake_run)
     rc = cli.main(["run", "--method", "SCALEX", "--category", "diagonal",
                    "--input", "rna=a.h5", "--input", "atac_gas=b.h5",
                    "--out", str(tmp_path / "o")])

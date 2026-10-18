@@ -7,6 +7,8 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+# the table behind a bubble figure: mtb.plot.build_table is deprecated in 0.4.0
+from multibench.plot.bubble import _build_table  # noqa: E402
 from multibench.engine import builder, envs, registry  # noqa: F401
 
 
@@ -52,8 +54,8 @@ def test_x07_a_family_only_your_row_has_does_not_lift_it():
     cls = pd.DataFrame({"metric": ["OCA", "F1"], "value": [0.9, 0.8], "method": "Mine",
                         "dataset": "D11", "category": "vertical", "clustering": "default",
                         "source": "user", "scored_with": "leidenalg/search/0.4.0"})
-    plain, _ = _messages(mtb.plot.build_table, pd.concat([d11, mine]))
-    tbl, msgs = _messages(mtb.plot.build_table, pd.concat([d11, mine, cls]))
+    plain, _ = _messages(_build_table, pd.concat([d11, mine]))
+    tbl, msgs = _messages(_build_table, pd.concat([d11, mine, cls]))
     assert tbl.overall["Mine"] == pytest.approx(plain.overall["Mine"])
     assert "Classification" in [b.label for b in tbl.blocks]          # still drawn
     assert not any("Classification" in m for m in msgs), msgs   # the n/a cells show it
@@ -67,7 +69,7 @@ def test_x86_language_chips_and_summary_scale_have_a_legend():
     d11 = _d11()
     fig, _ = _messages(mtb.plot.bubble, pd.concat([d11, _mine(d11)]))
     texts = [t.get_text() for t in fig.axes[0].texts]
-    assert "Py / R: the method's language; ?: your rows" in texts
+    assert "Py / R: the method's language; ?: not a package method" in texts      # 0.4.0
     fig, _ = _messages(mtb.plot.bubble, d11)
     assert "Py / R: the method's language" in [t.get_text() for t in fig.axes[0].texts]
     two = pd.concat([d11, d11.assign(dataset="D11b")])
@@ -77,13 +79,13 @@ def test_x86_language_chips_and_summary_scale_have_a_legend():
 
 
 def test_x87_clustering_columns_follow_catalog_metrics():
-    tbl = mtb.plot.build_table(_d11())
+    tbl = _build_table(_d11())
     order = mtb.catalog.metrics().query("family == 'clustering'").metric.tolist()
     assert tbl.blocks[0].raw.columns.tolist() == order
 
 
 def test_x88_bubble_table_repr_is_short():
-    text = repr(mtb.plot.build_table(_d11()))
+    text = repr(_build_table(_d11()))
     assert len(text.splitlines()) == 1 and text.startswith("BubbleTable: 13 methods (")
     assert "families DR and clustering (6)" in text and "datasets D11" in text
 
@@ -94,7 +96,7 @@ def test_x88_bubble_table_repr_is_short():
     ("leidenalg/search/0.4.0", None),
     ("leidenalg/user/0.4.0", None),
     ("unknown", None)])
-@pytest.mark.parametrize("fn", [mtb.plot.build_table, mtb.plot.bar])
+@pytest.mark.parametrize("fn", [_build_table, mtb.plot.bar])
 def test_x94_rows_scored_before_040_warn_next_to_stored_rows(fn, scored_with, expect):
     d11 = _d11()
     _, msgs = _messages(fn, pd.concat([d11, _mine(d11, scored_with=scored_with)]))
@@ -127,7 +129,7 @@ def test_a_family_two_rows_have_counts_in_no_overall():
                         for m in ("scJoint_rerun", "iNMF_rerun") for c in ("OCA", "F1")])
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
-        t = mtb.plot.build_table(pd.concat([stored, mine, cls]))
+        t = _build_table(pd.concat([stored, mine, cls]))
     order = list(t.methods)
     for m in ("scJoint", "iNMF"):
         assert order.index(m + "_rerun") == order.index(m) + 1      # same scores, side by side

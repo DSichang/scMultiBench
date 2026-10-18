@@ -88,8 +88,10 @@ def test_datasets_table_columns_and_registry_derived_category(files_dir):
     # the paper-derived columns are empty in the shipped CSV, so none is returned
     # (study round 1, L56; tests/test_catalog_text.py covers a CSV that fills one)
     assert not set(_paper_columns()) & set(df.columns)
-    # category filter: one mosaic table since 0.4.0 (the D45s subsample left, X04)
-    assert set(catalog.datasets(category="mosaic").dataset) == {"D45"}
+    # category filter: one mosaic table since 0.4.0 (the D45s subsample left, X04),
+    # and the mosaic demo subsets catalog.datasets lists since 0.4.0
+    assert set(catalog.datasets(category="mosaic").dataset) == {
+        "D45", "D38mini", "D45mini", "D46mini", "D49mini"}
 
 
 def test_catalog_columns_match_registry(files_dir):

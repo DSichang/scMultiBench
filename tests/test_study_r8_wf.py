@@ -14,6 +14,7 @@ R8-06  template-like docstring passages; ``label_order_confidence`` was an
 """
 import inspect
 import math
+import re
 import warnings
 from pathlib import Path
 
@@ -100,14 +101,14 @@ def test_the_ari_tail_names_its_metric_and_never_prints_minus_zero():
 @pytest.fixture
 def near_zero_ari(monkeypatch):
     """Every evaluation that computes ARI reports -0.00004 (ARI at chance)."""
-    real = W._evaluate
+    real = W._scores                        # the wide frame run_all scores with
 
     def fake(*a, **k):
         val = real(*a, **k)
         if "ARI" in val.index:
             val.loc["ARI", "Value"] = -0.00004
         return val
-    monkeypatch.setattr(W, "_evaluate", fake)
+    monkeypatch.setattr(W, "_scores", fake)
 
 
 def _result_lines(text, prefix):
@@ -387,18 +388,16 @@ def test_without_methods_the_first_3_other_blocks_are_shown(macos, mydata, monke
                                "modalities=\"all\", dry_run=True) shows every row.")
 
 
-def test_a_gpu_block_is_listed_without_the_linux_sentence(macos, mydata, monkeypatch):
+def test_off_linux_a_gpu_block_is_left_out(macos, mydata, monkeypatch):
+    # 0.4.0: off Linux the OS already blocks, so the GPU sentence is left out
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
     msg = _nothing_runnable(modalities=["rna", "adt"])
     plan = _plan(modalities=["rna", "adt"])
-    gpu = sorted(m for m in plan["method"] if mtb.method_info(m)["requires_gpu"])
-    assert "moETM" in gpu
-    lines = msg.splitlines()
-    verb = "is" if len(gpu) == 1 else "are"
-    assert lines[2] == (f"{len(gpu)} of {len(plan)} methods {verb} also blocked by "
-                        "something else:")
-    assert [l.split(" (")[0].strip() for l in lines[3:3 + len(gpu)]] == gpu
-    assert lines[3].endswith("needs an NVIDIA GPU, and this computer has none.")
+    assert any(mtb.method_info(m)["requires_gpu"] for m in plan["method"])   # moETM
+    assert "NVIDIA GPU" not in msg and "also blocked by something else" not in msg
+    assert msg.splitlines()[2].startswith(
+        "mtb.run_all('data/MYDATA', 'vertical', modalities=['rna', 'adt'], dry_run=True) "
+        "shows every row."), msg
     assert "not on this computer" not in msg
 
 
@@ -413,7 +412,7 @@ def test_on_linux_the_message_is_todays(no_envs, mydata, monkeypatch):
                         for r in order.head(3).itertuples())
             + "\nmtb.run_all('data/MYDATA', 'vertical', modalities=['rna', "
             "'adt'], dry_run=True) shows every row. Its files_ok and env_ok columns say which check "
-            "failed. mtb.env.doctor() checks the environments.")
+            "failed. mtb.env.install(dry_run=True) checks the environments.")
     assert msg == want
     assert "is not installed. Run multibench env install --methods" in msg
     msg = _nothing_runnable(modalities=["rna", "adt"], methods=["totalVI"])
@@ -428,18 +427,21 @@ def test_the_scan_frame_keeps_the_linux_sentence(macos, mydata):
 
 
 def test_the_dry_run_header_names_no_column(no_envs, mydata, capsys):
-    rc = cli.main(["run-all", "MYDATA", "--category", "vertical", "--data-path", "data",
+    rc = cli.main(["run-all", "data/MYDATA", "--category", "vertical",
                    "--modalities", "rna,adt", "--methods", "Matilda,totalVI",
                    "--dry-run"])
     err = capsys.readouterr().err
     assert rc == 0, err
     head = err.splitlines()[0]
     assert "files_ok False" not in head
-    assert head.endswith(" A method whose input files are missing has no command."), head
-    rc = cli.main(["run-all", "MYDATA", "--category", "vertical", "--data-path", "data",
+    # 0.4.0: the header is one sentence
+    assert head == ("# Dry run: 0 of 2 methods can run on data/MYDATA (vertical); the "
+                    "reason column says why."), err
+    rc = cli.main(["run-all", "data/MYDATA", "--category", "vertical",
                    "--methods", "Matilda", "--dry-run", "--modalities", "all"])
     head = capsys.readouterr().err.splitlines()[0]
-    assert head.endswith(" A row whose input files are missing has no command."), head
+    assert re.fullmatch(r"# Dry run: \d+ of \d+ rows can run on data/MYDATA \(vertical\); "
+                        r"the reason column says why\.", head), head
 
 
 def test_the_cli_spelling_names_run_all_dry_run(macos, mydata, monkeypatch):

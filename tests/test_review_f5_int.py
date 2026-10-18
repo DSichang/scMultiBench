@@ -39,6 +39,11 @@ def _numbered_adata():
     return a
 
 
+def _value(long):
+    """metric -> value of evaluate's long table (0.4.0)."""
+    return long.set_index("metric")["value"]
+
+
 def _recorded(fn, *a, **kw):
     with warnings.catch_warnings(record=True) as rec:
         warnings.simplefilter("always")
@@ -52,7 +57,7 @@ def test_r_row_numbers_score_as_before_on_numbered_obs_names(tmp_path):
     rb = _r_row_numbers(tmp_path / "b_r.csv", SAMPLES)
     rl = _r_row_numbers(tmp_path / "ct_r.csv", CELLTYPE)
     want = mtb.evaluate(a, labels="celltype", batch="sample", metrics=METRICS)
-    assert want.loc["ASW_batch", "Value"] < 0.5
+    assert _value(want)["ASW_batch"] < 0.5
     got, warned = _recorded(mtb.evaluate, a, labels=str(rl), batch=str(rb), metrics=METRICS)
     pd.testing.assert_frame_equal(got, want)
     assert warned == []
@@ -85,14 +90,13 @@ def test_run_all_reads_r_row_numbers_on_a_folder_with_numbered_barcodes(
     rb = _r_row_numbers(tmp_path / "b_r.csv", batch)
     (vec, aligned), warned = _recorded(W._cell_vector, rb, "NUMBC", data)
     assert not aligned and list(vec) == list(batch) and warned == []
-    kw = dict(data_path=data, **KW)
-    by_r = _quiet(mtb.run_all, "NUMBC", "vertical", tmp_path / "a", batch=rb, **kw)
-    by_one = _quiet(mtb.run_all, "NUMBC", "vertical", tmp_path / "b",
-                    batch=_one_column(tmp_path / "b1.csv", batch), **kw)
+    by_r = _quiet(mtb.run_all, str(d), "vertical", tmp_path / "a", batch=rb, **KW)
+    by_one = _quiet(mtb.run_all, str(d), "vertical", tmp_path / "b",
+                    batch=_one_column(tmp_path / "b1.csv", batch), **KW)
     assert _batch_metrics(by_r) == _batch_metrics(by_one)
     assert _batch_metrics(by_r)[0] == "CHAIN_OK"
-    rc = _quiet(cli.main, ["run-all", "NUMBC", "--category", "vertical", "--methods",
-                           "Matilda", "--modalities", "rna,adt", "--data-path", str(data),
+    rc = _quiet(cli.main, ["run-all", str(d), "--category", "vertical", "--methods",
+                           "Matilda", "--modalities", "rna,adt",
                            "--batch", str(rb), "--dry-run"])
     assert rc == 0, capsys.readouterr().err
 
@@ -118,7 +122,7 @@ def test_several_barcode_label_files_are_aligned_with_their_batch(tmp_path):
     # the file of origin is the sample: 1 for s1, 2 for s2
     want = mtb.evaluate(a, labels="celltype", batch=np.where(SAMPLES == "s1", 1, 2),
                         metrics=METRICS)
-    assert want.loc["ASW_batch", "Value"] < 0.5
+    assert _value(want)["ASW_batch"] < 0.5
     files = _per_sample_files(tmp_path, a)
     got, warned = _recorded(mtb.evaluate, a, labels=files, metrics=METRICS)
     pd.testing.assert_frame_equal(got, want)
@@ -133,10 +137,10 @@ def test_several_barcode_label_files_are_aligned_with_their_batch(tmp_path):
         assert _quiet(cli.main, ["evaluate", "--embedding", str(tmp_path / "mine.h5ad"),
                                  *flags, "--metrics", ",".join(METRICS),
                                  "--out", str(tmp_path / f"{tag}.csv")]) == 0, tag
-        out = pd.read_csv(tmp_path / f"{tag}.csv", index_col=0)["Value"]
+        out = _value(pd.read_csv(tmp_path / f"{tag}.csv"))
         # iLISI is NaN where the LISI backend is unavailable
         assert out.round(6).fillna(-1).to_dict() == \
-            want["Value"].round(6).fillna(-1).to_dict(), tag
+            _value(want).round(6).fillna(-1).to_dict(), tag
 
 
 def test_a_repeated_first_column_is_not_taken_for_cell_ids(tmp_path):
@@ -173,7 +177,7 @@ def test_a_repeated_barcode_is_named(cite, tmp_path):
     pd.DataFrame({"sample": batch}, index=bars).to_csv(drep)
     with pytest.raises(ValueError, match=r"^batch: the first column of d_rep\.csv repeats "
                                          r"1 id"):
-        mtb.run_all("MYCITE", "vertical", dry_run=True, batch=drep, data_path=data, **KW)
+        mtb.run_all(str(data / "MYCITE"), "vertical", dry_run=True, batch=drep, **KW)
     # a file with several columns: the fix names no column= argument (R6-03:
     # it suggests a Series)
     wide = tmp_path / "wide.csv"
@@ -188,12 +192,14 @@ def test_a_repeated_barcode_is_named(cite, tmp_path):
     assert "column=" not in str(e.value)
 
 
-def test_run_all_cli_names_the_label_files_not_a_python_call(cite, tmp_path, capsys):
+def test_run_all_cli_names_the_label_files_not_a_python_call(cite, tmp_path, capsys,
+                                                            monkeypatch):
     data, batch, _ = cite
+    monkeypatch.setattr(mtb.config.DEFAULT, "data_path", data)   # run-all reads MYCITE there
     half = _barcode_csv(tmp_path / "half.csv", batch,
                         index=BARS[: N // 2] + [f"x{i}" for i in range(N // 2)])
     rc = _quiet(cli.main, ["run-all", "MYCITE", "--category", "vertical", "--methods",
-                           "Matilda", "--modalities", "rna,adt", "--data-path", str(data),
+                           "Matilda", "--modalities", "rna,adt",
                            "--batch", str(half), "--dry-run"])
     err = capsys.readouterr().err
     assert rc == 1

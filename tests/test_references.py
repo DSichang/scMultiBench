@@ -72,15 +72,16 @@ def test_method_info_keeps_existing_keys():
         assert k in info, k
 
 
-def test_effective_merges_wrapper_defaults_over_upstream():
-    # r3 (Y38): effective is the value of every tunable key in a run
+def test_tunable_defaults_merge_wrapper_defaults_over_upstream():
+    # r3 (Y38): the default of every tunable key is its value in a run (0.4.0:
+    # the "effective" copy of these defaults is gone; tunable = {key: {type, default}})
     p = mtb.params_for("scMDC", "vertical", ["rna", "adt"])
-    assert "nbatch" not in p["tunable"] and "nbatch" not in p["effective"]   # from the folder
-    assert p["effective"] == {k: t["default"] for k, t in p["tunable"].items()}
+    assert "effective" not in p and "nbatch" not in p["tunable"]   # nbatch: from the folder
+    assert all(set(t) >= {"type", "default"} for t in p["tunable"].values())
     m = mtb.params_for("Multigrate", "vertical", ["rna", "adt"])
-    assert m["effective"]["epochs"] == 200             # the wrapper's value over the script's
-    eff = mtb.method_info("scMDC", verbose=True)["params"]["vertical:rna+adt"]["effective"]
-    assert eff == p["effective"]
+    assert m["tunable"]["epochs"] == {"type": "int", "default": 200}   # the wrapper's value
+    tun = mtb.method_info("scMDC", verbose=True)["params"]["vertical:rna+adt"]["tunable"]
+    assert tun == p["tunable"]
 
 
 def test_cite_bibtex_and_text():

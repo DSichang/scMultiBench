@@ -88,8 +88,9 @@ def test_x29_x30_dry_run_rows_say_what_runs():
 
 
 def test_x34_env_dir_is_its_all():
-    assert mtb.env.__all__ == ["install", "doctor"]
-    assert [n for n in dir(mtb.env) if not n.startswith("__")] == ["doctor", "install"]
+    # env.doctor is deprecated in 0.4.0: hidden from __all__ and dir()
+    assert mtb.env.__all__ == ["install"]
+    assert [n for n in dir(mtb.env) if not n.startswith("__")] == ["install"]
     assert callable(mtb.env.recipe)
 
 

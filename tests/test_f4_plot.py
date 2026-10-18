@@ -17,6 +17,8 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+# the table behind a bubble figure: mtb.plot.build_table is deprecated in 0.4.0
+from multibench.plot.bubble import _build_table  # noqa: E402
 from multibench import cli, config
 from tests.conftest import full_scan
 
@@ -58,8 +60,8 @@ def _two_own_folders():
                      ignore_index=True)
 
 
-@pytest.mark.parametrize("fn,kw", [(mtb.plot.build_table, {}),
-                                   (mtb.plot.build_table, {"aggregate": "summary"}),
+@pytest.mark.parametrize("fn,kw", [(_build_table, {}),
+                                   (_build_table, {"aggregate": "summary"}),
                                    (mtb.plot.bar, {})])
 def test_two_own_datasets_sharing_no_method_mention_the_same_cells(fn, kw):
     _, msgs = _messages(fn, _two_own_folders(), **kw)
@@ -73,7 +75,7 @@ def test_stored_rows_keep_the_no_overlap_text():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         stored = mtb.load_results("vertical", dataset="D11")
-    _, msgs = _messages(mtb.plot.build_table,
+    _, msgs = _messages(_build_table,
                         pd.concat([stored, _mine("RNA PCA", "MYCITE")], ignore_index=True))
     (msg,) = [m for m in msgs if m.startswith("The rows come from")]
     assert "same cells" not in msg
@@ -88,7 +90,7 @@ def _incomplete():
 
 
 def test_incomplete_matrix_warning_is_short_sentences():
-    _, msgs = _messages(mtb.plot.build_table, _incomplete(), aggregate="summary")
+    _, msgs = _messages(_build_table, _incomplete(), aggregate="summary")
     (msg,) = [m for m in msgs if m.startswith("The summary ranks")]
     assert msg == ("The summary ranks 2 datasets. C has scores on 1 of them. With "
                    "overall='rank', a missing dataset counts as rank 0, the lowest. "
@@ -99,7 +101,7 @@ def test_incomplete_matrix_warning_is_short_sentences():
     _, msgs = _messages(mtb.plot.bar, _incomplete())
     (msg,) = [m for m in msgs if m.startswith("The summary ranks")]
     assert ";" not in msg
-    assert msg.endswith("Filter long_df to the methods scored on every dataset.")
+    assert msg.endswith("Pass methods= with the methods scored on every dataset.")
 
 
 def test_incomplete_matrix_groups_methods_by_count():
@@ -131,12 +133,12 @@ def _with_gap():
 
 def test_na_raise_does_not_offer_to_hide_the_error():
     with pytest.raises(ValueError) as e:
-        mtb.plot.build_table(_with_gap(), na="raise")
+        _build_table(_with_gap(), na="raise")
     msg = str(e.value)
     assert "hide this message" not in msg
     assert msg.endswith("Pass na='warn' to draw the figure with these gaps.")
     # the warning keeps its own last sentence
-    _, msgs = _messages(mtb.plot.build_table, _with_gap())
+    _, msgs = _messages(_build_table, _with_gap())
     (warn,) = [m for m in msgs if "has no" in m]
     assert warn.endswith("Pass metrics= without NMI to compare on the same metrics.")
     assert "hide this message" not in warn
@@ -154,8 +156,8 @@ def test_na_raise_cli_spelling(tmp_path, capsys):
                    "--out", str(tmp_path / "f.png")])
     err = capsys.readouterr().err
     assert rc != 0
-    assert ("warning: --na is deprecated and will be removed in 0.5; leave it out for a "
-            "warning that names the n/a cells." in err)
+    assert ("warning: plot --na is deprecated and will be removed in 0.5; leave it out for "
+            "a warning that names the n/a cells." in err)
     assert "Leave out --na to draw the figure with these gaps." in err
     assert "hide this message" not in err
 
@@ -163,11 +165,15 @@ def test_na_raise_cli_spelling(tmp_path, capsys):
 # --- R4-12 (e): extended summaries --------------------------------------------
 
 def test_plot_extended_summaries_are_plain():
+    # 0.4.0: one paragraph says the bars follow recommend's order
     bar = inspect.getdoc(mtb.plot.bar).split("\n\n")
-    assert bar[1].startswith("Parameters")
+    assert bar[1].startswith("Within each dataset the methods are ranked on each metric")
+    assert bar[2].startswith("Parameters")
     assert "summary view" not in inspect.getdoc(mtb.plot.bar)
-    bt = inspect.getdoc(mtb.plot.build_table).split("\n\n")
-    assert bt[1] == "Returns the numbers ``mtb.plot.bubble`` draws, without drawing."
+    # build_table is deprecated in 0.4.0; its docstring names the replacement
+    assert inspect.getdoc(mtb.plot.build_table) == (
+        "Deprecated: ``mtb.recommend(category, long_df=...)`` gives the numbers\n"
+        "behind a figure.")
 
 
 # --- R4-13 (a): recommend's warning lines -------------------------------------
@@ -194,12 +200,12 @@ def _no_log_joins(msg):
 def test_recommend_unscored_methods_line_is_plain(result_dir):
     r, msg = _recommend("vertical")
     unscored = r[r.grand_score.isna()].method.tolist()
-    assert (f"These {len(unscored)} methods have no re-run scores and are listed "
+    assert (f"These {len(unscored)} methods have no stored results and are listed "
             f"last: {', '.join(unscored)}.") in msg
     assert "Try source" not in msg
     _no_log_joins(msg)
     _, msg = _recommend("vertical", modalities=["rna", "adt"])
-    assert "Seurat_WNN has no re-run scores and is listed last." in msg
+    assert "Seurat_WNN has no stored results and is listed last." in msg
     assert "Try source" not in msg
 
 
@@ -208,8 +214,9 @@ def test_recommend_coverage_and_dropped_lines_are_plain(result_dir, layout_tree_
     d28 = mtb.load_results("diagonal")
     part = pd.concat([d28, d28[~d28.method.isin(["iNMF", "SCALEX"])].assign(dataset="D28b")])
     _, msg = _recommend("diagonal", long_df=part)
+    # 0.4.0: recommend has no coverage column, so the line ends with the counts
     assert ("Some methods have scores on only part of the datasets: SCALEX 1 of 2, "
-            "iNMF 1 of 2. Check the coverage column before reading the order.") in msg
+            "iNMF 1 of 2.\n") in msg
     _no_log_joins(msg)
     _, msg = _recommend("cross", source="published", result_path=layout_tree)
     assert ("scMoMaT has scores only on datasets left out of the ranking, "
@@ -231,8 +238,8 @@ def test_degenerate_rerun_warning_head_is_a_sentence(result_dir):
         results._warn_degenerate(bad, result_dir, "0.4.0")
     msg = str(rec[0].message)
     assert msg.startswith(
-        "This re-run row has ARI below 0.01 where the article's run scored above 0.2: "
-        "Conos/D28 (re-run 0.4.0, ARI 0.0013). It most likely comes from a failed run.")
+        "This stored row has ARI below 0.01 where the article's run scored above 0.2: "
+        "Conos/D28 (stored 0.4.0, ARI 0.0013). It most likely comes from a failed run.")
     _no_log_joins(msg)
 
 
@@ -248,9 +255,8 @@ def test_reordered_label_dict_error_is_short_sentences(tmp_path):
                      labels={"cty2": str(p2), "cty1": str(p1)}, metrics=["ASW"],
                      verbose=False)
     assert str(e.value) == (
-        "The label keys cty2 and cty1 are not in the default order. Pass the dict "
-        "from mtb.labels_for(dataset, category, method) "
-        "unchanged, a list of paths in cell order, or label_order=[...]. The default "
+        "The label keys cty2 and cty1 are not in the default order. Pass a list of paths "
+        "in cell order, or dataset=, category= and method=. The default "
         "order is cty1, cty2, ... by number, with rna before adt before atac. It is not "
         "alphabetical.")
 
@@ -302,8 +308,8 @@ def test_prepared_file_note_names_the_method(root):
         sc = full_scan("D28", "diagonal", data_path=root / "data", verbose=False)
     # GLUE's one-batch row; its several-batch row lacks its files in D28
     cav = sc.set_index(["method", "modalities"]).loc[("GLUE", "rna+atac_peak"), "caveat"]
-    assert ("GLUE reads inputs/atac_peak_normpeaks.h5. mtb.run writes that file "
-            "first, so start GLUE with mtb.run or mtb.run_all. The printed command alone "
+    assert ("GLUE reads inputs/atac_peak_normpeaks.h5. mtb.run_all writes that file "
+            "first, so start GLUE with mtb.run_all. The printed command alone "
             "fails in a job script.") in cav
     assert "shell line" not in cav
 
@@ -314,8 +320,8 @@ def test_prepared_file_note_cli_spelling(monkeypatch):
     plan = {"atac": {"value": "/o/inputs/a.h5", "convert": True, "normpeaks_from": None},
             "rna": {"value": "/o/inputs/b.h5", "convert": True, "normpeaks_from": None}}
     assert runner._prepared_note(plan, "/o", "GLUE") == (
-        "GLUE reads inputs/a.h5, inputs/b.h5. multibench run writes those "
-        "files first, so start GLUE with multibench run or multibench run-all. The "
+        "GLUE reads inputs/a.h5, inputs/b.h5. multibench run-all writes those "
+        "files first, so start GLUE with multibench run-all. The "
         "printed command alone fails in a job script.")
 
 

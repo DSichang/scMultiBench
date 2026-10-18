@@ -169,9 +169,9 @@ def test_troubleshooting_does_not_hand_out_the_dry_run_command_to_run_alone(name
 def test_end_to_end_does_not_say_the_printed_command_runs_on_its_own():
     md = _markdown("tutorial_end_to_end")
     assert "prepare the command on a laptop and run it on Linux" not in md
-    # run(dry_run=True) returns the command (X84)
-    assert ("`mtb.run(..., dry_run=True)` returns the command without running it. "
-            "It works on any computer.") in md
+    # run(dry_run=True) returned the command (X84); 0.4.0 runs Matilda with run_all
+    assert ("`mtb.run_all(..., dry_run=True)` returns the plan and the command without "
+            "running anything. It works on any computer.") in md
 
 
 def test_a_dry_run_command_alone_can_fail():

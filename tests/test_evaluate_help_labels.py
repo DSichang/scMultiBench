@@ -33,13 +33,13 @@ def _help(capsys):
 
 def test_the_help_names_the_obs_column(capsys):
     text = _help(capsys)
-    assert ("With an .h5ad EMBEDDING, --labels can instead name a column of its obs, as "
-            "celltype or obs:celltype: give it once, without --column.") in text
+    # 0.4.0: --column and --batch-column are hidden, so the help no longer names them
+    assert ("a first column of barcodes is aligned to the embedding's cells. With an .h5ad "
+            "EMBEDDING it can name a column of its obs, as celltype.") in text
     assert ("--batch BATCH per-cell batch labels CSV; a first column of barcodes is "
-            "aligned as for --labels. With an .h5ad EMBEDDING it can instead name a column "
-            "of its obs, without --batch-column.") in text
-    assert ("A first column of barcodes is aligned to the obs_names of an .h5ad EMBEDDING, "
-            "or to the barcodes in the first column of a .csv EMBEDDING.") in text
+            "aligned as for --labels. With an .h5ad EMBEDDING it can name a column "
+            "of its obs.") in text
+    assert "--column" not in text and "--batch-column" not in text
     assert (".csv/.tsv (a first column of barcodes gives the cell ids: labels and batches "
             "with barcodes are matched by them)") in text
     assert "is dropped" not in text
@@ -73,7 +73,7 @@ def test_what_the_help_says_works(out, capsys, labels):
                        labels.replace("celltype", "donor"), "--metrics", "ARI,NMI,iLISI",
                        "--out", str(scores)], capsys)
     assert rc == 0, err
-    got = pd.read_csv(scores, index_col=0)["Value"]
+    got = pd.read_csv(scores).set_index("metric")["value"]      # the long table (0.4.0)
     assert got["ARI"] == got["NMI"] == 1.0 and 0.0 <= got["iLISI"] <= 1.0
 
 

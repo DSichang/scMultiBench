@@ -163,8 +163,8 @@ def test_a_command_that_reads_a_prepared_file_says_so(data, tmp_path, capsys):
         sc = full_scan("D28", "diagonal", data_path=data, verbose=False)
     row = sc.set_index("method").loc["Seurat_v3"]
     assert "/inputs/atac_peak_normpeaks.h5" in row["command"]
-    assert ("Seurat_v3 reads inputs/atac_peak_normpeaks.h5. mtb.run writes that "
-            "file first, so start Seurat_v3 with mtb.run or mtb.run_all. The printed "
+    assert ("Seurat_v3 reads inputs/atac_peak_normpeaks.h5. mtb.run_all writes that "
+            "file first, so start Seurat_v3 with mtb.run_all. The printed "
             "command alone fails in a job script.") in row["caveat"]
     # GLUE reads a renamed peak copy as well (R3-04); a command that reads
     # only the dataset's own files has no such note
@@ -172,27 +172,25 @@ def test_a_command_that_reads_a_prepared_file_says_so(data, tmp_path, capsys):
     glue = sc.set_index(["method", "modalities"]).loc[("GLUE", "rna+atac_peak"), "caveat"]
     assert "inputs/atac_peak_normpeaks.h5" in glue
     assert "reads inputs/" not in sc.set_index("method").loc["MultiMAP", "caveat"]
-    # the dry run prints the same note
-    inp = mtb.inputs_for("D28", "diagonal", "Seurat_v3", data_path=data)
-    mtb.run("Seurat_v3", "diagonal", inputs=inp, out_dir=tmp_path / "o", dry_run=True)
-    assert "# Seurat_v3 reads inputs/atac_peak_normpeaks.h5" in capsys.readouterr().err
     # the CLI marks the line in its '# commands' block
-    rc = cli.main(["run-all", "D28", "--category", "diagonal", "--data-path", str(data),
+    rc = cli.main(["run-all", str(data / "D28"), "--category", "diagonal",
                    "--methods", "Seurat_v3,MultiMAP", "--dry-run", "--out-dir", str(tmp_path)])
     out = capsys.readouterr().out
     assert rc == 0
-    lines = {ln.split(" (")[0]: ln for ln in out.splitlines() if ": conda run" in ln}
-    assert "[use multibench run]" in lines["Seurat_v3"]
-    assert "[use multibench run]" not in lines["MultiMAP"]
+    lines = {m.group(1): ln for ln in out.splitlines()
+             if (m := re.match(r"(\S+) \(rna\+", ln))}
+    assert "[use multibench run-all]" in lines["Seurat_v3"]
+    assert "[use multibench run-all]" not in lines["MultiMAP"]
 
 
 # ------------------------------------------------------------------ L39/L41 CLI help
 @pytest.mark.parametrize("cmd", ["evaluate", "run-all"])
-def test_leiden_flavor_help_names_both_stored_tables(cmd, capsys):
+def test_leiden_flavor_is_hidden_from_help(cmd, capsys):
+    # 0.4: --leiden-flavor is a hidden deprecated flag of both commands
     with pytest.raises(SystemExit):
         cli.main([cmd, "--help"])
     text = " ".join(capsys.readouterr().out.split())
-    assert "keep it to compare with the stored tables" in text           # X98
+    assert "--leiden-flavor" not in text
     assert "leidenalg matches both stored tables" not in text
     assert "backend of the published tables" not in text
 
@@ -265,7 +263,7 @@ def test_the_na_hint_uses_the_spelling_of_the_caller(tmp_path, capsys):
     err = capsys.readouterr().err
     assert "hide this message" not in err and "na='skip'" not in err
     assert cli.main(args + ["--na", "skip"]) == 0
-    assert ("warning: --na is deprecated and will be removed in 0.5; leave it out for a "
+    assert ("warning: plot --na is deprecated and will be removed in 0.5; leave it out for a "
             "warning that names the n/a cells." in capsys.readouterr().err)
     with warnings.catch_warnings(record=True) as rec:
         warnings.simplefilter("always")

@@ -9,6 +9,8 @@ Two defects, both reproduced on the demo data before the fix:
   gave ARI 0.0005; against ``cty3, cty1, cty2`` it gave 0.700. uniPort is the
   same case on D28: it takes RNA as ``--path1`` but concatenates the ATAC
   cells first (``main_uniPort.py:48``).
+  (0.4.0: ``mtb.labels_for`` is deprecated; the order is ``resolve.labels_for``'s,
+  which ``mtb.evaluate(..., dataset=, category=, method=)`` reads.)
 * ``evaluate(labels=labels_for(ds, category, method))`` raised the
   multi-entry dict ``ValueError`` - whose hint recommends that very call -
   whenever the method's order was not the default one: SMILE
@@ -22,6 +24,11 @@ import multibench as mtb
 from multibench.engine import registry, resolve
 
 
+def _value(out, code):
+    """The value of ``code`` in evaluate's long table."""
+    return float(out.set_index("metric")["value"][code])
+
+
 def _write_cty(path, values):
     pd.DataFrame({"x": values}).to_csv(path, index=False)
 
@@ -29,25 +36,25 @@ def _write_cty(path, values):
 # ------------------------------------------------ the order labels_for returns
 def test_stabmap_puts_its_reference_batch_first(root):
     data = root / "data"
-    assert list(mtb.labels_for("D52", "cross", "StabMap", data_path=data)) == ["cty3", "cty1", "cty2"]
+    assert list(resolve.labels_for("D52", "cross", "StabMap", data_path=data)) == ["cty3", "cty1", "cty2"]
     # the mosaic variant's reference is data1, so the default order is right there
-    assert list(mtb.labels_for("D46", "mosaic", "StabMap", data_path=data)) == ["cty1", "cty2", "cty3"]
+    assert list(resolve.labels_for("D46", "mosaic", "StabMap", data_path=data)) == ["cty1", "cty2", "cty3"]
     # without a method nothing changes
-    assert list(mtb.labels_for("D52", data_path=data)) == ["cty1", "cty2", "cty3"]
+    assert list(resolve.labels_for("D52", data_path=data)) == ["cty1", "cty2", "cty3"]
 
 
 def test_uniport_puts_its_atac_cells_first(root):
     data = root / "data"
-    assert list(mtb.labels_for("D28", "diagonal", "uniPort", data_path=data)) == ["atac_cty", "rna_cty"]
-    assert list(mtb.labels_for("D28", "diagonal", "SCALEX", data_path=data)) == ["rna_cty", "atac_cty"]
+    assert list(resolve.labels_for("D28", "diagonal", "uniPort", data_path=data)) == ["atac_cty", "rna_cty"]
+    assert list(resolve.labels_for("D28", "diagonal", "SCALEX", data_path=data)) == ["rna_cty", "atac_cty"]
 
 
 def test_smile_and_multivi_follow_their_upstream_concatenation(root):
     """main_SMILE.py: (paired rna2+atac2), query rna1, query atac3.
     main_MultiVI.py: rna1, atac3, then the paired cells (D45: equal batch sizes)."""
     data = root / "data"
-    assert list(mtb.labels_for("D45", "mosaic", "SMILE", data_path=data)) == ["cty2", "cty1", "cty3"]
-    assert list(mtb.labels_for("D45", "mosaic", "MultiVI", data_path=data)) == ["cty1", "cty3", "cty2"]
+    assert list(resolve.labels_for("D45", "mosaic", "SMILE", data_path=data)) == ["cty2", "cty1", "cty3"]
+    assert list(resolve.labels_for("D45", "mosaic", "MultiVI", data_path=data)) == ["cty1", "cty3", "cty2"]
 
 
 # ------------------------------------------------ evaluate takes the dict as is
@@ -81,17 +88,21 @@ def _stacked_dataset(tmp_path, files, order):
 def test_evaluate_takes_the_labels_for_dict_as_is(tmp_path, method, category, files, order):
     pytest.importorskip("scib")
     emb = _stacked_dataset(tmp_path, files, order)
-    d = mtb.labels_for("SYN", category, method, data_path=tmp_path)
+    d = resolve.labels_for("SYN", category, method, data_path=tmp_path)
     assert list(d) == order
     got = mtb.evaluate(emb, labels=d, metrics=["ARI"], verbose=False)
     ref = mtb.evaluate(emb, labels=[d[k] for k in order], metrics=["ARI"], verbose=False)
     pd.testing.assert_frame_equal(got, ref)
-    assert float(got.loc["ARI", "Value"]) > 0.9
+    assert _value(got, "ARI") > 0.9
+    # the 0.4.0 call reads the same files in the same order
+    new = mtb.evaluate(emb, dataset=str(tmp_path / "SYN"), category=category, method=method,
+                       metrics=["ARI"], verbose=False)
+    assert _value(new, "ARI") == _value(got, "ARI")
     # the fixture can tell the orders apart: the default order scores worse
-    default = mtb.labels_for("SYN", data_path=tmp_path)
+    default = resolve.labels_for("SYN", data_path=tmp_path)
     assert list(default) != order
     worse = mtb.evaluate(emb, labels=list(default.values()), metrics=["ARI"], verbose=False)
-    assert float(worse.loc["ARI", "Value"]) < float(got.loc["ARI", "Value"]) - 0.1
+    assert _value(worse, "ARI") < _value(got, "ARI") - 0.1
 
 
 def test_a_copied_or_reordered_dict_is_checked_like_any_dict(tmp_path):
@@ -99,19 +110,20 @@ def test_a_copied_or_reordered_dict_is_checked_like_any_dict(tmp_path):
     as is; a copy or an edit is held to the default order like any dict."""
     pytest.importorskip("scib")
     emb = _stacked_dataset(tmp_path, *_CASES[0][2:])
-    d = mtb.labels_for("SYN", "mosaic", "SMILE", data_path=tmp_path)
+    d = resolve.labels_for("SYN", "mosaic", "SMILE", data_path=tmp_path)
     with pytest.raises(ValueError) as exc:
         mtb.evaluate(emb, labels=dict(d), metrics=["ASW"], verbose=False)
     msg = str(exc.value)
-    assert "Pass the dict from mtb.labels_for(dataset, category, method) unchanged" in msg
-    moved = mtb.labels_for("SYN", "mosaic", "SMILE", data_path=tmp_path)
+    assert "Pass a list of paths in cell order, or dataset=, category= and method=." in msg
+    moved = resolve.labels_for("SYN", "mosaic", "SMILE", data_path=tmp_path)
     moved["cty2"] = moved.pop("cty2")          # same keys, cty2 moved to the end
     with pytest.raises(ValueError, match="nor the default order"):
         mtb.evaluate(emb, labels=moved, metrics=["ASW"], verbose=False)
-    # label_order= still overrides the recorded order
-    got = mtb.evaluate(emb, labels=d, label_order=["cty2", "cty1", "cty3"],
-                       metrics=["ASW"], verbose=False)
-    assert float(got.loc["ASW", "Value"]) > 0.9
+    # label_order= (deprecated) still overrides the recorded order
+    with pytest.warns(FutureWarning, match=r"evaluate\(label_order=\) is deprecated"):
+        got = mtb.evaluate(emb, labels=d, label_order=["cty2", "cty1", "cty3"],
+                           metrics=["ASW"], verbose=False)
+    assert _value(got, "ASW") > 0.9
 
 
 def test_the_error_hint_is_valid_for_every_wired_variant(root):
@@ -127,7 +139,7 @@ def test_the_error_hint_is_valid_for_every_wired_variant(root):
         for spec in registry.load():
             if not any(v.when.get("category") == cat for v in spec.variants):
                 continue
-            d = mtb.labels_for(ds, cat, spec.id, data_path=data)
+            d = resolve.labels_for(ds, cat, spec.id, data_path=data)
             assert _labels_from_dict(d, None) == list(d.values()), (ds, spec.id)
             checked += 1
     assert checked > 20
@@ -180,11 +192,11 @@ def test_every_declared_cell_order_parses(root):
                         ("StabMap", "mosaic"): "reference_first",
                         ("uniPort", "diagonal"): ["atac_gas", "rna"],
                         ("Seurat_v5", "diagonal"): ["atac_peak", "rna"]}
-    assert type(mtb.labels_for("D11", data_path=root / "data")) is resolve.LabelFiles
+    assert type(resolve.labels_for("D11", data_path=root / "data")) is resolve.LabelFiles
 
 
 def test_label_files_without_ids_follow_the_folder_barcodes(tmp_path):
-    # Y18 (r3): a reordered AnnData scored with labels_for of its folder is aligned
+    # Y18 (r3): a reordered AnnData scored with the label files of its folder is aligned
     import warnings
     import anndata as ad
     import pandas as pd
@@ -203,11 +215,11 @@ def test_label_files_without_ids_follow_the_folder_barcodes(tmp_path):
     emb[:, 1] += 6 * (ct == "C")
     cite = ad.AnnData(np.zeros((n, 2)), obs=obs.copy())
     cite.obsm["X_p"] = emb
-    labels = mtb.labels_for(str(tmp_path / "LABS"))
+    folder = str(tmp_path / "LABS")
     with warnings.catch_warnings(record=True) as rec:
         warnings.simplefilter("always")
-        same = mtb.evaluate(cite, labels=labels, obsm="X_p", metrics=["ARI"])
-        moved = mtb.evaluate(cite[rng.permutation(n)], labels=labels, obsm="X_p",
+        same = mtb.evaluate(cite, dataset=folder, obsm="X_p", metrics=["ARI"])
+        moved = mtb.evaluate(cite[rng.permutation(n)], dataset=folder, obsm="X_p",
                              metrics=["ARI"])
-    assert same.loc["ARI", "Value"] == moved.loc["ARI", "Value"] > 0.9
+    assert _value(same, "ARI") == _value(moved, "ARI") > 0.9
     assert not [w for w in rec if "by position" in str(w.message)]

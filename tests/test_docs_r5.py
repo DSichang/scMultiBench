@@ -53,8 +53,8 @@ def test_evaluate_page_comparability_sentence_is_plain():
     # Y07 (r3): no "Compare ranks."; one true sentence on why the same embedding moves
     assert "most methods give a slightly different embedding on each run." in visible
     assert "Compare ranks." not in visible and "4,096" not in visible
-    assert ("The Leiden clusters depend on the cell order and the machine, so the same "
-            "embedding can score a few hundredths differently.") in visible
+    assert ("The same embedding can also score a few hundredths differently on another "
+            "machine or cell order") in visible
 
 
 @needs_docs
@@ -70,9 +70,8 @@ def test_evaluate_page_says_a_barcode_csv_is_aligned_by_id():
 def test_api_page_exit_code_3_follows_the_cli_rule():
     api = _flat("api.md")
     assert "failed or was skipped" not in api
-    assert ("`3` when `run-all` finished but a method failed, or a method named in "
+    assert ("`3` when `run-all` finished but a method failed or a method in "
             "`--methods` was skipped.") in api
-    assert "A skipped method that `--methods` did not name does not set `3`" in api
     # the CLI says the same (R5-03)
     assert "a method named in ``--methods`` was skipped" in " ".join(cli.__doc__.split())
 

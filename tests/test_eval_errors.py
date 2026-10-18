@@ -37,9 +37,9 @@ def test_metrics_token_typo_is_a_value_error_listing_valid_values():
 
 def test_metrics_family_token_and_code_list_agree():
     emb, lab = _blobs()
-    a = evaluate(emb, labels=lab, metrics=["ASW"])
-    b = evaluate(emb, labels=lab, metrics="clustering")
-    assert a.loc["ASW", "Value"] == pytest.approx(b.loc["ASW", "Value"])
+    a = evaluate(emb, labels=lab, metrics=["ASW"]).set_index("metric")["value"]
+    b = evaluate(emb, labels=lab, metrics="clustering").set_index("metric")["value"]
+    assert a["ASW"] == pytest.approx(b["ASW"])
     # the batch family needs batch labels
     with pytest.raises(ValueError, match="metrics='batch' needs batch labels"):
         evaluate(emb, labels=lab, metrics="batch")
@@ -48,7 +48,7 @@ def test_metrics_family_token_and_code_list_agree():
 def test_metrics_folds_case_like_the_other_metric_arguments():
     emb, lab = _blobs()
     out = evaluate(emb, labels=lab, metrics=["asw"])
-    assert out.index.tolist() == ["ASW"]
+    assert out["metric"].tolist() == ["ASW"]
     with pytest.raises(ValueError, match=r"unknown metric\(s\) \['nope'\]; valid: clustering, batch, classification, all, or the codes \['ARI'"):
         evaluate(emb, labels=lab, metrics=["asw", "nope"])
 
@@ -99,16 +99,17 @@ def test_verbose_sweep_notice(capsys, monkeypatch):
     monkeypatch.setattr(mscib, "_SWEEP_NOTICE_CELLS", 0)  # every sweep now counts as long
     evaluate(emb, labels=lab, metrics=["ARI"])            # default verbose=True announces it
     err = capsys.readouterr().err
-    assert re.search(r"Clustering 120 cells for ARI with the "
-                     r"(igraph|leidenalg) Leiden backend\.", err)
-    assert "To skip it, pass clusters=, or metrics= without ARI." in err
-    # with batches, the batch clusters are named and clusters= is not offered
-    evaluate(emb, labels=lab, clusters=lab, batch=np.arange(len(lab)) % 2,
-             metrics=["NMI_batch"])
+    # 0.4.0: the line has no "To skip it" sentence
+    assert re.fullmatch(r"Clustering 120 cells for ARI with the "
+                        r"(igraph|leidenalg) Leiden backend\.\n", err)
+    # with batches, the batch clusters are named; clustering= (deprecated since
+    # 0.4) through its implementation
+    pipeline._evaluate(emb, labels=lab, clustering=lab, batch=np.arange(len(lab)) % 2,
+                       metrics=["NMI_batch"])
     err = capsys.readouterr().err
     assert "Clustering 120 cells for NMI_batch with the " in err
-    assert err.rstrip().endswith("To skip it, pass metrics= without NMI_batch.")
-    evaluate(emb, labels=lab, clusters=lab)               # nothing left to cluster
+    assert err.rstrip().endswith("Leiden backend.")
+    pipeline._evaluate(emb, labels=lab, clustering=lab)   # nothing left to cluster
     assert "Leiden" not in capsys.readouterr().err
     evaluate(emb, labels=lab, metrics=["ARI"], verbose=False)
     assert "Leiden" not in capsys.readouterr().err
@@ -118,18 +119,19 @@ def test_verbose_sweep_notice(capsys, monkeypatch):
 
 def test_docstrings_match_the_code():
     doc = " ".join(evaluate.__doc__.split())
-    assert "not needed for an unchanged ``mtb.labels_for`` dict" in doc
     assert "v1" not in doc
     assert "verbose" in doc and "2,000 cells" in doc
     import multibench.plot as mplot
     assert "BatchResult.long()" not in mplot.bubble.__doc__
     assert ":meth:`BatchResult.long`" not in mplot.bar.__doc__
-    assert "``BatchResult.long`` property" in mplot.bubble.__doc__
+    # 0.4.0 docstring: "as mtb.load_results, mtb.evaluate and BatchResult.long return"
+    assert "``mtb.evaluate`` and ``BatchResult.long`` return" in \
+        " ".join(mplot.bubble.__doc__.split())
     from multibench.data import results
     assert "v1" not in results.__doc__ and "v1" not in results.load_results.__doc__
-    assert "Parameters" in pipeline.to_long.__doc__
-    assert pipeline.to_long.__doc__.strip().splitlines()[0] == \
-        "Reshape ``mtb.evaluate``'s scores into the long table of ``mtb.load_results``."
+    # to_long is deprecated since 0.4: evaluate returns the long table
+    assert pipeline.to_long.__doc__.strip() == \
+        "Deprecated: ``mtb.evaluate(..., method=, dataset=)`` returns the long table."
 
 
 def test_a_wrong_batch_column_gets_its_error_without_the_unused_batch_warning(tmp_path):

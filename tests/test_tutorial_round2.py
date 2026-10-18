@@ -136,8 +136,7 @@ def test_end_to_end_evaluates_with_the_default_backend(monkeypatch):
     import multibench as mtb
     monkeypatch.setattr(mtb.config.DEFAULT, "leiden_flavor", "igraph")
     seen = []
-    ns = {"mtb": _Recorder(mtb, seen), "pd": pd, "emb": np.zeros((3, 2)),
-          "labels": mtb.labels_for("D11")}
+    ns = {"mtb": _Recorder(mtb, seen), "pd": pd, "emb": np.zeros((3, 2))}
     exec(_e2e_cell("mtb.evaluate("), ns)
     assert seen == ["igraph"]
     md = " ".join(_markdown(E2E, "## 7. Score").split())
@@ -146,10 +145,12 @@ def test_end_to_end_evaluates_with_the_default_backend(monkeypatch):
 
 
 def _scores_like_evaluate(flavor):
-    """Matilda's stored D11 scores in evaluate's shape, with the scoring
-    record evaluate attaches."""
+    """Matilda's stored D11 scores in the shape section 7's evaluate returns
+    (0.4.0: the long table, its rows named "Matilda (this run)"), with the
+    scoring record evaluate attaches."""
     import pandas as pd
     import multibench as mtb
+    from multibench.eval import pipeline
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         stored = mtb.load_results("vertical", dataset="D11", methods=["Matilda"])
@@ -157,7 +158,8 @@ def _scores_like_evaluate(flavor):
     # the clusters part 0.4.0's evaluate records ("sweep" was 0.3's)
     df.attrs = {"leiden_flavor": flavor, "clustering": "search",
                 "multibench_version": mtb.__version__, "scib_version": "1.1.7"}
-    return df
+    return pipeline._long_table(df, method="Matilda (this run)", dataset="D11",
+                                category="vertical")
 
 
 def _run_plot_cell(scores):
@@ -182,7 +184,7 @@ def test_end_to_end_plot_compares_this_run_with_the_stored_table():
     M03 warning fires, which is why section 7 sets leidenalg."""
     import pandas as pd
     ns, ours = _run_plot_cell(_scores_like_evaluate("leidenalg"))
-    long = pd.concat([ns["stored"], ns["mine"]], ignore_index=True)
+    long = pd.concat([ns["stored"], ns["scores"]], ignore_index=True)
     assert "Matilda (this run)" in set(long.method) and "Matilda" in set(long.method)
     assert long.method.nunique() == ns["stored"].method.nunique() + 1
     assert ours == [], ours

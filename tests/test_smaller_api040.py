@@ -37,7 +37,8 @@ def test_rescore_prints_by_default():
 
 
 def test_data_has_a_module_docstring():
-    assert mtb.data.__doc__.startswith("The benchmark's data: ``fetch`` downloads a dataset")
+    # 0.4.0 calls them demo datasets (R10)
+    assert mtb.data.__doc__.startswith("Demo data: ``fetch`` downloads demo datasets")
 
 
 def test_fetchable_example_is_the_call():

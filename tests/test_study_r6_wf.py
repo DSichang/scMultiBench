@@ -43,8 +43,9 @@ pytest.importorskip("scib")
 KW = dict(methods=["Matilda"], modalities=["rna", "adt"], verbose=False)
 BARS = [f"c{i}" for i in range(N)]
 CELLTYPE = np.array(["A"] * (N // 2) + ["B"] * (N // 2))
-MOVED = ("Pass data_path= to mtb.load_batch, or run rescore from the folder where "
-         "run_all ran.")
+# 0.4.0: load_batch(data_path=) is deprecated; the fix names config.DEFAULT.data_path
+MOVED = ("Set mtb.config.DEFAULT.data_path to the folder that holds it, or run rescore "
+         "from the folder where run_all ran.")
 
 
 def _ari(res):
@@ -470,8 +471,9 @@ def test_docstrings_state_the_new_rules():
     assert "is handed to ``evaluate(metrics=)``" not in flat["rescore"]
     assert ("``None`` = the batch ``run_all`` was given, else each cell's label "
             "file.") in flat["rescore"]
-    # R7-12 (b)
-    assert "data_path : path-like | None Folder that holds the dataset folder; " \
-        "``None`` = the path each record saved." in flat["load_batch"]
+    # R7-12 (b); 0.4.0: data_path= is deprecated, the Notes give the search order
+    assert "data_path :" not in flat["load_batch"]
+    assert ("the dataset folder under the recorded data root, then "
+            "``mtb.config.DEFAULT.data_path``.") in flat["load_batch"]
     assert "``batch_<hash>.csv``" in flat["save"]
-    assert "data_path" in inspect.signature(mtb.load_batch).parameters
+    assert "data_path" not in inspect.signature(mtb.load_batch).parameters

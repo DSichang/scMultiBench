@@ -48,7 +48,8 @@ def _err(capsys, argv):
 def test_name_alone_with_labels_writes_rows_with_that_name(diag, tmp_path, capsys):
     d, emb = diag
     out = tmp_path / "mine.csv"
-    rc = cli.main(["evaluate", "--embedding", str(emb), "--name", "RNA+ATAC PCA",
+    # 0.4.0: --method is the row name (--name is its deprecated alias)
+    rc = cli.main(["evaluate", "--embedding", str(emb), "--method", "RNA+ATAC PCA",
                    "--labels", str(d / "rna_cty.csv"), "--labels", str(d / "atac_cty.csv"),
                    "--dataset", "MYDIAG", "--category", "diagonal", "--metrics", "ASW",
                    "--out", str(out)])
@@ -61,7 +62,7 @@ def test_name_alone_with_labels_writes_rows_with_that_name(diag, tmp_path, capsy
 def test_name_without_method_or_labels_reads_the_dataset_labels(diag, capsys):
     # 0.4.0 (Y09): --dataset and --category read the label files, as labels_for does
     d, emb = diag
-    rc, err = _err(capsys, ["evaluate", "--embedding", str(emb), "--name", "x",
+    rc, err = _err(capsys, ["evaluate", "--embedding", str(emb), "--method", "x",
                             "--dataset", "D28", "--category", "diagonal", "--metrics",
                             "ASW"])
     assert rc == 0
@@ -86,17 +87,17 @@ def test_unknown_method_with_name_says_leave_out_method(diag, capsys):
 
 def test_unknown_method_without_labels_names_the_rename(diag, capsys):
     d, emb = diag
+    # 0.4.0: --method takes any row name; a name close to a package method that
+    # orders the cells otherwise gets a did-you-mean warning, and the folder order
     rc, err = _err(capsys, ["evaluate", "--embedding", str(emb), "--method", "uniPort_rerun",
-                            "--dataset", "D28", "--category", "diagonal"])
-    assert rc == 1
-    assert ("error: uniPort_rerun is not a package method. To name your rows "
-            "uniPort_rerun, pass --method uniPort --name uniPort_rerun. For your own "
-            "method, pass --name and the label files with --labels, once per file, in "
-            "your embedding's cell order.") in err
-    # a typo gets 'Did you mean', not the rename
+                            "--dataset", "D28", "--category", "diagonal", "--metrics", "ASW"])
+    assert rc == 0, err
+    assert "warning: Did you mean" in err and "uniPort puts the cells of D28 in another order" in err
+    assert "# labels: rna_cty.csv, atac_cty.csv from D28, in that order" in err
+    # a name close to a method that does not run on diagonal: just the row name
     rc, err = _err(capsys, ["evaluate", "--embedding", str(emb), "--method", "Matlida",
-                            "--dataset", "D28", "--category", "diagonal"])
-    assert rc == 1 and "Did you mean Matilda?" in err and "--name Matlida" not in err
+                            "--dataset", "D28", "--category", "diagonal", "--metrics", "ASW"])
+    assert rc == 0 and "warning:" not in err
 
 
 def test_check_method_is_short_sentences():
@@ -142,8 +143,7 @@ def test_no_unknown_method_or_no_category_message_has_variant_or_qsemicolon(tmp_
     np.save(tmp_path / "emb.npy", np.zeros((10, 3)))
     for argv in (["info", "stabmapp"], ["params", "Matilda", "--category", "cross"],
                  ["evaluate", "--embedding", str(tmp_path / "emb.npy"), "--method", "SCALEX",
-                  "--name", "ADT_PCA", "--dataset", "D11", "--category", "vertical",
-                  "--data-path", str(_DATA)],
+                  "--dataset", str(_DATA / "D11"), "--category", "vertical"],
                  ["evaluate", "--embedding", str(tmp_path / "emb.npy"), "--method",
                   "uniPort_rerun", "--dataset", "D11", "--category", "vertical"]):
         rc, err = _err(capsys, argv)
@@ -169,16 +169,16 @@ def test_name_with_package_method_writes_no_needs_labels(tmp_path):
     emb = _d11_emb(tmp_path)
     out = tmp_path / "m.csv"
     assert cli.main(["evaluate", "--embedding", str(emb), "--method", "Matilda", "--name",
-                     "Matilda_rerun", "--dataset", "D11", "--category", "vertical",
-                     "--data-path", str(_DATA), "--metrics", "ASW", "--out", str(out)]) == 0
+                     "Matilda_rerun", "--dataset", str(_DATA / "D11"), "--category",
+                     "vertical", "--metrics", "ASW", "--out", str(out)]) == 0
     mine = pd.read_csv(out)
     assert set(mine["method"]) == {"Matilda_rerun"}
     assert "needs_labels" not in mine.columns
     # the same columns as the long table without --name
     out2 = tmp_path / "plain.csv"
     assert cli.main(["evaluate", "--embedding", str(emb), "--method", "Matilda",
-                     "--dataset", "D11", "--category", "vertical", "--data-path",
-                     str(_DATA), "--metrics", "ASW", "--out", str(out2)]) == 0
+                     "--dataset", str(_DATA / "D11"), "--category", "vertical",
+                     "--metrics", "ASW", "--out", str(out2)]) == 0
     assert list(pd.read_csv(out2).columns) == list(mine.columns)
 
 
@@ -186,7 +186,8 @@ def test_name_help_says_method_can_be_left_out():
     parser = cli.build_parser()
     ev = next(a for a in parser._actions if a.dest == "command").choices["evaluate"]
     act = next(a for a in ev._actions if a.dest == "name")
-    assert act.help == "the row name in the long table (default: --method)"      # X95
+    import argparse
+    assert act.help == argparse.SUPPRESS       # 0.4.0: --method is the row name; --name hidden
 
 
 # ====================================================================== R6-08
@@ -203,8 +204,8 @@ def test_cli_overlay_with_a_stored_name_says_rename_with_name(tmp_path, capsys):
                             "--dataset", "D28", "--out", str(tmp_path / "f.png")])
     # the command line renames the rows itself since 0.4.0 (X15) and says so
     assert rc == 0, err
-    assert ("# Your rows of uniPort are drawn as uniPort_rerun: the stored table has the "
-            "same method and dataset.") in err
+    assert ("# Your rows of uniPort are drawn as uniPort (this run): the stored results "
+            "have the same method and dataset.") in err
     assert "error:" not in err
 
 
@@ -212,11 +213,11 @@ def test_python_overlay_with_a_stored_name_names_to_long():
     df = pd.concat([mtb.load_results("diagonal", dataset="D28"), _user_rows()],
                    ignore_index=True)
     with pytest.raises(ValueError) as e:
-        mtb.plot.build_table(df)
+        mtb.plot.bubble(df)                    # plot.build_table is deprecated (0.4.0)
     # an advice that works on any long frame (0.4.0, X16)
-    assert str(e.value) == ("Your rows and the stored table both have uniPort on D28. "
+    assert str(e.value) == ("Your rows and the stored results both have uniPort on D28. "
                             "Give your rows another name, e.g. "
-                            "rows.assign(method=rows.method + \"_rerun\").")
+                            "rows.assign(method=rows.method + ' (this run)').")
 
 
 def test_a_user_source_that_starts_like_a_stored_one_is_not_stored():
@@ -225,14 +226,15 @@ def test_a_user_source_that_starts_like_a_stored_one_is_not_stored():
     df = pd.concat([mtb.load_results("diagonal", dataset="D28"),
                     _user_rows().assign(source="rerun_mine")], ignore_index=True)
     with pytest.raises(ValueError) as e:
-        mtb.plot.build_table(df)
-    assert str(e.value).startswith("Your rows and the stored table both have uniPort on D28.")
+        mtb.plot.bubble(df)
+    assert str(e.value).startswith("Your rows and the stored results both have uniPort on "
+                                   "D28.")
 
 
 def test_repeated_user_rows_give_the_plain_repeat_text():
     rows = pd.concat([_user_rows("Mine"), _user_rows("Mine")], ignore_index=True)
     with pytest.raises(ValueError) as e:
-        mtb.plot.build_table(rows)
+        mtb.plot.bubble(rows)
     assert str(e.value) == ("6 rows repeat the same method, metric and dataset, for "
                             "example Mine, ARI, D28. The figure does not average them. "
                             "Remove the repeats, or give each version its own method name.")
@@ -270,7 +272,8 @@ def test_cli_dry_run_prints_the_header_first_and_the_path_as_given(tmp_path, cap
     cap = capsys.readouterr()
     assert rc == 0
     lines = cap.err.splitlines()
-    assert lines[0] == "# Dry run. Nothing was executed."
+    assert lines[0].startswith("warning: multibench run is deprecated")      # 0.4.0
+    assert lines[1] == "# Dry run. Nothing was executed."
     assert ("# SCALEX reads data/LUNG/atac_gas.h5, which does not exist. multibench scan "
             "shows what the folder holds.") in lines
     assert lines[-1] == "# multibench run would execute:"
@@ -294,7 +297,7 @@ def test_plot_messages_are_sentences(tmp_path, capsys):
         method="PriyaNet", source="user", scored_with="igraph/search/0.4.0")
     msg = style.backend_warning(pd.concat([_stored("D11"), own], ignore_index=True))
     assert msg.startswith("The rows for PriyaNet were clustered with the igraph Leiden "
-                          "backend. The stored tables used leidenalg, which can move ARI "
+                          "backend. The stored results used leidenalg, which can move ARI "
                           "by up to about 0.1. ")
     # require_complete: one sentence per group of methods lacking the same datasets
     rows = []

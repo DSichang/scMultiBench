@@ -1,5 +1,5 @@
 """Fix round 3, work package 'cli': ``run-all --batch`` (R3-09), help texts that
-name `multibench config` and the two ``scan --strict`` rules (R3-11), and the
+name `multibench config` (R3-11; ``scan --strict`` is hidden since 0.4.0), and the
 ``env plan`` / ``env install`` size total in two short lines (R3-13).
 
 The run-all test runs the real runner in prefix mode against a stand-in env
@@ -36,10 +36,6 @@ def _sub(*names):
                       if isinstance(a, argparse._SubParsersAction))
         parser = action.choices[name]
     return parser
-
-
-def _opt_help(parser, flag):
-    return next(a.help for a in parser._actions if flag in a.option_strings)
 
 
 def _rendered_help(parser, flag, columns=80):
@@ -131,8 +127,8 @@ def _clear_env_caches():
 
 
 def _run_all(data, out, *extra):
-    return cli.main(["run-all", "MYCITE", "--category", "vertical", "--methods", "Matilda",
-                     "--modalities", "rna,adt", "--data-path", str(data),
+    return cli.main(["run-all", str(data / "MYCITE"), "--category", "vertical",
+                     "--methods", "Matilda", "--modalities", "rna,adt",
                      "--out-dir", str(out), "--format", "csv", *extra])
 
 
@@ -146,8 +142,7 @@ def test_run_all_parser_accepts_batch_and_its_help_is_two_lines():
     # R5-02 added the barcode clause: three lines
     assert len(lines) <= 3, lines
     text = " ".join(" ".join(lines).split())
-    # the order the ids follow: the label files', as run_all puts them per method
-    assert "evaluate --batch" in text and "cells in the order of the label files" in text
+    assert text.startswith("--batch CSV one batch per cell: a CSV as for evaluate --batch")
     assert "a first column of barcodes is aligned by barcode" in text
     assert "(default: one batch per label file)" in text
 
@@ -197,24 +192,18 @@ def test_run_all_dry_run_accepts_batch(standin, tmp_path, capsys):
 
 
 # ====================================================================== R3-11
-def test_scan_strict_help_names_both_rules():
-    text = " ".join(_opt_help(_sub("scan"), "--strict").split())
-    assert text.startswith("exit 1 when no requested row is runnable, when a method "
-                           "named in --methods has none")
-    assert "nothing requested is runnable" not in text
-
-
 def test_help_defaults_point_to_multibench_config_not_python():
-    for path, flag in ((("scan",), "--data-path"), (("run-all",), "--leiden-flavor"),
-                       (("evaluate",), "--leiden-flavor")):
-        text = _opt_help(_sub(*path), flag)
-        assert "default: shown by multibench config" in text, (path, flag)
-        assert "mtb." not in text, (path, flag)
+    # 0.4.0: --data-path and --leiden-flavor are hidden; the DATASET argument names
+    # where the data root is shown
+    for path in (("scan",), ("run-all",)):
+        text = next(a.help for a in _sub(*path)._actions if a.dest == "dataset")
+        assert "(multibench config)" in text, path
+        assert "mtb." not in text, path
 
 
 def test_evaluate_description_and_load_results_name_scored_with():
     desc = " ".join(_sub("evaluate").description.split())
-    assert "(metric,value,method,dataset,category,source,scored_with)" in desc
+    assert "(metric, value, method, dataset, category, source, scored_with)" in desc
     doc = results.load_results.__doc__
     returns = doc.split("Returns\n")[1].split("Raises\n")[0]
     assert len(returns.split()) - 3 <= 30        # minus the header rule and the type

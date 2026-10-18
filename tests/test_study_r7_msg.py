@@ -112,7 +112,8 @@ def test_cli_run_all_dry_run_starts_with_the_header(wrong_ref, capsys):
     err = capsys.readouterr().err
     assert rc == 0
     lines = err.splitlines()
-    assert lines[0].startswith("# Dry run. Nothing was executed."), err
+    assert lines[0] == ("# Dry run: 0 of 1 method can run on D11 (vertical); the reason "
+                        "column says why."), err                   # 0.4.0: one sentence
     assert err.count(WRONG_REF) == 1, err
     assert f"# {WRONG_REF}" in lines[1:], err
 
@@ -426,7 +427,8 @@ def test_gas_order_error_is_sentences(tmp_path, pinned):
     msg = str(e.value)
     assert msg == ("SCALEX reads atac_gas.h5 of LUNG, which lists the ATAC cells in another "
                    "order than atac_peak.h5. atac_cty.csv follows atac_peak.h5. Write "
-                   "atac_gas.h5 again with mtb.io.to_canonical(..., modality='gas').")
+                   "atac_gas.h5 again with mtb.io.export_dataset(..., "
+                   "atac_kind='gene_activity').")
     assert ";" not in msg
 
 
@@ -457,6 +459,6 @@ def test_orientation_error_starts_with_the_method(tmp_path, pinned):
     msg = str(e.value)
     assert msg == ("totalVI reads rna.h5 of TRANS, which stores matrix/data as cells x "
                    "features, shape (20, 60). The file lists 60 features and 20 cells. Its "
-                   "matrix/data needs features x cells, shape (60, 20). Re-export it with "
-                   "mtb.io.to_canonical(src, dst), or transpose matrix/data.")
+                   "matrix/data needs features x cells, shape (60, 20). Export it again "
+                   "with mtb.io.export_dataset, or transpose matrix/data.")
     assert " - " not in msg and "TRANS/vertical" not in msg

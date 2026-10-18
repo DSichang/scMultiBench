@@ -24,6 +24,11 @@ pytest.importorskip("scib")
 METRICS = ["ASW", "ASW_batch"]
 
 
+def _value(df, metric):
+    """One value of evaluate's long table."""
+    return df.set_index("metric").loc[metric, "value"]
+
+
 def _scrambled(values, seed=2):
     return np.random.default_rng(seed).permutation(values)
 
@@ -39,7 +44,7 @@ def test_obs_prefix_names_the_same_column():
     # the column itself, which is what the name stands for
     _same(bare, mtb.evaluate(a, labels=a.obs["celltype"], batch=a.obs["donor"],
                              metrics=METRICS))
-    assert bare.loc["ASW", "Value"] > 0.7
+    assert _value(bare, "ASW") > 0.7
     for name in ("celltype", "obs:celltype"):
         assert pipeline._obs_column_name(name, a) == "celltype"
     assert pipeline._obs_column_name("obs:nope", a) is None
@@ -66,7 +71,7 @@ def test_exact_column_name_wins():
     _same(good, mtb.evaluate(emb, labels=lab, metrics=["ARI"]))
     bad = mtb.evaluate(a, labels="x", metrics=["ARI"])
     _same(bad, mtb.evaluate(emb, labels=wrong, metrics=["ARI"]))
-    assert good.loc["ARI", "Value"] > bad.loc["ARI", "Value"] + 0.2
+    assert _value(good, "ARI") > _value(bad, "ARI") + 0.2
     # obs:obs:x reaches it too, through the prefix
     _same(mtb.evaluate(a, labels="obs:obs:x", metrics=["ARI"]), good)
     # the obs of a MuData names its columns <modality>:<column>
@@ -78,18 +83,19 @@ def test_exact_column_name_wins():
 
 
 def test_clustering_takes_the_obs_prefix():
+    # clustering= is deprecated since 0.4: its implementation, without the warning
     emb, lab = _cells()
     a = _adata(emb, celltype=lab, leiden=lab, other=_scrambled(lab))
     kw = dict(labels="celltype", metrics=["ARI", "NMI"])
-    bare = mtb.evaluate(a, clusters="leiden", **kw)
+    bare = pipeline._evaluate(a, clustering="leiden", **kw)
     # before, "obs:leiden" was taken for the path of an h5 file
-    prefixed = mtb.evaluate(a, clusters="obs:leiden", **kw)
+    prefixed = pipeline._evaluate(a, clustering="obs:leiden", **kw)
     _same(prefixed, bare)
-    assert bare["Value"].tolist() == [1.0, 1.0] and bare.attrs["clustering"] == "user"
-    assert mtb.evaluate(a, clusters="obs:other", **kw).loc["ARI", "Value"] < 0.1
+    assert bare["value"].tolist() == [1.0, 1.0] and bare.attrs["clustering"] == "user"
+    assert _value(pipeline._evaluate(a, clustering="obs:other", **kw), "ARI") < 0.1
     # a column called obs:leiden wins over the prefix reading
     a.obs["obs:leiden"] = a.obs["other"]
-    assert mtb.evaluate(a, clusters="obs:leiden", **kw).loc["ARI", "Value"] < 0.1
+    assert _value(pipeline._evaluate(a, clustering="obs:leiden", **kw), "ARI") < 0.1
 
 
 def test_unknown_column_keeps_its_error():
@@ -133,8 +139,9 @@ def test_array_output_with_a_column_name(tmp_path, monkeypatch):
     assert str(e.value) == (
         "batch='obs:donor' is not a file, and the embedding has no obs. Pass the values, as "
         "batch=adata.obs['donor'].")
+    # clustering= is deprecated since 0.4: its implementation, without the warning
     with pytest.raises(FileNotFoundError) as e:
-        mtb.evaluate(emb, labels=lab, clusters="obs:leiden", metrics=["ARI"])
+        pipeline._evaluate(emb, labels=lab, clustering="obs:leiden", metrics=["ARI"])
     assert str(e.value) == (
         "clusters='obs:leiden' is not a file, and the embedding has no obs. Pass the "
         "values, as clusters=adata.obs['leiden'].")
@@ -151,7 +158,7 @@ def test_array_output_with_a_column_name(tmp_path, monkeypatch):
         f"The batch file sub/donor does not exist. From the working directory "
         f"{cwd}, the path resolves to {Path('sub/donor').resolve()}.")
     with pytest.raises(FileNotFoundError) as e:
-        mtb.evaluate(emb, labels=lab, clusters="clusters.h5", metrics=["ARI"])
+        pipeline._evaluate(emb, labels=lab, clustering="clusters.h5", metrics=["ARI"])
     assert str(e.value) == (
         f"The clustering file clusters.h5 does not exist. From the working directory "
         f"{cwd}, the path resolves to {Path('clusters.h5').resolve()}.")
@@ -190,7 +197,8 @@ def test_names_no_file(tmp_path, monkeypatch):
 
 def test_docstring_states_the_rule():
     doc = " ".join(mtb.evaluate.__doc__.split())
-    assert ("an ``.obs`` column name (``\"celltype\"``, ``\"obs:celltype\"``, "
+    # 0.4.0 docstring: the obs: spelling still works but is no longer listed
+    assert ("an ``.obs`` column name (``\"celltype\"``, "
             "``\"rna:celltype\"`` for a MuData modality)") in doc
 
 

@@ -48,7 +48,7 @@ def test_bar_warns_about_a_lone_method_and_the_incomplete_matrix():
                     "dataset."]
     inc = [m for m in msgs if m.startswith("The summary ranks ")]
     assert len(inc) == 1 and "PCA_standin has scores on 1 of them." in inc[0]
-    assert "Filter long_df to the methods scored on every dataset" in inc[0]
+    assert inc[0].endswith("Pass methods= with the methods scored on every dataset.")
 
 
 def test_build_table_summary_warns_about_the_lone_method_too():
@@ -110,9 +110,9 @@ def test_require_complete_drops_the_incomplete_method_without_a_coverage_warning
     assert [m for m in msgs if not m.startswith("require_complete=True dropped")] == []
 
 
+# plot.build_table is deprecated in 0.4.0: its docstring names mtb.recommend only
 @pytest.mark.parametrize("fn, said", [
-    (mtb.plot.bar, "a method missing from some datasets, a dataset with one method"),
-    (mtb.plot.build_table, "an incomplete method x dataset matrix")])
+    (mtb.plot.bar, "a method missing from some datasets, a dataset with one method")])
 def test_docstrings_list_the_warnings(fn, said):
     doc = " ".join(fn.__doc__.split())
     assert "Warns" in fn.__doc__

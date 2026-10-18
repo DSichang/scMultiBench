@@ -376,10 +376,11 @@ def test_run_all_dry_run_header_is_sentences(monkeypatch, capsys, tmp_path):
     # one-batch folder (X80): the lines count methods
     assert re.search(r"^# Commands of the 13 methods whose input files are in place\. "
                      r"\[env missing\] marks a method whose environment is not "
-                     r"installed\. \[use multibench run\] marks a command that reads a "
-                     r"file multibench run writes first\.$", out, re.M), out
-    assert re.match(r"# Dry run\. Nothing was executed\. 0 of 14 methods can run on D28 "
-                    r"\(diagonal\)\.", err), err
+                     r"installed\. \[use multibench run-all\] marks a command that reads "
+                     r"a file multibench run-all writes first\.$", out, re.M), out
+    # 0.4.0: the header is one sentence
+    assert err.startswith("# Dry run: 0 of 14 methods can run on D28 (diagonal); the "
+                          "reason column says why.\n"), err
     # methods with one diagonal row each: the lines count methods
     rc, out, err = _cli(["run-all", "D28", "--category", "diagonal", "--dry-run",
                          "--methods", "SCALEX,Portal,uniPort",
@@ -389,8 +390,8 @@ def test_run_all_dry_run_header_is_sentences(monkeypatch, capsys, tmp_path):
     assert re.search(r"^# Commands of the 3 methods whose input files are in place\. "
                      r"\[env missing\] marks a method whose environment is not installed\.$",
                      out, re.M), out
-    assert re.match(r"# Dry run\. Nothing was executed\. 0 of 3 methods can run on D28 "
-                    r"\(diagonal\)\.", err), err
+    assert err.startswith("# Dry run: 0 of 3 methods can run on D28 (diagonal); the "
+                          "reason column says why.\n"), err
 
 
 def test_count_lines_say_methods_only_when_each_has_one_row(monkeypatch, capsys, tmp_path):
@@ -412,8 +413,9 @@ def test_count_lines_say_methods_only_when_each_has_one_row(monkeypatch, capsys,
                 methods=["sciPENN", "totalVI", "Concerto"])
     assert "[run_all] Dry run: 0 of 3 requested methods can run on D52 (cross); " in \
         capsys.readouterr().out
+    # 0.4.0: the plan leaves out UINMF's two-batch row, as a run does
     mtb.run_all("D52", "cross", out_dir=tmp_path, dry_run=True, modalities="all")
-    assert "[run_all] Dry run: 0 of 30 requested rows can run on D52 (cross); " in \
+    assert "[run_all] Dry run: 0 of 29 requested rows can run on D52 (cross); " in \
         capsys.readouterr().out
 
 

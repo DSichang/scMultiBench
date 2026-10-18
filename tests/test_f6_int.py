@@ -145,6 +145,7 @@ def test_the_batch_label_errors_name_only_metrics_the_family_computes():
             pipeline.evaluate(emb, labels=ct, metrics=fam)
         named = re.search(r"needs batch labels for (.*?)\. ", str(exc.value)).group(1)
         named = set(re.split(r", | and ", named))
+        # 0.4.0: evaluate returns the long table, one row per metric
         computed = set(_quiet(pipeline.evaluate, emb, labels=ct, batch=bat,
-                              metrics=fam, verbose=False).index)
+                              metrics=fam, verbose=False)["metric"])
         assert named and named <= computed, (fam, named, computed)

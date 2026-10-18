@@ -302,7 +302,7 @@ def test_the_anchors_exist_once(tmp_path):
     assert set(re.findall(r"\(#(recipe-[a-z0-9-]+)\)", page)) <= set(ANCHORS)
     # the section sits in "Inputs", after the ATAC details and before the rule
     before, after = page.split("### Recipes for your own data { #own-data-recipes }")
-    assert before.rstrip().endswith("its caveat stays in the log and in the summary.")
+    assert before.rstrip().endswith("export the ATAC form it reads.")
     assert after.split("\n---\n", 1)[1].lstrip().startswith("## GPU or CPU?")
     linked = set()
     for nb in sorted((ROOT / "notebooks").glob("*.ipynb")):
@@ -317,28 +317,30 @@ def test_the_anchors_exist_once(tmp_path):
     src = tmp_path / "filtered_feature_bc_matrix.h5"
     _tenx(src, GENES, PEAKS, "atac", n_cells=20)
     with pytest.raises(ValueError) as e:
-        mtb.io.to_canonical(src, tmp_path / "out" / "rna.h5")
+        mtb.io.read_canonical(src)
     assert str(e.value) == f'{src} is a 10x Genomics file. See the recipe "A 10x .h5 file" in the docs.'
     assert not (tmp_path / "out").exists()
 
 
 def test_a_10x_file_is_not_read_as_a_dataset_file(tmp_path, monkeypatch, capsys):
     """The recipe opens by saying that the package does not read the file,
-    and the command-line block says so for ``multibench convert``. A run and
-    a conversion that are given the file stop and write nothing."""
-    _says("recipe-10x-h5", "`scan`, `run_all` and `multibench convert` do not read this file. "
+    and the command-line block says so for ``multibench export`` (0.4.0: was
+    convert). A run and an export that are given the file stop and write
+    nothing."""
+    from multibench.engine import runner
+    _says("recipe-10x-h5", "`scan`, `run_all` and `multibench export` do not read this file. "
                            "Read it with scanpy first.")
-    _says("recipe-donors", "`multibench convert` reads `.h5ad` files, not a 10x `.h5` file.")
+    _says("recipe-donors", "`multibench export` reads `.h5ad` files, not a 10x `.h5` file.")
     monkeypatch.chdir(tmp_path)
     src = "filtered_feature_bc_matrix.h5"
     _tenx(src, GENES, PEAKS, "atac", n_cells=20)
     # the call that run_all makes for each method
     with pytest.raises(ValueError, match=rf'{re.escape(src)} is a 10x Genomics file\. See the '
                                          r'recipe "A 10x \.h5 file" in the docs\.$'):
-        mtb.run("scMDC", "vertical", inputs={"rna": src, "adt": src}, out_dir="out",
-                dry_run=True)
-    for argv in (["convert", src, "OUT/", "--modality", "rna"],
-                 ["convert", src, "OUT", "--rna", "X"]):
+        runner.run("scMDC", "vertical", inputs={"rna": src, "adt": src}, out_dir="out",
+                   dry_run=True)
+    for argv in (["export", src, "OUT/"],
+                 ["export", src, "OUT", "--rna", "X"]):
         assert cli.main(argv) == 1
         assert capsys.readouterr().err.splitlines()[0] == (
             f'error: {src} is a 10x Genomics file. See the recipe "A 10x .h5 file" in the '
@@ -371,7 +373,7 @@ def test_the_dataset_folder_section_points_to_the_recipes():
                "another number of donors, see [Recipes for your own data](#own-data-recipes).")
     paragraphs = [" ".join(par.split()) for par in section.strip().split("\n\n")]
     assert paragraphs[0] == ("`mtb.io.export_dataset` writes an AnnData or MuData as a dataset "
-                             "folder, which `scan`, `run_all` and `inputs_for` read.")
+                             "folder, which `scan` and `run_all` read.")
     assert paragraphs[1] == pointer and " ".join(page.split()).count(pointer) == 1
     # before the first tab, and outside every collapsed block
     link = "[Recipes for your own data](#own-data-recipes)"
@@ -492,8 +494,9 @@ def test_10x_recipe_runs(host, tmp_path, monkeypatch, capsys):
     # the two ATAC names of its second line: one matrix, the same cells
     first, second = _quoted(
         "recipe-10x-h5", r"For 10x Multiome the check lists `([^`]+)` and `([^`]+)`: one "
-                         r"matrix under two names\.")          # Z21 (r3): no reader claim
+                         r"matrix under two names, one copy on disk\.")   # Z21 (r3): no reader claim
     assert (first, second) == ("atac.h5", "atac_peak.h5")
+    assert (mine / first).samefile(mine / second)          # "one copy on disk"
     assert capsys.readouterr().out.splitlines()[1] == (
         f"[scan] Cells per file: rna.h5 270, {first} 270, {second} 270.")
     content = _content(mine)
@@ -567,7 +570,7 @@ def test_10x_recipe_for_cite_seq(host, tmp_path, monkeypatch, capsys):
     # "For 10x Multiome the check lists atac.h5 and atac_peak.h5": this folder
     # has neither
     for name in _quoted("recipe-10x-h5", r"For 10x Multiome the check lists `([^`]+)` and "
-                                         r"`([^`]+)`: one matrix under two names\."):
+                                         r"`([^`]+)`: one matrix under two names, one copy on disk\."):
         assert not (mine / name).exists() and name not in printed[1]
 
 
@@ -1031,21 +1034,35 @@ def test_a_diagonal_folder_with_labels_for_one_side_is_not_scored(host, tmp_path
     assert [r["status"] for r in res.records] == ["RUN_OK"]
 
 
+def _labelled_call():
+    """The page's call for an embedding with labels for some of the cells
+    (0.4.0: a subset of the AnnData, not the deprecated missing_labels=)."""
+    call = 'mtb.evaluate(emb[emb.obs["label"].notna()], labels="label")'
+    assert f"`{call}`" in _said("recipe-no-labels")
+    return call
+
+
+def _emb(matrix, labels):
+    """An embedding as res.embedding(m) returns it: obsm["X_emb"], obs["label"]."""
+    emb = ad.AnnData(np.zeros((len(labels), 1)))
+    emb.obsm["X_emb"] = matrix
+    emb.obs["label"] = np.asarray(labels, dtype=object)
+    return emb
+
+
 def test_the_evaluate_call_of_the_page_scores_the_labelled_cells():
     """The call for an embedding with labels for some of the cells."""
-    call = 'mtb.evaluate(adata, labels="obs:celltype", obsm="X_emb", missing_labels="drop")'
-    assert f"`{call}`" in _said("recipe-no-labels")
-    adata = _cite()
-    adata.obsm["X_emb"] = np.random.default_rng(0).normal(size=(adata.n_obs, 4))
-    adata.obs["celltype"] = adata.obs["celltype"].astype(object)
-    adata.obs.loc[adata.obs_names[:12], "celltype"] = np.nan
-    # "It says how many cells it scored."
-    with pytest.warns(UserWarning, match=r"^Scored the 108 labelled cells of 120\.$"):
-        scores = eval(call, {"mtb": mtb, "adata": adata})
-    assert (scores.attrs["cells_scored"], scores.attrs["cells_total"]) == (108, 120)
-    # "Without missing_labels="drop", evaluate raises when a label is missing."
+    call = _labelled_call()
+    _says("recipe-no-labels", "`evaluate` raises when a label is missing")
+    labels = _cite().obs["celltype"].astype(object).to_numpy()
+    labels[:12] = None
+    emb = _emb(np.random.default_rng(0).normal(size=(len(labels), 4)), labels)
+    scores = eval(call, {"mtb": mtb, "emb": emb})
+    assert scores["value"].notna().all()
+    assert scores.equals(mtb.evaluate(emb[12:].copy(), labels="label"))
+    # "evaluate raises when a label is missing."
     with pytest.raises(ValueError, match=r"^labels: 12 of the 120 cells have no label\. "):
-        eval(call.replace(', missing_labels="drop"', ""), {"mtb": mtb, "adata": adata})
+        mtb.evaluate(emb, labels="label")
 
 
 def test_scores_of_one_labelled_side_do_not_see_the_other_side():
@@ -1053,31 +1070,24 @@ def test_scores_of_one_labelled_side_do_not_see_the_other_side():
     are those of the RNA cells alone: embeddings that put the ATAC cells in
     different places get the same scores, so the recipe says that no score
     compares methods on such data."""
-    _says("recipe-no-labels", "No score compares methods on such data. "
-                              "`missing_labels=\"drop\"` would score the RNA cells alone, and "
-                              "those scores do not change with where a method puts the ATAC "
+    _says("recipe-no-labels", "No score compares methods on such data: scores of the RNA "
+                              "cells alone do not change with where a method puts the ATAC "
                               "cells.")
-    call = 'mtb.evaluate(adata, labels="obs:celltype", obsm="X_emb", missing_labels="drop")'
-    _says("recipe-no-labels", "An embedding that you hold in an AnnData can be scored on its "
-                              "labelled cells, when every modality and every batch has "
-                              f"labelled cells: `{call}`.")
+    call = _labelled_call()
     rng = np.random.default_rng(0)
     n = 120
     types = rng.choice(["T", "B", "NK"], n)
-    adata = ad.AnnData(np.zeros((2 * n, 3)))
-    adata.obs["celltype"] = np.array([*types, *[None] * n], dtype=object)   # RNA, then ATAC
     centre = {"T": 0.0, "B": 6.0, "NK": 12.0}
     rna = np.array([[centre[t]] * 4 for t in types]) + rng.normal(size=(n, 4))
     # the ATAC cells on the RNA cells, far from all of them, and at one point
     scores = []
     for atac in (rna, rna + 100.0, np.zeros((n, 4))):
-        adata.obsm["X_emb"] = np.vstack([rna, atac])
-        with pytest.warns(UserWarning, match=r"^Scored the 120 labelled cells of 240\.$"):
-            scores.append(eval(call, {"mtb": mtb, "adata": adata}))
-    assert scores[0]["Value"].notna().all()
+        emb = _emb(np.vstack([rna, atac]), [*types, *[None] * n])   # RNA, then ATAC
+        scores.append(eval(call, {"mtb": mtb, "emb": emb}))
+    assert scores[0]["value"].notna().all()
     assert scores[1].equals(scores[0]) and scores[2].equals(scores[0])
     # they are the scores of the RNA cells alone
-    assert eval(call, {"mtb": mtb, "adata": adata[:n].copy()}).equals(scores[0])
+    assert mtb.evaluate(_emb(rna, types), labels="label").equals(scores[0])
 
 
 # ------------------------------------------------ cell types later, per layout
@@ -1544,11 +1554,13 @@ def _cross_reads():
 def test_batch_counts_follow_the_registry():
     """The recipe says how many batches a cross method reads, per pair of
     modalities, and that ``describe_layout("cross")`` lists them. Both
-    follow the registry, and so do the methods of the four cross tutorials."""
+    follow the registry, and so do the methods of the four cross tutorials.
+    UINMF's two-batch variant stays in the registry, but run_all leaves it
+    out next to its three-batch one (0.4.0), so the page no longer names it."""
     assert ("A cross method reads a fixed number of batches: three for RNA + ADT and for "
-            "RNA + ATAC, where UINMF also reads two, and two for ADT + ATAC and for "
-            "RNA + ADT + ATAC. `mtb.describe_layout(\"cross\")` lists them.") \
-        in _said("recipe-donors")
+            "RNA + ATAC, and two for ADT + ATAC and for RNA + ADT + ATAC. "
+            "`mtb.describe_layout(\"cross\")` lists them.") in _said("recipe-donors")
+    assert "UINMF" not in _said("recipe-donors")
     said = {("rna", "adt"): (3, {"UINMF": 2}), ("rna", "atac"): (3, {"UINMF": 2}),
             ("adt", "atac"): (2, {}), ("rna", "adt", "atac"): (2, {})}
     reads = _cross_reads()
@@ -1585,7 +1597,7 @@ def test_the_command_lines_parse(host, tmp_path, monkeypatch, capsys):
     on it without scores."""
     monkeypatch.chdir(tmp_path)
     convert, run_all = _commands()
-    assert convert[:2] == ["multibench", "convert"] and run_all[:2] == ["multibench", "run-all"]
+    assert convert[:2] == ["multibench", "export"] and run_all[:2] == ["multibench", "run-all"]
     _says("recipe-donors", "Without cell types, leave `--labels` out and run without scores.")
     assert "--labels" not in convert and "--no-evaluate" in run_all
     parser = cli.build_parser()
@@ -1641,8 +1653,9 @@ def test_details_name_the_filter_error_and_the_files_of_other_data(tmp_path):
     assert ("An export also raises `FileExistsError` when the folder holds files of other "
             "data that it does not write: files with other cells, and after `batch=` files "
             "of other batch numbers. With `batch_index=`, a call checks its own batch "
-            "number, and `n_batches=` says how many batches the data has. The message names "
-            "the first file. `overwrite=True` does not remove them.") in said
+            "number. The message names the first file. `overwrite=True` does not remove "
+            "them. Write data with fewer batches into a new folder.") in said
+    assert "n_batches=" not in said
     # the two filters of the paragraph select the two parts
     both = _cells(60, genes=50)
     both.var_names = GENES[2:32] + PEAKS[:20]

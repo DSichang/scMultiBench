@@ -70,8 +70,9 @@ def test_pipeline_evaluate_without_clustering():
     from multibench.eval.pipeline import evaluate
     emb, ct, _cl, _ba = _toy()
     df = evaluate(emb, category="vertical", metrics="clustering", labels=ct)
-    assert "ARI" in df.index
-    assert float(df.loc["ARI", "Value"]) > 0.9
+    values = df.set_index("metric")["value"]        # 0.4.0: the long table
+    assert "ARI" in values.index
+    assert float(values["ARI"]) > 0.9
 
 
 def test_pipeline_evaluate_auto_orients_dims_by_cells():
@@ -81,5 +82,6 @@ def test_pipeline_evaluate_auto_orients_dims_by_cells():
     from multibench.eval.pipeline import evaluate
     emb, ct, _cl, _ba = _toy()          # emb is cells x dims (80 x 5)
     df = evaluate(emb.T, category="vertical", metrics="clustering", labels=ct)  # dims x cells
-    assert "ARI" in df.index
-    assert float(df.loc["ARI", "Value"]) > 0.9
+    values = df.set_index("metric")["value"]        # 0.4.0: the long table
+    assert "ARI" in values.index
+    assert float(values["ARI"]) > 0.9

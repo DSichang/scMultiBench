@@ -97,11 +97,14 @@ def test_to_long_dataset_and_category_default_to_placeholders():
     assert set(out.dataset) == {"all"} and set(out.category) == {"user"}
 
 
-def test_to_long_rejects_already_long_frame():
+def test_to_long_of_a_long_frame_only_sets_the_named_columns():
+    # 0.4.0: evaluate returns the long table, and to_long takes it as it is
     w = pd.DataFrame({"Value": [0.5]}, index=["ARI"])
     long = to_long(w, method="M", dataset="D", category="vertical")
-    with pytest.raises(ValueError, match="already long frame"):
-        to_long(long, method="M2", dataset="D", category="vertical")
+    again = to_long(long, method="M2", category="mosaic")
+    assert again["method"].tolist() == ["M2"] and again["category"].tolist() == ["mosaic"]
+    pd.testing.assert_frame_equal(again.drop(columns=["method", "category"]),
+                                  long.drop(columns=["method", "category"]))
 
 
 def test_to_long_rejects_wide_one_row_frame_with_hint():
@@ -141,11 +144,13 @@ def test_to_long_all_blank_names_raises():
 
 # --- CSV read-back: metric names are strings or to_long raises -------------
 def _evaluate_frame():
-    """A real ``mtb.evaluate`` frame (its index is unnamed)."""
+    """The wide frame ``mtb.evaluate`` returned before 0.4 (its index is
+    unnamed), as CSVs saved then hold it."""
     import numpy as np
+    from multibench.eval import pipeline
     lab = np.repeat(["a", "b"], 20)
     emb = np.random.default_rng(0).normal(size=(40, 3)) + (lab == "b")[:, None] * 5.0
-    return mtb.evaluate(emb, labels=lab, clusters=lab, metrics=["ARI", "NMI"])
+    return pipeline._scores(emb, labels=lab, clusters=lab, metrics=["ARI", "NMI"])
 
 
 def test_to_long_accepts_plain_read_csv_of_evaluate_frame(tmp_path):
@@ -174,10 +179,13 @@ def test_to_long_accepts_cli_evaluate_out_read_back_plainly(tmp_path):
     labels = tmp_path / "cty.csv"
     pd.DataFrame({"x": lab}).to_csv(labels, index=False)
     f = tmp_path / "wide.csv"
+    # 0.4.0: evaluate --out writes the long table (and has no --clusters)
     assert cli.main(["evaluate", "--embedding", str(emb), "--labels", str(labels),
-                     "--clusters", str(labels), "--metrics", "ARI,NMI", "--out", str(f)]) == 0
+                     "--metrics", "ARI,NMI", "--out", str(f)]) == 0
     out = to_long(pd.read_csv(f), method="M", dataset="D", category="vertical")
     assert out.metric.tolist() == ["ARI", "NMI"]
+    assert out.columns.tolist() == ["metric", "value", "method", "dataset", "category",
+                                    "source", "scored_with"]
 
 
 FIX = "pd.read_csv(path, index_col=0)"

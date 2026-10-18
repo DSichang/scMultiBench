@@ -2,7 +2,9 @@ import importlib
 
 import pandas as pd
 
-# the module: mtb.plot.bubble is the function, without the 0.2 attribute paths
+# the module: mtb.plot.bubble is the function, without the 0.2 attribute paths.
+# The table tests call its internal _build_table: the public build_table is
+# deprecated in 0.4.0 (mtb.recommend(category, long_df=...)) and forwards to it.
 bubble = importlib.import_module("multibench.plot.bubble")
 
 
@@ -19,7 +21,7 @@ def _toy_long():
 
 
 def test_build_table_pivots_and_adds_overall():
-    tbl = bubble.build_table(_toy_long(), metrics=["ARI", "NMI"])
+    tbl = bubble._build_table(_toy_long(), metrics=["ARI", "NMI"])
     assert set(tbl.norm.columns) == {"ARI", "NMI"}
     assert set(tbl.norm.index) == {"A", "B"}
     # B dominates both metrics -> higher overall
@@ -29,7 +31,7 @@ def test_build_table_pivots_and_adds_overall():
 
 
 def test_build_table_respects_method_filter():
-    tbl = bubble.build_table(_toy_long(), metrics=["ARI"], methods=["A"])
+    tbl = bubble._build_table(_toy_long(), metrics=["ARI"], methods=["A"])
     assert list(tbl.norm.index) == ["A"]
 
 
@@ -38,7 +40,7 @@ def test_render_returns_figure_with_circles(tmp_path):
     matplotlib.use("Agg")
     from matplotlib.patches import Circle
 
-    fig = bubble.render(bubble.build_table(_toy_long(), metrics=["ARI", "NMI"]))
+    fig = bubble.render(bubble._build_table(_toy_long(), metrics=["ARI", "NMI"]))
     ax = fig.axes[0]
     circles = [p for p in ax.patches if isinstance(p, Circle)]
     # Shiny knit-table contract: metric markers are circles whose RADIUS varies
@@ -79,7 +81,7 @@ def test_summary_aggregate_ranks_within_dataset_then_averages():
         "dataset": ["D1", "D1", "D2", "D2"],
         "category": ["vertical"] * 4,
     })
-    tbl = bubble.build_table(long, metrics=["ARI"], aggregate="summary")
+    tbl = bubble._build_table(long, metrics=["ARI"], aggregate="summary")
     assert abs(tbl.overall["A"] - tbl.overall["B"]) < 1e-9
 
     # asymmetric case: B wins BOTH datasets -> B must outrank A overall
@@ -90,7 +92,7 @@ def test_summary_aggregate_ranks_within_dataset_then_averages():
         "dataset": ["D1", "D1", "D2", "D2"],
         "category": ["vertical"] * 4,
     })
-    tbl2 = bubble.build_table(long2, metrics=["ARI"], aggregate="summary")
+    tbl2 = bubble._build_table(long2, metrics=["ARI"], aggregate="summary")
     assert tbl2.overall["B"] > tbl2.overall["A"]
 
 
@@ -147,30 +149,11 @@ def test_bubble_is_plain_function_with_signature_and_docstring():
     import multibench as mtb
     assert inspect.isfunction(mtb.plot.bubble)
     params = list(inspect.signature(mtb.plot.bubble).parameters)
-    assert params[0] == "long_df"
-    for p in ("metrics", "methods", "order", "aggregate", "title", "save",
-              "require_complete", "overall"):
-        assert p in params
+    # 0.4.0: order=, aggregate=, require_complete= and overall= are deprecated
+    assert params == ["long_df", "metrics", "methods", "title", "save"]
     assert "Parameters" in mtb.plot.bubble.__doc__
-    assert "mean_overall" in mtb.plot.bubble.__doc__      # OVERALL_DOC written out
     txt = pydoc.render_doc(mtb.plot.bubble)
     assert "bubble(" in txt.replace("\b", "") and "long_df" in txt
-
-
-def test_bubble_overall_doc_matches_style():
-    # The `overall` parameter text is written out in bubble's docstring
-    # (the static docs build cannot see a runtime splice) and must stay in step
-    # with style.OVERALL_DOC, the single source it shares with plot.bar.
-    from multibench.plot import style
-    body = style.OVERALL_DOC.split("\n", 1)[1]        # everything below the type line
-    # compare on normalised whitespace: the docstrings are re-wrapped and
-    # re-indented for the generated API reference, the WORDS are the pin
-    norm = lambda t: " ".join(t.split())
-    # `multibench.plot.bubble` is the function in this module's namespace and
-    # the submodule in the package's - reach the function unambiguously
-    import importlib
-    fn = importlib.import_module("multibench.plot.bubble").bubble
-    assert norm(body) in norm(fn.__doc__)
 
 
 def test_the_02_attribute_paths_are_removed(tmp_path):
@@ -182,14 +165,15 @@ def test_the_02_attribute_paths_are_removed(tmp_path):
     with pytest.raises(AttributeError, match=r"^mtb\.plot\.plot_bubble was removed in 0\.4\. "
                                              r"Use mtb\.plot\.bubble\.$"):
         mtb.plot.plot_bubble
-    tbl = mtb.plot.build_table(_toy_long(), metrics=["ARI", "NMI"])
-    assert isinstance(tbl, mtb.plot.BubbleTable)
+    with pytest.warns(FutureWarning, match=r"^plot\.build_table is deprecated"):
+        tbl = mtb.plot.build_table(_toy_long(), metrics=["ARI", "NMI"])
+    assert isinstance(tbl, bubble.BubbleTable)
     mtb.plot.render(tbl).savefig(tmp_path / "x.png")
 
 
 def test_metrics_order_is_honoured():
     import matplotlib; matplotlib.use("Agg")
-    tbl = bubble.build_table(_three(), metrics=["NMI", "ARI", "iF1"])
+    tbl = bubble._build_table(_three(), metrics=["NMI", "ARI", "iF1"])
     assert list(tbl.raw.columns) == ["NMI", "ARI", "iF1"]
     fig = bubble.render(tbl)
     labels = [t.get_text() for t in fig.axes[0].texts if t.get_text() in {"NMI", "ARI", "iF1"}]
@@ -197,64 +181,64 @@ def test_metrics_order_is_honoured():
     # family block order still paper order: clustering block before batch block
     long = _three()
     extra = long[long.metric == "ARI"].assign(metric="GC")
-    tbl2 = bubble.build_table(pd.concat([long, extra]), metrics=["GC", "ARI"])
+    tbl2 = bubble._build_table(pd.concat([long, extra]), metrics=["GC", "ARI"])
     assert list(tbl2.raw.columns) == ["ARI", "GC"]
 
 
 def test_unknown_metric_raises_with_available():
     with pytest.raises(ValueError, match=r"^Unknown metric F1\. ") as e:
-        bubble.build_table(_three(), metrics=["ARI", "NMI", "F1"])
+        bubble._build_table(_three(), metrics=["ARI", "NMI", "F1"])
     assert "The table has ARI, NMI and iF1." in str(e.value)
 
 
 def test_unknown_method_raises_with_suggestion():
     long = _three().replace({"method": {"A": "scJoint"}})
-    tbl = bubble.build_table(long, methods=["scjoint"])      # case-insensitive: ok
+    tbl = bubble._build_table(long, methods=["scjoint"])      # case-insensitive: ok
     assert tbl.methods == ["scJoint"]
     with pytest.raises(ValueError) as e:
-        bubble.build_table(long, methods=["scjiont"])
+        bubble._build_table(long, methods=["scjiont"])
     assert str(e.value) == ("Unknown method scjiont. Did you mean scJoint? The table has "
                             "B, C and scJoint.")
 
 
 def test_metric_alias_resolves():
-    tbl = bubble.build_table(_three(), metrics=["ari", "nmi"])
+    tbl = bubble._build_table(_three(), metrics=["ari", "nmi"])
     assert list(tbl.raw.columns) == ["ARI", "NMI"]
     with pytest.raises(ValueError, match="more than once"):
-        bubble.build_table(_three(), metrics=["ARI", "ari"])
+        bubble._build_table(_three(), metrics=["ARI", "ari"])
 
 
 def test_bad_aggregate_raises():
     with pytest.raises(ValueError, match="aggregate must be 'dataset' or 'summary'"):
-        bubble.build_table(_three(), aggregate="mean")
+        bubble._build_table(_three(), aggregate="mean")
     with pytest.raises(ValueError, match="overall must be one of"):
-        bubble.build_table(_three(), overall="median")
+        bubble._build_table(_three(), overall="median")
 
 
 def test_order_reorders_without_filtering():
-    tbl = bubble.build_table(_three(), order=["A"])
+    tbl = bubble._build_table(_three(), order=["A"])
     assert tbl.methods == ["A", "C", "B"]          # A pinned first, rest best-first
     assert tbl.overall["C"] > tbl.overall["B"]
     with pytest.raises(ValueError, match=r"^Unknown method nope\. "):
-        bubble.build_table(_three(), order=["nope"])
+        bubble._build_table(_three(), order=["nope"])
 
 
 def test_duplicate_rows_raise():
     long = _three()
     with pytest.raises(ValueError, match="rows repeat the same method, metric and dataset"):
-        bubble.build_table(pd.concat([long, long]))
+        bubble._build_table(pd.concat([long, long]))
     nods = long.drop(columns=["dataset"])
     with pytest.raises(ValueError, match="rows repeat the same method and metric"):
-        bubble.build_table(pd.concat([nods, nods]))
+        bubble._build_table(pd.concat([nods, nods]))
     # a plain frame without dataset still works
-    assert bubble.build_table(nods).methods == ["C", "B", "A"]
+    assert bubble._build_table(nods).methods == ["C", "B", "A"]
 
 
 def test_multi_dataset_under_aggregate_dataset_warns():
     import matplotlib; matplotlib.use("Agg")
     two = _three(datasets=("D1", "D2"))
     with pytest.warns(UserWarning, match="summary"):
-        tbl = bubble.build_table(two)
+        tbl = bubble._build_table(two)
     assert tbl.methods == ["C", "B", "A"]             # bare names, unchanged
     assert tbl.datasets == ("D1", "D2")
     fig = bubble.render(tbl)
@@ -263,23 +247,23 @@ def test_multi_dataset_under_aggregate_dataset_warns():
     # a method present in ONE of the two datasets is tagged with that dataset
     mixed = pd.concat([two, two[(two.method == "A") & (two.dataset == "D1")].assign(method="X")])
     with pytest.warns(UserWarning):
-        fig = bubble.render(bubble.build_table(mixed))
+        fig = bubble.render(bubble._build_table(mixed))
     assert any(lab == "X · D1" for lab in [t.get_text() for t in fig.axes[0].get_yticklabels()])
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        bubble.build_table(two, aggregate="summary")   # complete matrix: silent
+        bubble._build_table(two, aggregate="summary")   # complete matrix: silent
 
 
 def test_summary_warns_on_incomplete_matrix():
     long = _three(datasets=("DS1", "DS2"))
     long = long[~((long.method == "C") & (long.dataset == "DS2"))]
     with pytest.warns(UserWarning, match="C has scores on 1 of them"):
-        tbl = bubble.build_table(long, aggregate="summary")
+        tbl = bubble._build_table(long, aggregate="summary")
     assert set(tbl.methods) == {"A", "B", "C"}
     assert tbl.coverage.to_dict() == {"A": 2, "B": 2, "C": 1}
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        bubble.build_table(_three(datasets=("DS1", "DS2")), aggregate="summary")
+        bubble._build_table(_three(datasets=("DS1", "DS2")), aggregate="summary")
 
 
 def test_summary_require_complete_restricts_and_raises():
@@ -290,20 +274,20 @@ def test_summary_require_complete_restricts_and_raises():
     # own method on one dataset vanished from the notebook's summary figure)
     with pytest.warns(UserWarning, match=r"require_complete=True dropped 1 method: "
                                          r"C lacks DS2\.") as rec:
-        tbl = bubble.build_table(long, aggregate="summary", require_complete=True)
+        tbl = bubble._build_table(long, aggregate="summary", require_complete=True)
     assert set(tbl.methods) == {"A", "B"}
     assert len([w for w in rec if "require_complete=True dropped" in str(w.message)]) == 1
     assert "Pass require_complete=False to keep them." in str(rec[0].message)
     # a complete frame stays silent under require_complete=True
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        full = bubble.build_table(_three(datasets=("DS1", "DS2")), aggregate="summary",
+        full = bubble._build_table(_three(datasets=("DS1", "DS2")), aggregate="summary",
                                   require_complete=True)
     assert set(full.methods) == {"A", "B", "C"}
     only_partial = long[((long.method == "A") & (long.dataset == "DS1"))
                         | ((long.method == "B") & (long.dataset == "DS2"))]
     with pytest.raises(ValueError, match="No method has results on all 2 datasets"):
-        bubble.build_table(only_partial, aggregate="summary", require_complete=True)
+        bubble._build_table(only_partial, aggregate="summary", require_complete=True)
 
 
 def _disagreeing():
@@ -328,14 +312,14 @@ def test_overall_basis_shared_with_bar():
         fig = mtb.plot.bar(long, **kw)
         return [t.get_text() for t in fig.axes[0].get_yticklabels()][::-1]
     for basis in ("rank", "mean_overall"):
-        bb = bubble.build_table(long, aggregate="summary", overall=basis).methods
+        bb = bubble._build_table(long, aggregate="summary", overall=basis).methods
         assert bb == bar_order(overall=basis), basis
     # defaults pin today's behaviour: bubble == 'rank', bar == 'mean_overall'
-    assert bubble.build_table(long, aggregate="summary").methods == \
-        bubble.build_table(long, aggregate="summary", overall="rank").methods
+    assert bubble._build_table(long, aggregate="summary").methods == \
+        bubble._build_table(long, aggregate="summary", overall="rank").methods
     assert bar_order() == bar_order(overall="mean_overall")
-    assert bubble.build_table(long, aggregate="summary").overall_basis == "rank"
-    tbl = bubble.build_table(long, aggregate="summary", overall="mean_overall")
+    assert bubble._build_table(long, aggregate="summary").overall_basis == "rank"
+    tbl = bubble._build_table(long, aggregate="summary", overall="mean_overall")
     assert tbl.overall_basis == "mean_overall"
 
 
@@ -343,7 +327,7 @@ def test_nan_cell_drawn_as_dash():
     import matplotlib; matplotlib.use("Agg")
     long = _three()
     long = long[~((long.method == "B") & (long.metric == "NMI"))]
-    fig = bubble.render(bubble.build_table(long))
+    fig = bubble.render(bubble._build_table(long))
     texts = [t.get_text() for t in fig.axes[0].texts]
     assert texts.count(bubble.NA_MARK) == 1
 
@@ -352,7 +336,7 @@ def test_chips_unknown_and_known(monkeypatch):
     import matplotlib; matplotlib.use("Agg")
     from matplotlib.patches import Circle
     # unknown (non-registry) methods get a '?' chip
-    fig = bubble.render(bubble.build_table(_three()))
+    fig = bubble.render(bubble._build_table(_three()))
     texts = [t.get_text() for t in fig.axes[0].texts]
     assert texts.count("?") == 3 and "L" not in texts
     # a registry method gets its language chip, and no badge for using labels
@@ -361,7 +345,7 @@ def test_chips_unknown_and_known(monkeypatch):
     class _Spec:
         language = "python"; needs_labels = True; variants = []
     monkeypatch.setattr(registry, "get", lambda name: _Spec())
-    fig = bubble.render(bubble.build_table(_three()))
+    fig = bubble.render(bubble._build_table(_three()))
     texts = [t.get_text() for t in fig.axes[0].texts]
     assert "L" not in texts and texts.count("Py") == 3
     badges = [p for p in fig.axes[0].patches if isinstance(p, Circle) and p.center[0] < 0]
@@ -376,7 +360,7 @@ def test_table_ranks_concatenates_blocks_in_figure_order():
     long = _three()
     long = pd.concat([long, pd.DataFrame({"method": ["A", "B", "C"], "metric": "GC",
                                           "value": [0.3, 0.9, 0.6], "dataset": "D1"})])
-    tbl = bubble.build_table(long, metrics=["NMI", "ARI", "GC"])
+    tbl = bubble._build_table(long, metrics=["NMI", "ARI", "GC"])
     assert list(tbl.ranks.columns) == list(tbl.norm.columns) == ["NMI", "ARI", "GC"]
     assert tbl.ranks.index.tolist() == tbl.methods
     for b in tbl.blocks:
@@ -385,7 +369,7 @@ def test_table_ranks_concatenates_blocks_in_figure_order():
 
 
 def test_table_ranks_are_max_ranks():
-    tbl = bubble.build_table(_three())
+    tbl = bubble._build_table(_three())
     n = len(tbl.methods)
     for c in tbl.ranks.columns:
         assert tbl.ranks[c].max() == n and tbl.ranks[c].min() == 1   # n = best
@@ -394,12 +378,12 @@ def test_table_ranks_are_max_ranks():
 
 
 def test_table_norm_is_matrix():
-    tbl = bubble.build_table(_three())
+    tbl = bubble._build_table(_three())
     assert tbl.norm.index.tolist() == tbl.methods
 
 
 def test_table_ranks_summary_mode():
-    tbl = bubble.build_table(_three(datasets=("D1", "D2")), aggregate="summary")
+    tbl = bubble._build_table(_three(datasets=("D1", "D2")), aggregate="summary")
     assert tbl.ranks.index.tolist() == tbl.methods
     assert list(tbl.ranks.columns) == list(tbl.norm.columns)
 
@@ -420,8 +404,8 @@ def test_figure_has_no_footnote_lines():
     long.loc[long.metric == "ARI", "value"] = 0.5                   # a grey column
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        figs = [bubble.render(bubble.build_table(long)),
-                bubble.render(bubble.build_table(_three(datasets=("D1", "D2")),
+        figs = [bubble.render(bubble._build_table(long)),
+                bubble.render(bubble._build_table(_three(datasets=("D1", "D2")),
                                                  aggregate="summary"))]
     for fig in figs:
         ax = fig.axes[0]
@@ -440,7 +424,7 @@ def _with_gap():
 def test_na_warn_default_names_method_and_rule():
     # R3-08: short sentences that name the row (no source column: plain "Row")
     with pytest.warns(UserWarning, match=r"Row B \(D1\) has no NMI\.") as rec:
-        tbl = bubble.build_table(_with_gap())
+        tbl = bubble._build_table(_with_gap())
     msg = str([w for w in rec if "has no NMI" in str(w.message)][0].message)
     assert "Pass metrics= without NMI to compare on the same metrics." in msg   # Y29 (r3)
     assert tbl.na_cells == ["B: DR and clustering Overall over 2 of 3 metrics (NMI n/a)"]
@@ -451,23 +435,28 @@ def test_na_warn_default_names_method_and_rule():
 
 
 def test_na_skip_and_raise():
-    # build_table(na=) is deprecated in 0.4.0 (X41) and keeps its effect
-    with pytest.warns(FutureWarning, match=r"plot.build_table\(na=\) is deprecated"):
-        bubble.build_table(_three(), na="skip")
+    # build_table is deprecated in 0.4.0 as a whole: its na= adds no second warning
+    with warnings.catch_warnings(record=True) as rec:
+        warnings.simplefilter("always")
+        import multibench as mtb
+        mtb.plot.build_table(_three(), na="skip")
+    assert [str(w.message) for w in rec] == [
+        "plot.build_table is deprecated and will be removed in 0.5. Use "
+        "mtb.recommend(category, long_df=...)."]
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         warnings.simplefilter("ignore", FutureWarning)
-        tbl = bubble.build_table(_with_gap(), na="skip")
+        tbl = bubble._build_table(_with_gap(), na="skip")
     assert tbl.na_cells == ["B: DR and clustering Overall over 2 of 3 metrics (NMI n/a)"]
     with pytest.raises(ValueError, match=r"Row B \(D1\) has no NMI\."):
-        bubble.build_table(_with_gap(), na="raise")
+        bubble._build_table(_with_gap(), na="raise")
     with pytest.raises(ValueError, match="na must be one of"):
-        bubble.build_table(_with_gap(), na="worst")
+        bubble._build_table(_with_gap(), na="worst")
     # a complete frame is silent under every policy
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         warnings.simplefilter("ignore", FutureWarning)
-        assert bubble.build_table(_three(), na="raise").na_cells == []
+        assert bubble._build_table(_three(), na="raise").na_cells == []
 
 
 def test_na_rule_in_summary_mode_is_rank_zero():
@@ -476,7 +465,7 @@ def test_na_rule_in_summary_mode_is_rank_zero():
     # the message says 'lowest rank': the legend reads 1 = best
     with pytest.warns(UserWarning, match=r"Row B has no NMI on D2\. In the summary, "
                                          r"a missing value counts as the lowest rank"):
-        tbl = bubble.build_table(long, aggregate="summary")
+        tbl = bubble._build_table(long, aggregate="summary")
     assert tbl.na_cells == ["B: NMI n/a in D2 -> rank 0 there"]
 
 
@@ -495,7 +484,7 @@ def test_radius_uses_methods_scored_in_the_column():
     from matplotlib.patches import Circle
     long = _three()
     long = long[~((long.method == "B") & (long.metric == "NMI"))]
-    tbl = bubble.build_table(long, na="skip")
+    tbl = bubble._build_table(long, na="skip")
     fig = bubble.render(tbl)
     ax = fig.axes[0]
     circles = [c for c in ax.patches if isinstance(c, Circle) and c.get_zorder() == 3
@@ -513,7 +502,7 @@ def test_circles_of_values_tied_by_rounding_have_one_size():
     rows = [dict(metric=k, value=v, method=m, dataset="D1")
             for m, ari, il in (("A", .5, 0.0), ("B", .6, 2.2e-16), ("C", .7, 4.4e-16))
             for k, v in (("ARI", ari), ("iLISI", il))]
-    tbl = B.build_table(pd.DataFrame(rows))
+    tbl = B._build_table(pd.DataFrame(rows))
     x_ilisi = max(c.center[0] for c in B.render(tbl).axes[0].patches if isinstance(c, Circle))
     radii = {round(c.radius, 6) for c in B.render(tbl).axes[0].patches
              if isinstance(c, Circle) and c.center[0] == x_ilisi}

@@ -133,7 +133,7 @@ def test_plot_incomplete_fix_follows_the_caller(cli_mode, monkeypatch):
         assert "--methods" in bar[0] and "long_df" not in bar[0]
     else:
         assert "require_complete=True" in bub[0] and "--require-complete" not in bub[0]
-        assert "long_df" in bar[0] and "--methods" not in bar[0]
+        assert "methods=" in bar[0] and "--methods" not in bar[0]
 
 
 def test_json_output_keeps_slashes_unescaped(capsys):
@@ -243,7 +243,9 @@ def test_strict_assume_gpu_passes_a_gpu_only_method(login_node, capsys):
                    "--strict", "--assume-gpu"])
     cap = capsys.readouterr()
     assert rc == 0, cap.err
-    assert cap.err == ""
+    # 0.4.0: --strict is deprecated and says so; --assume-gpu is hidden, silent
+    assert cap.err == ("warning: scan --strict is deprecated and will be removed in 0.5. "
+                       "Use the exit code of multibench run-all.\n")
 
 
 def test_strict_counts_the_gpu_test_on_its_own(login_node, capsys):
@@ -320,7 +322,7 @@ def test_cli_run_all_dry_run_takes_assume_gpu(login_node, capsys):
 # ------------------------------------------------------------------- M29
 def test_h5mu_labels_spelling_is_one_and_documented():
     lay = mtb.describe_layout("mosaic")
-    h5mu = [l for l in lay.splitlines() if ".h5mu" in l and "convert" in l]
+    h5mu = [l for l in lay.splitlines() if ".h5mu" in l and "multibench export" in l]
     assert h5mu and all("--labels rna:cell_type" in l for l in h5mu)
     epi = [l for l in cli._CONVERT_EPILOG.splitlines() if ".h5mu" in l]
     assert epi and all("--labels rna:cell_type" in l for l in epi)

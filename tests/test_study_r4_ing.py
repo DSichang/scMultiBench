@@ -9,6 +9,7 @@
   ``scan`` keeps such rows runnable, with the caveat.
 """
 import os
+import argparse
 import re
 import shutil
 import stat
@@ -185,6 +186,11 @@ def test_config_keeps_the_fetch_hint_for_an_empty_folder(host, monkeypatch):
 
 
 # ================================================= (2) --strict: scripts not fetched
+#: 0.4.0: scan --strict is deprecated; its first stderr line says so
+STRICT_DEPRECATED = ("warning: scan --strict is deprecated and will be removed in 0.5. "
+                     "Use the exit code of multibench run-all.\n")
+
+
 @pytest.mark.parametrize("make", [True, False], ids=["empty folder", "no folder"])
 def test_scan_strict_fails_while_the_scripts_are_not_fetched(host, monkeypatch, capsys,
                                                              make):
@@ -200,8 +206,8 @@ def test_scan_strict_fails_while_the_scripts_are_not_fetched(host, monkeypatch, 
     capsys.readouterr()
     assert cli.main(MATILDA + ["--strict"]) == 1
     err = capsys.readouterr().err
-    assert err.startswith("error: --strict: 0 of 1 row is runnable. Rows whose method "
-                          "scripts are not fetched: 1.")
+    assert err.startswith(STRICT_DEPRECATED + "error: --strict: 0 of 1 row is runnable. "
+                          "Rows whose method scripts are not fetched: 1.")
     assert "  Matilda: The method scripts are not fetched.\n" in err
     assert err.rstrip().endswith("Run multibench fetch --scripts first.")
     assert "no row" not in err
@@ -214,8 +220,9 @@ def test_scan_strict_names_fetch_without_methods(host, monkeypatch, capsys):
     err = capsys.readouterr().err
     # the rows blocked only by the scripts have no reason: the head does not
     # send the reader to that column
+    assert err.startswith(STRICT_DEPRECATED)
     assert re.search(r"^error: --strict: 0 of (\d+) rows are runnable\. Rows whose method "
-                     r"scripts are not fetched: \1\.\n", err), err
+                     r"scripts are not fetched: \1\.\n", err, re.M), err
     assert "reason column" not in err
     assert err.rstrip().endswith("Run multibench fetch --scripts first.")
 
@@ -249,10 +256,8 @@ def test_scan_strict_passes_once_the_scripts_are_fetched(host, monkeypatch, caps
     assert cli.main(MATILDA + ["--strict"]) == 0, capsys.readouterr().err
 
 
-def test_scan_strict_help_names_the_scripts():
+def test_scan_strict_is_hidden_from_help():
+    # 0.4.0: --strict is deprecated; it parses but --help leaves it out
     act = next(a for a in cli.build_parser()._subparsers._group_actions[0]
                .choices["scan"]._actions if a.dest == "strict")
-    text = " ".join(act.help.split())
-    assert "or when the method scripts are not fetched. Example: " in text
-    assert text.startswith("exit 1 when no requested row is runnable, when a method "
-                           "named in --methods has none")
+    assert act.help == argparse.SUPPRESS

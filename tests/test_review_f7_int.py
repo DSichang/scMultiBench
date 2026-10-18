@@ -39,23 +39,24 @@ def _doc(obj) -> str:
 
 
 # ======================================================================= R7-10
-def test_scan_summary_names_doctor_on_linux_when_an_environment_is_missing(monkeypatch,
+def test_scan_summary_names_install_on_linux_when_an_environment_is_missing(monkeypatch,
                                                                             capsys):
     monkeypatch.setattr(R, "linux_only_sentence", lambda: None)
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     full_scan("D11", "vertical", modalities="all")
     line = capsys.readouterr().out.strip()
     assert line.startswith("[scan] ") and line.endswith(
-        " have their environment installed. mtb.env.doctor() checks the environments."), line
+        " have their environment installed. mtb.env.install(dry_run=True) checks the "
+        "environments."), line                  # 0.4: env.doctor is deprecated
     monkeypatch.setattr(config, "_CLI", True)
     full_scan("D11", "vertical", modalities="all")
     assert capsys.readouterr().out.strip().endswith(
-        "multibench env doctor checks the environments.")
+        "multibench env install --dry-run checks the environments.")
     # every environment installed: nothing to check
     monkeypatch.setattr(config, "_CLI", False)
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     full_scan("D11", "vertical")
-    assert "doctor" not in capsys.readouterr().out
+    assert "checks the environments" not in capsys.readouterr().out
 
 
 def test_env_reason_names_the_category_in_a_sentence(monkeypatch):
@@ -127,17 +128,18 @@ def test_missing_batch_file_on_the_cli(tmp_path, monkeypatch, capsys):
 # ============================================================ describe_layout
 def test_diagonal_layout_points_to_its_own_list(monkeypatch):
     text = mtb.describe_layout("diagonal")
+    # 0.4: mtb.run is deprecated; the layout says that scan and run_all skip a
+    # method whose ATAC file holds the other representation
     assert "method_info(m)['atac']" not in text
-    assert "mtb.run only warns, so check the list above first." in text
     assert "need both files:       MultiMAP, Seurat_v3" in text
+    assert "mtb.scan and mtb.run_all skip such a method." in text
+    assert "only warns" not in text
     monkeypatch.setattr(config, "_CLI", True)
     cli_text = mtb.describe_layout("diagonal")
-    assert "multibench run only warns, so check the list above first." in cli_text
+    assert "only warns" not in cli_text
     assert "multibench info METHOD" not in cli_text
-    # vertical has no method that reads two files: the pointer is right there
     monkeypatch.setattr(config, "_CLI", False)
-    assert ("mtb.run only warns, so check method_info(m)['atac'] first."
-            in mtb.describe_layout("vertical"))
+    assert "only warns" not in mtb.describe_layout("vertical")
 
 
 # ====================================================== several-datasets warning
@@ -311,8 +313,9 @@ def test_method_info_returns_and_raises_read_as_a_card():
     assert "(" not in returns and ";" not in returns
     assert "declared stub" not in raises
     flat = " ".join(doc.split())
-    # params moved to verbose=True in 0.4.0 (X40)
-    assert "``params`` (per variant, as ``mtb.params_for``)" in flat
+    # 0.4: method_info(verbose=) is deprecated; the card points at params_for
+    assert "``params`` (per variant" not in flat
+    assert "mtb.params_for : the hyperparameters of one variant" in flat
 
 
 # ==================================================== docs pages
@@ -369,13 +372,13 @@ def test_changes_page_lists_the_review_changes():
 
 
 @needs_docs
-def test_plot_page_says_what_require_complete_does_where_it_is_asked_for():
+def test_plot_page_says_how_to_keep_the_methods_scored_everywhere():
     text = _flat("tutorials/plot.md")
-    assert ("A summary compares methods scored on the same datasets. "
-            "`require_complete=True` keeps only the methods scored on every dataset.") in text
-    assert "Use `require_complete=True`." not in text
+    # 0.4: require_complete= is deprecated; methods= keeps the methods scored on
+    # every dataset
+    assert "require_complete" not in text
+    assert ("A method missing from a dataset ranks last there. A warning lists these "
+            "methods; `methods=` keeps the ones scored on every dataset.") in text
     # the subsample tables left in 0.4.0 (X04): the page says a summary needs datasets
     # of your own
-    assert "The stored tables hold one dataset per category" in text
-    # said once on the page
-    assert text.count("keeps only the methods") == 1
+    assert "The stored results hold one dataset per category" in text

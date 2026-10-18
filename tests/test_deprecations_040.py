@@ -9,15 +9,22 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+# the table behind a bubble figure: mtb.plot.build_table is deprecated in 0.4.0
+from multibench.plot.bubble import _build_table  # noqa: E402
 from multibench import cli
+
+
+def _future(call):
+    """``(result, messages)`` of ``call()``: the FutureWarnings it emitted, in order."""
+    with warnings.catch_warnings(record=True) as rec:
+        warnings.simplefilter("always")
+        out = call()
+    return out, [str(w.message) for w in rec if issubclass(w.category, FutureWarning)]
 
 
 def _one_warning(call):
     """``(result, message)`` of ``call()``, which must emit exactly one FutureWarning."""
-    with warnings.catch_warnings(record=True) as rec:
-        warnings.simplefilter("always")
-        out = call()
-    future = [str(w.message) for w in rec if issubclass(w.category, FutureWarning)]
+    out, future = _future(call)
     assert len(future) == 1, future
     return out, future[0]
 
@@ -59,7 +66,7 @@ def test_find_methods_runnable_still_filters():
     for value, want in ((True, mtb.find_methods("vertical")), (False, [])):
         got, msg = _one_warning(lambda: mtb.find_methods("vertical", runnable=value))
         assert got == want
-        assert msg == _msg("find_methods(runnable=)", "scan")
+        assert msg == _msg("find_methods(runnable=)", "mtb.scan")
 
 
 def test_cite_fmt_is_format():
@@ -70,25 +77,32 @@ def test_cite_fmt_is_format():
 
 
 # ------------------------------------------------------------------ run
+#: run itself is deprecated in 0.4.0; a deprecated keyword of it adds its own warning
+RUN_MSG = _msg("run", "mtb.run_all(dataset, category, methods=[method])")
+
+
 def test_run_task_has_no_effect_and_convert_still_works():
     inp = mtb.inputs_for("D11", "vertical", "Matilda", modalities=["rna", "adt"])
-    ref = mtb.run("Matilda", "vertical", inputs=inp, out_dir="o", dry_run=True)
-    got, msg = _one_warning(lambda: mtb.run("Matilda", "vertical", inputs=inp, out_dir="o",
-                                            dry_run=True, task="clustering"))
-    assert got == ref and msg == _msg("run(task=)")
-    got, msg = _one_warning(lambda: mtb.run("Matilda", "vertical", inputs=inp, out_dir="o",
-                                            dry_run=True, convert=False))
+    ref, msgs = _future(lambda: mtb.run("Matilda", "vertical", inputs=inp, out_dir="o",
+                                        dry_run=True))
+    assert msgs == [RUN_MSG]
+    got, msgs = _future(lambda: mtb.run("Matilda", "vertical", inputs=inp, out_dir="o",
+                                        dry_run=True, task="clustering"))
+    assert got == ref and msgs == [RUN_MSG, _msg("run(task=)")]
+    got, msgs = _future(lambda: mtb.run("Matilda", "vertical", inputs=inp, out_dir="o",
+                                        dry_run=True, convert=False))
     assert got == ref
-    assert msg == _msg("run(convert=)", note="run converts the inputs it needs itself")
+    assert msgs == [RUN_MSG, _msg("run(convert=)",
+                                  note="run converts the inputs it needs itself")]
 
 
 def test_run_repo_path_still_points_at_the_scripts():
     inp = mtb.inputs_for("D11", "vertical", "Matilda", modalities=["rna", "adt"])
     repo = mtb.config.DEFAULT.repo_path
-    got, msg = _one_warning(lambda: mtb.run("Matilda", "vertical", inputs=inp, out_dir="o",
-                                            dry_run=True, repo_path=repo))
+    got, msgs = _future(lambda: mtb.run("Matilda", "vertical", inputs=inp, out_dir="o",
+                                        dry_run=True, repo_path=repo))
     assert got == mtb.run("Matilda", "vertical", inputs=inp, out_dir="o", dry_run=True)
-    assert msg == _msg("run(repo_path=)", "config.DEFAULT.repo_path")
+    assert msgs == [RUN_MSG, _msg("run(repo_path=)", "config.DEFAULT.repo_path")]
 
 
 def test_scan_per_method_still_works():
@@ -114,15 +128,16 @@ def test_evaluate_output_and_clustering_keywords():
     rng = np.random.default_rng(0)
     emb, labels = rng.normal(size=(60, 4)), np.repeat(["a", "b", "c"], 20)
     clusters = np.repeat([0, 1, 2], 20)
-    ref = mtb.evaluate(emb, labels, metrics=["ARI"], clusters=clusters, verbose=False)
+    ref = mtb.evaluate(emb, labels, metrics=["ARI"], verbose=False)
     got, msg = _one_warning(lambda: mtb.evaluate(output=emb, labels=labels, metrics=["ARI"],
-                                                 clusters=clusters, verbose=False))
+                                                 verbose=False))
     pd.testing.assert_frame_equal(got, ref)
     assert msg == _msg("evaluate(output=)", "embedding=")
+    # clustering= keeps its effect: the given clusters match the labels exactly
     got, msg = _one_warning(lambda: mtb.evaluate(emb, labels, metrics=["ARI"],
                                                  clustering=clusters, verbose=False))
-    pd.testing.assert_frame_equal(got, ref)
-    assert msg == _msg("evaluate(clustering=)", "clusters=")
+    assert got.set_index("metric")["value"]["ARI"] == 1.0
+    assert msg == _msg("evaluate(clustering=)", "the default, the article's Leiden clusters")
 
 
 # ------------------------------------------------------------------ stored results
@@ -130,8 +145,8 @@ def test_source_still_reads_the_published_tables():
     got, msg = _one_warning(lambda: mtb.load_results("vertical", dataset="D11",
                                                      source="published"))
     assert set(got.source) == {"published"}
-    assert msg == _msg("load_results(source=)", note="leave it out to read the re-run tables")
-    assert set(mtb.load_results("vertical", dataset="D11").source) == {"rerun"}
+    assert msg == _msg("load_results(source=)", note="leave it out to read the stored results")
+    assert set(mtb.load_results("vertical", dataset="D11").source) == {"stored"}
 
 
 def test_result_path_and_clustering_still_work(result_dir):
@@ -148,25 +163,29 @@ def test_result_path_and_clustering_still_work(result_dir):
 
 def test_available_datasets_still_lists_the_published_tables():
     got, msg = _one_warning(mtb.available_datasets)
-    # during 0.4.x it lists what results_coverage lists (X59), not 0.3's published ids
-    assert got == sorted(mtb.results_coverage().dataset.unique())
+    # during 0.4.x it lists the datasets with stored results (X59), not 0.3's published ids
+    cat = mtb.catalog.datasets()
+    stored = sorted(cat[cat.has_results].dataset)
+    assert got == stored
     got, _ = _one_warning(lambda: mtb.available_datasets(source="published"))
     assert got == ["D11", "D24", "D25", "D28", "D52"]
     got, _ = _one_warning(lambda: mtb.available_datasets(source="rerun"))
-    assert got == sorted(mtb.results_coverage().dataset.unique())
-    assert msg == _msg("available_datasets", "results_coverage")
+    assert got == stored
+    assert msg == _msg("available_datasets", "mtb.catalog.datasets()")
 
 
 def test_results_coverage_and_recommend_source():
-    _, msg = _one_warning(lambda: mtb.results_coverage("vertical", source="rerun"))
-    assert msg == _msg("results_coverage(source=)",
-                       note="leave it out to read the re-run tables")
+    _, msgs = _future(lambda: mtb.results_coverage("vertical", source="rerun"))
+    # results_coverage itself is deprecated in 0.4.0; source= adds its own warning
+    assert msgs == [_msg("results_coverage", "mtb.load_results(category)"),
+                    _msg("results_coverage(source=)",
+                         note="leave it out to read the stored results")]
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
         ref = mtb.recommend("vertical")
         got, msg = _one_warning(lambda: mtb.recommend("vertical", source="rerun"))
     pd.testing.assert_frame_equal(got, ref)
-    assert msg == _msg("recommend(source=)", note="leave it out to read the re-run tables")
+    assert msg == _msg("recommend(source=)", note="leave it out to read the stored results")
 
 
 # ------------------------------------------------------------------ catalog / io / plot / env
@@ -215,7 +234,7 @@ def test_io_normalize_peak_names(tmp_path):
     fn(src, dst)
     with h5py.File(dst) as h:
         assert [x.decode() for x in h["matrix/features"][:]] == ["chr1:1-200", "chr2:5-9"]
-    assert msg == _msg("io.normalize_peak_names", note="run renames the peaks itself")
+    assert msg == _msg("io.normalize_peak_names", note="a run renames the peaks itself")
     assert "normalize_peak_names" not in mtb.io.__all__ + dir(mtb.io)
 
 
@@ -257,9 +276,10 @@ def test_bar_group_is_metrics_and_the_styling_keywords_keep_their_effect():
                                      value=d11.value[::-1].to_numpy())])
     plain = _pixels(mtb.plot.bar(two, overall="mean_overall"))
     for kw, value in (("cmap", "Reds"), ("show_datasets", False)):
-        fig, msg = _one_warning(lambda: mtb.plot.bar(two, overall="mean_overall",
-                                                     **{kw: value}))
-        assert msg == _msg(f"plot.bar({kw}=)", note=BAR_TAILS[kw])
+        fig, msgs = _future(lambda: mtb.plot.bar(two, overall="mean_overall", **{kw: value}))
+        # overall= is deprecated in 0.4.0 too (X: bar's slim signature)
+        assert msgs == [_msg("plot.bar(overall=)", "the default"),
+                        _msg(f"plot.bar({kw}=)", note=BAR_TAILS[kw])]
         assert _pixels(fig) != plain, kw
     from matplotlib.collections import PathCollection        # the dots: a scatter
     dots = mtb.plot.bar(two, overall="mean_overall", show_datasets=True)
@@ -300,10 +320,16 @@ def test_bubble_na_keeps_its_effect():
     plt.close("all")
 
 
-def test_bar_and_bubble_share_the_rank_default():
+def test_bar_and_bubble_overall_is_deprecated_and_rank_is_the_default():
     import inspect
-    for fn in (mtb.plot.bar, mtb.plot.bubble):
-        assert inspect.signature(fn).parameters["overall"].default == "rank"
+    import matplotlib.pyplot as plt
+    for name in ("bar", "bubble"):
+        fn = getattr(mtb.plot, name)
+        assert "overall" not in inspect.signature(fn).parameters
+        fig, msg = _one_warning(lambda: fn(_long(), overall="rank"))
+        assert msg == _msg(f"plot.{name}(overall=)", "the default")
+        assert _pixels(fig) == _pixels(fn(_long()))
+    plt.close("all")
 
 
 def test_export_dataset_compression_still_works(tmp_path):
@@ -336,7 +362,7 @@ def test_export_dataset_reads_the_atac_kind_from_the_names(tmp_path):
         mtb.io.export_dataset(None, tmp_path / "Q", rna=rna, atac=odd)
 
 
-@pytest.mark.parametrize("name, new", [("status", "env.doctor"),
+@pytest.mark.parametrize("name, new", [("status", "env.install(methods, dry_run=True)"),
                                        ("plan", "env.install(['Matilda'], dry_run=True)")])
 def test_env_names(name, new):
     rows, msg = _one_warning(lambda: getattr(mtb.env, name)(**({} if name == "status" else
@@ -362,7 +388,7 @@ def test_names_left_the_top_level():
                  "eval"):
         assert name not in mtb.__all__ and name not in dir(mtb)
     assert callable(mtb.eval.evaluate)          # importable, not listed
-    assert dir(mtb.eval) == sorted(["evaluate", "to_long"] + [
+    assert dir(mtb.eval) == sorted(["evaluate"] + [          # to_long: deprecated in 0.4.0
         n for n in dir(mtb.eval) if n.startswith("__")])
     assert [n for n in dir(mtb.data) if not n.startswith("_")] == sorted(mtb.data.__all__)
 
@@ -390,9 +416,12 @@ def test_cli_help_hides_the_deprecated_commands_and_flags():
         for flag in flags:
             assert flag not in text, (cmd, flag)
     # the embedding is the first argument since 0.4.0 (X19); --embedding is hidden
-    assert "EMBEDDING" in _help("evaluate") and "--clusters" in _help("evaluate")
-    assert "--build" in _help("env", "install") and "--packed" not in _help("env", "install")
-    assert "advanced" in _help("run") and "advanced" in _help("run-all")
+    assert "EMBEDDING" in _help("evaluate") and "--clusters" not in _help("evaluate")
+    # env install --build is hidden in 0.4.0 (maintainer page)
+    assert "--build" not in _help("env", "install") and "--packed" not in _help("env", "install")
+    # run is a hidden deprecated command in 0.4.0; its help says so
+    assert "\n    run " not in top and "\n    convert " not in top
+    assert _help("run").split("\n\n")[1].startswith("Deprecated: use multibench run-all")
 
 
 def _cli(*argv):
@@ -410,16 +439,16 @@ def test_cli_deprecated_commands_warn_once_and_work():
            "find." in err
     code, out, err = _cli("find", "--category", "vertical", "--runnable")
     assert out.split() == mtb.find_methods("vertical")
-    assert err.strip() == "warning: --runnable is deprecated and will be removed in 0.5. " \
-                          "Use multibench scan."
+    assert err.strip() == "warning: find --runnable is deprecated and will be removed in " \
+                          "0.5. Use multibench scan."
     code, out, err = _cli("find", "--task", "dimension_reduction")
     assert out.split() == ["Matilda", "sciPENN"]
-    assert err.strip() == "warning: --task is deprecated and will be removed in 0.5; it " \
-                          "has no replacement."          # task took metric families (X58)
+    assert err.strip() == "warning: find --task is deprecated and will be removed in 0.5; " \
+                          "it has no replacement."          # task took metric families (X58)
     code, out, err = _cli("env", "groups")
     assert code == 0 and "scmb_torch" in out
     assert "multibench env groups is deprecated and will be removed in 0.5. Use multibench " \
-           "env doctor." in err
+           "env install --dry-run." in err
 
 
 def test_cli_cite_prints_text_by_default():
@@ -434,7 +463,7 @@ def test_fetch_outputs_is_deprecated_and_still_served():
     assert "fetch_outputs" not in mtb.data.__all__ and "fetch_outputs" not in dir(mtb.data)
     got, msg = _one_warning(lambda: mtb.data.fetch_outputs)
     assert got is F.fetch_outputs
-    assert msg == _msg("data.fetch_outputs", note="use mtb.load_results for the stored scores")
+    assert msg == _msg("data.fetch_outputs", note="use mtb.load_results for the stored results")
 
 
 def test_cli_fetch_outputs_is_hidden_and_warns_once(monkeypatch, tmp_path):
@@ -444,10 +473,10 @@ def test_cli_fetch_outputs_is_hidden_and_warns_once(monkeypatch, tmp_path):
     monkeypatch.setattr(F, "fetch_outputs",
                         lambda ds, **kw: calls.append(ds) or tmp_path / "outputs" / ds)
     assert "--outputs" not in _help("fetch") and "stored outputs" not in _help()
-    code, out, err = _cli("fetch", "D11", "--outputs", "--data-path", str(tmp_path))
+    code, out, err = _cli("fetch", "D11", "--outputs")
     assert code == 0 and calls == ["D11"]
-    assert err.strip() == ("warning: --outputs is deprecated and will be removed in 0.5; "
-                           "use multibench plot for the stored scores.")
+    assert err.strip() == ("warning: fetch --outputs is deprecated and will be removed in 0.5; "
+                           "use multibench plot for the stored results.")
 
 
 def test_bubble_table_matrix_is_norm():
@@ -455,7 +484,7 @@ def test_bubble_table_matrix_is_norm():
     long = pd.DataFrame([{"method": m, "metric": k, "value": v, "dataset": "D"}
                          for m, v in (("A", 0.9), ("B", 0.5), ("C", 0.1))
                          for k in ("ARI", "NMI")])
-    tbl = mtb.plot.build_table(long)
+    tbl = _build_table(long)
     got, msg = _one_warning(lambda: tbl.matrix)
     assert got is tbl.norm
     assert msg == _msg("BubbleTable.matrix", "BubbleTable.norm")

@@ -390,7 +390,10 @@ def test_import_multibench_stays_light():
     assert out.split() == ["False", "False"]
     src = (ROOT / "multibench" / "data" / "examples.py").read_text()
     top = [ln for ln in src.splitlines() if re.match(r"(import|from) ", ln)]
-    assert top == ["from __future__ import annotations", "import os", "from pathlib import Path"]
+    # 0.4.0: the deprecation helper and DATA_KEYWORDS come from the package itself
+    # (light: the subprocess above shows that neither loads anndata or scanpy)
+    assert [ln for ln in top if not ln.startswith("from .")] == [
+        "from __future__ import annotations", "import os", "from pathlib import Path"]
 
 
 def test_write_example_returns_the_folder(tmp_path):

@@ -1,4 +1,4 @@
-"""The stored re-run tables and recommend: what they hold and how they rank."""
+"""The stored results and recommend: what they hold and how they rank."""
 from __future__ import annotations
 
 import warnings
@@ -40,12 +40,13 @@ def test_x03_conos_rows_left_the_d28_table():
 
 
 def test_x04_one_stored_table_per_category():
-    cov = mtb.results_coverage()
-    assert cov.groupby("category").dataset.nunique().to_dict() == {
+    cat = mtb.catalog.datasets()
+    stored = cat[cat.has_results]
+    assert stored.groupby("category").dataset.nunique().to_dict() == {
         "cross": 1, "diagonal": 1, "mosaic": 1, "vertical": 1}
-    assert not cov.dataset.str.endswith("s").any()
-    r = mtb.recommend("diagonal")
-    assert set(r.loc[r.grand_score.notna(), "n_datasets"]) == {1}
+    assert not stored.dataset.str.endswith("s").any()
+    # recommend's n_datasets column left in 0.4.0: the stored results hold one dataset
+    assert set(mtb.load_results("diagonal").dataset) == {"D28"}
 
 
 def test_x04_bar_of_one_dataset_has_no_whiskers():
@@ -92,10 +93,10 @@ def test_x14_rows_repeating_stored_rows_are_refused(fn):
     both = pd.concat([d28, d28[d28.method == "iNMF"].assign(source="user")])
     call = (lambda: mtb.recommend("diagonal", long_df=both)) if fn == "recommend" \
         else (lambda: mtb.plot.bar(both))
-    with pytest.raises(ValueError, match=r"Your rows and the stored table both have iNMF "
+    with pytest.raises(ValueError, match=r"Your rows and the stored results both have iNMF "
                                          r"on D28\. Give your rows another name, e\.g\. "
                                          r"rows\.assign\(method=rows\.method \+ "
-                                         r"\"_rerun\"\)\."):
+                                         r"' \(this run\)'\)\."):
         call()
 
 
@@ -103,12 +104,15 @@ def test_x16_the_rename_advice_works_on_a_long_frame():
     d11 = _d11()
     rows = d11[d11.method == "scMM"].assign(source="user")
     # Y23 (r3): the advice keeps each method its own name
-    with pytest.raises(ValueError, match=r'rows\.assign\(method=rows\.method \+ "_rerun"\)') as e:
-        mtb.plot.build_table(pd.concat([d11, rows]))
+    # 0.4.0: the suffix is " (this run)"; recommend(long_df=) replaces build_table
+    with pytest.raises(ValueError, match=r"rows\.assign\(method=rows\.method \+ "
+                                         r"' \(this run\)'\)") as e:
+        mtb.recommend("vertical", long_df=pd.concat([d11, rows]))
     assert "to_long(method" not in str(e.value)
     # the advice runs as written
-    fixed = rows.assign(method=rows.method + "_rerun")
-    mtb.plot.build_table(pd.concat([d11, fixed]))
+    fixed = rows.assign(method=rows.method + " (this run)")
+    r, _ = _messages(mtb.recommend, "vertical", long_df=pd.concat([d11, fixed]))
+    assert "scMM (this run)" in set(r.method)
 
 
 def test_x89_batch_family_on_vertical_says_why():

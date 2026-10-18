@@ -48,8 +48,8 @@ def _evaluate(h5ad, *flags):
 
 
 def _values(path):
-    # iLISI is NaN where the LISI backend is unavailable
-    return pd.read_csv(path, index_col=0)["Value"].round(6).fillna(-1).to_dict()
+    # iLISI is NaN where the LISI backend is unavailable; evaluate writes the long table
+    return pd.read_csv(path).set_index("metric")["value"].round(6).fillna(-1).to_dict()
 
 
 def _dry_run(data, *flags):
@@ -78,7 +78,7 @@ def test_evaluate_batch_column_scores_as_a_one_column_barcode_file(tmp_path):
     assert _values(tmp_path / "both") == want
     assert want["ASW_batch"] < 0.5             # the file sees the sample shift
     py = mtb.evaluate(a, labels="celltype", batch="sample", metrics=METRICS)
-    assert want == py["Value"].round(6).fillna(-1).to_dict()
+    assert want == py.set_index("metric")["value"].round(6).fillna(-1).to_dict()
 
 
 def test_run_all_batch_column_dry_run_and_run(batchy, tmp_path, capsys):
@@ -107,13 +107,12 @@ def test_batch_column_without_batch_is_a_usage_error(command, tmp_path, capsys):
     assert "--batch-column needs --batch" in capsys.readouterr().err
 
 
-def test_batch_column_help_is_one_line(capsys):
+def test_batch_column_is_hidden_from_help(capsys):
+    # 0.4.0: --batch-column is deprecated; it parses but --help leaves it out
     for command in ("evaluate", "run-all"):
         with pytest.raises(SystemExit):
             cli.main([command, "--help"])
-        text = " ".join(capsys.readouterr().out.split())
-        assert ("--batch-column NAME the column to read in the --batch CSV when it has "
-                "several columns") in text, command
+        assert "--batch-column" not in capsys.readouterr().out, command
 
 
 # ============================================================ the error text

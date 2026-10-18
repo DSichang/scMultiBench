@@ -547,7 +547,6 @@ def test_a_file_name_left_unchanged_is_visible(key, changed, cells, linux, tmp_p
 
 
 @pytest.mark.parametrize("key,files", [
-    ("diagonal_multi", "rna3.h5 and 3 more files of batch 3, above n_batches=2."),
     ("cross_rna_adt", "rna3.h5 and 2 more files of batch 3."),
 ])
 def test_fewer_batches_than_the_folder_holds_are_refused(key, files, tmp_path, monkeypatch):
@@ -563,18 +562,10 @@ def test_fewer_batches_than_the_folder_holds_are_refused(key, files, tmp_path, m
     folder = Path("mydata") / NAMES[key]
     before = _bytes(folder)
     export = src[EXPORT]
-    if key == "diagonal_multi":
-        # the loop takes its batches from the two lists
-        assert "`n_batches` says how many batches the data has." in src[5]
-        for three, two in (("rna = [rna1, rna2, rna3]", "rna = [rna1, rna2]"),
-                           ("atac = [atac1, atac2, atac3]", "atac = [atac1, atac2]")):
-            assert export.count(three) == 1
-            export = export.replace(three, two)
-    else:
-        assert ("When the folder holds batches that your data does not have, "
-                "`export_dataset` stops and names the files. A new value of `NAME` avoids "
-                "that.") in src[5]
-        ns["adata"] = ns["adata"][ns["adata"].obs["batch"].astype(str) != "3"].copy()
+    assert ("When the folder holds batches that your data does not have, "
+            "`export_dataset` stops and names the files. A new value of `NAME` avoids "
+            "that.") in src[5]
+    ns["adata"] = ns["adata"][ns["adata"].obs["batch"].astype(str) != "3"].copy()
     with pytest.raises(FileExistsError) as e:
         _run_cell(export, ns)
     assert str(e.value) == f"{folder} holds {files} Export to a new folder."
@@ -582,6 +573,38 @@ def test_fewer_batches_than_the_folder_holds_are_refused(key, files, tmp_path, m
     _run_cell(_renamed(export, key, "MINE"), ns)
     assert not [p.name for p in (Path("mydata") / "MINE").iterdir() if "3" in p.name]
     assert _bytes(folder) == before
+
+
+def test_fewer_batches_in_the_diagonal_loop_need_a_new_name(tmp_path, monkeypatch):
+    """0.4.0: the diagonal loop no longer passes the deprecated ``n_batches=``.
+    A call with ``batch_index=`` checks its own batch number only, so a
+    reader with two batches who leaves ``NAME`` keeps the example's third
+    batch in the folder; the Details say so and tell them to give ``NAME`` a
+    new value, which avoids it."""
+    key = "diagonal_multi"
+    _on_disk(key)
+    monkeypatch.chdir(tmp_path)
+    src, ns = _sources(key), _namespace(key)
+    assert "n_batches" not in "\n".join(s for _, s in _cells(key))
+    details = next(t for _, t in _cells(key) if "Details: export" in t)
+    assert ("A call with `batch_index=` checks the files of its own batch number. Files of "
+            "other batch numbers stay: for data with fewer batches, give `NAME` a new "
+            "value.") in " ".join(details.split())
+    for i in (EXAMPLE, READ, EXPORT):
+        _run_cell(src[i], ns)
+    folder = Path("mydata") / NAMES[key]
+    third = {p.name: p.read_bytes() for p in folder.iterdir() if "3" in p.name}
+    assert third
+    export = src[EXPORT]
+    # the loop takes its batches from the two lists
+    for three, two in (("rna = [rna1, rna2, rna3]", "rna = [rna1, rna2]"),
+                       ("atac = [atac1, atac2, atac3]", "atac = [atac1, atac2]")):
+        assert export.count(three) == 1
+        export = export.replace(three, two)
+    _run_cell(export, ns)
+    assert {p.name: p.read_bytes() for p in folder.iterdir() if "3" in p.name} == third
+    _run_cell(_renamed(export, key, "MINE"), ns)
+    assert not [p.name for p in (Path("mydata") / "MINE").iterdir() if "3" in p.name]
 
 
 # ------------------------------------------------------ the batch sentence
@@ -683,9 +706,10 @@ def test_the_command_line_of_the_diagonal_tutorial_writes_the_same_folder(tmp_pa
     monkeypatch.chdir(tmp_path)
     src, ns = _sources(key), _namespace(key)
     assert "The command line writes the same folder from the two files:" in src[0]
-    (command,) = re.findall(r"```\n(multibench convert .*?)\n```", src[0], re.S)
+    # 0.4.0: multibench export replaces convert
+    (command,) = re.findall(r"```\n(multibench export .*?)\n```", src[0], re.S)
     argv = shlex.split(command.replace("\\\n", " "))
-    assert argv[:4] == ["multibench", "convert", "my_rna.h5ad", f"mydata/{NAMES[key]}"]
+    assert argv[:4] == ["multibench", "export", "my_rna.h5ad", f"mydata/{NAMES[key]}"]
     for i in (EXAMPLE, READ, EXPORT):
         _run_cell(src[i], ns)
     by_cell = _content(Path("mydata") / NAMES[key])
@@ -711,8 +735,7 @@ WRITE_OBSM = ", and one after `obsm:` as `\"obsm:protein\"`"
 #: what the sentence adds where the cell writes batches, by category or by tutorial
 WRITE_BATCHES = {
     "mosaic": " Each call writes one batch.",
-    "diagonal_multi": (" The loop writes one RNA batch and one ATAC batch per call, and "
-                       "`n_batches` says how many batches the data has."),
+    "diagonal_multi": " The loop writes one RNA batch and one ATAC batch per call.",
     "cross": (" When the folder holds batches that your data does not have, `export_dataset` "
               "stops and names the files. A new value of `NAME` avoids that."),
 }

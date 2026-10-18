@@ -20,6 +20,8 @@ from matplotlib import colors
 from matplotlib.patches import Circle, Rectangle
 
 import multibench as mtb
+# the table behind a bubble figure: mtb.plot.build_table is deprecated in 0.4.0
+from multibench.plot.bubble import _build_table  # noqa: E402
 from multibench import config
 
 B = importlib.import_module("multibench.plot.bubble")
@@ -58,7 +60,7 @@ def _mine(method="PCA", dataset="MYCITE", scored_with="igraph/search/0.4.0",
 
 def test_dataset_mode_own_dataset_gets_the_no_overlap_warning():
     df = pd.concat([_stored("D11"), _mine()], ignore_index=True)
-    _, msgs = _messages(mtb.plot.build_table, df)
+    _, msgs = _messages(_build_table, df)
     assert ("The rows come from 2 datasets, D11 and MYCITE, that share no method. The "
             "figure ranks unrelated rows against each other. Plot each dataset on "
             "its own, or score your method on D11 and add it to that table.") in msgs
@@ -72,7 +74,7 @@ def test_dataset_mode_lone_dataset_next_to_shared_ones_gets_no_summary_advice():
     # S3: a stand-in on LUNG added to the three diagonal tables
     diag = _stored(["D24", "D25", "D28"], source="published", category="diagonal")
     own = _mine(method="PCA_standin", dataset="LUNG", scored_with="leidenalg/search/0.4.0")
-    _, msgs = _messages(mtb.plot.build_table, pd.concat([diag, own], ignore_index=True))
+    _, msgs = _messages(_build_table, pd.concat([diag, own], ignore_index=True))
     assert not any("aggregate='summary'" in m for m in msgs), msgs
     assert any(m.startswith("This figure averages each method over 4 datasets")
                and m.endswith("Plot each dataset on its own.") for m in msgs), msgs
@@ -88,7 +90,7 @@ def _pair():
 
 
 def test_dataset_mode_rerun_pair_still_suggests_the_summary():
-    _, msgs = _messages(mtb.plot.build_table, _pair())
+    _, msgs = _messages(_build_table, _pair())
     assert msgs == [
         "This figure averages each method over 2 datasets, D11 and D11b. Its rows "
         "mix datasets. Pass aggregate='summary' for the rank-averaged summary panel, "
@@ -97,7 +99,7 @@ def test_dataset_mode_rerun_pair_still_suggests_the_summary():
 
 def test_dataset_mode_advice_uses_the_cli_spelling(monkeypatch):
     monkeypatch.setattr(config, "_CLI", True)
-    _, msgs = _messages(mtb.plot.build_table, _pair())
+    _, msgs = _messages(_build_table, _pair())
     assert msgs[0].startswith("This figure averages each method over 2 datasets")
     assert "Pass --aggregate summary" in msgs[0] and "aggregate='summary'" not in msgs[0]
 
@@ -105,9 +107,9 @@ def test_dataset_mode_advice_uses_the_cli_spelling(monkeypatch):
 def test_no_plot_warning_says_by_construction():
     lone = pd.concat([_stored("D11"), _mine(scored_with="leidenalg/search/0.4.0")],
                      ignore_index=True)
-    calls = [(mtb.plot.build_table, {}),
-             (mtb.plot.build_table, {"aggregate": "summary"}),
-             (mtb.plot.build_table, {"aggregate": "summary", "overall": "mean_overall"}),
+    calls = [(_build_table, {}),
+             (_build_table, {"aggregate": "summary"}),
+             (_build_table, {"aggregate": "summary", "overall": "mean_overall"}),
              (mtb.plot.bar, {}), (mtb.plot.bar, {"overall": "rank"})]
     seen = []
     for fn, kw in calls:
@@ -137,7 +139,7 @@ def _ilisi_tie():
 
 
 def test_one_method_figure_warns_and_is_grey():
-    _, msgs = _messages(mtb.plot.build_table, _mine())
+    _, msgs = _messages(_build_table, _mine())
     assert msgs == ["Only one method, PCA, is in this figure. With nothing to rank "
                     "it against, the fills are grey. Plot it with methods scored on "
                     "the same dataset."]
@@ -150,8 +152,9 @@ def test_one_method_figure_warns_and_is_grey():
 
 
 def test_constant_column_warns_and_uses_the_neutral_fill():
-    tbl, msgs = _messages(mtb.plot.build_table, _ilisi_tie())
-    assert msgs == ["iLISI is 0.000 for every method. That column is grey."]
+    tbl, msgs = _messages(_build_table, _ilisi_tie())
+    assert msgs == ["iLISI is 0.000 for every method. That column is grey. Leave it out "
+                    "with metrics=."]
     assert tbl.norm["iLISI"].tolist() == [1.0, 1.0, 1.0]    # R parity kept
     assert tbl.ranks["iLISI"].tolist() == [3.0, 3.0, 3.0]
     fig = B.render(tbl)
@@ -180,12 +183,12 @@ def test_stored_demo_figures_are_unchanged():
 # --- M03: igraph rows next to the stored tables -----------------------------
 
 BACKEND = ("The rows for {m} were clustered with the igraph Leiden backend. The stored "
-           "tables used leidenalg, which can move ARI by up to about 0.1. Set "
+           "results used leidenalg, which can move ARI by up to about 0.1. Set "
            "mtb.config.DEFAULT.leiden_flavor = 'leidenalg' before evaluate to compare "
            "them.")
 
 
-@pytest.mark.parametrize("fn", [mtb.plot.build_table, mtb.plot.bubble, mtb.plot.bar])
+@pytest.mark.parametrize("fn", [_build_table, mtb.plot.bubble, mtb.plot.bar])
 def test_igraph_rows_next_to_stored_rows_warn(fn):
     df = pd.concat([_stored("D11"), _mine(method="MyMethod", dataset="D11")],
                    ignore_index=True)
@@ -193,7 +196,7 @@ def test_igraph_rows_next_to_stored_rows_warn(fn):
     assert msgs.count(BACKEND.format(m="MyMethod")) == 1, msgs
 
 
-@pytest.mark.parametrize("fn", [mtb.plot.build_table, mtb.plot.bar])
+@pytest.mark.parametrize("fn", [_build_table, mtb.plot.bar])
 def test_no_backend_warning_for_leidenalg_or_own_rows(fn):
     lalg = _mine(method="MyMethod", dataset="D11", scored_with="leidenalg/search/0.4.0")
     _, msgs = _messages(fn, pd.concat([_stored("D11"), lalg], ignore_index=True))
@@ -211,11 +214,11 @@ def test_backend_warning_needs_a_sweep_metric_on_show():
     df = pd.concat([_stored("D11"), _mine(method="MyMethod", dataset="D11")],
                    ignore_index=True)
     # under the 0.4.0 search ASW reads the Leiden clusters too: cLISI does not
-    _, msgs = _messages(mtb.plot.build_table, df, metrics=["cLISI"])
+    _, msgs = _messages(_build_table, df, metrics=["cLISI"])
     assert not any("igraph Leiden backend" in m for m in msgs), msgs
     # clusters from the user: only iF1 depends on the backend
     user = _mine(method="MyMethod", dataset="D11", scored_with="igraph/user/0.4.0")
-    _, msgs = _messages(mtb.plot.build_table,
+    _, msgs = _messages(_build_table,
                         pd.concat([_stored("D11"), user], ignore_index=True))
     assert not any("igraph Leiden backend" in m for m in msgs), msgs
 
@@ -224,7 +227,7 @@ def test_backend_warning_cli_spelling(monkeypatch):
     monkeypatch.setattr(config, "_CLI", True)
     df = pd.concat([_stored("D11"), _mine(method="MyMethod", dataset="D11")],
                    ignore_index=True)
-    _, msgs = _messages(mtb.plot.build_table, df)
+    _, msgs = _messages(_build_table, df)
     hit = [m for m in msgs if "igraph Leiden backend" in m]
     assert hit and hit[0].endswith("Score them with multibench evaluate "
                                    "--leiden-flavor leidenalg to compare them.")

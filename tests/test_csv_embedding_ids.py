@@ -156,7 +156,7 @@ def test_the_scores_no_longer_follow_the_row_order_of_the_label_file(tmp_path, c
                         verbose=False)
     moved = mtb.evaluate(emb, labels=_labels(tmp_path, "shuffled.csv", PERM),
                          metrics=["ARI", "NMI"], verbose=False)
-    assert same["Value"].tolist() == moved["Value"].tolist() == [1.0, 1.0]
+    assert same["value"].tolist() == moved["value"].tolist() == [1.0, 1.0]
 
 
 def test_batch_and_clustering_files_and_a_series_are_matched_too(tmp_path, capsys, seen):
@@ -166,10 +166,12 @@ def test_batch_and_clustering_files_and_a_series_are_matched_too(tmp_path, capsy
     other = PERM[::-1]
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        mtb.evaluate(emb, labels=pd.Series(TYPES, index=BARS).iloc[PERM],
-                     batch=_labels(tmp_path, "batch.csv", other, donors, column="donor"),
-                     clusters=_labels(tmp_path, "clusters.csv", PERM, clusters,
-                                        column="leiden"), metrics="all")
+        # clustering= is deprecated since 0.4: its implementation, without the warning
+        pipeline._evaluate(emb, labels=pd.Series(TYPES, index=BARS).iloc[PERM],
+                           batch=_labels(tmp_path, "batch.csv", other, donors,
+                                         column="donor"),
+                           clustering=_labels(tmp_path, "clusters.csv", PERM, clusters,
+                                              column="leiden"), metrics="all")
     assert capsys.readouterr().err == (
         "evaluate: matched the labels Series and 2 more to the rows of emb.csv by "
         "barcode.\n")
@@ -200,7 +202,7 @@ def test_the_command_line_matches_by_barcode(tmp_path, capsys):
                        "--out", str(out)])
     assert rc == 0
     assert capsys.readouterr().err == MOVED.format("shuffled.csv")
-    assert pd.read_csv(out, index_col=0)["Value"].tolist() == [1.0, 1.0]
+    assert pd.read_csv(out)["value"].tolist() == [1.0, 1.0]
 
 
 # ------------------------------------------------------------- other cells
@@ -242,12 +244,13 @@ def test_a_file_with_no_id_in_common_is_matched_by_position(tmp_path, capsys, se
             ("batch.csv", dict(labels=TYPES, batch=_labels(
                 tmp_path, "batch.csv", bars=NO_SUFFIX, values=donors, column="donor")),
              "batch"),
-            ("clusters.csv", dict(labels=TYPES, clusters=_labels(
+            ("clusters.csv", dict(labels=TYPES, clustering=_labels(
                 tmp_path, "clusters.csv", bars=NO_SUFFIX, values=donors, column="leiden")),
              "clustering")):
         seen.clear()
         with pytest.warns(UserWarning) as rec:
-            mtb.evaluate(emb, metrics="all" if said == "batch" else ["ARI"], **kw)
+            # clustering= is deprecated since 0.4: its implementation, without the warning
+            pipeline._evaluate(emb, metrics="all" if said == "batch" else ["ARI"], **kw)
         assert [str(w.message) for w in rec] == [NONE_SHARED.format(name)]
         assert seen[said] == list(TYPES[PERM] if said == "labels" else donors)
         np.testing.assert_allclose(seen["emb"], EMB)
@@ -276,11 +279,11 @@ def test_a_series_with_no_id_in_common_is_matched_by_position(tmp_path, capsys, 
     for kw, said, values in (
             (dict(labels=pd.Series(TYPES[PERM], index=NO_SUFFIX)), "labels", TYPES[PERM]),
             (dict(labels=TYPES, batch=pd.Series(donors, index=NO_SUFFIX)), "batch", donors),
-            (dict(labels=TYPES, clusters=pd.Series(donors, index=NO_SUFFIX)),
+            (dict(labels=TYPES, clustering=pd.Series(donors, index=NO_SUFFIX)),
              "clustering", donors)):
         seen.clear()
         with pytest.warns(UserWarning) as rec:
-            mtb.evaluate(emb, metrics="all" if said == "batch" else ["ARI"], **kw)
+            pipeline._evaluate(emb, metrics="all" if said == "batch" else ["ARI"], **kw)
         assert [str(w.message) for w in rec] == [SERIES_NONE_SHARED.format(
             "clusters" if said == "clustering" else said)]
         assert seen[said] == list(values)
@@ -526,7 +529,7 @@ def test_method_runs_are_scored_in_file_order_as_before(cite, tmp_path, monkeypa
     (h5,) = (tmp_path / "plain").rglob("embedding.h5")
     with_arrays = mtb.evaluate(io.read_embedding(h5), labels=labels,
                                metrics=["ARI", "NMI"], verbose=False)
-    assert with_arrays["Value"].round(4).tolist() == scores
+    assert with_arrays["value"].round(4).tolist() == scores
     # a barcode column in front of the labels, rows as before: the same scores
     cells = [f"c{i}" for i in range(N)]
     pd.DataFrame({"x": labels}, index=cells).to_csv(data / "MYCITE" / "cty.csv")

@@ -29,45 +29,40 @@ def test_bar_aggregates_across_datasets():
 
 
 def test_bar_group_selects_metric_family():
-    fig = mtb.plot.bar(_long(metrics=("ARI", "NMI")), group="clustering")
+    fig = mtb.plot.bar(_long(metrics=("ARI", "NMI")), metrics="clustering")
     assert "clustering" in fig.axes[0].get_title(loc="left")
 
 
 def test_bar_group_batch_errors_clearly_without_batch_metrics():
     """A single-batch design has no batch metrics; say so instead of drawing nothing."""
     with pytest.raises(ValueError) as e:
-        mtb.plot.bar(_long(metrics=("ARI", "NMI")), group="batch")
+        mtb.plot.bar(_long(metrics=("ARI", "NMI")), metrics="batch")
     assert "multi-batch" in str(e.value)
 
 
-def test_bar_top_n():
-    fig = mtb.plot.bar(_long(), top=2)
-    assert len(fig.axes[0].get_yticklabels()) == 2
+def test_bar_methods_selects_the_bars():
+    # methods= replaces the deprecated top= (0.4.0)
+    fig = mtb.plot.bar(_long(), methods=["B", "C"])
+    assert [t.get_text() for t in fig.axes[0].get_yticklabels()] == ["B", "C"]
 
 
 def test_bar_xlabel_names_dataset_or_formula():
     one = mtb.plot.bar(_long(datasets=("D1",)))
     assert one.axes[0].get_xlabel() == "overall score (D1)"
-    two = mtb.plot.bar(_long(), overall="mean_overall")
-    assert "mean of per-dataset overall" in two.axes[0].get_xlabel()
     rk = mtb.plot.bar(_long())
     assert "rank of mean ranks" in rk.axes[0].get_xlabel()
-    with pytest.raises(ValueError, match="overall must be one of"):
+    # the deprecated overall= (0.4.0) keeps its effect
+    with pytest.warns(FutureWarning, match=r"plot\.bar\(overall=\) is deprecated"):
+        two = mtb.plot.bar(_long(), overall="mean_overall")
+    assert "mean of per-dataset overall" in two.axes[0].get_xlabel()
+    with pytest.warns(FutureWarning), pytest.raises(ValueError, match="overall must be one of"):
         mtb.plot.bar(_long(), overall="median")
 
 
-def test_bar_overall_doc_and_default_basis():
-    assert "mean_overall" in mtb.plot.bar.__doc__ and "rank" in mtb.plot.bar.__doc__
+def test_bar_doc_names_the_recommend_order():
+    # 0.4.0: the overall= text left the docstring with the keyword; the bars
+    # are in recommend's order
     import inspect
-    assert inspect.signature(mtb.plot.bar).parameters["overall"].default == "rank"
-
-
-def test_bar_overall_doc_matches_style():
-    # Same parity pin as test_bubble: the `overall` text is written out in
-    # bar's docstring and must stay identical to style.OVERALL_DOC.
-    from multibench.plot import style
-    body = style.OVERALL_DOC.split("\n", 1)[1]
-    # compare on normalised whitespace: the docstrings are re-wrapped and
-    # re-indented for the generated API reference, the WORDS are the pin
-    norm = lambda t: " ".join(t.split())
-    assert norm(body) in norm(mtb.plot.bar.__doc__)
+    assert "overall" not in inspect.signature(mtb.plot.bar).parameters
+    norm = " ".join(mtb.plot.bar.__doc__.split())
+    assert "in the order of ``mtb.recommend(category, long_df=long_df, metrics=...)``" in norm

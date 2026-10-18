@@ -59,17 +59,17 @@ def test_per_batch_folder_fails_every_vertical_row_with_the_hint(tmp_path):
 def test_labels_for_vertical_on_a_per_batch_folder_warns_or_raises(tmp_path):
     _per_batch_folder(tmp_path / "MB")
     with pytest.warns(UserWarning, match="This folder holds per-batch files"):
-        lab = mtb.labels_for("MB", "vertical", data_path=tmp_path)
+        lab = resolve.labels_for("MB", "vertical", data_path=tmp_path)
     assert list(lab) == ["cty1", "cty2", "cty3"]
     with pytest.raises(ValueError, match="Export without batch="):
-        mtb.labels_for("MB", "vertical", data_path=tmp_path, check=True)
+        resolve.labels_for("MB", "vertical", data_path=tmp_path, check=True)
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        mtb.labels_for("MB", "vertical", data_path=tmp_path, check=False)
-        mtb.labels_for("MB", "cross", "StabMap", data_path=tmp_path)
+        resolve.labels_for("MB", "vertical", data_path=tmp_path, check=False)
+        resolve.labels_for("MB", "cross", "StabMap", data_path=tmp_path)
     # without a method only the default-order warning (StabMap reorders), since 0.4
     with pytest.warns(UserWarning) as rec:
-        mtb.labels_for("MB", data_path=tmp_path)
+        resolve.labels_for("MB", data_path=tmp_path)
     assert [str(w.message).startswith("labels_for('MB') returns the files in the default "
                                       "order") for w in rec] == [True]
 
@@ -139,7 +139,7 @@ def test_numbered_atac_role_reads_the_031_peak_name(tmp_path):
 
 
 # ------------------------------------------------------------------ L55
-def test_stabmap_reference_batch_is_exposed_and_documented():
+def test_stabmap_reference_batch_is_exposed():
     sup = {(e["category"], "+".join(e["modalities"])): e["reference_batch"]
            for e in mtb.method_info("StabMap")["supports"]}
     # cross: the last batch. mosaic: the batch the others are mapped onto.
@@ -152,6 +152,3 @@ def test_stabmap_reference_batch_is_exposed_and_documented():
                    ("mosaic", "rna1+rna2+adt2+adt3"): 2,
                    ("mosaic", "rna1+rna2+atac2+atac3"): 2}
     assert all(e["reference_batch"] is None for e in mtb.method_info("Matilda")["supports"])
-    doc = inspect.getdoc(mtb.labels_for)
-    assert "StabMap: its reference batch first" in doc
-    assert "methods.yaml" not in doc and "output.cell_order" not in doc

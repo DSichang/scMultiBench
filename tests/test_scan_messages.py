@@ -57,7 +57,8 @@ def test_every_size_hint_is_checked_on_the_data():
 
 
 def test_a_variant_inside_a_larger_one_is_named_once():
-    # X68 (r3): the dry run's one line says which row runs; no row repeats it
+    # X68 (r3): the dry run's one line says which row runs; no row repeats it.
+    # 0.4.0: the nested row itself is left out, as a run leaves it out
     plan = mtb.run_all("D52mini", "cross", methods=["UINMF"], dry_run=True, verbose=False)
-    assert "rna1+rna2+adt1+adt2" in set(plan["modalities"])
+    assert "rna1+rna2+adt1+adt2" not in set(plan["modalities"])
     assert not plan["caveat"].str.contains("so this row is not run").any()

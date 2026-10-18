@@ -72,9 +72,9 @@ def test_requested_method_with_no_variant_in_category_is_a_request_error(no_envs
 # ------------------------------------------------------------------ J6: did-you-mean before any I/O
 @pytest.mark.parametrize("call", [
     lambda: full_scan("NOPE", "vertical", data_path="/nonexistent/dir", methods=["StabMapp"]),
-    lambda: mtb.run_all("NOPE", "vertical", out_dir="/tmp/unused", data_path="/nonexistent/dir",
+    lambda: mtb.run_all("/nonexistent/dir/NOPE", "vertical", out_dir="/tmp/unused",
                         methods=["StabMapp"], verbose=False),
-    lambda: mtb.run_all("NOPE", "vertical", out_dir="/tmp/unused", data_path="/nonexistent/dir",
+    lambda: mtb.run_all("/nonexistent/dir/NOPE", "vertical", out_dir="/tmp/unused",
                         params={"StabMapp": {"k": 1}}, verbose=False),
     lambda: full_scan("NOPE", "vertical", data_path="/nonexistent/dir", methods=["StabMapp"],
                      out_dir="runs"),
@@ -104,11 +104,10 @@ def test_cli_scan_default_table_is_compact(capsys):
     out = capsys.readouterr().out
     assert rc == 0
     header = out.splitlines()[0].split()
-    # the compact set, plus atac because D11's vertical variants read ATAC
-    assert header == workflow.compact_columns(full_scan("D11", "vertical", verbose=False))
-    assert [c for c in header if c not in ("atac", "caveat")] == workflow.COMPACT_COLUMNS
+    # 0.4.0: mtb.scan's per-method table (the plan view is run-all --dry-run's)
+    assert header == ["method", "modalities", "runnable", "reason"]
+    assert header == list(mtb.scan("D11", "vertical", verbose=False).columns)
     assert _widest(out) <= 160, _widest(out)
-    assert "..." in out                      # long reasons are clipped
     assert "env_reason" not in out
 
 
@@ -165,7 +164,7 @@ def test_cli_run_all_dry_run_is_compact_too(capsys, tmp_path):
     assert table.splitlines()[0].split() == workflow.compact_columns(
         full_scan("D11", "vertical", verbose=False))
     assert _widest(table) <= 160
-    assert "# Dry run." in cap.err and "# Dry run." not in cap.out
+    assert "# Dry run:" in cap.err and "# Dry run" not in cap.out    # one-sentence header
 
 
 # ------------------------------------------------------------------ J3: dry-run prints the commands
@@ -304,7 +303,7 @@ def test_cli_run_param_forwarded_and_prefix_checked(monkeypatch, tmp_path, capsy
         class R:
             out_dir = tmp_path
         return R()
-    monkeypatch.setattr(mtb, "run", fake_run)
+    monkeypatch.setattr(cli, "_run", fake_run)     # the deprecated command calls the runner
     rc = cli.main(["run", "--method", "SCALEX", "--category", "diagonal",
                    "--input", "rna=a.h5", "--input", "atac_gas=b.h5", "--out", str(tmp_path),
                    "-p", "epochs=5", "--param", "SCALEX:lr=1e-3", "-p", "gpu=true"])
@@ -328,7 +327,7 @@ def test_param_help_has_an_example():
 
 def test_run_all_params_unknown_method_before_io_and_dry_run_key_check():
     with pytest.raises(KeyError, match="Did you mean Matilda"):
-        mtb.run_all("NOPE", "vertical", out_dir="/tmp/unused", data_path="/nonexistent",
+        mtb.run_all("/nonexistent/NOPE", "vertical", out_dir="/tmp/unused",
                     params={"Matlda": {"epochs": 5}}, verbose=False)
     with pytest.raises(KeyError) as e:
         mtb.run_all("D11", "vertical", out_dir=None, dry_run=True, methods=["Matilda"],
@@ -444,12 +443,12 @@ def test_read_only_commands_put_data_on_stdout_and_notes_on_stderr(argv, capsys,
            if l.startswith(("error:", "warning:", "[run_all]", "[env]", "# dry"))]
     assert bad == [], f"diagnostics leaked to stdout: {bad}"
     notes = [l for l in cap.err.splitlines() if l.strip()]
-    assert all(l.startswith(("#", "warning:")) for l in notes), notes
+    # scan's notes are mtb.scan's [scan] lines (0.4.0)
+    assert all(l.startswith(("#", "warning:", "[scan]")) for l in notes), notes
 
 
 @pytest.mark.parametrize("argv,code,needle", [
-    (["scan", "NOPE", "--category", "vertical", "--data-path", "/nonexistent"], 1,
-     "does not exist"),
+    (["scan", "/nonexistent/NOPE", "--category", "vertical"], 1, "does not exist"),
     (["cite", "BOGUS"], 1, "BOGUS"),
     (["env", "recipe", "Matlda"], 1, "Did you mean Matilda"),
     (["run-all", "D52", "--category", "cross", "--out-dir", "/tmp/unused", "--methods",
@@ -496,8 +495,8 @@ def test_warnings_are_formatted_on_stderr(monkeypatch, capsys):
 
     def warn_scan(*a, **k):
         warnings.warn("something odd in the data")
-        return pd.DataFrame({"method": ["M"], "runnable": [True]}), None
-    monkeypatch.setattr(workflow, "_scan", warn_scan)
+        return pd.DataFrame({"method": ["M"], "runnable": [True]})
+    monkeypatch.setattr(workflow, "_scan_methods", warn_scan)     # what scan prints
     monkeypatch.delenv("MULTIBENCH_DEBUG", raising=False)
     rc = cli.main(["scan", "D11", "--category", "vertical"])
     cap = capsys.readouterr()
@@ -515,7 +514,7 @@ def test_run_all_progress_goes_to_stderr(monkeypatch, tmp_path, capsys):
     def fake_run_all(*a, **k):
         print("[run_all] M (vertical/D11) ...")          # library progress on stdout
         return FakeRes()
-    monkeypatch.setattr(mtb, "run_all", fake_run_all)
+    monkeypatch.setattr(workflow, "_run_all", fake_run_all)       # what the command calls
     rc = cli.main(["run-all", "D11", "--category", "vertical", "--out-dir", str(tmp_path)])
     cap = capsys.readouterr()
     assert rc == 0

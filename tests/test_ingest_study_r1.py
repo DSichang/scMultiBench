@@ -69,14 +69,15 @@ def test_log_normalised_rna_warns_on_export_and_to_canonical(tmp_path):
     with pytest.warns(UserWarning, match=r"rna values are not whole numbers.*"
                                          r"rna='layer:counts'\.$"):
         ingest.export_dataset(a, tmp_path / "LOG", adt="obsm:protein", labels="obs:cell_type")
+    # io.to_canonical is deprecated in 0.4.0: the implementation it wraps
     with pytest.warns(UserWarning, match=r"rna values are not whole numbers.*layer='counts'"):
-        ingest.to_canonical(a, tmp_path / "x.h5", modality="rna")
+        ingest._to_canonical(a, tmp_path / "x.h5", modality="rna")
     # raw counts: no warning at all
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         ingest.export_dataset(a, tmp_path / "RAW", rna="layer:counts", adt="obsm:protein",
                               labels="obs:cell_type")
-        ingest.to_canonical(a, tmp_path / "y.h5", modality="rna", layer="counts")
+        ingest._to_canonical(a, tmp_path / "y.h5", modality="rna", layer="counts")
 
 
 def test_gene_activity_scores_are_not_count_checked(tmp_path):

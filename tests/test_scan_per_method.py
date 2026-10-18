@@ -185,10 +185,10 @@ def test_first_line(linux, monkeypatch, tmp_path, capsys):
         "computer. MYCITE holds RNA and ADT.")
     assert first("MYCITE", "vertical", methods=["Matilda", "totalVI", "MIRA"], **kw) == (
         "[scan] 2 of 3 methods have their input files in MYCITE. 1 of 3 can run on this "
-        "computer. MYCITE holds RNA and ADT. mtb.env.doctor() checks the environments.")
+        "computer. MYCITE holds RNA and ADT. mtb.env.install(dry_run=True) checks the environments.")
     monkeypatch.setattr(config, "_CLI", True)
     assert first("MYCITE", "vertical", methods=["totalVI"], **kw).endswith(
-        " MYCITE holds RNA and ADT. multibench env doctor checks the environments.")
+        " MYCITE holds RNA and ADT. multibench env install --dry-run checks the environments.")
     monkeypatch.setattr(config, "_CLI", False)
     # numbered files: the batches
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)

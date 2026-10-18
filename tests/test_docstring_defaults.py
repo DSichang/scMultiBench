@@ -14,7 +14,6 @@ import inspect
 import pkgutil
 import re
 
-import pytest
 
 import multibench
 
@@ -116,24 +115,8 @@ def test_the_scan_sees_the_known_choice_sets():
             m = _CHOICE_LINE.match(line)
             if m:
                 seen.setdefault(path, set()).update(m.group("names").split(", "))
-    assert {"overall"} <= seen["multibench.plot.bar.bar"]
-    # bubble's __module__ is set to "multibench.plot" (plot/__init__.py)
-    assert {"aggregate", "overall"} <= seen["multibench.plot.bubble"]
-    # build_table(na=) is deprecated since 0.4.0 (X41): no longer documented
-    assert {"aggregate", "overall"} <= seen["multibench.plot.bubble.build_table"]
-    assert "na" not in seen["multibench.plot.bubble.build_table"]
+    # 0.4.0: bar(overall=), bubble(aggregate=, overall=) and build_table are
+    # deprecated and left the docstrings, so the plot module documents no choice set
+    assert not [p for p in seen if p.startswith("multibench.plot")]
     assert "flavor" in seen["multibench.eval.scib.compute"]
     assert "flavor" in seen["multibench.eval.scib.leiden_sweep"]
-
-
-@pytest.mark.parametrize("name, expected", [("overall", "rank")])
-def test_bar_reference_defaults_match_the_code(name, expected):
-    griffe = pytest.importorskip("griffe")
-    # the package attribute multibench.plot.bar is the function; reach the module
-    bar_mod = importlib.import_module("multibench.plot.bar")
-    # a docstring without a parent: griffe renders the choice-set default
-    ds = griffe.Docstring(inspect.getdoc(bar_mod.bar))
-    params = {p.name: p for s in ds.parse("numpy") if s.kind.value == "parameters"
-              for p in s.value}
-    assert _literal(str(params[name].default)) == expected
-    assert inspect.signature(bar_mod.bar).parameters[name].default == expected

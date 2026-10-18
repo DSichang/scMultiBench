@@ -92,7 +92,8 @@ def test_catalog_describes_clisi_in_plain_direction():
 
 def test_wide_csv_read_back_is_marked_unknown(tmp_path):
     emb, lab = _blobs()
-    mtb.evaluate(emb, labels=lab, metrics=["ASW"]).to_csv(tmp_path / "metric.csv")
+    # the wide frame evaluate returned before 0.4, as a CSV saved then holds it
+    pipeline._scores(emb, labels=lab, metrics=["ASW"]).to_csv(tmp_path / "metric.csv")
     back = pd.read_csv(tmp_path / "metric.csv", index_col=0)
     long, msgs = _user_warnings(mtb.to_long, back, method="X", dataset="D11",
                                 category="vertical")

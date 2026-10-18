@@ -4,7 +4,7 @@ R3-14: a label count that differs from the embedding's cell count names the
 argument the user passed (the CLI flag on the command line) and, for one
 label file of several batches, the fix. The export error names the object
 passed as ``data`` in plain words.
-R3-16: the sweep note is two or three short sentences; off Linux, run's
+R3-16: the sweep note is short sentences (one since 0.4.0); off Linux, run's
 missing-env error is the Linux sentence alone.
 """
 import re
@@ -54,13 +54,14 @@ def test_cli_one_label_file_of_three_names_the_flags_and_the_fix(tmp_path, capsy
     assert "celltype" not in err and "emb has" not in err
 
 
-def test_python_label_count_error_names_labels_for(tmp_path):
+def test_python_label_count_error_names_dataset_category_and_method(tmp_path):
+    # 0.4.0: the hint names evaluate's own keywords, not the deprecated labels_for
     emb, _, folder = _batch_folder(tmp_path)
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=str(folder / "cty1.csv"), metrics=["ASW"])
     assert str(e.value) == (
         "labels has 30 entries for 90 cells in the embedding. For a folder with one "
-        "label file per batch, pass mtb.labels_for(dataset, category, method).")
+        "label file per batch, pass dataset=, category= and method=.")
 
 
 def test_batch_and_clustering_counts_follow_the_same_pattern(tmp_path, capsys):
@@ -68,9 +69,11 @@ def test_batch_and_clustering_counts_follow_the_same_pattern(tmp_path, capsys):
     with pytest.raises(ValueError, match=r"^batch has 30 entries for 90 cells in the "
                                          r"embedding\.$"):
         mtb.evaluate(emb, labels=lab, batch=lab[:30], metrics="all")
+    # clustering= is deprecated since 0.4: its implementation, without the warning
+    from multibench.eval import pipeline
     with pytest.raises(ValueError, match=r"^clusters has 30 entries for 90 cells in "
                                          r"the embedding\.$"):
-        mtb.evaluate(emb, labels=lab, clusters=lab[:30], metrics=["ARI"])
+        pipeline._evaluate(emb, labels=lab, clustering=lab[:30], metrics=["ARI"])
     np.save(tmp_path / "emb.npy", emb)
     pd.DataFrame({"x": lab}).to_csv(tmp_path / "cty.csv", index=False)
     pd.DataFrame({"x": lab[:30]}).to_csv(tmp_path / "batch.csv", index=False)
@@ -213,7 +216,7 @@ def test_other_short_label_files_keep_their_advice(tmp_path, capsys):
         mtb.evaluate(emb, labels=str(d / "rna_cty.csv"), metrics=["ASW"])
     assert str(e.value) == (
         "labels has 80 entries for 150 cells in the embedding. For a folder with one "
-        "label file per batch, pass mtb.labels_for(dataset, category, method).")
+        "label file per batch, pass dataset=, category= and method=.")
     # one file of several of one side, which add up to the cells: the same
     d = _folder(data, "RNA2", {}, {"rna_cty1.csv": 40, "rna_cty2.csv": 40})
     assert _cli_error(capsys, "--embedding", str(tmp_path / "emb80.npy"), "--metrics", "ASW",
@@ -267,11 +270,10 @@ def test_sweep_note_is_short_sentences(capsys, monkeypatch):
     emb, lab = _blobs()
     mtb.evaluate(emb, labels=lab)
     err = capsys.readouterr().err.strip()
+    # 0.4.0: one sentence, without "To skip it ..."
     assert re.fullmatch(
         r"Clustering 90 cells for ARI, NMI, ASW, iASW and iF1 with the "
-        r"(igraph|leidenalg) Leiden backend\. To skip it, pass clusters=, or "
-        r"metrics= without ARI, NMI, ASW, "
-        r"iASW and iF1\.", err), err
+        r"(igraph|leidenalg) Leiden backend\.", err), err
     assert " - " not in err and ";" not in err and "per 3,000 cells" not in err
 
 
@@ -284,8 +286,8 @@ def test_sweep_note_cli_spelling(tmp_path, capsys, monkeypatch):
     assert cli.main(["evaluate", "--embedding", str(tmp_path / "emb.npy"), "--labels",
                      str(tmp_path / "cty.csv"), "--metrics", "ARI,NMI"]) == 0
     err = capsys.readouterr().err
-    assert ("for ARI and NMI with the") in err
-    assert "To skip it, pass --clusters, or --metrics without ARI and NMI." in err
+    assert re.fullmatch(r"Clustering 90 cells for ARI and NMI with the "
+                        r"(igraph|leidenalg) Leiden backend\.\n", err), err
 
 
 # --- R3-16 (b) ---------------------------------------------------------------

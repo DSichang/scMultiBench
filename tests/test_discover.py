@@ -121,7 +121,7 @@ def test_find_methods_runnable_filter():
     from multibench.engine import registry
     all_ids = discover.find_methods()
     for flag, want in ((True, all_ids), (False, [])):
-        with pytest.warns(FutureWarning, match=r"runnable=\) is deprecated .* Use scan\."):
+        with pytest.warns(FutureWarning, match=r"runnable=\) is deprecated .* Use mtb\.scan\."):
             assert discover.find_methods(runnable=flag) == want
     assert "SCALEX" in all_ids
     # Milestone: every method is now wired -> zero stubs, every id dispatchable.

@@ -279,16 +279,17 @@ def _cli(argv, capsys):
 def test_convert_one_file_from_the_command_line(tmp_path, capsys):
     src = tmp_path / "arc.h5ad"
     _arc().write_h5ad(src)
-    rc, line = _cli(["convert", str(src), f"{tmp_path}/DIR/", "--modality", "rna"], capsys)
+    # 0.4.0: export replaces convert (a deprecated alias); --modality is hidden
+    rc, line = _cli(["export", str(src), f"{tmp_path}/DIR/", "--modality", "rna"], capsys)
     assert rc == 1 and not (tmp_path / "DIR").exists()
     assert line == (f"error: The matrix holds {HEAD} Write a dataset folder, as multibench "
-                    f'convert SRC OUT --rna "X[feature_types=Gene Expression]".')
-    rc, line = _cli(["convert", str(src), f"{tmp_path}/DIR/", "--modality", "peak"], capsys)
+                    f'export SRC OUT --rna "X[feature_types=Gene Expression]".')
+    rc, line = _cli(["export", str(src), f"{tmp_path}/DIR/", "--modality", "peak"], capsys)
     assert rc == 1 and line == (
-        f"error: The matrix holds {HEAD} Write a dataset folder, as multibench convert SRC "
+        f"error: The matrix holds {HEAD} Write a dataset folder, as multibench export SRC "
         f'OUT --atac "X[feature_types=Peaks]" --atac-kind peak.')
     # the command the message shows writes the folder
-    rc, _ = _cli(["convert", str(src), str(tmp_path / "OUT"), "--atac",
+    rc, _ = _cli(["export", str(src), str(tmp_path / "OUT"), "--atac",
                   "X[feature_types=Peaks]", "--atac-kind", "peak"], capsys)
     assert rc == 0
     assert ingest.read_canonical(tmp_path / "OUT" / "atac_peak.h5").n_vars == PEAKS

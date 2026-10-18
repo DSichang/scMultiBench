@@ -15,6 +15,8 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+# the table behind a bubble figure: mtb.plot.build_table is deprecated in 0.4.0
+from multibench.plot.bubble import _build_table  # noqa: E402
 from multibench import cli, config
 
 matplotlib.use("Agg")
@@ -119,7 +121,7 @@ def test_figures_of_five_or_more_metrics_keep_their_size(metrics):
 def test_several_datasets_warning_is_plain():
     d11 = _stored("D11", "rerun", "vertical")     # a second dataset of the same methods
     df = pd.concat([d11, d11.assign(dataset="D11b")], ignore_index=True)
-    _, msgs = _messages(mtb.plot.build_table, df)
+    _, msgs = _messages(_build_table, df)
     assert msgs == [
         "This figure averages each method over 2 datasets, D11 and D11b. Its rows "
         "mix datasets. Pass aggregate='summary' for the rank-averaged summary panel, "
@@ -131,7 +133,7 @@ def test_several_datasets_warning_with_a_lone_dataset():
     own = pd.DataFrame([{"metric": m, "value": v, "method": "PCA_standin",
                          "dataset": "LUNG", "category": "diagonal", "source": "user"}
                         for m, v in (("ARI", 0.3), ("NMI", 0.4), ("cLISI", 0.9))])
-    _, msgs = _messages(mtb.plot.build_table, pd.concat([diag, own], ignore_index=True))
+    _, msgs = _messages(_build_table, pd.concat([diag, own], ignore_index=True))
     assert ("This figure averages each method over 4 datasets, D24, D25, D28 and LUNG. "
             "Its rows mix datasets. Plot each dataset on its own.") in msgs
     assert not any("paper's" in m for m in msgs), msgs
@@ -141,7 +143,7 @@ def test_several_datasets_warning_cli_spelling(monkeypatch):
     monkeypatch.setattr(config, "_CLI", True)
     d11 = _stored("D11", "rerun", "vertical")     # a second dataset of the same methods
     df = pd.concat([d11, d11.assign(dataset="D11b")], ignore_index=True)
-    _, msgs = _messages(mtb.plot.build_table, df)
+    _, msgs = _messages(_build_table, df)
     assert msgs == [
         "This figure averages each method over 2 datasets, D11 and D11b. Its rows "
         "mix datasets. Pass --aggregate summary for the rank-averaged summary panel, "
@@ -156,7 +158,7 @@ def _rows(method, values):
 
 
 def test_one_method_warning_is_plain():
-    _, msgs = _messages(mtb.plot.build_table,
+    _, msgs = _messages(_build_table,
                         pd.DataFrame(_rows("PCA_LSI_stack", (0.3, 0.4, 0.9))))
     assert msgs == [
         "Only one method, PCA_LSI_stack, is in this figure. With nothing to rank it "
@@ -165,13 +167,15 @@ def test_one_method_warning_is_plain():
 
 def test_equal_column_warning_is_plain():
     df = pd.DataFrame(_rows("A", (0.3, 0.4, 1.0)) + _rows("B", (0.5, 0.2, 1.0)))
-    _, msgs = _messages(mtb.plot.build_table, df)
-    assert msgs == ["cLISI is 1.000 for every method. That column is grey."]
+    _, msgs = _messages(_build_table, df)
+    # 0.4.0: the warning says how to leave the column out
+    assert msgs == ["cLISI is 1.000 for every method. That column is grey. Leave it out "
+                    "with metrics=."]
     df = pd.DataFrame(_rows("A", (0.3, 0.4, 1.0)) + _rows("B", (0.3, 0.2, 1.0)))
-    _, msgs = _messages(mtb.plot.build_table, df)
+    _, msgs = _messages(_build_table, df)
     # columns in figure order, catalog.metrics()'s since 0.4.0 (X87): ARI first
     assert msgs == ["ARI is 0.300 and cLISI is 1.000 for every method. Those "
-                    "columns are grey."]
+                    "columns are grey. Leave them out with metrics=."]
 
 
 def test_equal_mean_rank_warning_is_plain():
@@ -180,10 +184,10 @@ def test_equal_mean_rank_warning_is_plain():
         for m, v in (("A", a), ("B", b)):
             rows += [{"method": m, "dataset": ds, "metric": k, "value": v}
                      for k in ("ARI", "NMI")]
-    _, msgs = _messages(mtb.plot.build_table, pd.DataFrame(rows), aggregate="summary")
+    _, msgs = _messages(_build_table, pd.DataFrame(rows), aggregate="summary")
     grey = [m for m in msgs if m.startswith("Every method has mean rank")]
     assert grey == ["Every method has mean rank 1.5 in ARI and NMI. Those columns "
-                    "are grey."], msgs
+                    "are grey. Leave them out with metrics=."], msgs
 
 
 # --- R5-11 (c): the CLI overlay line -----------------------------------------
@@ -206,8 +210,8 @@ def test_cli_overlay_line_is_plain(tmp_path, monkeypatch, capsys):
                    "--input", str(mine), "--out", str(tmp_path / "x.png")])
     err = capsys.readouterr().err
     assert rc == 0, err
-    assert ("# Added your 3 rows (PCA_LSI_stack) to the stored diagonal table, "
-            "which has 6 rows (source rerun).") in err.splitlines()
+    assert ("# Added your 3 rows (PCA_LSI_stack) to the 6 stored results of "
+            "diagonal.") in err.splitlines()
     assert "# overlay" not in err
 
 
@@ -221,10 +225,10 @@ def _with_gap():
 
 def test_na_raise_leaves_out_the_overall_sentence():
     with pytest.raises(ValueError) as e:
-        mtb.plot.build_table(_with_gap(), na="raise")
+        _build_table(_with_gap(), na="raise")
     assert str(e.value) == ("Row B has no NMI. Pass na='warn' to draw the figure "
                             "with these gaps.")
-    _, msgs = _messages(mtb.plot.build_table, _with_gap())
+    _, msgs = _messages(_build_table, _with_gap())
     assert "Row B has no NMI. Pass metrics= without NMI to compare on the same metrics." in msgs
 
 
@@ -242,9 +246,8 @@ def test_reordered_plain_dict_error_names_only_the_default_order(tmp_path):
     with pytest.raises(ValueError) as e:
         P._labels_from_dict({"cty2": p2, "cty1": p1}, None)
     assert str(e.value) == (
-        "The label keys cty2 and cty1 are not in the default order. Pass the "
-        "dict from mtb.labels_for(dataset, category, method) unchanged, a list of "
-        "paths in cell order, or label_order=[...]. The default order is cty1, "
+        "The label keys cty2 and cty1 are not in the default order. Pass a list of "
+        "paths in cell order, or dataset=, category= and method=. The default order is cty1, "
         "cty2, ... by number, with rna before adt before atac. It is not "
         "alphabetical.")
 
@@ -263,7 +266,8 @@ def test_reordered_labels_for_dict_names_the_method_order(tmp_path):
         P._labels_from_dict(three, None)
     assert str(e.value).startswith(
         "The label keys cty1, cty3 and cty2 are in neither the method's cell "
-        "order nor the default order. Pass the dict from mtb.labels_for(")
+        "order nor the default order. Pass a list of paths in cell order, or dataset=, "
+        "category= and method=.")
     # labels_for without a method returns the default order: no method to name
     plain = LabelFiles({"cty1": p1, "cty2": p2})
     plain["cty1"] = plain.pop("cty1")

@@ -82,13 +82,14 @@ def test_each_mean_rank_gets_its_own_sentence():
     msg = B._no_comparison_message(["A", "B"], {"NMI": 1.6667, "GC": 2.0, "ARI": 1.6667},
                                    aggregate="summary")
     assert msg == ("Every method has mean rank 1.67 in NMI and ARI. Every method has "
-                   "mean rank 2 in GC. Those columns are grey.")
+                   "mean rank 2 in GC. Those columns are grey. Leave them out with "
+                   "metrics=.")
     with warnings.catch_warnings(record=True) as rec:
         warnings.simplefilter("always")
         mtb.plot.bubble(_two_tie_groups(), aggregate="summary")
     (grey,) = [str(w.message) for w in rec if "grey" in str(w.message)]
     assert grey == ("Every method has mean rank 1.67 in NMI. Every method has mean "
-                    "rank 2 in GC. Those columns are grey.")
+                    "rank 2 in GC. Those columns are grey. Leave them out with metrics=.")
     for text in (msg, grey):
         assert ", and" not in text and ";" not in text
 
@@ -111,17 +112,17 @@ def test_the_macos_list_counts_only_rows_whose_files_are_present(macos_no_gpu):
     msg = _nothing_runnable("D11", "vertical", modalities="all")
     plan = full_scan("D11", "vertical", verbose=False, modalities="all")
     lacking = int((~plan["files_ok"]).sum())
-    have = len(plan) - lacking
     lines = msg.splitlines()
-    assert lines[2] == f"1 of {have} methods is also blocked by something else:"
-    assert lines[3].startswith("  moETM (rna+adt): moETM needs an NVIDIA GPU")
-    assert lines[4] == f"{lacking} rows need files that D11 does not have."
-    assert lines[5].startswith("mtb.run_all('D11', 'vertical', modalities=\"all\", dry_run=True) shows "
+    # 0.4: off Linux the GPU sentence is left out (the OS already blocks), so no
+    # method is listed as also blocked by something else
+    assert lines[2] == f"{lacking} rows need files that D11 does not have."
+    assert lines[3].startswith("mtb.run_all('D11', 'vertical', modalities=\"all\", dry_run=True) shows "
                                "every row.")
+    assert "NVIDIA GPU" not in msg and "also blocked" not in msg
     assert "atac" not in msg
     # with modalities= the rows the folder cannot have are not in the scan
     msg = _nothing_runnable("D11", "vertical", modalities=["rna", "adt"])
-    assert "need files" not in msg and msg.splitlines()[2] == lines[2]
+    assert "need files" not in msg and "also blocked" not in msg
 
 
 def test_a_mosaic_folder_lists_no_file_it_cannot_have(macos_no_gpu):
@@ -131,11 +132,17 @@ def test_a_mosaic_folder_lists_no_file_it_cannot_have(macos_no_gpu):
     assert re.search(r"^\d+ rows? needs? files that D46 does not have\.$", msg, re.M), msg
 
 
-def test_a_folder_variant_is_listed_by_its_method_name(macos_no_gpu):
+def test_a_folder_variant_is_listed_by_its_method_name(macos_no_gpu, monkeypatch):
     for kw in ({}, {"methods": ["scBridge", "SCALEX"]}):
         msg = _nothing_runnable("D28", "diagonal", **kw)
         assert "((" not in msg
-        assert "\n  scBridge: scBridge needs an NVIDIA GPU" in msg, msg
+        assert "NVIDIA GPU" not in msg, msg          # 0.4: left out off Linux
+    # on Linux the GPU sentence is said, on the line of the method's name
+    monkeypatch.setattr(R, "linux_only_sentence", lambda: None)
+    msg = _nothing_runnable("D28", "diagonal", methods=["scBridge", "SCALEX"])
+    assert "((" not in msg
+    line = next(l for l in msg.splitlines() if l.startswith("  scBridge"))
+    assert line.startswith("  scBridge: ") and "scBridge needs an NVIDIA GPU" in line, msg
 
 
 # ============================================================ describe_layout
@@ -171,7 +178,7 @@ def test_labels_for_names_a_missing_folder_as_scan_does(in_tmp):
 
 
 @pytest.mark.parametrize("kw,start", [
-    # 0.4: the default is the re-run tables; the published ones need source=
+    # 0.4: the default is the stored results; the published tables need source=
     (dict(category="vertical", clustering="louvain", source="published"),
      "The published tables of vertical have no louvain variant. They have default only."),
     (dict(category="cross", dataset="D52s", source="published"),
@@ -179,11 +186,11 @@ def test_labels_for_names_a_missing_folder_as_scan_does(in_tmp):
     (dict(category="cross", dataset=["D52", "D52s"], source="published"),
      "The published tables of cross hold D52, not D52s."),
     (dict(category="cross", dataset="D99"),
-     "The re-run tables of cross hold D52, not D99."),
+     "The stored results of cross hold D52, not D99."),
     (dict(category="cross", dataset="D99", source="both"),
-     "The published tables of cross hold D52, not D99. The re-run tables of cross hold "
+     "The published tables of cross hold D52, not D99. The stored results of cross hold "
      "D52, not D99."),
-    (dict(dataset="D99"), "The re-run tables hold D11, D28, D45 and D52, not D99."),
+    (dict(dataset="D99"), "The stored results hold D11, D28, D45 and D52, not D99."),
 ])
 def test_missing_tables_are_named_in_plain_sentences(kw, start):
     with warnings.catch_warnings():
@@ -203,7 +210,7 @@ def test_the_cli_names_no_result_path_flag(capsys, tmp_path):
                    "--out", str(tmp_path / "x.png")])
     err = capsys.readouterr().err
     assert rc == 1
-    assert "error: The re-run tables of cross hold D52, not D53." in err, err
+    assert "error: The stored results of cross hold D52, not D53." in err, err
     assert "--result-path" not in err and "result_path=" not in err, err
 
 
@@ -233,13 +240,12 @@ def test_an_unknown_modality_is_named_in_sentences():
 
 def test_a_metrics_token_error_is_plain_outside_its_examples():
     emb, lab = np.random.default_rng(0).normal(size=(6, 2)), list("aabbcc")
-    e = _raised(mtb.evaluate, emb, labels=lab, metrics="ARI")
+    # 0.4: one code is a valid metrics= (metrics="ARI"); an unknown token is refused
+    e = _raised(mtb.evaluate, emb, labels=lab, metrics="ARII")
     assert isinstance(e, ValueError)
-    assert str(e) == ("Unknown metrics= token ARI. Pass 'all', 'clustering', 'batch' or "
-                      "'classification', or a list of metric codes such as "
-                      "metrics=['ARI', 'NMI']. A single code goes in a list: "
-                      "metrics=['ARI'].")
-    _plain(str(e), "metrics=['ARI', 'NMI']", "metrics=['ARI']")
+    assert str(e) == ("Unknown metrics= token ARII. Pass 'all', 'clustering', 'batch' or "
+                      "'classification', or metric codes such as metrics=['ARI', 'NMI'].")
+    _plain(str(e), "metrics=['ARI', 'NMI']")
     e = _raised(mtb.evaluate, emb, labels=lab, metrics="dimension_reduction")
     _plain(str(e), "metrics=['ARI', 'NMI']")
     e = _raised(mtb.evaluate, emb, labels=lab, metrics=3)
@@ -275,13 +281,16 @@ def test_the_empty_cli_table_is_a_sentence(capsys):
 
 
 def test_the_deprecated_evaluate_flags_warn_in_sentences(monkeypatch, capsys):
-    from tests.test_cli_parity import _wide
-    monkeypatch.setattr(mtb, "evaluate", lambda *a, **kw: _wide())
+    from multibench.eval import pipeline
+    # the CLI scores with the internal wide frame and prints the long table
+    monkeypatch.setattr(pipeline, "_scores", lambda *a, **kw: pd.DataFrame(
+        {"Value": [0.5, 0.6, 0.7]}, index=["ARI", "NMI", "ASW"]))
     assert cli.main(["evaluate", "--embedding", "e.h5", "--labels", "l.csv",
                      "--task", "clustering"]) == 0
     err = capsys.readouterr().err
-    assert ("warning: --task is deprecated and will be removed in 0.5. Use --metrics "
-            "clustering.\n") in err, err
+    # 0.4: the warning names its command
+    assert ("warning: evaluate --task is deprecated and will be removed in 0.5. Use "
+            "--metrics clustering.\n") in err, err
     assert "deprecated;" not in err
     # 0.4: --only is removed; argparse refuses it
     with pytest.raises(SystemExit) as e:
@@ -319,8 +328,10 @@ def test_preflight_is_gone_from_what_users_read():
     env = _subparser("env")
     sub = next(a for a in env._actions if a.__class__.__name__ == "_SubParsersAction")
     helps = [a.help for a in sub._choices_actions]
-    assert "check which environments are installed or need building" in helps
-    texts = helps + [_doc(W.run_all), _doc(mtb.inputs_for), _doc(W.scan)]
+    # 0.4: env doctor and env status are deprecated and hidden; install is listed
+    assert "check which environments are installed or need building" not in helps
+    assert "unpack or build every needed env (mtb.env.install)" in helps
+    texts = helps + [_doc(W.run_all), _doc(W.scan)]
     assert not [t for t in texts if "preflight" in t.lower()]
 
 

@@ -336,8 +336,8 @@ def test_the_row_numbers_of_a_filtered_table_name_no_cell(tmp_path, how, files):
         ingest.export_dataset(ex, f, rna=None, labels=kept["celltype"], overwrite=True)
     assert str(e.value) == (
         "labels= Series index does not match the cell barcodes: 100 of 100 cells have no "
-        "entry (['EX0000-1', 'EX0001-1', 'EX0002-1', 'EX0003-1', 'EX0004-1']...); index it "
-        "by obs_names (or pass a plain list in cell order)")
+        "entry (['EX0000-1', 'EX0001-1', 'EX0002-1', 'EX0003-1', 'EX0004-1']...). Index it "
+        "by obs_names, or pass a plain list in cell order.")
     assert _snapshot(f) == before
 
 

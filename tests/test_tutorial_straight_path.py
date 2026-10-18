@@ -243,12 +243,13 @@ def test_the_generator_refuses_a_method_that_reads_only_some_batches(monkeypatch
             pytest.skip(f"{ds} is not on disk")
         monkeypatch.setitem(GEN.TASKS[key], "methods", ["StabMap", "UINMF"])
         GEN.check_task(key)
-        real = mtb.labels_for
-        monkeypatch.setattr(mtb, "labels_for", lambda *a, **k: (
+        # 0.4.0: the generator checks with the internal labels_for (mtb.labels_for is deprecated)
+        real = GEN.labels_for
+        monkeypatch.setattr(GEN, "labels_for", lambda *a, **k: (
             list(real(*a, **k))[:2] if a[2:] == ("UINMF",) else real(*a, **k)))
         with pytest.raises(SystemExit, match=f"UINMF reads only some batches of {ds}"):
             GEN.check_task(key)
-        monkeypatch.setattr(mtb, "labels_for", real)
+        monkeypatch.setattr(GEN, "labels_for", real)
 
 
 # ------------------------------------------------- the article's 13 tasks
@@ -453,8 +454,10 @@ def test_the_tasks_cover_every_method_of_the_four_categories():
 def test_end_to_end_installs_and_runs_matilda():
     code = "\n".join(_code("tutorial_end_to_end"))
     assert 'mtb.env.install(["Matilda"])' in code        # installs by default (X27)
-    assert 'mtb.run("Matilda", "vertical"' in code
-    assert "mtb.evaluate(emb" in code
+    # 0.4.0: one method is run_all(methods=[m]); res.embedding(m) is its embedding
+    assert 'mtb.run_all("D11", "vertical", methods=["Matilda"]' in code
+    assert 'emb = res.embedding("Matilda")' in code
+    assert "mtb.evaluate(emb" in code and "mtb.run(" not in code
 
 
 @pytest.mark.parametrize("name", RUNNING)
@@ -505,9 +508,9 @@ def test_methods_read_every_batch(key):
     t = GEN.TASKS[key]
     if not (mtb.config.DEFAULT.data_path / t["ds"]).is_dir():
         pytest.skip(f"{t['ds']} is not on disk")
-    n = len(mtb.labels_for(t["ds"]))
+    n = len(GEN.labels_for(t["ds"]))
     for m in t["methods"]:
-        assert len(mtb.labels_for(t["ds"], t["cat"], m)) == n, m
+        assert len(GEN.labels_for(t["ds"], t["cat"], m)) == n, m
 
 
 @pytest.mark.parametrize("key", KEYS)

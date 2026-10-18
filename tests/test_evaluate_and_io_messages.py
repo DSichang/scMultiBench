@@ -142,17 +142,20 @@ def test_x49_evaluate_takes_the_only_obsm_key():
 
 
 def test_x50_x71_classification_docs_and_left_out_cells():
-    doc = " ".join(mtb.classification_metrics.__doc__.split())
+    # 0.4.0: mtb.classify and mtb.classification_metrics are deprecated wrappers
+    # ("Deprecated: use ..."); the implementation keeps these docs
+    from multibench.eval import classify as C
+    doc = " ".join(C.classification_metrics.__doc__.split())
     assert ('The ``mean`` row is what ``mtb.evaluate(metrics="classification")`` '
             "returns; this adds one row per reference.") in doc
     import numpy as np
     emb = np.random.default_rng(3).normal(size=(90, 4))
     labels = np.array(["a", "b", "c"] * 15 + ["a", "b"] * 22 + ["a"])
     batch = np.array(["1"] * 45 + ["2"] * 45)
-    pred = mtb.classify(emb, labels=labels, batch=batch)
+    pred = C.classify(emb, labels=labels, batch=batch)
     # batch 2 lacks type c: the 15 c cells of batch 1 are left out with 2 as reference
     assert pred.attrs["left_out"] == {"1": 0, "2": 15}
-    assert "lacks is left out" in " ".join(mtb.classify.__doc__.split())
+    assert "lacks is left out" in " ".join(C.classify.__doc__.split())
 
 
 def test_x58_find_methods_task_names_no_replacement():
@@ -210,7 +213,7 @@ def test_x76_tokens_ignore_letter_case():
     assert len(plan)
     emb = np.random.default_rng(5).normal(size=(60, 4))
     got = mtb.evaluate(emb, labels=np.repeat(["a", "b", "c"], 20), metrics="Clustering")
-    assert "ARI" in got.index
+    assert "ARI" in set(got["metric"])
 
 
 def test_x83_read_canonical_reads_an_embedding_file(tmp_path):

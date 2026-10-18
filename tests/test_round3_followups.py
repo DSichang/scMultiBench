@@ -9,21 +9,23 @@ import multibench as mtb
 
 
 def test_fetchable_is_reexported_under_data():
-    ids = mtb.data.fetchable()
+    with pytest.warns(FutureWarning, match=r"Use mtb\.catalog\.datasets\(\)"):
+        ids = mtb.data.fetchable()
     assert ids == mtb.data.results.fetchable()
     assert "D11" in ids and len(ids) >= 5
 
 
 def test_io_dir_hides_leaked_imports():
     names = dir(mtb.io)
-    assert "to_canonical" in names and "export_dataset" in names
+    assert "to_canonical" not in names      # deprecated: hidden from dir()
+    assert "export_dataset" in names and "read_canonical" in names
     for leaked in ("annotations", "np", "os", "re", "Path"):
         assert leaked not in names
     assert mtb.io.annotations is not None      # attribute itself untouched
 
 
 def test_load_results_canonicalises_dataset_case():
-    with pytest.warns(UserWarning, match="'d52' is not a stored table id but 'D52' is"):
+    with pytest.warns(UserWarning, match="dataset 'd52' is not in the stored results but 'D52' is"):
         df = mtb.load_results("cross", dataset="d52")
     assert set(df["dataset"].astype(str)) == {"D52"}
     with warnings.catch_warnings():

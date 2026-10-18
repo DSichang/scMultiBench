@@ -76,7 +76,7 @@ def test_source_column_and_values(result_dir):
     assert (pub.source == "published").all() and "clustering" not in pub
     assert abs(_val(pub, "iNMF", "ARI") - 0.198677) < 1e-6
     rr = results.load_results("diagonal", dataset="D28")
-    assert (rr.source == "rerun").all()
+    assert (rr.source == "stored").all()          # 0.4.0: the value is "stored" (R7)
     # 11: the degenerate Conos rows left the table in 0.4.0 (X03)
     assert rr.method.nunique() == 11 and "Conos" not in set(rr.method)
     assert abs(_val(rr, "iNMF", "ARI") - 0.234054) < 1e-6
@@ -89,7 +89,7 @@ def test_source_both_concat(result_dir):
     both = results.load_results("diagonal", dataset="D28", source="both")
     assert len(both) == len(pub) + len(rr)
     assert list(both.columns) == COLS
-    assert set(both.source.unique()) == {"published", "rerun"}
+    assert set(both.source.unique()) == {"published", "stored"}
     # a 7-column frame (one source at a time) still plots
     from matplotlib.figure import Figure
     assert isinstance(mtb.plot.bubble(rr), Figure)
@@ -118,7 +118,7 @@ def test_zero_row_filter_warns(result_dir):
                                   source="published")
     assert len(df) == 0 and list(df.columns) == COLS
     msg = [str(w.message) for w in rec if issubclass(w.category, UserWarning)][0]
-    assert msg.endswith(". The re-run tables hold 1 dataset (D11). Leave out source= to "
+    assert msg.endswith(". The stored results hold 1 dataset (D11). Leave out source= to "
                         "read them.")
     # a KNOWN metric absent from the tables: still the empty-frame-plus-warning
     with pytest.warns(UserWarning, match="kBET"):
@@ -174,7 +174,7 @@ def test_result_path_single_csv(tmp_path, result_dir):
     assert set(back.method) == set(five.method)
     # a round-trip of a 7-col frame keeps its own provenance
     rr.to_csv(f, index=False)
-    assert (results.load_results(result_path=f).source == "rerun").all()
+    assert (results.load_results(result_path=f).source == "stored").all()
     # not a long CSV -> ValueError naming what is missing
     pd.DataFrame({"Value": [1.0]}, index=["ARI"]).to_csv(tmp_path / "wide.csv")
     with pytest.raises(ValueError, match=r"missing column\(s\) \['metric', 'value', 'method'\]"):
@@ -197,7 +197,7 @@ def test_mosaic_rerun_loads(result_dir):
         results.load_results("mosaic", source="published")
     # 'both' on mosaic = rerun only, no error
     b = results.load_results("mosaic", source="both")
-    assert set(b.source) == {"rerun"}
+    assert set(b.source) == {"stored"}
 
 
 def test_category_none_unions_everything(result_dir):
@@ -220,7 +220,7 @@ def test_dataset_list_and_unknown_dataset(result_dir):
         results.load_results("diagonal", dataset="D999", source="published")
     assert "The published tables of diagonal hold D24, D25 and D28, not D999." in str(e.value)
     assert "result_path=" not in str(e.value)
-    with pytest.raises(FileNotFoundError, match="The re-run tables of diagonal") as e:
+    with pytest.raises(FileNotFoundError, match="The stored results of diagonal") as e:
         results.load_results("diagonal", dataset="D999")
     assert "hold D28, not D999" in str(e.value)
 
@@ -245,17 +245,18 @@ def test_concat_to_csv_reload_keeps_provenance(tmp_path, result_dir):
     back = results.load_results(result_path=f)            # default keeps every row
     assert len(back) == len(rr) + 2
     assert back.source.notna().all()
-    assert set(back.source) == {"rerun", "user"}
+    assert set(back.source) == {"stored", "user"}
     user = results.load_results(result_path=f, source="user")
     assert set(user.method) == {"MyMethod"} and len(user) == 2
-    rerun = results.load_results(result_path=f, source="rerun")   # prefix match
-    assert set(rerun.source) == {"rerun"} and "MyMethod" not in set(rerun.method)
     assert len(results.load_results(result_path=f, source="both")) == len(back)
-    with pytest.raises(ValueError, match=r"source 'bogus' not in .*present: \['rerun', 'user'\]"):
+    with pytest.raises(ValueError, match=r"source 'bogus' not in .*present: \['stored', 'user'\]"):
         results.load_results(result_path=f, source="bogus")
     # the directory branch still validates against the fixed vocabulary
     with pytest.raises(ValueError, match="unknown source 'user'"):
         results.load_results("vertical", source="user")
+    # the deprecated source="rerun" still picks the stored rows of a file (0.4.x)
+    rerun = results.load_results(result_path=f, source="rerun")
+    assert set(rerun.source) == {"stored"} and "MyMethod" not in set(rerun.method)
 
 
 def test_load_long_csv_fills_nan_provenance(tmp_path):
@@ -276,7 +277,7 @@ def test_load_long_csv_fills_nan_provenance(tmp_path):
 def test_dataset_list_validates_every_element(result_dir):
     with pytest.raises(FileNotFoundError, match=r"^The published tables of diagonal hold D24, D25 and D28, not D99\.$") as e:
         results.load_results("diagonal", dataset=["D24", "D99"], source="published")
-    with pytest.raises(FileNotFoundError, match=r"The re-run tables of diagonal hold D28, not D98 and D99\."):
+    with pytest.raises(FileNotFoundError, match=r"The stored results of diagonal hold D28, not D98 and D99\."):
         _quiet_rerun("diagonal", dataset=["D28", "D98", "D99"])
     # source='both': an id present in ONE source is fine (D24 is published-only)
     both = _quiet_rerun("diagonal", dataset=["D24", "D28"], source="both")
@@ -319,15 +320,15 @@ def test_degenerate_rerun_rows_are_flagged(result_dir):
     assert "Conos" not in set(rr.method)
     bad_row = pd.DataFrame({"metric": ["ARI"], "value": [0.0013], "method": ["Conos"],
                             "dataset": ["D28"], "category": ["diagonal"],
-                            "clustering": ["default"], "source": ["rerun"]})
+                            "clustering": ["default"], "source": ["stored"]})
     bad = results._degenerate_rerun_rows(bad_row, result_dir)
     assert bad[["category", "dataset", "method"]].values.tolist() == [["diagonal", "D28", "Conos"]]
     assert bad.rerun_ARI.iloc[0] < 0.01 and bad.published_ARI.iloc[0] > 0.2
     with pytest.warns(DegenerateRerunWarning) as rec:
         results._warn_degenerate(bad_row, result_dir, "0.4.0")
     msg = str(rec[0].message)
-    assert msg == ("This re-run row has ARI below 0.01 where the article's run scored "
-                   "above 0.2: Conos/D28 (re-run 0.4.0, ARI 0.0013). It most likely "
+    assert msg == ("This stored row has ARI below 0.01 where the article's run scored "
+                   "above 0.2: Conos/D28 (stored 0.4.0, ARI 0.0013). It most likely "
                    "comes from a failed run. Leave it out before ranking.")
     assert "df[" not in msg and "published table" not in msg
 
@@ -339,10 +340,12 @@ def test_catalog_datasets_covers_every_dataset_with_results(result_dir, layout_t
     # the subsample tables left in 0.4.0 (X04): no "s" id is listed
     assert not cat.dataset.str.endswith("s").any()
     assert cat[cat.dataset.isin(have)].has_results.all()
-    # the CSV rows come first, the appended ids after them in natural order
-    tail = cat.dataset.tolist()[-1:]
-    assert tail == ["D24"]
-    # the article's datasets keep their category; has_results is the re-run tables'
+    # the CSV rows come first, the appended ids after them, then (0.4.0) the 12
+    # demo subsets in natural order
+    ids = cat.dataset.tolist()
+    demo = [d for d in ids if "mini" in d]
+    assert len(demo) == 12 and ids[-12:] == demo and ids[-13] == "D24"
+    # the article's datasets keep their category; has_results is the stored results'
     rows = cat.set_index("dataset")
     assert rows.loc["D24", "category"] == rows.loc["D25", "category"] == "diagonal"
     assert not rows.loc["D24", "has_results"] and not rows.loc["D25", "has_results"]
@@ -354,26 +357,26 @@ def test_catalog_datasets_covers_every_dataset_with_results(result_dir, layout_t
 
 
 # ---------------------------------------------------------------------------
-# re-test round 3: plain 'rerun' provenance, one-method tables, fetchable()
+# re-test round 3: plain 'stored' provenance, one-method tables, fetchable()
 # ---------------------------------------------------------------------------
-def test_source_column_is_plain_rerun_and_version_in_attrs(result_dir, tmp_path):
+def test_source_column_is_plain_stored_and_version_in_attrs(result_dir, tmp_path):
     """Two of three re-testers filtered df[df.source == 'rerun'] and got an
     empty frame: the column carried the file stamp 'rerun-0.2.1'. The column
-    now holds exactly 'published' | 'rerun' | 'user'; the stamp lives in
-    frame.attrs['rerun_version']."""
+    now holds exactly 'published' | 'stored' | 'user' (0.4.0 renamed 'rerun',
+    R7); the stamp lives in frame.attrs['rerun_version']."""
     rr = _quiet_rerun("vertical", dataset="D11")
-    assert set(rr.source) == {"rerun"}
+    assert set(rr.source) == {"stored"}
     assert rr.attrs["rerun_version"] == "0.4.0"
-    assert len(rr[rr.source == "rerun"]) == len(rr)
+    assert len(rr[rr.source == "stored"]) == len(rr)
     both = _quiet_rerun("cross", dataset="D52", source="both")
-    assert set(both.source) == {"published", "rerun"}
+    assert set(both.source) == {"published", "stored"}
     assert both.attrs["rerun_version"] == "0.4.0"
     # published-only frames carry the key too, as None
     pub = results.load_results("diagonal", dataset="D28", source="published")
     assert set(pub.source) == {"published"} and pub.attrs["rerun_version"] is None
-    # results_coverage reports the same stamp and plain 'rerun' rows
+    # results_coverage reports the same stamp and plain 'stored' rows
     cov = mtb.results_coverage("cross", source="both")
-    assert set(cov.source) == {"published", "rerun"} and cov.attrs["rerun_version"] == "0.4.0"
+    assert set(cov.source) == {"published", "stored"} and cov.attrs["rerun_version"] == "0.4.0"
     # a user file: the column keeps whatever it carries, an old stamp is
     # still matched by source='rerun' (prefix) and parsed into attrs
     old = rr.assign(source="rerun-0.1.0")
@@ -382,15 +385,16 @@ def test_source_column_is_plain_rerun_and_version_in_attrs(result_dir, tmp_path)
     back = results.load_results(result_path=f, source="rerun")
     assert set(back.source) == {"rerun-0.1.0"} and back.attrs["rerun_version"] == "0.1.0"
     assert set(results.load_results(result_path=f, source="user").method) == {"MyMethod"}
-    # a rerun frame without a stamp (plain 'rerun' written by this version)
-    rr.to_csv(f, index=False)
-    back = results.load_results(result_path=f, source="rerun")
-    assert set(back.source) == {"rerun"} and back.attrs["rerun_version"] is None
     # the DegenerateRerunWarning keeps naming the full stamp
     bad_row = rr.iloc[:1].assign(metric="ARI", value=0.001, method="Conos",
                                  dataset="D28", category="diagonal")
-    with pytest.warns(DegenerateRerunWarning, match=r"Conos/D28 \(re-run 0.4.0, ARI"):
+    with pytest.warns(DegenerateRerunWarning, match=r"Conos/D28 \(stored 0.4.0, ARI"):
         results._warn_degenerate(bad_row, result_dir, "0.4.0")
+    # a stored frame without a stamp (plain 'stored' written by this version):
+    # the deprecated source="rerun" still picks its rows
+    rr.to_csv(f, index=False)
+    back = results.load_results(result_path=f, source="rerun")
+    assert set(back.source) == {"stored"} and back.attrs["rerun_version"] is None
 
 
 def test_single_method_table_warns_when_other_source_has_more(result_dir, layout_tree):
@@ -429,7 +433,7 @@ def test_single_method_table_warns_when_other_source_has_more(result_dir, layout
     # a different FileNotFoundError inside the lookup, the same silence
     import shutil
     shutil.copytree(result_dir / "rerun", layout_tree / "rerun")
-    with pytest.raises(FileNotFoundError, match="The re-run tables of cross hold D52, not D54."):
+    with pytest.raises(FileNotFoundError, match="The stored results of cross hold D52, not D54."):
         results._load_rerun("cross", ["D54"], layout_tree)
     with warnings.catch_warnings():
         warnings.simplefilter("error", UserWarning)
@@ -467,8 +471,8 @@ def test_shipped_tree_is_consistent_across_the_api(result_dir):
     assert results.available_datasets() == rr
     cov = mtb.results_coverage(source="both")
     assert set(cov[cov.source == "published"].dataset) == set(sum(pub.values(), []))
-    assert set(cov[cov.source == "rerun"].dataset) == set(rr)
-    assert set(mtb.results_coverage().dataset) == set(rr)      # the default lists rerun rows
+    assert set(cov[cov.source == "stored"].dataset) == set(rr)
+    assert set(mtb.results_coverage().dataset) == set(rr)      # the default lists stored rows
     cat = mtb.catalog.datasets()
     assert set(cat[cat.has_results].dataset) == set(rr)
     for c, ds in pub.items():

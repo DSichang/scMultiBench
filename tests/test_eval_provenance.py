@@ -42,10 +42,12 @@ def test_evaluate_records_a_search():
 
 
 def test_evaluate_records_user_clusters_and_no_sweep():
+    # clustering= is deprecated since 0.4: its implementation, without the warning
     emb, lab = _blobs()
-    wide = mtb.evaluate(emb, labels=lab, clusters=lab, metrics=["ARI", "NMI"])
-    assert wide.attrs["clustering"] == "user"
-    assert wide.attrs["leiden_flavor"] is None          # nothing needed a sweep
+    long = pipeline._evaluate(emb, labels=lab, clustering=lab, metrics=["ARI", "NMI"])
+    assert long.attrs["clustering"] == "user"
+    assert long.attrs["leiden_flavor"] is None          # nothing needed a sweep
+    assert set(long["scored_with"]) == {f"none/user/{mtb.__version__}"}
 
 
 def test_evaluate_without_clustering_metrics_records_none():
@@ -83,13 +85,15 @@ def test_to_long_of_a_frame_without_provenance_says_unknown(tmp_path):
         long = mtb.to_long(w, method="M")
     assert long.columns.tolist() == pipeline.LONG_COLUMNS + ["scored_with"]
     assert set(long["scored_with"]) == {"unknown"}
-    # a CSV read back carries no attrs either
+    # 0.4.0: evaluate's CSV is the long table, so its scored_with column comes
+    # back with it, and to_long keeps it
     emb, lab = _blobs()
-    mtb.evaluate(emb, labels=lab, metrics=["ASW"]).to_csv(tmp_path / "w.csv")
-    back = pd.read_csv(tmp_path / "w.csv", index_col=0)
+    scores = mtb.evaluate(emb, labels=lab, metrics=["ASW"])
+    scores.to_csv(tmp_path / "w.csv", index=False)
+    back = pd.read_csv(tmp_path / "w.csv")
     long = mtb.to_long(back, method="M")
     assert long.columns.tolist() == pipeline.LONG_COLUMNS + ["scored_with"]
-    assert set(long["scored_with"]) == {"unknown"}
+    assert long["scored_with"].tolist() == scores["scored_with"].tolist()
 
 
 def _mine():

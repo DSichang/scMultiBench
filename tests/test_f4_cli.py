@@ -140,8 +140,8 @@ def test_run_all_timeout_exits_3_and_the_line_names_the_limit(slow, tmp_path, ca
 
 
 def test_python_run_all_status_line_ends_with_the_error(failing, tmp_path, capsys):
-    res = mtb.run_all("MYCITE", "vertical", out_dir=tmp_path / "py", methods=["Matilda"],
-                      modalities=["rna", "adt"], data_path=failing)
+    res = mtb.run_all(str(failing / "MYCITE"), "vertical", out_dir=tmp_path / "py",
+                      methods=["Matilda"], modalities=["rna", "adt"])
     out = capsys.readouterr().out
     assert len(res.failures) == 1                       # the Python call does not raise
     assert _status_line(out).endswith(") ValueError: stand-in method failed on purpose")
@@ -171,9 +171,11 @@ def test_exit_code_3_is_documented_in_both_helps(capsys):
     assert "``3`` means ``run-all``" in " ".join(cli.__doc__.split())
     with pytest.raises(SystemExit):
         cli.main(["run-all", "--help"])
-    text = capsys.readouterr().out
-    lines = [l for l in text.splitlines() if "exit code 3" in l.lower()]
-    assert len(lines) == 1, text
+    text = " ".join(capsys.readouterr().out.split())
+    # 0.4.0: the epilog names exit code 1 too, once
+    assert ("Exit code 1 means no method could start; 3 means the run finished, but a "
+            "method failed or a method named in --methods was skipped.") in text
+    assert text.count("3 means") == 1, text
 
 
 def test_dry_run_still_exits_0_with_a_blocked_row(working, tmp_path, monkeypatch, capsys):
@@ -279,29 +281,27 @@ def test_count_error_speaks_of_the_row_order_of_output(tmp_path, capsys):
 # ====================================================================== R4-07
 def test_run_all_description_names_the_saved_files_and_the_plot_command():
     desc = " ".join(_sub("run-all").description.split())
-    assert ("evaluate each output and save summary.csv, long.csv, failures.csv and "
-            "batch_result.json under --out-dir. multibench plot bubble --input OUT draws "
-            "the figure.") in desc
+    assert ("on the dataset folder, score each output and save summary.csv, long.csv, "
+            "failures.csv and batch_result.json under --out-dir. multibench plot bubble "
+            "--input OUT draws the figure.") in desc
     assert "and figure under" not in desc
 
 
 def test_run_all_data_path_and_dry_run_help():
     p = _sub("run-all")
-    data = " ".join(next(a.help for a in p._actions if "--data-path" in a.option_strings)
-                    .split())
-    assert data.endswith("(default: shown by multibench config)"), data
+    import argparse
+    data = next(a.help for a in p._actions if "--data-path" in a.option_strings)
+    assert data == argparse.SUPPRESS                  # 0.4.0: hidden and deprecated
     dry = " ".join(next(a.help for a in p._actions if "--dry-run" in a.option_strings)
                    .split())
-    # the ledger's wording ('as multibench scan prints it') wraps to three lines
-    assert dry == ("print the plan (one row per method variant, as in multibench scan) "
-                   "and the commands; nothing runs")
-    for flag in ("--data-path", "--dry-run"):
-        lines = _rendered_help(p, flag)
-        if "  " not in lines[0].strip():      # the flag alone; the help starts below
-            lines = lines[1:]
-        assert len(lines) <= 2, (flag, lines)
+    assert dry == "print the plan (one row per method variant) and the commands; nothing runs"
+    lines = _rendered_help(p, "--dry-run")
+    if "  " not in lines[0].strip():          # the flag alone; the help starts below
+        lines = lines[1:]
+    assert len(lines) <= 2, lines
     text = p.format_help()
-    assert "mtb." not in text.split("--dry-run", 1)[1].split("--assume-gpu", 1)[0]
+    assert "--data-path" not in text and "--assume-gpu" not in text
+    assert "mtb." not in text.split("--dry-run", 1)[1]
     assert "package data path" not in text
 
 
@@ -342,7 +342,10 @@ def test_mosaic_auto_plan_has_short_lines_without_semicolons_in_parentheses(linu
     err = _plan_err(capsys)
     assert not _parens_with_semicolon(err), err
     lines = err.splitlines()
-    assert re.fullmatch(r"# 6 envs: 7\.6 GB to download, at least \d+\.\d GB on disk", lines[0])
+    # 0.4.0: the total names the shared layer the envs download once
+    assert re.fullmatch(r"# 6 envs: 7\.6 GB to download, at least \d+\.\d GB on disk"
+                        r" \(with the shared layer [^,()]+, \d+\.\d GB, downloaded once\)",
+                        lines[0]), lines[0]
     assert lines[1] == "# for jobs on GPU nodes, pass --flavor gpu"
     assert "GPU build" not in err and "only a GPU" not in err
 

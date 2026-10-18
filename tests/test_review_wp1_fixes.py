@@ -22,10 +22,10 @@ def test_fetch_outputs_takes_method_names_in_any_case(served):  # noqa: F811
         F.fetch_outputs("D11", methods=["totalVI"], data_path=data, quiet=True)
 
 
-def test_cli_dry_run_refuses_a_bad_param_before_its_header(capsys):
-    rc = cli.main(["run", "--method", "Matilda", "--category", "vertical", "--out-dir", "/o",
-                   "--input", "rna=/d/rna.h5", "--input", "adt=/d/adt.h5",
-                   "--input", "cty=/d/cty.csv", "--param", "epochz=1", "--dry-run"])
+def test_cli_dry_run_refuses_a_bad_param_before_its_header(tmp_path, capsys):
+    (tmp_path / "DS").mkdir()
+    rc = cli.main(["run-all", str(tmp_path / "DS"), "--category", "vertical", "--methods",
+                   "Matilda", "--param", "Matilda:epochz=1", "--dry-run"])
     err = capsys.readouterr().err
     assert rc == 1 and "Dry run" not in err
     assert err.startswith("error: Matilda does not accept ['epochz']")
