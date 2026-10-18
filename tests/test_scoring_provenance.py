@@ -18,7 +18,7 @@ def _doc(obj):
 
 def test_leiden_flavor_names_the_backend_of_the_stored_sources():
     doc = _doc(config.Config)
-    assert "Scores can differ by up to about 0.1 between the two." in doc
+    assert "up to about 0.1" not in doc                   # Z32 (r3)
     assert "backend of both stored sources" not in doc
 
 

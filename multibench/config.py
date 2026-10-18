@@ -189,7 +189,7 @@ class Config:
     leiden_flavor : str
         Leiden backend of the clustering in ``mtb.evaluate``: ``"leidenalg"``
         (default, the article's and the stored tables') or ``"igraph"``
-        (faster). Scores can differ by up to about 0.1 between the two.
+        (faster).
     envs_dir : pathlib.Path
         Where the method environments live (``<envs_dir>/<env>``). Default
         ``$MULTIBENCH_ENVS_DIR``, else the first writable envs folder of the
@@ -208,8 +208,11 @@ class Config:
     mtb.data.fetch : downloads reference datasets into ``data_path``.
     """
 
-    result_path: Path = field(default_factory=lambda: _ROOT / "multibench" / "result")
-    files_path: Path = field(default_factory=lambda: _ROOT / "multibench" / "files")
+    # the package's own tables: not set by users, so not in the signature or repr
+    result_path: Path = field(default_factory=lambda: _ROOT / "multibench" / "result",
+                              init=False, repr=False)
+    files_path: Path = field(default_factory=lambda: _ROOT / "multibench" / "files",
+                             init=False, repr=False)
     repo_path: Path = _LazyPath(_default_repo_path, cache=False)
     data_path: Path = _LazyPath(_default_data_path, cache=False)
     leiden_flavor: str = "leidenalg"
