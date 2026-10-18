@@ -1016,6 +1016,9 @@ def _evaluate(embedding, labels=None, *, dataset=None, method="embedding", categ
               label_order=None, missing_labels="error", data_path=None) -> pd.DataFrame:
     """:func:`evaluate` with the deprecated ``clustering=``, ``label_order=`` and
     ``missing_labels=``; ``data_path`` is the folder that holds ``dataset``."""
+    if not isinstance(missing_labels, str) or missing_labels not in ("error", "drop"):
+        raise ValueError(
+            f'missing_labels must be "error" or "drop", got {missing_labels!r}.')
     if not isinstance(method, str) or not method.strip():
         raise TypeError(f"method= takes a name, such as method='Matilda'; got {method!r}.")
     name = None

@@ -1308,15 +1308,16 @@ def _default_order_warning(dataset: str, category, stems: list[str],
         doer = who(names)
         method = repr(names[0]) if len(names) == 1 else "<method>"
         whose = "its" if len(names) == 1 else "their"
-        fix = config.hint(f"labels_for({dataset!r}, {cat!r}, {method})",
+        fix = config.hint(f"mtb.evaluate(..., dataset={dataset!r}, category={cat!r}, "
+                          f"method={method})",
                           f"--method {method.strip(chr(39))}")
         return f"{head} {where}{doer} them in another order: pass {fix} for {whose} output."
     parts = [f"in {cat}, {who(names)} them in another order" if i == 0
              else f"in {cat}, {_and_list(names)} {'does' if len(names) == 1 else 'do'}"
              for i, (cat, names) in enumerate(by_cat.items())]
     text = "; ".join(parts)
-    return (f"{head} {text[0].upper()}{text[1:]}: pass labels_for({dataset!r}, "
-            f"<category>, <method>) for their output.")
+    return (f"{head} {text[0].upper()}{text[1:]}: pass mtb.evaluate(..., dataset="
+            f"{dataset!r}, category=<category>, method=<method>) for their output.")
 
 
 class LabelFiles(dict):

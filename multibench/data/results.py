@@ -961,9 +961,9 @@ def recommend(
     per-dataset score is the mean rank over the metrics, min-max scaled
     within the dataset (1 = best, 0 = worst there), and ``grand_score`` is
     the mean over the datasets. The order is the row order of
-    ``mtb.plot.bubble`` and ``mtb.plot.bar`` for the same rows, so
-    ``long_df=`` gives the numbers behind a figure. Methods the package runs
-    for the category without scores are listed last.
+    ``mtb.plot.bubble`` and ``mtb.plot.bar`` for the same rows and the same
+    ``metrics=``, so ``long_df=`` gives the numbers behind a figure. Methods
+    the package runs for the category without scores are listed last.
 
     Parameters
     ----------

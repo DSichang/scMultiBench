@@ -30,7 +30,7 @@ def bar(long_df: pd.DataFrame, *, metrics=None, methods=None, title: str | None 
 
     Within each dataset the methods are ranked on each metric; the bar is the
     across-dataset score, in the order of ``mtb.recommend(category,
-    long_df=long_df)``.
+    long_df=long_df, metrics=...)`` with the same metrics.
 
     Parameters
     ----------

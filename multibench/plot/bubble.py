@@ -997,7 +997,8 @@ def bubble(long_df, *, metrics=None, methods=None, title=None, save=None):
     """Draw the article's bubble table: methods as rows, metrics as columns.
 
     Metrics are grouped into families, each led by an *Overall* bar. Rows run
-    best first, in the order of ``mtb.recommend(category, long_df=long_df)``.
+    best first, in the order of ``mtb.recommend(category, long_df=long_df,
+    metrics=...)`` with the same metrics.
 
     Parameters
     ----------
