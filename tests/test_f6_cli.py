@@ -216,7 +216,7 @@ def test_python_overlay_with_a_stored_name_names_to_long():
     # an advice that works on any long frame (0.4.0, X16)
     assert str(e.value) == ("Your rows and the stored table both have uniPort on D28. "
                             "Give your rows another name, e.g. "
-                            "rows.assign(method=\"uniPort_rerun\").")
+                            "rows.assign(method=rows.method + \"_rerun\").")
 
 
 def test_a_user_source_that_starts_like_a_stored_one_is_not_stored():

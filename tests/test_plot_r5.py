@@ -225,7 +225,7 @@ def test_na_raise_leaves_out_the_overall_sentence():
     assert str(e.value) == ("Row B has no NMI. Pass na='warn' to draw the figure "
                             "with these gaps.")
     _, msgs = _messages(mtb.plot.build_table, _with_gap())
-    assert "Row B has no NMI. Its Overall uses the metrics it has." in msgs
+    assert "Row B has no NMI. Pass metrics= without NMI to compare on the same metrics." in msgs
 
 
 # --- R5-11 (e): the label-order error names a method only when one was used ---

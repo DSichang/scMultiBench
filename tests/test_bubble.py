@@ -442,7 +442,7 @@ def test_na_warn_default_names_method_and_rule():
     with pytest.warns(UserWarning, match=r"Row B \(D1\) has no NMI\.") as rec:
         tbl = bubble.build_table(_with_gap())
     msg = str([w for w in rec if "has no NMI" in str(w.message)][0].message)
-    assert "Its Overall uses the metrics it has." in msg
+    assert "Pass metrics= without NMI to compare on the same metrics." in msg   # Y29 (r3)
     assert tbl.na_cells == ["B: DR and clustering Overall over 2 of 3 metrics (NMI n/a)"]
     # the arithmetic the message describes: B's Overall is the mean over ARI, cLISI ranks
     b = tbl.blocks[0]

@@ -95,18 +95,20 @@ def test_x14_rows_repeating_stored_rows_are_refused(fn):
         else (lambda: mtb.plot.bar(both))
     with pytest.raises(ValueError, match=r"Your rows and the stored table both have iNMF "
                                          r"on D28\. Give your rows another name, e\.g\. "
-                                         r"rows\.assign\(method=\"iNMF_rerun\"\)\."):
+                                         r"rows\.assign\(method=rows\.method \+ "
+                                         r"\"_rerun\"\)\."):
         call()
 
 
 def test_x16_the_rename_advice_works_on_a_long_frame():
     d11 = _d11()
     rows = d11[d11.method == "scMM"].assign(source="user")
-    with pytest.raises(ValueError, match=r'rows\.assign\(method="scMM_rerun"\)') as e:
+    # Y23 (r3): the advice keeps each method its own name
+    with pytest.raises(ValueError, match=r'rows\.assign\(method=rows\.method \+ "_rerun"\)') as e:
         mtb.plot.build_table(pd.concat([d11, rows]))
     assert "to_long(method" not in str(e.value)
     # the advice runs as written
-    fixed = rows.assign(method="scMM_rerun")
+    fixed = rows.assign(method=rows.method + "_rerun")
     mtb.plot.build_table(pd.concat([d11, fixed]))
 
 

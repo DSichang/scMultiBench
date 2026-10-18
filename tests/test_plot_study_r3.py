@@ -156,16 +156,17 @@ def _d28_with_mine():
 def test_na_warning_names_the_stored_row_in_short_sentences():
     _, msgs = _messages(mtb.plot.build_table, _d28_with_mine())
     (msg,) = [m for m in msgs if "has no" in m]
-    assert msg.startswith("The stored row Conos (D28, published) has no ASW, iASW or "
-                          "ASW_batch. Its Overall uses the metrics it has.")
-    assert msg.endswith("Its Overall uses the metrics it has.")
+    # Y29 (r3): the sentence after the gaps is what to do about them
+    tail = " Pass metrics= without ASW, iASW and ASW_batch to compare on the same metrics."
+    assert msg == ("The stored row Conos (D28, published) has no ASW, iASW or "
+                   "ASW_batch." + tail)
     assert "hide this message" not in msg
     assert " - the family Overall" not in msg and "LiNet" not in msg
     with pytest.raises(ValueError) as e:
         mtb.plot.build_table(_d28_with_mine(), na="raise")
     # R4-12: the error names na='warn' instead of offering to hide itself
     # R5-11: and leaves out the Overall sentence, since no figure is drawn
-    assert str(e.value) == (msg.replace(" Its Overall uses the metrics it has.", "")
+    assert str(e.value) == (msg.replace(tail, "")
                             + " Pass na='warn' to draw the figure with these gaps.")
 
 
@@ -175,7 +176,8 @@ def test_na_warning_names_your_row():
     _, msgs = _messages(mtb.plot.build_table, df)
     (msg,) = [m for m in msgs if "has no" in m]
     assert "Your row LiNet (D28) has no GC." in msg
-    assert "Each row's Overall uses the metrics it has." in msg
+    assert msg.endswith("Pass metrics= without ASW, iASW, ASW_batch and GC to compare on "
+                        "the same metrics.")
 
 
 def test_na_warning_stops_after_three_rows():
@@ -187,7 +189,7 @@ def test_na_warning_stops_after_three_rows():
     (msg,) = [m for m in msgs if "has no" in m]
     assert msg.count("has no NMI.") == 3
     assert "... and 1 more row." in msg
-    assert "Each row's Overall uses the metrics it has." in msg
+    assert msg.endswith("Pass metrics= without NMI to compare on the same metrics.")
 
 
 def test_na_warning_in_summary_mode():

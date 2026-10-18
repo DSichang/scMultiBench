@@ -138,11 +138,11 @@ def test_na_raise_does_not_offer_to_hide_the_error():
     # the warning keeps its own last sentence
     _, msgs = _messages(mtb.plot.build_table, _with_gap())
     (warn,) = [m for m in msgs if "has no" in m]
-    assert warn.endswith("Its Overall uses the metrics it has.")
+    assert warn.endswith("Pass metrics= without NMI to compare on the same metrics.")
     assert "hide this message" not in warn
     # R5-11: the error leaves out the Overall sentence (no figure is drawn)
-    assert "Overall uses the metrics" not in msg
-    body = warn.replace(" Its Overall uses the metrics it has.", "")
+    assert "to compare on the same metrics" not in msg
+    body = warn.replace(" Pass metrics= without NMI to compare on the same metrics.", "")
     assert msg.startswith(body + " ")
 
 

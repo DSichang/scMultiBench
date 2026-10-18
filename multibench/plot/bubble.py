@@ -89,7 +89,7 @@ class BubbleTable:
         mean within-dataset max-ranks under ``"summary"``.
     overall : pandas.Series
         Combined Overall per method (mean of the Overalls of the families
-        two or more methods have); it sets
+        every row has); it sets
         the row order unless ``order`` is given.
     aggregate : str
         ``"dataset"`` (metric markers are circles) or ``"summary"`` (bars,
@@ -663,9 +663,12 @@ def _na_message(missing: list, df: pd.DataFrame, aggregate: str,
         sentences.append("In the summary, a missing value counts as the lowest rank on "
                          "that dataset.")
     elif na != "raise":
-        # the Overall rule describes the figure, which na="raise" does not draw
-        sentences.append("Its Overall uses the metrics it has." if len(missing) == 1
-                         else "Each row's Overall uses the metrics it has.")
+        # what to do about it; na="raise" draws no figure
+        gaps = _and_list(dict.fromkeys(c for _, per_ds, _w in missing
+                                       for _, codes in per_ds for c in codes))
+        sentences.append(_config.hint(
+            f"Pass metrics= without {gaps} to compare on the same metrics.",
+            f"Pass --metrics without {gaps} to compare on the same metrics."))
     if na == "raise":
         sentences.append(_config.hint("Pass na='warn' to draw the figure with these gaps.",
                                       "Leave out --na to draw the figure with these gaps."))
@@ -697,8 +700,8 @@ def _duplicate_rows_message(dup, keys) -> str:
         first = str(mixed["method"].iloc[0])
         return (f"Your rows and the stored table both have "
                 f"{_and_distinct(mixed['method'])}{where}. "
-                + _config.hint(f"Give your rows another name, e.g. "
-                               f"rows.assign(method=\"{first}_rerun\").",
+                + _config.hint("Give your rows another name, e.g. "
+                               "rows.assign(method=rows.method + \"_rerun\").",
                                f"Give your rows another name, such as {first}_rerun, "
                                f"with evaluate --name."))
     what = _and_list(keys)
