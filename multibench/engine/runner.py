@@ -603,11 +603,51 @@ def unknown_params_error(method: str, unknown: list, allowed: set) -> KeyError:
 
 def check_params(method: str, variant, params: dict | None) -> None:
     """Raise :func:`unknown_params_error` for a ``params`` key the variant does
-    not accept, before anything runs."""
+    not accept, and :func:`check_param_types`' error for a value of the wrong
+    type, before anything runs."""
     allowed = set(variant.tunable) | set(variant.params)
     unknown = [k for k in (params or {}) if k not in allowed]
     if unknown:
         raise unknown_params_error(method, unknown, allowed)
+    check_param_types(method, variant, params)
+
+
+#: the script's declared type -> what a value must be
+_TYPE_WORDS = {"int": "a whole number", "float": "a number", "str": "a text value"}
+
+
+def _fits(value, kind: str) -> bool:
+    """Whether ``value`` can stand on the command line for an argument of
+    argparse ``type=kind``: a bool never stands for a number or text."""
+    import numbers
+    if isinstance(value, bool):
+        return False
+    if kind == "str":
+        return True
+    if isinstance(value, numbers.Integral):
+        return True
+    if isinstance(value, numbers.Real):
+        return kind == "float"           # 3.0 reaches argparse's int() as "3.0"
+    if isinstance(value, str):
+        try:
+            int(value) if kind == "int" else float(value)
+            return True
+        except ValueError:
+            return False
+    return False
+
+
+def check_param_types(method: str, variant, params: dict | None) -> None:
+    """``TypeError`` for a ``params`` value that does not fit the type the
+    script declares for it (``int``, ``float``, ``str``): ``2.5`` or ``True``
+    for ``epochs`` would reach the script as ``--epochs 2.5`` or a bare
+    ``--epochs``."""
+    for key, value in (params or {}).items():
+        decl = variant.tunable.get(key) or {}
+        kind = decl.get("type")
+        if kind in _TYPE_WORDS and value is not None and not _fits(value, kind):
+            raise TypeError(f"{method}: {key} takes {_TYPE_WORDS[kind]}, got {value!r}. "
+                            f"Its default is {decl.get('default')!r}.")
 
 
 def cpu_params_for(spec, params: dict | None, *,
@@ -725,6 +765,9 @@ def _run(method: str, category: str, *, inputs: dict, out_dir: str,
     _check_template(cmd_template)
     method = registry.check_method(method)
     _check_removed_roles(method, inputs)
+    if registry.get(method).legacy_modalities(category, _modality_roles(inputs)):
+        # 0.3's key of the vertical peak methods' ATAC file
+        inputs = {("atac" if k == "atac_gas" else k): v for k, v in inputs.items()}
     check_params(method, registry.get(method).select(category, _modality_roles(inputs)),
                  params)
     _check_input_cells(method, category, inputs)

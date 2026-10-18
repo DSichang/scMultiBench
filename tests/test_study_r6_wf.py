@@ -372,18 +372,35 @@ def test_rescore_without_clustering_metrics_keeps_the_stored_order(cross, tmp_pa
     assert new.summary[cols].equals(res.summary[cols])
 
 
-def test_rescore_with_a_clustering_metric_ranks_with_one_sweep(cross, tmp_path,
-                                                              monkeypatch, capsys):
-    _cross_run(cross, tmp_path, "totalVI")
+def test_rescore_with_a_clustering_metric_reuses_the_recorded_order(cross, tmp_path,
+                                                                   monkeypatch, capsys):
+    # 0.4.0 (X82): the recorded label order is reused, so the orders are not
+    # ranked again: no ranking clustering at all
+    res = _cross_run(cross, tmp_path, "totalVI")
     back = mtb.load_batch(tmp_path / "totalVI")
     calls = _count_sweeps(monkeypatch)
     new = _quiet(back.rescore, metrics=["ARI"], verbose=True)
-    assert len(calls) == 1
+    assert calls == []
+    assert new.records[0]["labels_used"] == res.records[0]["labels_used"]
     assert len(new.records[0]["label_order_candidates"]) == 6
+    lines = capsys.readouterr().out.splitlines()
+    assert not any("ranking" in line for line in lines), lines
+    assert lines[0].startswith("[rescore] totalVI -> CHAIN_OK")
+
+
+def test_rescore_ranks_the_orders_of_a_record_without_one(cross, tmp_path, monkeypatch,
+                                                          capsys):
+    _cross_run(cross, tmp_path, "totalVI")
+    p = tmp_path / "totalVI" / "batch_result.json"
+    blob = json.loads(p.read_text())
+    blob["records"][0].pop("labels_used")
+    p.write_text(json.dumps(blob))
+    calls = _count_sweeps(monkeypatch)
+    _quiet(mtb.load_batch(tmp_path / "totalVI").rescore, metrics=["ARI"], verbose=True)
+    assert len(calls) == 1
     lines = capsys.readouterr().out.splitlines()
     assert lines[0] == ("[rescore] totalVI: ranking 6 label orders on 150 cells with "
                         "one Leiden clustering ...")
-    assert lines[1].startswith("[rescore] totalVI -> CHAIN_OK")
 
 
 def test_a_stored_order_that_no_longer_fits_is_ranked_again(cross, tmp_path, monkeypatch):

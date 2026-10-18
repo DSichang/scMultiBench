@@ -208,6 +208,7 @@ class Variant:
     extra_outputs: list[OutputSpec] = field(default_factory=list)
     helpers: list = field(default_factory=list)     # modules upstream does not ship, from engine/helpers/<method>/
     size_hint: str = ""                # what the method needs from the data's size; starts with the method name
+    min_cells: int | None = None       # the cell total below which size_hint applies (None: always shown)
     downloads: list = field(default_factory=list)   # [{file, url}] the first run downloads next to the script
 
     def matches(self, category: str, modalities: set[str]) -> bool:
@@ -418,6 +419,20 @@ class MethodSpec:
         """True when some variant takes an ATAC input."""
         return any(v.consumes_atac for v in self.variants)
 
+    def legacy_modalities(self, category: str, modalities) -> set | None:
+        """The 0.4 spelling of a 0.3 role set, else ``None``: the vertical
+        variants of scMM, scMDC, moETM, UnitedNet and iPOLNG read ``atac.h5``
+        (peaks) under the role ``atac`` since 0.4, ``atac_gas`` before (saved
+        records and older ``inputs=`` keys still name it)."""
+        mods = set(modalities)
+        if category != "vertical" or "atac_gas" not in mods or "atac" in mods:
+            return None
+        if any(v.when.get("category") == "vertical"
+               and "atac_gas" in v.when.get("modalities", []) for v in self.variants):
+            return None
+        new = (mods - {"atac_gas"}) | {"atac"}
+        return new if any(v.matches(category, new) for v in self.variants) else None
+
     def select(self, category: str, modalities: set[str], *,
                loose: bool = False) -> Variant:
         """The variant declared for ``(category, modalities)``.
@@ -430,6 +445,9 @@ class MethodSpec:
         for v in self.variants:
             if v.matches(category, modalities):
                 return v
+        legacy = self.legacy_modalities(category, modalities)
+        if legacy is not None:
+            return self.select(category, legacy)
         if loose:
             want = {modality_family(m) for m in modalities}
             hits = [v for v in self.variants

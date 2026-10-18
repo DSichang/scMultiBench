@@ -643,6 +643,25 @@ def _diagonal_side(files) -> tuple | None:
     return ("RNA", "ATAC") if side == "rna" else ("ATAC", "RNA")
 
 
+def _files_that_fit(files: list, n_cells: int) -> list:
+    """The first label files whose cells add up to ``n_cells`` (a method that
+    read batches 1-2 of 3), else ``[]``."""
+    total, out = 0, []
+    for f in files:
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                total += len(io.read_labels(f))
+        except Exception:  # noqa: BLE001 - only a hint: no fit
+            return []
+        out.append(f)
+        if total == n_cells:
+            return out
+        if total > n_cells:
+            return []
+    return []
+
+
 def _count_error(what: str, n: int, n_cells: int, given, category=None) -> str:
     """evaluate()'s error for ``n`` values of ``what`` against ``n_cells`` rows.
 
@@ -667,6 +686,14 @@ def _count_error(what: str, n: int, n_cells: int, given, category=None) -> str:
         escib.count_error(what, n, n_cells),
         f"{_FLAGS[what]} gave {n:,} {_UNITS[what]}{names} for {n_cells:,} cells "
         f"in --embedding.")
+    if what == "labels" and n > n_cells and len(files) > 1:
+        fit = _files_that_fit(files, n_cells)
+        if fit:
+            keys = [f.stem for f in fit]
+            return (f"The embedding has {n_cells:,} cells = {'+'.join(keys)}. "
+                    + config.hint(f"Pass label_order={keys!r}.",
+                                  "Pass --labels for " + " and ".join(
+                                      f.name for f in fit) + " only."))
     if what != "labels" or n >= n_cells:
         return msg
     batches = _batch_files(files[0], n_cells) if len(files) == 1 else []

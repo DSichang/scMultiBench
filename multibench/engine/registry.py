@@ -63,6 +63,7 @@ def _parse_variant(d: dict, method_id: str | None = None) -> Variant:
         helpers=list(d.get("helpers", []) or []),
         downloads=list(d.get("downloads", []) or []),
         size_hint=d.get("size_hint", "") or "",
+        min_cells=d.get("min_cells"),
     )
     # labels_for orders label files by this: a bad declaration fails at load
     try:

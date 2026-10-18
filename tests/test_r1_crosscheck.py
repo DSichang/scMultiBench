@@ -227,3 +227,152 @@ def test_x43_catalog_files_dir_is_deprecated(fn):
         by_pos = f(config.DEFAULT.files_path)               # 0.3 took it by position
     pd.testing.assert_frame_equal(by_kw, want)
     pd.testing.assert_frame_equal(by_pos, want)
+
+
+# --- run_all, scan, load_batch: X01, X11, X13, X35, X63-X66, X68, X79-X81 ----
+
+def _tree(tmp_path, scored_with="leidenalg/search/0.4.0", version="0.4.0"):
+    """A saved run_all folder of one scored method."""
+    import json
+    rec = {"method": "Matilda", "status": "CHAIN_OK", "metrics": {"ARI": 0.5},
+           "multibench_version": version, "out_dir": str(tmp_path / "Matilda_D11")}
+    (tmp_path / "batch_result.json").write_text(json.dumps(
+        {"dataset": "D11", "category": "vertical", "records": [rec]}))
+    long = pd.DataFrame({"metric": ["ARI"], "value": [0.5], "method": ["Matilda"],
+                         "dataset": ["D11"], "category": ["vertical"],
+                         "clustering": ["default"], "source": ["user"]})
+    if scored_with is not None:
+        long["scored_with"] = scored_with
+    long.to_csv(tmp_path / "long.csv", index=False)
+    return tmp_path
+
+
+@pytest.mark.parametrize("scored_with,warns", [
+    (None, True), ("leidenalg/sweep/0.3.9", True), ("leidenalg/search/0.4.0", False)])
+def test_x01_load_batch_warns_for_scores_before_040(tmp_path, scored_with, warns):
+    _, msgs = _messages(mtb.load_batch, _tree(tmp_path, scored_with))
+    hit = "These scores come from multibench 0.3.x. res.rescore() scores them as " \
+          "0.4.0 does."
+    assert (hit in msgs) is warns, msgs
+
+
+def test_x35_summary_puts_the_scores_first(tmp_path):
+    res, _ = _messages(mtb.load_batch, _tree(tmp_path))
+    cols = res.summary.columns.tolist()
+    assert cols[:4] == ["method", "status", "ARI", "run_sec"]
+    assert cols[-2:] == ["caveat", "reason"]
+
+
+@pytest.mark.parametrize("value", [2.5, "abc", True, 3.0])
+def test_x63_param_values_are_type_checked(value):
+    with pytest.raises(TypeError, match=r"^Multigrate: epochs takes a whole number, got "):
+        mtb.run_all("D52mini", "cross", methods=["Multigrate"],
+                    params={"Multigrate": {"epochs": value}}, dry_run=True, verbose=False)
+    plan = mtb.run_all("D52mini", "cross", methods=["Multigrate"],
+                       params={"Multigrate": {"epochs": "3"}}, dry_run=True, verbose=False)
+    assert "--epochs 3 " in plan.command.iloc[0] + " "
+
+
+def test_x64_tunable_leaves_out_what_the_package_or_script_sets():
+    tun = mtb.params_for("scJoint", "diagonal", ["rna", "atac_gas"])["tunable"]
+    for name in ("cty_path1", "cty_path2", "rna_protein_paths", "atac_protein_paths",
+                 "checkpoint", "input_size", "number_of_class"):
+        assert name not in tun, name
+    assert {"batch_size", "epochs_stage1", "lr_stage1"} <= set(tun)
+    with pytest.raises(KeyError, match=r"scJoint does not accept \['cty_path1'\]"):
+        mtb.run_all("D28", "diagonal", methods=["scJoint"],
+                    params={"scJoint": {"cty_path1": "x.csv"}}, dry_run=True, verbose=False)
+    assert "r_dim" not in mtb.params_for("scMM", "vertical", ["rna", "atac"])["tunable"]
+
+
+def test_x65_method_colon_key_gets_the_nested_example():
+    with pytest.raises(TypeError, match=r"such as params=\{'Multigrate': \{'epochs': 3\}\}\.$"):
+        mtb.run_all("D52mini", "cross", params={"Multigrate:epochs": 3}, dry_run=True)
+
+
+def test_x66_dry_run_refuses_skip_existing_with_params():
+    with pytest.raises(ValueError, match=r"^skip_existing=True with params="):
+        mtb.run_all("D52mini", "cross", methods=["Multigrate"],
+                    params={"Multigrate": {"epochs": 3}}, skip_existing=True,
+                    dry_run=True, verbose=False)
+
+
+def test_x68_size_error_names_the_label_files_that_fit(tmp_path):
+    import numpy as np
+    labels = mtb.labels_for("D52mini", "cross", "UINMF")
+    n = sum(len(pd.read_csv(labels[k])) for k in ("cty1", "cty2"))
+    emb = np.random.default_rng(0).normal(size=(n, 5))
+    with pytest.raises(ValueError, match=rf"^The embedding has {n:,} cells = cty1\+cty2\. "
+                                         r"Pass label_order=\['cty1', 'cty2'\]\.$"):
+        mtb.evaluate(emb, labels=labels, category="cross", metrics=["ARI"])
+
+
+def test_x68_dry_run_marks_the_nested_variant():
+    plan = mtb.run_all("D52mini", "cross", methods=["UINMF"], dry_run=True, verbose=False)
+    row = plan.set_index("modalities").loc["rna1+rna2+adt1+adt2"]
+    assert row.caveat.startswith("Not run: UINMF runs on rna1+rna2+rna3+adt1+adt2+adt3 "
+                                 "instead.")
+
+
+def test_x80_one_batch_folder_lists_no_batched_variant(capsys):
+    plan = mtb.run_all("D27mini", "diagonal", methods=["iNMF", "online_iNMF"],
+                       dry_run=True)
+    assert set(plan.modalities) == {"rna+atac_gas"}
+    assert "2 rows for numbered batches are not listed." in capsys.readouterr().out
+    every = mtb.run_all("D27mini", "diagonal", methods=["iNMF"], dry_run=True,
+                        modalities="all", verbose=False)
+    assert len(every) == 2
+
+
+def test_x81_online_inmf_size_note_only_on_a_small_folder():
+    big = mtb.run_all("D28", "diagonal", methods=["online_iNMF"], dry_run=True,
+                      verbose=False)
+    assert not big.caveat.str.contains("5,000 cells").any()
+    from multibench.engine import registry
+    v = registry.get("online_iNMF").select("diagonal", {"rna", "atac_gas"})
+    assert v.min_cells == 5000 and "5,000 cells" in v.size_hint
+
+
+def test_x79_scan_names_the_batch_renumbering(tmp_path, capsys, monkeypatch):
+    import os
+    src = mtb.config.DEFAULT.data_path / "D45mini"
+    d = tmp_path / "MYMOSAIC"
+    d.mkdir()
+    for new, old in (("rna1", "rna2"), ("atac1", "atac2"), ("rna2", "rna1"),
+                     ("atac3", "atac3")):
+        os.symlink(src / f"{old}.h5", d / f"{new}.h5")
+    monkeypatch.chdir(tmp_path)
+    mtb.scan("./MYMOSAIC", "mosaic")
+    out = capsys.readouterr().out
+    assert ("[scan] MYMOSAIC has batches 1 RNA+ATAC, 2 RNA, 3 ATAC. Methods read 1 RNA, "
+            "2 RNA+ATAC, 3 ATAC: renumber the files to match.") in out
+
+
+def test_x11_a_local_folder_shadowed_by_the_data_path_is_named(tmp_path, monkeypatch):
+    from multibench.engine import resolve
+    monkeypatch.setattr(resolve, "_SHADOW_NOTED", set())
+    (tmp_path / "D11").mkdir()
+    monkeypatch.chdir(tmp_path)
+    _, msgs = _messages(mtb.inputs_for, "D11", "vertical", "Matilda")
+    want = (f"Using {mtb.config.DEFAULT.data_path / 'D11'}; ./D11 also exists: pass "
+            "'./D11' for it.")
+    assert msgs.count(want) == 1, msgs
+    _, msgs = _messages(mtb.inputs_for, "D11", "vertical", "Matilda")
+    assert want not in msgs                                  # once a session
+
+
+def test_x13_vertical_peak_methods_read_the_atac_role():
+    for m in ("UnitedNet", "iPOLNG", "moETM", "scMDC", "scMM"):
+        got = mtb.inputs_for("D27mini_vertical", "vertical", m)
+        assert "atac" in got and "atac_gas" not in got, m
+        assert got["atac"].endswith("atac_peak.h5"), m
+    plan = mtb.run_all("D27mini_vertical", "vertical", modalities=["rna", "atac"],
+                       dry_run=True, verbose=False)
+    assert {"scMM", "scMDC", "moETM", "UnitedNet", "iPOLNG"} <= set(plan.method)
+    # 0.3's key and saved records still select the variant
+    argv = mtb.run("scMM", "vertical", inputs={"rna": "a.h5", "atac_gas": "b.h5"},
+                   out_dir="o", dry_run=True)
+    assert "--path2" in argv
+    from multibench.engine import registry
+    assert registry.get("scMM").select("vertical", {"rna", "atac_gas"}).when[
+        "modalities"] == ["rna", "atac"]

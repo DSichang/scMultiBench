@@ -284,6 +284,27 @@ def missing_dataset_message(base, dataset: str) -> str:
                           "holds it. multibench layout shows the layout."))
 
 
+#: (data path, name) pairs already told that ./name is shadowed, once a session
+_SHADOW_NOTED: set = set()
+
+
+def _note_local_folder(base: Path, name: str) -> None:
+    """One warning when a bare dataset name resolves under ``base`` while the
+    working directory holds a folder of the same name."""
+    here = Path(name)
+    if len(here.parts) != 1 or not here.is_dir():
+        return
+    if os.path.abspath(here) == os.path.abspath(base / name):
+        return
+    key = (os.path.abspath(base), name)
+    if key in _SHADOW_NOTED:
+        return
+    _SHADOW_NOTED.add(key)
+    path = f"./{name}"
+    _compat.warn(f"Using {base / name}; {path} also exists: pass "
+                 + config.hint(f"{path!r}", path) + " for it.", UserWarning)
+
+
 def canonical_dataset(base, dataset: str) -> str:
     """The spelling of ``dataset`` in the listing of ``base``, with a warning
     when it differs only in case: a case-insensitive file system opens
@@ -296,6 +317,7 @@ def canonical_dataset(base, dataset: str) -> str:
     except OSError:
         return name
     if name in listing:
+        _note_local_folder(base, name)
         return name
     same = [n for n in listing if n.lower() == name.lower() and (base / n).is_dir()]
     if len(same) != 1:
