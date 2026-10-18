@@ -1049,7 +1049,14 @@ def _dataset_labels(dataset, category, method, data_path):
         own = None
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message=resolve.DEFAULT_ORDER_WARNING)
-        labels = resolve.labels_for(dataset, category, own, data_path=data_path)
+        try:
+            labels = resolve.labels_for(dataset, category, own, data_path=data_path)
+        except KeyError as e:
+            if own is None or not e.args:
+                raise
+            raise KeyError(str(e.args[0]) + config.hint(
+                " For your own embedding, pass the label files as labels=.",
+                " For your own embedding, pass the label files with --labels.")) from None
     if not labels:
         raise ValueError(f"{dataset} has no label file. "
                          + config.hint("Pass labels=.", "Pass --labels."))
@@ -1063,9 +1070,10 @@ def _dataset_labels(dataset, category, method, data_path):
             except Exception:  # noqa: BLE001 - no variant here: nothing to suggest
                 theirs = list(labels)
         if theirs != list(labels):
-            _compat.warn(f"Did you mean method={near!r}? {near} puts the cells of "
-                         f"{dataset} in another order; {method!r} reads the folder's "
-                         f"order.", UserWarning)
+            _compat.warn(config.hint(f"Did you mean method={near!r}? ", f"Did you mean "
+                                     f"--method {near}? ")
+                         + f"{near} puts the cells of {dataset} in another order; "
+                         f"{method!r} reads the folder's order.", UserWarning)
     return labels
 
 
