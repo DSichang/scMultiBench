@@ -627,6 +627,9 @@ def check_params(method: str, variant, params: dict | None) -> None:
     type, before anything runs."""
     allowed = set(variant.tunable)
     unknown = [k for k in (params or {}) if k not in allowed]
+    if unknown and all(isinstance(params[k], dict) for k in unknown):
+        raise KeyError(f"run takes params={params[unknown[0]]!r}; the nested form is "
+                       f"for run_all.")
     if unknown:
         raise unknown_params_error(method, unknown, allowed)
     check_param_types(method, variant, params)

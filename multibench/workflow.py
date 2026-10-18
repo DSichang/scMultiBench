@@ -3488,6 +3488,11 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         methods = [registry.check_method(m) for m in methods]
     _check_params_shape(params, methods, "run_all")
     params = {registry.check_method(m): v for m, v in (params or {}).items()}
+    if methods is not None:
+        stray = [m for m in params if m not in methods]
+        if stray:
+            raise ValueError(f"params names {_and_list(stray)}, which "
+                             f"{'is' if len(stray) == 1 else 'are'} not in methods=.")
     if assume_gpu and not dry_run:
         raise ValueError(
             "assume_gpu=True applies to a dry run only; a real run checks this "
@@ -3770,6 +3775,8 @@ def sweep(dataset: str, category: str, method: str, param: str, values, *,
     mtb.params_for : the hyperparameters of the variant.
     mtb.run_all : what each value runs through.
     """
+    if method in config._CATEGORY_FOLDERS:
+        raise TypeError("sweep takes (dataset, category, method, param, values).")
     dataset, data_path = _resolve.split_dataset(dataset, data_path)
     method = registry.check_method(method)
     values = list(values)
