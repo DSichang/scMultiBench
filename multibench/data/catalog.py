@@ -1,5 +1,5 @@
-"""The benchmark's method, dataset and metric tables: ``mtb.catalog.methods()``,
-``datasets()`` and ``metrics()``."""
+"""The reference tables: ``mtb.catalog.datasets()`` (which datasets) and
+``mtb.catalog.metrics()`` (which metrics)."""
 from __future__ import annotations
 
 import re
@@ -9,7 +9,7 @@ import pandas as pd
 
 from .. import _compat, config
 
-__all__ = ["methods", "datasets", "metrics"]
+__all__ = ["datasets", "metrics"]
 
 
 def __dir__() -> list[str]:
@@ -148,8 +148,9 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
     ----------
     metrics
         ``None`` (no restriction), a family token (``"clustering"``,
-        ``"batch"``, ``"classification"``, ``"all"``) or a list of metric codes (case/alias
-        tolerant: ``["ari", "kbet"]`` -> ``ARI, kBET``).
+        ``"batch"``, ``"classification"``, ``"all"``), one metric code, or a list
+        of codes and families (case/alias tolerant: ``["ari", "kbet"]`` -> ``ARI,
+        kBET``; a family in a list adds its codes, kBET only when named).
     extra : collection of str
         Codes accepted on top of :func:`_known_metrics` - the metrics present
         in a frame, so a user's own metric name in a long file can still be
@@ -164,10 +165,9 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
     Raises
     ------
     ValueError
-        A string that is not a family token (``"Unknown metrics= token
-        ARI. Pass 'all', 'clustering', 'batch' or 'classification', or a list
-        of metric codes ..."``; a method task token gets an extra sentence
-        saying the slot selects a metric family), an unknown code in a list
+        A string that is neither a family token nor a metric code (a method
+        task token gets an extra sentence saying the slot selects a metric
+        family), an unknown code in a list
         (listing the valid codes), an empty list, or a list that names the
         same metric twice after canonicalisation.
     TypeError
@@ -181,16 +181,19 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
     if isinstance(metrics, str):
         if metrics in fams:
             return MetricSelection(metrics, fams[metrics], False)
-        hint = ""
-        from ..engine.registry import list_tasks
-        if metrics in list_tasks():
-            hint = (f" {kw}= selects a metric family, not a task. The tasks "
-                    f"dimension_reduction and clustering both use the clustering family.")
-        elif _canonical_metric(metrics) in _known_metrics():
-            hint = f" A single code goes in a list: {kw}=[{_canonical_metric(metrics)!r}]."
-        raise ValueError(
-            f"Unknown {kw}= token {metrics}. Pass 'all', 'clustering', 'batch' or "
-            f"'classification', or a list of metric codes such as {kw}=['ARI', 'NMI'].{hint}")
+        code = _canonical_metric(metrics)
+        if code in _known_metrics() or code in set(map(str, extra)):
+            metrics = [code]               # one code: a list of one
+        else:
+            hint = ""
+            from ..engine.registry import list_tasks
+            if metrics in list_tasks():
+                hint = (f" {kw}= selects a metric family, not a task. The tasks "
+                        f"dimension_reduction and clustering both use the clustering "
+                        f"family.")
+            raise ValueError(
+                f"Unknown {kw}= token {metrics}. Pass 'all', 'clustering', 'batch' or "
+                f"'classification', or metric codes such as {kw}=['ARI', 'NMI'].{hint}")
     if isinstance(metrics, (bytes, dict)) or not hasattr(metrics, "__iter__"):
         got = type(metrics).__name__
         raise TypeError(
@@ -205,6 +208,11 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
     present = sorted(set(map(str, extra)))
     codes, unknown = [], []
     for m in wanted:
+        if isinstance(m, str) and m.lower() in (*fams, "all"):
+            # a family in the list: its codes (kBET only when named, as for the token)
+            family = valid if m.lower() == "all" else fams[m.lower()]
+            codes += [c for c in family if c != "kBET" and c not in codes]
+            continue
         c = _canonical_metric(m)
         if c is None or (c not in valid and c not in present):
             unknown.append(m)
@@ -215,7 +223,10 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
             f"unknown metric(s) {unknown}; valid: clustering, batch, classification, "
             f"all, or the codes {valid}"
             + (f"; present in this frame: {present}" if present else ""))
-    dup = sorted({c for c in codes if codes.count(c) > 1})
+    named = [_canonical_metric(m) for m in wanted
+             if not (isinstance(m, str) and m.lower() in (*fams, "all"))]
+    dup = sorted({c for c in named if named.count(c) > 1})
+    codes = list(dict.fromkeys(codes))
     if dup:
         raise ValueError(
             f"{kw}= names the same metric twice after canonicalisation: {dup}")
@@ -265,6 +276,10 @@ def methods() -> pd.DataFrame:
     mtb.method_info : everything the package knows about one method.
     """
     return _methods()
+
+
+methods = _compat.renamed("catalog.methods", "mtb.find_methods() and mtb.method_info(method)",
+                          methods)
 
 
 def _methods(files_dir: Path | str | None = None) -> pd.DataFrame:
@@ -318,38 +333,29 @@ _PAPER_COLUMNS = ["assay", "tissue", "n_cells", "n_batches", "source"]
 @_compat.keywords("catalog.datasets", private="_datasets", kept=_FILES_DIR,
                   positional=("files_dir",))
 def datasets(*, category: str | None = None) -> pd.DataFrame:
-    """Table of the benchmark's datasets, joined with the stored results.
+    """The datasets: the benchmark's, and the demo subsets ``mtb.data.fetch``
+    downloads.
 
     Parameters
     ----------
     category : str | None
-        Keep only the datasets the benchmark scored in this integration
-        category (``vertical``, ``diagonal``, ``mosaic`` or ``cross``);
-        ``None`` = all.
+        ``vertical``, ``diagonal``, ``mosaic`` or ``cross``: only the datasets
+        of that category; ``None`` = all.
 
     Returns
     -------
     pandas.DataFrame
-        One row per dataset id: ``dataset``, ``simulated`` (ids starting with
-        ``SD``), ``category`` (the categories the benchmark scored it in,
-        ``;``-joined) and ``has_results`` (``mtb.load_results`` has scores
-        for it).
-
-    Raises
-    ------
-    ValueError
-        Unknown ``category``; the message lists the valid ones.
+        One row per dataset: ``dataset``, ``category`` (``;``-joined when the
+        benchmark scored it in several), ``simulated`` (ids starting with
+        ``SD``), ``fetchable`` (``mtb.data.fetch`` downloads it) and
+        ``has_results`` (``mtb.load_results`` has stored results for it).
 
     Examples
     --------
     >>> import multibench as mtb
     >>> ds = mtb.catalog.datasets()
-    >>> ds[ds.has_results][["dataset", "category"]]
-
-    See Also
-    --------
-    mtb.results_coverage : which methods have stored scores on each dataset.
-    mtb.data.fetchable : dataset ids that can be downloaded.
+    >>> ds[ds.fetchable].dataset.tolist()
+    >>> ds[ds.has_results]
     """
     return _datasets(category=category)
 
@@ -383,10 +389,17 @@ def _datasets(files_dir: Path | str | None = None, *,
     if extra:
         raw = pd.concat([raw, pd.DataFrame({name_col: extra})], ignore_index=True)
 
+    from .fetch import AVAILABLE, DEMO_CATEGORIES
+    for ds, cat in DEMO_CATEGORIES.items():
+        cat_of.setdefault(ds, [cat])
+    demos = [d for d in DEMO_CATEGORIES if d not in set(raw[name_col])]
+    raw = pd.concat([raw, pd.DataFrame({name_col: sorted(demos, key=_dataset_sort_key)})],
+                    ignore_index=True)
     out = pd.DataFrame()
     out["dataset"] = raw[name_col].astype(str).str.strip()
-    out["simulated"] = out["dataset"].str.upper().str.startswith("SD")
     out["category"] = out["dataset"].map(lambda d: ";".join(cat_of[d]) if d in cat_of else None)
+    out["simulated"] = out["dataset"].str.upper().str.startswith("SD")
+    out["fetchable"] = out["dataset"].isin(set(AVAILABLE))
     out["has_results"] = out["dataset"].isin(served)
 
     for col in _PAPER_COLUMNS:
@@ -419,7 +432,6 @@ def metrics() -> pd.DataFrame:
     See Also
     --------
     mtb.evaluate : computes these metrics for an embedding.
-    mtb.classification_metrics : the classification metrics of ``mtb.classify``'s predictions.
     """
     return _metrics()
 

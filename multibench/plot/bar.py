@@ -21,80 +21,60 @@ FAMILY_CMAPS = {"clustering": "Blues", "batch": "Greens", "classification": "Pin
 @_compat.keywords("plot.bar", renamed={"group": "metrics"}, private="_bar", kept={
     "cmap": _compat.note("leave it out for the metric family's colours"),
     "show_datasets": _compat.note(
-        'leave it out to draw the dataset dots of overall="mean_overall"')})
-def bar(long_df: pd.DataFrame, *, metrics=None, top: int | None = None,
-        title: str | None = None, save: str | None = None, overall: str = "rank"):
-    """Draw each method's overall score across datasets as a horizontal bar.
+        'leave it out to draw the dataset dots of overall="mean_overall"'),
+    "top": _compat.use("methods="),
+    "overall": _compat.use("the default")})
+def bar(long_df: pd.DataFrame, *, metrics=None, methods=None, title: str | None = None,
+        save: str | None = None):
+    """Draw each method's overall score as a horizontal bar, best on top.
+
+    Within each dataset the methods are ranked on each metric; the bar is the
+    across-dataset score, in the order of ``mtb.recommend(category,
+    long_df=long_df)``.
 
     Parameters
     ----------
     long_df : pandas.DataFrame
-        Long table with ``method``, ``metric``, ``value`` columns and an
-        optional ``dataset`` (absent = one dataset), e.g. from
-        ``mtb.load_results``.
+        A long table (``method``, ``metric``, ``value`` and optional
+        ``dataset``), as ``mtb.load_results``, ``mtb.evaluate`` and
+        ``BatchResult.long`` return.
     metrics : str, list of str | None
-        Metric codes to score, or a family (``"clustering"``, ``"batch"``,
-        ``"classification"``, ``"all"``) drawn in its colour, as the
-        benchmark's summary panels; ``None`` = every metric.
-    top : int | None
-        Keep the ``top`` best methods, scored against all of them; ``None``
-        = every method.
+        A family (``"clustering"``, ``"batch"``, ``"classification"``,
+        ``"all"``) drawn in its colour, a code, or codes; ``None`` = every
+        metric.
+    methods : list of str | None
+        Methods (bars) to show, ranked among themselves; ``None`` = every
+        method in the frame.
     title : str | None
-        Figure title; ``None`` = the dataset, or the number of datasets. With
-        a family, ``(<family> metrics)`` is appended.
+        Figure title; ``None`` = the dataset, or the number of datasets.
     save : str | None
-        File to write the figure to (140 dpi, tight bounding box).
-    overall : {"rank", "mean_overall"}
-        Across-dataset *Overall*: ``"rank"`` re-ranks mean ranks (missing
-        dataset = rank 0); ``"mean_overall"`` averages per-dataset Overalls
-        (missing dataset skipped).
+        File to write the figure to.
 
     Returns
     -------
     matplotlib.figure.Figure
-        One horizontal bar per method, best on top.
 
     Raises
     ------
     ValueError
-        ``long_df`` lacks ``method`` / ``metric`` / ``value``, is empty
-        (``mtb.load_results`` may have returned nothing; see its warning), or
-        repeats a ``(method, dataset, metric)`` row.
-    ValueError
-        Unknown ``metrics`` code (the error suggests a close match and lists
-        the metrics present), or an invalid ``overall``.
-    ValueError
-        ``metrics`` names a family with no metric in the frame: batch metrics
-        need a multi-batch dataset, and the stored tables have no
-        classification scores.
-
-    Warns
-    -----
-    UserWarning
-        A method missing from some datasets, a dataset with one method, a
-        metric only one method has (it does not count), rows scored before
-        0.4.0, or a figure of two methods.
+        ``long_df`` lacks ``method`` / ``metric`` / ``value``, is empty,
+        repeats a ``(method, dataset, metric)`` row, or ``metrics`` /
+        ``methods`` names a value it does not hold.
 
     Examples
     --------
     >>> import multibench as mtb
     >>> df = mtb.load_results("diagonal")
-    >>> fig = mtb.plot.bar(df, metrics="clustering", top=10, save="clustering.png")
-
-    See Also
-    --------
-    mtb.plot.bubble : per-dataset (or rank-averaged) bubble table, same ``overall=`` formulas.
-    mtb.load_results : stored metric tables as a long frame.
+    >>> fig = mtb.plot.bar(df, metrics="clustering", save="clustering.png")
     """
-    return _bar(long_df, metrics=metrics, top=top, title=title, save=save,
-                overall=overall)
+    return _bar(long_df, metrics=metrics, methods=methods, title=title, save=save)
 
 
-def _bar(long_df: pd.DataFrame, *, metrics=None, top: int | None = None,
+def _bar(long_df: pd.DataFrame, *, metrics=None, methods=None, top: int | None = None,
          title: str | None = None, save: str | None = None, overall: str = "rank",
          cmap: str = "Blues", show_datasets: bool = True):
-    """:func:`bar`, with the deprecated ``cmap`` (the colours when no metric
-    family is drawn) and ``show_datasets`` of 0.3."""
+    """:func:`bar`, with the deprecated ``top``, ``overall``, ``cmap`` (the colours
+    when no metric family is drawn) and ``show_datasets``."""
     import matplotlib.pyplot as plt
     from .bubble import _resolve
     from ..data import catalog
@@ -109,6 +89,11 @@ def _bar(long_df: pd.DataFrame, *, metrics=None, top: int | None = None,
         raise ValueError(
             "long_df has no rows to plot. If it came from load_results, its "
             "UserWarning says why.")
+    if methods is not None:
+        from ..data import catalog as _catalog
+        methods = _resolve(methods, long_df["method"].unique().tolist(), "method",
+                           _catalog._canonical_id)
+        long_df = long_df[long_df["method"].isin(methods)]
     family = (metrics.lower() if isinstance(metrics, str)
               and metrics.lower() in FAMILY_METRICS else None)
     if family:
@@ -144,7 +129,7 @@ def _bar(long_df: pd.DataFrame, *, metrics=None, top: int | None = None,
     for msg in style.coverage_warnings(
             parts, basis=overall,
             incomplete_fix=_config.hint(
-                "Filter long_df to the methods scored on every dataset.",
+                "Pass methods= with the methods scored on every dataset.",
                 "Pass --methods with the methods scored on every dataset."),
             stored=style.stored_datasets(long_df)):
         _compat.warn(msg, UserWarning)

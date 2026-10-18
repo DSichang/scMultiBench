@@ -52,60 +52,12 @@ def _scored_with(attrs) -> str | None:
     return "/".join(parts)
 
 
-@_compat.keywords("to_long", dropped=("clustering", "source"))
-def to_long(value_df, *, method: str, dataset: str | None = None,
-            category: str | None = None) -> pd.DataFrame:
-    """Reshape ``mtb.evaluate``'s scores into the long table of ``mtb.load_results``.
-
-    The result has the columns of ``mtb.load_results`` and concatenates with
-    the stored tables.
-
-    Parameters
-    ----------
-    value_df : pandas.DataFrame, pandas.Series or path
-        What ``mtb.evaluate`` returns (metrics as the index, one column
-        ``Value``), a Series indexed by metric, or that frame's CSV (read
-        back, or its path).
-    method : str
-        Method id written into every row; your own name is fine.
-    dataset : str, optional
-        Dataset id written into every row; ``None`` writes ``"all"``.
-    category : str, optional
-        Integration category written into every row (``vertical``,
-        ``diagonal``, ``mosaic`` or ``cross``); ``None`` writes ``"user"``,
-        the value ``load_results`` gives a user file without a category
-        column.
-
-    Returns
-    -------
-    pandas.DataFrame
-        One row per metric, with the columns ``metric, value, method,
-        dataset, category, source, scored_with``: ``source`` is ``"user"``,
-        which tells your rows from the stored ones. ``scored_with`` is
-        ``"unknown"`` for a frame not from ``mtb.evaluate``.
-
-    Raises
-    ------
-    ValueError
-        ``value_df`` is already long (pass it to the plot / ``load_results``
-        consumers directly), lacks ``Value`` (for a wide one-row frame the
-        message gives the ``df.T.set_axis(['Value'], axis=1)`` fix) or string
-        metric names, has only blank names, or names one metric twice
-        (``ari`` and ``ARI``).
-
-    Examples
-    --------
-    >>> import multibench as mtb, pandas as pd
-    >>> wide = mtb.evaluate(emb, labels=labels, metrics=["ARI", "NMI"])
-    >>> mine = mtb.to_long(wide, method="MyMethod", dataset="D11",
-    ...                    category="vertical")
-
-    See Also
-    --------
-    mtb.evaluate : computes the wide frame this function reshapes.
-    mtb.load_results : the stored scores, in the same long shape.
-    mtb.plot.bubble : plots a long frame.
-    """
+def _long_table(value_df, *, method: str, dataset: str | None = None,
+                category: str | None = None) -> pd.DataFrame:
+    """The long table of a wide score frame (metrics as the index, one column
+    ``Value``), its CSV, or a Series indexed by metric: one row per metric with
+    the columns of ``mtb.load_results`` plus ``scored_with``. ``dataset=None``
+    writes ``"all"``, ``category=None`` writes ``"user"``."""
     if category is not None:
         config.category_folder(category)        # "verticall" is refused here
     if isinstance(value_df, (str, Path)):
@@ -170,6 +122,25 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
         for k in ("scib_version",) + DROP_ATTRS:
             if k in value_df.attrs:
                 out.attrs[k] = value_df.attrs[k]
+    return out
+
+
+@_compat.keywords("to_long", dropped=("clustering", "source"))
+def to_long(value_df, *, method: str, dataset: str | None = None,
+            category: str | None = None) -> pd.DataFrame:
+    """Deprecated: ``mtb.evaluate(..., method=, dataset=)`` returns the long table."""
+    _compat.deprecated("to_long", _compat.use("mtb.evaluate(..., method=, dataset=)"))
+    cols = {str(c) for c in getattr(value_df, "columns", [])}
+    if not {"metric", "value", "method"} <= cols:
+        return _long_table(value_df, method=method, dataset=dataset, category=category)
+    # what evaluate returns in 0.4: only the named columns change
+    out = value_df.copy()
+    out["method"] = method
+    if dataset is not None:
+        out["dataset"] = dataset
+    if category is not None:
+        config.category_folder(category)
+        out["category"] = category
     return out
 
 
@@ -956,16 +927,145 @@ def _metrics_spelling(metrics) -> str:
 _METRICS_KEYWORD = ("0.4", _compat.use("metrics="))
 
 
-@_compat.keywords("evaluate", renamed={"output": "embedding", "clustering": "clusters"},
+@_compat.keywords("evaluate", private="_evaluate", renamed={"output": "embedding"},
+                  kept={"clustering": _compat.use("the default, the article's Leiden clusters"),
+                        "label_order": _compat.use("evaluate(..., dataset=, method=)"),
+                        "missing_labels": _compat.note(
+                            "keep the cells that have a label, as adata[adata.obs[col].notna()]"),
+                        "data_path": _compat.use("dataset= as the folder path")},
                   removed={"task": _METRICS_KEYWORD, "family": _METRICS_KEYWORD,
                            "only": _METRICS_KEYWORD,
                            "slow_metrics": ("0.3.0", _compat.note(
                                "pass metrics=[...] without cLISI and iLISI")),
                            "column": ("0.3.0", _compat.note(
-                               "pass the column itself as labels=, batch= or clusters=")),
+                               "pass the column itself as labels= or batch=")),
                            "metric_set": ("0.3.0", _compat.note(
                                "only the scIB metric set exists, so drop it"))})
-def evaluate(
+def evaluate(embedding, labels=None, *, dataset: str | None = None,
+             method: str = "embedding", category: str | None = None, batch=None,
+             metrics=None, obsm: str | None = None, verbose: bool = True) -> pd.DataFrame:
+    """Score an embedding with the benchmark's metrics.
+
+    The protocol is the article's: Leiden clusters searched to the number of
+    cell types for ARI, NMI, ASW, iASW and iF1, and to the number of batches
+    for ARI_batch and NMI_batch.
+
+    Parameters
+    ----------
+    embedding
+        Cells x dims: an array, DataFrame, AnnData or MuData (``.obsm[obsm]``),
+        or a file: ``.h5`` (the benchmark's ``embedding.h5``), ``.h5ad``,
+        ``.npy``, ``.csv`` / ``.tsv``.
+    labels
+        One cell type per cell: CSV path(s), a 1-D array-like, or an ``.obs``
+        column name (``"celltype"``, ``"rna:celltype"`` for a MuData
+        modality). ``None`` = the label files of ``dataset``.
+    dataset : str | None
+        The dataset folder, a name or a path; its name fills the ``dataset``
+        column. With ``labels=None`` its label files are read, in the cell
+        order of ``method`` when that is a package method.
+    method : str
+        Fills the ``method`` column: a package method id or your own name.
+    category : str | None
+        ``vertical``, ``diagonal``, ``mosaic`` or ``cross``; fills the
+        ``category`` column. With two or more batches, all but ``vertical``
+        add the classification metrics.
+    batch
+        One batch per cell, in the forms ``labels`` takes; needed for the
+        batch metrics unless ``labels`` lists two or more files.
+    metrics : None, str or list of str
+        ``None`` = every metric the inputs allow except kBET; a family
+        (``"clustering"``, ``"batch"``, ``"classification"``, ``"all"``), a
+        code (``"ARI"``) or a list of codes and families.
+    obsm : str | None
+        ``.obsm`` key of an AnnData, MuData or ``.h5ad`` embedding; ``'X'``
+        means ``.X``. ``None`` = ``X_emb``, or the only key.
+    verbose : bool
+        Print a line when the Leiden search starts on more than 2,000 cells
+        or labels are matched by barcode.
+
+    Returns
+    -------
+    pandas.DataFrame
+        The long table: ``metric, value, method, dataset, category, source,
+        scored_with``, one row per metric. ``mtb.plot.bubble`` draws it, next
+        to ``mtb.load_results`` rows or alone.
+
+    Raises
+    ------
+    ValueError
+        Missing or misaligned labels or batches, an unknown category or
+        metric, or batch or classification metrics without batch labels.
+    FileNotFoundError
+        An embedding, label file or dataset folder that does not exist.
+
+    Examples
+    --------
+    >>> import multibench as mtb
+    >>> mtb.evaluate("out/Matilda_D11/embedding.h5", dataset="D11",
+    ...              category="vertical", method="Matilda")
+    >>> mtb.evaluate(adata, labels="celltype", batch="sample", obsm="X_pca",
+    ...              method="PCA")
+    """
+    return _evaluate(embedding, labels, dataset=dataset, method=method,
+                     category=category, batch=batch, metrics=metrics, obsm=obsm,
+                     verbose=verbose)
+
+
+def _evaluate(embedding, labels=None, *, dataset=None, method="embedding", category=None,
+              batch=None, metrics=None, obsm=None, verbose=True, clustering=None,
+              label_order=None, missing_labels="error", data_path=None) -> pd.DataFrame:
+    """:func:`evaluate` with the deprecated ``clustering=``, ``label_order=``,
+    ``missing_labels=`` and ``data_path=``."""
+    if not isinstance(method, str) or not method.strip():
+        raise TypeError(f"method= takes a name, such as method='Matilda'; got {method!r}.")
+    name = None
+    if dataset is not None:
+        from ..engine import resolve
+        name, data_path = resolve.split_dataset(dataset, data_path)
+        if labels is None:
+            labels = _dataset_labels(name, category, method, data_path)
+    elif labels is None:
+        raise ValueError("evaluate needs labels=, one cell type per cell, or dataset= "
+                         "to read the label files of a dataset folder.")
+    wide = _scores(embedding, labels, category=category, batch=batch, metrics=metrics,
+                   clusters=clustering, obsm=obsm, label_order=label_order,
+                   verbose=verbose, missing_labels=missing_labels)
+    return _long_table(wide, method=method, dataset="user" if name is None else name,
+                       category=category)
+
+
+def _dataset_labels(dataset, category, method, data_path):
+    """The label files of ``dataset``: in ``method``'s cell order when it is a
+    package method, else the folder's; one did-you-mean warning when ``method``
+    is close to a package method that puts the cells in another order."""
+    from ..engine import registry, resolve
+    try:
+        own = registry.check_method(method)
+    except (KeyError, TypeError):
+        own = None
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message=resolve.DEFAULT_ORDER_WARNING)
+        labels = resolve.labels_for(dataset, category, own, data_path=data_path)
+    if not labels:
+        raise ValueError(f"{dataset} has no label file. Pass labels=.")
+    near = registry.closest_method(method) if own is None and category else None
+    if near:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            try:
+                theirs = list(resolve.labels_for(dataset, category, near,
+                                                 data_path=data_path, check=False))
+            except Exception:  # noqa: BLE001 - no variant here: nothing to suggest
+                theirs = list(labels)
+        if theirs != list(labels):
+            _compat.warn(f"Did you mean method={near!r}? {near} puts the cells of "
+                         f"{dataset} in another order; {method!r} reads the folder's "
+                         f"order.", UserWarning)
+    return labels
+
+
+def _scores(
     embedding,
     labels=None,
     *,
@@ -978,77 +1078,9 @@ def evaluate(
     verbose: bool = True,
     missing_labels: str = "error",
 ) -> pd.DataFrame:
-    """Compute the benchmark's metrics for an embedding against cell-type labels.
-
-    The protocol is the article's: Leiden clusters searched to the number of
-    cell types for ARI, NMI, ASW, iASW and iF1, and to the number of batches
-    for ARI_batch and NMI_batch. ``mtb.to_long`` reshapes the result for
-    plotting or for ``mtb.load_results``.
-
-    Parameters
-    ----------
-    embedding
-        Cells x dims: an array, DataFrame, AnnData or MuData (``.obsm[obsm]``),
-        or a file: ``.h5`` (the benchmark's ``embedding.h5``), ``.h5ad``,
-        ``.npy``, ``.csv`` / ``.tsv``.
-    labels
-        One cell type per cell: CSV path(s), a ``mtb.labels_for`` dict, a 1-D
-        array-like, or an ``.obs`` column name (``"celltype"``,
-        ``"obs:celltype"``, ``"rna:celltype"`` for a MuData modality).
-    category : str, optional
-        Integration category: ``vertical``, ``diagonal``, ``mosaic`` or
-        ``cross``. With two or more batches it decides whether the
-        classification metrics are added: not for ``"vertical"``.
-    batch
-        One batch per cell, in the forms ``labels`` takes; needed for the
-        batch metrics unless ``labels`` lists two or more files.
-    metrics : None, str or list of str
-        ``None`` = every metric the inputs allow except kBET; or
-        ``"clustering"``, ``"batch"``, ``"classification"``, ``"all"``, or a
-        list of codes such as ``["ARI", "NMI"]``.
-    clusters
-        Your own cluster per cell, in the forms ``labels`` takes or an ``.h5``
-        path; replaces the Leiden clusters of ARI, NMI, ASW, iASW and iF1.
-    obsm : str | None
-        ``.obsm`` key of an AnnData, MuData or ``.h5ad`` embedding; ``'X'``
-        means ``.X``. ``None`` = ``X_emb``, or the only key when there is one.
-    label_order : list of str
-        Keys of a multi-entry ``labels`` dict in the embedding's cell order;
-        not needed for an unchanged ``mtb.labels_for`` dict.
-    verbose : bool
-        ``False`` prints nothing; ``True`` prints a line when the Leiden
-        search starts on more than 2,000 cells or labels are matched by
-        barcode.
-    missing_labels : {"error", "drop"}
-        A cell without a label raises, or is left out with a warning.
-
-    Returns
-    -------
-    pandas.DataFrame
-        One row per metric (``ARI``, ``NMI``, ...), one column ``Value``;
-        ``attrs`` records the Leiden backend, where the clusters came from and
-        the package versions.
-
-    Raises
-    ------
-    ValueError
-        Missing or misaligned labels or batches, a count that differs from
-        the embedding's cells, an unknown category or metric, or batch or
-        classification metrics without batch labels.
-    FileNotFoundError
-        An embedding or label path that does not exist.
-
-    Examples
-    --------
-    >>> import multibench as mtb
-    >>> mtb.evaluate(res.output, labels=mtb.labels_for("D11"))  # res: mtb.run(...)
-    >>> mtb.evaluate(adata, labels="celltype", batch="sample", obsm="X_pca")
-
-    See Also
-    --------
-    mtb.labels_for : the label files of a dataset, in a method's cell order.
-    mtb.to_long : the long results table of these scores.
-    """
+    """The scores of :func:`evaluate` as a wide frame: one row per metric, one
+    column ``Value``; ``attrs`` records how they were scored. ``clusters``
+    replaces the Leiden clusters of ARI, NMI, ASW, iASW and iF1."""
     if not isinstance(missing_labels, str) or missing_labels not in ("error", "drop"):
         raise ValueError(
             f'missing_labels must be "error" or "drop", got {missing_labels!r}.')

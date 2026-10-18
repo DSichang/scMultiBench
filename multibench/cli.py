@@ -62,7 +62,7 @@ from . import __version__, _compat, config, discover, workflow
 from . import plot as plot_ns
 from .config import _and_list
 from .data.results import _unpublished_msg
-from .engine import envs, ingest, registry, schema
+from .engine import envs, ingest, registry, resolve, schema
 from .engine.runner import _prepared_at
 from .eval import io as eio
 from .eval import pipeline
@@ -1279,7 +1279,7 @@ def _evaluate_labels(args, stack):
             if args.name is not None:
                 # your own method: the order of a registry method's output is not yours
                 warnings.filterwarnings("ignore", message=r"labels_for\(.*default order")
-            labels = multibench.labels_for(args.dataset, args.category,
+            labels = resolve.labels_for(args.dataset, args.category,
                                            data_path=args.data_path)
         if not labels:
             raise ValueError(f"{args.dataset} has no label file. Pass one with --labels.")
@@ -1302,7 +1302,7 @@ def _evaluate_labels(args, stack):
             raise KeyError(schema.no_category_message(args.method, spec.wired_categories,
                                                       args.category)
                            + " For your own embedding, pass the label files with --labels.")
-        labels = multibench.labels_for(args.dataset, args.category, args.method,
+        labels = resolve.labels_for(args.dataset, args.category, args.method,
                                        data_path=args.data_path)
         if not labels:
             # before the line below, which would name no file
@@ -1367,7 +1367,7 @@ def _label_order_problem(files, method, dataset, category) -> str | None:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         try:
-            labels = multibench.labels_for(dataset, category, method)
+            labels = resolve.labels_for(dataset, category, method)
         except FileNotFoundError:
             labels = None
         except Exception:  # noqa: BLE001 - no variant for category etc.: not checked
@@ -1382,7 +1382,7 @@ def _label_order_problem(files, method, dataset, category) -> str | None:
                 for n in names:
                     (Path(tmp) / dataset / n).touch()
                 try:
-                    labels = multibench.labels_for(dataset, category, method, data_path=tmp)
+                    labels = resolve.labels_for(dataset, category, method, data_path=tmp)
                 except Exception:  # noqa: BLE001 - not checked
                     return None
     expected = [Path(p).name for p in labels.values()]
@@ -1468,11 +1468,11 @@ def _cmd_evaluate(args) -> int:
         token = pipeline._CLI_LABELS_FROM.set(None if args.labels else args.dataset)
         try:
             with _quiet_stdout(), _leiden_flavor(args.leiden_flavor):
-                df = multibench.evaluate(embedding, metrics=metrics, **kw)
+                df = pipeline._scores(embedding, metrics=metrics, **kw)
         finally:
             pipeline._CLI_LABELS_FROM.reset(token)
     if long_mode:
-        df = multibench.to_long(df, method=name or args.method, dataset=args.dataset,
+        df = pipeline._long_table(df, method=name or args.method, dataset=args.dataset,
                                 category=args.category)
         if args.out:
             df.to_csv(args.out, index=False)

@@ -258,80 +258,11 @@ def _expand_families(metrics, available) -> list:
 NA_POLICIES = ("skip", "warn", "raise")
 
 
-@_compat.keywords("plot.build_table", private="_build_table", kept={
-    "na": _compat.note("leave it out for a warning that names the n/a cells")})
-def build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None,
-                aggregate: str = "dataset", require_complete: bool = False,
-                overall: str = "rank") -> BubbleTable:
-    """Compute the ranks, scores and row order behind a bubble figure.
-
-    Returns the numbers ``mtb.plot.bubble`` draws, without drawing.
-
-    Parameters
-    ----------
-    long_df : pandas.DataFrame
-        Long table with ``method``, ``metric``, ``value`` columns and an
-        optional ``dataset`` column.
-    metrics : str, list of str | None
-        Metric codes to keep, in this order within each family, or a family
-        (``"clustering"``, ``"batch"``, ``"classification"``, ``"all"``, as
-        ``mtb.evaluate`` takes them); ``None`` = every metric in the frame.
-    methods : list of str | None
-        Methods (rows) to keep; ``None`` = every method in the frame.
-    order : list of str | None
-        Methods to put first, in this order. The rest follow, best first. To
-        drop methods, use ``methods``.
-    aggregate : {"dataset", "summary"}
-        ``"dataset"``: raw metric values of one dataset (several are averaged
-        per method). ``"summary"``: within-dataset max-ranks averaged across
-        datasets (the paper's panel c).
-    require_complete : bool
-        With ``aggregate="summary"``: keep only the methods present in every
-        dataset.
-    overall : {"rank", "mean_overall"}
-        Formula for each family's Overall under ``aggregate="summary"``:
-        ``"rank"`` (the paper's panel rule: the rank of the mean ranks) or
-        ``"mean_overall"`` (the mean of the per-dataset Overalls).
-    Returns
-    -------
-    BubbleTable
-        Read ``methods`` (row order: best first unless ``order`` is given),
-        ``ranks`` (max-ranks, ``n`` = best) and ``overall`` (over the families
-        every row has); all fields are under ``mtb.plot.BubbleTable``.
-
-    Raises
-    ------
-    ValueError
-        ``long_df`` lacks ``method`` / ``metric`` / ``value``, or ``metrics`` /
-        ``methods`` / ``order`` names an absent value.
-    ValueError
-        Duplicate ``(method[, dataset], metric)`` rows, or an invalid
-        ``aggregate`` / ``overall``.
-    ValueError
-        No method is complete under ``require_complete=True``.
-
-    Warns
-    -----
-    UserWarning
-        ``n/a`` cells (also in ``na_cells``), several datasets under
-        ``aggregate="dataset"``, an incomplete method x dataset matrix under
-        ``"summary"``, methods dropped by ``require_complete``, or a column
-        that has the same value in every row.
-
-    Examples
-    --------
-    >>> import multibench as mtb
-    >>> tbl = mtb.plot.build_table(mtb.load_results("vertical", dataset="D11"))
-    >>> tbl.methods                      # rows, best first
-
-    See Also
-    --------
-    mtb.plot.bubble : builds the table and draws the figure in one call.
-    mtb.plot.BubbleTable : what is returned, field by field.
-    """
-    return _build_table(long_df, metrics=metrics, methods=methods, order=order,
-                        aggregate=aggregate, require_complete=require_complete,
-                        overall=overall)
+def build_table(long_df: pd.DataFrame, **kwargs) -> BubbleTable:
+    """Deprecated: ``mtb.recommend(category, long_df=...)`` gives the numbers
+    behind a figure."""
+    _compat.deprecated("plot.build_table", _compat.use("mtb.recommend(category, long_df=...)"))
+    return _build_table(long_df, **kwargs)
 
 
 def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None,
@@ -347,9 +278,7 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=Non
         missing = sorted(need - have)
         hint = ""
         if "Value" in have or long_df.index.name == "metric":
-            hint = (" This looks like evaluate()'s output - convert it "
-                    "with mtb.to_long(df, method=..., dataset=..., "
-                    "category=...) first.")
+            hint = " mtb.evaluate returns the long table this function takes."
         raise ValueError(
             f"bubble() needs a long table with columns "
             f"['method', 'metric', 'value']; missing {missing}.{hint}")
@@ -1049,81 +978,58 @@ _KEPT = {"cmap": _compat.note("leave it out for the families' colours"),
          "na": _compat.note("leave it out for a warning that names the n/a cells")}
 
 
-@_compat.keywords("plot.bubble", private="_bubble", kept=_KEPT)
-def bubble(long_df, *, metrics=None, methods=None, order=None,
-           aggregate="dataset", title=None, save=None, require_complete=False,
-           overall="rank"):
-    """Draw the paper-style bubble table: methods as rows, metrics as columns.
+_KEPT.update({
+    "order": _compat.use("methods="),
+    "aggregate": _compat.use("mtb.plot.bar"),
+    "require_complete": _compat.use("methods="),
+    "overall": _compat.use("the default"),
+})
 
-    Metrics are grouped into task families, each led by an *Overall* bar;
-    rows run best first unless ``order`` is given. ``mtb.plot.build_table``
-    returns the same numbers without drawing.
+
+@_compat.keywords("plot.bubble", private="_bubble", kept=_KEPT)
+def bubble(long_df, *, metrics=None, methods=None, title=None, save=None):
+    """Draw the article's bubble table: methods as rows, metrics as columns.
+
+    Metrics are grouped into families, each led by an *Overall* bar. Rows run
+    best first, in the order of ``mtb.recommend(category, long_df=long_df)``.
 
     Parameters
     ----------
     long_df : pandas.DataFrame
-        Long table with ``method``, ``metric``, ``value`` and optional
-        ``dataset`` columns, as from ``mtb.load_results``, ``mtb.to_long`` or
-        the ``BatchResult.long`` property.
+        A long table (``method``, ``metric``, ``value`` and optional
+        ``dataset``), as ``mtb.load_results``, ``mtb.evaluate`` and
+        ``BatchResult.long`` return; stored and your own rows can be concatenated.
     metrics : str, list of str | None
-        Metric codes to show, in this order within each family, or a family
-        (``"clustering"``, ``"batch"``, ``"classification"``, ``"all"``);
-        ``None`` = every metric in the frame.
+        A family (``"clustering"``, ``"batch"``, ``"classification"``,
+        ``"all"``), a code, or codes in their column order; ``None`` = every
+        metric in the frame.
     methods : list of str | None
         Methods (rows) to show; ``None`` = every method in the frame.
-    order : list of str | None
-        Methods to put first, in this order. The rest follow, best first. To
-        drop methods, use ``methods``.
-    aggregate : {"dataset", "summary"}
-        ``"dataset"``: one dataset's values, drawn as circles. ``"summary"``:
-        within-dataset ranks averaged across datasets, drawn as bars (the
-        paper's panel c).
     title : str | None
         Figure title; ``None`` = ``"<category> <dataset>"`` when the table
-        holds one of each, as the command line; ``""`` = no title.
+        holds one of each; ``""`` = no title.
     save : str or path-like | None
-        File to write the figure to (tight bounding box); the suffix picks
-        the format, e.g. ``.pdf``, ``.png``, ``.svg``.
-    require_complete : bool
-        With ``aggregate="summary"``: keep only the methods present in every
-        dataset.
-    overall : {"rank", "mean_overall"}
-        Across-dataset *Overall*: ``"rank"`` re-ranks mean ranks (missing
-        dataset = rank 0); ``"mean_overall"`` averages per-dataset Overalls
-        (missing dataset skipped). Applies under ``aggregate="summary"``.
+        File to write the figure to; the suffix picks the format (``.pdf``,
+        ``.png``, ``.svg``).
 
     Returns
     -------
     matplotlib.figure.Figure
-        The figure (one axes), already saved when ``save`` is given.
 
     Raises
     ------
     ValueError
-        As ``mtb.plot.build_table``.
-
-    Warns
-    -----
-    UserWarning
-        As ``mtb.plot.build_table``; also when the figure compares two
-        methods ("With 2 methods each column only shows which is higher.").
+        ``long_df`` lacks ``method`` / ``metric`` / ``value``, repeats a
+        ``(method, dataset, metric)`` row, or ``metrics`` / ``methods`` names
+        a value it does not hold.
 
     Examples
     --------
     >>> import multibench as mtb
     >>> df = mtb.load_results("vertical", dataset="D11")
-    >>> fig = mtb.plot.bubble(df, metrics=["ARI", "NMI", "ASW"], title="D11",
-    ...                       save="d11.pdf")
-
-    See Also
-    --------
-    mtb.plot.build_table : the numbers behind the figure, to audit first.
-    mtb.plot.bar : one bar per method across datasets; same ``overall=`` formulas.
-    mtb.to_long : reshape ``mtb.evaluate``'s scores into a long table.
+    >>> fig = mtb.plot.bubble(df, metrics="clustering", save="d11.pdf")
     """
-    return _bubble(long_df, metrics=metrics, methods=methods, order=order,
-                   aggregate=aggregate, title=title, save=save,
-                   require_complete=require_complete, overall=overall)
+    return _bubble(long_df, metrics=metrics, methods=methods, title=title, save=save)
 
 
 def _bubble(long_df, *, metrics=None, methods=None, order=None,

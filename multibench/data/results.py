@@ -671,6 +671,10 @@ def _load_results(
     if sel.codes is not None:
         before = len(out)
         out = out[out["metric"].isin(sel.codes)]
+        absent = [c for c in sel.codes if c not in have_metrics]
+        if sel.explicit and absent and not out.empty:
+            _compat.warn(f"The stored results have no {_and_list(absent)}.",
+                         UserWarning)
         if out.empty and sel.explicit:
             _compat.warn(
                 f"metric(s) {sel.codes} not present in {where} "
@@ -942,7 +946,8 @@ def _unmeasured_note(category: str, datasets, wanted: set[str], stored: bool) ->
 
 
 @_compat.keywords("recommend", private="_recommend", kept={
-    **_TABLE_KEYWORDS, "atac": _compat.use('modalities=["atac_peak"] or ["atac_gas"]')}, removed=_REMOVED_METRIC_KEYWORDS)
+    **_TABLE_KEYWORDS, "atac": _compat.use('modalities=["atac_peak"] or ["atac_gas"]')},
+    dropped=("min_methods",), removed=_REMOVED_METRIC_KEYWORDS)
 def recommend(
     category: str,
     *,
@@ -950,17 +955,16 @@ def recommend(
     methods: list[str] | None = None,
     metrics=None,
     long_df: pd.DataFrame | None = None,
-    min_methods: int = 2,
 ) -> pd.DataFrame:
-    """Rank the methods of a category from the stored scores.
+    """Rank the methods of a category, best first.
 
     Within each dataset the methods are ranked on each metric; each
     per-dataset score is the mean rank over the metrics, min-max scaled
-    within the dataset (1 = best, 0 = worst there). A method's
-    ``grand_score`` is the mean of its per-dataset scores, the
-    ``overall="mean_overall"`` score of ``mtb.plot.bar``; the stored tables
-    hold one dataset per category. Methods the package runs for the category
-    without scores are listed last.
+    within the dataset (1 = best, 0 = worst there), and ``grand_score`` is
+    the mean over the datasets. The order is the row order of
+    ``mtb.plot.bubble`` and ``mtb.plot.bar`` for the same rows, so
+    ``long_df=`` gives the numbers behind a figure. Methods the package runs
+    for the category without scores are listed last.
 
     Parameters
     ----------
@@ -973,19 +977,16 @@ def recommend(
         Rank only these methods, among themselves; ``None`` = every method.
     metrics : None, str or list of str
         ``None`` = the ``"clustering"`` family (the benchmark's main ranking);
-        or ``"batch"``, ``"all"``, or a list of codes.
+        or a family, a code, or a list of codes and families.
     long_df : pandas.DataFrame
-        Scores to rank instead of the stored ones, such as
+        A long table to rank instead of the stored results, such as
         ``pd.concat([mtb.load_results(category), mine])``.
-    min_methods : int
-        Datasets with fewer methods than this are left out.
 
     Returns
     -------
     pandas.DataFrame
         One row per method, best first: ``method``, ``grand_score``,
-        ``n_datasets``, ``coverage`` (the share of datasets it was scored on),
-        ``datasets`` and the method's labels, runtime and environment.
+        ``needs_labels``, ``runtime_tier``, ``worst_sec`` and ``env``.
 
     Raises
     ------
@@ -996,24 +997,15 @@ def recommend(
     KeyError
         Unknown method name in ``methods``, with a did-you-mean hint.
 
-    Warns
-    -----
-    UserWarning
-        One message: partial coverage, methods left out and why.
-
     Examples
     --------
     >>> import multibench as mtb
     >>> mtb.recommend("vertical", modalities=["rna", "adt"])
-    >>> mtb.recommend("diagonal", modalities=["atac_peak"], metrics="all")
-
-    See Also
-    --------
-    mtb.load_results : the stored scores it ranks.
-    mtb.plot.bar : the same score as bars.
+    >>> mtb.recommend("vertical", methods=mtb.find_methods("vertical", needs_labels=False))
+    >>> mtb.recommend("vertical", long_df=pd.concat([mtb.load_results("vertical"), mine]))
     """
     return _recommend(category, modalities=modalities, methods=methods,
-                      metrics=metrics, long_df=long_df, min_methods=min_methods)
+                      metrics=metrics, long_df=long_df)
 
 
 def _recommend(
@@ -1047,8 +1039,8 @@ def _recommend(
         # every metric: the "metrics present" error names what the frame holds
         long_df = _load_results(category, source=source, result_path=result_path)
     df = long_df.copy()
-    table_noun = {"published": "published table", "rerun": "re-run sweeps",
-                  "both": "stored tables"}.get(source, "stored tables") \
+    table_noun = {"published": "published table", "rerun": "stored results",
+                  "both": "stored results"}.get(source, "stored results") \
         if long_df_was_none else "long_df frame"
     label = f"the {table_noun}" if long_df_was_none else "long_df"
 
@@ -1128,8 +1120,7 @@ def _recommend(
                if sizes and max(sizes.values()) == 1 else "")
         raise ValueError(
             f"No {category} dataset has {min_methods} or more methods. {counts}."
-            f"{one}{hint} Otherwise pass long_df= with more methods, or lower "
-            f"min_methods.")
+            f"{one}{hint} Otherwise pass long_df= with more methods.")
     per_ds = pd.DataFrame({ds: style.compute_overall(mat) for ds, mat in kept.items()})
     # igraph-scored rows ranked against leidenalg-scored stored rows
     backend = style.backend_warning(df[df["dataset"].isin(list(kept))])
@@ -1184,16 +1175,10 @@ def _recommend(
         rows.append({
             "method": m,
             "grand_score": float(grand.loc[m]) if scored else float("nan"),
-            "n_datasets": int(n_ds.loc[m]) if scored else 0,
-            "n_datasets_total": int(n_total),
-            "coverage": float(n_ds.loc[m]) / n_total if scored else 0.0,
             "needs_labels": needs,
             "runtime_tier": tier,
             "worst_sec": worst,
             "env": env,
-            "datasets": ", ".join(sorted((str(d) for d in per_ds.columns
-                                          if pd.notna(per_ds.loc[m, d])),
-                                         key=catalog._dataset_sort_key)) if scored else "",
         })
     out = pd.DataFrame(rows)
     out = out.sort_values("grand_score", ascending=False, kind="mergesort",
@@ -1226,13 +1211,11 @@ def _recommend(
             f"{table_noun}, but this package does not run {it} for {category}, "
             f"so {they} left out of the ranking. "
             f"mtb.find_methods(category={category!r}) does not list {it}.")
-    partial = out[(out["coverage"] < 1.0) & out["grand_score"].notna()]
-    if not partial.empty:
+    partial = [m for m in out["method"] if m in n_ds.index and n_ds.loc[m] < n_total]
+    if partial:
         notes.append(
             "Some methods have scores on only part of the datasets: "
-            + ", ".join(f"{r.method} {r.n_datasets} of {r.n_datasets_total}"
-                        for r in partial.itertuples())
-            + ". Check the coverage column before reading the order.")
+            + ", ".join(f"{m} {int(n_ds.loc[m])} of {n_total}" for m in partial) + ".")
     if backend:
         notes.append(backend)
     if only_dropped:
@@ -1242,9 +1225,8 @@ def _recommend(
             f"datasets left out of the ranking, so {'it is' if one else 'they are'} "
             f"listed last.")
     if no_rows:
-        scores = ({"published": "published scores", "rerun": "re-run scores"}
-                  .get(source, "stored scores") if long_df_was_none
-                  else "scores in long_df")
+        scores = ({"published": "published scores"}.get(source, "stored results")
+                  if long_df_was_none else "scores in long_df")
         head = (f"{no_rows[0]} has no {scores} and is listed last"
                 if len(no_rows) == 1 else
                 f"These {len(no_rows)} methods have no {scores} and are listed "

@@ -1,16 +1,17 @@
-"""The benchmark's data: ``fetch`` downloads a dataset, ``fetchable`` lists the ids
-``fetch`` takes, and ``write_example`` writes a tutorial dataset as ``.h5ad`` files."""
+"""Demo data: ``fetch`` downloads demo datasets and ``write_example`` writes a
+tutorial's example ``.h5ad`` files; ``mtb.catalog.datasets()`` lists them."""
 
 from .. import _compat
 from .examples import write_example  # noqa: F401
 from .fetch import fetch, fetch_outputs as _fetch_outputs  # noqa: F401
-from .results import fetchable  # noqa: F401  (the downloadable reference datasets)
+from .results import fetchable as _fetchable
 
-__all__ = ["fetch", "fetchable", "write_example"]
+__all__ = ["fetch", "write_example"]
 
 __getattr__ = _compat.module_getattr(__name__, "data", old={
     "fetch_outputs": (_fetch_outputs, _compat.note(
-        "use mtb.load_results for the stored scores")),
+        "use mtb.load_results for the stored results")),
+    "fetchable": (_fetchable, _compat.use("mtb.catalog.datasets()")),
 })
 
 

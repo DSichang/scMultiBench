@@ -3,10 +3,9 @@
 Methods whose dependencies conflict run in separate envs; methods that fit
 together share one. ``mtb.method_info(m)['env']`` names a method's env.
 
-- ``mtb.env.doctor(methods)`` checks the envs a selection of methods needs.
-- ``mtb.env.install(methods)`` installs them: a prebuilt archive when one
-  exists, else a build from the pinned package list; ``dry_run=True``
-  previews them, with download sizes.
+``mtb.env.install(methods)`` installs the envs a selection of methods needs:
+a prebuilt archive when one exists, else a build from the pinned package
+list. ``dry_run=True`` shows each env's state and size and installs nothing.
 
 The envs are Linux-only.
 """
@@ -27,7 +26,7 @@ import yaml
 from .. import _compat, config
 from . import registry
 
-__all__ = ["install", "doctor"]
+__all__ = ["install"]
 
 
 def __dir__() -> list[str]:
@@ -1110,7 +1109,7 @@ def _check_conda(conda) -> None:
         raise TypeError(
             f"conda is the conda/mamba executable, not a list of methods "
             f"(got {list(conda)!r}); for their envs call "
-            f"mtb.env.doctor(methods={list(conda)!r})")
+            f"mtb.env.install({list(conda)!r}, dry_run=True)")
     if not isinstance(conda, (str, os.PathLike)):
         raise TypeError(
             f"conda must be the conda/mamba executable (a path or a name on "
@@ -1122,7 +1121,7 @@ def _check_conda(conda) -> None:
         raise ValueError(
             f"{name!r} is a method id, but status() takes no methods: its "
             f"only positional argument is conda, the conda/mamba executable. "
-            f"For this method call mtb.env.doctor(methods=[{m!r}]), or keep "
+            f"For this method call mtb.env.install([{m!r}], dry_run=True), or keep "
             f"the status() row whose method is {m!r}")
     if shutil.which(name) is None:
         raise ValueError(
@@ -1353,15 +1352,14 @@ def _frame(rows: list[dict], first: tuple):
 
 
 @_compat.keywords("env.install", private="_install",
-                  kept={"packed": _compat.use("build=")}, hidden=("force",))
+                  kept={"packed": _compat.use("build="), "conda": _compat.use("conda on PATH")},
+                  hidden=("force",))
 def install(methods: list[str] | None = None, *, category: str | None = None,
-            build: bool = False, dry_run: bool = False, conda: str | None = None,
-            flavor: str = "auto"):
-    """Install the conda envs a set of methods needs.
+            dry_run: bool = False, flavor: str = "auto", build: bool = False):
+    """Install the conda envs a set of methods needs; Linux only.
 
-    The Python form of ``multibench env install``. It unpacks the published
-    archives, or builds from lockfiles, on Linux; ``dry_run=True`` returns
-    the plan and installs nothing.
+    Each env is unpacked from its published archive, or built from its
+    lockfile where none is published. Installed envs are skipped.
 
     Parameters
     ----------
@@ -1369,19 +1367,16 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
         Method ids to cover; ``None`` = every method of ``category``, or every
         method.
     category : str | None
-        Integration category (``vertical``, ``diagonal``, ``mosaic`` or
-        ``cross``) whose methods to cover when ``methods`` is ``None``.
-    build : bool
-        ``True`` = build every env from its lockfile instead of unpacking
-        the published archive.
+        ``vertical``, ``diagonal``, ``mosaic`` or ``cross``: the methods to
+        cover when ``methods`` is ``None``.
     dry_run : bool
-        ``True`` = return the plan and install nothing.
-    conda : str | None
-        conda/mamba executable; ``None`` = conda if found, else mamba. The
-        archives need none.
+        ``True`` = install nothing and return each env's state and size.
     flavor : str
-        Archive build per env: ``'cpu'``, ``'gpu'`` or ``'auto'`` (``'cpu'``
-        unless an NVIDIA GPU is visible); unused with ``build=True``.
+        ``'cpu'``, ``'gpu'`` or ``'auto'`` (``'gpu'`` when an NVIDIA GPU is
+        visible): the archive build of each env.
+    build : bool
+        ``True`` = build every env from its lockfile instead of unpacking the
+        archive.
 
     Returns
     -------
@@ -1389,45 +1384,27 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
         One row per env, the env serving the most methods first: ``env``,
         ``methods``, ``state`` (``'have'``, ``'packed archive published'``,
         ``'name taken'`` ... on a dry run; ``'PACKED'``, ``'BUILD'`` after an
-        install), ``exists``, ``archive_bytes`` / ``unpacked_bytes`` (the
-        download and its size on disk), ``packed_url``, ``flavor``
-        (``'any'`` for an env with one archive for CPU and GPU hosts),
-        ``cmds`` (the lockfile build it runs; empty when the archive is
-        unpacked) and ``fallback_cmds`` (the lockfile build of an env with an
-        archive).
+        install), ``exists``, ``has_lock``, ``other_env`` (a same-named env
+        multibench did not make, which is not used), ``archive_bytes`` /
+        ``unpacked_bytes``, ``packed_url``, ``flavor``, ``cmds`` and
+        ``fallback_cmds``.
 
     Raises
     ------
-    ValueError
-        ``flavor`` is not ``'auto'``, ``'cpu'`` or ``'gpu'``; or unknown
-        ``category``.
     KeyError
-        Unknown method id in ``methods``; the message suggests a close
-        match, if any.
-    TypeError
-        ``methods`` given as a bare string.
+        Unknown method id, with a did-you-mean hint.
     RuntimeError
-        A real install on a host that is not Linux, no conda where needed,
-        or a failed build.
-
-    Warns
-    -----
-    UserWarning
-        A CPU install finds no CPU archive for an env; its one archive is
-        installed.
+        A real install on a host that is not Linux, no conda where needed, or
+        a failed build.
 
     Examples
     --------
     >>> import multibench as mtb
-    >>> mtb.env.install(["Matilda"], dry_run=True)  # the plan, sizes, URLs
-    >>> mtb.env.install(["Matilda"])                # the archive, flavor='auto'
-
-    See Also
-    --------
-    mtb.env.doctor : which of those envs exist here.
+    >>> mtb.env.install(["Matilda", "totalVI"], dry_run=True)
+    >>> mtb.env.install(category="vertical")
     """
     return _install(methods, category=category, build=build, dry_run=dry_run,
-                    conda=conda, flavor=flavor)
+                    flavor=flavor)
 
 
 def _install(methods=None, *, category=None, build: bool = False, packed=None,
@@ -1532,7 +1509,9 @@ def _install_rows(methods: list[str] | None = None, *, category: str | None = No
         # what runs: the archive is unpacked, so the lockfile build is the fallback
         archived = packed and env in manifest and state not in ("BUILD", "NO-LOCK")
         cmds, fallback = ([], r.get("cmds", [])) if archived else (r.get("cmds", []), [])
-        out.append({**r, "state": state, "packed_url": _first_url(manifest.get(key)),
+        other = None if r["exists"] else _str_or_none(other_env_prefix(env, conda))
+        out.append({**r, "state": state, "other_env": other,
+                    "packed_url": _first_url(manifest.get(key)),
                     "archive_bytes": size.get("archive_bytes"),
                     "unpacked_bytes": size.get("unpacked_bytes"),
                     "flavor": flav, "cmds": cmds, "fallback_cmds": fallback})
@@ -1544,62 +1523,17 @@ def _install_rows(methods: list[str] | None = None, *, category: str | None = No
     return out
 
 
-@_compat.keywords("env.doctor", private="_doctor", kept={"as_frame": _compat.NO_EFFECT})
-def doctor(category: str | list[str] | None = None, methods: list[str] | None = None,
-           conda: str | None = None):
-    """Report, per needed env, whether it is installed and has a lockfile.
+def doctor(category=None, methods=None, conda=None, *, as_frame=None):
+    """Deprecated: ``mtb.env.install(methods, dry_run=True)`` shows the same."""
+    _compat.deprecated("env.doctor", _compat.use("mtb.env.install(methods, dry_run=True)"))
+    if as_frame is not None:
+        _compat.deprecated("env.doctor(as_frame=)")
+    return _doctor(category, methods, conda)
 
-    Run it before ``mtb.run`` on a new machine; ``mtb.env.install`` installs
-    the envs it reports missing.
 
-    Parameters
-    ----------
-    category : str | list[str] | None
-        Integration category (``vertical``, ``diagonal``, ``mosaic`` or
-        ``cross``) whose methods to check; ``None`` = every method. A list
-        of method ids here is read as ``methods``.
-    methods : list[str] | None
-        Method ids to check instead of ``category``.
-    conda : str | None
-        conda/mamba executable that lists the installed envs; ``None`` =
-        conda if found, else mamba.
-
-    Returns
-    -------
-    pandas.DataFrame
-        One row per env, the env serving the most methods first: ``env``,
-        ``methods``, ``exists``, ``has_lock`` (a lockfile can build it),
-        ``flavor`` (``'cpu'`` / ``'gpu'`` / ``'single'`` archive, when installed)
-        and ``other_env`` (the path of a same-named env multibench did not
-        install, which is not used).
-
-    Raises
-    ------
-    ValueError
-        Unknown ``category``; the message lists the valid ones.
-    KeyError
-        Unknown method id in ``methods``; the message suggests a close
-        match, if any.
-    TypeError
-        ``methods`` given as a bare string.
-
-    Examples
-    --------
-    >>> import multibench as mtb
-    >>> mtb.env.doctor("vertical")
-    >>> mtb.env.doctor(methods=["Matilda", "totalVI"])
-
-    See Also
-    --------
-    mtb.env.install : builds or unpacks the envs reported missing.
-    mtb.scan : uses the same installed-env check per method.
-    """
+def _doctor(category=None, methods=None, conda=None):
+    """The rows of the deprecated :func:`doctor` as a frame, ``env`` first."""
     return _frame(_doctor_rows(category, methods, conda), _DOCTOR_FIRST)
-
-
-def _doctor(category=None, methods=None, conda=None, *, as_frame: bool = True):
-    """:func:`doctor`, with the deprecated ``as_frame=`` (no effect: a frame)."""
-    return doctor(category, methods, conda)
 
 
 def _doctor_rows(category: str | list[str] | None = None,

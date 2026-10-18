@@ -35,7 +35,7 @@ from .engine import runner as _runner
 from .engine.schema import base_modality as _schema_base
 from .engine.runner import run as _run
 from .eval import io as _eio, scib as _escib
-from .eval.pipeline import LONG_COLUMNS as _LONG_COLUMNS, evaluate as _evaluate, to_long as _to_long
+from .eval.pipeline import LONG_COLUMNS as _LONG_COLUMNS, _long_table as _to_long, _scores
 
 __all__ = ["scan", "run_all", "BatchResult", "describe_layout", "load_batch", "sweep"]
 
@@ -1531,7 +1531,8 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
         if _runner.linux_only_sentence():
             line += f" {LINUX_ONLY_SUMMARY}"
         elif any(e and e not in installed for e in df["env"]):
-            doctor = config.hint("mtb.env.doctor()", "multibench env doctor")
+            doctor = config.hint("mtb.env.install(dry_run=True)",
+                             "multibench env install --dry-run")
             line += f" {doctor} checks the environments."
         print(line, flush=True)
     return df, private
@@ -1671,7 +1672,8 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
     if _runner.linux_only_sentence():
         line += f" {LINUX_ONLY_CHECK}"
     elif any(e and e not in installed for e in df["env"]):
-        doctor = config.hint("mtb.env.doctor()", "multibench env doctor")
+        doctor = config.hint("mtb.env.install(dry_run=True)",
+                             "multibench env install --dry-run")
         line += f" {doctor} checks the environments."
     print(line, flush=True)
     if cells:
@@ -1869,7 +1871,7 @@ def _evaluate_best_order(emb, category, cands, *, metrics=None, user_batch=False
             # the batches go only with a selection that still uses them
             multi = several and ((user_batch and batch_given)
                                  or _names_batch_metric(chosen))
-        return _evaluate(emb, category=category, labels=lab,
+        return _scores(emb, category=category, labels=lab,
                          verbose=False, batch=(batch if multi else None),
                          clusters=clusters, metrics=chosen)
 
@@ -2513,6 +2515,54 @@ class BatchResult:
                                     f"{first['method']}: {first.get('error')}")
         return new
 
+    def embedding(self, method: str):
+        """The embedding of one method, as an AnnData.
+
+        Parameters
+        ----------
+        method : str
+            A method of this result.
+
+        Returns
+        -------
+        anndata.AnnData
+            ``obsm["X_emb"]`` in the method's cell order; ``obs_names`` are
+            the cells' barcodes and ``obs`` holds each cell's ``label`` and
+            ``batch``.
+
+        Raises
+        ------
+        KeyError
+            No record for ``method``.
+        ValueError
+            The method did not run, or it writes a graph instead of an embedding.
+        FileNotFoundError
+            Its output folder is gone.
+
+        Examples
+        --------
+        >>> res = mtb.run_all("D11", "vertical", methods=["Matilda"], out_dir="out/")
+        >>> adata = res.embedding("Matilda")
+        >>> sc.pp.neighbors(adata, use_rep="X_emb")
+        """
+        import anndata as ad
+        have = [r.get("method") for r in self.records]
+        name = method if method in have else _registry_id_or(method)
+        rec = next((r for r in self.records if r.get("method") == name), None)
+        if rec is None:
+            raise KeyError(f"No record for {method!r}; this result has {_and_list(have)}.")
+        if not _scorable(rec) or not rec.get("out_dir"):
+            raise ValueError(f"{name} has no output: its status is {rec.get('status')}. "
+                             f"res.failures says why.")
+        variant = registry.get(name).select(self.category, set(rec.get("modalities") or ()))
+        emb = _load_embedding(Path(rec["out_dir"]), variant)
+        if emb is None:
+            raise ValueError(f"{name} writes a graph, not an embedding.")
+        root, _ = _dataset_root(rec, self.dataset)
+        obs = _embedding_obs(rec, self.dataset, self.category, root, emb.shape[0],
+                             self._batch_text(rec.get("batch_file")))
+        return ad.AnnData(obs=obs, obsm={"X_emb": np.asarray(emb)})
+
     def save(self, out_dir=None) -> "Path":
         """Write this result to disk so it outlives the process.
 
@@ -2625,6 +2675,44 @@ class BatchResult:
                 f"{ok}/{len(self.records)} with metrics{extra}, {bad} failed>")
 
 
+def _embedding_obs(rec, dataset, category, root, n, batch_text=None) -> pd.DataFrame:
+    """The ``obs`` of :meth:`BatchResult.embedding`: each row's barcode (the
+    index), ``label`` and ``batch``, from the label files in the order the
+    record was scored with (else the method's order)."""
+    folder = _dataset_folder(dataset, root)
+    names = [f for f in rec.get("labels_used") or () if (folder / f).is_file()]
+    if not names and folder.is_dir():
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            files = _resolve.labels_for(dataset, category, rec["method"],
+                                        modalities=rec.get("modalities") or None,
+                                        data_path=root, check=False)
+        names = [Path(p).name for p in files.values()]
+    labels, barcodes, batch = [], [], []
+    for f in names:
+        lab = _eio.read_labels(folder / f)
+        bars = next((b for b in map(_resolve._barcodes_of, _label_data_files(folder / f))
+                     if b is not None and len(b) == len(lab)), None)
+        labels.append(np.asarray(lab, dtype=object))
+        barcodes.append(bars)
+        batch.append(np.full(len(lab), Path(f).stem, dtype=object))
+    if sum(map(len, labels)) != n:
+        _compat.warn(f"The label files of {dataset} do not hold the {n:,} cells of "
+                     f"{rec['method']}, so obs has no barcodes, labels or batches.",
+                     UserWarning)
+        return pd.DataFrame(index=pd.Index([str(i) for i in range(n)]))
+    index = (np.concatenate([np.asarray(b, dtype=object) for b in barcodes])
+             if all(b is not None for b in barcodes) else np.arange(n).astype(str))
+    obs = pd.DataFrame({"label": np.concatenate(labels), "batch": np.concatenate(batch)},
+                       index=pd.Index(index, dtype=object))
+    if batch_text:
+        saved = pd.read_csv(__import__("io").StringIO(batch_text), dtype=str,
+                            keep_default_na=False)
+        if "cell" in saved.columns and set(obs.index) <= set(saved["cell"]):
+            obs["batch"] = saved.set_index("cell")["batch"].reindex(obs.index).to_numpy()
+    return obs
+
+
 # ---------------------------------------------------------------------- run_all
 #: closing lines that name no cause (R's after any error)
 _ERROR_TRAILERS = ("Execution halted",)
@@ -2723,7 +2811,8 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
     blocked = blocked.assign(_files=~blocked["files_ok"].astype(bool)).sort_values(
         ["_files", "method"], kind="stable").drop(columns="_files")
     platform = _platform_line(blocked)
-    doctor = config.hint("mtb.env.doctor()", "multibench env doctor")
+    doctor = config.hint("mtb.env.install(dry_run=True)",
+                             "multibench env install --dry-run")
     where = _scan_hint(dataset, category, data_path=data_path, methods=methods,
                        modalities=modalities, allow_atac_mismatch=allow_atac_mismatch,
                        assume_gpu=assume_gpu, every=every)

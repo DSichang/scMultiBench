@@ -28,7 +28,7 @@ import numpy as np
 from .. import _compat, config
 from .registry import ATAC_VALUES as _ATAC_KINDS
 
-__all__ = ["export_dataset", "to_canonical", "read_canonical"]
+__all__ = ["export_dataset", "read_canonical"]
 
 
 def __dir__() -> list[str]:
@@ -792,6 +792,9 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
                          dtype=dtype, category=category, feature_names=feature_names)
 
 
+to_canonical = _compat.renamed("io.to_canonical", "mtb.io.export_dataset", to_canonical)
+
+
 def _to_canonical(src, out: Path | str | None = None, modality: str | None = None,
                   convert: bool = True, *, layer: str | None = None,
                   obsm: str | None = None, mod: str | None = None,
@@ -863,62 +866,43 @@ def _to_canonical(src, out: Path | str | None = None, modality: str | None = Non
                             compression=compression, block=block)
 
 
-def read_canonical(path: Path | str, sparse: bool | None = None):
-    """Read a canonical ``.h5`` back into an AnnData (cells x features).
+@_compat.keywords("io.read_canonical", private="_read_canonical",
+                  kept={"sparse": _compat.use("the default")})
+def read_canonical(path: Path | str):
+    """Read a canonical ``.h5`` (a dataset file or an ``embedding.h5``) as an AnnData.
 
-    The inverse of ``mtb.io.to_canonical``: ``matrix/data`` is transposed
-    back to cells x features, ``matrix/features`` become ``var_names`` and
-    ``matrix/barcodes`` become ``obs_names``.
+    ``matrix/data`` (features x cells) becomes ``.X`` (cells x features, CSR
+    when fewer than half of the entries are non-zero), ``matrix/features``
+    the ``var_names`` and ``matrix/barcodes`` the ``obs_names``. A method's
+    ``embedding.h5`` goes to ``.obsm["X_emb"]`` of an AnnData without features.
 
     Parameters
     ----------
     path : Path | str
         Canonical ``.h5`` file.
-    sparse : bool | None
-        ``True`` = CSR ``.X``; ``False`` = dense ndarray; ``None`` = CSR when
-        fewer than half of the entries are non-zero.
 
     Returns
     -------
     anndata.AnnData
-        ``.X`` as float, cells x features; names taken from the file when it
-        has them.
 
     Raises
     ------
     FileNotFoundError
-        ``path`` does not exist; the message names ``mtb.config.DEFAULT.data_path``.
+        ``path`` does not exist.
     ValueError
         ``path`` is a 10x Genomics ``.h5`` file; the message says how to read it.
 
     Examples
     --------
     >>> import multibench as mtb
-    >>> d = mtb.config.DEFAULT.data_path / "D11"
-    >>> rna = mtb.io.read_canonical(d / "rna.h5")
-    >>> rna.shape, rna.var_names[:3]
-    >>> adt = mtb.io.read_canonical(d / "adt.h5", sparse=False)
-
-    Notes
-    -----
-    ``mtb.data.fetch("D11")`` downloads a demo dataset into
-    ``mtb.config.DEFAULT.data_path``, not into the current directory.
-
-    The whole matrix is read densely, so memory peaks at the dense size
-    (features x cells x 8 bytes) even when the result is CSR: it is meant
-    for the shipped benchmark inputs and for what ``to_canonical`` writes,
-    not for a 100k-cell peak matrix.
-
-    A method's ``embedding.h5`` (one dataset ``data``) is read into
-    ``.obsm["X_emb"]`` of an AnnData without features; another file without
-    ``matrix/data`` raises ``ValueError``.
-    ``matrix/features`` and ``matrix/barcodes`` are optional; without them
-    AnnData's default names (``'0'``, ``'1'``, ...) are kept.
-
-    See Also
-    --------
-    mtb.io.to_canonical : write a canonical file from an AnnData / path.
+    >>> rna = mtb.io.read_canonical(mtb.config.DEFAULT.data_path / "D11" / "rna.h5")
     """
+    return _read_canonical(path)
+
+
+def _read_canonical(path: Path | str, sparse: bool | None = None):
+    """:func:`read_canonical` with the deprecated ``sparse=``: ``True`` = CSR,
+    ``False`` = dense, ``None`` = CSR when fewer than half of the entries are non-zero."""
     import anndata as ad
     import scipy.sparse as sp
     if not Path(path).exists():
@@ -1328,16 +1312,17 @@ def _as_obs_vector(data, spec, *, what, master):
 
 
 @_compat.keywords("io.export_dataset", private="_export_dataset",
-                  kept={"compression": _compat.note("leave it out for gzip")})
+                  kept={"compression": _compat.note("leave it out for gzip"),
+                        "dtype": _compat.use("the default float64"),
+                        "n_batches": _compat.use("a new dataset folder")})
 def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                    adt=None, atac=None,
                    atac_kind: str | None = None, labels=None,
-                   batch=None, dtype: str = "float64",
+                   batch=None,
                    category: str | None = None,
                    adt_names: list | None = None,
                    batch_index: int | None = None,
-                   overwrite: bool = False,
-                   n_batches: int | None = None) -> Path:
+                   overwrite: bool = False) -> Path:
     """Write an AnnData / MuData (or loose objects) as a canonical dataset folder.
 
     Produces the layout ``mtb.describe_layout`` documents (``rna.h5``,
@@ -1374,8 +1359,6 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         Batch per cell, same forms as ``labels``; splits the files per batch
         (``rna1.h5``, ``rna2.h5``, ...) for mosaic or cross. Every cell
         needs a batch.
-    dtype : str
-        Stored dtype of ``matrix/data``, forwarded to ``mtb.io.to_canonical``.
     category : str or None
         Integration category the folder is for (``vertical``, ``diagonal``,
         ``mosaic`` or ``cross``); sets the ATAC and label filenames.
@@ -1388,9 +1371,6 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     overwrite : bool
         ``True`` = replace files already in ``dataset_dir``; ``False`` = raise
         before writing anything.
-    n_batches : int or None
-        With ``batch_index``: how many batches the calls write in total.
-        Files of a higher batch number in ``dataset_dir`` are refused.
 
     Returns
     -------
@@ -1424,7 +1404,6 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
 
     See Also
     --------
-    mtb.io.to_canonical : one matrix -> one canonical file.
     mtb.describe_layout : the layout being produced and the role -> filename mapping.
     mtb.scan : confirm the folder is found and which methods can run on it.
     """
@@ -1432,9 +1411,9 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         raise TypeError("export_dataset takes an AnnData or MuData object, not a path: "
                         "read the file first, e.g. anndata.read_h5ad(path).")
     return _export_dataset(data, dataset_dir, rna=rna, adt=adt, atac=atac,
-                           atac_kind=atac_kind, labels=labels, batch=batch, dtype=dtype,
+                           atac_kind=atac_kind, labels=labels, batch=batch,
                            category=category, adt_names=adt_names, batch_index=batch_index,
-                           overwrite=overwrite, n_batches=n_batches)
+                           overwrite=overwrite)
 
 
 def _export_dataset(data, dataset_dir: Path | str, *, rna="X",
@@ -1447,7 +1426,8 @@ def _export_dataset(data, dataset_dir: Path | str, *, rna="X",
                     overwrite: bool = False,
                     n_batches: int | None = None,
                     compression="gzip") -> Path:
-    """:func:`export_dataset`, with the deprecated ``compression``."""
+    """:func:`export_dataset`, with the deprecated ``compression``, ``dtype`` and
+    ``n_batches`` (with ``batch_index``: files of a higher batch number are refused)."""
     out = Path(dataset_dir)
     category = _check_category(category)
     if data is None and isinstance(rna, str) and rna == "X":

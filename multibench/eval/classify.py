@@ -21,8 +21,7 @@ from .pipeline import (_Table, _as_written, _cell_ids, _count_error,
 COLUMNS = ["reference", "batch", "cell", "label", "predicted"]
 
 
-@_compat.keywords("classify", renamed={"output": "embedding"})
-def classify(embedding, labels=None, *, batch=None, reference=None,
+def classify(output, labels=None, *, batch=None, reference=None,
              obsm: str | None = None, label_order=None, seed: int = 0) -> pd.DataFrame:
     """Predict the cell type of each query cell from a reference batch.
 
@@ -32,7 +31,7 @@ def classify(embedding, labels=None, *, batch=None, reference=None,
 
     Parameters
     ----------
-    embedding
+    output
         Embedding, cells x dims, in the forms ``mtb.evaluate`` takes: a run
         output file (``embedding.h5``, ``.h5ad``, ``.csv``), an AnnData, a
         DataFrame or an array.
@@ -47,7 +46,7 @@ def classify(embedding, labels=None, *, batch=None, reference=None,
         The batch to learn from. ``None`` = every batch in turn, as in the
         article.
     obsm : str | None
-        ``.obsm`` key of an AnnData or ``.h5ad`` ``embedding``; ``'X'`` means
+        ``.obsm`` key of an AnnData or ``.h5ad`` ``output``; ``'X'`` means
         ``.X``; ``None`` = ``X_emb``, or the only key when there is one.
     label_order : list of str
         Keys of a ``labels`` dict in the method's cell order, as in
@@ -108,24 +107,24 @@ def classify(embedding, labels=None, *, batch=None, reference=None,
         stems = [Path(p).stem for p in labels]
         names = stems if len(set(stems)) == len(stems) else \
             [str(i + 1) for i in range(len(labels))]
-    _check_embedding(embedding)
+    _check_embedding(output)
 
-    cells = "adata.obs_names" if io._is_anndata(embedding) else None
-    if isinstance(embedding, (str, Path)) and Path(embedding).suffix.lower() == ".h5ad":
+    cells = "adata.obs_names" if io._is_anndata(output) else None
+    if isinstance(output, (str, Path)) and Path(output).suffix.lower() == ".h5ad":
         import anndata as ad
-        embedding = ad.read_h5ad(embedding)
-    adata = embedding if io._is_anndata(embedding) else None
+        output = ad.read_h5ad(output)
+    adata = output if io._is_anndata(output) else None
     table = None
-    if isinstance(embedding, (str, Path)) and Path(embedding).suffix.lower() in {".csv", ".tsv"}:
-        file = io._require_file(embedding, "output")
+    if isinstance(output, (str, Path)) and Path(output).suffix.lower() in {".csv", ".tsv"}:
+        file = io._require_file(output, "output")
         emb, ids = io._read_csv_embedding(file)
         if ids is not None and emb.shape[0] != emb.shape[1] \
                 and _n_values(labels, adata) == emb.shape[1]:
             ids = None           # dims x cells: the first column names the dimensions
         table = None if ids is None else _Table(file.name)
     else:
-        ids = _cell_ids(embedding)
-        emb = np.asarray(io.as_matrix(embedding, obsm=obsm))
+        ids = _cell_ids(output)
+        emb = np.asarray(io.as_matrix(output, obsm=obsm))
     if emb.ndim != 2:
         raise ValueError(_NOT_EMBEDDING.format(what="output"))
     if _is_label_path_list(labels):

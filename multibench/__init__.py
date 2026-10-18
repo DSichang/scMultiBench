@@ -25,23 +25,25 @@ from . import plot
 from . import eval
 from . import data
 from .data import catalog
-from .data.results import load_results, available_datasets, results_coverage, recommend
+from .data.results import (load_results, available_datasets, recommend,
+                           results_coverage as _results_coverage)
 from .data import results as _results
 from .eval.pipeline import evaluate, to_long
-from .eval.classify import classify, classification_metrics
-from .engine.runner import run
+from .eval.classify import (classify as _classify,
+                            classification_metrics as _classification_metrics)
+from .engine.runner import run as _run
 from .engine import registry as _registry
-from .engine.schema import AmbiguousVariantError
-from .engine.resolve import inputs_for, labels_for
+from .engine.schema import AmbiguousVariantError as _AmbiguousVariantError
+from .engine.resolve import inputs_for as _inputs_for, labels_for as _labels_for
 from .engine import ingest as io
 from .engine import envs as env
 from .discover import list_methods, find_methods, method_info, params_for, cite
 from .workflow import (scan, run_all, BatchResult, list_categories,
-                       describe_layout, load_batch, sweep)
+                       describe_layout, load_batch, sweep as _sweep)
 from . import _compat
 
-# `import multibench.io` / `from multibench.env import plan` work as for a real
-# submodule: the three namespaces live elsewhere in the package
+# `import multibench.io` / `from multibench.env import install` work as for a
+# real submodule: the three namespaces live elsewhere in the package
 import sys as _sys
 for _name, _module in (("io", io), ("catalog", catalog), ("env", env)):
     _sys.modules.setdefault(f"{__name__}.{_name}", _module)
@@ -50,30 +52,39 @@ del _sys, _name, _module
 __version__ = "0.4.0"
 
 __all__ = [
-    # sub-namespaces
+    # namespaces
     "config", "plot", "catalog", "io", "env", "data",
-    # discover
-    "find_methods", "method_info", "params_for", "describe_layout", "cite",
-    # inputs
-    "inputs_for", "labels_for",
+    # methods
+    "find_methods", "method_info", "params_for", "cite",
     # run
-    "scan", "run", "run_all", "sweep", "load_batch", "BatchResult",
-    # score
-    "evaluate", "to_long", "classify", "classification_metrics",
-    # compare
-    "load_results", "results_coverage", "recommend",
-    "AmbiguousVariantError", "__version__",
+    "scan", "run_all", "load_batch", "BatchResult",
+    # metrics
+    "evaluate", "load_results", "recommend",
+    # setup
+    "describe_layout", "__version__",
 ]
 
 
-# deprecated 0.4 names: reachable until 0.5, not in __all__ or dir(mtb)
+# deprecated: reachable until 0.5, not in __all__ or dir(mtb)
 list_tasks = _compat.renamed("list_tasks", "category= and metrics=", _registry.list_tasks)
+_RUN_ONE = "mtb.run_all(dataset, category, methods=[method])"
+run = _compat.renamed("run", _RUN_ONE, _run)
+inputs_for = _compat.renamed("inputs_for", _RUN_ONE, _inputs_for)
+labels_for = _compat.renamed("labels_for", "mtb.evaluate(..., dataset=, method=)", _labels_for)
+sweep = _compat.renamed("sweep", "a loop over mtb.run_all(params=...)", _sweep)
+_CLASSIFICATION = "mtb.evaluate(..., metrics='classification')"
+classify = _compat.renamed("classify", _CLASSIFICATION, _classify)
+classification_metrics = _compat.renamed("classification_metrics", _CLASSIFICATION,
+                                         _classification_metrics)
+results_coverage = _compat.renamed("results_coverage", "mtb.load_results(category)",
+                                   _results_coverage)
 
 # the 0.2 names, removed in 0.4 as their warnings said
 __getattr__ = _compat.module_getattr(__name__, "", old={
     # nothing raises it since the Conos rows left the stored tables
     "DegenerateRerunWarning": (_results.DegenerateRerunWarning,
                                _compat.note("nothing raises it")),
+    "AmbiguousVariantError": (_AmbiguousVariantError, _compat.use("except ValueError")),
 }, removed={
     "plan": ("0.4", _compat.use("mtb.run_all(..., dry_run=True)")),
     "plan_commands": ("0.4", _compat.use("mtb.run_all(..., dry_run=True)")),

@@ -1,7 +1,7 @@
-"""evaluate(): compute metrics; to_long(): reshape to the long results frame."""
-from .pipeline import evaluate, to_long
+"""evaluate(): the benchmark's metrics of an embedding, as the long results table."""
+from .pipeline import evaluate, to_long  # noqa: F401  (to_long: deprecated)
 
-__all__ = ["evaluate", "to_long"]
+__all__ = ["evaluate"]
 
 
 def __dir__() -> list[str]:

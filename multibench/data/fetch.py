@@ -44,6 +44,13 @@ AVAILABLE = {"D11": "11 MB", "D28": "137 MB", "D45": "290 MB",
              "D52mini": "2 MB", "D37mini": "12 MB", "D49mini": "5 MB",
              "D56mini": "10 MB", "D58mini": "7 MB", "D59mini": "8 MB"}
 
+#: the category of each demo subset, as its tutorial runs it
+DEMO_CATEGORIES = {"D27mini_vertical": "vertical", "D22mini": "vertical",
+                   "D27mini": "diagonal", "D37mini": "diagonal", "D38mini": "mosaic",
+                   "D45mini": "mosaic", "D46mini": "mosaic", "D49mini": "mosaic",
+                   "D52mini": "cross", "D56mini": "cross", "D58mini": "cross",
+                   "D59mini": "cross"}
+
 #: ``{dataset: url}`` of the benchmark host's ``run_all`` output trees (the
 #: deprecated ``fetch_outputs``); ships in the wheel next to ``packed_urls.json``
 OUTPUT_MANIFEST = Path(__file__).resolve().parent.parent / "engine" / "output_urls.json"

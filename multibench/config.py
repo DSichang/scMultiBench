@@ -2,7 +2,7 @@
 
 Change a field of ``mtb.config.DEFAULT`` to use your own data folder, env
 folder or Leiden backend, for example
-``mtb.config.DEFAULT.data_path = "/scratch/data"``. ``help(mtb.config.Config)``
+``mtb.config.DEFAULT.data_path = "/scratch/data"``. ``help(mtb.config.DEFAULT)``
 lists the fields; ``multibench config`` prints each path and where it came
 from.
 """
@@ -16,7 +16,7 @@ import socket as _socket
 from dataclasses import dataclass, field
 from pathlib import Path
 
-__all__ = ["Config", "DEFAULT"]
+__all__ = ["DEFAULT"]
 
 
 def __dir__() -> list[str]:
@@ -205,7 +205,7 @@ class Config:
     See Also
     --------
     mtb.env.install : provisions the method envs under ``envs_dir``.
-    mtb.data.fetch : downloads reference datasets into ``data_path``.
+    mtb.data.fetch : downloads demo datasets into ``data_path``.
     """
 
     # the package's own tables: not set by users, so not in the signature or repr
@@ -220,6 +220,9 @@ class Config:
 
 
 DEFAULT = Config()
+# a second settings object is not needed: the class leaves the public names
+_Config = Config
+del Config
 
 
 def _base_source() -> str:
@@ -530,3 +533,9 @@ def ensure_repo(path=None, ref=None):
     else:
         part.rename(p)
     return p
+
+
+from . import _compat  # noqa: E402  (stdlib only: no import cycle)
+__getattr__ = _compat.module_getattr(__name__, "config", old={
+    "Config": (_Config, _compat.use("mtb.config.DEFAULT")),
+})
