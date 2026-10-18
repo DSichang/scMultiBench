@@ -2100,9 +2100,8 @@ def build_parser() -> argparse.ArgumentParser:
     pra.add_argument("--no-evaluate", dest="no_evaluate", action="store_true",
                      help="run only; do not compute metrics on the outputs")
     pra.add_argument("--batch", metavar="CSV",
-                     help="one batch per cell: a CSV as for evaluate --batch, cells in "
-                          "the order of the label files; a first column of barcodes is "
-                          "aligned by barcode (default: one batch per label file)")
+                     help="one batch per cell, in the order of the label files or by a "
+                          "first column of barcodes (default: one batch per label file)")
     pra.add_argument("--batch-column", dest="batch_column", metavar="NAME",
                      action=_Retired, tail=_compat.use("a one-column --batch CSV"))
     pra.add_argument("--leiden-flavor", dest="leiden_flavor", choices=["igraph", "leidenalg"],
