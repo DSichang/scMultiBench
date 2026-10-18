@@ -2,7 +2,7 @@
 
 On a host without the methods' conda envs (Colab, a laptop) the tutorial
 loads real outputs instead of running: ``mtb.load_batch(
-mtb.data.fetch_outputs("D11"), methods=trio)``. These tests serve a local
+F.fetch_outputs("D11"), methods=trio)``. These tests serve a local
 tarball through the module's single network seam (``fetch._download``) so
 download bookkeeping, idempotence, the traversal guard, the methods filter
 and the ``load_batch(methods=)`` filter run without the network.
@@ -103,15 +103,10 @@ def test_manifest_ships_in_the_wheel():
     assert any(fnmatch.fnmatch("engine/output_urls.json", g) for g in globs)
 
 
-def test_fetch_outputs_is_public_under_data():
-    assert "fetch_outputs" in mtb.data.__all__
-    assert mtb.data.fetch_outputs is F.fetch_outputs
-
-
 # ------------------------------------------------------------------ download
 def test_downloads_extracts_and_returns_the_dataset_folder(served, capsys):
     data, calls = served
-    out = mtb.data.fetch_outputs(DATASET, data_path=data)
+    out = F.fetch_outputs(DATASET, data_path=data)
     assert out == data / "outputs" / DATASET
     assert calls == [F._output_urls()[DATASET]]
     assert (out / "batch_result.json").is_file()
@@ -126,23 +121,23 @@ def test_downloads_extracts_and_returns_the_dataset_folder(served, capsys):
 
 def test_idempotent_second_call_downloads_nothing(served, capsys):
     data, calls = served
-    first = mtb.data.fetch_outputs(DATASET, data_path=data)
+    first = F.fetch_outputs(DATASET, data_path=data)
     capsys.readouterr()
-    again = mtb.data.fetch_outputs(DATASET, data_path=data)
+    again = F.fetch_outputs(DATASET, data_path=data)
     assert again == first and len(calls) == 1
     assert capsys.readouterr().out == ""
 
 
 def test_quiet_prints_nothing(served, capsys):
     data, _ = served
-    mtb.data.fetch_outputs(DATASET, data_path=data, quiet=True)
+    F.fetch_outputs(DATASET, data_path=data, quiet=True)
     assert capsys.readouterr().out == ""
 
 
 def test_default_data_path_is_the_configured_one(served, monkeypatch, tmp_path):
     data, _ = served
     monkeypatch.setattr(mtb.config.DEFAULT, "data_path", tmp_path / "cfg")
-    out = mtb.data.fetch_outputs(DATASET, quiet=True)
+    out = F.fetch_outputs(DATASET, quiet=True)
     assert out == tmp_path / "cfg" / "outputs" / DATASET
     assert (out / "batch_result.json").is_file()
 
@@ -152,7 +147,7 @@ def test_archive_rooted_at_the_tree_itself_is_accepted(tmp_path, monkeypatch):
     _write_tree(src)
     tgz = _tar_of(src, tmp_path / "flat.tar.gz", None)
     monkeypatch.setattr(F, "_download", lambda url: tgz)
-    out = mtb.data.fetch_outputs(DATASET, data_path=tmp_path / "data", quiet=True)
+    out = F.fetch_outputs(DATASET, data_path=tmp_path / "data", quiet=True)
     assert (out / "batch_result.json").is_file()
     assert (out / f"{METHODS[0]}_{DATASET}" / "embedding.h5").is_file()
 
@@ -164,7 +159,7 @@ def test_archive_without_batch_result_raises_and_leaves_no_folder(tmp_path, monk
     tgz = _tar_of(src.parent, tmp_path / "bad.tar.gz", None)
     monkeypatch.setattr(F, "_download", lambda url: tgz)
     with pytest.raises(RuntimeError, match="did not contain batch_result.json"):
-        mtb.data.fetch_outputs(DATASET, data_path=tmp_path / "data", quiet=True)
+        F.fetch_outputs(DATASET, data_path=tmp_path / "data", quiet=True)
     assert not (tmp_path / "data" / "outputs" / DATASET).exists()
     assert list((tmp_path / "data" / "outputs").iterdir()) == []
 
@@ -177,7 +172,7 @@ def test_traversal_safe(tmp_path, monkeypatch):
         t.add(payload, arcname="outputs-D11/../../escape.txt")
     monkeypatch.setattr(F, "_download", lambda url: tgz)
     with pytest.raises(RuntimeError, match="escapes target dir"):
-        mtb.data.fetch_outputs(DATASET, data_path=tmp_path / "data", quiet=True)
+        F.fetch_outputs(DATASET, data_path=tmp_path / "data", quiet=True)
     assert not (tmp_path / "escape.txt").exists()
     assert not (tmp_path / "data" / "escape.txt").exists()
 
@@ -188,14 +183,14 @@ def test_foreign_nonempty_folder_without_batch_result_is_refused(served):
     dest.mkdir(parents=True)
     (dest / "notes.txt").write_text("mine")
     with pytest.raises(RuntimeError, match="exists without batch_result.json"):
-        mtb.data.fetch_outputs(DATASET, data_path=data, quiet=True)
+        F.fetch_outputs(DATASET, data_path=data, quiet=True)
     assert (dest / "notes.txt").read_text() == "mine" and calls == []
 
 
 def test_empty_leftover_folder_is_replaced(served):
     data, _ = served
     (data / "outputs" / DATASET).mkdir(parents=True)
-    out = mtb.data.fetch_outputs(DATASET, data_path=data, quiet=True)
+    out = F.fetch_outputs(DATASET, data_path=data, quiet=True)
     assert (out / "batch_result.json").is_file()
 
 
@@ -203,7 +198,7 @@ def test_empty_leftover_folder_is_replaced(served):
 def test_unknown_dataset_raises_listing_the_manifest_ids(served):
     data, calls = served
     with pytest.raises(ValueError) as e:
-        mtb.data.fetch_outputs("D99", data_path=data)
+        F.fetch_outputs("D99", data_path=data)
     assert str(e.value) == ("'D99' has no shipped run_all outputs; available: "
                             "D11, D28, D46, D52")
     assert calls == []                      # validated before any download
@@ -211,10 +206,10 @@ def test_unknown_dataset_raises_listing_the_manifest_ids(served):
 
 def test_methods_filter_validates_against_the_tree(served):
     data, _ = served
-    out = mtb.data.fetch_outputs(DATASET, ["Matilda", "scMoMaT"], data_path=data, quiet=True)
+    out = F.fetch_outputs(DATASET, ["Matilda", "scMoMaT"], data_path=data, quiet=True)
     assert out == data / "outputs" / DATASET       # the folder either way
     with pytest.raises(KeyError) as e:
-        mtb.data.fetch_outputs(DATASET, ["Matilda", "nope"], data_path=data, quiet=True)
+        F.fetch_outputs(DATASET, ["Matilda", "nope"], data_path=data, quiet=True)
     msg = str(e.value)
     assert "no shipped output for ['nope'] in D11" in msg
     assert "methods in the tree: ['Matilda', 'MOFA2', 'scMoMaT']" in msg
@@ -223,7 +218,7 @@ def test_methods_filter_validates_against_the_tree(served):
 def test_methods_filter_checks_after_the_download_on_a_fresh_tree(served):
     data, calls = served
     with pytest.raises(KeyError):
-        mtb.data.fetch_outputs(DATASET, ["nope"], data_path=data, quiet=True)
+        F.fetch_outputs(DATASET, ["nope"], data_path=data, quiet=True)
     assert len(calls) == 1                  # the tree is on disk for next time
     assert (data / "outputs" / DATASET / "batch_result.json").is_file()
 
@@ -232,7 +227,7 @@ def test_methods_filter_checks_after_the_download_on_a_fresh_tree(served):
 def test_load_batch_methods_filter_is_the_tutorial_path(served):
     data, _ = served
     trio = ["scMoMaT", "Matilda"]
-    res = mtb.load_batch(mtb.data.fetch_outputs(DATASET, trio, data_path=data, quiet=True),
+    res = mtb.load_batch(F.fetch_outputs(DATASET, trio, data_path=data, quiet=True),
                          methods=trio)
     assert [r["method"] for r in res.records] == ["Matilda", "scMoMaT"]   # tree order
     assert sorted(res.summary["method"]) == ["Matilda", "scMoMaT"]
@@ -243,14 +238,14 @@ def test_load_batch_methods_filter_is_the_tutorial_path(served):
 
 def test_load_batch_without_methods_is_unchanged(served):
     data, _ = served
-    res = mtb.load_batch(mtb.data.fetch_outputs(DATASET, data_path=data, quiet=True))
+    res = mtb.load_batch(F.fetch_outputs(DATASET, data_path=data, quiet=True))
     assert [r["method"] for r in res.records] == METHODS
     assert len(res.long) == 2 * len(METHODS)
 
 
 def test_load_batch_unknown_method_raises_listing_the_tree(served):
     data, _ = served
-    out = mtb.data.fetch_outputs(DATASET, data_path=data, quiet=True)
+    out = F.fetch_outputs(DATASET, data_path=data, quiet=True)
     with pytest.raises(KeyError) as e:
         mtb.load_batch(out, methods=["Matilda", "ghost"])
     msg = str(e.value)

@@ -10,16 +10,16 @@ import multibench as mtb
 from multibench import cli
 from multibench.engine import envs
 
-from test_fetch_outputs import served  # noqa: F401 - the local outputs archive
+from test_fetch_outputs import F, served  # noqa: F401 - the local outputs archive
 
 
 def test_fetch_outputs_takes_method_names_in_any_case(served):  # noqa: F811
     data, _ = served
-    out = mtb.data.fetch_outputs("D11", methods=["matilda", "MOFA+"], data_path=data,
+    out = F.fetch_outputs("D11", methods=["matilda", "MOFA+"], data_path=data,
                                  quiet=True)
     assert (out / "batch_result.json").is_file()
     with pytest.raises(KeyError, match="no shipped output for"):
-        mtb.data.fetch_outputs("D11", methods=["totalVI"], data_path=data, quiet=True)
+        F.fetch_outputs("D11", methods=["totalVI"], data_path=data, quiet=True)
 
 
 def test_cli_dry_run_refuses_a_bad_param_before_its_header(capsys):

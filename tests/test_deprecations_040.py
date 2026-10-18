@@ -425,3 +425,26 @@ def test_cli_deprecated_commands_warn_once_and_work():
 def test_cli_cite_prints_text_by_default():
     _, out, _ = _cli("cite", "Matilda")
     assert out.strip() == mtb.cite("Matilda")
+
+
+# ------------------------------------------------------- stored demo outputs
+def test_fetch_outputs_is_deprecated_and_still_served():
+    import importlib
+    F = importlib.import_module("multibench.data.fetch")
+    assert "fetch_outputs" not in mtb.data.__all__ and "fetch_outputs" not in dir(mtb.data)
+    got, msg = _one_warning(lambda: mtb.data.fetch_outputs)
+    assert got is F.fetch_outputs
+    assert msg == _msg("data.fetch_outputs", note="use mtb.load_results for the stored scores")
+
+
+def test_cli_fetch_outputs_is_hidden_and_warns_once(monkeypatch, tmp_path):
+    import importlib
+    F = importlib.import_module("multibench.data.fetch")
+    calls = []
+    monkeypatch.setattr(F, "fetch_outputs",
+                        lambda ds, **kw: calls.append(ds) or tmp_path / "outputs" / ds)
+    assert "--outputs" not in _help("fetch") and "stored outputs" not in _help()
+    code, out, err = _cli("fetch", "D11", "--outputs", "--data-path", str(tmp_path))
+    assert code == 0 and calls == ["D11"]
+    assert err.strip() == ("warning: --outputs is deprecated and will be removed in 0.5; "
+                           "use multibench plot for the stored scores.")

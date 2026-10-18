@@ -88,12 +88,12 @@ from test_fetch_outputs import F, _write_tree, served  # noqa: E402,F401
 
 def test_a_tree_of_another_url_is_fetched_again(served, monkeypatch, capsys):  # noqa: F811
     data, calls = served
-    out = mtb.data.fetch_outputs("D11", data_path=data, quiet=True)
+    out = F.fetch_outputs("D11", data_path=data, quiet=True)
     assert (out / ".source").read_text().strip() == F._output_urls()["D11"]
     (out / "mine.txt").write_text("x")
     new = {**F._output_urls(), "D11": "https://example.org/new/outputs-D11.tar.gz"}
     monkeypatch.setattr(F, "_output_urls", lambda: new)
-    out = mtb.data.fetch_outputs("D11", data_path=data)
+    out = F.fetch_outputs("D11", data_path=data)
     old = data / "outputs" / "D11.old"
     assert calls[-1] == new["D11"] and (old / "mine.txt").is_file()
     assert (out / ".source").read_text().strip() == new["D11"]
@@ -103,16 +103,30 @@ def test_a_tree_of_another_url_is_fetched_again(served, monkeypatch, capsys):  #
 def test_a_tree_without_a_source_is_fetched_again(served):  # noqa: F811
     data, calls = served
     _write_tree(data / "outputs" / "D11")           # a 0.3.x cache: no .source
-    mtb.data.fetch_outputs("D11", data_path=data, quiet=True)
+    F.fetch_outputs("D11", data_path=data, quiet=True)
     assert len(calls) == 1 and (data / "outputs" / "D11.old").is_dir()
 
 
-def test_a_stored_tree_of_0_3_says_to_fetch_again(tmp_path):
+def test_a_stored_tree_of_0_3_says_to_rescore(tmp_path):
+    # the stored-outputs concept left in 0.4.0: one warning for every 0.3.x tree
     tree = tmp_path / "outputs" / "D11"
     _write_tree(tree)                               # long.csv without scored_with
-    with pytest.warns(UserWarning, match=r"These are the 0\.3\.x stored outputs\. "
-                      r"mtb\.data\.fetch_outputs\('D11'\) gets the 0\.4\.0 ones\."):
+    with pytest.warns(UserWarning, match=r"^These scores come from multibench 0\.3\.x\. "
+                      r"res\.rescore\(\) scores them as 0\.4\.0 does\.$"):
         mtb.load_batch(tree)
+
+
+def test_an_earlier_old_tree_is_kept(served, capsys):  # noqa: F811
+    # Z28: a second refetch moves the tree to the first free name, deleting none
+    import shutil
+    data, calls = served
+    for _ in range(2):
+        _write_tree(data / "outputs" / "D11")       # a tree without .source
+        F.fetch_outputs("D11", data_path=data)
+        shutil.rmtree(data / "outputs" / "D11")
+    assert (data / "outputs" / "D11.old").is_dir() and (data / "outputs" / "D11.old-2").is_dir()
+    assert f"(the earlier tree moves to {data / 'outputs' / 'D11.old-2'})" in \
+        capsys.readouterr().out
 
 
 # Y40: a second dataset is refused before any download
@@ -120,7 +134,7 @@ def test_fetch_outputs_takes_one_dataset(served):  # noqa: F811
     data, calls = served
     with pytest.raises(TypeError, match="fetch_outputs takes one dataset; call it once "
                                         "per dataset."):
-        mtb.data.fetch_outputs("D11", "D28", data_path=data)
+        F.fetch_outputs("D11", "D28", data_path=data)
     assert calls == []
 
 

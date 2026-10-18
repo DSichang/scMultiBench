@@ -44,8 +44,8 @@ AVAILABLE = {"D11": "11 MB", "D28": "137 MB", "D45": "290 MB",
              "D52mini": "2 MB", "D37mini": "12 MB", "D49mini": "5 MB",
              "D56mini": "10 MB", "D58mini": "7 MB", "D59mini": "8 MB"}
 
-#: ``{dataset: url}`` of the benchmark host's ``run_all`` output trees
-#: (``mtb.data.fetch_outputs``); ships in the wheel next to ``packed_urls.json``
+#: ``{dataset: url}`` of the benchmark host's ``run_all`` output trees (the
+#: deprecated ``fetch_outputs``); ships in the wheel next to ``packed_urls.json``
 OUTPUT_MANIFEST = Path(__file__).resolve().parent.parent / "engine" / "output_urls.json"
 
 
@@ -132,7 +132,6 @@ def fetch(*datasets: str, data_path=None, quiet: bool = False) -> Path:
     See Also
     --------
     mtb.data.fetchable : the dataset ids this function can download.
-    mtb.data.fetch_outputs : precomputed ``run_all`` outputs for a tutorial dataset.
     mtb.config.Config : ``data_path``, the default data root.
     """
     import shutil as _shutil
@@ -179,57 +178,8 @@ def _methods_in_tree(folder: Path) -> list:
 
 def fetch_outputs(dataset: str, methods=None, *, data_path=None,
                   quiet: bool = False) -> Path:
-    """Download precomputed ``run_all`` outputs for a tutorial dataset.
-
-    Use it on a host without the method environments, such as Colab or a
-    laptop. ``evaluate`` and ``plot`` then run on the stored outputs.
-    With more than 4,096 cells scanpy's neighbour search is approximate, so the
-    same embedding can score a few hundredths differently on another machine or
-    library version.
-
-    Parameters
-    ----------
-    dataset : str
-        Dataset id with shipped outputs: ``D11``, ``D28``, ``D45`` or ``D52``.
-    methods : list of str, optional
-        Method ids that must be in the tree; checked only, the whole tree
-        is downloaded either way.
-    data_path : Path | str | None
-        Data root that holds the dataset folders; ``None`` =
-        ``mtb.config.DEFAULT.data_path``.
-    quiet : bool
-        Suppress the one "downloading ..." line.
-
-    Returns
-    -------
-    pathlib.Path
-        ``<data_path>/outputs/<dataset>`` - pass it to ``mtb.load_batch``. A
-        tree of an earlier release is fetched again, and the earlier one
-        moves to ``outputs/<dataset>.old``.
-
-    Raises
-    ------
-    ValueError
-        ``dataset`` has no shipped outputs (the message lists the ids).
-    KeyError
-        A name in ``methods`` is not in the tree (the message lists its methods).
-    RuntimeError
-        The archive lacks ``batch_result.json``, or a non-empty ``outputs/<dataset>/`` lacks one.
-    OSError
-        The download failed; the message names the URL.
-
-    Examples
-    --------
-    >>> import multibench as mtb
-    >>> out = mtb.data.fetch_outputs("D11")
-    >>> res = mtb.load_batch(out)
-
-    See Also
-    --------
-    mtb.load_batch : load the downloaded tree as a ``BatchResult``.
-    mtb.run_all : produces the same tree from your own run.
-    mtb.data.fetch : download the input datasets themselves.
-    """
+    """Deprecated: download the stored ``run_all`` outputs of ``dataset`` into
+    ``<data_path>/outputs/<dataset>``; returns that folder."""
     import shutil as _shutil
     import tempfile as _tempfile
 
@@ -251,7 +201,12 @@ def fetch_outputs(dataset: str, methods=None, *, data_path=None,
     # the tree records the URL it came from: a new manifest URL fetches it again
     source = dest / ".source"
     if not (have_tree and source.is_file() and source.read_text().strip() == url):
-        old = outputs / f"{dataset}.old" if have_tree else None
+        old = None
+        if have_tree:                        # the first free name: never delete a tree
+            old = outputs / f"{dataset}.old"
+            k = 2
+            while old.exists():
+                old, k = outputs / f"{dataset}.old-{k}", k + 1
         if dest.is_dir() and not have_tree:
             if any(dest.iterdir()):
                 raise RuntimeError(
@@ -279,7 +234,6 @@ def fetch_outputs(dataset: str, methods=None, *, data_path=None,
                     f"downloaded archive for {dataset} did not contain batch_result.json")
             (found / ".source").write_text(url + "\n")
             if old is not None:
-                _shutil.rmtree(old, ignore_errors=True)
                 dest.rename(old)
             found.rename(dest)
         finally:

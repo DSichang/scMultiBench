@@ -650,8 +650,9 @@ def _cmd_convert(args) -> int:
 
 
 def _cmd_fetch(args) -> int:
-    """``multibench fetch``: :func:`multibench.data.fetch` (or ``fetch_outputs``) per
-    dataset named, and with ``--scripts`` the method scripts (``config.ensure_repo``)."""
+    """``multibench fetch``: :func:`multibench.data.fetch` per dataset named (the
+    deprecated ``--outputs``: ``fetch_outputs``), and with ``--scripts`` the method
+    scripts (``config.ensure_repo``)."""
     from .data.fetch import AVAILABLE, fetch, fetch_outputs
     ids = [d for tok in (args.datasets or []) for d in _csv_list(tok)]
     if not ids and not args.scripts:
@@ -1944,19 +1945,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     # ---- fetch
     pfe = sub.add_parser(
-        "fetch", help="download demo datasets, stored outputs or the method scripts "
-                      "(mtb.data.fetch / mtb.data.fetch_outputs)",
+        "fetch", help="download demo datasets or the method scripts (mtb.data.fetch)",
         description="Download the demo datasets named into the data root (skipping "
-                    "those present), or with --outputs their stored run-all outputs. "
+                    "those present). "
                     "--scripts fetches the method scripts the first run would fetch, so "
                     "compute nodes without network need no download.")
     pfe.add_argument("datasets", nargs="*", metavar="DATASET",
                      help="dataset ids, space- or comma-separated (mtb.data.fetchable() "
                           "lists them)")
-    pfe.add_argument("--outputs", action="store_true",
-                     help="download the stored run-all outputs of each dataset instead "
-                          "(D11, D28, D45, D52; mtb.data.fetch_outputs), under "
-                          "<data root>/outputs/")
+    pfe.add_argument("--outputs", action=_Retired, nargs=0, default=False,
+                     tail=_compat.note("use multibench plot for the stored scores"))
     pfe.add_argument("--scripts", action="store_true",
                      help="fetch the method scripts (PYangLab/scMultiBench, with git) "
                           "into repo_path, or report them present; prints the commit")

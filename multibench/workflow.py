@@ -55,8 +55,7 @@ def load_batch(out_dir, *, methods=None, data_path=None) -> "BatchResult":
     Parameters
     ----------
     out_dir : path-like
-        Folder holding ``batch_result.json``: a ``run_all`` ``out_dir`` or a
-        ``mtb.data.fetch_outputs`` tree.
+        Folder holding ``batch_result.json``: a ``run_all`` ``out_dir``.
     methods : list[str] | None
         Methods whose records to keep; ``None`` = every record.
     data_path : path-like | None
@@ -89,7 +88,7 @@ def load_batch(out_dir, *, methods=None, data_path=None) -> "BatchResult":
     >>> res = mtb.load_batch("out/")
     >>> res.summary
     >>> res.plot().savefig("compare.png")
-    >>> mtb.load_batch(mtb.data.fetch_outputs("D11"), methods=["Matilda", "scMM"])
+    >>> mtb.load_batch("out/", methods=["Matilda", "scMM"])
 
     Notes
     -----
@@ -102,16 +101,14 @@ def load_batch(out_dir, *, methods=None, data_path=None) -> "BatchResult":
     the folder of the same name (``<method>_<dataset>``) next to
     ``batch_result.json``. The dataset folder is looked up
     under ``data_path=``, the recorded ``data_path`` and then ``data_root``,
-    and the one found is recorded as an absolute path. So a ``fetch_outputs``
-    tree or a copied ``run_all`` folder can be re-scored.
+    and the one found is recorded as an absolute path. So a copied ``run_all``
+    folder can be re-scored.
 
     See Also
     --------
     mtb.BatchResult : the object returned.
 
     mtb.run_all : writes the folder this function reads.
-
-    mtb.data.fetch_outputs : downloads recorded run outputs in the same layout.
     """
     folder = Path(out_dir)
     with open(folder / "batch_result.json") as fh:
@@ -145,10 +142,7 @@ def load_batch(out_dir, *, methods=None, data_path=None) -> "BatchResult":
     long_path = folder / "long.csv"
     long_table = pd.read_csv(long_path) if long_path.exists() else None
     if _scored_before_040(long_table, records):
-        from .data.fetch import _output_urls
-        stored = folder.parent.name == "outputs" and folder.name in _output_urls()
-        _compat.warn(OLD_TREE_STORED.format(folder.name) if stored else OLD_TREE,
-                     UserWarning)
+        _compat.warn(OLD_TREE, UserWarning)
     for r in records:
         rows = [] if long_table is None else long_table[long_table["method"] == r.get("method")]
         r["_long"] = rows if len(rows) else None
@@ -171,9 +165,6 @@ def _named_leiden_warnings(method: str):
 #: load_batch's warning for a folder scored before 0.4.0
 OLD_TREE = ("These scores come from multibench 0.3.x. res.rescore() scores them as "
             "0.4.0 does.")
-#: the same for a ``fetch_outputs`` tree
-OLD_TREE_STORED = ("These are the 0.3.x stored outputs. mtb.data.fetch_outputs({!r}) "
-                   "gets the 0.4.0 ones.")
 
 
 def _scored_before_040(long_table, records) -> bool:
@@ -1821,11 +1812,6 @@ def _metric_codes(metrics):
         return None
 
 
-#: the metrics that score the labels against a Leiden clustering: ``rescore``
-#: ranks the label orders (one clustering) only when one is asked for
-_SWEEP_METRICS = ("ARI", "NMI", "iF1")
-
-
 def _names_batch_metric(metrics) -> bool:
     """Whether ``metrics=`` is ``None`` or names a metric that needs the
     batches: one of the batch or the classification family."""
@@ -1991,6 +1977,21 @@ def _check_save_target(folder: Path, dataset: str, category: str) -> None:
             f"{folder} already holds a saved result for dataset={have[0]!r} "
             f"category={have[1]!r}; this one is dataset={dataset!r} "
             f"category={category!r}. Save it to another folder.")
+
+
+def _plan_caveats(dataset, category, data_path, methods) -> dict:
+    """``{(method, modalities): caveat}`` of ``run_all``'s plan for these methods;
+    ``{}`` when the plan cannot be made (no dataset folder)."""
+    methods = [m for m in dict.fromkeys(methods) if m]
+    if not methods:
+        return {}
+    try:
+        plan, _ = _scan(dataset, category, methods=methods, modalities="all",
+                        data_path=data_path, verbose=False)
+    except Exception:  # noqa: BLE001 - no plan, no caveat
+        return {}
+    return {(r["method"], tuple(_row_modalities(r["modalities"]))): _run_caveat(r["caveat"])
+            for _, r in plan.iterrows()}
 
 
 def _scorable(rec: dict) -> bool:
@@ -2199,8 +2200,6 @@ class BatchResult:
         **Source of the rows.** Each record contributes the unrounded frame
         ``run_all`` attached (or ``long.csv`` via ``mtb.load_batch``) when
         present. Otherwise the record contributes its ``metrics`` dict.
-        Neither that dict nor the folders that ``mtb.data.fetch_outputs``
-        downloads carry ``scored_with``.
 
         See Also
         --------
@@ -2219,11 +2218,14 @@ class BatchResult:
                 with warnings.catch_warnings():
                     # a metrics dict has no scoring record: no wide-CSV warning
                     warnings.simplefilter("ignore", UserWarning)
-                    frames.append(_to_long(
-                        wide, method=r.get("method"),
-                        dataset=r.get("dataset", self.dataset),
-                        category=r.get("category", self.category)
-                    ).drop(columns="scored_with"))
+                    frame = _to_long(wide, method=r.get("method"),
+                                     dataset=r.get("dataset", self.dataset),
+                                     category=r.get("category", self.category))
+                if r.get("scored_with"):
+                    frame["scored_with"] = r["scored_with"]
+                else:
+                    frame = frame.drop(columns="scored_with")
+                frames.append(frame)
         if not frames:
             return pd.DataFrame(columns=_LONG_COLUMNS)
         return pd.concat(frames, ignore_index=True)
@@ -2338,9 +2340,8 @@ class BatchResult:
         """Score the saved outputs again with new labels, batch or metrics.
 
         No method is re-run. Each record's embedding is read back from its
-        ``out_dir``. With more than 4,096 cells scanpy's neighbour search is approximate, so the
-        same embedding can score a few hundredths differently on another machine or
-        library version.
+        ``out_dir``. The Leiden clusters depend on the cell order and the machine,
+        so the same embedding can score a few hundredths differently.
 
         Parameters
         ----------
@@ -2350,8 +2351,8 @@ class BatchResult:
             the batch ``run_all`` was given, else each cell's label file.
         labels : array-like | Series | path | None
             One cell-type label per cell; a Series or a barcode-indexed CSV is
-            aligned by barcode. ``None`` = the label files the record used
-            (ranked again only for a record without them).
+            aligned by barcode. ``None`` = the dataset's label files, their
+            orders ranked as ``run_all`` ranks them.
         metrics : str | list[str] | None
             Metric family (``"clustering"``, ``"batch"``, ``"classification"``,
             ``"all"``) or metric codes; ``None`` = every metric the batch
@@ -2425,6 +2426,10 @@ class BatchResult:
                 batch_at[root] = (vec, by_cell, file)
         if batch is None and _names_batch_metric(metrics):
             _warn_unsaved_batch([r for r in self.records if _scorable(r)], self)
+        caveats = {root: _plan_caveats(self.dataset, self.category, root,
+                                       [r.get("method") for r in self.records
+                                        if _scorable(r)])
+                   for root in used}
         no_output = []             # records whose saved output is not found
         for r, (root, ok) in zip(self.records, found):
             rec = copy.deepcopy({k: v for k, v in r.items() if k != "_long"})
@@ -2436,6 +2441,9 @@ class BatchResult:
             rec["data_path"] = root
             if ok and root is not None:
                 rec["data_root"] = root
+            # the plan's caveat as this version words it
+            rec["caveat"] = caveats.get(root, {}).get(
+                (method, tuple(rec.get("modalities") or ())), "")
             try:
                 mods = rec.get("modalities") or []
                 variant = registry.get(method).select(self.category, set(mods))
@@ -2466,15 +2474,12 @@ class BatchResult:
                                                     else (None, False))
                     if file:
                         new._batches[file[0]] = file[1]
-                    # the recorded label order is reused: ranking the orders again
-                    # clusters the cells once per order and picks the same files
-                    keep = rec.get("labels_used") if labels is None else None
                     with _named_leiden_warnings(method):
                         _score_record(rec, emb, self.dataset, self.category, root, variant,
                                       batch=batch_ids, labels=label_ids, metrics=metrics,
                                       labels_by_cell=labels_by_cell,
                                       batch_by_cell=batch_by_cell,
-                                      keep_order=keep, batch_given=batch is not None,
+                                      batch_given=batch is not None,
                                       on_rank=_rank_line(method) if verbose else None,
                                       tried=tried[root])
             except Exception as e:  # noqa: BLE001 - one bad record must not abort the rest
@@ -2579,6 +2584,11 @@ class BatchResult:
             if text is not None:
                 (folder / name).write_text(text)
         slim = [{k: v for k, v in r.items() if k != "_long"} for r in merged.records]
+        here = folder.resolve()
+        for r in slim:
+            # inside the folder: relative, so the folder can be moved or packed
+            if r.get("out_dir") and Path(r["out_dir"]).resolve().is_relative_to(here):
+                r["out_dir"] = str(Path(r["out_dir"]).resolve().relative_to(here))
         with open(folder / "batch_result.json", "w") as fh:
             json.dump({"dataset": self.dataset, "category": self.category,
                        "records": slim}, fh, indent=1, default=str)
@@ -3280,7 +3290,7 @@ def _batch_length_problem(plan, batch, dataset, category, data_path) -> str:
 
 #: what scoring writes into a record
 _SCORE_KEYS = ("metrics", "labels_used", "label_order_candidates", "batch_source",
-               "n_batches", "_long", "note", "error")
+               "n_batches", "_long", "scored_with", "note", "error")
 
 
 def _drop_scores(rec: dict) -> dict:
@@ -3292,11 +3302,9 @@ def _drop_scores(rec: dict) -> dict:
 
 def _score_record(rec, emb, dataset, category, data_path, variant, *,
                   batch=None, labels=None, metrics=None, labels_by_cell=False,
-                  batch_by_cell=False, keep_order=None, on_rank=None,
-                  batch_given=True, tried=None):
+                  batch_by_cell=False, on_rank=None, batch_given=True, tried=None):
     """Fill ``rec`` with the status and scores of ``emb``. ``labels`` / ``batch`` in
     ``labels_for`` order (``*_by_cell``) go into each label order, else follow the rows."""
-    stored = rec.get("label_order_candidates")
     stored_used = rec.get("labels_used")
     _drop_scores(rec)
     rec["emb_shape"] = list(emb.shape)
@@ -3340,10 +3348,6 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
                 raise ValueError(f"labels has {len(labels)} entries, embedding has "
                                  f"{n} cells")
             cands = [(["(user labels)"], labels, np.ones(n, dtype=int))]
-    kept = [c for c in cands if keep_order and c[0] == list(keep_order)]
-    if kept:
-        # the stored order is still a candidate: no ranking, no sweep
-        cands = kept
     if batch is not None:
         # the user's ids replace each candidate's file-of-origin batch, in that
         # candidate's order. With labels in embedding rows: the stored label order
@@ -3369,6 +3373,12 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
         if cands and not placed:
             raise ValueError(f"batch has {len(batch)} entries, embedding has {n} cells")
         cands = placed
+    # orders whose labels and batches agree cell for cell are one ordering
+    distinct = {}
+    for c in cands:
+        distinct.setdefault((np.asarray(c[1]).astype(str).tobytes(),
+                             np.asarray(c[2]).astype(str).tobytes()), c)
+    cands = list(distinct.values())
     if not cands:
         rec["status"] = "RUN_OK_NO_LABEL_MATCH"
         if not _dataset_folder(dataset, data_path).is_dir():
@@ -3394,9 +3404,7 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
     rec["metrics"] = {k: (None if pd.isna(x) else round(float(x), 4) + 0.0)
                       for k, x in val["Value"].items()}
     rec["labels_used"] = names
-    if kept and stored:
-        rec["label_order_candidates"] = stored
-    elif len(spread) > 1:
+    if len(spread) > 1:
         rec["label_order_candidates"] = spread
     # the batch vector the batch metrics saw
     winning_batch = next(b for order, _, b in cands if order == names)
@@ -3407,6 +3415,8 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
         rec["batch_source"] = "file_of_origin" if n_batches > 1 else None
     rec["n_batches"] = n_batches
     rec["_long"] = _to_long(val, method=rec["method"], dataset=dataset, category=category)
+    if len(rec["_long"]):
+        rec["scored_with"] = str(rec["_long"]["scored_with"].iloc[0])
     rec["status"] = "CHAIN_OK" if embedding else "CHAIN_OK_GRAPH_METHOD"
     return rec
 

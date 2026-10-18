@@ -399,7 +399,7 @@ def test_docs_pages_carry_the_colab_speed_round(path):
     import importlib
     _fetch = importlib.import_module("multibench.data.fetch")
     assert _fetch.OUTPUT_MANIFEST.is_file() and "D11" in _fetch._output_urls()
-    assert "output_urls.json" not in (mtb.data.fetch_outputs.__doc__ or "")
+    assert "output_urls.json" not in (_fetch.fetch_outputs.__doc__ or "")
     assert {"envs_dir", "leiden_flavor"} <= {f.name for f in dataclasses.fields(mtb.config.Config)}
     text = path.read_text()
     if path.name == "installation.md":
@@ -415,13 +415,13 @@ def test_docs_pages_carry_the_colab_speed_round(path):
     if path.name == "api.md":
         # the signatures live on the generated reference pages now; the
         # overview keeps the prose and links every entry point there
-        assert "reference/data.md#multibench.data.fetch.fetch_outputs" in text
+        assert "fetch_outputs" not in text
         assert "reference/run.md#multibench.workflow.load_batch" in text
         assert "reference/config.md#multibench.config.Config" in text
     if path.parent.name == "reference":
         directives = _directives(text)
         if path.name == "data.md":
-            assert "multibench.data.fetch.fetch_outputs" in directives
+            assert "multibench.data.fetch.fetch_outputs" not in directives
         if path.name == "run.md" and path.parent.name == "tutorials":
             assert "multibench.workflow.load_batch" in directives
         if path.name == "config.md":
@@ -476,7 +476,6 @@ REFERENCE = {
     "mtb.plot.build_table": ("plot.md", "multibench.plot.bubble.build_table"),
     "mtb.plot.BubbleTable": ("plot.md", "multibench.plot.bubble.BubbleTable"),
     "mtb.data.fetch": ("data.md", "multibench.data.fetch.fetch"),
-    "mtb.data.fetch_outputs": ("data.md", "multibench.data.fetch.fetch_outputs"),
     "mtb.data.fetchable": ("data.md", "multibench.data.results.fetchable"),
     "mtb.data.write_example": ("data.md", "multibench.data.examples.write_example"),
     "mtb.catalog.methods": ("catalog.md", "multibench.data.catalog.methods"),

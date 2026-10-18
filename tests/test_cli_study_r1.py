@@ -97,7 +97,7 @@ def test_config_prints_each_path_with_its_source(monkeypatch, tmp_path, capsys):
     assert rc == 0 and {r["name"] for r in rows} >= {"data_path", "repo_path", "envs_dir"}
 
 
-def test_fetch_wraps_data_fetch_and_fetch_outputs(monkeypatch, tmp_path, capsys):
+def test_fetch_wraps_data_fetch(monkeypatch, tmp_path, capsys):
     mod = importlib.import_module("multibench.data.fetch")
     calls = []
 
@@ -164,7 +164,7 @@ def test_new_commands_name_their_python_function():
     parser = cli.build_parser()
     sub = next(a for a in parser._actions if a.dest == "command")
     short = {a.dest: a.help for a in sub._choices_actions}
-    assert "mtb.data.fetch" in short["fetch"] and "mtb.data.fetch_outputs" in short["fetch"]
+    assert "mtb.data.fetch" in short["fetch"] and "fetch_outputs" not in short["fetch"]
     assert "mtb.config.DEFAULT" in short["config"]
     assert "mtb.method_info" in short["info"]
     assert "MULTIBENCH_DATA_PATH" in helps["config"]

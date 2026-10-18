@@ -353,16 +353,16 @@ def _count_sweeps(monkeypatch, fail=False):
     return calls
 
 
-def test_rescore_without_clustering_metrics_keeps_the_stored_order(cross, tmp_path,
-                                                                    monkeypatch):
+def test_rescore_ranks_the_label_orders_again(cross, tmp_path, monkeypatch):
+    # Z01 (r3): the orders are ranked on the current scoring, also without ARI
     res = _cross_run(cross, tmp_path, "totalVI")
     rec = res.records[0]
     assert rec["labels_used"] == ["cty1.csv", "cty2.csv", "cty3.csv"]
     assert len(rec["label_order_candidates"]) == 6
     back = mtb.load_batch(tmp_path / "totalVI")
-    calls = _count_sweeps(monkeypatch, fail=True)
+    calls = _count_sweeps(monkeypatch)
     new = back.rescore(metrics=["ASW"])
-    assert calls == []
+    assert len(calls) == 1
     out = new.records[0]
     assert out["status"] == "CHAIN_OK"
     assert out["metrics"]["ASW"] == rec["metrics"]["ASW"]
@@ -372,20 +372,24 @@ def test_rescore_without_clustering_metrics_keeps_the_stored_order(cross, tmp_pa
     assert new.summary[cols].equals(res.summary[cols])
 
 
-def test_rescore_with_a_clustering_metric_reuses_the_recorded_order(cross, tmp_path,
-                                                                   monkeypatch, capsys):
-    # 0.4.0 (X82): the recorded label order is reused, so the orders are not
-    # ranked again: no ranking clustering at all
-    res = _cross_run(cross, tmp_path, "totalVI")
-    back = mtb.load_batch(tmp_path / "totalVI")
+def test_rescore_candidates_come_from_the_new_scores(cross, tmp_path, monkeypatch, capsys):
+    # Z01 (r3): an old record's candidates are replaced, so the winner's ARI is the ARI
+    _cross_run(cross, tmp_path, "totalVI")
+    p = tmp_path / "totalVI" / "batch_result.json"
+    blob = json.loads(p.read_text())
+    blob["records"][0]["label_order_candidates"] = [
+        {"order": ["cty1.csv", "cty2.csv", "cty3.csv"], "ARI": 0.99},
+        {"order": ["cty2.csv", "cty1.csv", "cty3.csv"], "ARI": 0.01}]
+    p.write_text(json.dumps(blob))
     calls = _count_sweeps(monkeypatch)
-    new = _quiet(back.rescore, metrics=["ARI"], verbose=True)
-    assert calls == []
-    assert new.records[0]["labels_used"] == res.records[0]["labels_used"]
-    assert len(new.records[0]["label_order_candidates"]) == 6
+    new = _quiet(mtb.load_batch(tmp_path / "totalVI").rescore, metrics=["ARI"],
+                 verbose=True)
+    assert len(calls) == 1
+    out = new.records[0]
+    assert out["label_order_candidates"][0]["ARI"] == out["metrics"]["ARI"]
+    assert len(out["label_order_candidates"]) == 6
     lines = capsys.readouterr().out.splitlines()
-    assert not any("ranking" in line for line in lines), lines
-    assert lines[0].startswith("[rescore] totalVI -> CHAIN_OK")
+    assert lines[0].startswith("[rescore] totalVI: ranking 6 label orders")
 
 
 def test_rescore_ranks_the_orders_of_a_record_without_one(cross, tmp_path, monkeypatch,

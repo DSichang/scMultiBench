@@ -155,7 +155,7 @@ def test_fetch_outputs_names_the_url(tmp_path, monkeypatch, dead, why):
     root = tmp_path / "data"
     url = F._output_urls()["D11"]
     with pytest.raises(OSError) as e:
-        mtb.data.fetch_outputs("D11", data_path=root, quiet=True)
+        F.fetch_outputs("D11", data_path=root, quiet=True)
     msg = str(e.value)
     assert msg.startswith(f"Could not download the stored outputs of D11 from {url} ")
     # the archive's own layout decides where it lands: the message names the
@@ -180,7 +180,7 @@ def test_cli_fetch_prints_the_sentence(tmp_path, monkeypatch, capsys):
 
 def test_raises_tables_list_the_download_error():
     import inspect
-    for fn in (mtb.data.fetch, mtb.data.fetch_outputs):
+    for fn in (mtb.data.fetch,):
         raises = inspect.getdoc(fn).split("Raises\n------\n")[1].split("\n\n")[0]
         assert "OSError\n    The download failed; the message names the URL." in raises, \
             fn.__name__

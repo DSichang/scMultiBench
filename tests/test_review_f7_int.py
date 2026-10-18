@@ -300,8 +300,7 @@ def test_long_names_when_scored_with_is_there():
                                       "clustering", "source"]
     doc = _doc(W.BatchResult.long)
     assert "When the scores carry ``scored_with``, so does the table." in doc
-    assert ("Neither that dict nor the folders that ``mtb.data.fetch_outputs`` downloads "
-            "carry ``scored_with``.") in doc
+    assert "fetch_outputs" not in doc
     assert "for rows ``run_all`` scored" not in doc
 
 

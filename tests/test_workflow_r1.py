@@ -487,8 +487,7 @@ def _caps(text):
 
 @pytest.mark.parametrize("obj", [mtb.scan, mtb.run_all, mtb.run, mtb.sweep, mtb.load_batch,
                                  mtb.describe_layout, mtb.BatchResult, runner.RunResult,
-                                 mtb.BatchResult.save, mtb.data.fetch,
-                                 mtb.data.fetch_outputs])
+                                 mtb.BatchResult.save, mtb.data.fetch])
 def test_docstrings_use_plain_wording(obj):
     doc = inspect.getdoc(obj)
     assert _caps(doc) == [], _caps(doc)
