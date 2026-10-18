@@ -23,15 +23,9 @@ MIRA:
     acc:
       default: gpu
       type: str
-    epoch:
-      default: 24
-      type: int
     filter_atac_cells:
       default: false
       type: flag
-    latent_dim:
-      default: 20
-      type: int
 Matilda:
   vertical:rna+adt:
     augmentation:
@@ -40,9 +34,6 @@ Matilda:
     batch_size:
       default: 64
       type: int
-    device:
-      default: cuda
-      type: str
     epochs:
       default: 30
       type: int
@@ -71,9 +62,6 @@ Matilda:
     batch_size:
       default: 64
       type: int
-    device:
-      default: cuda
-      type: str
     epochs:
       default: 30
       type: int
@@ -102,9 +90,6 @@ Matilda:
     batch_size:
       default: 64
       type: int
-    device:
-      default: cuda
-      type: str
     epochs:
       default: 30
       type: int
@@ -211,15 +196,6 @@ Multigrate:
     lr:
       default: 0.001
       type: float
-UnitedNet:
-  cross:rna1+rna2+rna3+atac1+atac2+atac3:
-    index:
-      default: 1
-      type: int
-  vertical:rna+atac:
-    index:
-      default: 1
-      type: int
 scBridge:
   diagonal:-:
     align_loss_epoch:
@@ -263,25 +239,16 @@ scJoint:
     batch_size:
       default: 256
       type: int
-    center_weight:
-      default: 1
-      type: int
     embedding_size:
       default: 64
       type: int
     epochs_stage1:
       default: 20
       type: int
-    epochs_stage3:
-      default: 20
-      type: int
     lr_decay_epoch:
       default: 20
       type: int
     lr_stage1:
-      default: 0.01
-      type: float
-    lr_stage3:
       default: 0.01
       type: float
     momentum:
@@ -293,38 +260,20 @@ scJoint:
     seed:
       default: 1
       type: int
-    threads:
-      default: 1
-      type: int
-    use_cuda:
-      default: true
-      type: bool
-    with_crossentorpy:
-      default: true
-      type: bool
   diagonal:rna1+rna2+rna3+atac_gas1+atac_gas2+atac_gas3:
     batch_size:
       default: 256
       type: int
-    center_weight:
-      default: 1
-      type: int
     embedding_size:
       default: 64
       type: int
     epochs_stage1:
       default: 20
       type: int
-    epochs_stage3:
-      default: 20
-      type: int
     lr_decay_epoch:
       default: 20
       type: int
     lr_stage1:
-      default: 0.01
-      type: float
-    lr_stage3:
       default: 0.01
       type: float
     momentum:
@@ -336,15 +285,6 @@ scJoint:
     seed:
       default: 1
       type: int
-    threads:
-      default: 1
-      type: int
-    use_cuda:
-      default: true
-      type: bool
-    with_crossentorpy:
-      default: true
-      type: bool
 scMDC:
   cross:rna1+rna2+rna3+adt1+adt2+adt3:
     batch_size:
@@ -353,8 +293,6 @@ scMDC:
     cutoff:
       default: 0.5
       type: float
-    device:
-      default: cuda
     f1:
       default: 1000
       type: float
@@ -370,12 +308,6 @@ scMDC:
     gamma:
       default: 0.1
       type: float
-    lr:
-      default: 1.0
-      type: float
-    maxiter:
-      default: 5000
-      type: int
     n_clusters:
       default: 27
       type: int
@@ -394,9 +326,6 @@ scMDC:
     resolution:
       default: 0.2
       type: float
-    run:
-      default: 1
-      type: int
     sigma1:
       default: 2.5
       type: float
@@ -406,12 +335,6 @@ scMDC:
     tau:
       default: 1.0
       type: float
-    tol:
-      default: 0.001
-      type: float
-    update_interval:
-      default: 1
-      type: int
   cross:rna1+rna2+rna3+atac1+atac2+atac3:
     batch_size:
       default: 256
@@ -419,8 +342,6 @@ scMDC:
     cutoff:
       default: 0.5
       type: float
-    device:
-      default: cuda
     f1:
       default: 1000
       type: float
@@ -436,12 +357,6 @@ scMDC:
     gamma:
       default: 0.1
       type: float
-    lr:
-      default: 1.0
-      type: float
-    maxiter:
-      default: 5000
-      type: int
     n_clusters:
       default: 27
       type: int
@@ -460,9 +375,6 @@ scMDC:
     resolution:
       default: 0.2
       type: float
-    run:
-      default: 1
-      type: int
     sigma1:
       default: 2.5
       type: float
@@ -472,12 +384,6 @@ scMDC:
     tau:
       default: 1.0
       type: float
-    tol:
-      default: 0.001
-      type: float
-    update_interval:
-      default: 1
-      type: int
   vertical:rna+adt:
     batch_size:
       default: 256
@@ -485,8 +391,6 @@ scMDC:
     cutoff:
       default: 0.5
       type: float
-    device:
-      default: cuda
     f1:
       default: 1000
       type: float
@@ -502,12 +406,6 @@ scMDC:
     gamma:
       default: 0.1
       type: float
-    lr:
-      default: 1.0
-      type: float
-    maxiter:
-      default: 5000
-      type: int
     n_clusters:
       default: 27
       type: int
@@ -526,9 +424,6 @@ scMDC:
     resolution:
       default: 0.2
       type: float
-    run:
-      default: 1
-      type: int
     sigma1:
       default: 2.5
       type: float
@@ -538,12 +433,6 @@ scMDC:
     tau:
       default: 1.0
       type: float
-    tol:
-      default: 0.001
-      type: float
-    update_interval:
-      default: 1
-      type: int
   vertical:rna+atac:
     batch_size:
       default: 256
@@ -551,8 +440,6 @@ scMDC:
     cutoff:
       default: 0.5
       type: float
-    device:
-      default: cuda
     f1:
       default: 1000
       type: float
@@ -568,12 +455,6 @@ scMDC:
     gamma:
       default: 0.1
       type: float
-    lr:
-      default: 1.0
-      type: float
-    maxiter:
-      default: 5000
-      type: int
     n_clusters:
       default: 27
       type: int
@@ -592,9 +473,6 @@ scMDC:
     resolution:
       default: 0.2
       type: float
-    run:
-      default: 1
-      type: int
     sigma1:
       default: 2.5
       type: float
@@ -604,12 +482,6 @@ scMDC:
     tau:
       default: 1.0
       type: float
-    tol:
-      default: 0.001
-      type: float
-    update_interval:
-      default: 1
-      type: int
 scMM:
   cross:rna1+rna2+rna3+adt1+adt2+adt3:
     batch_size:
@@ -633,9 +505,6 @@ scMM:
     lr:
       default: 0.0001
       type: float
-    no_cuda:
-      default: false
-      type: flag
     num_hidden_layers:
       default: 1
       type: int
@@ -644,9 +513,6 @@ scMM:
       type: str
     p_hidden_dim:
       default: 20
-      type: int
-    print_freq:
-      default: 0
       type: int
     r_hidden_dim:
       default: 100
@@ -676,9 +542,6 @@ scMM:
     lr:
       default: 0.0001
       type: float
-    no_cuda:
-      default: false
-      type: flag
     num_hidden_layers:
       default: 1
       type: int
@@ -687,9 +550,6 @@ scMM:
       type: str
     p_hidden_dim:
       default: 20
-      type: int
-    print_freq:
-      default: 0
       type: int
     r_hidden_dim:
       default: 100
@@ -719,9 +579,6 @@ scMM:
     lr:
       default: 0.0001
       type: float
-    no_cuda:
-      default: false
-      type: flag
     num_hidden_layers:
       default: 1
       type: int
@@ -730,9 +587,6 @@ scMM:
       type: str
     p_hidden_dim:
       default: 20
-      type: int
-    print_freq:
-      default: 0
       type: int
     r_hidden_dim:
       default: 100
@@ -762,9 +616,6 @@ scMM:
     lr:
       default: 0.0001
       type: float
-    no_cuda:
-      default: false
-      type: flag
     num_hidden_layers:
       default: 1
       type: int
@@ -773,9 +624,6 @@ scMM:
       type: str
     p_hidden_dim:
       default: 20
-      type: int
-    print_freq:
-      default: 0
       type: int
     r_hidden_dim:
       default: 100

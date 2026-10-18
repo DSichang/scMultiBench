@@ -13,7 +13,9 @@ out (setting it would duplicate the flag or have no effect):
   set from the data);
 - a ``store_true`` switch whose default is already ``True`` (it cannot be
   turned off);
-- the arguments in :data:`SET_FROM_DATA`, which the package sets per run.
+- arguments no Python file of the script's folder reads (``args.<name>``);
+- the arguments in :data:`SET_FROM_DATA`, which the package sets per run, and
+  in :data:`NOT_TUNABLE`.
 
 A switch is recorded as ``type: flag`` with the value the script gets
 without it (``False`` for ``store_true``, ``True`` for ``store_false``).
@@ -50,6 +52,22 @@ SET_FROM_DATA = {
     "scMDC": {"nbatch"},        # one per input file
     "scMM": {"model"},          # rna_protein or rna_atac, from the modalities
     "scBridge": {"umap_plot"},  # passed: the script's figure save crashes
+}
+#: arguments a run does not take from ``params=``: the CUDA switch the package
+#: sets per host, logging and thread settings, and what is read only by code
+#: that never runs. tests/test_params_api.py checks each is a script argument.
+NOT_TUNABLE = {
+    "Matilda": {"device"},              # the driver passes device='auto'
+    "scMDC": {"device"},                # cpu_params on a host without a GPU
+    "scMM": {"no_cuda", "print_freq"},  # every variant passes no_cuda; print_freq logs
+    # use_cuda: cpu_params; main_scJoint.py:108 set_num_threads(1) ignores --threads;
+    # the stage-3 arguments are read only by util/trainingprocess_stage3.py, whose
+    # call is commented out (main_scJoint.py:130-137)
+    "scJoint": {"use_cuda", "threads", "epochs_stage3", "lr_stage3", "with_crossentorpy",
+                "center_weight"},
+    # main_UnitedNet.py:234 names its output embedding{index}.h5; the package reads
+    # embedding1.h5
+    "UnitedNet": {"index"},
 }
 #: a metavar that names a file or folder: the argument is an input, not a knob
 _PATH_METAVAR = re.compile(r"metavar\s*=\s*['\"](DIR|DIRS|PATH|PATHS|FILE|FILES)['\"]")
@@ -91,6 +109,24 @@ def set_by_script(txt: str) -> set:
     return set(re.findall(r"\bargs\.([A-Za-z0-9_]+)\s*=(?!=)", txt))
 
 
+def folder_text(path) -> str:
+    """Every Python file of the script's folder, where the parsed arguments are read."""
+    out = []
+    for f in sorted(Path(path).parent.rglob("*.py")):
+        try:
+            out.append(f.read_text(errors="ignore"))
+        except OSError:
+            pass
+    return "\n".join(out)
+
+
+def is_read(name: str, text: str) -> bool:
+    """Whether ``text`` reads the parsed argument ``name`` (``args.name``, or all
+    of them through ``vars(args)``)."""
+    return bool(re.search(r"\bvars\(\s*\w+\s*\)|\.__dict__\b", text)
+                or re.search(r"\w\.%s\b" % re.escape(name), text))
+
+
 def extract(txt: str, skip: set) -> dict:
     tun = {}
     for m in re.finditer(r"add_argument\(\s*[\'\"]--([A-Za-z0-9_\-]+)[\'\"](.*?)\)", txt, re.S):
@@ -121,14 +157,17 @@ def main():
     out = {}
     for s in registry.load():
         for v in s.variants:
-            skip = set_by_package(s, v) | SET_FROM_DATA.get(s.id, set())
+            skip = (set_by_package(s, v) | SET_FROM_DATA.get(s.id, set())
+                    | NOT_TUNABLE.get(s.id, set()))
             path = resolve(v.entrypoint)
             if path:
                 try:
                     txt = open(path, errors="ignore").read()
                 except Exception:
                     continue
-                tun = extract(txt, skip | set_by_script(txt))
+                every = folder_text(path) if path.endswith(".py") else txt
+                tun = {k: t for k, t in extract(txt, skip | set_by_script(txt)).items()
+                       if not path.endswith(".py") or is_read(k, every)}
             else:
                 tun = {k: t for k, t in (current.get(s.id, {}).get(vkey(v)) or {}).items()
                        if k not in skip}

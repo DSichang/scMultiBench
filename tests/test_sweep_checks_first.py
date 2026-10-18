@@ -34,7 +34,7 @@ def test_an_unknown_param_raises_before_any_setting_runs(monkeypatch, tmp_path):
         mtb.sweep("D11", "vertical", "sciPENN", "epochz", [1], out_dir=tmp_path / "sw",
                   verbose=False)
     assert e.value.args[0].startswith("sciPENN does not accept ['epochz']; it accepts "
-                                      "['seed']. An empty set")
+                                      "['seed'].")
     assert not (tmp_path / "sw").exists()
 
 

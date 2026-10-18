@@ -157,14 +157,14 @@ def test_scmm_and_scmvp_keep_their_existing_cpu_treatment():
 
 
 def test_cpu_params_keys_are_accepted_params_of_every_variant():
-    """The runner emits cpu_params below the params check, so the registry
-    guarantees they are params the script declares (tunable | params) -
-    and params_for / run_all therefore accept an explicit override."""
+    """The runner emits cpu_params below the params check. Since r3 (X64) they are
+    the package's switch, not tunable; the scripts declare them
+    (tests/test_params_api.py reads the scripts)."""
     for m, cp in CPU_SWITCH.items():
         for v in registry.get(m).variants:
-            assert set(cp) <= set(v.tunable) | set(v.params), (m, v.when)
-    assert "use_cuda" in mtb.params_for("scJoint", "diagonal", ["rna", "atac_gas"])["tunable"]
-    assert "device" in mtb.params_for("scMDC", "vertical", ["rna", "adt"])["tunable"]
+            assert not set(cp) & set(v.tunable), (m, v.when)
+    assert "use_cuda" not in mtb.params_for("scJoint", "diagonal", ["rna", "atac_gas"])["tunable"]
+    assert "device" not in mtb.params_for("scMDC", "vertical", ["rna", "adt"])["tunable"]
     # the cross variant runs the SAME script as the vertical ones: it inherits
     # their tunables (params.yaml has no entry for it)
     cross = registry.get("scMDC").select("cross", {"rna1", "rna2", "rna3", "adt1", "adt2", "adt3"})
@@ -172,7 +172,7 @@ def test_cpu_params_keys_are_accepted_params_of_every_variant():
     # scMDC has two cross variants (RNA + ADT, RNA + ATAC), both on that script
     for second in ("adt", "atac"):
         mods = [f"{r}{i}" for r in ("rna", second) for i in (1, 2, 3)]
-        assert "device" in mtb.params_for("scMDC", "cross", mods)["tunable"]
+        assert "gamma" in mtb.params_for("scMDC", "cross", mods)["tunable"]
 
 
 # ------------------------------------------------------------ schema validation
@@ -229,9 +229,9 @@ def test_schema_rejects_bad_shapes():
 
 
 def test_registry_rejects_cpu_params_the_script_does_not_accept():
-    with pytest.raises(ValueError, match=r"'X' cpu_params names \['use_cuda'\], which the "
-                                         r"vertical:rna\+adt variant does not accept"):
-        _parse(cpu_params={"use_cuda": ""})
+    # r3: the CUDA switch left tunable, so the check reads the scripts themselves
+    from tests.test_params_api import test_the_keys_left_out_are_script_arguments
+    test_the_keys_left_out_are_script_arguments()
 
 
 def test_validate_gpu_fields_is_the_schema_entry_point():
@@ -291,11 +291,11 @@ def test_dry_run_unchanged_on_gpu_host(tmp_path, gpu):
 
 
 def test_explicit_param_wins_over_cpu_params(tmp_path, no_gpu):
-    argv = mtb.run("scMDC", "vertical", inputs=_cite_inputs(tmp_path),
-                   out_dir=str(tmp_path / "o"), dry_run=True, params={"device": "cuda:1"},
-                   cmd_template="conda run -n x {cmd}")
-    assert argv[argv.index("--device") + 1] == "cuda:1"
-    assert argv.count("--device") == 1 and "cpu" not in argv
+    # r3 (X64): the CUDA switch is the package's, so params= cannot set it
+    with pytest.raises(KeyError, match=r"scMDC does not accept \['device'\]"):
+        mtb.run("scMDC", "vertical", inputs=_cite_inputs(tmp_path),
+                out_dir=str(tmp_path / "o"), dry_run=True, params={"device": "cuda:1"},
+                cmd_template="conda run -n x {cmd}")
 
 
 def test_real_run_merges_and_logs_one_stderr_line(tmp_path, no_gpu, monkeypatch, capsys):
@@ -315,12 +315,12 @@ def test_real_run_is_silent_on_gpu_host_and_with_explicit_key(tmp_path, monkeypa
     mtb.run("scMDC", "vertical", inputs=_cite_inputs(tmp_path),
             out_dir=str(tmp_path / "o1"), convert=False, cmd_template="conda run -n x {cmd}")
     assert "--device" not in _FakePopen.calls["cmd"]
+    # r3 (X64): an explicit device is refused before anything runs
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
-    mtb.run("scMDC", "vertical", inputs=_cite_inputs(tmp_path / "b"),
-            out_dir=str(tmp_path / "o2"), convert=False, params={"device": "cuda:0"},
-            cmd_template="conda run -n x {cmd}")
-    cmd = _FakePopen.calls["cmd"]
-    assert cmd[cmd.index("--device") + 1] == "cuda:0"
+    with pytest.raises(KeyError, match=r"does not accept \['device'\]"):
+        mtb.run("scMDC", "vertical", inputs=_cite_inputs(tmp_path / "b"),
+                out_dir=str(tmp_path / "o2"), convert=False, params={"device": "cuda:0"},
+                cmd_template="conda run -n x {cmd}")
     assert "[run] no GPU" not in capsys.readouterr().err
 
 

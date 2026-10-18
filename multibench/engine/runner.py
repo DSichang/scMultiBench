@@ -617,8 +617,10 @@ def _argv(variant, method: str, values: dict, out_str: str, repo: Path,
 def unknown_params_error(method: str, unknown: list, allowed: set) -> KeyError:
     """The error for ``params`` keys a variant does not accept (``run``,
     ``run_all`` and ``sweep`` say the same)."""
-    return KeyError(f"{method} does not accept {unknown}; it accepts {sorted(allowed)}. "
-                    "An empty set means it hardcodes its hyperparameters upstream.")
+    if not allowed:
+        return KeyError(f"{method} does not accept {unknown}; {method} takes no "
+                        f"hyperparameters (its script hardcodes them).")
+    return KeyError(f"{method} does not accept {unknown}; it accepts {sorted(allowed)}.")
 
 
 def check_params(method: str, variant, params: dict | None) -> None:

@@ -104,16 +104,6 @@ def _parse_method(d: dict) -> MethodSpec:
         gpu_evidence=d.get("gpu_evidence", "") or "",
         gpu_use=d.get("gpu_use", "") or "",
     )
-    # a cpu_params flag the script does not accept would make argparse refuse the run
-    for v in spec.variants:
-        accepted = set(v.tunable) | set(v.params)
-        bad = [k for k in spec.cpu_params if k not in accepted]
-        if bad:
-            raise ValueError(
-                f"methods.yaml: {spec.id!r} cpu_params names {bad}, which the "
-                f"{_variant_key(v.when)} variant does not accept (its params: "
-                f"{sorted(accepted)}); cpu_params must be command-line params the "
-                f"upstream script declares")
     if spec.atac is not None and spec.atac not in ATAC_VALUES:
         raise ValueError(
             f"methods.yaml: {spec.id!r} has atac={spec.atac!r}; valid: {list(ATAC_VALUES)}")

@@ -22,11 +22,11 @@ def _dry(method, category, inputs, params, tmp_path):
 
 # X63: a param is rendered by the type the script declares
 def test_a_bool_argument_gets_an_explicit_value(tmp_path, gpu):
-    # main_scJoint.py: --use_cuda type=bool; bool('') is False
-    argv = " ".join(_dry("scJoint", "diagonal", SCJOINT, {"use_cuda": False}, tmp_path))
-    assert "--use_cuda ''" in argv
-    argv = " ".join(_dry("scJoint", "diagonal", SCJOINT, {"use_cuda": True}, tmp_path))
-    assert "--use_cuda True" in argv
+    # a type=bool argument: bool('') is False (scJoint's use_cuda left tunable in r3)
+    argv = _dry("Matilda", "vertical", MATILDA, {"augmentation": False}, tmp_path)
+    assert argv[argv.index("--augmentation") + 1] == ""
+    argv = _dry("Matilda", "vertical", MATILDA, {"augmentation": True}, tmp_path)
+    assert argv[argv.index("--augmentation") + 1] == "True"
 
 
 def test_matilda_augmentation_false_reaches_the_driver(tmp_path):
@@ -49,8 +49,8 @@ def test_a_switch_or_bool_refuses_another_value(tmp_path):
     with pytest.raises(TypeError, match=r"scMDC: filter1 takes True or False, got 1\."):
         _dry("scMDC", "vertical", {"rna": "/d/rna.h5", "adt": "/d/adt.h5"},
              {"filter1": 1}, tmp_path)
-    with pytest.raises(TypeError, match=r"use_cuda takes True or False, got 'False'"):
-        _dry("scJoint", "diagonal", SCJOINT, {"use_cuda": "False"}, tmp_path)
+    with pytest.raises(TypeError, match=r"augmentation takes True or False, got 'False'"):
+        _dry("Matilda", "vertical", MATILDA, {"augmentation": "False"}, tmp_path)
 
 
 def test_a_store_false_switch_is_present_for_false():
@@ -78,8 +78,9 @@ def test_a_package_set_key_is_refused():
 
 # Y38: one default, the one a run uses
 def test_tunable_default_is_what_a_run_uses():
-    t = mtb.params_for("scMM", "vertical", ["rna", "atac"])["tunable"]["no_cuda"]
-    assert t["default"] is True and t["script_default"] is False
+    # r3 (X64): no_cuda is the package's switch and left tunable; epochs keeps both
+    t = mtb.params_for("scMM", "vertical", ["rna", "atac"])["tunable"]
+    assert "no_cuda" not in t and t["epochs"]["default"] == t["epochs"]["script_default"]
 
 
 # Y02: a tree records its source URL; a new manifest URL fetches it again

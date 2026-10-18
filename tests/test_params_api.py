@@ -13,8 +13,9 @@ def test_params_for_returns_defaults_and_tunable():
     r = mtb.params_for("Multigrate", "vertical", ["rna", "adt"])
     assert r["method"] == "Multigrate"
     assert r["variant"] == "vertical:rna+adt"
-    # defaults are what the package actually emits
-    assert r["defaults"]["epochs"] == 200
+    # the default is what the package actually emits (Y38: no separate 'defaults')
+    assert r["tunable"]["epochs"]["default"] == r["effective"]["epochs"] == 200
+    assert "defaults" not in r
     # tunable is documentation harvested from the upstream argparse
     assert set(r["tunable"]) >= {"epochs", "lr"}
 
@@ -26,9 +27,9 @@ def test_params_for_reports_untunable_methods_honestly():
 
 
 def test_params_for_tunable_carries_default_and_type():
+    # scMDC's lr is declared but never read (X64, r3): gamma stands in
     spec = mtb.params_for("scMDC", "vertical", ["rna", "adt"])["tunable"]
-    assert spec["lr"]["default"] == 1.0
-    assert spec["lr"]["type"] == "float"
+    assert spec["gamma"]["type"] == "float" and "lr" not in spec
 
 
 def test_params_for_requires_disambiguation_when_multiple_variants():
@@ -49,7 +50,9 @@ def test_params_for_single_variant_needs_no_selector():
 def test_method_info_exposes_params_per_variant():
     info = mtb.method_info("Multigrate", verbose=True)
     assert "vertical:rna+adt" in info["params"]
-    assert info["params"]["vertical:rna+adt"]["defaults"]["bs"] == 256
+    # Y38 (r3): no 'defaults' block; the tunable default is the value a run uses
+    assert set(info["params"]["vertical:rna+adt"]) == {"tunable", "effective"}
+    assert info["params"]["vertical:rna+adt"]["tunable"]["bs"]["default"] == 256
 
 
 def test_tunable_is_doc_only_and_never_emitted():
@@ -101,3 +104,75 @@ def test_params_for_unknown_category_is_explicit():
     with pytest.raises(KeyError) as e:
         mtb.params_for("totalVI", "mosaic")        # declared, but no such variant
     assert "totalVI does not run on mosaic data. Its categories: vertical, cross." in str(e.value)
+
+
+# ------------------------------------------------ X64 / Z05 (r3): what tunable lists
+def _gen_params():
+    import importlib
+    import warnings
+    with warnings.catch_warnings():          # the generator silences warnings on import
+        return importlib.import_module("multibench.tools.gen_params")
+
+
+def _scripts():
+    """``[(method, variant, path, folder text)]`` of every variant whose script is here."""
+    gen = _gen_params()
+    out = []
+    for s in registry.load():
+        for v in s.variants:
+            path = gen.resolve(v.entrypoint)
+            if path and path.endswith(".py"):
+                out.append((s, v, path, gen.folder_text(path)))
+    if not out:
+        pytest.skip("the method scripts are not in this checkout")
+    return out
+
+
+def test_every_tunable_key_is_an_argument_the_script_reads():
+    import re
+    for s, v, path, every in _scripts():
+        txt = open(path, errors="ignore").read()
+        for k in v.tunable:
+            assert re.search(r"add_argument\(\s*['\"]--%s['\"]" % re.escape(k), txt), (s.id, k)
+            assert _gen_params().is_read(k, every), (s.id, k)
+
+
+def test_the_keys_left_out_are_script_arguments():
+    # the table names real arguments, so it fails loudly when a script changes
+    import re
+    gen = _gen_params()
+    declared = {}
+    for s, v, path, _ in _scripts():
+        txt = open(path, errors="ignore").read()
+        declared.setdefault(s.id, set()).update(
+            re.findall(r"add_argument\(\s*['\"]--([A-Za-z0-9_\-]+)['\"]", txt))
+    for method, keys in gen.NOT_TUNABLE.items():
+        assert keys <= declared[method], (method, keys - declared[method])
+    # a cpu_params flag the script does not declare would make argparse refuse the run
+    for s in registry.load():
+        if s.cpu_params:
+            assert set(s.cpu_params) <= declared[s.id], s.id
+
+
+def test_host_switches_and_dead_knobs_are_not_tunable():
+    assert "index" not in mtb.params_for("UnitedNet", "vertical", ["rna", "atac"])["tunable"]
+    assert "UnitedNet" not in mtb.find_methods(tunable=True)
+    gone = {("scMDC", "vertical", ("rna", "adt")): {"device", "run"},
+            ("scMM", "vertical", ("rna", "atac")): {"no_cuda", "print_freq"},
+            ("Matilda", "vertical", ("rna", "adt")): {"device"},
+            ("scJoint", "diagonal", ("rna", "atac_gas")): {
+                "use_cuda", "threads", "epochs_stage3", "lr_stage3", "with_crossentorpy",
+                "center_weight"}}
+    for (m, cat, mods), keys in gone.items():
+        p = mtb.params_for(m, cat, list(mods))
+        assert not keys & set(p["tunable"]) and not keys & set(p["effective"]), m
+        assert set(p["effective"]) == set(p["tunable"])
+        assert all(t["default"] == p["effective"][k] for k, t in p["tunable"].items())
+    # the package still turns CUDA off on a CPU host
+    plan = mtb.run_all("D52mini", "cross", methods=["scMDC"], dry_run=True, verbose=False)
+    assert " --device cpu" in plan.command.iloc[0] or envs_has_gpu()
+
+
+def envs_has_gpu():
+    from multibench.engine import envs
+    return envs.host_has_gpu()

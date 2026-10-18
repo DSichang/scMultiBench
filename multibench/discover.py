@@ -165,11 +165,9 @@ list_methods = _compat.renamed("list_methods", "find_methods", find_methods)
 
 
 def _effective(v) -> dict:
-    """The value each knob runs with when the caller passes no ``params``: upstream
-    argparse defaults overlaid with what the package passes."""
-    eff = {k: (t or {}).get("default") for k, t in v.tunable.items()}
-    eff.update(dict(v.params))
-    return eff
+    """The value of every tunable key in a run without ``params``: the script's
+    default, or what the package passes."""
+    return {k: v.params.get(k, (t or {}).get("default")) for k, t in v.tunable.items()}
 
 
 def _tunable(v) -> dict:
@@ -290,8 +288,7 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
                       "labels": [r for r in v.roles() if is_label_role(r)],
                       "reference_batch": _reference_batch(v)}
                      for v in s.variants],
-        "params": {_variant_key(v): {"defaults": dict(v.params),
-                                     "tunable": _tunable(v),
+        "params": {_variant_key(v): {"tunable": _tunable(v),
                                      "effective": _effective(v)}
                    for v in s.variants},
     }
@@ -372,8 +369,8 @@ def params_for(method: str, category: str | None = None,
     dict
         ``method``, ``variant`` (``'category:mods'``), ``tunable`` (what you
         can set, ``{name: {"default", "type", "script_default"}}``; ``default``
-        is what a run uses when you pass nothing), ``effective`` (every value
-        a run passes), ``fixed_in_script`` (what the script pins, with
+        is what a run uses when you pass nothing), ``effective`` (the value of
+        every tunable key in a run), ``fixed_in_script`` (what the script pins, with
         ``file:line``) and ``upstream_knobs`` (what its library documents but
         the script does not expose).
 
@@ -503,7 +500,7 @@ def params_for(method: str, category: str | None = None,
                 raise
     up = upstream.knobs_for(s.id)
     return {"method": s.id, "variant": _variant_key(v),
-            "defaults": dict(v.params), "tunable": _tunable(v),
+            "tunable": _tunable(v),
             "effective": _effective(v),
             "fixed_in_script": up["fixed_in_script"],
             "upstream_knobs": up["upstream_knobs"],

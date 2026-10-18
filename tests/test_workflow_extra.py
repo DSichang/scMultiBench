@@ -122,8 +122,7 @@ def test_sweep_rejects_a_param_the_method_does_not_expose():
                   out_dir="/tmp/unused", modalities=["rna", "adt"])
     # run_all's message since 0.4 (it was "does not expose ..." before)
     assert e.value.args[0] == ("Multigrate does not accept ['not_a_real_param']; it accepts "
-                               "['bs', 'epochs', 'lr']. An empty set means it hardcodes its "
-                               "hyperparameters upstream.")
+                               "['bs', 'epochs', 'lr'].")
 
 
 def test_runresult_is_documented():
