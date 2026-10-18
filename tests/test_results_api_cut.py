@@ -34,7 +34,8 @@ def test_compare_signatures_are_the_contract():
     rc = inspect.signature(results.results_coverage).parameters
     assert list(rc) == ["category"]
     re_ = inspect.signature(results.recommend).parameters
-    assert list(re_) == ["category", "modalities", "atac", "methods", "metrics", "long_df",
+    # atac= is deprecated since 0.4.0 (X44): modalities=["atac_peak"] does the same
+    assert list(re_) == ["category", "modalities", "methods", "metrics", "long_df",
                          "min_methods"]
     assert all(re_[n].kind is inspect.Parameter.KEYWORD_ONLY for n in list(re_)[1:])
     assert "Parameters" in results.load_results.__doc__
