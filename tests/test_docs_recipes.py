@@ -492,13 +492,13 @@ def test_10x_recipe_runs(host, tmp_path, monkeypatch, capsys):
     # the two ATAC names of its second line: one matrix, the same cells
     first, second = _quoted(
         "recipe-10x-h5", r"For 10x Multiome the check lists `([^`]+)` and `([^`]+)`: one "
-                         r"matrix under two names\. Diagonal methods read the second\.")
+                         r"matrix under two names\.")          # Z21 (r3): no reader claim
     assert (first, second) == ("atac.h5", "atac_peak.h5")
     assert capsys.readouterr().out.splitlines()[1] == (
         f"[scan] Cells per file: rna.h5 270, {first} 270, {second} 270.")
     content = _content(mine)
     assert content[first] == content[second] != content["rna.h5"]
-    # "Diagonal methods read the second": none of them reads a file named atac.h5
+    # the diagonal methods read the second name; none reads a file named atac.h5
     roles = {r for m in mtb.list_methods(category="diagonal")
              for v in mtb.method_info(m)["supports"] if v["category"] == "diagonal"
              for r in v["modalities"] if r.startswith("atac")}

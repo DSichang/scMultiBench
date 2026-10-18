@@ -1023,8 +1023,7 @@ def own_cells(key):
              "file has. Compare them with your data.")
     if 'atac_kind="peak"' in export and "category=" not in export:
         # without a category, the export writes the peaks under both names
-        check += (" `atac.h5` and `atac_peak.h5` are one matrix under two names. Diagonal "
-                  "methods read the second.")
+        check += " `atac.h5` and `atac_peak.h5` are one matrix under two names."
     check += (" A further line is about one method: why it cannot run, or what it does not "
               "read or needs from your data.")
     if cat == "cross":

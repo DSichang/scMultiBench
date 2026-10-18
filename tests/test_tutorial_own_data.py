@@ -721,8 +721,8 @@ CHECK_TEXT = ("Check the folder before you run anything. `runnable` says whether
               "run on your data on this computer, and `reason` says why not. The first two "
               "lines above the table say what the folder holds and how many cells each file "
               "has. Compare them with your data.")
-CHECK_TWO_NAMES = (" `atac.h5` and `atac_peak.h5` are one matrix under two names. Diagonal "
-                   "methods read the second.")
+# Z21 (r3): the vertical methods read atac.h5 too, so no sentence on which reads which
+CHECK_TWO_NAMES = " `atac.h5` and `atac_peak.h5` are one matrix under two names."
 CHECK_FURTHER = (" A further line is about one method: why it cannot run, or what it does not "
                  "read or needs from your data.")
 CHECK_CROSS = (" With fewer batches than the methods read, such a line names the files that "
@@ -925,7 +925,7 @@ def test_the_check_names_the_two_atac_files(key, tmp_path, monkeypatch, capsys):
         content = _content(Path("mydata") / NAMES[key])
         assert cells["atac.h5"] == cells["atac_peak.h5"] > 0
         assert content["atac.h5"] == content["atac_peak.h5"]
-        # "Diagonal methods read the second": none of them reads a file named atac.h5
+        # the diagonal methods read atac_peak.h5; none reads a file named atac.h5
         roles = {r for m in mtb.list_methods(category="diagonal")
                  for v in mtb.method_info(m)["supports"] if v["category"] == "diagonal"
                  for r in v["modalities"] if r.startswith("atac")}
