@@ -447,3 +447,13 @@ def test_env_install_off_linux_says_it_once(monkeypatch, capsys):
     assert "warning:" not in err and err.count("run only on Linux") == 1
     cli.main(["env", "install", "--methods", "Matilda", "--dry-run"])
     assert "# dry run - run it without --dry-run on a Linux machine" in capsys.readouterr().err
+
+
+# Y21: a bare name that is data/<name> here gets that path
+def test_scan_names_data_folder_here(tmp_path, monkeypatch):
+    (tmp_path / "data" / "CITE").mkdir(parents=True)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(mtb.config.DEFAULT, "data_path", tmp_path / "cache")
+    with pytest.raises(FileNotFoundError, match=r"data/CITE exists here: pass 'data/CITE'\."):
+        mtb.scan("CITE", "vertical")
+    assert "mtb.scan('data/MYDATA', 'vertical')" in mtb.describe_layout("vertical")

@@ -328,10 +328,10 @@ def describe_layout(category: str | None = None) -> str:
                           "multibench scan checks the files and the environment of each "
                           "method variant (columns files_ok, env_ok)."),
               config.hint(
-                  f"Next: mtb.scan('MYDATA', '{cat}'), then, on Linux, "
-                  f"mtb.run_all('MYDATA', '{cat}', out_dir='out/')",
-                  f"Next: multibench scan MYDATA --category {cat}, then, on Linux, "
-                  f"multibench run-all MYDATA --category {cat} --out-dir out/")]
+                  f"Next: mtb.scan('data/MYDATA', '{cat}'), then, on Linux, "
+                  f"mtb.run_all('data/MYDATA', '{cat}', out_dir='out/')",
+                  f"Next: multibench scan data/MYDATA --category {cat}, then, on Linux, "
+                  f"multibench run-all data/MYDATA --category {cat} --out-dir out/")]
     return _compat.Text("\n".join(lines))
 
 

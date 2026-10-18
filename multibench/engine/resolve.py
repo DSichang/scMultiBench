@@ -271,8 +271,9 @@ def missing_dataset_message(base, dataset: str) -> str:
     base = Path(base)
     here = Path(str(dataset))
     default = Path(os.path.abspath(config.DEFAULT.data_path))
-    if len(here.parts) == 1 and here.is_dir() and Path(os.path.abspath(base)) == default:
-        path = f"./{dataset}"
+    near = next((p for p in (here, Path("data") / here) if p.is_dir()), None)
+    if len(here.parts) == 1 and near is not None and Path(os.path.abspath(base)) == default:
+        path = f"./{near}" if near == here else str(near)
         return (f"The folder {base / dataset} does not exist. {path} exists here: pass "
                 + config.hint(f"{path!r}.", f"{path}."))
     dirs = sorted(p.name for p in base.iterdir() if p.is_dir()) if base.is_dir() else []

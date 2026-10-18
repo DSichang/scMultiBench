@@ -56,17 +56,17 @@ def test_cli_layout_names_commands_not_python_calls(cat, capsys):
     out = capsys.readouterr().out
     assert "multibench scan" in out and "mtb." not in out
     assert out.rstrip().splitlines()[-1] == (
-        f"Next: multibench scan MYDATA --category {cat}, then, on Linux, "
-        f"multibench run-all MYDATA --category {cat} --out-dir out/")
+        f"Next: multibench scan data/MYDATA --category {cat}, then, on Linux, "
+        f"multibench run-all data/MYDATA --category {cat} --out-dir out/")
     py = mtb.describe_layout(cat)
-    assert py.splitlines()[-1] == (f"Next: mtb.scan('MYDATA', '{cat}'), then, on Linux, "
-                                   f"mtb.run_all('MYDATA', '{cat}', out_dir='out/')")
+    assert py.splitlines()[-1] == (f"Next: mtb.scan('data/MYDATA', '{cat}'), then, on Linux, "
+                                   f"mtb.run_all('data/MYDATA', '{cat}', out_dir='out/')")
 
 
 def test_cli_layout_overview_names_commands(capsys):
     assert cli.main(["layout"]) == 0
     out = capsys.readouterr().out
-    assert "mtb." not in out and "multibench scan MYDATA --category <category>" in out
+    assert "mtb." not in out and "multibench scan data/MYDATA --category <category>" in out
 
 
 def _cite_h5ad(path, n=60):

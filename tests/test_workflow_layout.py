@@ -28,7 +28,7 @@ def test_one_category_prints_only_that_category(cat):
     assert not any(f"\n{c}: " in txt for c in others)
     assert "Every file name the loader reads" not in txt    # the full table: overview only
     # the last line runs scan on this category, and the install line is per method
-    assert txt.splitlines()[-1].startswith(f"Next: mtb.scan('MYDATA', '{cat}')")
+    assert txt.splitlines()[-1].startswith(f"Next: mtb.scan('data/MYDATA', '{cat}')")
     assert "multibench env install --methods X\n" in txt          # no --run (X27)
     assert "lockfiles" not in txt and "two gates" not in txt
     # 0.4: scan's table has one row per method, with runnable and reason
@@ -125,7 +125,7 @@ def test_overview_keeps_every_category_and_the_full_table():
     assert "Every file name the loader reads:" in txt
     for k in W.ROLES:
         assert k in txt
-    assert "mtb.scan('MYDATA', '<category>')" in txt
+    assert "mtb.scan('data/MYDATA', '<category>')" in txt
 
 
 def test_one_atac_rule_in_describe_layout():
