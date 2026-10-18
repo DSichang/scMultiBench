@@ -61,6 +61,13 @@ def bar(long_df: pd.DataFrame, *, metrics=None, methods=None, title: str | None 
         repeats a ``(method, dataset, metric)`` row, or ``metrics`` /
         ``methods`` names a value it does not hold.
 
+    Warns
+    -----
+    UserWarning
+        A method missing from some datasets, a dataset with one method, a
+        metric only one method has, rows scored before 0.4.0, or a figure of
+        two methods.
+
     Examples
     --------
     >>> import multibench as mtb

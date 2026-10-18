@@ -996,6 +996,11 @@ def recommend(
     KeyError
         Unknown method name in ``methods``, with a did-you-mean hint.
 
+    Warns
+    -----
+    UserWarning
+        One message: partial coverage, methods left out and why.
+
     Examples
     --------
     >>> import multibench as mtb

@@ -1030,6 +1030,12 @@ def bubble(long_df, *, metrics=None, methods=None, title=None, save=None):
         ``(method, dataset, metric)`` row, or ``metrics`` / ``methods`` names
         a value it does not hold.
 
+    Warns
+    -----
+    UserWarning
+        ``n/a`` cells, several datasets averaged per method, a column with the
+        same value in every row, or a figure of two methods.
+
     Examples
     --------
     >>> import multibench as mtb
