@@ -422,3 +422,16 @@ def test_position_note_grammar_and_once(tmp_path):
     said = [str(x.message) for x in w if "by position" in str(x.message)]
     assert said == ["cty.csv has no cell ids, so its rows are matched to the embedding by "
                     "position."]
+
+
+# Y19: a label column that differs in letter case gets a did-you-mean
+def test_label_column_case_did_you_mean(tmp_path):
+    import numpy as np
+    import pandas as pd
+    ad = pytest.importorskip("anndata")
+    a = ad.AnnData(np.ones((4, 3)), obs=pd.DataFrame({"celltype": list("abab")},
+                                                     index=[f"c{i}" for i in range(4)]))
+    with pytest.raises(KeyError, match=r"Did you mean 'celltype'\?"):
+        mtb.io.export_dataset(a, tmp_path / "A", labels="obs:Celltype")
+    with pytest.raises(ValueError, match=r"Did you mean 'celltype'\?$"):
+        mtb.io.export_dataset(a, tmp_path / "B", labels="Celltype")

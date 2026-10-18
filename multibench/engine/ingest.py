@@ -1041,10 +1041,17 @@ def _mudata_selector(mdata, spec):
     return spec
 
 
+def _case_hint(col, columns) -> str:
+    """`` Did you mean 'celltype'?`` for a name that differs only in letter case."""
+    same = [str(c) for c in columns if str(c).lower() == str(col).lower()]
+    return f" Did you mean {same[0]!r}?" if len(same) == 1 else ""
+
+
 def _obs_column(obs, col, *, what, spec, where):
     if col not in obs.columns:
         raise KeyError(f"{what}={spec!r}: column {col!r} not in obs: searched {where}; "
-                       f"available: {list(obs.columns)}")
+                       f"available: {list(obs.columns)}"
+                       + (f".{hint}" if (hint := _case_hint(col, obs.columns)) else ""))
     return obs[col]
 
 
@@ -1103,7 +1110,7 @@ def _select_obs(data, spec, *, what):
         + config.hint("mdata.obs" if mu else "data.obs", "the obs of SRC")
         + (f". Columns: {', '.join(cols[:5])}"
            f"{f' and {len(cols) - 5:,} more' if len(cols) > 5 else ''}."
-           if cols else ", which has no columns."))
+           if cols else ", which has no columns.") + _case_hint(spec, cols))
 
 
 def _is_file_name(spec: str) -> bool:
