@@ -7,10 +7,16 @@ out (setting it would duplicate the flag or have no effect):
 
 - the flags of the variant's ``args`` in methods.yaml (its input files and
   output folder);
-- path arguments: a ``metavar`` naming a directory or path, or a name in
-  :data:`PATHY`;
+- path arguments: a ``metavar`` naming a directory or path, a name ending
+  in ``_path``, or a name in :data:`PATHY`;
 - arguments the script overwrites after parsing (``args.input_size = ...``:
-  set from the data).
+  set from the data);
+- a ``store_true`` switch whose default is already ``True`` (it cannot be
+  turned off);
+- the arguments in :data:`SET_FROM_DATA`, which the package sets per run.
+
+A switch is recorded as ``type: flag`` with the value the script gets
+without it (``False`` for ``store_true``, ``True`` for ``store_false``).
 
 A variant whose script is not found under :data:`ROOTS` keeps its entry of the
 current params.yaml, filtered by the first rule.
@@ -37,7 +43,14 @@ PATHY = set("""path1 path2 path3 path4 path5 save_path cty_path out output outdi
 data_dir data_path source_data target_data source_cty target_cty train_path1 train_path2
 test_path1 test_path2 train_cty_path save ref_path1 ref_path2 query_path1 query_path2
 pair_path1 pair_path2 dataset_path ae_weights ae_weight_file embedding_file prediction_file
-pre_trained rna adt atac cty file_path input output_path result_path""".split())
+pre_trained rna adt atac cty file_path input output_path result_path data_file save_name
+experiment load_model""".split())
+#: arguments the package sets per run from the data (methods.yaml ``params``)
+SET_FROM_DATA = {
+    "scMDC": {"nbatch"},        # one per input file
+    "scMM": {"model"},          # rna_protein or rna_atac, from the modalities
+    "scBridge": {"umap_plot"},  # passed: the script's figure save crashes
+}
 #: a metavar that names a file or folder: the argument is an input, not a knob
 _PATH_METAVAR = re.compile(r"metavar\s*=\s*['\"](DIR|DIRS|PATH|PATHS|FILE|FILES)['\"]")
 
@@ -83,15 +96,20 @@ def extract(txt: str, skip: set) -> dict:
     for m in re.finditer(r"add_argument\(\s*[\'\"]--([A-Za-z0-9_\-]+)[\'\"](.*?)\)", txt, re.S):
         name = m.group(1)
         body = m.group(2)[:250].replace("\n", " ")
-        if name in PATHY or name in skip or _PATH_METAVAR.search(body):
+        if (name in PATHY or name.endswith("_path") or name in skip
+                or _PATH_METAVAR.search(body)):
             continue
         d = re.search(r"default\s*=\s*([^,\)]+)", body)
         t = re.search(r"type\s*=\s*([A-Za-z]+)", body)
-        act = "store_true" in body
         rec = {"default": lit(d.group(1)) if d else None}
         if t:
             rec["type"] = t.group(1)
-        elif act:
+        elif "store_true" in body or "store_false" in body:
+            off = "store_true" in body
+            if rec["default"] is None:
+                rec["default"] = not off
+            if rec["default"] is off:      # the switch cannot change the value
+                continue
             rec["type"] = "flag"
         tun[name] = rec
     return tun
@@ -103,7 +121,7 @@ def main():
     out = {}
     for s in registry.load():
         for v in s.variants:
-            skip = set_by_package(s, v)
+            skip = set_by_package(s, v) | SET_FROM_DATA.get(s.id, set())
             path = resolve(v.entrypoint)
             if path:
                 try:
@@ -123,8 +141,8 @@ def main():
            "# script's own argparse. These are never added to a command line by the\n"
            "# package; they document what `run(..., params={...})` may override, and\n"
            "# are surfaced by `multibench.params_for(method, category, modalities)`.\n"
-           "# Arguments the package or the script sets (input files, the CPU switch,\n"
-           "# values the script takes from the data) are left out.\n"
+           "# Arguments the package or the script sets (input files, values taken\n"
+           "# from the data) are left out.\n"
            "#\n"
            "# A method absent from this file exposes no command-line hyperparameters\n"
            "# (they are hardcoded in its source). Since method scripts are never\n"

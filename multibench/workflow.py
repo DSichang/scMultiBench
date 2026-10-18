@@ -2787,7 +2787,7 @@ def _check_param_keys(plan_df: pd.DataFrame, params: dict) -> None:
         for _, r in rows.iterrows():
             variant = registry.get(method).select(r["category"],
                                                   set(_row_modalities(r["modalities"])))
-            allowed |= set(variant.tunable) | set(variant.params)
+            allowed |= set(variant.tunable)
         unknown = [k for k in overrides if k not in allowed]
         if unknown:
             raise _unknown_params_error(method, unknown, allowed)

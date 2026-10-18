@@ -4,8 +4,8 @@
 # script's own argparse. These are never added to a command line by the
 # package; they document what `run(..., params={...})` may override, and
 # are surfaced by `multibench.params_for(method, category, modalities)`.
-# Arguments the package or the script sets (input files, the CPU switch,
-# values the script takes from the data) are left out.
+# Arguments the package or the script sets (input files, values taken
+# from the data) are left out.
 #
 # A method absent from this file exposes no command-line hyperparameters
 # (they are hardcoded in its source). Since method scripts are never
@@ -23,25 +23,15 @@ MIRA:
     acc:
       default: gpu
       type: str
-    atac_topic_modal_path:
-      default: 'NULL'
     epoch:
       default: 24
       type: int
     filter_atac_cells:
-      default: null
+      default: false
       type: flag
     latent_dim:
       default: 20
       type: int
-    load_model:
-      default: null
-      type: flag
-    rna_topic_modal_path:
-      default: 'NULL'
-    save_name:
-      default: mira
-      type: str
 Matilda:
   vertical:rna+adt:
     augmentation:
@@ -248,7 +238,7 @@ scBridge:
       default: 20
       type: int
     novel_type:
-      default: null
+      default: false
       type: flag
     prototype_momentum:
       default: 0.9
@@ -268,8 +258,6 @@ scBridge:
     train_epoch:
       default: 20
       type: int
-    umap_plot:
-      default: null
 scJoint:
   diagonal:rna+atac_gas:
     batch_size:
@@ -365,8 +353,6 @@ scMDC:
     cutoff:
       default: 0.5
       type: float
-    data_file:
-      default: Normalized_filtered_BMNC_GSE128639_Seurat.h5
     device:
       default: cuda
     f1:
@@ -395,9 +381,6 @@ scMDC:
       type: int
     n_neighbors:
       default: 30
-      type: int
-    nbatch:
-      default: 2
       type: int
     phi1:
       default: 0.001
@@ -436,8 +419,6 @@ scMDC:
     cutoff:
       default: 0.5
       type: float
-    data_file:
-      default: Normalized_filtered_BMNC_GSE128639_Seurat.h5
     device:
       default: cuda
     f1:
@@ -466,9 +447,6 @@ scMDC:
       type: int
     n_neighbors:
       default: 30
-      type: int
-    nbatch:
-      default: 2
       type: int
     phi1:
       default: 0.001
@@ -507,8 +485,6 @@ scMDC:
     cutoff:
       default: 0.5
       type: float
-    data_file:
-      default: Normalized_filtered_BMNC_GSE128639_Seurat.h5
     device:
       default: cuda
     f1:
@@ -537,9 +513,6 @@ scMDC:
       type: int
     n_neighbors:
       default: 30
-      type: int
-    nbatch:
-      default: 2
       type: int
     phi1:
       default: 0.001
@@ -578,8 +551,6 @@ scMDC:
     cutoff:
       default: 0.5
       type: float
-    data_file:
-      default: Normalized_filtered_BMNC_GSE128639_Seurat.h5
     device:
       default: cuda
     f1:
@@ -608,9 +579,6 @@ scMDC:
       type: int
     n_neighbors:
       default: 30
-      type: int
-    nbatch:
-      default: 2
       type: int
     phi1:
       default: 0.001
@@ -644,9 +612,6 @@ scMDC:
       type: int
 scMM:
   cross:rna1+rna2+rna3+adt1+adt2+adt3:
-    analytics:
-      default: true
-      type: flag
     batch_size:
       default: 64
       type: int
@@ -656,9 +621,6 @@ scMM:
     epochs:
       default: 10
       type: int
-    experiment:
-      default: test
-      type: str
     latent_dim:
       default: 10
       type: int
@@ -671,9 +633,6 @@ scMM:
     lr:
       default: 0.0001
       type: float
-    model:
-      default: rna_protein
-      type: str
     no_cuda:
       default: false
       type: flag
@@ -696,9 +655,6 @@ scMM:
       default: 1
       type: int
   cross:rna1+rna2+rna3+atac1+atac2+atac3:
-    analytics:
-      default: true
-      type: flag
     batch_size:
       default: 64
       type: int
@@ -708,9 +664,6 @@ scMM:
     epochs:
       default: 10
       type: int
-    experiment:
-      default: test
-      type: str
     latent_dim:
       default: 10
       type: int
@@ -723,9 +676,6 @@ scMM:
     lr:
       default: 0.0001
       type: float
-    model:
-      default: rna_protein
-      type: str
     no_cuda:
       default: false
       type: flag
@@ -748,9 +698,6 @@ scMM:
       default: 1
       type: int
   vertical:rna+adt:
-    analytics:
-      default: true
-      type: flag
     batch_size:
       default: 64
       type: int
@@ -760,9 +707,6 @@ scMM:
     epochs:
       default: 10
       type: int
-    experiment:
-      default: test
-      type: str
     latent_dim:
       default: 10
       type: int
@@ -775,9 +719,6 @@ scMM:
     lr:
       default: 0.0001
       type: float
-    model:
-      default: rna_protein
-      type: str
     no_cuda:
       default: false
       type: flag
@@ -800,9 +741,6 @@ scMM:
       default: 1
       type: int
   vertical:rna+atac:
-    analytics:
-      default: true
-      type: flag
     batch_size:
       default: 64
       type: int
@@ -812,9 +750,6 @@ scMM:
     epochs:
       default: 10
       type: int
-    experiment:
-      default: test
-      type: str
     latent_dim:
       default: 10
       type: int
@@ -827,9 +762,6 @@ scMM:
     lr:
       default: 0.0001
       type: float
-    model:
-      default: rna_protein
-      type: str
     no_cuda:
       default: false
       type: flag

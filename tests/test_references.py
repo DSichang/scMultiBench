@@ -74,7 +74,7 @@ def test_method_info_keeps_existing_keys():
 
 def test_effective_merges_wrapper_defaults_over_upstream():
     p = mtb.params_for("scMDC", "vertical", ["rna", "adt"])
-    assert p["tunable"]["nbatch"]["default"] == 2       # upstream default, untouched
+    assert "nbatch" not in p["tunable"]                  # set from the folder
     assert p["effective"]["nbatch"] == 1                 # what the wrapper really runs
     assert p["effective"]["lr"] == 1.0
     eff = mtb.method_info("scMDC", verbose=True)["params"]["vertical:rna+adt"]["effective"]

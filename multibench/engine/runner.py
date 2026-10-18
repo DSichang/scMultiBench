@@ -605,7 +605,7 @@ def check_params(method: str, variant, params: dict | None) -> None:
     """Raise :func:`unknown_params_error` for a ``params`` key the variant does
     not accept, and :func:`check_param_types`' error for a value of the wrong
     type, before anything runs."""
-    allowed = set(variant.tunable) | set(variant.params)
+    allowed = set(variant.tunable)
     unknown = [k for k in (params or {}) if k not in allowed]
     if unknown:
         raise unknown_params_error(method, unknown, allowed)
@@ -613,13 +613,16 @@ def check_params(method: str, variant, params: dict | None) -> None:
 
 
 #: the script's declared type -> what a value must be
-_TYPE_WORDS = {"int": "a whole number", "float": "a number", "str": "a text value"}
+_TYPE_WORDS = {"int": "a whole number", "float": "a number", "str": "a text value",
+               "bool": "True or False", "flag": "True or False"}
 
 
 def _fits(value, kind: str) -> bool:
     """Whether ``value`` can stand on the command line for an argument of
     argparse ``type=kind``: a bool never stands for a number or text."""
     import numbers
+    if kind in ("bool", "flag"):
+        return isinstance(value, bool)
     if isinstance(value, bool):
         return False
     if kind == "str":
@@ -639,15 +642,15 @@ def _fits(value, kind: str) -> bool:
 
 def check_param_types(method: str, variant, params: dict | None) -> None:
     """``TypeError`` for a ``params`` value that does not fit the type the
-    script declares for it (``int``, ``float``, ``str``): ``2.5`` or ``True``
-    for ``epochs`` would reach the script as ``--epochs 2.5`` or a bare
-    ``--epochs``."""
+    script declares for it (``int``, ``float``, ``str``, ``bool``, ``flag``):
+    ``2.5`` or ``True`` for ``epochs`` would reach the script as ``--epochs
+    2.5`` or a bare ``--epochs``, and ``"False"`` for a ``bool`` is true."""
     for key, value in (params or {}).items():
         decl = variant.tunable.get(key) or {}
         kind = decl.get("type")
         if kind in _TYPE_WORDS and value is not None and not _fits(value, kind):
             raise TypeError(f"{method}: {key} takes {_TYPE_WORDS[kind]}, got {value!r}. "
-                            f"Its default is {decl.get('default')!r}.")
+                            f"Its default is {variant.params.get(key, decl.get('default'))!r}.")
 
 
 def cpu_params_for(spec, params: dict | None, *,

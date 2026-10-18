@@ -40,7 +40,7 @@ def test_cli_params_prints_every_variant_without_a_selector(capsys):
     assert "# Matilda vertical:rna+adt: 10 tunable" in out
     assert "# Matilda vertical:rna+atac: 10 tunable" in out
     header = next(l for l in out.splitlines() if l.strip().startswith("key"))
-    assert header.split() == ["key", "type", "default", "effective"]
+    assert header.split() == ["key", "type", "default", "script_default"]
     assert "epochs" in out and "z_dim" in out and "--param KEY=VALUE" in out
     tun = multibench.params_for("Matilda", "vertical", ["rna", "adt"])["tunable"]
     for k in tun:
@@ -72,7 +72,7 @@ def test_cli_params_formats(capsys):
     assert set(rows[0]) >= {"method", "variant", "tunable", "effective", "fixed_in_script"}
     rc = cli.main(["params", "Matilda", "--format", "csv"])
     out = capsys.readouterr().out
-    assert rc == 0 and out.splitlines()[0] == "variant,key,type,default,effective"
+    assert rc == 0 and out.splitlines()[0] == "variant,key,type,default,script_default"
     assert out.count("\n") == 1 + n * 10   # header + 3 variants x 10 keys
 
 

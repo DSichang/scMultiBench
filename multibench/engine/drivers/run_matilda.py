@@ -44,11 +44,12 @@ def main() -> None:
     for k in shape_keys:
         p.add_argument(f"--{k}", type=int)
     p.add_argument("--lr", type=float)
-    # on by default; the runner drops a Python False, so "False" turns it off
+    # on by default; the runner passes False as "" (main_matilda_train.py's
+    # type=bool), and "False" also turns it off
     p.add_argument("--augmentation", nargs="?", const="True", default="True")
     a = p.parse_args()
     shape = {k: getattr(a, k) for k in shape_keys if getattr(a, k) is not None}
-    fit_kw = dict(shape, augmentation=a.augmentation != "False")
+    fit_kw = dict(shape, augmentation=a.augmentation not in ("", "False"))
     if a.lr is not None:
         fit_kw["lr"] = a.lr
 

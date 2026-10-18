@@ -41,10 +41,23 @@ def build_command(variant: Variant, values: dict, out_dir: str,
 
     merged = {**variant.params, **(params or {})}
     for k, v in merged.items():
-        if v is True:            # bare flag, e.g. --no_cuda
-            cmd.append(f"--{k}")
-        elif v is False or v is None:
-            continue
-        else:
-            cmd.extend([f"--{k}", str(v)])
+        cmd.extend(_param_tokens(k, v, (variant.tunable.get(k) or {})))
     return cmd
+
+
+def _param_tokens(key: str, value, decl: dict) -> list[str]:
+    """The tokens of one param, by the type the script declares: a
+    ``type=bool`` argument gets ``True`` or ``''`` (argparse's ``bool('')``
+    is ``False``); a switch (``flag``) is present when the value differs
+    from the one the script gets without it. Otherwise ``True`` is a bare
+    flag, ``False``/``None`` nothing, anything else its text."""
+    kind = decl.get("type")
+    if kind == "bool" and isinstance(value, bool):
+        return [f"--{key}", "True" if value else ""]
+    if kind == "flag" and isinstance(value, bool):
+        return [f"--{key}"] if value != bool(decl.get("default")) else []
+    if value is True:
+        return [f"--{key}"]
+    if value is False or value is None:
+        return []
+    return [f"--{key}", str(value)]

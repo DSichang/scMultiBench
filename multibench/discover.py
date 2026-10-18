@@ -176,6 +176,14 @@ def _effective(v) -> dict:
     return eff
 
 
+def _tunable(v) -> dict:
+    """``{name: {"default", "type", "script_default"}}``: ``default`` is what a
+    run uses, ``script_default`` the script's own."""
+    eff = _effective(v)
+    return {k: {**(t or {}), "default": eff[k], "script_default": (t or {}).get("default")}
+            for k, t in v.tunable.items()}
+
+
 def _reference_batch(variant):
     """Batch ``N`` of a variant's ``reference`` const ``data<N>``, else ``None``."""
     ref = next((a.const for a in variant.args if a.role == "reference" and a.const), None)
@@ -287,7 +295,7 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
                       "reference_batch": _reference_batch(v)}
                      for v in s.variants],
         "params": {_variant_key(v): {"defaults": dict(v.params),
-                                     "tunable": dict(v.tunable),
+                                     "tunable": _tunable(v),
                                      "effective": _effective(v)}
                    for v in s.variants},
     }
@@ -366,12 +374,12 @@ def params_for(method: str, category: str | None = None,
     Returns
     -------
     dict
-        ``method``, ``variant`` (``'category:mods'``), ``tunable`` (what the
-        script accepts, ``{name: {"default", "type"}}`` with the upstream
-        default), ``defaults`` (what the package passes), ``effective`` (what
-        a run uses when you pass nothing), ``fixed_in_script`` (what the
-        script pins, with ``file:line``) and ``upstream_knobs`` (what its
-        library documents but the script does not expose).
+        ``method``, ``variant`` (``'category:mods'``), ``tunable`` (what you
+        can set, ``{name: {"default", "type", "script_default"}}``; ``default``
+        is what a run uses when you pass nothing), ``effective`` (every value
+        a run passes), ``fixed_in_script`` (what the script pins, with
+        ``file:line``) and ``upstream_knobs`` (what its library documents but
+        the script does not expose).
 
     Raises
     ------
@@ -387,8 +395,8 @@ def params_for(method: str, category: str | None = None,
     --------
     >>> import multibench as mtb
     >>> p = mtb.params_for("Matilda", "vertical", ["rna", "adt"])
-    >>> # upstream default vs what a run uses
-    >>> p["tunable"]["device"]["default"], p["effective"]["device"]
+    >>> p["tunable"]["epochs"]["default"]
+    30
 
     See Also
     --------
@@ -499,7 +507,7 @@ def params_for(method: str, category: str | None = None,
                 raise
     up = upstream.knobs_for(s.id)
     return {"method": s.id, "variant": _variant_key(v),
-            "defaults": dict(v.params), "tunable": dict(v.tunable),
+            "defaults": dict(v.params), "tunable": _tunable(v),
             "effective": _effective(v),
             "fixed_in_script": up["fixed_in_script"],
             "upstream_knobs": up["upstream_knobs"],

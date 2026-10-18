@@ -767,14 +767,14 @@ def _cmd_params(args) -> int:
         return _EXIT_OK
     frames = []
     for p in rows:
-        tun, eff = p["tunable"], p["effective"]
+        tun = p["tunable"]
         # object columns: an int default prints as 256, not 256.000
         tbl = pd.DataFrame([{"variant": p["variant"], "key": k,
                              "type": t.get("type"),
                              "default": t.get("default"),
-                             "effective": eff.get(k)}
+                             "script_default": t.get("script_default")}
                             for k, t in sorted(tun.items())],
-                           columns=["variant", "key", "type", "default", "effective"],
+                           columns=["variant", "key", "type", "default", "script_default"],
                            dtype=object)
         if fmt in ("csv", "tsv"):
             frames.append(tbl)
@@ -1875,7 +1875,7 @@ def build_parser() -> argparse.ArgumentParser:
     ppa = sub.add_parser(
         "params", help="the hyperparameters a method accepts (mtb.params_for)",
         description="Print, per variant of METHOD, the tunable hyperparameters "
-                    "(key, type, upstream default, effective value in a wrapper run) "
+                    "(key, type, the default a run uses, the script's own default) "
                     "that --param / run(params=) accept, then the values the script "
                     "pins (fixed_in_script, with file:line) and the upstream library "
                     "knobs it does not expose. Without --category/--modalities every "
