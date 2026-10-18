@@ -13,7 +13,7 @@ package does not run.
 Each tutorial is one straight path, run top to bottom on Linux or Colab:
 install the package, download the data and the method environments, run the
 task's default methods with ``run_all``, plot, run the same calls on data in
-the reader's own format, and draw the benchmark's stored scores where the
+the reader's own format, and draw the benchmark's stored results where the
 package ships them. There are no flags or fallbacks. No notebook defines a
 function. The example files of section 5 come from ``mtb.data.write_example``.
 A step that cannot work on the reader's computer fails with the package's own
@@ -55,6 +55,7 @@ import nbformat as nbf
 
 import multibench as mtb
 from multibench.data.examples import EXAMPLES
+from multibench.engine.resolve import labels_for
 
 OUT = "notebooks"
 os.makedirs(OUT, exist_ok=True)
@@ -72,10 +73,9 @@ def details(*paras, label="Details"):
 
 
 def stored_method_count(cat, dataset):
-    """The methods the stored tables hold for the dataset, counted from
-    ``results_coverage`` at generation time."""
-    cov = mtb.results_coverage(cat)
-    return cov[cov.dataset == dataset].method.nunique()
+    """The methods the stored results hold for the dataset, counted from
+    ``load_results`` at generation time."""
+    return mtb.load_results(cat, dataset=dataset).method.nunique()
 
 
 def _gb(rows):
@@ -174,7 +174,7 @@ COLAB_GPU_NOTE = ("On Colab, choose a GPU runtime before you run the notebook: R
 # the task's method variants (the cross tasks with three batches also hold
 # UINMF's two-batch sets, which belong to no other task); `methods` are the
 # two the notebook runs by default (one when the task has a single method);
-# `stored_ds` is the dataset whose stored scores the last section draws;
+# `stored_ds` is the dataset whose stored results the last section draws;
 # `not_wrapped` are the methods the article evaluates on the task and the
 # package does not run.
 def _three(*roles):
@@ -363,9 +363,9 @@ def check_task(key):
                          f"method of the task: change the dataset or name the modalities")
     with warnings.catch_warnings():          # a count of the files: no order needed
         warnings.simplefilter("ignore", UserWarning)
-        n = len(mtb.labels_for(t["ds"]))
+        n = len(labels_for(t["ds"]))
     for m in everyone:
-        if len(mtb.labels_for(t["ds"], t["cat"], m)) < n:
+        if len(labels_for(t["ds"], t["cat"], m)) < n:
             raise SystemExit(f"{m} reads only some batches of {t['ds']}: reword the notebooks")
     # the vertical, mosaic and cross texts say that ATAC is a peak matrix
     gas = mtb.find_methods(t["cat"], modalities=["atac_gas"])
@@ -437,7 +437,7 @@ MUDATA_NOTE = ("A 10x Multiome MuData goes in with one call. Here the labels are
                "```")
 DIAG_CLI = ("The command line writes the same folder from the two files:\n\n"
             "```\n"
-            "multibench convert my_rna.h5ad mydata/{name} --rna X --atac-from my_atac.h5ad \\\n"
+            "multibench export my_rna.h5ad mydata/{name} --atac-from my_atac.h5ad \\\n"
             "    --atac-kind gene_activity --labels obs:celltype --category diagonal\n"
             "```")
 DIAG_ONE_SIDE = ("`labels=` needs the column in both files. With cell types for the RNA "
@@ -451,14 +451,13 @@ MULTI_PEAK = ("For ATAC as a peak matrix, pass `atac_kind=\"peak\"`. {multi_peak
               "the peak matrix.")
 MOSAIC_LAYOUT = ("`mtb.describe_layout(\"mosaic\")` lists the batch patterns and the methods "
                  "that accept each one. The command line writes one batch per call with "
-                 "`multibench convert ... --category mosaic --batch-index N`.")
+                 "`multibench export ... --category mosaic --batch-index N`.")
 MOSAIC_ONE_FILE = ("A batch with RNA and ADT in one file goes in with a selector, for "
                    "example `adt=\"obsm:protein\"`.")
 CROSS_ORDER = ("The batches are numbered in the sorted order of their names, read as text: "
                "donors `A`, `B` and `C` become batches 1, 2 and 3, and `10` comes before `2`.")
 CROSS_INDEX = ("For one AnnData per batch, call `export_dataset` once per batch with "
-               "`batch_index=N` instead of `batch=`, and pass `n_batches=` with the number of "
-               "batches in every call.")
+               "`batch_index=N` instead of `batch=`.")
 FOLDER_NOTE = ("`\"mydata/\" + NAME` is the dataset folder that `scan` and `run_all` read. "
                "With a new value of `NAME`, the folder holds the files of your data only.")
 CHECK_NOTE = ("The check lists the methods you name. Without `methods=`, it lists every "
@@ -471,8 +470,8 @@ LEFTOVER = ("`export_dataset` raises `FileExistsError` when the folder holds fil
 LEFTOVER_BATCH = ("After `batch=`, the files of batch numbers that the call does not write "
                   "count as well.")
 LEFTOVER_INDEX = ("A call with `batch_index=` checks the files of its own batch number. Files "
-                  "of other batch numbers stay, unless `n_batches=` says that the data has "
-                  "fewer batches.")
+                  "of other batch numbers stay: for data with fewer batches, give `NAME` a "
+                  "new value.")
 OVERWRITE_NOTE = ("`overwrite=True` replaces the files of an earlier run of this cell. "
                   "Without it, `export_dataset` raises `FileExistsError` rather than "
                   "replace a file.")
@@ -647,7 +646,7 @@ for b in range(len(rna)):      # one call per batch
                           atac_kind="gene_activity",  # <- or "peak"
                           labels="obs:celltype",      # <- the cell-type column
                           category="diagonal", batch_index=b + 1,
-                          n_batches=len(rna), overwrite=True)''',
+                          overwrite=True)''',
    notes=[MULTI_NUMBERING, MULTI_PEAK],
  ),
  "mosaic_rna_adt": dict(
@@ -943,7 +942,7 @@ def check_own(key):
             with warnings.catch_warnings(record=True) as seen, \
                     contextlib.redirect_stdout(io.StringIO()):
                 warnings.simplefilter("always")
-                mtb.data.write_example(t["ds"], quiet=True)
+                mtb.data.write_example(t["ds"], verbose=False)
                 exec(compile(own["read"], f"tutorial_{key}: read cell", "exec"), ns)
                 exec(compile(own["export"], f"tutorial_{key}: export cell", "exec"), ns)
             with warnings.catch_warnings():
@@ -1010,9 +1009,8 @@ def own_cells(key):
              + ".")
     if cat == "mosaic":
         write += " Each call writes one batch."
-    elif "n_batches=" in export:
-        write += (" The loop writes one RNA batch and one ATAC batch per call, and "
-                  "`n_batches` says how many batches the data has.")
+    elif "batch_index=b + 1" in export:
+        write += " The loop writes one RNA batch and one ATAC batch per call."
     elif cat == "cross":
         write += (" When the folder holds batches that your data does not have, "
                   "`export_dataset` stops and names the files. A new value of `NAME` "
@@ -1194,18 +1192,18 @@ res.summary''')
         n_stored = stored_method_count(cat, stored_ds)
         stored_notes = []
         if stored_ds != ds and stored_ds in ds:
-            stored_notes.append(f"The stored scores are for the full `{stored_ds}`, the benchmark "
+            stored_notes.append(f"The stored results are for the full `{stored_ds}`, the benchmark "
                                 f"dataset `{ds}` is drawn from.")
         elif stored_ds != ds:
-            stored_notes.append(f"There are no stored scores for `{ds}`. `{stored_ds}` is another "
+            stored_notes.append(f"There are no stored results for `{ds}`. `{stored_ds}` is another "
                                 f"benchmark dataset of the same task.")
-        stored_notes.append("The stored scores are the package's own runs of the methods.")
+        stored_notes.append("The stored results are the package's own runs of the methods.")
         stored_notes.append(
             "Scores of your runs differ a little from the stored ones: most methods give "
             "a slightly different embedding on each run.")
-        md(f"""## {section}. Stored scores
+        md(f"""## {section}. Stored results
 
-The package ships stored scores for {n_stored} methods on `{stored_ds}`. `load_results` reads them and `mtb.plot.bubble` draws them, without running anything.
+The package ships stored results for {n_stored} methods on `{stored_ds}`. `load_results` reads them and `mtb.plot.bubble` draws them, without running anything.
 
 """ + details(*stored_notes))
         code(f'''long = mtb.load_results("{cat}", dataset="{stored_ds}")
@@ -1350,8 +1348,8 @@ mtb.find_methods(category="vertical")""")
 
 """ + details(
         "A method matches when one of its variants meets every filter: category, "
-        "modalities, `needs_labels` and `atac`. A variant is one set of input files "
-        "that a method accepts.",
+        "modalities and `needs_labels`. A variant is one set of input files that a "
+        "method accepts.",
         "The modality `\"atac\"` matches every method that reads ATAC. "
         "`\"atac_peak\"` keeps the methods that read peaks, and `\"atac_gas\"` the "
         "methods that read gene activity."))
