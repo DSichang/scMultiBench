@@ -1,4 +1,4 @@
-"""Download reference datasets from the repository's release assets."""
+"""Download demo datasets from the repository's release assets."""
 from __future__ import annotations
 
 import http.client
@@ -7,7 +7,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from .. import config
+from .. import _compat, config
 
 
 def safe_extract(tar: tarfile.TarFile, dest) -> None:
@@ -85,62 +85,53 @@ def _output_urls() -> dict:
     return dict(json.loads(OUTPUT_MANIFEST.read_text()))
 
 
-def fetch(*datasets: str, data_path=None, quiet: bool = False) -> Path:
-    """Download reference datasets into the data root, skipping those present.
+#: the tails of the deprecated keywords of fetch and write_example
+DATA_KEYWORDS = {"data_path": _compat.use("mtb.config.DEFAULT.data_path"),
+                 "quiet": _compat.use("verbose=")}
+
+
+@_compat.keywords("data.fetch", private="_fetch", kept=DATA_KEYWORDS)
+def fetch(*datasets: str, verbose: bool = True) -> Path:
+    """Download demo datasets into the data root, skipping those present.
 
     Parameters
     ----------
     *datasets : str
-        Dataset ids to fetch; ``mtb.data.fetchable()`` lists them.
-    data_path : Path | str | None
-        Data root that holds the dataset folders; ``None`` =
-        ``mtb.config.DEFAULT.data_path``. Each dataset lands in
-        ``<data_path>/<dataset>/``.
-    quiet : bool
-        Suppress the one "downloading ..." line per dataset.
+        Dataset ids; ``mtb.catalog.datasets()`` marks them ``fetchable``.
+    verbose : bool
+        Print one "downloading ..." line per dataset.
 
     Returns
     -------
     pathlib.Path
-        The data root (not the dataset folder) - pass it as ``data_path=``.
+        The data root, ``mtb.config.DEFAULT.data_path``; each dataset lands
+        in ``<data root>/<dataset>/``.
 
     Raises
     ------
     ValueError
-        A dataset id is not a release asset (the message lists the ids).
-    RuntimeError
-        The downloaded archive lacks the ``<dataset>/`` folder.
+        A dataset id that cannot be downloaded (the message lists the ids).
     OSError
         The download failed; the message names the URL.
 
     Examples
     --------
     >>> import multibench as mtb
-    >>> # the data root; D11 lands in <data_path>/D11/ (about 11 MB)
-    >>> root = mtb.data.fetch("D11")
-    >>> mtb.scan("D11", "vertical", data_path=root)
-    >>> mtb.data.fetch("D11", "D28", data_path="data", quiet=True)
+    >>> mtb.data.fetch("D11")                   # about 11 MB
+    >>> mtb.scan("D11", "vertical")
 
     Notes
     -----
-    **What it covers.** The tutorial reference sets published as release
-    assets (``mtb.data.fetchable()``); the progress line states each one's
-    approximate download size. The full collection is linked from the
-    scMultiBench README ("Get the data" in the installation guide).
-
-    **Idempotence.** A non-empty ``<data_path>/<dataset>/`` counts as present
-    and is left alone, whatever it holds (even for an id that is not a
-    release asset); an empty leftover folder is removed and fetched again.
-
-    **Atomic extraction.** Each archive is unpacked into a temporary folder
-    under the data root and then moved into place. An archive entry that
-    would write outside that folder raises ``RuntimeError``.
-
-    See Also
-    --------
-    mtb.data.fetchable : the dataset ids this function can download.
-    mtb.config.Config : ``data_path``, the default data root.
+    A non-empty ``<data root>/<dataset>/`` counts as present and is left
+    alone. Each archive is unpacked into a temporary folder under the data
+    root and then moved into place.
     """
+    return _fetch(*datasets, verbose=verbose)
+
+
+def _fetch(*datasets: str, data_path=None, quiet: bool = False,
+           verbose: bool = True) -> Path:
+    """:func:`fetch`, with the deprecated ``data_path=`` and ``quiet=``."""
     import shutil as _shutil
     import tempfile as _tempfile
 
@@ -156,7 +147,7 @@ def fetch(*datasets: str, data_path=None, quiet: bool = False) -> Path:
                 f"{ds!r} is not in the release assets ({', '.join(sorted(AVAILABLE))}); "
                 "see 'Get the data' in the installation guide for the full collection")
         url = f"{RELEASE_URL}/{ds}.tar.gz"
-        if not quiet:
+        if verbose and not quiet:
             print(f"downloading {ds} ({AVAILABLE[ds]}) from {url} ...", flush=True)
         tgz = _download_or_explain(
             url, ds, f"download the file by hand and unpack it into {root}, as shown "

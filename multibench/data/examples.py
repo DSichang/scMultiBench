@@ -12,6 +12,9 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from .. import _compat
+from .fetch import DATA_KEYWORDS
+
 __all__ = ["write_example"]
 
 #: the example files of each dataset, in writing order
@@ -244,8 +247,8 @@ def _write_marked(adata, target: Path, mark: str) -> None:
         raise
 
 
-def write_example(dataset: str, folder: Path | str = ".", *,
-                  data_path=None, quiet: bool = False) -> Path:
+@_compat.keywords("data.write_example", private="_write_example", kept=DATA_KEYWORDS)
+def write_example(dataset: str, folder: Path | str = ".", *, verbose: bool = True) -> Path:
     """Write the example files of a tutorial dataset as .h5ad files.
 
     The files hold a part of the dataset in the shape that your own data
@@ -261,11 +264,8 @@ def write_example(dataset: str, folder: Path | str = ".", *,
     folder : Path | str
         Folder the files are written to; it is created when it does not
         exist. The default is the current folder.
-    data_path : Path | str | None
-        Data root that holds the dataset folder; ``None`` =
-        ``mtb.config.DEFAULT.data_path``.
-    quiet : bool
-        Suppress the one line printed per file.
+    verbose : bool
+        Print one line per file.
 
     Returns
     -------
@@ -291,7 +291,14 @@ def write_example(dataset: str, folder: Path | str = ".", *,
     mtb.data.fetch : download the dataset that the example is made from.
     mtb.io.export_dataset : write the objects read from the files as a dataset folder.
     """
+    return _write_example(dataset, folder, verbose=verbose)
+
+
+def _write_example(dataset: str, folder: Path | str = ".", *, data_path=None,
+                   quiet: bool = False, verbose: bool = True) -> Path:
+    """:func:`write_example`, with the deprecated ``data_path=`` and ``quiet=``."""
     from .. import __version__, config
+    quiet = quiet or not verbose
     from ..engine.ingest import read_canonical
 
     if dataset not in EXAMPLES:

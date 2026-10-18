@@ -70,11 +70,11 @@ def _variant_matches(v, category, want, needs_labels, atac) -> bool:
 
 @_compat.keywords("find_methods", private="_find_methods", kept={
     "task": _compat.note("it has no replacement"), "runnable": _compat.use("scan"),
-    "atac": _compat.use('modalities=["atac_peak"] or ["atac_gas"]')})
+    "atac": _compat.use('modalities=["atac_peak"] or ["atac_gas"]'),
+    "tunable": _compat.use("mtb.params_for")})
 def find_methods(category: str | None = None, *,
-                 needs_labels: bool | None = None,
                  modalities: list[str] | set[str] | None = None,
-                 tunable: bool | None = None) -> list[str]:
+                 needs_labels: bool | None = None) -> list[str]:
     """Return the method ids that match every filter you pass.
 
     A method matches when one of its variants meets ``category``,
@@ -85,17 +85,13 @@ def find_methods(category: str | None = None, *,
     category : str | None
         Integration category: ``vertical``, ``diagonal``, ``mosaic`` or
         ``cross``; ``None`` = any.
-    needs_labels : bool | None
-        ``True`` = a matching variant needs cell-type labels; ``False`` = one
-        runs without them; ``None`` = no filter.
     modalities : list[str] | set[str] | None
         Modalities a variant must consume, e.g. ``["rna", "adt"]``;
         ``"atac_peak"`` / ``"atac_gas"`` also select by ATAC representation.
         ``None`` = no filter.
-    tunable : bool | None
-        ``True`` = methods with command-line hyperparameters that
-        ``run(params=...)`` can set; ``False`` = the rest (settings fixed in
-        the script); ``None`` = both.
+    needs_labels : bool | None
+        ``True`` = a matching variant needs cell-type labels; ``False`` = one
+        runs without them; ``None`` = no filter.
 
     Returns
     -------
@@ -120,17 +116,17 @@ def find_methods(category: str | None = None, *,
     mtb.method_info : the per-variant ``supports`` table these filters are read from.
     mtb.scan : which of these methods can actually run on a given dataset.
     """
-    return _find_methods(category, needs_labels=needs_labels, modalities=modalities,
-                         tunable=tunable)
+    return _find_methods(category, needs_labels=needs_labels, modalities=modalities)
 
 
 def _find_methods(category: str | None = None, *, task: str | None = None,
                   needs_labels: bool | None = None, atac: str | None = None,
                   modalities: list[str] | set[str] | None = None,
                   runnable: bool | None = None, tunable: bool | None = None) -> list[str]:
-    """:func:`find_methods`, with the deprecated ``task`` and ``runnable``:
-    ``task`` keeps the methods that declare it, ``runnable=True`` those with a
-    variant the package runs and ``False`` the declared stubs."""
+    """:func:`find_methods`, with the deprecated ``task``, ``runnable`` and
+    ``tunable``: ``task`` keeps the methods that declare it, ``runnable=True``
+    those with a variant the package runs and ``False`` the declared stubs,
+    ``tunable=True`` those with a hyperparameter ``params=`` can set."""
     registry.check_category(category)
     registry.check_task(task)
     want, atac = _modality_filter(modalities, atac)
@@ -171,11 +167,9 @@ def _effective(v) -> dict:
 
 
 def _tunable(v) -> dict:
-    """``{name: {"default", "type", "script_default"}}``: ``default`` is what a
-    run uses, ``script_default`` the script's own."""
+    """``{name: {"type", "default"}}``: ``default`` is what a run uses."""
     eff = _effective(v)
-    return {k: {**(t or {}), "default": eff[k], "script_default": (t or {}).get("default")}
-            for k, t in v.tunable.items()}
+    return {k: {**(t or {}), "default": eff[k]} for k, t in v.tunable.items()}
 
 
 def _reference_batch(variant):
@@ -192,12 +186,12 @@ _INFO_KEYS = ("id", "language", "notes", "categories", "env", "atac", "needs_lab
 
 
 class _Info(dict):
-    """``method_info``'s dict: a key that only ``verbose=True`` adds says so."""
+    """``method_info``'s dict: a hyperparameter key names ``params_for``."""
 
     def __missing__(self, key):
-        if key in _VERBOSE_KEYS:
-            raise KeyError(f"{key!r} is in method_info({self.get('id')!r}, "
-                           f"verbose=True)")
+        if key in ("params", "fixed_in_script", "upstream_knobs", "upstream_url"):
+            raise KeyError(f"{key!r} is in mtb.params_for({self.get('id')!r}, "
+                           f"category, modalities)")
         raise KeyError(key)
 
 
@@ -207,19 +201,15 @@ _VERBOSE_KEYS = ("status", "variants", "driver", "scripts_url", "version", "para
                  "notes_long")
 
 
-def method_info(method: str, *, verbose: bool = False) -> dict:
+@_compat.keywords("method_info", private="_method_info",
+                  kept={"verbose": _compat.use("mtb.params_for")})
+def method_info(method: str) -> dict:
     """Return everything known about one method as a flat dict.
 
     Parameters
     ----------
     method : str
         Method id, e.g. ``"Matilda"``; see ``mtb.find_methods()``.
-    verbose : bool
-        ``True`` adds the maintainer's keys: ``params`` (per variant, as
-        ``mtb.params_for``), ``status``, ``variants``, ``driver``,
-        ``scripts_url``, ``version``, ``fixed_in_script``,
-        ``upstream_knobs``, ``upstream_url``, ``gpu_evidence`` and
-        ``notes_long``.
 
     Returns
     -------
@@ -261,6 +251,12 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
     mtb.find_methods : filter methods by category, modalities, labels, ATAC representation.
     mtb.cite : the paper to cite for a method.
     """
+    return _method_info(method)
+
+
+def _method_info(method: str, verbose: bool = False) -> dict:
+    """:func:`method_info`, with the deprecated ``verbose=True``, which adds the
+    maintainer's keys (``params``, ``status``, ``variants``, ``driver`` ...)."""
     s = registry.get(method)
     method = s.id
     if not s.variants:
@@ -288,9 +284,7 @@ def method_info(method: str, *, verbose: bool = False) -> dict:
                       "labels": [r for r in v.roles() if is_label_role(r)],
                       "reference_batch": _reference_batch(v)}
                      for v in s.variants],
-        "params": {_variant_key(v): {"tunable": _tunable(v),
-                                     "effective": _effective(v)}
-                   for v in s.variants},
+        "params": {_variant_key(v): {"tunable": _tunable(v)} for v in s.variants},
     }
     up = upstream.knobs_for(s.id)
     info["fixed_in_script"] = up["fixed_in_script"]
@@ -335,14 +329,17 @@ def _variant_key(v) -> str:
     return registry._variant_key(v.when)
 
 
+_DATASET_VARIANT = _compat.use("params_for(method, category, modalities)")
+
+
+@_compat.keywords("params_for", private="_params_for",
+                  kept={"dataset": _DATASET_VARIANT, "data_path": _DATASET_VARIANT})
 def params_for(method: str, category: str | None = None,
-               modalities: list[str] | set[str] | None = None, *,
-               dataset: str | None = None,
-               data_path: Path | str | None = None) -> dict:
+               modalities: list[str] | set[str] | None = None) -> dict:
     """Return the hyperparameters of one method variant.
 
-    Call it before ``run(params=...)``, ``run_all(params=...)`` or ``sweep`` to
-    see what a method accepts and what it runs with when you pass nothing.
+    Call it before ``run_all(params=...)`` to see what a method accepts and
+    what it runs with when you pass nothing.
 
     Parameters
     ----------
@@ -354,32 +351,24 @@ def params_for(method: str, category: str | None = None,
     modalities : list[str] | set[str] | None
         Modality tokens of the variant, e.g. ``["rna", "adt"]``; ``None`` =
         infer it from the other arguments.
-    dataset : str | None
-        Dataset folder (a name under ``data_path``, or a path) that settles an
-        ambiguous selection: the variant whose input files it holds.
-    data_path : Path | str | None
-        Folder that holds the dataset folder; ``None`` =
-        ``mtb.config.DEFAULT.data_path``.
 
     Returns
     -------
     dict
-        ``method``, ``variant`` (``'category:mods'``), ``tunable`` (what you
-        can set, ``{name: {"default", "type", "script_default"}}``; ``default``
-        is what a run uses when you pass nothing), ``effective`` (the value of
-        every tunable key in a run), ``fixed_in_script`` (what the script pins, with
-        ``file:line``) and ``upstream_knobs`` (what its library documents but
-        the script does not expose).
+        ``method``, ``variant`` (``'category:mods'``), ``tunable`` (what
+        ``params=`` can set, ``{name: {"type", "default"}}``; ``default`` is
+        what a run uses when you pass nothing), ``fixed_in_script`` (what the
+        script pins, with ``file:line``), ``upstream_knobs`` (what its library
+        documents but the script does not expose) and ``upstream_url``.
 
     Raises
     ------
     KeyError
         Unknown method, a declared stub, or no variant for ``category`` /
         ``modalities``.
-    AmbiguousVariantError
-        Several variants fit; the message spells out the call that selects one.
     ValueError
-        Unknown ``category`` or modality token.
+        Unknown ``category`` or modality token, or several variants fit (the
+        message spells out the call that selects one).
 
     Examples
     --------
@@ -390,10 +379,18 @@ def params_for(method: str, category: str | None = None,
 
     See Also
     --------
-    mtb.method_info : the same ``params`` block for every variant at once.
-    mtb.sweep : run one method over a range of one of these hyperparameters.
-    mtb.AmbiguousVariantError : raised when several variants fit the selection.
+    mtb.run_all : takes these keys as ``params={method: {key: value}}``.
     """
+    return _params_for(method, category, modalities)
+
+
+def _params_for(method: str, category: str | None = None,
+                modalities: list[str] | set[str] | None = None, *,
+                dataset: str | None = None,
+                data_path: Path | str | None = None) -> dict:
+    """:func:`params_for`, with the deprecated ``dataset=`` and ``data_path=``:
+    the variant whose input files the dataset folder holds settles an
+    ambiguous selection."""
     if dataset is not None:
         dataset, data_path = _resolve.split_dataset(dataset, data_path)
     s = registry.get(method)
@@ -498,7 +495,6 @@ def params_for(method: str, category: str | None = None,
     up = upstream.knobs_for(s.id)
     return {"method": s.id, "variant": _variant_key(v),
             "tunable": _tunable(v),
-            "effective": _effective(v),
             "fixed_in_script": up["fixed_in_script"],
             "upstream_knobs": up["upstream_knobs"],
             "upstream_url": up["upstream_url"]}
