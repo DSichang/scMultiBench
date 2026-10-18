@@ -2243,7 +2243,7 @@ def build_parser() -> argparse.ArgumentParser:
                     help="what to do when a label is missing. error (default) stops. "
                          "drop scores the labelled cells only and says how many")
     pe.add_argument("--obsm", help="for .h5ad input: the .obsm key holding the "
-                                   "embedding (default: the only .obsm key; X = .X)")
+                                   "embedding (default: X_emb, else the only key; X = .X)")
     pe.add_argument("--column", metavar="NAME",
                     help="the column to read in each --labels CSV when a file has "
                          "several columns")
