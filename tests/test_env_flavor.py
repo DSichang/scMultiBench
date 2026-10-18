@@ -468,8 +468,9 @@ def test_cli_install_help_explains_auto(capsys):
         assert e.value.code == 0
         out = " ".join(capsys.readouterr().out.split())     # argparse wraps lines
         assert "--flavor {auto,cpu,gpu}" in out
-        assert "'auto' (default) = 'cpu' when no NVIDIA GPU is visible on this host" in out
-        assert "'<env>-cpu' archive" in out and "mtb.env.host_has_gpu" not in out
+        # round 2 (Y34): one short sentence
+        assert "auto (default) = gpu when this computer has an NVIDIA GPU" in out
+        assert "any = one build serves both" in out and "mtb.env.host_has_gpu" not in out
     with pytest.raises(SystemExit):
         cli.main(["env", "install", "--help"])
     out = " ".join(capsys.readouterr().out.split()).replace("CPU- only", "CPU-only")

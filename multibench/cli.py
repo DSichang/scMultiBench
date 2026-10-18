@@ -1833,14 +1833,9 @@ _METHODS_HELP = "comma-separated method ids, as printed by multibench find"
 _LEIDEN_HELP = ("Leiden backend of the clustering: leidenalg, the article's (keep it to "
                 "compare with the stored tables), or igraph, faster (default: shown by "
                 "multibench config)")
-_FLAVOR_HELP = ("which packed archive to take per env: 'cpu' = the '<env>-cpu' archive "
-                "(the same env without the CUDA libraries, 3-4x smaller) where "
-                "published, else the '<env>' archive with a warning, 'gpu' = the "
-                "'<env>' archive, 'auto' (default) = 'cpu' when no NVIDIA GPU is "
-                "visible on this host, 'gpu' otherwise. The env "
-                "name is the same whatever the flavour; env doctor shows which "
-                "flavour is installed. Installing on a login node for jobs on GPU "
-                "nodes: pass gpu")
+_FLAVOR_HELP = ("cpu or gpu build of each env; auto (default) = gpu when this computer "
+                "has an NVIDIA GPU (on a login node for GPU jobs, pass gpu). In the "
+                "plan, any = one build serves both")
 #: ``--allow-atac-mismatch`` of scan and run-all
 _ATAC_MISMATCH_HELP = ("count a method as runnable when its ATAC file holds the other "
                        "representation or peak names the method cannot read. The "
@@ -2039,8 +2034,8 @@ def build_parser() -> argparse.ArgumentParser:
         "layout", help="how to lay out your dataset on disk (mtb.describe_layout)",
         description="Print the directory layout and role -> filename contract the "
                     "package expects, optionally for one category.")
-    play.add_argument("category", nargs="?", help=_CATEGORY_HELP + " Optional: "
-                      "without it, the layout of every category is printed.")
+    play.add_argument("category", nargs="?", help="vertical, diagonal, mosaic or cross. "
+                      "Optional: without it, the layout of every category is printed.")
     play.set_defaults(func=_cmd_layout, _parser=play)
 
     # ---- convert
@@ -2485,9 +2480,8 @@ def build_parser() -> argparse.ArgumentParser:
                     "to stderr. With --build: 'build(dry-run)' or 'NO-LOCK'. "
                     "--flavor picks the CPU-only or the CUDA archive. auto picks by "
                     "whether this computer has an NVIDIA GPU. The environment name is "
-                    "the same either way. They are linux-64 conda environments. On "
-                    "macOS and Windows a warning comes first, and the install "
-                    "refuses.")
+                    "the same either way. They are linux-64 conda environments: on "
+                    "macOS and Windows the install refuses.")
     ei.add_argument("--category", help=_CATEGORY_HELP)
     ei.add_argument("--methods", help=_METHODS_HELP + "; only their envs")
     ei.add_argument("--build", action="store_true",
