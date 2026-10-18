@@ -18,7 +18,8 @@ out (setting it would duplicate the flag or have no effect):
   in :data:`NOT_TUNABLE`.
 
 A switch is recorded as ``type: flag`` with the value the script gets
-without it (``False`` for ``store_true``, ``True`` for ``store_false``).
+without it (``False`` for ``store_true``, ``True`` for ``store_false``); an
+argument with ``choices=`` records them.
 
 A variant whose script is not found under :data:`ROOTS` keeps its entry of the
 current params.yaml, filtered by the first rule.
@@ -137,9 +138,12 @@ def extract(txt: str, skip: set) -> dict:
             continue
         d = re.search(r"default\s*=\s*([^,\)]+)", body)
         t = re.search(r"type\s*=\s*([A-Za-z]+)", body)
+        c = re.search(r"choices\s*=\s*(\[[^\]]*\])", body)
         rec = {"default": lit(d.group(1)) if d else None}
         if t:
             rec["type"] = t.group(1)
+        if c:
+            rec["choices"] = lit(c.group(1))    # argparse refuses any other value
         elif "store_true" in body or "store_false" in body:
             off = "store_true" in body
             if rec["default"] is None:

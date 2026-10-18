@@ -195,28 +195,16 @@ def fetch_outputs(dataset: str, methods=None, *, data_path=None,
     outputs = root / "outputs"
     dest = outputs / dataset
     url = urls[dataset]
-    have_tree = (dest / "batch_result.json").is_file()
-    # the tree records the URL it came from: a new manifest URL fetches it again
-    source = dest / ".source"
-    if not (have_tree and source.is_file() and source.read_text().strip() == url):
-        old = None
-        if have_tree:                        # the first free name: never delete a tree
-            old = outputs / f"{dataset}.old"
-            k = 2
-            while old.exists():
-                old, k = outputs / f"{dataset}.old-{k}", k + 1
-        if dest.is_dir() and not have_tree:
-            if any(dest.iterdir()):
-                raise RuntimeError(
-                    f"{dest} exists without batch_result.json - remove it and "
-                    f"the outputs will be fetched fresh")
-            dest.rmdir()                     # empty leftover
+    # a tree in place is used as it is: never moved, replaced or deleted
+    if not (dest / "batch_result.json").is_file():
+        if dest.is_dir() and any(dest.iterdir()):
+            raise RuntimeError(
+                f"{dest} exists without batch_result.json; fetch_outputs leaves it "
+                f"alone. Move it elsewhere to fetch the outputs.")
         if not quiet:
-            print(f"downloading run_all outputs for {dataset} from {url} ..."
-                  + (f" (the earlier tree moves to {old})" if old else ""), flush=True)
+            print(f"downloading run_all outputs for {dataset} from {url} ...", flush=True)
         tgz = _download_or_explain(
             url, f"the stored outputs of {dataset}",
-            f"pass the tree you have, {dest}, to mtb.load_batch." if old else
             f"download the file by hand and unpack it into {dest}, so that "
             f"{dest / 'batch_result.json'} exists.")
         outputs.mkdir(parents=True, exist_ok=True)
@@ -231,8 +219,8 @@ def fetch_outputs(dataset: str, methods=None, *, data_path=None,
                 raise RuntimeError(
                     f"downloaded archive for {dataset} did not contain batch_result.json")
             (found / ".source").write_text(url + "\n")
-            if old is not None:
-                dest.rename(old)
+            if dest.is_dir():
+                dest.rmdir()                 # empty: nothing of the user's is lost
             found.rename(dest)
         finally:
             _shutil.rmtree(tmp, ignore_errors=True)

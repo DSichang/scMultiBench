@@ -1211,6 +1211,24 @@ def _strip_to_match(longer: list, shorter: list) -> str | None:
     return None
 
 
+def suffix_fix(what: str, cells: list, given: list) -> str:
+    """`` They match after removing '-1' from the batch ids: pass ...`` when a 10x
+    suffix (or prefix) on one side only is all that keeps the ids ``given`` from
+    the ``cells``, else ``""``. evaluate, export_dataset and run_all name it."""
+    cells, given = [str(i) for i in cells], [str(i) for i in given]
+    if not cells or not given:
+        return ""
+    cut = _strip_to_match(cells, given)
+    if cut and cells[0].endswith(cut):
+        return (f" They match after adding {cut!r} to the {what} ids: pass "
+                f"{what}.set_axis({what}.index + {cut!r}).")
+    cut = _strip_to_match(given, cells)
+    if cut and given[0].endswith(cut):
+        return (f" They match after removing {cut!r} from the {what} ids: pass "
+                f"{what}.set_axis({what}.index.str.removesuffix({cut!r})).")
+    return ""
+
+
 def _align_cells(a, *, master, master_name, role, category=None):
     """``a`` in the master cell order. Other barcodes raise, and so do repeated
     ones (:func:`_check_unique_barcodes`)."""
@@ -1292,17 +1310,16 @@ def _as_obs_vector(data, spec, *, what, master):
             pos = {k: i for i, k in enumerate(idx)}
             return np.asarray(spec)[[pos[x] for x in m]]
         if isinstance(spec.index, pd.RangeIndex) and len(spec) == len(m):
-            if what == "batch":
-                # a filtered or sorted column would go to other cells
-                from ..eval import io as eio
-                _compat.warn(eio._by_position(what),
-                             UserWarning)
+            # a filtered or sorted column would go to other cells
+            from ..eval import io as eio
+            _compat.warn(eio._by_position(what), UserWarning)
             return np.asarray(spec)
         lack = [x for x in m if x not in set(idx)]
+        fix = suffix_fix(what, m, idx) if len(lack) == len(m) else ""
         raise ValueError(
             f"{what}= Series index does not match the cell barcodes: {len(lack)} of "
-            f"{len(m)} cells have no entry ({lack[:5]}{'...' if len(lack) > 5 else ''}); "
-            f"index it by obs_names (or pass a plain list in cell order)")
+            f"{len(m)} cells have no entry ({lack[:5]}{'...' if len(lack) > 5 else ''})."
+            + (fix or " Index it by obs_names, or pass a plain list in cell order."))
     vals = np.asarray(spec)
     if vals.ndim != 1:
         raise ValueError(f"{what}= must be 1-D, got shape {vals.shape}")

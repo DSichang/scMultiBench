@@ -683,17 +683,10 @@ def _align_vector(x, ids, *, what: str, column: str | None, cells: str | None):
                 f"do not match the embedding's (embedding e.g. {ids[0]}, {what} e.g. "
                 f"{x.index[0]}).")
         # a 10x suffix such as -1 on one side only: the one fix
-        from ..engine.ingest import _strip_to_match
-        emb, own = [str(i) for i in ids], [str(i) for i in x.index]
-        cut = _strip_to_match(emb, own)
-        if cut and emb[0].endswith(cut):
-            raise ValueError(f"{head} They match after adding {cut!r} to the {what} ids: "
-                             f"pass {what}.set_axis({what}.index + {cut!r}).")
-        cut = _strip_to_match(own, emb)
-        if cut and own[0].endswith(cut):
-            raise ValueError(f"{head} They match after removing {cut!r} from the {what} "
-                             f"ids: pass {what}.set_axis({what}.index.str.removesuffix("
-                             f"{cut!r})).")
+        from ..engine.ingest import suffix_fix
+        fix = suffix_fix(what, list(ids), list(x.index))
+        if fix:
+            raise ValueError(head + fix)
         raise ValueError(f"{head} Pass {what} indexed like the embedding, or "
                          f"{what}.to_numpy() to match by position.")
     if len(missing) or len(extra):

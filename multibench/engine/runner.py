@@ -676,6 +676,10 @@ def check_param_types(method: str, variant, params: dict | None) -> None:
         if kind in _TYPE_WORDS and value is not None and not _fits(value, kind):
             raise TypeError(f"{method}: {key} takes {_TYPE_WORDS[kind]}, got {value!r}. "
                             f"Its default is {variant.params.get(key, decl.get('default'))!r}.")
+        choices = decl.get("choices")
+        if choices and value is not None and str(value) not in map(str, choices):
+            raise ValueError(f"{method}: {key} takes {config._and_list(map(str, choices), 'or')}, "
+                             f"got {value!r}.")
 
 
 def cpu_params_for(spec, params: dict | None, *,

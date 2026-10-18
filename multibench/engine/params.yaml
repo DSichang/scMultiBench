@@ -21,6 +21,14 @@ Cobolt:
 MIRA:
   vertical:rna+atac:
     acc:
+      choices:
+      - cpu
+      - gpu
+      - tpu
+      - ipu
+      - hpu
+      - mps
+      - auto
       default: gpu
       type: str
     filter_atac_cells:

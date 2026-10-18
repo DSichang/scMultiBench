@@ -476,6 +476,8 @@ def _no_comparison_message(methods, constant: dict, aggregate: str = "dataset",
     if not constant:
         return None
     which = "That column is" if len(constant) == 1 else "Those columns are"
+    fix = (" Leave " + ("it" if len(constant) == 1 else "them") + " out with "
+           + _config.hint("metrics=", "--metrics") + ".")
     if aggregate == "summary":
         # columns that share a mean rank are named together
         groups = {}
@@ -483,14 +485,14 @@ def _no_comparison_message(methods, constant: dict, aggregate: str = "dataset",
             groups.setdefault(f"{round(v, 2):g}", []).append(str(c))
         same = " ".join(f"Every method has mean rank {v} in {_and_list(cs)}."
                         for v, cs in groups.items())
-        return f"{same} {which} grey."
+        return f"{same} {which} grey.{fix}"
     sentences = []
     for cols, who in (([c for c in constant if c not in partial], "every method"),
                       ([c for c in constant if c in partial], "every method with a value")):
         if cols:
             sentences.append(_and_list([f"{c} is {constant[c]:.3f}" for c in cols])
                              + f" for {who}.")
-    return f"{' '.join(sentences)} {which} grey."
+    return f"{' '.join(sentences)} {which} grey.{fix}"
 
 
 def _na_report(blocks, parts, aggregate: str) -> list:
@@ -645,10 +647,11 @@ def _duplicate_rows_message(dup, keys) -> str:
 
 
 def _method_language(name):
-    """``"python"`` or ``"r"``; None for a name the registry does not know."""
+    """``"python"`` or ``"r"`` (``"StabMap (this run)"`` is StabMap's); None for a
+    name the registry does not know."""
     from ..engine import registry
     try:
-        return registry.get(name).language.lower()
+        return registry.get(str(name).removesuffix(THIS_RUN)).language.lower()
     except KeyError:
         return None
 
@@ -893,7 +896,7 @@ def _draw(tbl, cmap, title, show_language, gaps):
     if show_language:
         # what the chips left of the rows mean
         unknown = any(not _method_language(m) for m in methods)
-        ax.text(-0.9, y_bottom - 0.05, LANGUAGE_NOTE + ("; ?: your rows"
+        ax.text(-0.9, y_bottom - 0.05, LANGUAGE_NOTE + ("; ?: not a package method"
                                                         if unknown else ""),
                 fontsize=6.4, va="center", gid="legend")
         y_bottom -= 0.6

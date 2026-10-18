@@ -287,22 +287,15 @@ def missing_dataset_message(base, dataset: str) -> str:
                           "holds it. multibench layout shows the layout."))
 
 
-#: (data path, name) pairs already told that ./name is shadowed, once a session
-_SHADOW_NOTED: set = set()
-
-
 def _note_local_folder(base: Path, name: str) -> None:
-    """One warning when a bare dataset name resolves under ``base`` while the
-    working directory holds a folder of the same name."""
+    """A warning, at every call site (the default filter shows each line once),
+    when a bare dataset name resolves under ``base`` while the working
+    directory holds a folder of the same name."""
     here = Path(name)
     if len(here.parts) != 1 or not here.is_dir():
         return
     if os.path.abspath(here) == os.path.abspath(base / name):
         return
-    key = (os.path.abspath(base), name)
-    if key in _SHADOW_NOTED:
-        return
-    _SHADOW_NOTED.add(key)
     path = f"./{name}"
     _compat.warn(f"Using {base / name}; {path} also exists: pass "
                  + config.hint(f"{path!r}", path) + " for it.", UserWarning)

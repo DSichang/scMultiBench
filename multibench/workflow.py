@@ -1974,17 +1974,18 @@ def _check_save_target(folder: Path, dataset: str, category: str) -> None:
             f"category={category!r}. Save it to another folder.")
 
 
-def _plan_caveats(dataset, category, data_path, methods) -> dict:
+def _plan_caveats(dataset, category, data_path, methods) -> dict | None:
     """``{(method, modalities): caveat}`` of ``run_all``'s plan for these methods;
-    ``{}`` when the plan cannot be made (no dataset folder)."""
+    ``None`` when the plan cannot be made (no dataset folder), so the saved
+    caveats stay."""
     methods = [m for m in dict.fromkeys(methods) if m]
     if not methods:
         return {}
     try:
         plan, _ = _scan(dataset, category, methods=methods, modalities="all",
                         data_path=data_path, verbose=False)
-    except Exception:  # noqa: BLE001 - no plan, no caveat
-        return {}
+    except Exception:  # noqa: BLE001 - no plan: the record keeps its caveat
+        return None
     return {(r["method"], tuple(_row_modalities(r["modalities"]))): _run_caveat(r["caveat"])
             for _, r in plan.iterrows()}
 
@@ -2436,8 +2437,9 @@ class BatchResult:
             if ok and root is not None:
                 rec["data_root"] = root
             # the plan's caveat as this version words it
-            rec["caveat"] = caveats.get(root, {}).get(
-                (method, tuple(rec.get("modalities") or ())), "")
+            plan = caveats.get(root)
+            if plan is not None:
+                rec["caveat"] = plan.get((method, tuple(rec.get("modalities") or ())), "")
             try:
                 mods = rec.get("modalities") or []
                 variant = registry.get(method).select(self.category, set(mods))
@@ -3150,6 +3152,10 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
                          f"{dataset}. Give each cell one id, or {by_position}.")
     foreign = index.difference(pd.Index(ids), sort=False)
     if len(foreign):
+        from .engine.ingest import suffix_fix
+        fix = suffix_fix(what, ids, list(index)) if len(foreign) == len(index) else ""
+        if fix:
+            raise ValueError(f"{what}: its ids are not cells of {dataset}.{fix}")
         if pd.api.types.is_integer_dtype(x.index):
             raise ValueError(f"{what}: the index holds row numbers (first: "
                              f"{list(x.index[:3])}), not cell barcodes. Set the "

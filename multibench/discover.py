@@ -545,9 +545,9 @@ def cite(*methods, format: str = "text") -> str:
 
     Parameters
     ----------
-    *methods : str | list[str]
-        Method ids, one per argument or as one list; ``"all"`` = every
-        method; none = the benchmark only.
+    *methods : str | list[str] | BatchResult
+        Method ids, one per argument or as one list; a ``BatchResult`` = the
+        methods that ran; ``"all"`` = every method; none = the benchmark only.
     format : str
         ``"text"`` (one line per entry) or ``"bibtex"`` (one ``@article`` per
         entry).
@@ -572,9 +572,7 @@ def cite(*methods, format: str = "text") -> str:
     >>> import multibench as mtb
     >>> print(mtb.cite())                                  # the benchmark only
     >>> print(mtb.cite("Matilda", "MOFA2"))
-    >>> res = mtb.load_batch("out/")
-    >>> ran = res.summary.query("status not in ['SKIPPED', 'FAIL', 'TIMEOUT']")
-    >>> print(mtb.cite(ran.method, format="bibtex"))      # methods that finished
+    >>> print(mtb.cite(mtb.load_batch("out/"), format="bibtex"))   # the methods that ran
 
     Notes
     -----
@@ -603,6 +601,11 @@ def cite(*methods, format: str = "text") -> str:
     args = list(methods)
     if format not in _CITE_FORMATS:
         raise ValueError(f"unknown format {format!r}; valid: {list(_CITE_FORMATS)}")
+    if len(args) == 1 and hasattr(args[0], "records") and hasattr(args[0], "summary"):
+        # a BatchResult: the methods that ran, in its order
+        args = [[r["method"] for r in args[0].records
+                 if r.get("status") != "SKIPPED"
+                 and not str(r.get("status", "")).startswith(("FAIL", "TIMEOUT"))]]
     if not args:
         ids: list[str] = []
     elif len(args) == 1 and not isinstance(args[0], str):
