@@ -163,3 +163,28 @@ def test_a_family_two_rows_have_counts_in_no_overall():
     assert "Classification" in [b.label for b in t.blocks]
     assert not [x for x in w if "Classification" in str(x.message)
                 or "has no OCA" in str(x.message)]
+
+
+# Y03: the cmd-template placeholder is replaced token by token
+def test_cmd_template_bare_quoted_and_mid_string():
+    from multibench.engine.runner import wrap_command
+    cmd = ["python", "x.py", "--a", "1"]
+    assert wrap_command(cmd, "srun {cmd}") == ["srun", *cmd]
+    assert wrap_command(cmd, "sbatch --wrap '{cmd}'") == ["sbatch", "--wrap",
+                                                         "python x.py --a 1"]
+    assert wrap_command(cmd, "bash -c '{cmd} > log'") == ["bash", "-c",
+                                                         "python x.py --a 1 > log"]
+
+
+def test_cmd_template_needs_one_placeholder(tmp_path):
+    for bad in ("srun", "{env_cmd} {env_cmd}"):
+        with pytest.raises(ValueError, match=r"must hold \{env_cmd\} \(or \{cmd\}\) once"):
+            mtb.run("Matilda", "vertical", inputs=MATILDA, out_dir=str(tmp_path),
+                    dry_run=True, cmd_template=bad)
+
+
+def test_cmd_template_env_cmd_in_quotes(tmp_path):
+    argv = mtb.run("Matilda", "vertical", inputs=MATILDA, out_dir=str(tmp_path),
+                   dry_run=True, cmd_template="sbatch --wrap '{env_cmd}'")
+    assert argv[:2] == ["sbatch", "--wrap"] and len(argv) == 3
+    assert argv[2].startswith("conda run -n ") or " run_matilda.py " in argv[2]

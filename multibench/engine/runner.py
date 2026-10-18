@@ -96,11 +96,27 @@ class RunResult:
 
 
 def wrap_command(cmd: list[str], cmd_template: str | None) -> list[str]:
-    """Wrap argv with a cmd_template like 'conda run -n env {cmd}'."""
+    """Wrap argv with a cmd_template like 'conda run -n env {cmd}', token by
+    token: a ``{cmd}`` token becomes the argv, a token that holds it (a quoted
+    ``'{cmd} > log'``) holds the quoted command line."""
     if not cmd_template or cmd_template.strip() == "{cmd}":
         return cmd
-    prefix = cmd_template.replace("{cmd}", "").strip()
-    return shlex.split(prefix) + cmd
+    # two words in place of {cmd}: still two when it stood unquoted, one when quoted
+    a, b = "MBCMDXA", "MBCMDXB"
+    toks = shlex.split(cmd_template.replace("{cmd}", f"{a} {b}"))
+    out: list[str] = []
+    i = 0
+    while i < len(toks):
+        if toks[i] == a and toks[i + 1:i + 2] == [b]:
+            out += cmd
+            i += 2
+            continue
+        out.append(toks[i].replace(f"{a} {b}", shlex.join(cmd)))
+        i += 1
+    if any(a in t or b in t for t in out):
+        raise ValueError(f"cmd_template {cmd_template!r}: put the placeholder in a word "
+                         f"of its own or in quotes.")
+    return out
 
 
 #: The ``cmd_template`` placeholder for the command inside the method env.
@@ -108,11 +124,15 @@ ENV_CMD = "{env_cmd}"
 
 
 def _check_template(cmd_template: str | None) -> None:
-    """``ValueError`` for a template that uses both placeholders."""
+    """``ValueError`` for a template that does not hold exactly one placeholder."""
     if cmd_template and ENV_CMD in cmd_template and "{cmd}" in cmd_template:
         raise ValueError(
             f"cmd_template {cmd_template!r} uses both {{cmd}} and {ENV_CMD}; use "
             f"{ENV_CMD} to run inside the method env, or {{cmd}} for the bare command")
+    if cmd_template and cmd_template.count(ENV_CMD) + cmd_template.count("{cmd}") != 1:
+        raise ValueError(
+            f"cmd_template {cmd_template!r} must hold {ENV_CMD} (or {{cmd}}) once, "
+            f"e.g. \"sbatch --wrap '{ENV_CMD}'\".")
 
 
 #: The environment variable that forces a run mode (``conda`` | ``prefix``).

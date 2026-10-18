@@ -2181,7 +2181,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--cmd-template", dest="cmd_template", metavar="TEMPLATE",
         help="template for launching the command: {cmd} = the bare command (no env "
              "activation), {env_cmd} = the command inside the method env, e.g. "
-             "\"srun --gres=gpu:1 {env_cmd}\"")
+             "\"srun --gres=gpu:1 {env_cmd}\" or \"sbatch --wrap '{env_cmd}'\"")
     pr.add_argument("--runner", dest="cmd_template", metavar="TEMPLATE", action=_Retired,
                     tail=_compat.use("--cmd-template"))
     pr.add_argument("--param", "-p", action="append", metavar="KEY=VALUE",
