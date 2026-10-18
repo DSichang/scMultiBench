@@ -435,3 +435,15 @@ def test_label_column_case_did_you_mean(tmp_path):
         mtb.io.export_dataset(a, tmp_path / "A", labels="obs:Celltype")
     with pytest.raises(ValueError, match=r"Did you mean 'celltype'\?$"):
         mtb.io.export_dataset(a, tmp_path / "B", labels="Celltype")
+
+
+# Y20: off Linux, env install says it once; its dry run ends with what to do
+def test_env_install_off_linux_says_it_once(monkeypatch, capsys):
+    from multibench import cli
+    monkeypatch.setattr(envs, "host_platform_problem", lambda: "macOS")
+    monkeypatch.setattr(envs, "installed_envs", lambda conda=None: [])
+    assert cli.main(["env", "install", "--methods", "Matilda"]) == 1
+    err = capsys.readouterr().err
+    assert "warning:" not in err and err.count("run only on Linux") == 1
+    cli.main(["env", "install", "--methods", "Matilda", "--dry-run"])
+    assert "# dry run - run it without --dry-run on a Linux machine" in capsys.readouterr().err

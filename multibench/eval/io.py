@@ -758,7 +758,7 @@ def _anndata_matrix(adata, obsm: str | None) -> np.ndarray:
     except KeyError:
         kind = type(adata).__name__            # AnnData, or MuData for a MuData
         keys = sorted(adata.obsm.keys())
-        if not given and keys:
+        if not given and len(keys) > 1 and kind == "AnnData":
             raise ValueError(
                 f"The {kind} has {len(keys)} obsm keys ({', '.join(map(str, keys))}): "
                 f"pass obsm=, or obsm='X' for .X.") from None

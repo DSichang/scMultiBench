@@ -1587,7 +1587,8 @@ def _flavor_token(flavor, env: str | None = None) -> str:
 def _cmd_env(args) -> int:
     """``multibench env ...``: environment recipes, preflight and installation."""
     cmd = args.env_cmd
-    refusing = cmd == "install" and args.run and not args.force
+    # an install off Linux stops with the error alone
+    refusing = cmd == "install" and not args.dry_run and not args.force
     if cmd in ("status", "plan", "doctor", "install") and not refusing:
         _platform_note()
     if cmd == "status":
@@ -1685,7 +1686,9 @@ def _cmd_env(args) -> int:
                   "(multibench env doctor shows where)", file=sys.stderr)
         if args.dry_run and any(not r["exists"] and r["state"] != "name taken"
                                 for r in rows):
-            print("# dry run - leave out --dry-run to create the missing envs"
+            print("# dry run - run it without --dry-run on a Linux machine"
+                  if envs.host_platform_problem() else
+                  "# dry run - leave out --dry-run to create the missing envs"
                   + (" (packed archives first, lockfile build otherwise)"
                      if packed else " from their lockfiles"), file=sys.stderr)
             if packed:
