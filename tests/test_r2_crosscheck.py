@@ -276,4 +276,4 @@ def test_hidden_rows_one_sentence(capsys):
     mtb.run_all("D11", "vertical", out_dir="/o", dry_run=True)
     assert said in capsys.readouterr().out
     cli.main(["scan", "D11", "--category", "vertical"])
-    assert said in capsys.readouterr().out
+    assert said in capsys.readouterr().err
