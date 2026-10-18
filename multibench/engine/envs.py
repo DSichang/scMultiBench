@@ -4,10 +4,9 @@ Methods whose dependencies conflict run in separate envs; methods that fit
 together share one. ``mtb.method_info(m)['env']`` names a method's env.
 
 - ``mtb.env.doctor(methods)`` checks the envs a selection of methods needs.
-- ``mtb.env.install(methods)`` previews them, with download sizes;
-  ``dry_run=False`` installs them: a prebuilt archive when one exists, else
-  a build from the pinned package list.
-- ``mtb.env.recipe(method)`` returns the hand-written recipe of one env.
+- ``mtb.env.install(methods)`` installs them: a prebuilt archive when one
+  exists, else a build from the pinned package list; ``dry_run=True``
+  previews them, with download sizes.
 
 The envs are Linux-only.
 """
@@ -28,17 +27,20 @@ import yaml
 from .. import _compat, config
 from . import registry
 
-__all__ = ["install", "doctor", "recipe"]
-
-#: helpers the API reference documents and the help texts name, outside __all__
-_DOCUMENTED = ("env_prefix", "host_has_gpu")
+__all__ = ["install", "doctor"]
 
 
 def __dir__() -> list[str]:
-    """``dir(mtb.env)`` lists :data:`__all__`, the two documented helpers
-    (``env_prefix``, ``host_has_gpu``) and the dunders (PEP 562)."""
-    return sorted(n for n in globals()
-                  if n in __all__ or n in _DOCUMENTED or n.startswith("__"))
+    """``dir(mtb.env)`` lists :data:`__all__` and the dunders (PEP 562); the
+    other names (``recipe``, ``env_prefix``, ``host_has_gpu`` ...) stay
+    importable."""
+    return sorted(n for n in globals() if n in __all__ or n.startswith("__"))
+
+
+class _LinuxOnlyError(OSError, RuntimeError):
+    """The refusal of a method run or an env install off Linux. Both an
+    ``OSError`` (what ``mtb.run`` raised) and a ``RuntimeError`` (what
+    ``mtb.env.install`` raised), so either ``except`` clause catches it."""
 
 
 # --- host platform --------------------------------------------------------
@@ -83,13 +85,12 @@ def linux_only_text(problem: str) -> str:
 
 
 def _require_linux(force: bool) -> None:
-    """Raise ``RuntimeError`` before any download or build on a non-Linux
-    host, unless ``force``."""
+    """Raise :class:`_LinuxOnlyError` before any download or build on a
+    non-Linux host, unless ``force``."""
     problem = None if force else host_platform_problem()
     if problem:
-        raise RuntimeError(
-            f"{linux_only_text(problem)} Run the install on a Linux machine. "
-            f"{config.hint('force=True', '--force')} tries anyway.")
+        raise _LinuxOnlyError(
+            f"{linux_only_text(problem)} Run the install on a Linux machine.")
 
 
 #: The first sentence of the install error without conda (the docs quote it).
@@ -119,7 +120,7 @@ VERIFIED_STAR = ("* = verified_working: the env ran the method end-to-end on "
 
 #: The marks of the ``env status`` and ``env doctor`` listings.
 MARK_LEGEND = ("[x]=installed  [L]=missing, lockfile ready (run multibench env "
-               "install --run)  [!]=missing, no lockfile")
+               "install)  [!]=missing, no lockfile")
 
 
 def env_mark(exists: bool, has_lock: bool) -> str:
@@ -302,16 +303,19 @@ def _cpu_fallback_warning(env: str, manifest: dict, sizes: dict) -> str:
             f"archive {archive_key(env, 'cpu')} is not published yet")
 
 
-def auto_flavor_note(flavor: str, *, planning: bool = False) -> str | None:
+def auto_flavor_note(flavor: str, *, planning: bool = False,
+                     dry_run: bool = False) -> str | None:
     """The stderr note for ``flavor='auto'`` on a host without a GPU, else
     ``None``: pass ``'gpu'`` when the jobs run on GPU nodes. ``planning``
-    returns the advice alone (``env plan`` already names the CPU builds)."""
+    returns the advice alone (``env plan`` already names the CPU builds);
+    ``dry_run`` says what would be installed."""
     if flavor != "auto" or resolve_flavor(flavor) != "cpu":
         return None
     gpu = config.hint("flavor='gpu'", "--flavor gpu")
     if planning:
         return f"# for jobs on GPU nodes, pass {gpu}"
-    return (f"# installing CPU builds (no NVIDIA GPU on this host); if the jobs run on GPU "
+    verb = "would install" if dry_run else "installing"
+    return (f"# {verb} CPU builds (no NVIDIA GPU on this host); if the jobs run on GPU "
             f"nodes, pass {gpu}")
 
 
@@ -1299,14 +1303,31 @@ def packed_manifest() -> dict:
     return _json.loads(_PACKED_MANIFEST.read_text())
 
 
-def install(methods: list[str] | None = None, *, category: str | None = None,
-            packed: bool = True, dry_run: bool = True, conda: str | None = None,
-            force: bool = False, flavor: str = "auto") -> list[dict]:
-    """Install the conda envs a set of methods needs (a dry run by default).
+#: the first columns of install's and doctor's frames
+_INSTALL_FIRST = ("env", "methods", "state")
+_DOCTOR_FIRST = ("env", "methods", "exists")
 
-    The Python form of ``multibench env install``. The default returns the
-    plan; ``dry_run=False`` unpacks packed archives or builds from lockfiles,
-    on Linux.
+
+def _frame(rows: list[dict], first: tuple):
+    """``rows`` as a DataFrame, ``first`` columns first."""
+    import pandas as pd
+    df = pd.DataFrame(rows)
+    if df.empty:
+        return pd.DataFrame(columns=list(first))
+    return df[[c for c in first if c in df.columns]
+              + [c for c in df.columns if c not in first]]
+
+
+@_compat.keywords("env.install", private="_install",
+                  kept={"packed": _compat.use("build=")}, hidden=("force",))
+def install(methods: list[str] | None = None, *, category: str | None = None,
+            build: bool = False, dry_run: bool = False, conda: str | None = None,
+            flavor: str = "auto"):
+    """Install the conda envs a set of methods needs.
+
+    The Python form of ``multibench env install``. It unpacks the published
+    archives, or builds from lockfiles, on Linux; ``dry_run=True`` returns
+    the plan and installs nothing.
 
     Parameters
     ----------
@@ -1316,31 +1337,30 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
     category : str | None
         Integration category (``vertical``, ``diagonal``, ``mosaic`` or
         ``cross``) whose methods to cover when ``methods`` is ``None``.
-    packed : bool
-        Use a prebuilt conda-pack archive where one is published, else the
-        lockfile; ``False`` = lockfile builds only.
+    build : bool
+        ``True`` = build every env from its lockfile instead of unpacking
+        the published archive.
     dry_run : bool
-        ``True`` = return the plan and install nothing; ``False`` = install the
-        missing envs.
+        ``True`` = return the plan and install nothing.
     conda : str | None
         conda/mamba executable; ``None`` = conda if found, else mamba. The
-        packed path needs none.
-    force : bool
-        ``True`` = attempt a real install on a non-Linux host, which is
-        refused otherwise.
+        archives need none.
     flavor : str
-        Packed-archive build per env: ``'cpu'``, ``'gpu'``
-        or ``'auto'`` (``'cpu'`` unless an NVIDIA GPU is visible); unused
-        when ``packed=False``.
+        Archive build per env: ``'cpu'``, ``'gpu'`` or ``'auto'`` (``'cpu'``
+        unless an NVIDIA GPU is visible); unused with ``build=True``.
 
     Returns
     -------
-    list[dict]
+    pandas.DataFrame
         One row per env, the env serving the most methods first: ``env``,
-        ``methods``, ``exists``, ``state`` (``'have'``, ``'packed archive
-        published'``, ``'name taken'`` ... on a dry run; ``'PACKED'``,
-        ``'BUILD'`` after an install), ``archive_bytes`` / ``unpacked_bytes``
-        (the download and its size on disk), ``packed_url`` and ``flavor``.
+        ``methods``, ``state`` (``'have'``, ``'packed archive published'``,
+        ``'name taken'`` ... on a dry run; ``'PACKED'``, ``'BUILD'`` after an
+        install), ``exists``, ``archive_bytes`` / ``unpacked_bytes`` (the
+        download and its size on disk), ``packed_url``, ``flavor``
+        (``'any'`` for an env with one archive for CPU and GPU hosts),
+        ``cmds`` (the lockfile build it runs; empty when the archive is
+        unpacked) and ``fallback_cmds`` (the lockfile build of an env with an
+        archive).
 
     Raises
     ------
@@ -1353,8 +1373,8 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
     TypeError
         ``methods`` given as a bare string.
     RuntimeError
-        ``dry_run=False`` only: a non-Linux host, no conda where needed, or a
-        failed build.
+        A real install on a host that is not Linux, no conda where needed,
+        or a failed build.
 
     Warns
     -----
@@ -1365,13 +1385,33 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
     Examples
     --------
     >>> import multibench as mtb
-    >>> mtb.env.install(["Matilda"])  # dry run: the plan, sizes, URLs
-    >>> mtb.env.install(["Matilda"], dry_run=False)  # packed archive, flavor='auto'
+    >>> mtb.env.install(["Matilda"], dry_run=True)  # the plan, sizes, URLs
+    >>> mtb.env.install(["Matilda"])                # the archive, flavor='auto'
 
     See Also
     --------
     mtb.env.doctor : which of those envs exist here.
     """
+    return _install(methods, category=category, build=build, dry_run=dry_run,
+                    conda=conda, flavor=flavor)
+
+
+def _install(methods=None, *, category=None, build: bool = False, packed=None,
+             dry_run: bool = False, conda=None, force: bool = False,
+             flavor: str = "auto"):
+    """:func:`install`, with the deprecated ``packed=`` (``False`` = ``build=True``)
+    and the hidden ``force=`` (try a real install off Linux)."""
+    if packed is not None:
+        build = not packed
+    return _frame(_install_rows(methods, category=category, packed=not build,
+                                dry_run=dry_run, conda=conda, force=force,
+                                flavor=flavor), _INSTALL_FIRST)
+
+
+def _install_rows(methods: list[str] | None = None, *, category: str | None = None,
+                  packed: bool = True, dry_run: bool = False, conda: str | None = None,
+                  force: bool = False, flavor: str = "auto") -> list[dict]:
+    """The rows of :func:`install`, as dicts."""
     check_flavor(flavor)
     if isinstance(methods, str) and methods in config._CATEGORY_FOLDERS:
         raise TypeError(f"methods must be a list of ids, got the category {methods!r} - "
@@ -1382,7 +1422,7 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
     unpacked: set[str] = set()
     if not dry_run:
         _require_linux(force)             # before conda is even asked anything
-        missing = [r for r in doctor(category=category, methods=methods, conda=conda)
+        missing = [r for r in _doctor_rows(category=category, methods=methods, conda=conda)
                    if not r["exists"]]
         for r in missing:          # before any download or build
             if r.get("other_env"):
@@ -1396,7 +1436,7 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
                 if r["env"] in packed_manifest():
                     raise RuntimeError(
                         f"{NO_CONDA} Environment {r['env']} has a packed archive. "
-                        + config.hint("Pass packed=True to install it.",
+                        + config.hint("Leave out build=True to install it.",
                                       "Leave out --build to install it."))
                 raise RuntimeError(
                     f"{NO_CONDA} Environment {r['env']} has no packed archive. Install "
@@ -1439,20 +1479,27 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
             key, would_install = env, None
         installed = installed_flavor(env, conda) if (r["exists"] or env in unpacked) else None
         size = sizes.get(key) or {}
+        flav = installed if (r["exists"] or env in unpacked) else would_install
+        if flav == "gpu" and packed and _single_build(env, manifest=manifest):
+            flav = "any"            # one archive for CPU and GPU hosts
+        # what runs: the archive is unpacked, so the lockfile build is the fallback
+        archived = packed and env in manifest and state not in ("BUILD", "NO-LOCK")
+        cmds, fallback = ([], r.get("cmds", [])) if archived else (r.get("cmds", []), [])
         out.append({**r, "state": state, "packed_url": _first_url(manifest.get(key)),
                     "archive_bytes": size.get("archive_bytes"),
                     "unpacked_bytes": size.get("unpacked_bytes"),
-                    "flavor": installed if (r["exists"] or env in unpacked) else would_install})
+                    "flavor": flav, "cmds": cmds, "fallback_cmds": fallback})
     if dry_run and packed and any(not r["exists"] and r["flavor"] == "cpu"
                                   and r["state"] != "name taken" for r in out):
-        note = auto_flavor_note(flavor)
+        note = auto_flavor_note(flavor, dry_run=True)
         if note:
             print(note, file=sys.stderr, flush=True)
     return out
 
 
+@_compat.keywords("env.doctor", private="_doctor", kept={"as_frame": _compat.NO_EFFECT})
 def doctor(category: str | list[str] | None = None, methods: list[str] | None = None,
-           conda: str | None = None, *, as_frame: bool = False):
+           conda: str | None = None):
     """Report, per needed env, whether it is installed and has a lockfile.
 
     Run it before ``mtb.run`` on a new machine; ``mtb.env.install`` installs
@@ -1469,12 +1516,10 @@ def doctor(category: str | list[str] | None = None, methods: list[str] | None = 
     conda : str | None
         conda/mamba executable that lists the installed envs; ``None`` =
         conda if found, else mamba.
-    as_frame : bool
-        ``True`` returns a ``pandas.DataFrame`` with the same keys as columns.
 
     Returns
     -------
-    list[dict] or pandas.DataFrame
+    pandas.DataFrame
         One row per env, the env serving the most methods first: ``env``,
         ``methods``, ``exists``, ``has_lock`` (a lockfile can build it),
         ``flavor`` (``'cpu'`` / ``'gpu'`` / ``'single'`` archive, when installed)
@@ -1494,14 +1539,26 @@ def doctor(category: str | list[str] | None = None, methods: list[str] | None = 
     Examples
     --------
     >>> import multibench as mtb
-    >>> mtb.env.doctor("vertical", as_frame=True)
-    >>> rows = mtb.env.doctor(methods=["Matilda", "totalVI"])
+    >>> mtb.env.doctor("vertical")
+    >>> mtb.env.doctor(methods=["Matilda", "totalVI"])
 
     See Also
     --------
     mtb.env.install : builds or unpacks the envs reported missing.
     mtb.scan : uses the same installed-env check per method.
     """
+    return _frame(_doctor_rows(category, methods, conda), _DOCTOR_FIRST)
+
+
+def _doctor(category=None, methods=None, conda=None, *, as_frame: bool = True):
+    """:func:`doctor`, with the deprecated ``as_frame=`` (no effect: a frame)."""
+    return doctor(category, methods, conda)
+
+
+def _doctor_rows(category: str | list[str] | None = None,
+                 methods: list[str] | None = None,
+                 conda: str | None = None) -> list[dict]:
+    """The rows of :func:`doctor`, as dicts."""
     category, methods = _category_or_methods(category, methods, "doctor")
     methods = _check_methods(methods)
     have = set(installed_envs(conda))
@@ -1510,13 +1567,12 @@ def doctor(category: str | list[str] | None = None, methods: list[str] | None = 
     by_env: dict[str, list[str]] = {}
     for m in methods:
         by_env.setdefault(group_for(m), []).append(m)
-    rows = [{"env": env, "methods": sorted(ms), "exists": env in have,
+    return [{"env": env, "methods": sorted(ms), "exists": env in have,
              "has_lock": lockfile(env) is not None,
              "flavor": installed_flavor(env, conda) if env in have else None,
              "other_env": (None if env in have
                            else _str_or_none(other_env_prefix(env, conda)))}
             for env, ms in sorted(by_env.items(), key=lambda kv: (-len(kv[1]), kv[0]))]
-    return _as_frame(rows, as_frame)
 
 
 def _str_or_none(path) -> str | None:
@@ -1771,5 +1827,6 @@ def plan(category=None, methods=None, **kwargs):
         args.append(repr(list(methods)))
     if category is not None:
         args.append(f"category={category!r}")
+    args.append("dry_run=True")
     _compat.deprecated("env.plan", _compat.use(f"env.install({', '.join(args)})"))
     return _plan(category, methods, **kwargs)

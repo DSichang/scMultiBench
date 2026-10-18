@@ -21,6 +21,14 @@ import warnings
 _PACKAGE = os.path.dirname(os.path.abspath(__file__)) + os.sep
 
 
+class Text(str):
+    """A ``str`` whose notebook / REPL echo is the text itself, line breaks and
+    all (``describe_layout``, ``cite``); it is a ``str`` in every other way."""
+
+    def __repr__(self) -> str:
+        return str(self)
+
+
 def use(new: str) -> str:
     """The tail of a message whose old spelling has a replacement ``new``."""
     return f". Use {new}."
@@ -73,13 +81,17 @@ def renamed(old: str, new: str, fn):
 
 def keywords(func: str, *, renamed: dict | None = None, dropped: tuple = (),
              kept: dict | None = None, removed: dict | None = None,
-             private: str | None = None, positional: tuple = ()):
+             private: str | None = None, positional: tuple = (),
+             hidden: tuple = ()):
     """Decorator for the old keywords of the public function ``func``. None of them
     is in its signature.
 
     positional : names
         Old keywords that 0.3 also took by position: extra positional
         arguments go to these names, in order, and then warn as above.
+    hidden : names
+        Keywords left out of the signature and the docs that keep working
+        without a warning: the call goes to ``private``.
 
     renamed : ``{old: new}``
         The value goes to ``new``, with ``Use new=.``
@@ -93,7 +105,7 @@ def keywords(func: str, *, renamed: dict | None = None, dropped: tuple = (),
         ``TypeError`` naming the replacement.
     """
     renamed, kept, removed = renamed or {}, kept or {}, removed or {}
-    if kept and not private:
+    if (kept or hidden) and not private:
         raise TypeError("keywords(kept=...) needs private=, the implementation's name")
 
     def deco(fn):
@@ -111,6 +123,8 @@ def keywords(func: str, *, renamed: dict | None = None, dropped: tuple = (),
                 if name in kwargs:
                     raise TypeError(removed_text(f"{func}({name}=)", since, tail))
             target = fn
+            if any(n in kwargs for n in hidden):
+                target = fn.__globals__[private]
             for name in [n for n in kwargs if n in renamed or n in dropped or n in kept]:
                 value = kwargs.pop(name)
                 if name in renamed:
