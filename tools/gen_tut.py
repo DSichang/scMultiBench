@@ -78,16 +78,6 @@ def stored_method_count(cat, dataset):
     return cov[cov.dataset == dataset].method.nunique()
 
 
-def stored_on_fewer_batches(dataset):
-    """The methods whose stored scores for ``dataset`` come from a run on
-    fewer batches than the others', from the ``label_order`` column of the
-    stored summary (UINMF on ``D52``: its two-batch variant)."""
-    import pandas as pd
-    df = pd.read_csv(os.path.join(OUT, "results", f"summary_{dataset}.csv"))
-    n = df.label_order.str.count(r"\+") + 1
-    return sorted(df.method[n < n.max()]), int(n.min()), int(n.max())
-
-
 def _gb(rows):
     rows = rows.to_dict("records") if hasattr(rows, "to_dict") else rows
     known = [r["archive_bytes"] for r in rows if r["archive_bytes"]]
@@ -383,11 +373,6 @@ def check_task(key):
         raise SystemExit(f"{and_list(gas)} read gene activity in {t['cat']}: reword the "
                          f"{t['cat']} blurbs and own-data sections")
     check_own(key)
-
-
-def labels_for_ds(key, method="UINMF"):
-    """The label files ``method`` reads on the task's dataset."""
-    return list(mtb.labels_for(TASKS[key]["ds"], TASKS[key]["cat"], method))
 
 
 def not_wrapped_sentence(key):
@@ -1216,15 +1201,6 @@ res.summary''')
             stored_notes.append(f"There are no stored scores for `{ds}`. `{stored_ds}` is another "
                                 f"benchmark dataset of the same task.")
         stored_notes.append("The stored scores are the package's own runs of the methods.")
-        fewer, n_few, n_all = stored_on_fewer_batches(stored_ds)
-        if fewer:
-            if fewer != ["UINMF"] or (n_few, n_all) != (2, 3) or len(labels_for_ds(key)) != 3:
-                raise SystemExit(f"{key}: stored scores of {fewer} read {n_few} of {n_all} "
-                                 f"batches: reword the stored-scores note")
-            stored_notes.append(
-                f"The stored scores of UINMF are from its two-batch variant, which read "
-                f"batches 1 and 2 of `{stored_ds}`. `run_all` on `{ds}` runs its three-batch "
-                f"variant.")
         stored_notes.append(
             "Scores of your runs differ a little from the stored ones: most methods give "
             "a slightly different embedding on each run.")

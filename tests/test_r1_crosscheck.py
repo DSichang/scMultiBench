@@ -71,10 +71,11 @@ def test_x59_available_datasets_lists_the_stored_datasets():
     assert got == sorted(mtb.results_coverage().dataset.unique())
 
 
-def test_x69_recommend_cross_names_uinmf_two_batches():
-    _, msgs = _messages(mtb.recommend, "cross")
-    assert any("UINMF's stored D52 scores cover batches 1-2 of 3" in m for m in msgs)
-    _, msgs = _messages(mtb.recommend, "vertical")
+def test_x69_uinmf_two_batch_rows_left_the_d52_table():
+    # owner, round 3: the rows of a run the package no longer makes are removed
+    assert "UINMF" not in set(mtb.load_results("cross", dataset="D52").method)
+    r, msgs = _messages(mtb.recommend, "cross")
+    assert pd.isna(r.set_index("method").loc["UINMF", "grand_score"])
     assert not any("batches 1-2" in m for m in msgs)
 
 

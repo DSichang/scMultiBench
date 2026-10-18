@@ -904,12 +904,6 @@ def _results_coverage(category: str | None = None, *, source: str = "rerun",
     return out
 
 
-#: what a stored row does not show: ``{(category, dataset, method): note}``
-_STORED_CAVEATS = {
-    ("cross", "D52", "UINMF"): "UINMF's stored D52 scores cover batches 1-2 of 3 "
-                               "(its two-batch variant).",
-}
-
 #: the modalities each shipped stored dataset measured, for recommend's error
 _STORED_DATASET_MODALITIES = {
     "D11": ("rna", "adt"), "D24": ("rna", "atac"), "D25": ("rna", "atac"),
@@ -1235,10 +1229,6 @@ def _recommend(
             + ". Check the coverage column before reading the order.")
     if backend:
         notes.append(backend)
-    for (cat, ds, m), text in _STORED_CAVEATS.items():
-        if long_df_was_none and cat == category and ds in per_ds.columns \
-                and m in grand.index and pd.notna(per_ds.loc[m, ds]):
-            notes.append(text)
     if only_dropped:
         one = len(only_dropped) == 1
         notes.append(
