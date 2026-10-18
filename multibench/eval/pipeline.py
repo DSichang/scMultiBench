@@ -337,8 +337,11 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
                 and _same_cells(first, ids, what=what, name=name, table=table,
                                 fix=_file_fix()):
             table.moved.append(name)
-        if what == "labels" and first is None and _has_cell_ids(ids):
-            _position_warning([name], [x])
+        if what == "labels" and first is None and _has_cell_ids(ids) and unique:
+            # no ids: the dataset folder's matrix names the cells, else by position
+            first = _folder_ids([x], [len(vals)], ids)
+            if first is None:
+                _position_warning([name], [x])
         return io.by_id_column(
             vals, first, ids if unique else None, what=what, name=name,
             target="the embedding", order="the rows of the embedding",
@@ -411,6 +414,32 @@ def _by_position_note(names: list) -> str:
             f"embedding by position.")
 
 
+def _folder_ids(files, counts, ids):
+    """The cell ids of label files that have none, from the matrix next to each
+    one with as many cells (``cty2.csv`` -> ``rna2.h5``, ...), when together they
+    are the embedding's cells; else ``None``."""
+    import h5py
+    from ..workflow import _label_data_files      # workflow imports this module
+    out = []
+    for f, n in zip(files, counts):
+        for m in (x for x in _label_data_files(Path(f)) if x.is_file()):
+            try:
+                with h5py.File(m, "r") as h:
+                    bars = [b.decode() if isinstance(b, bytes) else str(b)
+                            for b in h["matrix/barcodes"][:]]
+            except (OSError, KeyError):
+                continue
+            if len(bars) == n:
+                out += bars
+                break
+        else:
+            return None
+    keys = pd.Series(out, dtype=object)
+    if not keys.is_unique or set(keys) != {str(i) for i in ids}:
+        return None
+    return keys
+
+
 def _position_warning(names: list, paths) -> None:
     """:func:`_by_position_note`, once per set of files in a session."""
     key = tuple(os.path.abspath(str(p)) for p in paths)
@@ -451,7 +480,15 @@ def _stack_label_files(files, ids, as_written=False, table=None):
             what="labels", name=name, target="the embedding", order=order,
             no_ids=_no_ids(ids), n_files=len(names), drop=True)
         return vals[pos], origin[pos]
-    if all(first is None for _, first in read) and _has_cell_ids(ids):
+    if all(first is None for _, first in read) and _has_cell_ids(ids) and unique:
+        # no ids: the dataset folder's matrices name the cells, else by position
+        keys = _folder_ids(files, [len(v) for v, _ in read], ids)
+        if keys is not None:
+            pos, _ = io.by_id_column(np.arange(len(vals)), keys, ids, what="labels",
+                                     name=_and_list(names), target="the embedding",
+                                     order=order, no_ids=_no_ids(ids),
+                                     n_files=len(names), drop=True)
+            return vals[pos], origin[pos]
         _position_warning(names, files)
     for (v, first), name in zip(read, names):
         io.by_id_column(v, first, None, what="labels", name=name, target="the embedding",

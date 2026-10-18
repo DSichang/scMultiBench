@@ -181,3 +181,33 @@ def test_every_declared_cell_order_parses(root):
                         ("uniPort", "diagonal"): ["atac_gas", "rna"],
                         ("Seurat_v5", "diagonal"): ["atac_peak", "rna"]}
     assert type(mtb.labels_for("D11", data_path=root / "data")) is resolve.LabelFiles
+
+
+def test_label_files_without_ids_follow_the_folder_barcodes(tmp_path):
+    # Y18 (r3): a reordered AnnData scored with labels_for of its folder is aligned
+    import warnings
+    import anndata as ad
+    import pandas as pd
+    import multibench as mtb
+    rng = np.random.default_rng(0)
+    n = 120
+    ct = np.array(["A", "B", "C"] * 40)
+    obs = pd.DataFrame({"celltype": ct}, index=[f"AAAC{i:03d}-1" for i in range(n)])
+    rna = ad.AnnData(rng.poisson(1, (n, 20)).astype("float32"), obs=obs,
+                     var=pd.DataFrame(index=[f"g{i}" for i in range(20)]))
+    adt = ad.AnnData(rng.poisson(1, (n, 5)).astype("float32"), obs=obs.copy(),
+                     var=pd.DataFrame(index=[f"p{i}" for i in range(5)]))
+    mtb.io.export_dataset(rna, tmp_path / "LABS", adt=adt, labels="obs:celltype")
+    emb = rng.normal(size=(n, 3))
+    emb[:, 0] += 6 * (ct == "B")
+    emb[:, 1] += 6 * (ct == "C")
+    cite = ad.AnnData(np.zeros((n, 2)), obs=obs.copy())
+    cite.obsm["X_p"] = emb
+    labels = mtb.labels_for(str(tmp_path / "LABS"))
+    with warnings.catch_warnings(record=True) as rec:
+        warnings.simplefilter("always")
+        same = mtb.evaluate(cite, labels=labels, obsm="X_p", metrics=["ARI"])
+        moved = mtb.evaluate(cite[rng.permutation(n)], labels=labels, obsm="X_p",
+                             metrics=["ARI"])
+    assert same.loc["ARI", "Value"] == moved.loc["ARI", "Value"] > 0.9
+    assert not [w for w in rec if "by position" in str(w.message)]

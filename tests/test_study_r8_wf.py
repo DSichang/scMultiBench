@@ -440,3 +440,13 @@ def test_the_dry_run_header_names_no_column(no_envs, mydata, capsys):
                    "--methods", "Matilda", "--dry-run", "--modalities", "all"])
     head = capsys.readouterr().err.splitlines()[0]
     assert head.endswith(" A row whose input files are missing has no command."), head
+
+
+def test_the_cli_spelling_names_run_all_dry_run(macos, mydata, monkeypatch):
+    # Z13 (r3): the command line's scan prints no commands; run-all --dry-run does
+    from multibench import config
+    monkeypatch.setattr(config, "_CLI", True)
+    msg = _nothing_runnable(modalities=["rna", "adt"], methods=["Matilda", "totalVI"])
+    assert msg.splitlines()[2] == ("multibench run-all data/MYDATA --category vertical "
+                                   "--methods Matilda,totalVI --modalities rna,adt "
+                                   "--dry-run shows the plan.")

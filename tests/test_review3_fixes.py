@@ -374,7 +374,9 @@ def test_the_rows_listed_for_a_gene_activity_folder(linux, tmp_path, capsys):
         gas = full_scan("GA", "cross", data_path=tmp_path, verbose=False)
         every = full_scan("GA", "cross", data_path=tmp_path, verbose=False, modalities="all")
         peak = full_scan("PK", "cross", data_path=tmp_path, verbose=False)
-    assert sorted(zip(gas["method"], gas["modalities"])) \
+    # r3 (X68): the peak folder has UINMF's files, so its two-batch row is left out
+    nested = ("UINMF", "rna1+rna2+atac1+atac2")
+    assert sorted(set(zip(gas["method"], gas["modalities"])) - {nested}) \
         == sorted(zip(peak["method"], peak["modalities"]))
     assert gas.attrs["held"] == ["rna", "atac"] and gas.attrs["not_held"] == ["adt"]
     assert not gas["files_ok"].any() and not every["files_ok"].any()
