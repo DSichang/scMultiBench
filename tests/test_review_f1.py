@@ -214,7 +214,9 @@ def test_cross_is_described_as_batches_with_the_same_modalities(capsys):
     with pytest.raises(SystemExit):
         cli.main(["scan", "--help"])
     help_text = " ".join(capsys.readouterr().out.split())
-    assert "cross (several batches, each with the same modalities)" in help_text
+    # one line in every --category help since 0.4.0 (X53); multibench layout explains
+    assert "vertical, diagonal, mosaic or cross (multibench layout explains them)" in \
+        help_text
     assert "several batches with all modalities" not in help_text
 
 

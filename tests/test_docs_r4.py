@@ -94,7 +94,8 @@ def _cite_adata(n_cells=400, n_genes=2500, n_adt=14, seed=0):
 def test_laptop_tab_prints_the_totalvi_command_before_the_table(tmp_path, monkeypatch, capsys):
     import matplotlib.pyplot as plt
     code = _laptop_tab()
-    assert 'mtb.scan("data/MYCITE", "vertical", modalities=["rna", "adt"])' in code
+    # the default modalities are left out since 0.4.0 (X48)
+    assert 'mtb.scan("data/MYCITE", "vertical")' in code
     assert max(len(line) for line in code.splitlines()) <= 80
     monkeypatch.chdir(tmp_path)
     _cite_adata().write_h5ad(tmp_path / "my_citeseq.h5ad")

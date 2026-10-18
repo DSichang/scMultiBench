@@ -407,7 +407,7 @@ def test_help_texts_put_the_object_first_and_end_in_plain_sentences():
                if re.search(r"\)\s*\(", a.help)]
     assert doubled == []
     assert _help(["params"], "--category").endswith(
-        "each with the same modalities). Only that category's variants.")
+        "(multibench layout explains them). Only that category's variants.")       # X53
     import argparse
     # 0.4: --task (and the list alias) are deprecated and hidden from the help
     assert _help(["list"], "--task") == argparse.SUPPRESS

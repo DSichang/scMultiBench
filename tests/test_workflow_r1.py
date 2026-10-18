@@ -176,7 +176,7 @@ def test_scan_off_linux_keeps_env_reason_short_and_says_what_works(off_linux, no
 
 def test_scan_on_linux_keeps_the_install_command(no_envs, capsys):
     df = full_scan("D11", "vertical", methods=["totalVI"])
-    assert "--run" in df.iloc[0]["env_reason"]
+    assert "multibench env install --methods totalVI." in df.iloc[0]["env_reason"]   # X27
     assert "Linux-only" not in capsys.readouterr().out
 
 

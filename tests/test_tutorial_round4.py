@@ -135,7 +135,8 @@ def test_the_colab_note_does_not_promise_a_cpu_build_of_every_environment(name):
     import multibench as mtb
     install = next(src for kind, src in _cells(name)
                    if kind == "markdown" and src.startswith("## 1. Install"))
-    rows = _quiet(mtb.env.install, _methods(name), flavor="cpu")
+    rows = _quiet(mtb.env.install, _methods(name), flavor="cpu",
+                  dry_run=True).to_dict("records")
     single = sorted(r["env"] for r in rows if r["flavor"] != "cpu")
     if single:
         assert CPU_BUILDS not in install, (
@@ -168,7 +169,8 @@ def test_troubleshooting_does_not_hand_out_the_dry_run_command_to_run_alone(name
 def test_end_to_end_does_not_say_the_printed_command_runs_on_its_own():
     md = _markdown("tutorial_end_to_end")
     assert "prepare the command on a laptop and run it on Linux" not in md
-    assert ("`mtb.run(..., dry_run=True)` prints the command without running it. "
+    # run(dry_run=True) returns the command (X84)
+    assert ("`mtb.run(..., dry_run=True)` returns the command without running it. "
             "It works on any computer.") in md
 
 

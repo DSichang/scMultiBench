@@ -177,10 +177,10 @@ def test_evaluate_help_names_both_flags():
     sub = next(a for a in parser._actions if a.__class__.__name__ == "_SubParsersAction")
     pe = sub.choices["evaluate"]
     helps = {a.option_strings[0]: a.help for a in pe._actions if a.option_strings}
+    # one job per flag since 0.4.0 (X95)
     assert helps["--method"].startswith(
-        "package method whose label order is used, or with --labels any row name. It "
-        "is also the row name unless --name is given")
-    assert helps["--name"].startswith("row name in the long table, e.g. SCALEX_rerun")
+        "the package method: picks its label order, and is the default row name")
+    assert helps["--name"].startswith("the row name in the long table, e.g. SCALEX_rerun")
 
 
 # ====================================================================== R5-10
@@ -313,7 +313,7 @@ def test_scan_env_reason_on_linux_names_the_command_without_backticks(monkeypatc
     assert rc == 0
     assert row["reason"] == (
         "Environment matilda is not installed. Run multibench env install --methods "
-        "Matilda --run. Use --category vertical to install the environments of "
+        "Matilda. Use --category vertical to install the environments of "
         "every vertical method.")
 
 

@@ -90,7 +90,9 @@ def test_env_install_cell_follows_pip_and_needs_no_conda():
         path = ROOT / "notebooks" / f"{name}.ipynb"
         nb = json.loads(path.read_text())
         src = ["".join(c["source"]).strip() for c in nb["cells"]]
-        env_cells = [i for i, c in enumerate(src) if "mtb.env.install(" in c and "dry_run=False" in c]
+        # env.install installs by default since 0.4.0 (X27): the cell passes no dry_run
+        env_cells = [i for i, c in enumerate(src) if "mtb.env.install(" in c
+                     and "dry_run" not in c]
         assert len(env_cells) == 1, f"{name}: exactly one env-install cell"
         i_pip, i_env = src.index(pip), env_cells[0]
         assert i_env > i_pip, f"{name}: the env cell must come after the pip cell"
@@ -102,7 +104,8 @@ def test_env_install_cell_follows_pip_and_needs_no_conda():
         assert "multibench env install" not in "\n".join(_code_cells(path)), \
             f"{name}: the notebook installs through the Python API, not a shell line"
     import multibench as mtb
-    assert inspect.signature(mtb.env.install).parameters["packed"].default is True
+    # build= replaces packed= since 0.4.0 (X25): the archives are the default
+    assert inspect.signature(mtb.env.install).parameters["build"].default is False
     quick = json.loads((ROOT / "notebooks" / "colab_quickstart.ipynb").read_text())
     quick_text = "\n".join("".join(c["source"]) for c in quick["cells"])
     assert "condacolab" not in quick_text.lower() and "dry_run=False" not in quick_text
@@ -465,7 +468,6 @@ REFERENCE = {
     "mtb.AmbiguousVariantError": ("config.md", "multibench.engine.schema.AmbiguousVariantError"),
     "mtb.env.install": ("env.md", "multibench.engine.envs.install"),
     "mtb.env.doctor": ("env.md", "multibench.engine.envs.doctor"),
-    "mtb.env.recipe": ("env.md", "multibench.engine.envs.recipe"),
     "mtb.io.export_dataset": ("io.md", "multibench.engine.ingest.export_dataset"),
     "mtb.io.to_canonical": ("io.md", "multibench.engine.ingest.to_canonical"),
     "mtb.io.read_canonical": ("io.md", "multibench.engine.ingest.read_canonical"),
@@ -483,7 +485,7 @@ REFERENCE = {
     "mtb.config.Config": ("config.md", "multibench.config.Config"),
 }
 #: on the reference pages, not on the API overview (maintainer tools)
-MAINTAINER_NAMES = {"mtb.env.recipe"}
+MAINTAINER_NAMES: set = set()      # mtb.env.recipe left __all__ in 0.4.0 (X34)
 NAMESPACES = ("env", "io", "plot", "data", "catalog", "config")
 MKDOCS = Path(os.environ.get(
     "SCMULTIBENCH_MKDOCS",
@@ -1369,7 +1371,9 @@ def test_changes_page_lists_0_3_5():
     line = "`N more rows need files this folder does not have. mtb.scan shows them.`"
     assert changed.count(line) == 2 and line in unsolved
     listed = re.search(r"in five tutorials: ([^.]+)\.", unsolved).group(1)
-    assert re.findall(r"`(\w+)`", listed) == list(MORE_ROWS) and len(MORE_ROWS) == 5
+    # diagonal_rna_atac's one-batch folder lists no batched row since 0.4.0 (X80)
+    assert re.findall(r"`(\w+)`", listed) == ["diagonal_rna_atac", *MORE_ROWS]
+    assert len(MORE_ROWS) == 4
     # the folder names: every new name is on the page, next to the name it replaces
     renamed = {key: name for key, name in NAMES.items() if name != OLD[key]["name"]}
     assert len(renamed) == 10

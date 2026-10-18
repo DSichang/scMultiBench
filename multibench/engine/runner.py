@@ -803,7 +803,7 @@ def _run(method: str, category: str, *, inputs: dict, out_dir: str,
         if linux_only:
             this = config.hint("this call", "this command")
             preview_with = config.hint("dry_run=True", "--dry-run")
-            raise envs._LinuxOnlyError(
+            raise envs.LinuxOnlyError(
                 f"{linux_only} Run {this} on a Linux machine. {preview_with} "
                 f"previews the method's command here.")
         have = envs.installed_envs()

@@ -375,7 +375,8 @@ def test_plot_page_says_what_require_complete_does_where_it_is_asked_for():
     assert ("A summary compares methods scored on the same datasets. "
             "`require_complete=True` keeps only the methods scored on every dataset.") in text
     assert "Use `require_complete=True`." not in text
-    assert ("They cannot be rebuilt. For a summary with your own method, use the full "
-            "datasets.") in text
+    # the subsample tables left in 0.4.0 (X04): the page says a summary needs datasets
+    # of your own
+    assert "The stored tables hold one dataset per category" in text
     # said once on the page
     assert text.count("keeps only the methods") == 1

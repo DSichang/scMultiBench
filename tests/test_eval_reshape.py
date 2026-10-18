@@ -74,9 +74,11 @@ def test_to_long_columns_pin_results_columns():
 
 def test_to_long_provenance_override_and_keyword_only_call():
     w = pd.DataFrame({"Value": [0.5, 0.6]}, index=["ARI", "NMI"])
-    out = to_long(w, method="M", dataset="D", category="vertical",
-                  clustering="louvain", source="mine")
-    assert set(out.clustering) == {"louvain"} and set(out.source) == {"mine"}
+    # clustering= and source= are deprecated with no effect since 0.4.0 (X36)
+    with pytest.warns(FutureWarning, match="it has no effect"):
+        out = to_long(w, method="M", dataset="D", category="vertical",
+                      clustering="louvain", source="mine")
+    assert set(out.clustering) == {"default"} and set(out.source) == {"user"}
     kw = to_long(w, method="M", dataset="D", category="vertical")
     assert kw.source.tolist() == ["user", "user"]
     with pytest.raises(TypeError):                   # everything after value_df is keyword-only

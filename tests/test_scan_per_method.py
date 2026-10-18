@@ -459,10 +459,10 @@ def test_reasons_are_printed_in_full(linux, monkeypatch, tmp_path, capsys):
     assert out[2:] == [
         "[scan] Matilda: cty.csv is missing.",
         "[scan] sciPENN: Environment env_sciPENN is not installed. Run multibench env "
-        "install --methods sciPENN --run. Use --category vertical to install the "
+        "install --methods sciPENN. Use --category vertical to install the "
         "environments of every vertical method.",
         "[scan] totalVI: Environment scmb_scvi is not installed. Run multibench env "
-        "install --methods totalVI --run. Use --category vertical to install the "
+        "install --methods totalVI. Use --category vertical to install the "
         "environments of every vertical method."]
     # one line per method that cannot run, in the order of the table, whole
     assert [l.split(": ")[0].split()[-1] for l in out[2:]] == list(pm["method"])

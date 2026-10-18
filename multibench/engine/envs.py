@@ -37,7 +37,7 @@ def __dir__() -> list[str]:
     return sorted(n for n in globals() if n in __all__ or n.startswith("__"))
 
 
-class _LinuxOnlyError(OSError, RuntimeError):
+class LinuxOnlyError(OSError, RuntimeError):
     """The refusal of a method run or an env install off Linux. Both an
     ``OSError`` (what ``mtb.run`` raised) and a ``RuntimeError`` (what
     ``mtb.env.install`` raised), so either ``except`` clause catches it."""
@@ -85,11 +85,11 @@ def linux_only_text(problem: str) -> str:
 
 
 def _require_linux(force: bool) -> None:
-    """Raise :class:`_LinuxOnlyError` before any download or build on a
+    """Raise :class:`LinuxOnlyError` before any download or build on a
     non-Linux host, unless ``force``."""
     problem = None if force else host_platform_problem()
     if problem:
-        raise _LinuxOnlyError(
+        raise LinuxOnlyError(
             f"{linux_only_text(problem)} Run the install on a Linux machine.")
 
 

@@ -400,9 +400,9 @@ def test_a_file_read_twice_for_the_message_warns_once(tmp_path):
             mtb.evaluate(emb, labels=str(path), metrics=["ASW"])
     assert str(e.value) == _e1(" (obs.csv)", EX_NA)
     assert [str(w.message) for w in rec] == [
-        "The first column of obs.csv looks like cell ids, but the output has no cell "
+        "The first column of obs.csv looks like cell ids, but the embedding has no cell "
         "ids. The file is matched by position. Check that its rows follow the rows of "
-        "the output."]
+        "the embedding."]
 
 
 def test_evaluate_raises_on_missing_labels_whole_message():

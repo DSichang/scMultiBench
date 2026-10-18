@@ -7,7 +7,10 @@ import multibench as mtb
 
 @pytest.mark.parametrize("fn", ["plan", "doctor"])
 def test_a_list_first_is_the_methods(fn):
-    f = getattr(mtb.env, fn)
+    # doctor returns a DataFrame since 0.4.0 (X26): compare its records
+    def f(*a, **k):
+        out = getattr(mtb.env, fn)(*a, **k)
+        return out.to_dict("records") if hasattr(out, "to_dict") else out
     assert f(["Matilda", "totalVI"]) == f(methods=["Matilda", "totalVI"])
     assert f(("Matilda",)) == f(methods=["Matilda"])
     assert f("vertical") == f(category="vertical")

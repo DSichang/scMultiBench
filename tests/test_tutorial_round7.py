@@ -193,7 +193,8 @@ def test_env_reason_on_linux_holds_the_install_command_the_tutorials_name(name, 
     t = GEN.TASKS[name.removeprefix("tutorial_")]
     cat, methods = t["cat"], t["methods"]
     md = _markdown(name, "## 2. Download the data and the environments")
-    assert f"`multibench env install --methods {','.join(methods)} --run`" in md
+    # installing is the default since 0.4.0 (X27): no --run
+    assert f"`multibench env install --methods {','.join(methods)}`" in md
     monkeypatch.setattr(R, "linux_only_sentence", lambda: None)
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     ds = t["ds"]
@@ -202,4 +203,4 @@ def test_env_reason_on_linux_holds_the_install_command_the_tutorials_name(name, 
     for m in methods:
         row = _quiet(full_scan, ds, cat, methods=[m], verbose=False).iloc[0]
         assert not row["env_ok"]
-        assert f"multibench env install --methods {m} --run" in row["env_reason"]
+        assert f"multibench env install --methods {m}." in row["env_reason"]

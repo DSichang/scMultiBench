@@ -341,6 +341,10 @@ class Variant:
         return any(a.const and "atac" in str(a.const) for a in self.args)
 
 
+#: the methods whose vertical ATAC role was ``atac_gas`` until 0.3 (it reads peaks)
+_ATAC_GAS_RENAMED = frozenset({"scMM", "scMDC", "moETM", "UnitedNet", "iPOLNG"})
+
+
 @dataclass
 class MethodSpec:
     id: str
@@ -425,10 +429,8 @@ class MethodSpec:
         (peaks) under the role ``atac`` since 0.4, ``atac_gas`` before (saved
         records and older ``inputs=`` keys still name it)."""
         mods = set(modalities)
-        if category != "vertical" or "atac_gas" not in mods or "atac" in mods:
-            return None
-        if any(v.when.get("category") == "vertical"
-               and "atac_gas" in v.when.get("modalities", []) for v in self.variants):
+        if self.id not in _ATAC_GAS_RENAMED or category != "vertical" \
+                or "atac_gas" not in mods or "atac" in mods:
             return None
         new = (mods - {"atac_gas"}) | {"atac"}
         return new if any(v.matches(category, new) for v in self.variants) else None

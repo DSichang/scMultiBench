@@ -351,7 +351,7 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
                 and _same_cells(first, ids, what=what, name=name, table=table,
                                 fix=_file_fix()):
             table.moved.append(name)
-        if first is None and _has_cell_ids(ids):
+        if what == "labels" and first is None and _has_cell_ids(ids):
             _compat.warn(_by_position_note(name), UserWarning)
         return io.by_id_column(
             vals, first, ids if unique else None, what=what, name=name,

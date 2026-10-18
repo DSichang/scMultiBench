@@ -147,7 +147,7 @@ def test_task_tutorial_installs_and_runs(key):
     cat, ds = t["cat"], t["ds"]
     code = "\n".join(_code(f"tutorial_{key}"))
     assert f"METHODS = {json.dumps(t['methods'])}" in code
-    assert "mtb.env.install(METHODS, dry_run=False)" in code
+    assert "mtb.env.install(METHODS)\n" in code          # installs by default (X27)
     assert f'mtb.data.fetch("{ds}")' in code
     # one line or wrapped: the call is compared with its whitespace collapsed
     assert (_flat(f'res = mtb.run_all("{ds}", "{cat}", methods=METHODS, '
@@ -175,7 +175,7 @@ def test_all_methods_notebook_installs_and_runs_every_method(key):
     assign = next(n for c in cells for n in ast.walk(_tree(c))
                   if isinstance(n, ast.Assign) and ast.unparse(n.targets[0]) == "METHODS")
     assert ast.literal_eval(assign.value) == GEN.task_methods(key)
-    assert "mtb.env.install(METHODS, dry_run=False)" in code
+    assert "mtb.env.install(METHODS)\n" in code          # installs by default (X27)
     assert f'mtb.data.fetch("{ds}")' in code
     assert (_flat(f'res = mtb.run_all("{ds}", "{cat}", methods=METHODS, '
                   f'out_dir="out/{ds}_all")') in _flat(code))
@@ -452,7 +452,7 @@ def test_the_tasks_cover_every_method_of_the_four_categories():
 
 def test_end_to_end_installs_and_runs_matilda():
     code = "\n".join(_code("tutorial_end_to_end"))
-    assert 'mtb.env.install(["Matilda"], dry_run=False)' in code
+    assert 'mtb.env.install(["Matilda"])' in code        # installs by default (X27)
     assert 'mtb.run("Matilda", "vertical"' in code
     assert "mtb.evaluate(emb" in code
 

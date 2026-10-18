@@ -51,7 +51,7 @@ def test_list_tasks_still_lists_the_tasks():
 def test_find_methods_task_still_filters():
     got, msg = _one_warning(lambda: mtb.find_methods(task="dimension_reduction"))
     assert got == ["Matilda", "sciPENN"]
-    assert msg == _msg("find_methods(task=)", "category=")
+    assert msg == _msg("find_methods(task=)", note="it has no replacement")       # X58
 
 
 def test_find_methods_runnable_still_filters():
@@ -389,7 +389,8 @@ def test_cli_help_hides_the_deprecated_commands_and_flags():
         text = _help(*cmd.split())
         for flag in flags:
             assert flag not in text, (cmd, flag)
-    assert "--embedding" in _help("evaluate") and "--clusters" in _help("evaluate")
+    # the embedding is the first argument since 0.4.0 (X19); --embedding is hidden
+    assert "EMBEDDING" in _help("evaluate") and "--clusters" in _help("evaluate")
     assert "--build" in _help("env", "install") and "--packed" not in _help("env", "install")
     assert "advanced" in _help("run") and "advanced" in _help("run-all")
 
@@ -413,8 +414,8 @@ def test_cli_deprecated_commands_warn_once_and_work():
                           "Use multibench scan."
     code, out, err = _cli("find", "--task", "dimension_reduction")
     assert out.split() == ["Matilda", "sciPENN"]
-    assert err.strip() == "warning: --task is deprecated and will be removed in 0.5. " \
-                          "Use --category."
+    assert err.strip() == "warning: --task is deprecated and will be removed in 0.5; it " \
+                          "has no replacement."          # task took metric families (X58)
     code, out, err = _cli("env", "groups")
     assert code == 0 and "scmb_torch" in out
     assert "multibench env groups is deprecated and will be removed in 0.5. Use multibench " \

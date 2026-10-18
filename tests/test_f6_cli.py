@@ -186,8 +186,7 @@ def test_name_help_says_method_can_be_left_out():
     parser = cli.build_parser()
     ev = next(a for a in parser._actions if a.dest == "command").choices["evaluate"]
     act = next(a for a in ev._actions if a.dest == "name")
-    assert act.help == ("row name in the long table, e.g. SCALEX_rerun; with --labels, "
-                        "--method can be left out")
+    assert act.help == "the row name in the long table, e.g. SCALEX_rerun"      # X95
 
 
 # ====================================================================== R6-08
@@ -202,12 +201,11 @@ def test_cli_overlay_with_a_stored_name_says_rename_with_name(tmp_path, capsys):
     _user_rows().to_csv(up, index=False)
     rc, err = _err(capsys, ["plot", "bubble", "--input", str(up), "--category", "diagonal",
                             "--dataset", "D28", "--out", str(tmp_path / "f.png")])
-    assert rc == 1
-    line = [l for l in err.splitlines() if l.startswith("error: ")][0]
-    assert line == ("error: Your rows and the stored table both have uniPort on D28. Give "
-                    "your rows another name, such as uniPort_rerun, with evaluate --name.")
-    for bad in ("(", "{", "variants", "sweep()"):
-        assert bad not in line
+    # the command line renames the rows itself since 0.4.0 (X15) and says so
+    assert rc == 0, err
+    assert ("# Your rows of uniPort are drawn as uniPort_rerun: the stored table has the "
+            "same method and dataset.") in err
+    assert "error:" not in err
 
 
 def test_python_overlay_with_a_stored_name_names_to_long():

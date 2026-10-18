@@ -56,10 +56,10 @@ def test_export_raises_when_barcodes_differ(tmp_path):
     with pytest.raises(ValueError) as e:
         ingest.export_dataset(rna, tmp_path / "X", atac=atac, atac_kind="peak")
     msg = str(e.value)
-    assert msg.startswith("RNA and ATAC have no cells in common.")
+    assert msg.startswith("RNA and ATAC share no barcode (RNA e.g. ")       # X10
     assert 'pass category="diagonal"' in msg
     # a different cell count, no barcode in common: the same message
-    with pytest.raises(ValueError, match="RNA and ATAC have no cells in common"):
+    with pytest.raises(ValueError, match="RNA and ATAC share no barcode"):
         ingest.export_dataset(rna, tmp_path / "Y", atac=atac[:10].copy(), atac_kind="peak")
 
 

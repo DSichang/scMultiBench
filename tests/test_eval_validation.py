@@ -208,7 +208,7 @@ def test_labels_for_some_cells_say_how_to_mark_the_others(tmp_path, capsys):
         assert str(exc.value) == series.format("labels") + (
             " For cells without a label, give them the label NaN and pass "
             "missing_labels=\"drop\".")
-    file = ("{}: some.csv has no row for 30 of the 90 cells of the output (first: "
+    file = ("{}: some.csv has no row for 30 of the 90 cells of the embedding (first: "
             "['cell60', 'cell61', 'cell62']). Give a row for every cell.")
     row = " A row with an empty label and {} leaves a cell out."
     some.rename("x").to_frame().to_csv(tmp_path / "some.csv")

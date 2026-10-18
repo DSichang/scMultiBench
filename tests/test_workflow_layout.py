@@ -29,7 +29,7 @@ def test_one_category_prints_only_that_category(cat):
     assert "Every file name the loader reads" not in txt    # the full table: overview only
     # the last line runs scan on this category, and the install line is per method
     assert txt.splitlines()[-1].startswith(f"Next: mtb.scan('MYDATA', '{cat}')")
-    assert "multibench env install --methods X --run" in txt
+    assert "multibench env install --methods X\n" in txt          # no --run (X27)
     assert "lockfiles" not in txt and "two gates" not in txt
     # 0.4: scan's table has one row per method, with runnable and reason
     assert ("mtb.scan says which methods can run on the folder, and why not the rest "

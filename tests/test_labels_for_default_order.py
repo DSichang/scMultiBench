@@ -26,11 +26,13 @@ def _notes(*args, **kw):
     return [str(x.message) for x in w if "default order" in str(x.message)]
 
 
-def test_d52_names_each_category_without_a_category():
+def test_d52_names_its_own_category_without_a_category():
+    # the dataset's category only since 0.4.0 (X67): D52's batches hold the same
+    # modalities, so it reads as cross
     assert _notes("D52") == [
         "labels_for('D52') returns the files in the default order cty1, cty2, cty3. In "
-        "cross, StabMap reads them in another order; in mosaic, StabMap does: pass "
-        "labels_for('D52', <category>, <method>) for their output."]
+        "cross, StabMap reads them in another order: pass labels_for('D52', 'cross', "
+        "'StabMap') for its output."]
 
 
 def test_with_the_category_the_call_is_named():

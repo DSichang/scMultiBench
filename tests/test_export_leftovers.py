@@ -405,9 +405,9 @@ def test_cells_without_unique_barcodes_are_judged_by_their_number(tmp_path):
     other = twice(_cells(90, "ME", seed=1)[0])
     assert _refused(other, f, rna=None, labels="obs:celltype") == (
         f"{f} holds rna.h5 and 1 more file with other cells. {ADVICE}")
-    # a matrix of these cells: the other matrix of the folder is named
-    assert _refused(other, f, rna=None, adt="obsm:protein") == (
-        f"{f} holds rna.h5 with other cells. {ADVICE}")
+    # a matrix of these cells: repeated barcodes are refused first since 0.4.0 (X09)
+    with pytest.raises(ValueError, match=r"^1 barcodes repeat, e\.g\. ME0000-1\."):
+        ingest.export_dataset(other, f, rna=None, adt="obsm:protein")
     # as many cells: neither names nor number tell them from the cells of the folder
     _write(twice(ex), f, rna=None, labels="obs:celltype")
     assert _names(f) == ["adt.h5", "cty.csv", "rna.h5"]

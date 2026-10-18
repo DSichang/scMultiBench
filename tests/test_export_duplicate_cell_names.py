@@ -20,6 +20,8 @@ md = pytest.importorskip("mudata")
 
 NAMES = ["c0", "c1", "c1", "c2", "c3", "c4"]
 UNIQUE = ["c0", "c1", "c2", "c3", "c4", "c5"]
+#: the 0.4.0 refusal of repeated barcodes (X09)
+REPEAT = "1 barcodes repeat, e.g. c1. Make them unique (prefix the sample)."
 
 
 def _mdata(names, atac_reversed):
@@ -48,20 +50,16 @@ def test_repeated_names_in_another_order_are_an_error(tmp_path, what, category):
     with pytest.raises(ValueError) as e:
         ingest.export_dataset(_mdata(NAMES, True), out, rna="mod:rna",
                               category=category, **{what: "mod:atac.obs:ct"})
-    assert str(e.value) == (
-        f"The cell names of mdata['atac'].obs are not unique, so its {what} cannot be "
-        f"matched to the cells. Give each cell a unique name, the same in every "
-        f"modality, first.")
+    # repeated barcodes are refused before anything else since 0.4.0 (X09)
+    assert str(e.value) == REPEAT
     assert not (out / "rna.h5").exists() and not (out / "cty.csv").exists()
 
 
-def test_repeated_names_in_the_same_order_are_taken_by_position(tmp_path):
-    with warnings.catch_warnings(record=True) as rec:
-        warnings.simplefilter("always")
-        out = ingest.export_dataset(_mdata(NAMES, False), tmp_path / "OUT", rna="mod:rna",
-                                    labels="mod:atac.obs:ct", category="vertical")
-    assert _labels(out) == [f"a{i}" for i in range(6)]
-    assert not [w for w in rec if "unique" in str(w.message) and "matched" in str(w.message)]
+def test_repeated_names_in_the_same_order_are_refused_too(tmp_path):
+    # 0.3.9 took them by position; 0.4.0 refuses repeated barcodes (X09)
+    with pytest.raises(ValueError, match=r"barcodes repeat"):
+        ingest.export_dataset(_mdata(NAMES, False), tmp_path / "OUT", rna="mod:rna",
+                              labels="mod:atac.obs:ct", category="vertical")
 
 
 def test_unique_names_in_another_order_are_matched_by_name(tmp_path):
@@ -89,8 +87,5 @@ def test_the_command_line_says_the_same(tmp_path, capsys):
     rc = cli.main(["convert", str(tmp_path / "m.h5mu"), str(tmp_path / "OUT"), "--rna",
                    "mod:rna", "--labels", "atac:ct", "--category", "vertical"])
     assert rc == 1
-    assert capsys.readouterr().err.splitlines()[0] == (
-        "error: The cell names of mdata['atac'].obs are not unique, so its labels cannot be "
-        "matched to the cells. Give each cell a unique name, the same in every modality, "
-        "first.")
+    assert capsys.readouterr().err.splitlines()[0] == f"error: {REPEAT}"
     assert not (tmp_path / "OUT").exists()

@@ -232,7 +232,8 @@ def test_the_help_of_modalities():
         "other data that the call does not write are refused either way")
     assert _help("convert", "--n-batches") == (
         "mode 2, with --batch-index: how many batches the dataset has. Files of a higher "
-        "batch number in OUT are refused")
+        "batch number in OUT are refused, so a later call cannot leave a stale batch file "
+        "from an earlier export")                              # X97: says why
 
 
 def test_the_note_follows_the_strict_error(no_envs, capsys):
@@ -306,7 +307,9 @@ def test_run_all_nothing_runnable_names_the_listed_rows(no_envs, tmp_path, capsy
     rc, _, err = _cli(base, capsys)
     lines = err.splitlines()
     assert rc == 1 and lines[0] == "error: No method can run on D11 (vertical)."
-    assert lines[-3] == NOTE[2:]
+    # the error's note counts rows only; the scan table's note counts methods too
+    assert lines[-3] == ("D11 holds RNA and ADT. 19 rows that read ATAC are not listed. "
+                         "--modalities all lists them.")
     assert lines[-2].startswith("multibench scan D11 --category vertical shows the listed "
                                 "rows. ")
     rc, _, err = _cli(base + ["--modalities", "all"], capsys)

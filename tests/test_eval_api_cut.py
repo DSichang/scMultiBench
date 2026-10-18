@@ -39,7 +39,8 @@ def test_evaluate_signature_is_the_contract():
 
 def test_to_long_signature_is_the_contract():
     params = inspect.signature(to_long).parameters
-    assert list(params) == ["value_df", "method", "dataset", "category", "clustering", "source"]
+    # clustering= and source= are deprecated since 0.4.0 (X36)
+    assert list(params) == ["value_df", "method", "dataset", "category"]
     assert all(params[n].kind is inspect.Parameter.KEYWORD_ONLY for n in list(params)[1:])
     assert params["dataset"].default is None and params["category"].default is None
 

@@ -44,7 +44,9 @@ def test_to_long_exposed_top_level():
 
 def test_namespace_all_hygiene():
     # env/config/io expose a curated __all__ (no leaked stdlib imports)
-    assert "recipe" in mtb.env.__all__ and "subprocess" not in mtb.env.__all__
+    # recipe left __all__ in 0.4.0 (X34); it stays importable
+    assert "recipe" not in mtb.env.__all__ and "subprocess" not in mtb.env.__all__
+    assert callable(mtb.env.recipe)
     assert "Config" in mtb.config.__all__ and "Path" not in mtb.config.__all__
     assert "category_folder" not in mtb.config.__all__      # internal token map
     assert "to_canonical" in mtb.io.__all__

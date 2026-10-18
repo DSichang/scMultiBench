@@ -404,7 +404,14 @@ def test_labels_without_ids_are_matched_by_position_as_before(tmp_path, capsys, 
     for labels in (str(one), str(numbered), shuffled, list(shuffled),
                    pd.Series(shuffled)):
         seen.clear()
-        _quiet(capsys, emb, labels=labels, metrics=["ARI"])
+        if isinstance(labels, str) and labels == str(one):
+            # a file without cell ids next to the embedding's ids says it is matched by
+            # position (0.4.0, X12); the labels are as before
+            with pytest.warns(UserWarning, match="cty.csv has no cell ids, so it is "
+                                                 "matched by position"):
+                mtb.evaluate(emb, labels=labels, metrics=["ARI"])
+        else:
+            _quiet(capsys, emb, labels=labels, metrics=["ARI"])
         assert seen["labels"] == list(shuffled)
 
 

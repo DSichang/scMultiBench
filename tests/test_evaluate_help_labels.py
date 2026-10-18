@@ -33,13 +33,13 @@ def _help(capsys):
 
 def test_the_help_names_the_obs_column(capsys):
     text = _help(capsys)
-    assert ("With an .h5ad --embedding, --labels can instead name a column of its obs, as "
+    assert ("With an .h5ad EMBEDDING, --labels can instead name a column of its obs, as "
             "celltype or obs:celltype: give it once, without --column.") in text
     assert ("--batch BATCH per-cell batch labels CSV; a first column of barcodes is "
-            "aligned as for --labels. With an .h5ad --embedding it can instead name a column "
+            "aligned as for --labels. With an .h5ad EMBEDDING it can instead name a column "
             "of its obs, without --batch-column.") in text
-    assert ("A first column of barcodes is aligned to the obs_names of an .h5ad --embedding, "
-            "or to the barcodes in the first column of a .csv --embedding.") in text
+    assert ("A first column of barcodes is aligned to the obs_names of an .h5ad EMBEDDING, "
+            "or to the barcodes in the first column of a .csv EMBEDDING.") in text
     assert (".csv/.tsv (a first column of barcodes gives the cell ids: labels and batches "
             "with barcodes are matched by them)") in text
     assert "is dropped" not in text

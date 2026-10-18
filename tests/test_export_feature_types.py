@@ -406,12 +406,11 @@ def test_read_canonical_names_a_10x_file(tmp_path):
         f.create_dataset("matrix/data", data=np.arange(12.0).reshape(3, 4))
         f.create_dataset("matrix/indptr", data=np.arange(3))
     assert ingest._is_tenx_h5(odd) and mtb.io.read_canonical(odd, sparse=False).shape == (4, 3)
-    # and a file without matrix/data keeps h5py's KeyError
+    # a method's embedding file (one dataset data) is read into obsm since 0.4.0 (X83)
     bare = tmp_path / "bare.h5"
     with h5py.File(bare, "w") as f:
         f.create_dataset("data", data=np.zeros((3, 4)))
-    with pytest.raises(KeyError):
-        mtb.io.read_canonical(bare)
+    assert mtb.io.read_canonical(bare).obsm["X_emb"].shape == (4, 3)
 
 
 def test_other_h5_files_keep_their_message(tmp_path):
