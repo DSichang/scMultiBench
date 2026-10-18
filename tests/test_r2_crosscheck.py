@@ -481,3 +481,21 @@ def test_unknown_option_shows_the_command_usage(capsys):
     err = capsys.readouterr().err
     assert e.value.code == 2 and err.startswith("usage: multibench scan ")
     assert "unrecognized arguments: --foo" in err
+
+
+# Y27: an ATAC-only batch of a mosaic folder gets no "No RNA written" note
+def test_cli_convert_atac_only_mosaic_batch(tmp_path, capsys):
+    import numpy as np
+    import pandas as pd
+    ad = pytest.importorskip("anndata")
+    from multibench import cli
+    a = ad.AnnData(np.ones((6, 4)), obs=pd.DataFrame({"celltype": list("ababab")},
+                                                     index=[f"c{i}" for i in range(6)]))
+    a.var_names = [f"chr1:{i * 100}-{i * 100 + 50}" for i in range(4)]
+    a.write_h5ad(tmp_path / "b3.h5ad")
+    rc = cli.main(["convert", str(tmp_path / "b3.h5ad"), str(tmp_path / "MOSX"), "--atac", "X",
+                   "--labels", "obs:celltype", "--category", "mosaic", "--batch-index", "3",
+                   "--n-batches", "3", "--atac-kind", "peak"])
+    err = capsys.readouterr().err
+    assert rc == 0, err
+    assert "No RNA written" not in err

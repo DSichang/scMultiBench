@@ -607,8 +607,10 @@ def _cmd_convert(args) -> int:
         wrote = sorted(n for n in after if before.get(n) != after[n])
         kept = sorted(n for n in after if n not in wrote)
         print(f"wrote dataset folder {p} (files: {', '.join(wrote)})")
-        if args.rna is None and (args.adt is not None or args.atac is not None
-                                 or args.atac_from is not None):
+        # a batch of a mosaic or cross folder may hold no RNA by design
+        one_batch = category in ("mosaic", "cross") and args.batch_index is not None
+        if args.rna is None and not one_batch and (args.adt is not None or args.atac is not None
+                                                   or args.atac_from is not None):
             print("# No RNA written: pass --rna X (or a layer) to write it.",
                   file=sys.stderr)
         if kept:
