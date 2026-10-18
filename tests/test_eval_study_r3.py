@@ -269,8 +269,8 @@ def test_sweep_note_is_short_sentences(capsys, monkeypatch):
     err = capsys.readouterr().err.strip()
     assert re.fullmatch(
         r"Clustering 90 cells for ARI, NMI, ASW, iASW and iF1 with the "
-        r"(igraph|leidenalg) Leiden backend\. This takes from seconds to a few "
-        r"minutes\. To skip it, pass clusters=, or metrics= without ARI, NMI, ASW, "
+        r"(igraph|leidenalg) Leiden backend\. To skip it, pass clusters=, or "
+        r"metrics= without ARI, NMI, ASW, "
         r"iASW and iF1\.", err), err
     assert " - " not in err and ";" not in err and "per 3,000 cells" not in err
 

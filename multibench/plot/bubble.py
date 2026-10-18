@@ -1129,8 +1129,6 @@ def _bubble(long_df, *, metrics=None, methods=None, order=None,
     tbl = _build_table(long_df, metrics=metrics, methods=methods, order=order,
                        aggregate=aggregate, require_complete=require_complete,
                        overall=overall, na=na)
-    if len(tbl.methods) == 2:
-        _compat.warn(style.TWO_METHODS, UserWarning)
     fig = render(tbl, cmap=cmap, title=title, show_language=show_language)
     if save is not None:
         fig.savefig(save, bbox_inches="tight")

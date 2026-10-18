@@ -521,10 +521,12 @@ def test_x72_batch_leiden_warning_says_what_it_affects(monkeypatch):
     monkeypatch.setattr(S, "_search_n_clusters", lambda adata, n, key, flavor: (
         adata.obs.__setitem__(key, pd.Categorical(["a"] * 4 + ["b"] * (adata.n_obs - 4)))
         or False))
-    with pytest.warns(UserWarning, match=r"^ARI_batch and NMI_batch use 2 clusters: no "
-                                         r"resolution gave 3\. Nothing to do\.$"):
-        S._n_clusters(S._clustering_graph(np.random.default_rng(4).normal(size=(40, 5))),
-                      3, "leidenalg", "batch")
+    # Y11 (r3): the warning went (nothing to do); the last step's clusters are used
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        got = S._n_clusters(S._clustering_graph(np.random.default_rng(4).normal(size=(40, 5))),
+                            3, "leidenalg", "batch")
+    assert sorted(set(got)) == ["a", "b"]
 
 
 def test_x74_an_h5mu_path_names_the_fix(tmp_path):

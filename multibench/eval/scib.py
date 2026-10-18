@@ -8,7 +8,6 @@ clusters.
 from __future__ import annotations
 
 import contextlib
-import contextvars
 import functools
 import io
 import warnings
@@ -320,28 +319,11 @@ def _search_n_clusters(adata, n: int, key: str, flavor: str) -> bool:
     return False
 
 
-#: the method whose output is scored, for the search warnings (``rescore``)
-FOR_METHOD: contextvars.ContextVar = contextvars.ContextVar("multibench_method",
-                                                            default=None)
-
-
 def _n_clusters(graph, n: int, flavor: str, per: str | None = None) -> np.ndarray:
-    """The searched clusters of ``graph`` as strings, with a warning when no
-    resolution gave ``n``; ``per`` names what each cluster stands for."""
+    """The searched clusters of ``graph`` as strings: those of the last step when no
+    resolution gave ``n``, as the article's search. ``per`` is kept for callers."""
     key = "_mb_search"
-    if not _search_n_clusters(graph, n, key, flavor):
-        got = graph.obs[key].nunique()
-        method = FOR_METHOD.get()
-        of = f" for {method}" if method else ""
-        if per == "batch":
-            # what it affects, and that the scores stand
-            _compat.warn(f"ARI_batch and NMI_batch use {got} clusters: no resolution "
-                         f"gave {n}{of}. Nothing to do.", UserWarning)
-        else:
-            what = f"{n} clusters" + (f", one per {per}" if per else "")
-            of = f"{',' if per and method else ''}{of}"
-            _compat.warn(f"No Leiden resolution gave {what}{of}; using the {got} clusters "
-                         f"of the last try.", UserWarning)
+    _search_n_clusters(graph, n, key, flavor)
     out = np.asarray(graph.obs[key].astype(str))
     del graph.obs[key]
     return out
@@ -369,18 +351,13 @@ def leiden_n_clusters(emb, n: int, *, flavor=None) -> np.ndarray:
     Returns
     -------
     numpy.ndarray
-        One cluster id (a string) per cell.
+        One cluster id (a string) per cell; those of the last step when no
+        resolution gave ``n``.
 
     Raises
     ------
     ValueError
         ``flavor`` is neither ``"igraph"`` nor ``"leidenalg"``.
-
-    Warns
-    -----
-    UserWarning
-        No resolution gave ``n`` clusters; the clusters of the last step are
-        returned.
     """
     flavor = _resolve_flavor(flavor)
     return _n_clusters(_clustering_graph(emb), int(n), flavor)
@@ -566,7 +543,7 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
                     config.hint(f"metrics= without {names}",
                                 f"--metrics without {names}"))
             print(f"Clustering {n:,} cells for {names} with the {flavor} Leiden "
-                  f"backend. This takes from seconds to a few minutes. To skip it, "
+                  f"backend. To skip it, "
                   f"pass {skip}.", file=sys.stderr, flush=True)
     if search_ct or search_bat:
         graph = _clustering_graph(emb)

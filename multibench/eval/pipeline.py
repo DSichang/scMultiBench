@@ -26,13 +26,6 @@ DROP_ATTRS = ("cells_scored", "cells_total")
 #: ``scored_with`` of rows whose frame carries no record of how it was scored
 UNKNOWN_SCORING = "unknown"
 
-#: to_long's warning for such a frame
-NO_SCORING_RECORD = (
-    "These scores carry no record of how they were scored. Their scored_with is "
-    "\"unknown\". A wide CSV read back loses that record. To keep it, save the "
-    "mtb.to_long(...) table instead of the wide one.")
-
-
 def _scib_version() -> str | None:
     """The installed scib version, or ``None`` when it cannot be read."""
     try:
@@ -98,12 +91,6 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
         message gives the ``df.T.set_axis(['Value'], axis=1)`` fix) or string
         metric names, has only blank names, or names one metric twice
         (``ari`` and ``ARI``).
-
-    Warns
-    -----
-    UserWarning
-        ``value_df`` has no record of how it was scored. Its ``scored_with`` is
-        ``"unknown"``.
 
     Examples
     --------
@@ -178,9 +165,7 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     stamp = _scored_with(getattr(value_df, "attrs", None))
     out["scored_with"] = UNKNOWN_SCORING if stamp is None else stamp
     out = out[LONG_COLUMNS + ["scored_with"]].reset_index(drop=True)
-    if stamp is None:
-        _compat.warn(NO_SCORING_RECORD, UserWarning)
-    else:
+    if stamp is not None:
         out.attrs = {k: value_df.attrs.get(k) for k in PROVENANCE_ATTRS}
         for k in ("scib_version",) + DROP_ATTRS:
             if k in value_df.attrs:

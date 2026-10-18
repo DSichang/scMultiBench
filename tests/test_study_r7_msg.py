@@ -196,10 +196,7 @@ def test_to_long_warning_for_scores_with_no_record_is_sentences():
     wide = pd.DataFrame({"Value": [0.5, 0.6]}, index=["ARI", "NMI"])
     msgs = _warned(mtb.to_long, wide, method="Mine", dataset="MYCITE",
                    category="vertical")
-    assert msgs == [
-        "These scores carry no record of how they were scored. Their scored_with is "
-        "\"unknown\". A wide CSV read back loses that record. To keep it, save the "
-        "mtb.to_long(...) table instead of the wide one."]
+    assert msgs == []              # Z31 (r3): every row's scored_with is "unknown"
 
 
 # ======================================================================= R7-09

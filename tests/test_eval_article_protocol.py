@@ -4,6 +4,8 @@ ARI, NMI, ASW, iASW and iF1 score Leiden clusters searched to the number of
 cell types; ARI_batch and NMI_batch = 1 - |ARI| / 1 - |NMI| of clusters searched to
 the number of batches, only with two or more batches.
 """
+import warnings
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -39,8 +41,9 @@ def test_the_search_keeps_the_last_clustering_when_it_cannot_reach_n(monkeypatch
             np.where(np.arange(adata.n_obs) % 2, f"a{len(seen)}", f"b{len(seen)}"))
 
     monkeypatch.setattr(S, "_leiden", two_clusters)
-    with pytest.warns(UserWarning, match=r"^No Leiden resolution gave 5 clusters; using "
-                                         r"the 2 clusters of the last try\.$"):
+    # Y11 (r3): the article's fallback, without a warning
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
         cl = S.leiden_n_clusters(emb, 5, flavor="leidenalg")
     assert len(seen) == S._SEARCH_STEPS == 30
     assert seen[:3] == [1.5, 2.25, 2.625]       # bisected upwards: too few clusters
@@ -98,9 +101,11 @@ def test_a_failed_cell_type_search_says_so(monkeypatch):
     emb, ct = _blobs(k=2)
     monkeypatch.setattr(S, "_SEARCH_STEPS", 1)               # 1.5 gives > 2 clusters here
     monkeypatch.setattr(S, "_SEARCH_RANGE", (2.0, 4.0))
-    with pytest.warns(UserWarning, match=r"gave 2 clusters, one per cell type; using the "
-                                         r"\d+ clusters of the last try\.$"):
-        S.compute(emb, ct, None, np.zeros(len(ct)), only={"ARI"}, verbose=False)
+    # Y11 (r3): nothing to set, so nothing is said; the ARI is still computed
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        out = S.compute(emb, ct, None, np.zeros(len(ct)), only={"ARI"}, verbose=False)
+    assert np.isfinite(out.loc["ARI", "Value"])
 
 
 @pytest.mark.filterwarnings("ignore:No Leiden resolution")

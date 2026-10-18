@@ -394,10 +394,7 @@ class MethodSpec:
         ``env_reason`` both use it."""
         if not self.requires_gpu:
             return ""
-        from .. import config
-        see = config.hint(f'method_info("{self.id}")["requires_gpu"]',
-                          f"multibench info {self.id}")
-        return f"{self.id} needs an NVIDIA GPU, and this computer has none. See {see}."
+        return f"{self.id} needs an NVIDIA GPU, and this computer has none."
 
     @property
     def wired_categories(self) -> list[str]:

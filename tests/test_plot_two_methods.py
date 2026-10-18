@@ -1,6 +1,5 @@
-"""bubble and bar warn once when they compare two methods: each column is
-min-max scaled, so the lower method is drawn at the bottom of every column
-(Matilda 1, RNA_PCA 0 though their values were close)."""
+"""bubble and bar draw two methods without a warning (r3, Z15): the
+quickstart says that with two rows the darker one is the better of the two."""
 import warnings
 
 import pandas as pd
@@ -8,7 +7,6 @@ import pytest
 
 import multibench as mtb
 
-MSG = "With 2 methods each column only shows which is higher."
 
 
 def _long(n):
@@ -23,7 +21,7 @@ def test_two_methods_warn_once(fn):
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
         getattr(mtb.plot, fn)(_long(2))
-    assert [str(x.message) for x in w if "2 methods" in str(x.message)] == [MSG]
+    assert not [x for x in w if "2 methods" in str(x.message)]
 
 
 @pytest.mark.parametrize("fn", ["bubble", "bar"])

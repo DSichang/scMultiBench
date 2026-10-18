@@ -152,11 +152,12 @@ def test_info_prints_gpu_use_and_cells_per_observed_runtime(capsys):
     assert re.search(r"^  GPU:\s+not used$", out, re.M)
     assert "209 s on D46 (21,416 cells)" in out
     assert "69 s on D52 (23,478 cells)" in out
-    assert "many times longer" not in out           # no GPU, no CPU slowdown note
+    assert "many times longer" not in out
     rc = cli.main(["info", "moETM"])
     out = capsys.readouterr().out
     assert re.search(r"^  GPU:\s+required$", out, re.M)
-    assert "many times longer" in out
+    assert "many times longer" not in out           # Z33 (r3): no CPU slowdown note
+    assert "setup_hint" not in out                  # Z33 (r3): only when there is one
     rc = cli.main(["info", "MIRA"])
     out = capsys.readouterr().out
     assert "on D12 (cells not recorded)" in out
@@ -165,7 +166,7 @@ def test_info_prints_gpu_use_and_cells_per_observed_runtime(capsys):
 def test_runtime_note_mentions_the_cpu_only_for_gpu_methods():
     assert "CPU-only" not in mtb.method_info("StabMap")["runtime"]["note"]
     assert "RTX 4090" in mtb.method_info("StabMap")["runtime"]["note"]
-    assert "CPU-only" in mtb.method_info("scMoMaT")["runtime"]["note"]
+    assert "CPU-only" not in mtb.method_info("scMoMaT")["runtime"]["note"]     # Z33 (r3)
 
 
 # ====================================================================== M24

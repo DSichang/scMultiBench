@@ -152,8 +152,6 @@ def _bar(long_df: pd.DataFrame, *, metrics=None, top: int | None = None,
     backend = style.backend_warning(shown)
     if backend:
         _compat.warn(backend, UserWarning)
-    if len({m for mat in parts.values() for m in mat.index}) == 2:
-        _compat.warn(style.TWO_METHODS, UserWarning)
     per_ds = pd.DataFrame({ds: compute_overall(mat) for ds, mat in parts.items()})
     # best-first with a stable tie-break (same as plot.bubble), then reversed
     # so the best method is drawn on top

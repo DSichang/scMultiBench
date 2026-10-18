@@ -327,9 +327,6 @@ def _runtime_hint(method: str) -> dict:
     # every observation was taken on the GPU benchmark host
     rt["host"] = "gpu"
     rt["note"] = "times observed on the benchmark host (NVIDIA RTX 4090)"
-    if registry.get(method).gpu != "not used":
-        rt["note"] += ("; on a CPU-only host expect training methods to take many "
-                       "times longer")
     return rt
 
 

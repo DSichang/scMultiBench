@@ -195,9 +195,8 @@ def test_schema_accepts_the_two_valid_shapes():
     assert spec.requires_gpu_reason == ""
     spec = _parse(requires_gpu=True, gpu_evidence="tools_scripts/X/main.py:12")
     assert spec.requires_gpu and spec.cpu_params == {}
-    assert spec.requires_gpu_reason == (
-        'X needs an NVIDIA GPU, and this computer has none. '
-        'See method_info("X")["requires_gpu"].')
+    # Z17 (r3): no lookup sentence after the fact
+    assert spec.requires_gpu_reason == 'X needs an NVIDIA GPU, and this computer has none.'
     # absent keys -> the defaults
     spec = _parse()
     assert spec.cpu_params == {} and spec.requires_gpu is False and spec.gpu_evidence == ""
@@ -326,8 +325,7 @@ def test_real_run_is_silent_on_gpu_host_and_with_explicit_key(tmp_path, monkeypa
 
 # ------------------------------------------------------------ runner: requires_gpu
 
-MOETM_REASON = ('moETM needs an NVIDIA GPU, and this computer has none. '
-                'See method_info("moETM")["requires_gpu"].')
+MOETM_REASON = 'moETM needs an NVIDIA GPU, and this computer has none.'
 
 
 def test_requires_gpu_raises_before_launching(tmp_path, no_gpu, monkeypatch):
@@ -420,9 +418,9 @@ def test_scan_docstring_documents_the_gate():
 
 
 def test_runtime_hint_names_its_host():
-    """The observed times were taken on the GPU benchmark host; a CPU-only
-    user must be told so next to the numbers."""
+    """The observed times were taken on the GPU benchmark host, and the note
+    says which (r3, Z33: without the CPU-host clause)."""
     import multibench as mtb
     rt = mtb.method_info("scMoMaT", verbose=True)["runtime"]
-    assert rt["host"] == "gpu" and "RTX 4090" in rt["note"] and "CPU-only" in rt["note"]
+    assert rt["host"] == "gpu" and "RTX 4090" in rt["note"] and "CPU-only" not in rt["note"]
     assert set(rt) >= {"tier", "worst_sec", "observed", "host", "note"}

@@ -78,7 +78,8 @@ def test_to_long_writes_scored_with_and_keeps_the_attrs():
 
 def test_to_long_of_a_frame_without_provenance_says_unknown(tmp_path):
     w = pd.DataFrame({"Value": [0.5, 0.6]}, index=["ARI", "NMI"])
-    with pytest.warns(UserWarning, match="no record of how they were scored"):
+    with warnings.catch_warnings():          # Z31 (r3): the column says it, silently
+        warnings.simplefilter("error", UserWarning)
         long = mtb.to_long(w, method="M")
     assert long.columns.tolist() == pipeline.LONG_COLUMNS + ["scored_with"]
     assert set(long["scored_with"]) == {"unknown"}
@@ -86,8 +87,7 @@ def test_to_long_of_a_frame_without_provenance_says_unknown(tmp_path):
     emb, lab = _blobs()
     mtb.evaluate(emb, labels=lab, metrics=["ASW"]).to_csv(tmp_path / "w.csv")
     back = pd.read_csv(tmp_path / "w.csv", index_col=0)
-    with pytest.warns(UserWarning, match="no record of how they were scored"):
-        long = mtb.to_long(back, method="M")
+    long = mtb.to_long(back, method="M")
     assert long.columns.tolist() == pipeline.LONG_COLUMNS + ["scored_with"]
     assert set(long["scored_with"]) == {"unknown"}
 

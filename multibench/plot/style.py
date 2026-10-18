@@ -292,11 +292,6 @@ def constant_columns(mat: pd.DataFrame) -> dict:
     return out
 
 
-#: the warning of a figure that compares two methods: each column is min-max
-#: scaled, so it holds 1 and 0
-TWO_METHODS = "With 2 methods each column only shows which is higher."
-
-
 #: the clusters part of a 0.4.0 ``scored_with``: the article's resolution
 #: search, the user's own clusters, or none (classification only)
 SCORING_PROTOCOLS = ("search", "user", "none")

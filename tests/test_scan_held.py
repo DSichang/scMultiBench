@@ -223,8 +223,7 @@ def test_the_log_of_a_real_run_names_the_listed_variants_only(linux, tmp_path, c
     # Matilda runs on rna+adt. Its two rows that read ATAC, and moETM's one,
     # are not listed
     kw = dict(methods=["Matilda", "moETM"], evaluate=False)
-    gpu = ('moETM needs an NVIDIA GPU, and this computer has none. See '
-           'method_info("moETM")["requires_gpu"].')
+    gpu = 'moETM needs an NVIDIA GPU, and this computer has none.'
     _quiet(mtb.run_all, "D11", "vertical", tmp_path / "out", **kw)
     log = capsys.readouterr().out
     assert [l for l in log.splitlines() if "skipping" in l] == [

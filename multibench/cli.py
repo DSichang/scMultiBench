@@ -728,8 +728,8 @@ def _cmd_info(args) -> int:
     if observed:
         print(textwrap.fill(rt["note"], width=88, initial_indent=pad, subsequent_indent=pad))
     hint = (info["setup_hint"] or "").strip()
-    print("  setup_hint:" + ("   none" if not hint else ""))
     if hint:
+        print("  setup_hint:")
         print(textwrap.fill(hint, width=88, initial_indent="    ", subsequent_indent="    "))
     print(f"  scripts:      {info['scripts_url']}")
     print(f"  more:         multibench params {info['id']}; multibench cite {info['id']}")

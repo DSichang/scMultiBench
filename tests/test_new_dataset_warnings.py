@@ -13,7 +13,6 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench.plot.style import TWO_METHODS
 
 matplotlib.use("Agg")
 
@@ -87,8 +86,8 @@ def test_a_complete_frame_plots_without_these_warnings():
     # and the summary would warn that the columns compare nothing
     df = pd.DataFrame(_rows("A", "D1") + _rows("B", "D1", 0.6)
                       + _rows("A", "D2", 0.3) + _rows("B", "D2", 0.4))
-    # bar's only warning: two methods (since 0.4); build_table has none
-    for fn, kw, want in ((mtb.plot.bar, {}, [TWO_METHODS]),
+    # no warning: the two-method warning went in r3 (Z15)
+    for fn, kw, want in ((mtb.plot.bar, {}, []),
                          (mtb.plot.build_table, {"aggregate": "summary"}, [])):
         _, msgs = _messages(fn, df, **kw)
         assert msgs == want, (fn, msgs)
@@ -99,7 +98,7 @@ def test_one_dataset_frame_needs_no_cross_dataset_warning():
     _, msgs = _messages(mtb.plot.bar, pd.DataFrame(_rows("A", "D1")))
     assert msgs == []
     _, msgs = _messages(mtb.plot.bar, pd.DataFrame(_rows("A", "D1") + _rows("B", "D1", 0.6)))
-    assert msgs == [TWO_METHODS]                   # the two-method warning (since 0.4)
+    assert msgs == []                              # no two-method warning (Z15, r3)
 
 
 def test_require_complete_drops_the_incomplete_method_without_a_coverage_warning():

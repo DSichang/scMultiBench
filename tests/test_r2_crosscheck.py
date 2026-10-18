@@ -1,6 +1,8 @@
 """Round 2 of the 0.4.0 cross-check: one test per fix and deprecation."""
 from __future__ import annotations
 
+import warnings
+
 import pytest
 
 import multibench as mtb
@@ -314,11 +316,11 @@ def test_rescore_leiden_warning_names_the_method(monkeypatch):
         obs = {}
     monkeypatch.setattr(scib, "_search_n_clusters",
                         lambda g, n, key, flavor: g.obs.update({key: _Ser()}) or False)
-    with pytest.warns(UserWarning, match=r"^No Leiden resolution gave 13 clusters, one per "
-                                         r"cell type, for scMM; using the 12 clusters"):
-        with workflow._named_leiden_warnings("scMM"):
-            scib._n_clusters(G(), 13, "leidenalg", per="cell type")
-    assert scib.FOR_METHOD.get() is None
+    # Y11 (r3): no warning at all, so nothing names a method
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        scib._n_clusters(G(), 13, "leidenalg", per="cell type")
+    assert not hasattr(workflow, "_named_leiden_warnings") and not hasattr(scib, "FOR_METHOD")
 
 
 class _Ser:
