@@ -572,7 +572,7 @@ def cite(*methods, format: str = "text") -> str:
     >>> import multibench as mtb
     >>> print(mtb.cite())                                  # the benchmark only
     >>> print(mtb.cite("Matilda", "MOFA2"))
-    >>> print(mtb.cite(mtb.load_batch("out/"), format="bibtex"))   # the methods that ran
+    >>> print(mtb.cite(mtb.load_batch("out/"), format="bibtex"))   # what ran
 
     Notes
     -----

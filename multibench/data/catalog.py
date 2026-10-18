@@ -333,8 +333,7 @@ _PAPER_COLUMNS = ["assay", "tissue", "n_cells", "n_batches", "source"]
 @_compat.keywords("catalog.datasets", private="_datasets", kept=_FILES_DIR,
                   positional=("files_dir",))
 def datasets(*, category: str | None = None) -> pd.DataFrame:
-    """The datasets: the benchmark's, and the demo subsets ``mtb.data.fetch``
-    downloads.
+    """The benchmark's datasets and the demo subsets ``mtb.data.fetch`` downloads.
 
     Parameters
     ----------

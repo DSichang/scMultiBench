@@ -1007,8 +1007,10 @@ def recommend(
     --------
     >>> import multibench as mtb
     >>> mtb.recommend("vertical", modalities=["rna", "adt"])
-    >>> mtb.recommend("vertical", methods=mtb.find_methods("vertical", needs_labels=False))
-    >>> mtb.recommend("vertical", long_df=pd.concat([mtb.load_results("vertical"), mine]))
+    >>> free = mtb.find_methods("vertical", needs_labels=False)
+    >>> mtb.recommend("vertical", methods=free)
+    >>> both = pd.concat([mtb.load_results("vertical"), mine])
+    >>> mtb.recommend("vertical", long_df=both)
     """
     return _recommend(category, modalities=modalities, methods=methods,
                       metrics=metrics, long_df=long_df)
