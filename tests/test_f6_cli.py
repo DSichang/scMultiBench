@@ -58,14 +58,14 @@ def test_name_alone_with_labels_writes_rows_with_that_name(diag, tmp_path, capsy
     assert "needs_labels" not in df.columns          # no package method to ask
 
 
-def test_name_without_method_or_labels_is_a_usage_error(diag, capsys):
+def test_name_without_method_or_labels_reads_the_dataset_labels(diag, capsys):
+    # 0.4.0 (Y09): --dataset and --category read the label files, as labels_for does
     d, emb = diag
-    with pytest.raises(SystemExit) as e:
-        cli.main(["evaluate", "--embedding", str(emb), "--name", "x", "--dataset", "D28",
-                  "--category", "diagonal"])
-    assert e.value.code == 2
-    assert ("Without --method, pass the label files with --labels, once per file, in "
-            "your embedding's cell order.") in capsys.readouterr().err
+    rc, err = _err(capsys, ["evaluate", "--embedding", str(emb), "--name", "x",
+                            "--dataset", "D28", "--category", "diagonal", "--metrics",
+                            "ASW"])
+    assert rc == 0
+    assert "# labels: rna_cty.csv, atac_cty.csv from D28, in that order" in err
 
 
 def test_unknown_method_with_name_says_leave_out_method(diag, capsys):
@@ -186,7 +186,7 @@ def test_name_help_says_method_can_be_left_out():
     parser = cli.build_parser()
     ev = next(a for a in parser._actions if a.dest == "command").choices["evaluate"]
     act = next(a for a in ev._actions if a.dest == "name")
-    assert act.help == "the row name in the long table, e.g. SCALEX_rerun"      # X95
+    assert act.help == "the row name in the long table (default: --method)"      # X95
 
 
 # ====================================================================== R6-08

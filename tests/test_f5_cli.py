@@ -154,13 +154,11 @@ def test_name_needs_a_package_method(diag, capsys):
             "your own embedding, leave out --method: --name mine --labels ") in err
 
 
-def test_name_without_method_needs_labels(diag, capsys):
+def test_name_without_method_reads_the_dataset_labels(diag, capsys):
     d, emb = diag
-    with pytest.raises(SystemExit) as e:
-        cli.main(["evaluate", "--embedding", str(emb), "--name", "x", "--dataset", "D28",
-                  "--category", "diagonal"])
-    assert e.value.code == 2
-    assert "Without --method, pass the label files with --labels" in capsys.readouterr().err
+    rc = cli.main(["evaluate", "--embedding", str(emb), "--name", "x", "--dataset", "D28",
+                   "--category", "diagonal", "--metrics", "ASW"])
+    assert rc == 0 and "from D28, in that order" in capsys.readouterr().err
 
 
 def test_unknown_method_with_labels_is_still_only_a_row_name(diag, tmp_path, capsys):
@@ -179,8 +177,8 @@ def test_evaluate_help_names_both_flags():
     helps = {a.option_strings[0]: a.help for a in pe._actions if a.option_strings}
     # one job per flag since 0.4.0 (X95)
     assert helps["--method"].startswith(
-        "the package method: picks its label order, and is the default row name")
-    assert helps["--name"].startswith("the row name in the long table, e.g. SCALEX_rerun")
+        "a package method: read the dataset's label files in its batch order")
+    assert helps["--name"].startswith("the row name in the long table (default: --method)")
 
 
 # ====================================================================== R5-10

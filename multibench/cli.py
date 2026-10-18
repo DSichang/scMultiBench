@@ -1237,10 +1237,20 @@ def _evaluate_labels(args, stack):
     """The ``labels=`` value of ``multibench evaluate``: the ``--labels`` file(s), or
     the dataset's label files in the method's cell order (``mtb.labels_for``)."""
     files = list(args.labels or [])
-    if not files:
-        if args.dataset is None or args.method is None or args.category is None:
-            _usage_error(args, "need --labels CSV (repeatable), or --dataset, --method "
-                         "and --category to read the dataset's label files")
+    if not files and args.method is None and args.dataset is not None \
+            and args.category is not None:
+        labels = multibench.labels_for(args.dataset, args.category, data_path=args.data_path)
+        if not labels:
+            raise ValueError(f"{args.dataset} has no label file. Pass one with --labels.")
+        print(f"# labels: {', '.join(Path(v).name for v in labels.values())} from "
+              f"{args.dataset}, in that order", file=sys.stderr)
+        if args.column is None:
+            return labels
+        files = list(labels.values())
+    elif not files:
+        if args.dataset is None or args.category is None:
+            _usage_error(args, "need --labels CSV (repeatable), or --dataset and "
+                         "--category to read the dataset's label files")
         try:
             spec = registry.get(args.method)
         except KeyError:
@@ -1394,9 +1404,6 @@ def _cmd_evaluate(args) -> int:
         if missing:
             _usage_error(args, "A long table needs --dataset, --category, and --method "
                          f"or --name. Missing: {', '.join(missing)}.")
-        if args.method is None and not args.labels:
-            _usage_error(args, "Without --method, pass the label files with --labels, "
-                         "once per file, in your embedding's cell order.")
     if name is not None and args.method is not None:
         try:
             registry.check_method(args.method)
@@ -2299,8 +2306,8 @@ def build_parser() -> argparse.ArgumentParser:
                          "as celltype or "
                          "obs:celltype: give it once, without --column. Repeat --labels "
                          "for several files. They are stacked in the order given, and "
-                         "each file counts as one batch. Without --labels, --dataset, "
-                         "--method and --category read the dataset's label files "
+                         "each file counts as one batch. Without --labels, --dataset "
+                         "and --category read the dataset's label files "
                          "(mtb.labels_for)")
     pe.add_argument("--data-path", dest="data_path",
                     help="with --dataset/--method/--category and no --labels: the "
@@ -2340,13 +2347,11 @@ def build_parser() -> argparse.ArgumentParser:
     pe.add_argument("--column", metavar="NAME",
                     help="the column to read in each --labels CSV when a file has "
                          "several columns")
-    pe.add_argument("--method", help="the package method: picks its label order, and "
-                                     "is the default row name. Needs --dataset and "
-                                     "--category")
-    pe.add_argument("--name", help="the row name in the long table, e.g. SCALEX_rerun")
-    pe.add_argument("--dataset", help="label the rows with this dataset id (needs "
-                                      "--category, and --method or --name); without "
-                                      "--labels its label files are read")
+    pe.add_argument("--method", help="a package method: read the dataset's label files "
+                                     "in its batch order (with --dataset, --category)")
+    pe.add_argument("--name", help="the row name in the long table (default: --method)")
+    pe.add_argument("--dataset", help="the dataset id of the rows (needs --category); "
+                                      "without --labels its label files are read")
     pe.add_argument("--out", help="CSV to write (default: print the table)")
     pe.set_defaults(func=_cmd_evaluate, _parser=pe)
 

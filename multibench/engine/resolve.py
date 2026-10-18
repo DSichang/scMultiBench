@@ -1313,8 +1313,9 @@ def _default_order_warning(dataset: str, category, stems: list[str],
         doer = who(names)
         method = repr(names[0]) if len(names) == 1 else "<method>"
         whose = "its" if len(names) == 1 else "their"
-        return (f"{head} {where}{doer} them in another order: pass "
-                f"labels_for({dataset!r}, {cat!r}, {method}) for {whose} output.")
+        fix = config.hint(f"labels_for({dataset!r}, {cat!r}, {method})",
+                          f"--method {method.strip(chr(39))}")
+        return f"{head} {where}{doer} them in another order: pass {fix} for {whose} output."
     parts = [f"in {cat}, {who(names)} them in another order" if i == 0
              else f"in {cat}, {_and_list(names)} {'does' if len(names) == 1 else 'do'}"
              for i, (cat, names) in enumerate(by_cat.items())]

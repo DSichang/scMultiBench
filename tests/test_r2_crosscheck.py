@@ -229,3 +229,39 @@ def test_evaluate_output_says_pass_the_embedding_first(tmp_path, capsys):
     cli.main(["evaluate", "--output", str(emb), "--labels", str(lab), "--metrics", "cLISI"])
     assert ("--output is deprecated and will be removed in 0.5. Pass the embedding as "
             "the first argument.") in capsys.readouterr().err
+
+
+# Y09 / X95: --dataset and --category read the label files without --method
+def test_cli_evaluate_dataset_without_method_reads_its_labels(tmp_path, capsys):
+    import numpy as np
+    from multibench import cli
+    n = sum(len(open(p).read().splitlines()) - 1
+            for p in mtb.labels_for("D52mini", "cross").values())
+    emb = tmp_path / "e.npy"
+    np.save(emb, np.random.default_rng(0).normal(size=(n, 5)))
+    rc = cli.main(["evaluate", str(emb), "--dataset", "D52mini", "--category", "cross",
+                   "--name", "mine", "--metrics", "cLISI"])
+    out = capsys.readouterr()
+    assert rc == 0 and "mine" in out.out
+    assert "# labels: cty1.csv, cty2.csv, cty3.csv from D52mini, in that order" in out.err
+
+
+def test_cli_evaluate_help_gives_each_flag_one_job(capsys):
+    from multibench import cli
+    with pytest.raises(SystemExit):
+        cli.main(["evaluate", "--help"])
+    text = " ".join(capsys.readouterr().out.split())
+    assert "the row name in the long table (default: --method)" in text
+    assert "a package method: read the dataset's label files in its batch order" in text
+
+
+# X67: labels_for without a method warns once per dataset and category
+def test_default_order_warning_once():
+    import warnings
+    from multibench.engine import resolve
+    resolve._ORDER_NOTED.clear()
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        mtb.labels_for("D52mini", "cross")
+        mtb.labels_for("D52mini", "cross")
+    assert len([x for x in w if "default order" in str(x.message)]) == 1

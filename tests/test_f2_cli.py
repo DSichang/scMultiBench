@@ -255,8 +255,8 @@ def test_evaluate_and_run_help_texts():
     assert "they replace the Leiden clusters of ARI, NMI, ASW, iASW and iF1" in clus
     meth = _opt_help(ev, "--method")
     # X95: one job per flag
-    assert meth.startswith("the package method: picks its label order, and is the "
-                           "default row name")
+    assert meth.startswith("a package method: read the dataset's label files in its "
+                           "batch order")
     assert "registry" not in meth
     dry = _opt_help(_sub("run"), "--dry-run")
     assert "environment activation included" in dry and "conda run -n" not in dry
