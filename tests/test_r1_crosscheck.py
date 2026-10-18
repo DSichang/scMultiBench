@@ -403,10 +403,10 @@ def test_x10_no_shared_barcode_names_both_spellings(tmp_path):
     atac = _adata()
     atac.obs_names = [f"AAAC{i}" for i in range(60)]
     atac.var_names = [f"chr1:{i * 100}-{i * 100 + 50}" for i in range(20)]
+    # round 2 (X10): names that match after removing a suffix say so
     with pytest.raises(ValueError, match=r"^RNA and ATAC share no barcode \(RNA e\.g\. "
-                                         r"AAAC0-1, ATAC e\.g\. AAAC0\)\. Make the names "
-                                         r"match; for different cells pass "
-                                         r'category="diagonal"\.$'):
+                                         r"AAAC0-1, ATAC e\.g\. AAAC0\)\. They match after "
+                                         r"removing '-1' from the RNA names\.$"):
         mtb.io.export_dataset(rna, tmp_path / "V", atac=atac, category="vertical")
 
 
@@ -417,8 +417,8 @@ def test_x12_a_label_file_without_ids_next_to_barcodes_warns(tmp_path):
     lab = tmp_path / "cty.csv"
     pd.DataFrame({"x": ["a", "b", "c"] * 20}).to_csv(lab, index=False)
     _, msgs = _messages(mtb.evaluate, a, labels=str(lab), metrics=["cLISI"])
-    assert ("cty.csv has no cell ids, so it is matched by position. Check that the "
-            "embedding rows follow the file.") in msgs
+    assert ("cty.csv has no cell ids, so its rows are matched to the embedding by "
+            "position.") in msgs
     b = _adata(names=False)
     b.obsm["X_pca"] = a.obsm["X_pca"]
     _, msgs = _messages(mtb.evaluate, b, labels=str(lab), metrics=["cLISI"])

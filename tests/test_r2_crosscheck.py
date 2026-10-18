@@ -394,3 +394,31 @@ def test_export_barcodes_that_differ_by_a_suffix():
     with pytest.raises(ValueError, match=r"\. Make the names match\.$"):
         mtb.io.export_dataset(rna, "/nonexistent/SUF", atac=_peak_adata(
             [f"x{i}" for i in range(30)]), atac_kind="peak", category="vertical")
+
+
+# Y17: export_dataset given a path says to read the file first
+def test_export_dataset_given_a_path():
+    with pytest.raises(TypeError, match=r"^export_dataset takes an AnnData or MuData "
+                                        r"object, not a path: read the file first"):
+        mtb.io.export_dataset("own/citeseq.h5ad", "/nonexistent/CITEP", adt="obsm:protein")
+
+
+# Y18: one file "has", once per file
+def test_position_note_grammar_and_once(tmp_path):
+    import warnings
+    import numpy as np
+    import pandas as pd
+    ad = pytest.importorskip("anndata")
+    a = ad.AnnData(np.zeros((60, 2)))
+    a.obs_names = [f"c{i}" for i in range(60)]
+    a.obsm["X_pca"] = np.random.default_rng(1).normal(size=(60, 4))
+    d = tmp_path / "LABS"
+    d.mkdir()
+    pd.DataFrame({"x": ["a", "b", "c"] * 20}).to_csv(d / "cty.csv", index=False)
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        for _ in range(2):
+            mtb.evaluate(a, labels=mtb.labels_for(str(d)), obsm="X_pca", metrics=["cLISI"])
+    said = [str(x.message) for x in w if "by position" in str(x.message)]
+    assert said == ["cty.csv has no cell ids, so its rows are matched to the embedding by "
+                    "position."]

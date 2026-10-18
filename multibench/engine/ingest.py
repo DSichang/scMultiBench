@@ -1412,6 +1412,9 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     mtb.describe_layout : the layout being produced and the role -> filename mapping.
     mtb.scan : confirm the folder is found and which methods can run on it.
     """
+    if isinstance(data, (str, os.PathLike)):
+        raise TypeError("export_dataset takes an AnnData or MuData object, not a path: "
+                        "read the file first, e.g. anndata.read_h5ad(path).")
     return _export_dataset(data, dataset_dir, rna=rna, adt=adt, atac=atac,
                            atac_kind=atac_kind, labels=labels, batch=batch, dtype=dtype,
                            category=category, adt_names=adt_names, batch_index=batch_index,

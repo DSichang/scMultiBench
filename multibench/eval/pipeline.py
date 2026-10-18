@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import contextvars
+import os
 import warnings
 from pathlib import Path
 
@@ -352,7 +353,7 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
                                 fix=_file_fix()):
             table.moved.append(name)
         if what == "labels" and first is None and _has_cell_ids(ids):
-            _compat.warn(_by_position_note(name), UserWarning)
+            _position_warning([name], [x])
         return io.by_id_column(
             vals, first, ids if unique else None, what=what, name=name,
             target="the embedding", order="the rows of the embedding",
@@ -412,10 +413,25 @@ def _has_cell_ids(ids) -> bool:
     return ids is not None and io._looks_like_ids(pd.Series(list(ids), dtype=object))
 
 
-def _by_position_note(name: str) -> str:
-    """The warning for a file without cell ids next to an embedding with them."""
-    return (f"{name} has no cell ids, so it is matched by position. Check that the "
-            f"embedding rows follow the file.")
+#: the label files :func:`_position_warning` named in this session
+_POSITION_NOTED: set = set()
+
+
+def _by_position_note(names: list) -> str:
+    """The warning for files without cell ids next to an embedding with them."""
+    if len(names) == 1:
+        return (f"{names[0]} has no cell ids, so its rows are matched to the embedding "
+                f"by position.")
+    return (f"{_and_list(names)} have no cell ids, so their rows are matched to the "
+            f"embedding by position.")
+
+
+def _position_warning(names: list, paths) -> None:
+    """:func:`_by_position_note`, once per set of files in a session."""
+    key = tuple(os.path.abspath(str(p)) for p in paths)
+    if key not in _POSITION_NOTED:
+        _POSITION_NOTED.add(key)
+        _compat.warn(_by_position_note(names), UserWarning)
 
 
 def _no_ids(ids) -> str:
@@ -451,8 +467,7 @@ def _stack_label_files(files, ids, as_written=False, table=None):
             no_ids=_no_ids(ids), n_files=len(names), drop=True)
         return vals[pos], origin[pos]
     if all(first is None for _, first in read) and _has_cell_ids(ids):
-        _compat.warn(_by_position_note(_and_list(names)).replace(" has no ", " have no "),
-                     UserWarning)
+        _position_warning(names, files)
     for (v, first), name in zip(read, names):
         io.by_id_column(v, first, None, what="labels", name=name, target="the embedding",
                         order=order, no_ids=(
