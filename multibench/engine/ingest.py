@@ -1048,8 +1048,11 @@ def _mudata_selector(mdata, spec):
 
 
 def _case_hint(col, columns) -> str:
-    """`` Did you mean 'celltype'?`` for a name that differs only in letter case."""
-    same = [str(c) for c in columns if str(c).lower() == str(col).lower()]
+    """`` Did you mean 'celltype'?`` for a name that differs only in letter case
+    or in underscores (``cell_type``)."""
+    def key(name):
+        return str(name).lower().replace("_", "")
+    same = [str(c) for c in columns if key(c) == key(col) and str(c) != str(col)]
     return f" Did you mean {same[0]!r}?" if len(same) == 1 else ""
 
 

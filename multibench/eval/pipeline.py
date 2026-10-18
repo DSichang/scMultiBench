@@ -321,10 +321,11 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
         if in_mod is not None:
             return np.asarray(in_mod)
         if not Path(x).is_file():
+            from ..engine.ingest import _case_hint
             raise ValueError(
                 f"{what}={x!r} is neither an obs column of the "
                 f"{type(adata).__name__} (obs columns: {_obs_choices(adata)}) nor an "
-                f"existing file")
+                f"existing file." + _case_hint(x.removeprefix("obs:"), _obs_choices(adata)))
     if _column_without_obs(x, adata):
         raise FileNotFoundError(_no_column_error(what, x))
     if isinstance(x, (str, Path)) and column is None:
