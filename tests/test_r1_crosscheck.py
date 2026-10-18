@@ -308,7 +308,11 @@ def test_x68_size_error_names_the_label_files_that_fit(tmp_path):
 
 
 def test_x68_dry_run_marks_the_nested_variant():
+    # r3: the default plan leaves the nested row out; with every combination it is marked
     plan = mtb.run_all("D52mini", "cross", methods=["UINMF"], dry_run=True, verbose=False)
+    assert "rna1+rna2+adt1+adt2" not in set(plan["modalities"])
+    plan = mtb.run_all("D52mini", "cross", methods=["UINMF"], modalities="all",
+                       dry_run=True, verbose=False)
     row = plan.set_index("modalities").loc["rna1+rna2+adt1+adt2"]
     assert "UINMF runs on rna1+rna2+rna3+adt1+adt2+adt3 instead, so this row is not " \
            "run." in row.caveat
@@ -344,8 +348,9 @@ def test_x79_scan_names_the_batch_renumbering(tmp_path, capsys, monkeypatch):
     monkeypatch.chdir(tmp_path)
     mtb.scan("./MYMOSAIC", "mosaic")
     out = capsys.readouterr().out
-    assert ("[scan] MYMOSAIC has batches 1 RNA+ATAC, 2 RNA, 3 ATAC. Methods read 1 RNA, "
-            "2 RNA+ATAC, 3 ATAC: renumber the files to match.") in out
+    assert ("[scan] Renumber the batches to 1 RNA, 2 RNA+ATAC, 3 ATAC (MYMOSAIC has "
+            "1 RNA+ATAC, 2 RNA, 3 ATAC).") in out
+    assert out.count("Renumber the batches") == 1                  # Z20 (r3): once
 
 
 def test_x11_a_local_folder_shadowed_by_the_data_path_is_named(tmp_path, monkeypatch):

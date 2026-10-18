@@ -208,7 +208,10 @@ class Variant:
     extra_outputs: list[OutputSpec] = field(default_factory=list)
     helpers: list = field(default_factory=list)     # modules upstream does not ship, from engine/helpers/<method>/
     size_hint: str = ""                # what the method needs from the data's size; starts with the method name
-    min_cells: int | None = None       # the cell total below which size_hint applies (None: always shown)
+    # the sizes below which size_hint applies; scan shows it only for such data
+    min_cells: int | None = None       # cells of the files the row reads, in total
+    min_cells_per_batch: int | None = None   # cells of each numbered batch
+    min_genes: int | None = None       # features of each RNA file
     downloads: list = field(default_factory=list)   # [{file, url}] the first run downloads next to the script
 
     def matches(self, category: str, modalities: set[str]) -> bool:

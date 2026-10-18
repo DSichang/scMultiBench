@@ -93,7 +93,7 @@ def test_gpu_refusal_is_one_plain_sentence_and_a_hint():
     reason = registry.get("moETM").requires_gpu_reason
     assert reason.startswith("moETM needs an NVIDIA GPU, and this computer has none.")
     assert "tools_scripts" not in reason and not re.search(r"\.py:\d+", reason)
-    assert 'method_info("moETM")["requires_gpu"]' in reason
+    assert reason == "moETM needs an NVIDIA GPU, and this computer has none."   # Z17 (r3)
 
 
 def test_gpu_refusal_names_the_cli_command_in_the_cli(tmp_path, no_gpu, monkeypatch, capsys):
@@ -104,7 +104,8 @@ def test_gpu_refusal_names_the_cli_command_in_the_cli(tmp_path, no_gpu, monkeypa
     rows = json.loads(capsys.readouterr().out)
     assert rc == 0
     row = next(r for r in rows if r["modalities"] == "rna+adt")
-    assert "multibench info moETM" in row["reason"]
+    # Z17 (r3): the sentence alone, in either spelling
+    assert row["reason"].endswith("moETM needs an NVIDIA GPU, and this computer has none.")
     assert "tools_scripts" not in row["reason"] and "method_info(" not in row["reason"]
 
 

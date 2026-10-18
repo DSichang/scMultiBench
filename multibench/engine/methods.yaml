@@ -24,6 +24,7 @@ methods:
       - when: {category: mosaic, modalities: [rna1, rna2, adt2, adt3]}
         entrypoint: tools_scripts/Multigrate/main_Multigrate_mosaic_rna_adt.py
         size_hint: "Multigrate needs about 1,300 cells in every batch of a mosaic run, 1,500 to be safe. It holds a tenth of the cells out for validation and draws 128 per batch. With fewer, training stops with an error about reconstruction_loss_validation."
+        min_cells_per_batch: 1300
         language: python
         args:
           - {role: rna1, flag: "--path1"}
@@ -36,6 +37,7 @@ methods:
       - when: {category: mosaic, modalities: [rna1, rna2, atac2, atac3]}
         entrypoint: tools_scripts/Multigrate/main_Multigrate_mosaic_rna_atac.py
         size_hint: "Multigrate needs about 1,300 cells in every batch of a mosaic run, 1,500 to be safe. It holds a tenth of the cells out for validation and draws 128 per batch. With fewer, training stops with an error about reconstruction_loss_validation."
+        min_cells_per_batch: 1300
         language: python
         args:
           - {role: rna1, flag: "--path1"}
@@ -121,6 +123,7 @@ methods:
         entrypoint: tools_scripts/Multigrate/main_Multigrate_rna_adt_atac_d46.py
         helpers: [main_Multigrate_rna_adt_atac_d46.py]
         size_hint: "Multigrate needs about 1,300 cells in every batch of a mosaic run, 1,500 to be safe. It holds a tenth of the cells out for validation and draws 128 per batch. With fewer, training stops with an error about reconstruction_loss_validation."
+        min_cells_per_batch: 1300
         language: python
         args:
           - {role: rna1, flag: "--path1"}
@@ -136,6 +139,7 @@ methods:
         entrypoint: tools_scripts/Multigrate/main_Multigrate_rna_adt_atac_d49.py
         helpers: [main_Multigrate_rna_adt_atac_d49.py]
         size_hint: "Multigrate needs about 1,300 cells in every batch of a mosaic run, 1,500 to be safe. It holds a tenth of the cells out for validation and draws 128 per batch. With fewer, training stops with an error about reconstruction_loss_validation."
+        min_cells_per_batch: 1300
         language: python
         args:
           - {role: rna1, flag: "--path1"}
@@ -285,7 +289,6 @@ methods:
       # Forced to CPU, as for scMSI (scMM does the same with its own --no_cuda flag).
       - when: {category: vertical, modalities: [rna, atac]}
         entrypoint: tools_scripts/scMVP/main_scMVP.py
-        size_hint: "scMVP drops every peak open in more than 10% of the cells and fails when none is left."
         language: python
         run_env:
           CUDA_VISIBLE_DEVICES: ""
@@ -576,6 +579,8 @@ methods:
       - when: {category: vertical, modalities: [rna, atac]}
         entrypoint: tools_scripts/MIRA/main_MIRA.py
         size_hint: "MIRA needs about 2,000 genes and several thousand cells. It failed on 1,000 genes and on 1,500 cells."
+        min_genes: 2000
+        min_cells: 3000
         helpers: [logger.py]          # copied from engine/helpers/MIRA/ before a run
         language: python
         args:
@@ -695,6 +700,7 @@ methods:
       - when: {category: diagonal, modalities: [rna, atac_gas]}
         entrypoint: tools_scripts/VIPCCA/main_VIPCCA.py
         size_hint: "VIPCCA selects 2,000 variable genes itself and fails on a dataset with fewer genes."
+        min_genes: 2000
         language: python
         args:
           - {role: rna, flag: "--path1"}
@@ -1306,7 +1312,7 @@ methods:
       - when: {category: diagonal, modalities: [rna, atac_gas]}
         entrypoint: tools_scripts/online iNMF/main_online_iNMF.Rmd
         size_hint: "online_iNMF needs about 5,000 cells in total. On fewer it stops with std::exception."
-        min_cells: 5000      # scan shows size_hint only for a folder with fewer cells
+        min_cells: 5000
         language: R
         args:
           - {role: rna}

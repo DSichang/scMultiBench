@@ -289,8 +289,8 @@ def test_dry_run_count_line_is_plain(no_envs, root, capsys, tmp_path):
                 data_path=root / "data")
     (line,) = [ln for ln in capsys.readouterr().out.splitlines()
                if ln.startswith("[run_all] Dry run:")]
-    assert " blocked. The table's reason column says why, and its files_ok and env_ok " \
-           "columns say which check failed. mtb.env.doctor() checks the environments." in line
+    assert line.endswith(" (vertical); the reason column says why.")    # Z19 (r3)
+    assert "doctor" not in line
     _no_log_joins(line)
 
 

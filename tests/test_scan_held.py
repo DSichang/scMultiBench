@@ -467,8 +467,8 @@ def test_named_methods_keep_the_error_of_0_3_4(no_envs):
 def test_dry_run_prints_the_note_after_its_count_line(no_envs, capsys):
     mtb.run_all("D11", "vertical", dry_run=True)
     out = capsys.readouterr().out.splitlines()
-    assert out[0].startswith("[run_all] Dry run: 0 of 14 requested methods can run on D11 "
-                             "(vertical). 14 are blocked. ")
+    assert out[0] == ("[run_all] Dry run: 0 of 14 requested methods can run on D11 "
+                      "(vertical); the reason column says why.")
     assert out[1] == ("[run_all] D11 holds RNA and ADT. Methods and variants that read ATAC "
                       'are not listed. modalities="all" lists them.')
     mtb.run_all("D11", "vertical", dry_run=True, modalities="all")

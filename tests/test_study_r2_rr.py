@@ -373,7 +373,8 @@ def test_labels_for_uinmf_returns_the_batches_it_reads(root):
 
 
 def test_scan_caveat_names_the_unused_batch(root):
-    df = full_scan("D52", "cross", data_path=root / "data", verbose=False)
+    # r3 (X68): the two-batch row is listed with every combination
+    df = full_scan("D52", "cross", data_path=root / "data", modalities="all", verbose=False)
     df = df[df.files_ok]
     by = df.set_index(["method", "modalities"])["caveat"]
     # the two-batch row also says that the three-batch row runs instead (X68)

@@ -398,8 +398,7 @@ def test_a_gpu_block_is_listed_without_the_linux_sentence(macos, mydata, monkeyp
     assert lines[2] == (f"{len(gpu)} of {len(plan)} methods {verb} also blocked by "
                         "something else:")
     assert [l.split(" (")[0].strip() for l in lines[3:3 + len(gpu)]] == gpu
-    assert lines[3].endswith("needs an NVIDIA GPU, and this computer has none. See "
-                             f"method_info(\"{gpu[0]}\")[\"requires_gpu\"].")
+    assert lines[3].endswith("needs an NVIDIA GPU, and this computer has none.")
     assert "not on this computer" not in msg
 
 

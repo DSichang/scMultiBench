@@ -386,15 +386,14 @@ PINNED = {
             "StabMap|mosaic|rna1+rna2+rna3+adt1+atac2",
             "UINMF|mosaic|rna1+rna2+rna3+adt1+atac2",
             "scMoMaT|mosaic|rna1+rna2+rna3+adt1+atac2"],
-    # D52's files also fit the mosaic pattern RNA | RNA + ADT | ADT, and both
-    # of UINMF's cross variants (two and three batches)
+    # D52's files also fit the mosaic pattern RNA | RNA + ADT | ADT; of UINMF's
+    # cross variants the plan lists the three-batch one that runs (X68, r3)
     "D52": ["Concerto|cross|rna1+rna2+rna3+adt1+adt2+adt3",
             "MOFA2|cross|rna1+rna2+rna3+adt1+adt2+adt3",
             "Multigrate|cross|rna1+rna2+rna3+adt1+adt2+adt3",
             "Multigrate|mosaic|rna1+rna2+adt2+adt3",
             "StabMap|cross|rna1+rna2+rna3+adt1+adt2+adt3",
             "StabMap|mosaic|rna1+rna2+adt2+adt3",
-            "UINMF|cross|rna1+rna2+adt1+adt2",
             "UINMF|cross|rna1+rna2+rna3+adt1+adt2+adt3",
             "scMoMaT|mosaic|rna1+rna2+adt2+adt3",
             "scMDC|cross|rna1+rna2+rna3+adt1+adt2+adt3",

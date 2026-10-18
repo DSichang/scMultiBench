@@ -64,7 +64,13 @@ def _parse_variant(d: dict, method_id: str | None = None) -> Variant:
         downloads=list(d.get("downloads", []) or []),
         size_hint=d.get("size_hint", "") or "",
         min_cells=d.get("min_cells"),
+        min_cells_per_batch=d.get("min_cells_per_batch"),
+        min_genes=d.get("min_genes"),
     )
+    # scan shows a size hint only for data below its size
+    if v.size_hint and not (v.min_cells or v.min_cells_per_batch or v.min_genes):
+        raise ValueError(f"methods.yaml: {method_id!r} {_variant_key(v.when)}: size_hint "
+                         f"needs min_cells, min_cells_per_batch or min_genes")
     # labels_for orders label files by this: a bad declaration fails at load
     try:
         v.stacked_roles()

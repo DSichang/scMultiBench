@@ -154,7 +154,7 @@ def test_the_glue_uinmf_and_raw_count_caveats_read_as_sentences(tmp_path, pinned
         "git. On a host without network, run multibench fetch --scripts first. GLUE reads "
         "inputs/atac_peak_normpeaks.h5."), glue["caveat"]
     uinmf = _quiet(full_scan, "D52", "cross", methods=["UINMF"], data_path=root / "data",
-                   verbose=False).iloc[0]
+                   modalities=["rna1", "rna2", "adt1", "adt2"], verbose=False).iloc[0]
     assert uinmf["caveat"].startswith("UINMF reads batches 1-2 of 3. Batch 3 is not used. "
                                       f"{SCRIPTS_NOTE}{pinned}.")
     tv = _quiet(full_scan, "LOGCITE", "vertical", methods=["totalVI"],
@@ -385,8 +385,9 @@ def test_run_all_dry_run_header_is_sentences(monkeypatch, capsys, tmp_path):
                          "--methods", "SCALEX,Portal,uniPort",
                          "--out-dir", str(tmp_path)], capsys)
     assert rc == 0
+    # Z18 (r3): none of the three reads a prepared file, so that mark is not explained
     assert re.search(r"^# Commands of the 3 methods whose input files are in place\. "
-                     r"\[env missing\] marks a method whose environment is not installed\. ",
+                     r"\[env missing\] marks a method whose environment is not installed\.$",
                      out, re.M), out
     assert re.match(r"# Dry run\. Nothing was executed\. 0 of 3 methods can run on D28 "
                     r"\(diagonal\)\.", err), err
@@ -409,10 +410,10 @@ def test_count_lines_say_methods_only_when_each_has_one_row(monkeypatch, capsys,
     assert f"of {len(d11)} rows have their input files." in capsys.readouterr().out
     mtb.run_all("D52", "cross", out_dir=tmp_path, dry_run=True,
                 methods=["sciPENN", "totalVI", "Concerto"])
-    assert "[run_all] Dry run: 0 of 3 requested methods can run on D52 (cross)." in \
+    assert "[run_all] Dry run: 0 of 3 requested methods can run on D52 (cross); " in \
         capsys.readouterr().out
     mtb.run_all("D52", "cross", out_dir=tmp_path, dry_run=True, modalities="all")
-    assert "[run_all] Dry run: 0 of 30 requested rows can run on D52 (cross)." in \
+    assert "[run_all] Dry run: 0 of 30 requested rows can run on D52 (cross); " in \
         capsys.readouterr().out
 
 

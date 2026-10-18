@@ -705,15 +705,18 @@ def _missing_files_reason(spec, category: str, mods: list, dataset: str,
         need = f"{spec.id} needs {want + ' ' if want else ''}ATAC"
         found = [p.parent / f"{b}{digits}.h5" for b in ("atac", "atac_peak", "atac_gas", "peak")]
         found = [f for f in found if f.is_file() and f.name != want_file]
-        # the right representation under a diagonal name: only the name is wrong
-        same = [f for f in found if category == "vertical" and want
+        # the right representation under another name: only the name is wrong
+        same = [f for f in found if want
                 and _atac_kind_of(f) == {"peak": "peaks",
                                          "gene-activity": "gene activity"}[want]]
-        if same:
+        if same and category == "vertical":
             atac_parts.append(
                 f"{spec.id} reads {want_file} for vertical. Rename {same[0].name} to "
                 f"{want_file}, or write it with " + config.hint('category="vertical"',
                                                                 "--category vertical"))
+        elif same:
+            atac_parts.append(f"{spec.id} reads {want_file}: rename {same[0].name} to "
+                              f"{want_file}")
         elif found:
             kinds = tuple(_atac_kind_of(f) for f in found)
             part = has_other.get((need, kinds))
@@ -1112,8 +1115,9 @@ def _renumber_hint(ds_dir: Path, category: str | None, mods=None) -> str:
         for perm in itertools.permutations(nums):
             moved = {perm[i]: have[b] for i, b in enumerate(nums)}
             if moved == want:
-                return (f"{ds_dir.name} has batches {_batch_desc(have)}. Methods read "
-                        f"{_batch_desc(want)}: renumber the files to match.")
+                # the action first: a clipped table column still shows it
+                return (f"Renumber the batches to {_batch_desc(want)} ({ds_dir.name} has "
+                        f"{_batch_desc(have)}).")
     return ""
 
 
@@ -1474,12 +1478,8 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
             notes = [n if n != spec.setup_hint else
                      "" if spec.id in _resolve._SAME_CELL_ROLES else _first_sentence(n)
                      for n in _runner.script_notes(spec, v, repo)]
-            if v.min_cells and v.size_hint in notes:
-                # the cells of the files this row reads (RNA and ATAC cells add up)
-                sizes = _cells_per_file(ds_dir)
-                total = sum(sizes.get(Path(str(p)).name) or 0 for p in got.values())
-                if total >= v.min_cells:           # the folder is large enough
-                    notes.remove(v.size_hint)
+            if v.size_hint in notes and not _too_small(v, got, ds_dir):
+                notes.remove(v.size_hint)          # the folder is large enough
             notes = [n for n in notes if n] + prepared
             if notes:
                 rec["caveat"] = _join_sentences([rec["caveat"], *notes])
@@ -1516,9 +1516,14 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
         private = private[keep].reset_index(drop=True)
     if every or modalities is None:
         # a smaller combination of a method next to a larger one whose files are
-        # there too is not run: its row says so, whatever this host can run
+        # there too is not run: left out of the plan, or with every combination
+        # its row says so, whatever this host can run
         with_files = df[df["files_ok"].astype(bool)]
-        for i in _nested_rows(with_files)[0]:
+        nested = _nested_rows(with_files)[0]
+        if not every and nested:
+            df = df.drop(index=nested).reset_index(drop=True)
+            private = private.drop(index=nested).reset_index(drop=True)
+        for i in nested if every else ():
             note = (f"{df.at[i, 'method']} runs on {_nested_full(with_files, i)} "
                     f"instead, so this row is not run.")
             old = str(df.at[i, "caveat"] or "")
@@ -1544,6 +1549,32 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
             line += f" {doctor} checks the environments."
         print(line, flush=True)
     return df, private
+
+
+def _too_small(variant, inputs: dict, ds_dir: Path) -> bool:
+    """Whether the files a row reads are below a size its ``size_hint`` names
+    (``min_cells``, ``min_cells_per_batch``, ``min_genes``); an unreadable size
+    counts as below."""
+    files = [Path(str(p)).name for p in inputs.values() if str(p).endswith(".h5")]
+    sizes = _cells_per_file(ds_dir)
+    if variant.min_cells and sum(sizes.get(f) or 0 for f in files) < variant.min_cells:
+        return True
+    if variant.min_cells_per_batch:
+        per: dict = {}
+        for f in files:
+            m = re.search(r"(\d+)\.h5$", f)
+            if m:
+                per[m.group(1)] = max(per.get(m.group(1), 0), sizes.get(f) or 0)
+        if not per or min(per.values()) < variant.min_cells_per_batch:
+            return True
+    if variant.min_genes:
+        for f in files:
+            if f.startswith("rna"):
+                path = ds_dir / f
+                sniff = path.is_file() and _resolve._sniff_h5(str(path), path.stat().st_mtime_ns)
+                if not sniff or sniff[1] < variant.min_genes:
+                    return True
+    return False
 
 
 def _row_paths(row, dataset, data_path) -> dict:
@@ -1664,7 +1695,9 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
         print(f"[scan] {renumber}", flush=True)
     if not several:                   # one category: why each method cannot run
         for method, reason in sorted(reasons):
-            if reason and reason != renumber:
+            # the renumber sentence was printed once above
+            reason = reason.replace(renumber, "").strip() if renumber else reason
+            if reason:
                 print(f"[scan] {method}: {reason}", flush=True)
     would = [i for i, r in df.iterrows() if _would_run(r)]
     if nested:
@@ -2656,8 +2689,9 @@ def _error_tail(error, width: int = 200) -> str:
 
 def _scan_hint(dataset: str, category: str, *, data_path=None, methods=None,
                modalities=None, allow_atac_mismatch: bool = False,
-               assume_gpu: bool = False, every: bool = False) -> str:
-    """The ``mtb.run_all(..., dry_run=True)`` call (or ``multibench scan`` command)
+               assume_gpu: bool = False, every: bool = False, dry_run_cli: bool = False) -> str:
+    """The ``mtb.run_all(..., dry_run=True)`` call (or ``multibench scan`` command;
+    ``dry_run_cli``: ``multibench run-all ... --dry-run``, which prints the commands)
     that shows the rows of a ``run_all`` call, with every non-default argument as
     the caller gave it. A folder outside the default data path is named by its
     path, as the docs teach (relative to the working directory when inside it)."""
@@ -2682,8 +2716,10 @@ def _scan_hint(dataset: str, category: str, *, data_path=None, methods=None,
     if assume_gpu:
         py.append("assume_gpu=True")
         cli.append("--assume-gpu")
+    cli_text = " ".join(shlex.quote(str(a)) for a in cli)
     return config.hint(f"mtb.run_all({', '.join(py + ['dry_run=True'])})",
-                       "multibench scan " + " ".join(shlex.quote(str(a)) for a in cli))
+                       f"multibench run-all {cli_text} --dry-run" if dry_run_cli
+                       else f"multibench scan {cli_text}")
 
 
 def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame,
@@ -2726,6 +2762,9 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
         head = (f"None of the requested methods ({', '.join(methods)}) can run on "
                 if methods else "No method can run on ") + f"{dataset} ({category})."
         what = "the plan" if methods else "the listed rows" if note else "every row"
+        where = _scan_hint(dataset, category, data_path=data_path, methods=methods,
+                           modalities=modalities, allow_atac_mismatch=allow_atac_mismatch,
+                           assume_gpu=assume_gpu, every=every, dry_run_cli=True)
         return f"{head}\n{platform}" + (f"{note}\n" if note else "") + f"{where} shows {what}."
     if methods:
         head = (f"None of the requested methods ({', '.join(methods)}) can run on "
@@ -3225,7 +3264,10 @@ def _nested_rows(plan: "pd.DataFrame") -> tuple[list, list[str]]:
     """``(indices, notes)``: the rows a sweep without ``modalities=`` leaves out
     because another row of the method holds their modalities, and why."""
     drop, notes = [], []
-    for method, rows in plan.groupby("method", sort=False):
+    # within one category: a scan without one also lists the other categories' rows
+    keys = ["method", "category"] if "category" in plan.columns else ["method"]
+    for key, rows in plan.groupby(keys, sort=False):
+        method = key[0] if isinstance(key, tuple) else key
         sets = {i: set(str(mods).split("+")) for i, mods in rows["modalities"].items()}
         inside = [i for i, a in sets.items() if any(a < b for b in sets.values())]
         if not inside:
@@ -3244,6 +3286,8 @@ def _nested_full(plan: "pd.DataFrame", i) -> str:
     """The largest modality combination of row ``i``'s method that holds row
     ``i``'s modalities."""
     rows = plan[plan["method"] == plan.at[i, "method"]]
+    if "category" in plan.columns:
+        rows = rows[rows["category"] == plan.at[i, "category"]]
     mine = set(str(plan.at[i, "modalities"]).split("+"))
     bigger = [str(m) for m in rows["modalities"] if mine < set(str(m).split("+"))]
     return max(bigger, key=lambda m: len(m.split("+")))
@@ -3541,14 +3585,8 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         if verbose:
             k, n = int(plan_df["runnable"].sum()), len(plan_df)
             msg = (f"[run_all] Dry run: {k} of {n} requested {_rows_word(plan_df, n)} "
-                   f"can run on {dataset} ({category}).")
-            if n > k:
-                doctor = config.hint("mtb.env.doctor()", "multibench env doctor")
-                msg += (f" {n - k} {'is' if n - k == 1 else 'are'} blocked. The table's "
-                        f"reason column says why, "
-                        f"and its files_ok and env_ok columns say which check "
-                        f"failed. {doctor} checks the environments.")
-            print(msg, flush=True)
+                   f"can run on {dataset} ({category})")
+            print(msg + ("; the reason column says why." if n > k else "."), flush=True)
             if not_listed:
                 print(f"[run_all] {not_listed}", flush=True)
             wrong_ref = _scripts_ref_note()

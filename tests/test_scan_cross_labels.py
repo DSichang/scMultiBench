@@ -57,7 +57,11 @@ def _rna_adt_rows(df):
     that read ATAC lack their files in such a folder."""
     rows = df[~df["modalities"].str.contains("atac") & (df["modalities"] != "(data_dir)")]
     assert not df.drop(index=rows.index)["files_ok"].any()
-    assert len(rows) == 11 and rows["method"].nunique() == 10
+    # r3 (X68): with its files in place the two-batch row is left out of the plan
+    two = (rows["method"] == "UINMF") & (rows["modalities"] == "rna1+rna2+adt1+adt2")
+    assert len(rows) == (11 if not rows["files_ok"].all() else 10) and not (
+        two.any() and rows["files_ok"].all())
+    assert rows["method"].nunique() == 10
     return rows
 
 

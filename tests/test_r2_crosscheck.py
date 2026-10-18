@@ -215,8 +215,8 @@ def test_mosaic_batches_numbered_wrong_say_renumber_in_the_reason(tmp_path, caps
     for f in ("rna1.h5", "atac1.h5", "rna2.h5", "atac3.h5", "cty1.csv", "cty2.csv",
               "cty3.csv"):
         (d / f).write_text("")
-    hint = ("MOSBAD has batches 1 RNA+ATAC, 2 RNA, 3 ATAC. Methods read 1 RNA, "
-            "2 RNA+ATAC, 3 ATAC: renumber the files to match.")
+    # r3: the action first, so a clipped column keeps it
+    hint = "Renumber the batches to 1 RNA, 2 RNA+ATAC, 3 ATAC (MOSBAD has 1 RNA+ATAC, 2 RNA, 3 ATAC)."
     plan = mtb.run_all(str(d), "mosaic", methods=["Cobolt"], out_dir=str(tmp_path / "o"),
                        dry_run=True, verbose=False)
     assert plan.loc[0, "reason"].startswith(hint)
@@ -224,6 +224,8 @@ def test_mosaic_batches_numbered_wrong_say_renumber_in_the_reason(tmp_path, caps
     cli.main(["scan", str(d), "--category", "mosaic", "--methods", "Cobolt",
               "--format", "csv"])
     assert hint in capsys.readouterr().out
+    cli.main(["scan", str(d), "--category", "mosaic", "--methods", "Cobolt"])
+    assert "Renumber the batches" in capsys.readouterr().out          # the clipped table
 
 
 # X43: config --get takes only the settings it prints

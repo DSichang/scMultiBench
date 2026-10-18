@@ -297,8 +297,8 @@ def test_scan_reason_is_sentences_with_their_own_subjects(tmp_path, monkeypatch)
         f"allow_atac_mismatch=True to run GLUE anyway.")
     moetm = _quiet(full_scan, "D11", "vertical", methods=["moETM"], verbose=False).iloc[0]
     assert moetm["reason"] == (
-        f"Environment {moetm['env']} runs only on Linux, not on this computer. moETM needs an NVIDIA GPU, and this computer has none. See "
-        f"method_info(\"moETM\")[\"requires_gpu\"].")
+        f"Environment {moetm['env']} runs only on Linux, not on this computer. moETM needs an "
+        f"NVIDIA GPU, and this computer has none.")
     assert ";" not in moetm["reason"]
 
 
@@ -326,8 +326,8 @@ def test_count_lines_say_rows_without_plural_brackets(monkeypatch, capsys, tmp_p
                    f"environment installed. mtb.env.doctor() checks the environments.\n")
     mtb.run_all("D11", "vertical", out_dir=tmp_path, dry_run=True, modalities="all")
     line = next(l for l in capsys.readouterr().out.splitlines() if "Dry run" in l)
-    assert line.startswith(f"[run_all] Dry run: 0 of {n} requested rows can run on D11 "
-                           f"(vertical). {n} are blocked. The table's reason column")
+    assert line == (f"[run_all] Dry run: 0 of {n} requested rows can run on D11 "
+                    f"(vertical); the reason column says why.")
     with pytest.raises(ValueError) as e:
         mtb.run_all("D11", "vertical", out_dir=tmp_path, verbose=False, modalities="all")
     assert f"\nThe first 3 of {n} blocked rows:\n" in str(e.value)
@@ -346,9 +346,10 @@ def test_cli_dry_run_headers_are_sentences(monkeypatch, capsys, tmp_path):
         "# Dry run. Nothing was executed. 0 of 1 method can run on D11 (vertical). The "
         "commands below are what multibench run would execute. A method whose input "
         "files are missing has no command.\n")
+    # Z18 (r3): a mark is explained only when a row carries it
     assert ("# Commands of the 1 method whose input files are in place. [env missing] marks "
-            "a method whose environment is not installed. [use multibench run] marks a "
-            "command that reads a file multibench run writes first.") in cap.out
+            "a method whose environment is not installed.\n") in cap.out
+    assert "[use multibench run]" not in cap.out
     for text in (cap.out, cap.err):
         assert "`" not in text and "(s)" not in text
 

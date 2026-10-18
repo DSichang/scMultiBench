@@ -1145,12 +1145,16 @@ def _run_all_command(args, stack) -> int:
                      compact=workflow.compact_columns(df))
         if args.format == "table" and not columns:
             have = df[df["command"].astype(str).str.len() > 0]
+            missing = not have["env_ok"].astype(bool).all()
+            prepared = any(_prepared_at(c or "") >= 0 for c in have.get("caveat", []))
             print()
+            # each mark is explained only when a row carries it
             print(f"# Commands of the {len(have)} {_rows_word(df, len(have))} "
-                  f"whose input files are in place. [env missing] marks a "
-                  f"{_rows_word(df, 1)} whose environment is not installed. "
-                  f"[use multibench run] marks a command that reads a file "
-                  f"multibench run writes first.")
+                  f"whose input files are in place."
+                  + (f" [env missing] marks a {_rows_word(df, 1)} whose environment is "
+                     f"not installed." if missing else "")
+                  + (" [use multibench run] marks a command that reads a file "
+                     "multibench run writes first." if prepared else ""))
             for _, r in have.iterrows():
                 tag = "" if r["env_ok"] else " [env missing]"
                 if _prepared_at(r.get("caveat", "")) >= 0:
