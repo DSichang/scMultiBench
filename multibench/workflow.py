@@ -1093,12 +1093,12 @@ def _batch_desc(batches: dict) -> str:
                      for b, fams in sorted(batches.items()))
 
 
-def _renumber_hint(ds_dir: Path, category: str | None) -> str:
+def _renumber_hint(ds_dir: Path, category: str | None, mods=None) -> str:
     """For a folder whose numbered batches match an accepted pattern of
-    ``category`` only after renumbering: what it holds and what the methods
-    read; ``""`` otherwise."""
+    ``category`` (of the variant reading ``mods``, when given) only after
+    renumbering: what it holds and what the methods read; ``""`` otherwise."""
     import itertools
-    from .engine.schema import _batch_of
+    from .engine.schema import _batch_of, modality_family
     if category not in ("mosaic", "cross"):
         return ""
     have: dict = {}
@@ -1110,7 +1110,9 @@ def _renumber_hint(ds_dir: Path, category: str | None) -> str:
     if len(have) < 2:
         return ""
     nums = sorted(have)
-    for roles, _methods in batch_patterns(category):
+    patterns = ([[modality_family(m) for m in mods]] if mods else
+                [roles for roles, _methods in batch_patterns(category)])
+    for roles in patterns:
         want: dict = {}
         for r in roles:
             want.setdefault(_batch_of(r), set()).add(_family(r.rstrip("0123456789")))
@@ -1434,7 +1436,8 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
             full = f"{type(e).__name__}: {e}"
             file_problems.append(full)
             short_problems.append(
-                _missing_files_reason(spec, cat, mods, dataset, data_path)
+                _renumber_hint(ds_dir, cat, mods)
+                or _missing_files_reason(spec, cat, mods, dataset, data_path)
                 or _short_reason(full, spec.id, dataset))
         if file_problems:
             rec["files_ok"], rec["files_reason"] = False, " ".join(file_problems)
@@ -1660,7 +1663,7 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
         print(f"[scan] {renumber}", flush=True)
     if not several:                   # one category: why each method cannot run
         for method, reason in sorted(reasons):
-            if reason:
+            if reason and reason != renumber:
                 print(f"[scan] {method}: {reason}", flush=True)
     would = [i for i, r in df.iterrows() if _would_run(r)]
     if nested:

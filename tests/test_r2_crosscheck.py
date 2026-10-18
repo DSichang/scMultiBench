@@ -188,3 +188,22 @@ def test_cmd_template_env_cmd_in_quotes(tmp_path):
                    dry_run=True, cmd_template="sbatch --wrap '{env_cmd}'")
     assert argv[:2] == ["sbatch", "--wrap"] and len(argv) == 3
     assert argv[2].startswith("conda run -n ") or " run_matilda.py " in argv[2]
+
+
+# X79: the renumber hint is each blocked row's reason, so every view shows it
+def test_mosaic_batches_numbered_wrong_say_renumber_in_the_reason(tmp_path, capsys):
+    from multibench import cli
+    d = tmp_path / "MOSBAD"
+    d.mkdir()
+    for f in ("rna1.h5", "atac1.h5", "rna2.h5", "atac3.h5", "cty1.csv", "cty2.csv",
+              "cty3.csv"):
+        (d / f).write_text("")
+    hint = ("MOSBAD has batches 1 RNA+ATAC, 2 RNA, 3 ATAC. Methods read 1 RNA, "
+            "2 RNA+ATAC, 3 ATAC: renumber the files to match.")
+    plan = mtb.run_all(str(d), "mosaic", methods=["Cobolt"], out_dir=str(tmp_path / "o"),
+                       dry_run=True, verbose=False)
+    assert plan.loc[0, "reason"].startswith(hint)
+    capsys.readouterr()
+    cli.main(["scan", str(d), "--category", "mosaic", "--methods", "Cobolt",
+              "--format", "csv"])
+    assert hint in capsys.readouterr().out
