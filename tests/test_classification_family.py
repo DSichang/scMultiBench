@@ -369,8 +369,10 @@ def test_bubble_grey_columns_with_a_method_without_values():
     lg.loc[lg.method == "M2", "value"] += 0.01
     _, said = _caught(mtb.plot.build_table, lg)
     grey = [m for m in said if "grey" in m]
+    # the family only M1 has does not count in its Overall (0.4.0, X07), said with it
     assert len(grey) == 1 and grey[0].endswith(
-        "for every method with a value. Those columns are grey.")
+        "for every method with a value. Those columns are grey. Classification has a "
+        "value for one method only, so it does not count in the row Overall.")
     assert "for every method." not in grey[0]
 
 

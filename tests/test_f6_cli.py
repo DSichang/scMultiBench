@@ -215,9 +215,10 @@ def test_python_overlay_with_a_stored_name_names_to_long():
                    ignore_index=True)
     with pytest.raises(ValueError) as e:
         mtb.plot.build_table(df)
+    # an advice that works on any long frame (0.4.0, X16)
     assert str(e.value) == ("Your rows and the stored table both have uniPort on D28. "
-                            "Give your rows another name, such as uniPort_rerun, with "
-                            "to_long(method=...).")
+                            "Give your rows another name, e.g. "
+                            "rows.assign(method=\"uniPort_rerun\").")
 
 
 def test_a_user_source_that_starts_like_a_stored_one_is_not_stored():
@@ -292,7 +293,7 @@ def _stored(ds):
 def test_plot_messages_are_sentences(tmp_path, capsys):
     from multibench.plot import style
     own = _stored("D11").query("method == 'Matilda'").assign(
-        method="PriyaNet", source="user", scored_with="igraph/sweep/0.3.2")
+        method="PriyaNet", source="user", scored_with="igraph/search/0.4.0")
     msg = style.backend_warning(pd.concat([_stored("D11"), own], ignore_index=True))
     assert msg.startswith("The rows for PriyaNet were clustered with the igraph Leiden "
                           "backend. The stored tables used leidenalg, which can move ARI "

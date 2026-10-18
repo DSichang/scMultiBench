@@ -300,7 +300,7 @@ def describe_layout(category: str | None = None) -> str:
               "per cell.",
               "",
               "Each method runs in its own environment, on Linux. Install one with:",
-              "  multibench env install --methods X --run",
+              "  multibench env install --methods X",
               config.hint("mtb.scan says which methods can run on the folder, and why "
                           "not the rest (columns runnable, reason).",
                           "multibench scan checks the files and the environment of each "
@@ -310,7 +310,7 @@ def describe_layout(category: str | None = None) -> str:
                   f"mtb.run_all('MYDATA', '{cat}', out_dir='out/')",
                   f"Next: multibench scan MYDATA --category {cat}, then, on Linux, "
                   f"multibench run-all MYDATA --category {cat} --out-dir out/")]
-    return "\n".join(lines)
+    return _compat.Text("\n".join(lines))
 
 
 #: The modality files of the demo datasets (``mtb.data.fetch``); ``describe_layout``
@@ -631,11 +631,11 @@ def _env_hint(env: str, method: str, category: str | None, other=None) -> str:
         return f"Environment {env} runs only on Linux, not on this computer."
     if other is not None:
         return envs.other_env_text(env, other, f"run multibench env install --methods "
-                                                f"{method} --run.")
+                                                f"{method}.")
     alt = (f" Use --category {category} to install the environments of every "
            f"{category} method." if category else "")
     return (f"Environment {env} is not installed. Run "
-            f"multibench env install --methods {method} --run.{alt}")
+            f"multibench env install --methods {method}.{alt}")
 
 
 #: ``.format(method=)`` caveat of a GPU-only row that ``scan(assume_gpu=True)``
@@ -1179,14 +1179,19 @@ def _lacking(families) -> str:
 
 
 def _not_listed_note(df: "pd.DataFrame", dataset: str, ds_dir: Path,
-                     category: str | None = None) -> str:
-    """What the folder holds, how many rows are not listed, and how to list them."""
+                     category: str | None = None, *, count_methods: bool = False) -> str:
+    """What the folder holds, how many rows are not listed, and how to list them;
+    ``count_methods`` adds how many methods have no listed row (the command
+    line's table, one row per variant, next to scan's count of methods)."""
     d, one = df.attrs["not_listed"], df.attrs["not_listed"] == 1
     b = df.attrs.get("not_listed_batch", 0)
     parts = []
     if d:
-        parts.append(f"{d} {'row that reads' if one else 'rows that read'} "
-                     f"{_lacking(df.attrs['not_held'])} {'is' if one else 'are'} not listed.")
+        k = df.attrs.get("not_listed_methods", d) if count_methods else 0
+        of = f" ({k} {'method' if k == 1 else 'methods'})" if 0 < k != d else ""
+        parts.append(f"{d} {'row' if one else 'rows'}{of} that "
+                     f"{'reads' if one else 'read'} {_lacking(df.attrs['not_held'])} "
+                     f"{'is' if one else 'are'} not listed.")
     if b:
         parts.append(f"{b} {'row' if b == 1 else 'rows'} for numbered batches "
                      f"{'is' if b == 1 else 'are'} not listed.")
@@ -1196,16 +1201,23 @@ def _not_listed_note(df: "pd.DataFrame", dataset: str, ds_dir: Path,
             + f" {_all_spelling()} lists {'it' if every == 1 else 'them'}.")
 
 
-def _batch_listed(df: "pd.DataFrame", ds_dir: Path, keep) -> list:
-    """One flag per row: ``False`` for a row whose files are missing and whose
-    numbered batches the folder does not hold; all ``True`` when that would
-    leave no row."""
+def _batch_listed(df: "pd.DataFrame", ds_dir: Path, keep, methods=None) -> list:
+    """One flag per row: ``False`` for a row for numbered batches when the
+    folder holds one batch (no numbered file); all ``True`` when that would
+    leave no row. A named method with no other row keeps its rows, as in
+    :func:`_listed`."""
     have = _resolve._folder_batches(ds_dir)
+    if have:
+        # a numbered folder may lack a batch file: those rows say which
+        return [True] * len(df)
     flags = []
     for mods, ok in zip(df["modalities"], df["files_ok"]):
         nums = {int(t[len(t.rstrip("0123456789")):]) for t in str(mods).split("+")
                 if t[-1:].isdigit()}
         flags.append(bool(ok) or not nums or nums <= have)
+    if methods:
+        left = set(df["method"][[k and f for k, f in zip(keep, flags)]])
+        flags = [f or m not in left for f, m in zip(flags, df["method"])]
     if not any(k and f for k, f in zip(keep, flags)):
         return [True] * len(df)
     return flags
@@ -1222,16 +1234,16 @@ def _scan_note(df: "pd.DataFrame", dataset: str, data_path=None,
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")       # scan warned about the spelling
         dataset = _resolve.canonical_dataset(base, dataset)
-    return _not_listed_note(df, dataset, base / dataset, category)
+    return _not_listed_note(df, dataset, base / dataset, category, count_methods=True)
 
 
 @_compat.keywords("scan", private="_scan_methods", dropped=("out_dir",),
-                  kept={"per_method": _compat.use("run_all(..., dry_run=True)")})
+                  kept={"per_method": _compat.use("run_all(..., dry_run=True)"),
+                        "params": _compat.use("run_all(..., params=..., dry_run=True)")})
 def scan(dataset: str, category: str | None = None, *,
          methods: list[str] | None = None,
          modalities: list[str] | str | None = None,
          data_path: Path | str | None = None,
-         params: dict | None = None,
          verbose: bool = True,
          assume_gpu: bool = False,
          allow_atac_mismatch: bool = False) -> pd.DataFrame:
@@ -1258,9 +1270,6 @@ def scan(dataset: str, category: str | None = None, *,
     data_path : Path | str | None
         Folder that holds the dataset folder; ``None`` =
         ``mtb.config.DEFAULT.data_path``.
-    params : dict | None
-        ``{method: {key: value}}`` hyperparameters to check against the keys
-        each method accepts.
     verbose : bool
         Print what the folder holds, the cells per file and each reason.
     assume_gpu : bool
@@ -1288,7 +1297,7 @@ def scan(dataset: str, category: str | None = None, *,
         Unknown ``category`` or modality token, or a method in ``methods``
         without a variant there.
     KeyError
-        Unknown method id, or a ``params`` key no variant accepts.
+        Unknown method id.
 
     Examples
     --------
@@ -1303,7 +1312,7 @@ def scan(dataset: str, category: str | None = None, *,
     mtb.env.doctor : the environment check on its own.
     """
     return _scan_methods(dataset, category, methods=methods, modalities=modalities,
-                         data_path=data_path, params=params, verbose=verbose,
+                         data_path=data_path, verbose=verbose,
                          assume_gpu=assume_gpu, allow_atac_mismatch=allow_atac_mismatch)
 
 
@@ -1366,7 +1375,6 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
     wrong_ref = config.scripts_ref_problem(repo) or config.scripts_folder_problem(repo) or ""
     rows = []
     dropped_dirs: list[str] = []
-    total_cells = None             # counted once, for a variant with min_cells
     off_linux = bool(_runner.linux_only_sentence())
     others: dict = {}          # env -> a same-named env multibench did not install
     reps = _token_reps(modalities) if modalities is not None else set()
@@ -1454,9 +1462,10 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
                      "" if spec.id in _resolve._SAME_CELL_ROLES else _first_sentence(n)
                      for n in _runner.script_notes(spec, v, repo)]
             if v.min_cells and v.size_hint in notes:
-                if total_cells is None:
-                    total_cells = sum(c or 0 for c in _cells_per_file(ds_dir).values())
-                if total_cells >= v.min_cells:     # the folder is large enough
+                # the cells of the files this row reads (RNA and ATAC cells add up)
+                sizes = _cells_per_file(ds_dir)
+                total = sum(sizes.get(Path(str(p)).name) or 0 for p in got.values())
+                if total >= v.min_cells:           # the folder is large enough
                     notes.remove(v.size_hint)
             notes = [n for n in notes if n] + prepared
             if notes:
@@ -1486,13 +1495,24 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
     # a variant for numbered batches the folder does not have (a batched
     # variant next to a one-batch folder) is not listed either
     batch_keep = ([True] * len(df) if every or modalities is not None
-                  else _batch_listed(df, ds_dir, keep))
+                  else _batch_listed(df, ds_dir, keep, methods))
     n_batch_out = sum(k and not b for k, b in zip(keep, batch_keep))
     keep = [k and b for k, b in zip(keep, batch_keep)]
     if not all(keep):
         df = df[keep].reset_index(drop=True)
         private = private[keep].reset_index(drop=True)
+    if every or modalities is None:
+        # a smaller combination of a method next to a larger one whose files are
+        # there too is not run: its row says so, whatever this host can run
+        with_files = df[df["files_ok"].astype(bool)]
+        for i in _nested_rows(with_files)[0]:
+            note = (f"{df.at[i, 'method']} runs on {_nested_full(with_files, i)} "
+                    f"instead, so this row is not run.")
+            old = str(df.at[i, "caveat"] or "")
+            df.at[i, "caveat"] = f"{old} {note}".strip()
     df.attrs.update(held=held, not_listed=len(left_out), not_listed_batch=n_batch_out,
+                    # the methods with no listed row, as scan's own line counts them
+                    not_listed_methods=len({m for m, _ in left_out} - set(df["method"])),
                     not_held=[f for f in registry._BASE_MODALITIES
                               if any(f in lack for _, lack in left_out)])
     private.attrs.update(dataset=dataset, folder=ds_dir, unlisted=left_out,
@@ -2053,7 +2073,8 @@ class BatchResult:
             emb_shape               [cells, dims] of the embedding
             n_tunable               number of command-line hyperparameters
             label_order             label file(s) the metrics used, in order
-            label_order_confidence  how clearly that order won, 0-1
+            label_order_confidence  how clearly that order won, 0-1 (blank:
+                                    label_order_note says why)
             label_order_note        why the confidence is blank
             batch_source            'file_of_origin' / 'user' / None
             n_batches               distinct batches used (1 = none)
@@ -2282,7 +2303,9 @@ class BatchResult:
         """Score the saved outputs again with new labels, batch or metrics.
 
         No method is re-run. Each record's embedding is read back from its
-        ``out_dir``.
+        ``out_dir``. With more than 4,096 cells scanpy's neighbour search is approximate, so the
+        same embedding can score a few hundredths differently on another machine or
+        library version: compare ranks, not third decimals.
 
         Parameters
         ----------
@@ -3472,14 +3495,7 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     not_listed = (_not_listed_note(plan_df, dataset, private.attrs["folder"], category)
                   if plan_df.attrs["not_listed"] or plan_df.attrs.get("not_listed_batch")
                   else "")
-    if dry_run and modalities is None:
-        # a smaller combination of a method next to a larger one is not run:
-        # its row says so, whatever this host can run
-        for i in _nested_rows(plan_df)[0]:
-            note = (f"Not run: {plan_df.at[i, 'method']} runs on "
-                    f"{_nested_full(plan_df, i)} instead.")
-            old = str(plan_df.at[i, "caveat"] or "")
-            plan_df.at[i, "caveat"] = f"{note} {old}".strip()
+
     if plan_df.empty:
         # a modalities= selection that matches nothing, without methods=
         raise _no_variant_error(category, methods, modalities)

@@ -53,7 +53,8 @@ def test_scan_base_atac_token_matches_every_atac_role():
     returned no row although every diagonal method reads RNA + ATAC."""
     with pytest.warns(UserWarning, match="scBridge"):
         df = full_scan("D28", "diagonal", modalities=["rna", "atac"], verbose=False)
-    full = full_scan("D28", "diagonal", verbose=False)
+    # every row: the rows for numbered batches are listed when modalities is given
+    full = full_scan("D28", "diagonal", modalities="all", verbose=False)
     assert _rows(df) == _rows(full[full["modalities"] != "(data_dir)"])
     assert len(df) >= 13
 
@@ -61,7 +62,8 @@ def test_scan_base_atac_token_matches_every_atac_role():
 def test_scan_base_atac_token_keeps_the_atac_gas_rows_of_vertical():
     df = full_scan("D11", "vertical", modalities=["rna", "atac"], verbose=False)
     mods = set(df["modalities"])
-    assert {"rna+atac", "rna+atac_gas"} <= mods
+    # the vertical peak methods read the atac role since 0.4.0 (X13)
+    assert "rna+atac" in mods and "rna+atac_gas" not in mods
     assert all(set(m.split("+")) <= {"rna", "atac", "atac_gas", "atac_peak"} for m in mods)
     # the combination is exact: scMoMaT's rna+adt+atac variant is a different one
     assert "rna+adt+atac" not in mods

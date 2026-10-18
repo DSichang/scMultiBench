@@ -137,7 +137,7 @@ def run_mode(env: str) -> tuple[str, Path | None]:
         raise OSError(
             f"{RUN_MODE_VAR}=prefix but env {env!r} has no prefix under "
             f"envs_dir {config.DEFAULT.envs_dir} (and conda reports none) - "
-            f"run mtb.env.install([<method>], dry_run=False) to unpack it, or "
+            f"run mtb.env.install([<method>]) to unpack it, or "
             f"point MULTIBENCH_ENVS_DIR / mtb.config.DEFAULT.envs_dir at it")
     if forced == "conda":
         return "conda", None
@@ -803,7 +803,7 @@ def _run(method: str, category: str, *, inputs: dict, out_dir: str,
         if linux_only:
             this = config.hint("this call", "this command")
             preview_with = config.hint("dry_run=True", "--dry-run")
-            raise EnvironmentError(
+            raise envs._LinuxOnlyError(
                 f"{linux_only} Run {this} on a Linux machine. {preview_with} "
                 f"previews the method's command here.")
         have = envs.installed_envs()
@@ -815,13 +815,13 @@ def _run(method: str, category: str, *, inputs: dict, out_dir: str,
         if other is not None:
             raise EnvironmentError(envs.other_env_text(
                 env_name, other,
-                config.hint(f"call mtb.env.install([{method!r}], dry_run=False).",
-                            f"run multibench env install --methods {method} --run.")))
+                config.hint(f"call mtb.env.install([{method!r}]).",
+                            f"run multibench env install --methods {method}.")))
         if have and env_name not in have:
-            py = f" In Python, call mtb.env.install([{method!r}], dry_run=False)."
+            py = f" In Python, call mtb.env.install([{method!r}])."
             raise EnvironmentError(
                 f"Environment {env_name} of {method} is not installed. Run "
-                f"multibench env install --methods {method} --run."
+                f"multibench env install --methods {method}."
                 + config.hint(py, ""))
 
     inputs, out_str = normalize_paths(inputs, out_dir)

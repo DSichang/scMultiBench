@@ -32,7 +32,8 @@ LISTED = {
     ("D11", "vertical"): (33, 14, 14),
     ("D27mini_vertical", "vertical"): (33, 14, 14),
     ("D22mini", "vertical"): (33, 33, 33),
-    ("D27mini", "diagonal"): (18, 18, 14),
+    # 0.4.0 (X80): rows for numbered batches a one-batch folder lacks are not listed
+    ("D27mini", "diagonal"): (18, 14, 14),
     ("D37mini", "diagonal"): (18, 18, 4),
     ("D38mini", "mosaic"): (16, 3, 3),
     ("D45mini", "mosaic"): (16, 6, 6),
@@ -42,8 +43,13 @@ LISTED = {
     ("D56mini", "cross"): (30, 9, 9),
     ("D58mini", "cross"): (30, 5, 5),
     ("D59mini", "cross"): (30, 30, 12),
-    ("D11", None): (97, 29, 14),
+    ("D11", None): (97, 15, 14),
 }
+
+
+def _core(attrs):
+    """The attrs these tests pin; 0.4.0 added not_listed_batch and not_listed_methods."""
+    return {k: attrs[k] for k in ("held", "not_listed", "not_held")}
 
 
 def _quiet(fn, *a, **kw):
@@ -134,7 +140,7 @@ def test_default_rows_are_a_subset_with_the_same_files_ok_rows(ds, cat):
     # what is listed is listed as before: every value, in the same order
     same = every.merge(listed[key], on=key, how="inner")
     pd.testing.assert_frame_equal(same.reset_index(drop=True), listed, check_like=False)
-    assert listed.attrs["not_listed"] == n_all - n_listed
+    assert listed.attrs["not_listed"] + listed.attrs["not_listed_batch"] == n_all - n_listed
 
 
 @pytest.mark.parametrize("ds,cat", [("D11", "vertical"), ("D28", "diagonal"),
@@ -228,7 +234,7 @@ def test_the_log_of_a_real_run_names_the_listed_variants_only(linux, tmp_path, c
     log = capsys.readouterr().out.splitlines()
     assert log[:3] == [
         f"[run_all] skipping moETM (rna+adt): {gpu}",
-        "[run_all] skipping moETM (rna+atac_gas): moETM needs peak ATAC (atac.h5), which "
+        "[run_all] skipping moETM (rna+atac): moETM needs peak ATAC (atac.h5), which "
         f"is not in the folder. {gpu}",
         "[run_all] 2 more rows need files this folder does not have. mtb.scan shows them."]
 
@@ -241,7 +247,7 @@ def test_nothing_left_means_no_filter(tmp_path, no_envs):
     df = full_scan("RNA_ONLY", "vertical", data_path=tmp_path, verbose=False)
     # no vertical variant reads RNA alone: every one is listed, with its reason
     assert len(df) == 33 and not df["files_ok"].any()
-    assert df.attrs == {"held": ["rna"], "not_listed": 0, "not_held": []}
+    assert _core(df.attrs) == {"held": ["rna"], "not_listed": 0, "not_held": []}
     row = df[(df["method"] == "totalVI")].iloc[0]
     assert row["reason"].startswith("adt.h5 is missing.")
 
@@ -249,7 +255,7 @@ def test_nothing_left_means_no_filter(tmp_path, no_envs):
 def test_nothing_held_means_no_filter(tmp_path, no_envs, capsys):
     (tmp_path / "EMPTY").mkdir()
     df = full_scan("EMPTY", "vertical", data_path=tmp_path)
-    assert len(df) == 33 and df.attrs == {"held": [], "not_listed": 0, "not_held": []}
+    assert len(df) == 33 and _core(df.attrs) == {"held": [], "not_listed": 0, "not_held": []}
     assert capsys.readouterr().out == (
         "[scan] 0 of 33 rows have their input files. 0 of 33 have their environment "
         "installed. mtb.env.doctor() checks the environments.\n")
@@ -275,7 +281,7 @@ def test_a_named_method_keeps_its_rows(no_envs):
     mira = df.set_index("method").loc["MIRA"]
     assert mira["reason"].startswith("MIRA needs peak ATAC (atac.h5), which is not in "
                                      "the folder.")
-    assert df.attrs == {"held": ["rna", "adt"], "not_listed": 0, "not_held": []}
+    assert _core(df.attrs) == {"held": ["rna", "adt"], "not_listed": 0, "not_held": []}
     # a named method with a listed row is listed by that row
     df = full_scan("D11", "vertical", methods=["Matilda", "MIRA"], verbose=False)
     assert sorted(zip(df["method"], df["modalities"])) == [("MIRA", "rna+atac"),
@@ -346,7 +352,7 @@ def test_two_families_can_be_lacking(tmp_path, no_envs, capsys):
     df = full_scan("RNA_ONLY", data_path=tmp_path)
     line = capsys.readouterr().out
     assert list(df["modalities"]) == ["(data_dir)"]
-    assert df.attrs == {"held": ["rna"], "not_listed": 96, "not_held": ["adt", "atac"]}
+    assert _core(df.attrs) == {"held": ["rna"], "not_listed": 96, "not_held": ["adt", "atac"]}
     assert line == (
         "[scan] 0 of 1 method has its input files. 0 of 1 has its environment installed. "
         "RNA_ONLY holds RNA. 96 rows that read ADT or ATAC are not listed. "
@@ -355,16 +361,16 @@ def test_two_families_can_be_lacking(tmp_path, no_envs, capsys):
 
 def test_attrs():
     df = full_scan("D11", "vertical", verbose=False)
-    assert df.attrs == {"held": ["rna", "adt"], "not_listed": 19, "not_held": ["atac"]}
-    assert full_scan("D11", "vertical", modalities="all", verbose=False).attrs == \
+    assert _core(df.attrs) == {"held": ["rna", "adt"], "not_listed": 19, "not_held": ["atac"]}
+    assert _core(full_scan("D11", "vertical", modalities="all", verbose=False).attrs) == \
         {"held": ["rna", "adt"], "not_listed": 0, "not_held": []}
     # what the folder holds does not follow the selection
-    assert full_scan("D11", "vertical", modalities=["rna", "atac"], verbose=False).attrs == \
+    assert _core(full_scan("D11", "vertical", modalities=["rna", "atac"], verbose=False).attrs) == \
         {"held": ["rna", "adt"], "not_listed": 0, "not_held": []}
-    assert full_scan("D11", "vertical", methods=["MIRA"], verbose=False).attrs == \
+    assert _core(full_scan("D11", "vertical", methods=["MIRA"], verbose=False).attrs) == \
         {"held": ["rna", "adt"], "not_listed": 0, "not_held": []}
     _on_disk("D22mini")
-    assert full_scan("D22mini", "vertical", verbose=False).attrs == \
+    assert _core(full_scan("D22mini", "vertical", verbose=False).attrs) == \
         {"held": ["rna", "adt", "atac"], "not_listed": 0, "not_held": []}
     # the dry run carries them, and a selection of rows keeps them
     plan = mtb.run_all("D11", "vertical", dry_run=True, verbose=False)
@@ -397,7 +403,7 @@ def test_two_donor_folder_keeps_the_missing_batch_reason(tmp_path, linux):
     _donors(tmp_path, "TWO", 2)
     df = full_scan("TWO", "cross", data_path=tmp_path, verbose=False)
     assert len(df) == 11 and int(df["files_ok"].sum()) == 1
-    assert df.attrs == {"held": ["rna", "adt"], "not_listed": 19, "not_held": ["atac"]}
+    assert _core(df.attrs) == {"held": ["rna", "adt"], "not_listed": 19, "not_held": ["atac"]}
     assert list(df[df["files_ok"]]["modalities"]) == ["rna1+rna2+adt1+adt2"]
     rest = df[~df["files_ok"]]
     assert set(rest["reason"]) == {"rna3.h5, adt3.h5 are missing."}

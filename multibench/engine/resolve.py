@@ -193,6 +193,8 @@ def select_variant(spec, category: str, modalities, *, ds_dir: Path | None = Non
     ``AmbiguousVariantError`` when several remain.
     """
     if modalities is not None:
+        # 0.3's atac_gas of the vertical peak methods names their atac role now
+        modalities = spec.legacy_modalities(category, modalities) or modalities
         v = spec.select(category, set(modalities), loose=True)
         if set(modalities) != set(v.when.get("modalities") or []):
             _check_representation(spec, modalities)
@@ -1264,6 +1266,24 @@ def _reordering_methods(stems: list[str], category: str | None, dataset: str,
     return out
 
 
+#: (dataset folder, category) pairs labels_for already warned about
+_ORDER_NOTED: set = set()
+
+
+def _folder_category(ds_dir: Path) -> str | None:
+    """The category a numbered folder's layout reads as: ``cross`` when every
+    batch holds the same modalities, else ``mosaic``; ``None`` otherwise."""
+    batches: dict = {}
+    for p in Path(ds_dir).iterdir():
+        m = re.fullmatch(r"(rna|adt|atac|atac_peak)(\d+)\.h5", p.name)
+        if m:
+            batches.setdefault(int(m.group(2)), set()).add(
+                "atac" if m.group(1).startswith("atac") else m.group(1))
+    if len(batches) < 2:
+        return None
+    return "cross" if len({frozenset(v) for v in batches.values()}) == 1 else "mosaic"
+
+
 def _default_order_warning(dataset: str, category, stems: list[str],
                            base: Path) -> str | None:
     """The warning of ``labels_for`` without a method when a method whose files
@@ -1276,6 +1296,11 @@ def _default_order_warning(dataset: str, category, stems: list[str],
     by_cat: dict[str, list[str]] = {}
     for m, cat in others:
         by_cat.setdefault(cat, []).append(m)
+    if category is None and len(by_cat) > 1:
+        # the dataset's own category only: a cross folder is not a mosaic one
+        own = _folder_category(base / dataset)
+        if own in by_cat:
+            by_cat = {own: by_cat[own]}
     call = (f"labels_for({dataset!r})" if category is None
             else f"labels_for({dataset!r}, {category!r})")
     head = f"{call} returns the files in the default order {', '.join(stems)}."
@@ -1418,7 +1443,9 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     stems = sorted(files, key=_label_sort_key)
     if method is None:
         note = _default_order_warning(dataset, category, stems, base)
-        if note:
+        key = (os.path.abspath(base / dataset), category)
+        if note and key not in _ORDER_NOTED:      # once a session per dataset
+            _ORDER_NOTED.add(key)
             _compat.warn(note, UserWarning)
     if method is not None and category is not None:
         spec = registry.get(method)

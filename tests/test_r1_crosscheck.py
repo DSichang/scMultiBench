@@ -139,7 +139,7 @@ def test_x86_language_chips_and_summary_scale_have_a_legend():
     d11 = _d11()
     fig, _ = _messages(mtb.plot.bubble, pd.concat([d11, _mine(d11)]))
     texts = [t.get_text() for t in fig.axes[0].texts]
-    assert "Py / R: the method's language; ?: not a package method" in texts
+    assert "Py / R: the method's language; ?: your rows" in texts
     fig, _ = _messages(mtb.plot.bubble, d11)
     assert "Py / R: the method's language" in [t.get_text() for t in fig.axes[0].texts]
     two = pd.concat([d11, d11.assign(dataset="D11b")])
@@ -220,8 +220,8 @@ def test_x43_catalog_files_dir_is_deprecated(fn):
     assert "files_dir" not in inspect.signature(f).parameters
     want = f()
     with pytest.warns(FutureWarning, match=rf"^catalog\.{fn}\(files_dir=\) is deprecated "
-                                           r"and will be removed in 0\.5\. Use "
-                                           r"config\.DEFAULT\.files_path\.$"):
+                                           r"and will be removed in 0\.5; leave it out "
+                                           r"for the package's tables\.$"):
         by_kw = f(files_dir=config.DEFAULT.files_path)
     with pytest.warns(FutureWarning):
         by_pos = f(config.DEFAULT.files_path)               # 0.3 took it by position
@@ -310,8 +310,8 @@ def test_x68_size_error_names_the_label_files_that_fit(tmp_path):
 def test_x68_dry_run_marks_the_nested_variant():
     plan = mtb.run_all("D52mini", "cross", methods=["UINMF"], dry_run=True, verbose=False)
     row = plan.set_index("modalities").loc["rna1+rna2+adt1+adt2"]
-    assert row.caveat.startswith("Not run: UINMF runs on rna1+rna2+rna3+adt1+adt2+adt3 "
-                                 "instead.")
+    assert "UINMF runs on rna1+rna2+rna3+adt1+adt2+adt3 instead, so this row is not " \
+           "run." in row.caveat
 
 
 def test_x80_one_batch_folder_lists_no_batched_variant(capsys):
@@ -376,3 +376,345 @@ def test_x13_vertical_peak_methods_read_the_atac_role():
     from multibench.engine import registry
     assert registry.get("scMM").select("vertical", {"rna", "atac_gas"}).when[
         "modalities"] == ["rna", "atac"]
+
+
+# --- evaluate, io, catalog lookups: X09, X10, X12, X36, X37, X47, X49, X50,
+#     X58, X61, X62, X67, X71, X72, X74, X76, X83, X90, X91 ----------------
+
+def _adata(n=60, names=True):
+    import anndata as ad
+    import numpy as np
+    a = ad.AnnData(np.random.default_rng(0).poisson(1, (n, 20)).astype(float))
+    if names:
+        a.obs_names = [f"AAAC{i}-1" for i in range(n)]
+    return a
+
+
+def test_x09_repeated_barcodes_are_refused(tmp_path):
+    a = _adata()
+    a.obs_names = [f"AAAC{i % 30}-1" for i in range(60)]
+    with pytest.raises(ValueError, match=r"^30 barcodes repeat, e\.g\. AAAC0-1\. Make them "
+                                         r"unique \(prefix the sample\)\.$"):
+        mtb.io.export_dataset(a, tmp_path / "DUP", category="vertical")
+    assert not (tmp_path / "DUP" / "rna.h5").exists()
+
+
+def test_x10_no_shared_barcode_names_both_spellings(tmp_path):
+    rna = _adata()
+    atac = _adata()
+    atac.obs_names = [f"AAAC{i}" for i in range(60)]
+    atac.var_names = [f"chr1:{i * 100}-{i * 100 + 50}" for i in range(20)]
+    with pytest.raises(ValueError, match=r"^RNA and ATAC share no barcode \(RNA e\.g\. "
+                                         r"AAAC0-1, ATAC e\.g\. AAAC0\)\. Make the names "
+                                         r"match; for different cells pass "
+                                         r'category="diagonal"\.$'):
+        mtb.io.export_dataset(rna, tmp_path / "V", atac=atac, category="vertical")
+
+
+def test_x12_a_label_file_without_ids_next_to_barcodes_warns(tmp_path):
+    import numpy as np
+    a = _adata()
+    a.obsm["X_pca"] = np.random.default_rng(1).normal(size=(60, 4))
+    lab = tmp_path / "cty.csv"
+    pd.DataFrame({"x": ["a", "b", "c"] * 20}).to_csv(lab, index=False)
+    _, msgs = _messages(mtb.evaluate, a, labels=str(lab), metrics=["cLISI"])
+    assert ("cty.csv has no cell ids, so it is matched by position. Check that the "
+            "embedding rows follow the file.") in msgs
+    b = _adata(names=False)
+    b.obsm["X_pca"] = a.obsm["X_pca"]
+    _, msgs = _messages(mtb.evaluate, b, labels=str(lab), metrics=["cLISI"])
+    assert not any("matched by position" in m for m in msgs)
+
+
+def test_x36_to_long_clustering_and_source_are_deprecated():
+    wide = pd.DataFrame({"Value": [0.5]}, index=["ARI"])
+    with pytest.warns(FutureWarning, match=r"^to_long\(source=\) is deprecated and will "
+                                           r"be removed in 0\.5; it has no effect\.$"):
+        out = mtb.to_long(wide, method="M", source="rerun", clustering="mine")
+    assert out[["clustering", "source"]].iloc[0].tolist() == ["default", "user"]
+
+
+def test_x37_to_canonical_keywords_are_deprecated(tmp_path):
+    import inspect
+    sig = inspect.signature(mtb.io.to_canonical).parameters
+    assert not {"convert", "compression", "block"} & set(sig)
+    a = _adata()
+    with pytest.warns(FutureWarning, match=r"^io\.to_canonical\(compression=\) is "
+                                           r"deprecated"):
+        p = mtb.io.to_canonical(a, tmp_path / "rna.h5", compression=None)
+    assert mtb.io.read_canonical(p).shape == (60, 20)
+    with pytest.warns(FutureWarning, match=r"^io\.to_canonical\(convert=\) is deprecated"):
+        assert mtb.io.to_canonical(p, tmp_path / "x.h5", "rna", False) == p
+
+
+def test_x38_scan_params_is_deprecated():
+    with pytest.warns(FutureWarning, match=r"^scan\(params=\) is deprecated and will be "
+                                           r"removed in 0\.5\. Use run_all\(\.\.\., "
+                                           r"params=\.\.\., dry_run=True\)\.$"):
+        mtb.scan("D11", "vertical", methods=["Matilda"], params={"Matilda": {"epochs": 3}},
+                 verbose=False)
+
+
+def test_x47_text_returns_echo_as_text():
+    for text in (mtb.describe_layout("vertical"), mtb.cite(["Matilda"])):
+        assert isinstance(text, str) and repr(text) == str(text) and "\n" in text
+
+
+def test_x49_evaluate_takes_the_only_obsm_key():
+    import numpy as np
+    a = _adata()
+    a.obsm["X_pca"] = np.random.default_rng(2).normal(size=(60, 4))
+    got = mtb.evaluate(a, labels=np.repeat(["a", "b", "c"], 20), metrics=["cLISI"])
+    want = mtb.evaluate(a, labels=np.repeat(["a", "b", "c"], 20), metrics=["cLISI"],
+                        obsm="X_pca")
+    pd.testing.assert_frame_equal(got, want)
+    a.obsm["X_umap"] = a.obsm["X_pca"][:, :2]
+    with pytest.raises(ValueError, match=r"obsm='X_emb' not found"):
+        mtb.evaluate(a, labels=np.repeat(["a", "b", "c"], 20), metrics=["cLISI"])
+
+
+def test_x50_x71_classification_docs_and_left_out_cells():
+    doc = " ".join(mtb.classification_metrics.__doc__.split())
+    assert ('The ``mean`` row is what ``mtb.evaluate(metrics="classification")`` '
+            "returns; this adds one row per reference.") in doc
+    import numpy as np
+    emb = np.random.default_rng(3).normal(size=(90, 4))
+    labels = np.array(["a", "b", "c"] * 15 + ["a", "b"] * 22 + ["a"])
+    batch = np.array(["1"] * 45 + ["2"] * 45)
+    pred = mtb.classify(emb, labels=labels, batch=batch)
+    # batch 2 lacks type c: the 15 c cells of batch 1 are left out with 2 as reference
+    assert pred.attrs["left_out"] == {"1": 0, "2": 15}
+    assert "lacks is left out" in " ".join(mtb.classify.__doc__.split())
+
+
+def test_x58_find_methods_task_names_no_replacement():
+    with pytest.warns(FutureWarning, match=r"find_methods\(task=\) is deprecated and will "
+                                           r"be removed in 0\.5; it has no replacement\."):
+        mtb.find_methods(task="clustering")
+
+
+def test_x61_x62_to_long_reads_a_path_and_checks_the_category(tmp_path):
+    wide = pd.DataFrame({"Value": [0.5, 0.6]}, index=["ARI", "NMI"])
+    wide.to_csv(tmp_path / "metric.csv")
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        out = mtb.to_long(tmp_path / "metric.csv", method="Old", dataset="D11",
+                          category="vertical")
+    assert out.metric.tolist() == ["ARI", "NMI"] and out.value.tolist() == [0.5, 0.6]
+    with pytest.raises(ValueError, match=r"^unknown category 'verticall'"):
+        mtb.to_long(wide, method="M", category="verticall")
+
+
+def test_x67_labels_for_names_the_dataset_category_once():
+    _, msgs = _messages(mtb.labels_for, "D52mini")
+    hits = [m for m in msgs if "default order" in m]
+    assert len(hits) == 1 and "In cross, StabMap" in hits[0] and "mosaic" not in hits[0]
+    _, msgs = _messages(mtb.labels_for, "D52mini")
+    assert not [m for m in msgs if "default order" in m]          # once a session
+
+
+def test_x72_batch_leiden_warning_says_what_it_affects(monkeypatch):
+    import numpy as np
+    from multibench.eval import scib as S
+    monkeypatch.setattr(S, "_search_n_clusters", lambda adata, n, key, flavor: (
+        adata.obs.__setitem__(key, pd.Categorical(["a"] * 4 + ["b"] * (adata.n_obs - 4)))
+        or False))
+    with pytest.warns(UserWarning, match=r"^ARI_batch and NMI_batch use 2 clusters: no "
+                                         r"resolution gave 3\. Nothing to do\.$"):
+        S._n_clusters(S._clustering_graph(np.random.default_rng(4).normal(size=(40, 5))),
+                      3, "leidenalg", "batch")
+
+
+def test_x74_an_h5mu_path_names_the_fix(tmp_path):
+    p = tmp_path / "x.h5mu"
+    p.write_bytes(b"")
+    with pytest.raises(ValueError, match=r"x\.h5mu is an \.h5mu: pass one modality, e\.g\. "
+                                         r"mudata\.read\(path\)\['rna'\]"):
+        mtb.evaluate(str(p), labels=["a"] * 3)
+
+
+def test_x76_tokens_ignore_letter_case():
+    import numpy as np
+    plan = mtb.run_all("D11", "vertical", modalities=["RNA", "ADT"], dry_run=True,
+                       verbose=False)
+    assert len(plan)
+    emb = np.random.default_rng(5).normal(size=(60, 4))
+    got = mtb.evaluate(emb, labels=np.repeat(["a", "b", "c"], 20), metrics="Clustering")
+    assert "ARI" in got.index
+
+
+def test_x83_read_canonical_reads_an_embedding_file(tmp_path):
+    import h5py
+    import numpy as np
+    p = tmp_path / "embedding.h5"
+    with h5py.File(p, "w") as f:
+        f["data"] = np.arange(30.0).reshape(10, 3)
+    a = mtb.io.read_canonical(p)
+    assert a.n_obs == 10 and a.obsm["X_emb"].shape == (10, 3)
+
+
+def test_x90_x91_hints_for_an_assay_and_a_prefix():
+    with pytest.raises(ValueError, match=r"CITE-seq and 10x Multiome are vertical\.$"):
+        mtb.find_methods(category="CITE-seq")
+    with pytest.raises(KeyError) as e:
+        mtb.method_info("Seurat")
+    assert all(s in str(e.value) for s in ("Seurat_v3", "Seurat_v5", "Seurat_WNN"))
+
+
+# --- environments: X25, X26, X27, X29, X30, X32, X33, X34 --------------------
+
+def test_x27_x26_install_acts_by_default_and_returns_a_frame(monkeypatch):
+    import inspect
+    from multibench.engine import envs
+    sig = inspect.signature(mtb.env.install).parameters
+    assert sig["dry_run"].default is False and "packed" not in sig and "force" not in sig
+    plan = mtb.env.install(["Matilda"], dry_run=True)
+    assert isinstance(plan, pd.DataFrame) and list(plan.columns[:3]) == [
+        "env", "methods", "state"]
+    assert isinstance(plan.to_dict("records"), list)
+    doc = mtb.env.doctor("vertical")
+    assert isinstance(doc, pd.DataFrame) and list(doc.columns[:3]) == [
+        "env", "methods", "exists"]
+    # a real install (the default) refuses off Linux before anything is fetched
+    monkeypatch.setattr(envs, "host_platform_problem", lambda: "this host is darwin/arm64")
+    with pytest.raises(OSError) as e:
+        mtb.env.install(["Matilda"])
+    assert isinstance(e.value, RuntimeError)                         # X32: both
+    assert "force" not in str(e.value)                               # X33: hidden
+
+
+def test_x25_packed_is_build():
+    with pytest.warns(FutureWarning, match=r"^env\.install\(packed=\) is deprecated and "
+                                           r"will be removed in 0\.5\. Use build=\.$"):
+        old = mtb.env.install(["SCALEX"], packed=False, dry_run=True)
+    new = mtb.env.install(["SCALEX"], build=True, dry_run=True)
+    pd.testing.assert_frame_equal(old, new)
+    assert set(new.state) <= {"build(dry-run)", "NO-LOCK", "have"}
+
+
+def test_x29_x30_dry_run_rows_say_what_runs():
+    plan = mtb.env.install(["Multigrate", "scMM"], dry_run=True).set_index("env")
+    published = plan[plan.state == "packed archive published"]
+    assert len(published)
+    for env, row in published.iterrows():
+        assert row["cmds"] == [] and row["fallback_cmds"], env
+    from multibench.engine import envs
+    for env, row in plan.iterrows():
+        if row["flavor"] and envs._single_build(env):
+            assert row["flavor"] == "any", env
+
+
+def test_x34_env_dir_is_its_all():
+    assert mtb.env.__all__ == ["install", "doctor"]
+    assert [n for n in dir(mtb.env) if not n.startswith("__")] == ["doctor", "install"]
+    assert callable(mtb.env.recipe)
+
+
+# --- command line: X15, X17-X24, X31, X33, X53, X77, X78, X95, X97, X98 ------
+
+def _cli(argv, capsys):
+    from multibench import cli
+    rc = cli.main(argv)
+    out = capsys.readouterr()
+    return rc, out.out, out.err
+
+
+def _help(*cmd):
+    from multibench import cli
+    import contextlib
+    import io
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf), pytest.raises(SystemExit):
+        cli.main([*cmd, "--help"])
+    return " ".join(buf.getvalue().split())
+
+
+def test_x15_cli_plot_renames_your_clashing_rows(tmp_path, capsys):
+    d11 = _d11()
+    rows = d11[d11.method == "scMM"].assign(source="user")
+    rows.to_csv(tmp_path / "mine.csv", index=False)
+    rc, _, err = _cli(["plot", "bubble", "--input", str(tmp_path / "mine.csv"),
+                       "--category", "vertical", "--dataset", "D11",
+                       "--out", str(tmp_path / "x.png")], capsys)
+    assert rc == 0, err
+    assert ("# Your rows of scMM are drawn as scMM_rerun: the stored table has the same "
+            "method and dataset.") in err
+
+
+def test_x17_x18_x53_x95_x97_x98_help_texts():
+    assert "as printed by multibench find" in _help("run")
+    assert "the dataset folder name under --data-path, or its path" in _help("run-all")
+    assert "integration category: vertical (several" not in _help("scan")
+    assert "vertical, diagonal, mosaic or cross (multibench layout explains them)" in \
+        _help("scan")
+    ev = _help("evaluate")
+    assert ("--method METHOD the package method: picks its label order, and is the "
+            "default row name.") in ev
+    assert "or with --labels any row name" not in ev
+    assert "leidenalg (the article's) or igraph (faster)" in ev
+    assert "so a later call cannot leave a stale batch file from an earlier export" in \
+        _help("convert")
+
+
+def test_x19_cli_evaluate_takes_the_embedding_first(tmp_path, capsys):
+    import numpy as np
+    np.save(tmp_path / "emb.npy", np.random.default_rng(6).normal(size=(30, 3)))
+    pd.DataFrame({"x": ["a", "b", "c"] * 10}).to_csv(tmp_path / "l.csv", index=False)
+    rc, out, err = _cli(["evaluate", str(tmp_path / "emb.npy"), "--labels",
+                         str(tmp_path / "l.csv"), "--metrics", "cLISI"], capsys)
+    assert rc == 0 and "cLISI" in out, err
+    rc, out2, _ = _cli(["evaluate", "--embedding", str(tmp_path / "emb.npy"), "--labels",
+                        str(tmp_path / "l.csv"), "--metrics", "cLISI"], capsys)
+    assert rc == 0 and out2 == out
+    assert "--embedding" not in _help("evaluate")
+    with pytest.raises(SystemExit):
+        _cli(["evaluate", "a.npy", "--embedding", "b.npy"], capsys)
+
+
+def test_x20_x24_cli_run_dry_run(capsys):
+    rc, _, err = _cli(["run", "--method", "totalVI", "--category", "vertical",
+                       "--input", "rna=a.h5", "--dry-run"], capsys)
+    assert rc == 1 and "# Dry run" not in err             # no header before the error
+    rc, out, err = _cli(["run", "--method", "totalVI", "--category", "vertical",
+                         "--input", "rna=a.h5", "--input", "adt=b.h5", "--dry-run",
+                         "--runner", "srun {env_cmd}"], capsys)
+    assert rc == 0 and out.startswith("srun ") and "<out_dir>" in out
+    assert ("--runner is deprecated and will be removed in 0.5. Use --cmd-template."
+            in err)
+    assert "--cmd-template" in _help("run") and "--runner" not in _help("run")
+
+
+def test_x21_x22_cli_params_tokens_and_int_defaults(capsys):
+    rc, out, err = _cli(["params", "Multigrate", "--category", "cross", "--modalities",
+                         "rna,adt"], capsys)
+    assert rc == 0, err
+    assert "cross:rna1+rna2+rna3+adt1+adt2+adt3" in out
+    assert "256.000" not in out and " 256 " in out
+
+
+def test_x27_x31_x33_cli_env_install(monkeypatch, capsys):
+    from multibench.engine import envs
+    assert "--dry-run" in _help("env", "install")
+    assert "--force" not in _help("env", "install") and "--run" not in _help("env", "install")
+    monkeypatch.setattr(envs, "host_platform_problem", lambda: "this host is darwin/arm64")
+    monkeypatch.setattr(envs, "installed_envs", lambda conda=None: [])
+    rc, out, _ = _cli(["env", "doctor", "--methods", "StabMap"], capsys)
+    assert "# next (on the Linux machine): multibench env install --methods StabMap" in out
+    assert "--run" not in out
+    rc, _, err = _cli(["env", "install", "--methods", "StabMap", "--run"], capsys)
+    assert rc == 1 and "run only on Linux" in err and "deprecated" not in err
+
+
+def test_x77_x78_cli_convert_atac_from_and_no_rna(tmp_path, capsys):
+    rna, atac = _adata(), _adata()
+    atac.var_names = [f"chr1:{i * 100}-{i * 100 + 50}" for i in range(20)]
+    rna.write_h5ad(tmp_path / "rna.h5ad")
+    atac.write_h5ad(tmp_path / "atac.h5ad")
+    rc, out, err = _cli(["convert", str(tmp_path / "rna.h5ad"), str(tmp_path / "V"),
+                         "--rna", "X", "--atac-from", str(tmp_path / "atac.h5ad"),
+                         "--atac-kind", "peak", "--category", "vertical"], capsys)
+    assert rc == 0 and "atac.h5" in out, err
+    rc, out, err = _cli(["convert", str(tmp_path / "atac.h5ad"), str(tmp_path / "A"),
+                         "--atac", "X", "--atac-kind", "peak", "--category", "vertical"],
+                        capsys)
+    assert rc == 0 and "# No RNA written: pass --rna X (or a layer) to write it." in err

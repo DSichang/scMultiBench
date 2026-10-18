@@ -187,3 +187,28 @@ def full_scan(*args, **kwargs):
     category. ``mtb.scan`` returns one row per method since 0.4."""
     from multibench import workflow
     return workflow._scan(*args, **kwargs)[0]
+
+
+# ---- no test downloads an environment archive -----------------------------------
+# env install acts by default since 0.4.0: a test that forgets dry_run=True /
+# --dry-run must fail here, not fetch gigabytes from the envs releases. A test
+# that serves its own archives patches urlopen itself, over this guard.
+@_pytest.fixture(autouse=True)
+def _no_archive_download(monkeypatch):
+    import urllib.request
+    real = urllib.request.urlopen
+
+    def guarded(req, *a, **kw):
+        url = str(getattr(req, "full_url", req))
+        if "/releases/download/envs-" in url:
+            raise RuntimeError(f"a test tried to download {url}")
+        return real(req, *a, **kw)
+    monkeypatch.setattr(urllib.request, "urlopen", guarded)
+
+
+# ---- once-a-session notes start fresh in every test -------------------------------
+@_pytest.fixture(autouse=True)
+def _fresh_session_notes(monkeypatch):
+    from multibench.engine import resolve
+    monkeypatch.setattr(resolve, "_SHADOW_NOTED", set())
+    monkeypatch.setattr(resolve, "_ORDER_NOTED", set())

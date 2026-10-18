@@ -16,14 +16,14 @@ def test_find_methods_needs_labels_filter():
 
 
 def test_method_info_returns_dict_with_runtime(files_dir):
-    info = discover.method_info("Seurat_v5")
+    info = discover.method_info("Seurat_v5", verbose=True)
     assert info["id"] == "Seurat_v5"
     assert info["language"] == "R"
     assert "env" in info and "status" in info
     assert set(info["runtime"]) == {"tier", "worst_sec", "observed", "host", "note"}
     # the catalog's paper-only columns moved to catalog.methods(); files_dir= is gone
     with pytest.raises(TypeError, match="files_dir"):
-        discover.method_info("Seurat_v5", files_dir=files_dir)
+        discover.method_info("Seurat_v5", files_dir=files_dir, verbose=True)
 
 
 def test_top_level_find_methods():
@@ -92,10 +92,10 @@ def test_method_info_declared_stub_raises_keyerror(monkeypatch):
     monkeypatch.setattr(registry, "get",
                         lambda m: stub if m == "SCALEX" else real_get(m))
     with pytest.raises(KeyError, match="SCALEX: no variants \\(declared stub\\)"):
-        discover.method_info("SCALEX")
+        discover.method_info("SCALEX", verbose=True)
     with pytest.raises(KeyError, match="declared stub"):
         discover.params_for("SCALEX", "diagonal")
-    assert discover.method_info("Matilda")["scripts_url"].startswith(
+    assert discover.method_info("Matilda", verbose=True)["scripts_url"].startswith(
         "https://github.com/PYangLab/scMultiBench/tree/main/tools_scripts/")
 
 
@@ -104,7 +104,7 @@ def test_method_info_scripts_url_is_percent_encoded():
     # space cuts the URL wherever it is printed or auto-linked
     import urllib.parse
     from multibench.engine import registry
-    url = discover.method_info("online_iNMF")["scripts_url"]
+    url = discover.method_info("online_iNMF", verbose=True)["scripts_url"]
     folder = "/".join(registry.get("online_iNMF").variants[0].entrypoint.split("/")[:2])
     assert " " in folder and " " not in url
     assert url.endswith("/tools_scripts/online%20iNMF")
@@ -139,14 +139,14 @@ def test_method_info_needs_labels_matches_inputs_for(root):
              ("SCALEX", "D28", "diagonal", None),
              ("Matilda", "D11", "vertical", ["rna", "adt"])]
     for m, ds, cat, mods in cases:
-        info = discover.method_info(m)
+        info = discover.method_info(m, verbose=True)
         got = resolve.inputs_for(ds, cat, m, modalities=mods, data_path=data, check=False)
         assert info["needs_labels"] == any(is_label_role(k) for k in got), (m, got)
         assert all("needs_labels" in sup for sup in info["supports"])
-    assert discover.method_info("scJoint")["needs_labels"] is True
-    assert discover.method_info("Matilda")["needs_labels"] is True
+    assert discover.method_info("scJoint", verbose=True)["needs_labels"] is True
+    assert discover.method_info("Matilda", verbose=True)["needs_labels"] is True
     # scBridge's labels are const filenames (not resolved roles) -> still True
-    assert discover.method_info("scBridge")["needs_labels"] is True
+    assert discover.method_info("scBridge", verbose=True)["needs_labels"] is True
     assert discover.find_methods(category="diagonal", needs_labels=True) >= ["scBridge"]
     assert "scJoint" in discover.find_methods(category="diagonal", needs_labels=True)
 
@@ -200,7 +200,7 @@ def test_find_methods_modalities_aliases():
 def test_method_info_unknown_method_points_at_mtb_list_methods():
     import pytest
     with pytest.raises(KeyError) as e:
-        discover.method_info("StabMapp")
+        discover.method_info("StabMapp", verbose=True)
     assert "Did you mean StabMap" in str(e.value) and "mtb.find_methods()" in str(e.value)
 
 

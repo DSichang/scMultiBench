@@ -150,7 +150,7 @@ def test_some_tutorial_environment_has_a_single_build():
     import multibench as mtb
     single = set()
     for t in GEN.TASKS.values():
-        rows = mtb.env.install(t["methods"], category=t["cat"], flavor="cpu")
+        rows = mtb.env.install(t["methods"], category=t["cat"], flavor="cpu", dry_run=True).to_dict("records")
         single |= {r["env"] for r in rows if r["flavor"] != "cpu"}
     assert single, "every tutorial env has a CPU build: the plain sentence would do"
 

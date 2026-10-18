@@ -150,12 +150,12 @@ def test_host_has_gpu_true_from_the_driver_record(probe):
     assert envs.host_has_gpu() is True
 
 
-def test_host_has_gpu_is_in_dir_but_not_in_all():
-    # documented and named in env plan --help: in dir(mtb.env) since 0.4
+def test_host_has_gpu_is_importable_but_not_in_all():
+    # dir(mtb.env) == __all__ since 0.4.0 (X34); the helpers stay importable
     assert callable(envs.host_has_gpu) and callable(mtb.env.host_has_gpu)
-    assert "host_has_gpu" not in mtb.env.__all__ and "host_has_gpu" in dir(mtb.env)
-    assert "env_prefix" in dir(mtb.env)
-    assert set(mtb.env.__all__) == {"install", "doctor", "recipe"}
+    assert "host_has_gpu" not in mtb.env.__all__ and "host_has_gpu" not in dir(mtb.env)
+    assert "env_prefix" not in dir(mtb.env)
+    assert set(mtb.env.__all__) == {"install", "doctor"}
 
 
 # ---------------------------------------------------------------- archive_for: published, placeholder, none
@@ -321,27 +321,28 @@ def _by_env(rows):
 
 def test_install_dry_run_sizes_follow_the_flavour(plan_rows, monkeypatch):
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
-    cpu = _by_env(mtb.env.install(["Matilda", "SCALEX", "UINMF"], flavor="cpu"))
+    cpu = _by_env(mtb.env.install(["Matilda", "SCALEX", "UINMF"], flavor="cpu", dry_run=True).to_dict("records"))
     assert cpu["matilda"]["flavor"] == "cpu"
     assert cpu["matilda"]["archive_bytes"] == 800_000_000
     assert cpu["matilda"]["unpacked_bytes"] == 2_500_000_000
     assert cpu["matilda"]["packed_url"] == "https://x/matilda-cpu.tar.gz"
     # the placeholder and the env without a CPU key fall back to the GPU build
+    # (flavor "any" since 0.4.0 for an env with one archive, X29)
     assert cpu["scmb_torch"]["flavor"] == "gpu"
     assert cpu["scmb_torch"]["archive_bytes"] == 4_500_000_000
     assert cpu["scmb_torch"]["packed_url"] == "https://x/scmb_torch.tar.gz"
-    assert cpu["scmb_r"]["flavor"] == "gpu" and cpu["scmb_r"]["archive_bytes"] == 900_000_000
+    assert cpu["scmb_r"]["flavor"] == "any" and cpu["scmb_r"]["archive_bytes"] == 900_000_000
     assert all(r["state"] == "packed archive published" for r in cpu.values())
-    auto = _by_env(mtb.env.install(["Matilda", "SCALEX", "UINMF"]))      # auto on a CPU host
+    auto = _by_env(mtb.env.install(["Matilda", "SCALEX", "UINMF"], dry_run=True).to_dict("records"))      # auto on a CPU host
     assert {k: (v["flavor"], v["archive_bytes"]) for k, v in auto.items()} == \
         {k: (v["flavor"], v["archive_bytes"]) for k, v in cpu.items()}
-    gpu = _by_env(mtb.env.install(["Matilda", "SCALEX", "UINMF"], flavor="gpu"))
+    gpu = _by_env(mtb.env.install(["Matilda", "SCALEX", "UINMF"], flavor="gpu", dry_run=True).to_dict("records"))
     assert gpu["matilda"]["flavor"] == "gpu"
     assert gpu["matilda"]["archive_bytes"] == 3_000_000_000
     assert gpu["matilda"]["unpacked_bytes"] == 9_000_000_000
     assert gpu["matilda"]["packed_url"] == "https://x/matilda.tar.gz"
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
-    auto = _by_env(mtb.env.install(["Matilda", "SCALEX", "UINMF"]))      # auto on a GPU host
+    auto = _by_env(mtb.env.install(["Matilda", "SCALEX", "UINMF"], dry_run=True).to_dict("records"))      # auto on a GPU host
     assert auto["matilda"]["flavor"] == "gpu" and auto["matilda"]["archive_bytes"] == 3_000_000_000
 
 
@@ -350,7 +351,7 @@ def test_install_dry_run_null_size_is_unknown(plan_rows, monkeypatch):
     unknown - exactly like an env missing from the table."""
     monkeypatch.setattr(envs, "packed_sizes", lambda: {
         "matilda-cpu": {"archive_bytes": 800_000_000, "unpacked_bytes": None}})
-    row = _by_env(mtb.env.install(["Matilda"], flavor="cpu"))["matilda"]
+    row = _by_env(mtb.env.install(["Matilda"], flavor="cpu", dry_run=True).to_dict("records"))["matilda"]
     assert row["flavor"] == "cpu" and row["archive_bytes"] == 800_000_000
     assert row["unpacked_bytes"] is None
     assert envs._gb(row["unpacked_bytes"]) == "?"
@@ -358,7 +359,7 @@ def test_install_dry_run_null_size_is_unknown(plan_rows, monkeypatch):
 
 def test_install_packed_false_has_no_flavour(plan_rows, monkeypatch):
     monkeypatch.setattr(envs, "host_has_gpu", lambda: pytest.fail("no probe without archives"))
-    rows = mtb.env.install(["Matilda"], packed=False, flavor="cpu")
+    rows = mtb.env.install(["Matilda"], packed=False, flavor="cpu", dry_run=True).to_dict("records")
     assert rows[0]["flavor"] is None and rows[0]["state"] == "build(dry-run)"
     assert rows[0]["archive_bytes"] is None and rows[0]["packed_url"] is None
 
@@ -368,14 +369,14 @@ def test_install_reports_the_installed_flavour_for_existing_envs(envs_dir, monke
     prefix = make_prefix(envs_dir, "matilda")
     (prefix / envs.FLAVOR_FILE).write_text("cpu\n")
     monkeypatch.setattr(envs, "install_packed", lambda env, **kw: pytest.fail("no download"))
-    row = _by_env(mtb.env.install(["Matilda"], flavor="gpu"))["matilda"]
+    row = _by_env(mtb.env.install(["Matilda"], flavor="gpu", dry_run=True).to_dict("records"))["matilda"]
     assert row["state"] == "have" and row["flavor"] == "cpu"
 
 
 def test_install_invalid_flavor_is_a_value_error(monkeypatch):
     monkeypatch.setattr(envs, "_check_methods", lambda m: pytest.fail("methods before flavour"))
     with pytest.raises(ValueError) as e:
-        mtb.env.install(["Matilda"], flavor="fast")
+        mtb.env.install(["Matilda"], flavor="fast", dry_run=True).to_dict("records")
     assert str(e.value) == "flavor='fast': choose one of 'auto', 'cpu', 'gpu'"
 
 
@@ -388,13 +389,13 @@ def test_install_run_hands_the_flavour_to_install_packed(envs_dir, monkeypatch, 
         return True
     monkeypatch.setattr(envs, "install_packed", fake_unpack)
     monkeypatch.setattr(envs, "_run_all", lambda cmds: pytest.fail("a build started"))
-    rows = mtb.env.install(["Matilda"], packed=True, dry_run=False, flavor="cpu")
+    rows = mtb.env.install(["Matilda"], packed=True, dry_run=False, flavor="cpu").to_dict("records")
     assert seen == [("matilda", "cpu")]
     assert rows[0]["state"] == "PACKED"
     # the outcome row carries the recorded flavour (fake_unpack wrote none)
     assert rows[0]["flavor"] is None
     (envs_dir / "matilda" / envs.FLAVOR_FILE).write_text("cpu\n")
-    assert _by_env(mtb.env.install(["Matilda"], flavor="gpu"))["matilda"]["flavor"] == "cpu"
+    assert _by_env(mtb.env.install(["Matilda"], flavor="gpu", dry_run=True).to_dict("records"))["matilda"]["flavor"] == "cpu"
 
 
 def test_install_signature_and_docs():
@@ -416,7 +417,7 @@ def test_env_tables_show_the_installed_flavour(envs_dir):
     prefix = make_prefix(envs_dir, torch)
     (prefix / envs.FLAVOR_FILE).write_text("cpu\n")
     make_prefix(envs_dir, "matilda")                    # installed, no record
-    doc = _by_env(envs.doctor(methods=["SCALEX", "Matilda", "UINMF"]))
+    doc = _by_env(envs.doctor(methods=["SCALEX", "Matilda", "UINMF"]).to_dict("records"))
     assert doc[torch]["exists"] and doc[torch]["flavor"] == "cpu"
     assert doc["matilda"]["exists"] and doc["matilda"]["flavor"] is None
     assert not doc["scmb_r"]["exists"] and doc["scmb_r"]["flavor"] is None
@@ -447,15 +448,15 @@ def test_cli_install_flavor_flag(cli_linux, monkeypatch, capsys):
     def fake_install(methods, **kw):
         seen.update(kw)
         return []
-    monkeypatch.setattr(envs, "install", fake_install)
-    for argv, want in ((["env", "install", "--packed"], "auto"),
-                       (["env", "install", "--packed", "--flavor", "cpu"], "cpu"),
-                       (["env", "install", "--flavor", "gpu", "--methods", "Matilda"], "gpu")):
+    monkeypatch.setattr(envs, "_install_rows", fake_install)
+    for argv, want in ((["env", "install", "--packed", "--dry-run"], "auto"),
+                       (["env", "install", "--packed", "--flavor", "cpu", "--dry-run"], "cpu"),
+                       (["env", "install", "--flavor", "gpu", "--methods", "Matilda", "--dry-run"], "gpu")):
         assert cli.main(argv) == 0
         assert seen["flavor"] == want, argv
         capsys.readouterr()
     with pytest.raises(SystemExit) as e:
-        cli.main(["env", "install", "--flavor", "cuda"])
+        cli.main(["env", "install", "--flavor", "cuda", "--dry-run"])
     assert e.value.code == 2
     assert "invalid choice: 'cuda'" in capsys.readouterr().err
 
@@ -468,7 +469,7 @@ def test_cli_install_help_explains_auto(capsys):
         out = " ".join(capsys.readouterr().out.split())     # argparse wraps lines
         assert "--flavor {auto,cpu,gpu}" in out
         assert "'auto' (default) = 'cpu' when no NVIDIA GPU is visible on this host" in out
-        assert "'<env>-cpu' archive" in out and "mtb.env.host_has_gpu" in out
+        assert "'<env>-cpu' archive" in out and "mtb.env.host_has_gpu" not in out
     with pytest.raises(SystemExit):
         cli.main(["env", "install", "--help"])
     out = " ".join(capsys.readouterr().out.split()).replace("CPU- only", "CPU-only")
@@ -477,7 +478,7 @@ def test_cli_install_help_explains_auto(capsys):
 
 def test_cli_install_dry_run_total_names_the_flavour(cli_linux, plan_rows, monkeypatch, capsys):
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
-    assert cli.main(["env", "install", "--packed", "--flavor", "cpu"]) == 0
+    assert cli.main(["env", "install", "--packed", "--flavor", "cpu", "--dry-run"]) == 0
     cap = capsys.readouterr()
     lines = {l.split()[0]: l for l in cap.out.splitlines()}
     assert "0.8 GB dl" in lines["matilda"] and "2.5 GB disk" in lines["matilda"] \
@@ -493,16 +494,16 @@ def test_cli_install_dry_run_total_names_the_flavour(cli_linux, plan_rows, monke
     assert "NVIDIA GPU" not in cap.err
     # auto on a CPU host says so once (the install note); gpu sums the CUDA
     # archives and never falls back
-    assert cli.main(["env", "install", "--packed"]) == 0
+    assert cli.main(["env", "install", "--packed", "--dry-run"]) == 0
     err = capsys.readouterr().err
     assert "# total for 3 envs: 6.2 GB to download\n" + builds in err
     assert err.count("NVIDIA GPU") == 1 and err.count("--flavor gpu") == 1
-    assert cli.main(["env", "install", "--packed", "--flavor", "gpu"]) == 0
+    assert cli.main(["env", "install", "--packed", "--flavor", "gpu", "--dry-run"]) == 0
     assert ("# total for 3 envs: 8.4 GB to download\n# 2 of 3 envs have the GPU build. "
             "1 env has a single build (the same archive for CPU and GPU hosts).\n"
             + du.replace("# 2.5 GB", "# 9.0 GB")) in capsys.readouterr().err
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
-    assert cli.main(["env", "install", "--packed"]) == 0
+    assert cli.main(["env", "install", "--packed", "--dry-run"]) == 0
     assert ("# total for 3 envs: 8.4 GB to download\n# 2 of 3 envs have the GPU build, "
             "because this host has an NVIDIA GPU.") in capsys.readouterr().err
 
@@ -564,7 +565,7 @@ def test_cli_status_doctor_plan_print_the_record(cli_linux, envs_dir, capsys):
     out = capsys.readouterr().out
     assert [l for l in out.splitlines() if l.startswith(torch)][0].endswith(" flavor=cpu")
     assert "flavor" not in [l for l in out.splitlines() if l.startswith("matilda")][0]
-    assert cli.main(["env", "install", "--packed", "--methods", "SCALEX,Matilda"]) == 0
+    assert cli.main(["env", "install", "--packed", "--methods", "SCALEX,Matilda", "--dry-run"]) == 0
     out = capsys.readouterr().out
     assert [l for l in out.splitlines() if l.startswith(torch)][0].endswith("[have          ] <- SCALEX flavor=cpu")
     assert [l for l in out.splitlines() if l.startswith("matilda")][0].endswith("<- Matilda")

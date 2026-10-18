@@ -963,7 +963,7 @@ def _draw(tbl, cmap, title, show_language, gaps):
     if show_language:
         # what the chips left of the rows mean
         unknown = any(not _method_language(m) for m in methods)
-        ax.text(-0.9, y_bottom - 0.05, LANGUAGE_NOTE + ("; ?: not a package method"
+        ax.text(-0.9, y_bottom - 0.05, LANGUAGE_NOTE + ("; ?: your rows"
                                                         if unknown else ""),
                 fontsize=6.4, va="center", gid="legend")
         y_bottom -= 0.6

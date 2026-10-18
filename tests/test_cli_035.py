@@ -20,7 +20,9 @@ from multibench import workflow as W
 from multibench.engine import envs, registry
 
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
-NOTE = "# D11 holds RNA and ADT. 19 rows that read ATAC are not listed. --modalities all lists them."
+# the command line's table has a row per variant: the methods are counted too (X23)
+NOTE = ("# D11 holds RNA and ADT. 19 rows (4 methods) that read ATAC are not listed. "
+        "--modalities all lists them.")
 
 
 def _on_disk(ds):
@@ -199,7 +201,8 @@ def test_scan_modalities_all_and_the_stderr_note(no_envs, capsys):
     # a list of tokens selects as before, and names nothing
     rc, out, err = _cli(["scan", "D11", "--category", "vertical", "--modalities", "rna,atac",
                          "--format", "csv"], capsys)
-    assert set(pd.read_csv(io.StringIO(out))["modalities"]) == {"rna+atac", "rna+atac_gas"}
+    # the vertical peak methods read the atac role since 0.4.0 (X13)
+    assert set(pd.read_csv(io.StringIO(out))["modalities"]) == {"rna+atac"}
     assert err == ""
     # every modality held: nothing to say
     _on_disk("D22mini")

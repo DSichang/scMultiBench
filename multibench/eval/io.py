@@ -51,6 +51,14 @@ def _require_file(path: Path | str, what: str = "file") -> Path:
     return p
 
 
+def _refuse_h5mu(path) -> None:
+    """``ValueError`` for an ``.h5mu`` path: it holds one AnnData per modality,
+    and evaluate takes one of them."""
+    if Path(path).suffix.lower() == ".h5mu":
+        raise ValueError(f"{Path(path).name} is an .h5mu: pass one modality, e.g. "
+                         f"mudata.read(path)['rna'], with obsm='...'.")
+
+
 def read_embedding(path: Path | str) -> np.ndarray:
     """Read an embedding from an HDF5 file's dataset ``data``; orient as (cells, dims).
 
@@ -79,6 +87,7 @@ def read_embedding(path: Path | str) -> np.ndarray:
         input matrix, not a method output.
     """
     path = _require_file(path, "output")
+    _refuse_h5mu(path)
     with h5py.File(path, "r") as f:
         if "data" not in f or not isinstance(f["data"], h5py.Dataset):
             keys = sorted(f.keys())
@@ -730,7 +739,13 @@ def _labels_look_measured(values) -> tuple[str, int, int] | None:
     return None
 
 
-def _anndata_matrix(adata, obsm: str) -> np.ndarray:
+def _anndata_matrix(adata, obsm: str | None) -> np.ndarray:
+    if obsm is None:
+        # X_emb, the package's own key, else the only key there is (an
+        # AnnData's: a MuData's obsm also holds its modalities)
+        keys = sorted(adata.obsm.keys())
+        only = len(keys) == 1 and type(adata).__name__ == "AnnData"
+        obsm = keys[0] if only and "X_emb" not in keys else "X_emb"
     if obsm == "X":
         X = adata.X
         return np.asarray(X.toarray() if hasattr(X, "toarray") else X, dtype=float)
@@ -763,7 +778,7 @@ def _read_csv_embedding(path: Path):
     return d.to_numpy(dtype=float), ids
 
 
-def as_matrix(output, *, obsm: str = "X_emb") -> np.ndarray:
+def as_matrix(output, *, obsm: str | None = None) -> np.ndarray:
     """Coerce a run output / embedding to a 2-D float numpy array.
 
     Accepted forms:
@@ -788,8 +803,9 @@ def as_matrix(output, *, obsm: str = "X_emb") -> np.ndarray:
     ----------
     output
         The embedding in any of the forms above.
-    obsm : str
-        Key of ``.obsm`` to use for AnnData / ``.h5ad`` inputs (``'X'`` = ``.X``).
+    obsm : str | None
+        Key of ``.obsm`` to use for AnnData / ``.h5ad`` inputs (``'X'`` = ``.X``);
+        ``None`` = ``X_emb``, or the only key when there is one.
 
     Returns
     -------
@@ -806,6 +822,7 @@ def as_matrix(output, *, obsm: str = "X_emb") -> np.ndarray:
         return _anndata_matrix(output, obsm)
     if isinstance(output, (str, Path)):
         p = _require_file(output, "output")
+        _refuse_h5mu(p)
         suf = p.suffix.lower()
         if suf in {".h5", ".hdf5", ".hdf"}:
             return read_embedding(p)

@@ -551,7 +551,7 @@ def test_installation_page_sizes_match_the_plans():
     rows = {f"{t['cat']} {t['label']}": t["methods"] for t in GEN.TASKS.values()}
     rows["end-to-end"] = ["Matilda"]
     for label, methods in rows.items():
-        gb = [GEN._gb(mtb.env.install(methods, flavor=f)) for f in ("gpu", "cpu")]
+        gb = [GEN._gb(mtb.env.install(methods, flavor=f, dry_run=True).to_dict("records")) for f in ("gpu", "cpu")]
         sizes = gb[0] if gb[0] == gb[1] else f"{gb[0]}, {gb[1]}"
         line = f"- {label} {sizes}: {GEN.and_list(methods)}"
         assert line in text, line

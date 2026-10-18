@@ -325,9 +325,14 @@ def _n_clusters(graph, n: int, flavor: str, per: str | None = None) -> np.ndarra
     key = "_mb_search"
     if not _search_n_clusters(graph, n, key, flavor):
         got = graph.obs[key].nunique()
-        what = f"{n} clusters" + (f", one per {per}" if per else "")
-        _compat.warn(f"No Leiden resolution gave {what}; using the {got} clusters "
-                     f"of the last try.", UserWarning)
+        if per == "batch":
+            # what it affects, and that the scores stand
+            _compat.warn(f"ARI_batch and NMI_batch use {got} clusters: no resolution "
+                         f"gave {n}. Nothing to do.", UserWarning)
+        else:
+            what = f"{n} clusters" + (f", one per {per}" if per else "")
+            _compat.warn(f"No Leiden resolution gave {what}; using the {got} clusters "
+                         f"of the last try.", UserWarning)
     out = np.asarray(graph.obs[key].astype(str))
     del graph.obs[key]
     return out

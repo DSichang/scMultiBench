@@ -59,8 +59,8 @@ def test_run_dry_run_uses_the_methods_env():
 
 def test_env_functions():
     assert mtb.env.plan(methods=["Seurat(WNN)"]) == mtb.env.plan(methods=["Seurat_WNN"])
-    assert [r["methods"] for r in mtb.env.doctor(methods=["matilda"])] == [["Matilda"]]
-    assert [r["methods"] for r in mtb.env.install(["scipenn"])] == [["sciPENN"]]
+    assert [r["methods"] for r in mtb.env.doctor(methods=["matilda"]).to_dict("records")] == [["Matilda"]]
+    assert [r["methods"] for r in mtb.env.install(["scipenn"], dry_run=True).to_dict("records")] == [["sciPENN"]]
     assert mtb.env.recipe("matilda") == mtb.env.recipe("Matilda")
 
 

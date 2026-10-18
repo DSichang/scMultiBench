@@ -35,6 +35,8 @@ def _stored_plus_lone_baseline():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         stored = mtb.load_results("mosaic")
+    # two stored datasets of the same methods (one table per category since 0.4.0)
+    stored = pd.concat([stored, stored.assign(dataset="D45b")], ignore_index=True)
     return pd.concat([stored, pd.DataFrame(_rows("PCA_standin", "LABMOS"))],
                      ignore_index=True)
 

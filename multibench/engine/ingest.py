@@ -703,11 +703,14 @@ def _write_canonical(out: Path, X, feats, bars, *, dtype, compression, block):
     return out
 
 
-def to_canonical(src, out: Path | str | None = None, modality: str | None = None,
-                 convert: bool = True, *, layer: str | None = None,
-                 obsm: str | None = None, mod: str | None = None,
-                 dtype: str = "float64", compression: str | None = "gzip",
-                 block: int = 1024, category: str | None = None,
+@_compat.keywords("io.to_canonical", private="_to_canonical", positional=("convert",), kept={
+    "convert": _compat.note("leave it out: a canonical .h5 is passed through as it is"),
+    "compression": _compat.note("leave it out for gzip"),
+    "block": _compat.note("leave it out")})
+def to_canonical(src, out: Path | str | None = None, modality: str | None = None, *,
+                 layer: str | None = None, obsm: str | None = None,
+                 mod: str | None = None, dtype: str = "float64",
+                 category: str | None = None,
                  feature_names: list | None = None) -> Path:
     """Convert one matrix to a canonical scMultiBench ``.h5`` and return its path.
 
@@ -729,9 +732,6 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
         ``'rna'``, ``'adt'``, ``'atac'``, ``'atac_peak'`` or ``'atac_gas'``;
         names the file when ``out`` is a directory or ``None``, and enables
         the ADT / ATAC checks.
-    convert : bool
-        ``False`` = never write: pass a canonical ``.h5`` through, raise for
-        anything else.
     layer : str | None
         Take the matrix from ``adata.layers[layer]`` instead of ``adata.X``.
     obsm : str | None
@@ -740,10 +740,6 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
         MuData modality to convert (``mdata.mod[mod]``); required for a MuData.
     dtype : str
         Stored dtype of ``matrix/data``; ``'float32'`` halves the file.
-    compression : str | None
-        h5py compression filter; ``None`` = uncompressed.
-    block : int
-        Number of features written per streaming step.
     category : str | None
         Integration category the file is for (``vertical``, ``diagonal``,
         ``mosaic`` or ``cross``); only changes ATAC filenames.
@@ -788,6 +784,19 @@ def to_canonical(src, out: Path | str | None = None, modality: str | None = None
     mtb.io.read_canonical : the inverse, canonical ``.h5`` -> AnnData.
     mtb.describe_layout : the folder layout and the role -> filename mapping.
     """
+    return _to_canonical(src, out, modality, layer=layer, obsm=obsm, mod=mod,
+                         dtype=dtype, category=category, feature_names=feature_names)
+
+
+def _to_canonical(src, out: Path | str | None = None, modality: str | None = None,
+                  convert: bool = True, *, layer: str | None = None,
+                  obsm: str | None = None, mod: str | None = None,
+                  dtype: str = "float64", compression: str | None = "gzip",
+                  block: int = 1024, category: str | None = None,
+                  feature_names: list | None = None) -> Path:
+    """:func:`to_canonical`, with the deprecated ``convert`` (``False``: never
+    write), ``compression`` (the h5py filter) and ``block`` (features per
+    streaming step)."""
     if isinstance(src, (str, Path)) and _is_canonical_h5(Path(src)):
         return Path(src)
     if isinstance(src, (str, Path)) and Path(src).suffix.lower() == ".h5" \
@@ -894,7 +903,9 @@ def read_canonical(path: Path | str, sparse: bool | None = None):
     for the shipped benchmark inputs and for what ``to_canonical`` writes,
     not for a 100k-cell peak matrix.
 
-    A file without ``matrix/data`` raises h5py's ``KeyError``.
+    A method's ``embedding.h5`` (one dataset ``data``) is read into
+    ``.obsm["X_emb"]`` of an AnnData without features; another file without
+    ``matrix/data`` raises ``ValueError``.
     ``matrix/features`` and ``matrix/barcodes`` are optional; without them
     AnnData's default names (``'0'``, ``'1'``, ...) are kept.
 
@@ -912,6 +923,16 @@ def read_canonical(path: Path | str, sparse: bool | None = None):
         # its 1-D matrix/data would fail below with a line about unpacking
         raise ValueError(_tenx_message(path))
     with h5py.File(path, "r") as f:
+        if "matrix/data" not in f and isinstance(f.get("data"), h5py.Dataset):
+            # a method's embedding.h5: the embedding goes to .obsm["X_emb"]
+            from ..eval.io import read_embedding
+            emb = read_embedding(path)
+            a = ad.AnnData(np.zeros((emb.shape[0], 0)))
+            a.obsm["X_emb"] = emb
+            return a
+        if "matrix/data" not in f:
+            raise ValueError(f"{Path(path).name} has no matrix/data: it is not a "
+                             f"canonical .h5. Its keys: {sorted(f.keys())}.")
         data = np.array(f["matrix/data"]).T
         X = np.asarray(data, dtype=float)
         if sparse is None:
@@ -1162,9 +1183,20 @@ def _as_modality(data, spec, *, what, master, feature_names=None):
         f"got {type(spec).__name__}")
 
 
+def _check_unique_barcodes(names) -> None:
+    """``ValueError`` when cell barcodes repeat: they could not be told apart,
+    nor matched between modalities."""
+    import pandas as pd
+    idx = pd.Index([str(x) for x in names])
+    dup = idx[idx.duplicated()].unique()
+    if len(dup):
+        raise ValueError(f"{len(dup):,} barcodes repeat, e.g. {dup[0]}. Make them unique "
+                         f"(prefix the sample).")
+
+
 def _align_cells(a, *, master, master_name, role):
-    """``a`` in the master cell order. Other barcodes raise; non-unique ones
-    are paired by position, with a warning."""
+    """``a`` in the master cell order. Other barcodes raise, and so do repeated
+    ones (:func:`_check_unique_barcodes`)."""
     names = [str(x) for x in a.obs_names]
     master = [str(x) for x in master]
     if names == master:
@@ -1183,9 +1215,10 @@ def _align_cells(a, *, master, master_name, role):
         same = "All modalities of one dataset must hold the same cells."
         if len(stray) == len(names):            # no cell in common
             if "atac" in pair and pair & {"rna", "data"}:
+                theirs, ours = (("ATAC", "RNA") if role == "atac" else ("RNA", "ATAC"))
                 raise ValueError(
-                    "RNA and ATAC have no cells in common. For RNA and ATAC from "
-                    "different cells (diagonal integration), pass "
+                    f"RNA and ATAC share no barcode ({ours} e.g. {master[0]}, {theirs} "
+                    f"e.g. {names[0]}). Make the names match; for different cells pass "
                     + config.hint('category="diagonal"', "--category diagonal") + ".")
             raise ValueError(f"{role} and {master_name} have no cells in common. {same}")
         if stray:
@@ -1196,13 +1229,8 @@ def _align_cells(a, *, master, master_name, role):
                     f"{len(master):,}. {len(lack):,} cells of {master_name} are not in "
                     f"{role}.")
         raise ValueError(f"{head} {same} Subset each modality to the shared barcodes first.")
-    if len(names) != len(master):
-        raise ValueError(
-            f"{role} has {len(names):,} cells and {master_name} has {len(master):,}. "
-            f"All modalities of one dataset must hold the same cells.")
-    _compat.warn(
-        f"{role}: obs_names are not unique, so the cells cannot be matched to "
-        f"{master_name} by barcode; pairing them positionally", UserWarning)
+    _check_unique_barcodes(master)
+    _check_unique_barcodes(names)
     return a
 
 
@@ -1441,6 +1469,7 @@ def _export_dataset(data, dataset_dir: Path | str, *, rna="X",
             order, order_name = master, master_name
         else:
             order, order_name = [str(x) for x in mats[0][1].obs_names], mats[0][3]
+        _check_unique_barcodes(order)
         masters[side] = order
         sides[side] = [(role, _align_cells(a, master=order, master_name=order_name, role=what),
                         kw, what, src) for role, a, kw, what, src in mats]

@@ -47,7 +47,7 @@ def test_params_for_single_variant_needs_no_selector():
 
 
 def test_method_info_exposes_params_per_variant():
-    info = mtb.method_info("Multigrate")
+    info = mtb.method_info("Multigrate", verbose=True)
     assert "vertical:rna+adt" in info["params"]
     assert info["params"]["vertical:rna+adt"]["defaults"]["bs"] == 256
 

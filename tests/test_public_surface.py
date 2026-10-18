@@ -27,7 +27,7 @@ MTB_ALL = {
 }
 PLOT_ALL = {"bubble", "bar", "build_table", "BubbleTable"}
 IO_ALL = {"export_dataset", "to_canonical", "read_canonical"}
-ENV_ALL = {"install", "doctor", "recipe"}
+ENV_ALL = {"install", "doctor"}          # recipe left __all__ in 0.4.0 (X34)
 CONFIG_ALL = {"Config", "DEFAULT"}
 
 
@@ -52,8 +52,9 @@ def test_io_all_is_exactly_the_contract():
 
 def test_env_all_is_exactly_the_contract():
     assert set(mtb.env.__all__) == ENV_ALL and mtb.env is envs
-    # the two helpers the reference documents are in dir() too (0.4)
-    assert _leaks(mtb.env) == {"env_prefix", "host_has_gpu"}
+    # dir(mtb.env) is __all__ since 0.4.0 (X34); recipe and the helpers stay importable
+    assert _leaks(mtb.env) == set()
+    assert callable(mtb.env.recipe) and callable(mtb.env.host_has_gpu)
     # the rest of engine/envs.py stays importable for the CLI and the tests
     for name in ("group_for", "create_all", "install_packed", "installed_envs",
                  "default_env_name", "packed_sizes", "packed_manifest"):
@@ -199,19 +200,21 @@ def test_env_install_is_the_cli_code_path(monkeypatch):
     monkeypatch.setattr(envs, "create_all", fake_create_all)
     monkeypatch.setattr(envs, "install_packed", lambda env, **kw: pytest.fail("no download"))
     monkeypatch.setattr(envs, "packed_manifest", lambda: {"scmb_torch": "https://x/t.tar.gz"})
-    out = mtb.env.install(["SCALEX"], category=None, packed=True, dry_run=True)
+    out = mtb.env.install(["SCALEX"], category=None, packed=True, dry_run=True).to_dict("records")
     assert seen == {"category": None, "methods": ["SCALEX"], "conda": None,
                     "dry_run": True, "force": False}
     assert [r["state"] for r in out] == ["packed archive published", "have"]
     assert out[0]["packed_url"] == "https://x/t.tar.gz"
-    out = mtb.env.install(["SCALEX"], packed=False)
+    out = mtb.env.install(["SCALEX"], packed=False, dry_run=True).to_dict("records")
     assert [r["state"] for r in out] == ["build(dry-run)", "have"]
     with pytest.raises(KeyError, match="Did you mean"):
-        mtb.env.install(["StabMapp"])
+        mtb.env.install(["StabMapp"], dry_run=True).to_dict("records")
+    # 0.4.0: build= replaces packed= (X25), installing is the default (X27), force= is
+    # hidden (X33)
     sig = inspect.signature(mtb.env.install)
-    assert list(sig.parameters) == ["methods", "category", "packed", "dry_run", "conda",
-                                    "force", "flavor"]
-    assert sig.parameters["dry_run"].default is True and sig.parameters["packed"].default is True
+    assert list(sig.parameters) == ["methods", "category", "build", "dry_run", "conda",
+                                    "flavor"]
+    assert sig.parameters["dry_run"].default is False and sig.parameters["build"].default is False
 
 
 # ------------------------------------------------------------------ CLI help names real functions

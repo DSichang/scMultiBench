@@ -119,7 +119,9 @@ def test_the_scan_sees_the_known_choice_sets():
     assert {"overall"} <= seen["multibench.plot.bar.bar"]
     # bubble's __module__ is set to "multibench.plot" (plot/__init__.py)
     assert {"aggregate", "overall"} <= seen["multibench.plot.bubble"]
-    assert {"aggregate", "overall", "na"} <= seen["multibench.plot.bubble.build_table"]
+    # build_table(na=) is deprecated since 0.4.0 (X41): no longer documented
+    assert {"aggregate", "overall"} <= seen["multibench.plot.bubble.build_table"]
+    assert "na" not in seen["multibench.plot.bubble.build_table"]
     assert "flavor" in seen["multibench.eval.scib.compute"]
     assert "flavor" in seen["multibench.eval.scib.leiden_sweep"]
 

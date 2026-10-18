@@ -126,7 +126,8 @@ def test_columns_order_and_one_row_per_method(linux, monkeypatch):
                for r in pm["reason"][:2])
     for m, reason in zip(pm["method"][2:], pm["reason"][2:]):
         assert reason and reason == by[m]
-    assert set(pm.attrs) == {"held", "not_listed", "not_held", "cells"}
+    assert set(pm.attrs) == {"held", "not_listed", "not_held", "cells", "not_listed_batch",
+                             "not_listed_methods"}
     assert {k: pm.attrs[k] for k in full.attrs} == full.attrs
 
 
@@ -275,7 +276,7 @@ def test_the_first_line_names_10x_files(linux, tmp_path, capsys):
     _tenx(tmp_path / "GAS" / "atac_gas.h5")
     got = mtb.inputs_for("GAS", "vertical", "scMM", data_path=tmp_path, check=True)
     assert got == {"rna": str(tmp_path / "GAS" / "rna.h5"),
-                   "atac_gas": str(tmp_path / "GAS" / "atac_peak.h5")}
+                   "atac": str(tmp_path / "GAS" / "atac_peak.h5")}      # X13
     pm, line = first("GAS", "vertical", methods=["VIMCCA", "scMM"])
     assert line == ("[scan] 2 of 2 methods have their input files in GAS. 2 of 2 can run "
                     "on this computer. GAS holds RNA and ATAC.")
@@ -504,13 +505,15 @@ def test_folder_caveats_are_printed_and_fixed_notes_are_not(linux, tmp_path, cap
     # the note on the method itself, the same on every folder, is run_all's
     _on_disk("D27mini")
     full = full_scan("D27mini", "diagonal", methods=["online_iNMF", "SCALEX"], verbose=False)
-    assert "online_iNMF needs about 5,000 cells" in " ".join(full["caveat"])
+    # 3,000 RNA + 3,000 ATAC cells: enough, so the size note is not shown (X81)
+    assert "online_iNMF needs about 5,000 cells" not in " ".join(full["caveat"])
     mtb.scan("D27mini", "diagonal", methods=["online_iNMF", "SCALEX"], per_method=True)
     out = capsys.readouterr().out
     assert "needs about 5,000 cells" not in out and len(out.splitlines()) == 2
     plan = mtb.run_all("D27mini", "diagonal", methods=["online_iNMF", "SCALEX"],
                        dry_run=True)
-    assert "online_iNMF needs about 5,000 cells" in capsys.readouterr().out and len(plan)
+    # 6,000 cells: no size note (X81)
+    assert "online_iNMF needs about 5,000 cells" not in capsys.readouterr().out and len(plan)
 
 
 def test_the_caveat_of_a_row_that_does_not_run_is_left_out(linux, tmp_path, capsys):

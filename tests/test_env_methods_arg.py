@@ -11,9 +11,9 @@ import multibench as mtb
 
 CALLS = {
     "plan": lambda m: mtb.env.plan(methods=m),
-    "install": lambda m: mtb.env.install(m),                # the default dry run
-    "install(methods=)": lambda m: mtb.env.install(methods=m),
-    "doctor": lambda m: mtb.env.doctor(methods=m),
+    "install": lambda m: mtb.env.install(m, dry_run=True).to_dict("records"),                # the default dry run
+    "install(methods=)": lambda m: mtb.env.install(methods=m, dry_run=True).to_dict("records"),
+    "doctor": lambda m: mtb.env.doctor(methods=m).to_dict("records"),
 }
 
 

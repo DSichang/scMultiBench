@@ -28,7 +28,8 @@ def test_requested_rows_the_folder_cannot_feed_are_counted(tmp_path):
                     data_path=tmp_path, verbose=False)
     text = str(e.value)
     assert "rna1+rna2+rna3" not in text
-    assert "\n1 other row needs files that DG does not have.\n" in text
+    # the row for numbered batches of this one-batch folder is not listed (X80)
+    assert "other row" not in text
     assert text.count("\n  iNMF (") == 1
 
 

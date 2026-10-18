@@ -176,9 +176,10 @@ def test_diagonal_label_column_missing_names_the_object(tmp_path):
 
 
 def test_disjoint_barcodes_point_at_diagonal_and_leave_no_folder(tmp_path):
-    with pytest.raises(ValueError, match=r"^RNA and ATAC have no cells in common\. For RNA "
-                                         r"and ATAC from different cells \(diagonal "
-                                         r"integration\), pass category=\"diagonal\"\.$"):
+    with pytest.raises(ValueError, match=r"^RNA and ATAC share no barcode \(RNA e\.g\. "
+                                         r"\S+, ATAC e\.g\. \S+\)\. Make the names "
+                                         r"match; for different cells pass "
+                                         r"category=\"diagonal\"\.$"):
         ingest.export_dataset(_rna(), tmp_path / "X", atac=_atac(), atac_kind="peak",
                               labels="obs:cell_type")
     assert not (tmp_path / "X").exists()
@@ -251,11 +252,11 @@ def test_cli_success_line_lists_only_what_this_call_wrote(tmp_path, capsys):
     assert rc == 0 and "(files: rna.h5, rna_cty.csv)" in cap.out
     assert ("# already in the folder: atac_cty.csv, atac_peak.h5 (not written by this call)"
             in cap.err)
-    with pytest.raises(SystemExit) as ei:
-        cli.main(["convert", str(tmp_path / "rna.h5ad"), str(tmp_path / "Z"), "--rna", "X",
-                  "--atac-from", str(tmp_path / "atac.h5ad"), "--atac-kind", "peak"])
-    assert ei.value.code == 2 and "--atac-from is for --category diagonal" in \
-        capsys.readouterr().err
+    # 0.4.0 (X77): --atac-from also reads the same cells of a paired category,
+    # matched by barcode; these are other cells, which the error names
+    rc = cli.main(["convert", str(tmp_path / "rna.h5ad"), str(tmp_path / "Z"), "--rna", "X",
+                   "--atac-from", str(tmp_path / "atac.h5ad"), "--atac-kind", "peak"])
+    assert rc == 1 and "share no barcode" in capsys.readouterr().err
 
 
 # ------------------------------------------------------------------ L06 / L07 mosaic

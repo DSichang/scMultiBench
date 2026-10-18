@@ -330,7 +330,7 @@ def test_a_matrix_file_without_features_fails_the_file_check(ready, tmp_path, ca
     assert not plan["runnable"].any() and list(plan["reason"]) == [short, short]
     with pytest.raises(ValueError) as e:            # the real run starts no method
         mtb.run_all("ZERO", "vertical", out_dir=tmp_path / "out", **kw)
-    assert (f"  VIMCCA (rna+atac): {short}\n  scMM (rna+atac_gas): {short}\n"
+    assert (f"  VIMCCA (rna+atac): {short}\n  scMM (rna+atac): {short}\n"
             in str(e.value))
     assert not (tmp_path / "out").exists()
     capsys.readouterr()

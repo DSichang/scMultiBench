@@ -29,6 +29,7 @@ import yaml
 
 import multibench as mtb
 from multibench import cli
+from multibench.engine import registry
 
 ROOT = Path(__file__).resolve().parent.parent
 PKG = ROOT / "multibench"
@@ -95,7 +96,8 @@ def test_find_methods_by_task_still_works():
         found = mtb.find_methods(task=task)
         assert found, f"find_methods(task={task!r}) found nothing"
         for m in found:
-            assert task in mtb.method_info(m)["tasks"], (task, m)
+            # method_info has no tasks key since 0.4.0 (X39): the registry keeps them
+            assert task in registry.get(m).tasks, (task, m)
     # every method keeps clustering, so dropping the other tags lost no method
     assert set(mtb.find_methods(task="clustering")) == everything
     with pytest.raises(ValueError, match="valid: \\['batch', 'clustering', 'dimension_reduction'\\]"):

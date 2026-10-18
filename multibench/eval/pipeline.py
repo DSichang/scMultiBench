@@ -57,9 +57,9 @@ def _scored_with(attrs) -> str | None:
     return "/".join(parts)
 
 
+@_compat.keywords("to_long", dropped=("clustering", "source"))
 def to_long(value_df, *, method: str, dataset: str | None = None,
-            category: str | None = None, clustering: str = "default",
-            source: str = "user") -> pd.DataFrame:
+            category: str | None = None) -> pd.DataFrame:
     """Reshape ``mtb.evaluate``'s scores into the long table of ``mtb.load_results``.
 
     The result has the columns of ``mtb.load_results`` and concatenates with
@@ -67,29 +67,28 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
 
     Parameters
     ----------
-    value_df : pandas.DataFrame or pandas.Series
+    value_df : pandas.DataFrame, pandas.Series or path
         What ``mtb.evaluate`` returns (metrics as the index, one column
-        ``Value``), a Series indexed by metric, or that frame's CSV read back.
+        ``Value``), a Series indexed by metric, or that frame's CSV (read
+        back, or its path).
     method : str
         Method id written into every row; your own name is fine.
     dataset : str, optional
         Dataset id written into every row; ``None`` writes ``"all"``.
     category : str, optional
-        Integration category written into every row; ``None`` writes
-        ``"user"``, the value ``load_results`` gives a user file without a
-        category column.
-    clustering : str
-        Value of the ``clustering`` column.
-    source : str
-        Value of the ``source`` column, which tells your rows from the stored
-        ones.
+        Integration category written into every row (``vertical``,
+        ``diagonal``, ``mosaic`` or ``cross``); ``None`` writes ``"user"``,
+        the value ``load_results`` gives a user file without a category
+        column.
 
     Returns
     -------
     pandas.DataFrame
         One row per metric, with the columns ``metric, value, method,
-        dataset, category, clustering, source, scored_with``. ``scored_with``
-        is ``"unknown"`` for a frame not from ``mtb.evaluate``.
+        dataset, category, clustering, source, scored_with``: ``clustering``
+        is ``"default"`` and ``source`` ``"user"``, which tells your rows from
+        the stored ones. ``scored_with`` is ``"unknown"`` for a frame not
+        from ``mtb.evaluate``.
 
     Raises
     ------
@@ -119,6 +118,11 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     mtb.load_results : the stored scores, in the same long shape.
     mtb.plot.bubble : plots a long frame.
     """
+    if category is not None:
+        config.category_folder(category)        # "verticall" is refused here
+    if isinstance(value_df, (str, Path)):
+        # evaluate()'s frame saved with to_csv: the metrics are its first column
+        value_df = pd.read_csv(io._require_file(value_df, "metric CSV"), index_col=0)
     if isinstance(value_df, pd.Series):
         value_df = value_df.to_frame("Value")
     cols = [str(c) for c in getattr(value_df, "columns", [])]
@@ -169,8 +173,8 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     out["method"] = method
     out["dataset"] = "all" if dataset is None else dataset
     out["category"] = "user" if category is None else category
-    out["clustering"] = clustering
-    out["source"] = source
+    out["clustering"] = "default"
+    out["source"] = "user"
     stamp = _scored_with(getattr(value_df, "attrs", None))
     out["scored_with"] = UNKNOWN_SCORING if stamp is None else stamp
     out = out[LONG_COLUMNS + ["scored_with"]].reset_index(drop=True)
@@ -266,7 +270,7 @@ def _column_without_obs(x, adata) -> bool:
 
 def _no_column_error(what: str, x: str) -> str:
     col = x[4:] if x.startswith("obs:") else x
-    return (f"{what}={x!r} is not a file, and the output has no obs. Pass the values, as "
+    return (f"{what}={x!r} is not a file, and the embedding has no obs. Pass the values, as "
             f"{what}=adata.obs[{col!r}].")
 
 
@@ -347,9 +351,11 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
                 and _same_cells(first, ids, what=what, name=name, table=table,
                                 fix=_file_fix()):
             table.moved.append(name)
+        if first is None and _has_cell_ids(ids):
+            _compat.warn(_by_position_note(name), UserWarning)
         return io.by_id_column(
             vals, first, ids if unique else None, what=what, name=name,
-            target="the output", order="the rows of the output",
+            target="the embedding", order="the rows of the embedding",
             no_ids=_no_ids(ids), drop=what == "labels")[0]
     if _carries_ids(x):
         other = table is not None and _shares_no_id(x.index, ids)
@@ -401,9 +407,20 @@ def _one_column_file(path, column: str, stack, *, what: str = "batch") -> str:
     return str(out)
 
 
+def _has_cell_ids(ids) -> bool:
+    """Whether the embedding names its cells (barcodes, not row numbers)."""
+    return ids is not None and io._looks_like_ids(pd.Series(list(ids), dtype=object))
+
+
+def _by_position_note(name: str) -> str:
+    """The warning for a file without cell ids next to an embedding with them."""
+    return (f"{name} has no cell ids, so it is matched by position. Check that the "
+            f"embedding rows follow the file.")
+
+
 def _no_ids(ids) -> str:
-    return ("the output repeats cell ids" if ids is not None
-            else "the output has no cell ids")
+    return ("the embedding repeats cell ids" if ids is not None
+            else "the embedding has no cell ids")
 
 
 def _stack_label_files(files, ids, as_written=False, table=None):
@@ -418,7 +435,7 @@ def _stack_label_files(files, ids, as_written=False, table=None):
     origin = np.concatenate([np.full(len(v), i + 1) for i, (v, _) in enumerate(read)])
     names = [Path(f).name for f in files]
     unique = ids is not None and pd.Index(ids).is_unique
-    order = "the rows of the output"
+    order = "the rows of the embedding"
     if all(first is not None for _, first in read):
         name = _and_list(names)
         keys = pd.concat([first for _, first in read], ignore_index=True)
@@ -430,11 +447,14 @@ def _stack_label_files(files, ids, as_written=False, table=None):
         # a caller of evaluate is 5 frames up: by_id_column, this, evaluate, its wrapper
         pos, _ = io.by_id_column(np.arange(len(vals)), pd.concat(
             [first for _, first in read], ignore_index=True), ids if unique else None,
-            what="labels", name=name, target="the output", order=order,
+            what="labels", name=name, target="the embedding", order=order,
             no_ids=_no_ids(ids), n_files=len(names), drop=True)
         return vals[pos], origin[pos]
+    if all(first is None for _, first in read) and _has_cell_ids(ids):
+        _compat.warn(_by_position_note(_and_list(names)).replace(" has no ", " have no "),
+                     UserWarning)
     for (v, first), name in zip(read, names):
-        io.by_id_column(v, first, None, what="labels", name=name, target="the output",
+        io.by_id_column(v, first, None, what="labels", name=name, target="the embedding",
                         order=order, no_ids=(
                             "the other label files have none" if unique
                             else _no_ids(ids)))
@@ -500,6 +520,8 @@ _UNITS = {"labels": "labels", "clusters": "cluster ids", "batch": "batch ids"}
 #: the dataset whose label files ``multibench evaluate --dataset`` read, so the
 #: errors name them, not a --labels never typed
 _CLI_LABELS_FROM = contextvars.ContextVar("cli_labels_from", default=None)
+#: the keys of a labels dict, in the order of its files (label_order's spelling)
+_LABEL_KEYS = contextvars.ContextVar("label_keys", default=None)
 
 
 def _label_files(given) -> list:
@@ -688,8 +710,10 @@ def _count_error(what: str, n: int, n_cells: int, given, category=None) -> str:
         f"in --embedding.")
     if what == "labels" and n > n_cells and len(files) > 1:
         fit = _files_that_fit(files, n_cells)
+        names = _LABEL_KEYS.get()
         if fit:
-            keys = [f.stem for f in fit]
+            keys = (names[:len(fit)] if names and len(names) == len(files)
+                    else [f.stem for f in fit])
             return (f"The embedding has {n_cells:,} cells = {'+'.join(keys)}. "
                     + config.hint(f"Pass label_order={keys!r}.",
                                   "Pass --labels for " + " and ".join(
@@ -909,7 +933,7 @@ def evaluate(
     batch=None,
     metrics=None,
     clusters=None,
-    obsm: str = "X_emb",
+    obsm: str | None = None,
     label_order=None,
     verbose: bool = True,
     missing_labels: str = "error",
@@ -945,9 +969,9 @@ def evaluate(
     clusters
         Your own cluster per cell, in the forms ``labels`` takes or an ``.h5``
         path; replaces the Leiden clusters of ARI, NMI, ASW, iASW and iF1.
-    obsm : str
+    obsm : str | None
         ``.obsm`` key of an AnnData, MuData or ``.h5ad`` embedding; ``'X'``
-        means ``.X``.
+        means ``.X``. ``None`` = ``X_emb``, or the only key when there is one.
     label_order : list of str
         Keys of a multi-entry ``labels`` dict in the embedding's cell order;
         not needed for an unchanged ``mtb.labels_for`` dict.
@@ -996,7 +1020,9 @@ def evaluate(
             "labels is an empty dict. Pass the cell types, as "
             "labels=adata.obs['celltype'].")
     # a dict becomes a list of paths first, for the file-of-origin batch rule
+    _LABEL_KEYS.set(None)
     if isinstance(labels, dict):
+        _LABEL_KEYS.set([str(k) for k in (labels if label_order is None else label_order)])
         labels = _labels_from_dict(labels, label_order)
     elif label_order is not None:
         raise TypeError(

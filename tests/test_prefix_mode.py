@@ -171,7 +171,7 @@ def test_env_prefix_asks_conda_when_not_under_envs_dir(envs_dir, monkeypatch, tm
 
 def test_doctor_and_status_count_the_prefix(envs_dir):
     make_prefix(envs_dir, SCALEX_ENV)
-    row = next(r for r in envs.doctor(methods=["SCALEX"]) if r["env"] == SCALEX_ENV)
+    row = next(r for r in envs.doctor(methods=["SCALEX"]).to_dict("records") if r["env"] == SCALEX_ENV)
     assert row["exists"] is True
     st = next(r for r in envs.status() if r["method"] == "SCALEX")
     assert st["exists"] is True
@@ -430,10 +430,10 @@ def linux_no_conda(envs_dir, monkeypatch):
 def test_install_no_conda_lockfile_build_refused_with_archive(linux_no_conda):
     # SCALEX -> scmb_torch: archive published, but packed=False asked for a build
     with pytest.raises(RuntimeError) as e:
-        mtb.env.install(["SCALEX"], packed=False, dry_run=False)
+        mtb.env.install(["SCALEX"], packed=False, dry_run=False).to_dict("records")
     assert str(e.value) == ("Conda is not installed on this computer. Environment "
-                            "scmb_torch has a packed archive. Pass packed=True to "
-                            "install it.")
+                            "scmb_torch has a packed archive. Leave out build=True "
+                            "to install it.")
 
 
 def test_install_no_conda_refused_without_archive(linux_no_conda):
@@ -442,11 +442,11 @@ def test_install_no_conda_refused_without_archive(linux_no_conda):
     env = envs.group_for("Matilda")
     assert env not in envs.packed_manifest()
     with pytest.raises(RuntimeError) as e:
-        mtb.env.install(["Matilda", "SCALEX"], packed=True, dry_run=False)
+        mtb.env.install(["Matilda", "SCALEX"], packed=True, dry_run=False).to_dict("records")
     assert str(e.value) == (f"Conda is not installed on this computer. Environment "
                             f"{env} has no packed archive. Install conda first.")
     with pytest.raises(RuntimeError, match=r"has no packed archive\. Install conda first\."):
-        mtb.env.install(["Matilda"], packed=False, dry_run=False)
+        mtb.env.install(["Matilda"], packed=False, dry_run=False).to_dict("records")
 
 
 def test_install_no_conda_packed_path_works(envs_dir, monkeypatch):
@@ -459,19 +459,19 @@ def test_install_no_conda_packed_path_works(envs_dir, monkeypatch):
         make_prefix(envs_dir, env)               # what a real unpack leaves behind
         return True
     monkeypatch.setattr(envs, "install_packed", fake_unpack)
-    rows = mtb.env.install(["SCALEX"], packed=True, dry_run=False)
+    rows = mtb.env.install(["SCALEX"], packed=True, dry_run=False).to_dict("records")
     assert [r["state"] for r in rows] == ["PACKED"]
     assert envs.installed_envs() == ["scmb_torch"]
     # a second call sees it as installed: no download, no build
     monkeypatch.setattr(envs, "install_packed",
                         lambda env, **kw: pytest.fail("downloaded an installed env"))
-    assert [r["state"] for r in mtb.env.install(["SCALEX"], packed=True, dry_run=False)] == ["have"]
+    assert [r["state"] for r in mtb.env.install(["SCALEX"], packed=True, dry_run=False).to_dict("records")] == ["have"]
 
 
 def test_install_dry_run_needs_no_conda(linux_no_conda):
-    rows = mtb.env.install(["SCALEX"], packed=True)
+    rows = mtb.env.install(["SCALEX"], packed=True, dry_run=True).to_dict("records")
     assert rows[0]["state"] == "packed archive published"
-    rows = mtb.env.install(["SCALEX"], packed=False)
+    rows = mtb.env.install(["SCALEX"], packed=False, dry_run=True).to_dict("records")
     assert rows[0]["state"] == "build(dry-run)"
 
 

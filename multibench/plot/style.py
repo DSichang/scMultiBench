@@ -79,7 +79,7 @@ def per_dataset_ranks(long_df: pd.DataFrame, metrics=None) -> dict:
     For each dataset the frame is pivoted to method x metric (mean over
     duplicate rows), metrics that dataset never computed are dropped, and
     every remaining column is replaced by its max-rank (1 = worst ... n =
-    best, ties share the maximum rank). A metric only one of two or more
+    best, ties share the maximum rank). A metric only one of three or more
     methods has is dropped too (:func:`lone_columns`); ``attrs["lone"]``
     names it. A frame without a ``dataset`` column
     is treated as one dataset named ``"all"``. Datasets whose pivot is empty
@@ -112,8 +112,9 @@ def per_dataset_ranks(long_df: pd.DataFrame, metrics=None) -> dict:
 
 def lone_columns(mat: pd.DataFrame) -> list:
     """Columns of a method x metric frame with a value for one method only,
-    when the frame holds two or more methods; ``[]`` otherwise."""
-    if len(mat.index) < 2:
+    when the frame holds three or more methods (with two, a gap is an n/a
+    cell); ``[]`` otherwise."""
+    if len(mat.index) < 3:
         return []
     return [c for c in mat.columns if mat[c].notna().sum() < 2]
 

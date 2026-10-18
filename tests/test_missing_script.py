@@ -46,6 +46,6 @@ def test_every_entrypoint_is_a_tools_scripts_path():
         eps = [v.entrypoint for v in registry.get(m).variants]
         assert eps and all(e.startswith("tools_scripts/") for e in eps), (m, eps)
         folder = "/".join(eps[0].split("/")[:2])
-        assert mtb.method_info(m)["scripts_url"] == (
+        assert mtb.method_info(m, verbose=True)["scripts_url"] == (
             "https://github.com/PYangLab/scMultiBench/tree/main/"
             + urllib.parse.quote(folder, safe="/"))

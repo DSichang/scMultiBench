@@ -16,7 +16,7 @@ from multibench.engine import envs, registry, schema
 # ----------------------------------------------------------------- H1 per-variant
 def test_scmomat_is_unsupervised_in_every_variant():
     # main_scMoMaT.py declares --cty_path and never reads it, so no variant passes it
-    info = discover.method_info("scMoMaT")
+    info = discover.method_info("scMoMaT", verbose=True)
     assert info["needs_labels"] is False
     assert not any(s["needs_labels"] for s in info["supports"])
     for cat in ("vertical", "cross", "mosaic"):
@@ -38,7 +38,7 @@ def test_category_and_modalities_must_hold_on_one_variant():
                 m for m in discover.find_methods()
                 if any(s["category"] == cat
                        and set(mods) <= {registry.base_modality(x) for x in s["modalities"]}
-                       for s in discover.method_info(m)["supports"]))
+                       for s in discover.method_info(m, verbose=True)["supports"]))
             assert sorted(discover.find_methods(category=cat, modalities=mods)) == want, (cat, mods)
 
 
@@ -51,7 +51,7 @@ def test_atac_filter_is_judged_on_variants_that_consume_atac():
         for m in discover.find_methods(category=cat, atac="peak"):
             assert any(s["category"] == cat
                        and any(registry.base_modality(x) == "atac" for x in s["modalities"])
-                       for s in discover.method_info(m)["supports"]) or m == "scBridge", (cat, m)
+                       for s in discover.method_info(m, verbose=True)["supports"]) or m == "scBridge", (cat, m)
 
 
 def test_the_two_per_variant_rules_on_a_synthetic_spec(monkeypatch):
@@ -123,11 +123,11 @@ def test_availability_api_is_gone():
     old keyword fails with Python's own TypeError."""
     with pytest.raises(TypeError, match="unexpected keyword argument 'available'"):
         mtb.find_methods(available=True)
-    assert "availability" not in discover.method_info("SCALEX")
+    assert "availability" not in discover.method_info("SCALEX", verbose=True)
     assert "availability" not in envs.plan(methods=["SCALEX"])[0]
     assert not hasattr(schema, "AVAILABILITY")
     assert not hasattr(registry.get("SCALEX"), "availability")
 
 
 def test_method_info_status_doc():
-    assert discover.method_info("VIMCCA")["status"] == "verified"
+    assert discover.method_info("VIMCCA", verbose=True)["status"] == "verified"

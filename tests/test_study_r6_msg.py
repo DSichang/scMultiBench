@@ -234,6 +234,8 @@ def test_strict_counts_are_unchanged(tmp_path, pinned, root, capsys):
     assert rc == 1
     n = len(list(W._variant_rows("diagonal")))     # 14 methods, four with a second row
     assert n == 18
+    # the four rows for numbered batches are not listed for this one-batch folder (X80)
+    n -= 4
     assert err.startswith(
         f"error: --strict: 0 of {n} rows are runnable. Rows with missing input files: "
         f"{n - 1}. Rows whose peak names the method cannot read: 1. Rows whose method "
@@ -241,10 +243,10 @@ def test_strict_counts_are_unchanged(tmp_path, pinned, root, capsys):
     rc, _, err = _cli(base + ["--methods", "GLUE,Seurat_v3,MultiMAP,scBridge"], capsys)
     assert rc == 1
     assert err.startswith(
-        # five rows: GLUE has a second one, for several batches
-        "error: --strict: 0 of 5 rows are runnable. Rows with missing input files: 4. Rows "
+        # four rows: GLUE's second one, for several batches, is not listed (X80)
+        "error: --strict: 0 of 4 rows are runnable. Rows with missing input files: 3. Rows "
         "whose peak names the method cannot read: 1. Rows whose method scripts are not "
-        "fetched: 5. No runnable row for GLUE, Seurat_v3, MultiMAP, scBridge:\n"), err
+        "fetched: 4. No runnable row for GLUE, Seurat_v3, MultiMAP, scBridge:\n"), err
     assert ("  GLUE: GLUE reads peak names such as chr1:100-200. atac_peak.h5 holds other "
             "names, for example peak_0. Rename them to chr:start-end, or pass "
             "--allow-atac-mismatch to run GLUE anyway.\n") in err
@@ -370,12 +372,13 @@ def test_run_all_dry_run_header_is_sentences(monkeypatch, capsys, tmp_path):
     rc, out, err = _cli(["run-all", "D28", "--category", "diagonal", "--dry-run",
                          "--out-dir", str(tmp_path)], capsys)
     assert rc == 0
-    # four diagonal methods have a second row, for several batches: the lines count rows
-    assert re.search(r"^# Commands of the 13 rows whose input files are in place\. "
-                     r"\[env missing\] marks a row whose environment is not installed\. "
-                     r"\[use multibench run\] marks a command that reads a file multibench "
-                     r"run writes first\.$", out, re.M), out
-    assert re.match(r"# Dry run\. Nothing was executed\. 0 of 18 rows can run on D28 "
+    # the second rows of four methods, for several batches, are not listed for this
+    # one-batch folder (X80): the lines count methods
+    assert re.search(r"^# Commands of the 13 methods whose input files are in place\. "
+                     r"\[env missing\] marks a method whose environment is not "
+                     r"installed\. \[use multibench run\] marks a command that reads a "
+                     r"file multibench run writes first\.$", out, re.M), out
+    assert re.match(r"# Dry run\. Nothing was executed\. 0 of 14 methods can run on D28 "
                     r"\(diagonal\)\.", err), err
     # methods with one diagonal row each: the lines count methods
     rc, out, err = _cli(["run-all", "D28", "--category", "diagonal", "--dry-run",
@@ -516,8 +519,8 @@ def test_positional_warning_is_plural_for_several_files(tmp_path):
     msgs = [str(w.message) for w in rec if "matched by position" in str(w.message)]
     assert msgs == [
         "The first column of lab_atac.csv and lab_rna.csv looks like cell ids, but the "
-        "output has no cell ids. These files are matched by position. Check that their "
-        "rows follow the rows of the output."], msgs
+        "embedding has no cell ids. These files are matched by position. Check that their "
+        "rows follow the rows of the embedding."], msgs
 
 
 # ======================================================================= R6-14

@@ -152,7 +152,8 @@ def _scores_like_evaluate(flavor):
         warnings.simplefilter("ignore")
         stored = mtb.load_results("vertical", dataset="D11", methods=["Matilda"])
     df = pd.DataFrame({"Value": dict(zip(stored.metric, stored.value))})
-    df.attrs = {"leiden_flavor": flavor, "clustering": "sweep",
+    # the clusters part 0.4.0's evaluate records ("sweep" was 0.3's)
+    df.attrs = {"leiden_flavor": flavor, "clustering": "search",
                 "multibench_version": mtb.__version__, "scib_version": "1.1.7"}
     return df
 

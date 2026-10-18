@@ -82,8 +82,8 @@ def test_config_prints_each_path_with_its_source(monkeypatch, tmp_path, capsys):
     assert rc == 0
     lines = out.splitlines()
     names = [l.split()[0] for l in lines if not l.startswith(" ")]
-    assert names == ["data_path", "envs_dir", "repo_path", "scripts_commit", "result_path",
-                     "leiden_flavor"]
+    # the shipped tables' path is inside the wheel: shown only when moved (0.4.0, X43)
+    assert names == ["data_path", "envs_dir", "repo_path", "scripts_commit", "leiden_flavor"]
     i = names.index("data_path") * 2
     assert lines[i].split()[1] == str(tmp_path / "data")
     assert "environment variable MULTIBENCH_DATA_PATH" in lines[i + 1]
@@ -206,14 +206,15 @@ def test_auto_flavour_on_a_cpu_host_says_how_to_get_gpu_builds(linux, monkeypatc
     assert "# This env has the CPU build, because this host has no NVIDIA GPU." in err
     assert "# for jobs on GPU nodes, pass --flavor gpu" in err
     assert err.count("NVIDIA GPU") == 1 and err.count("--flavor gpu") == 1
-    assert cli.main(["env", "install", "--packed", "--methods", "scMoMaT"]) == 0
+    assert cli.main(["env", "install", "--packed", "--methods", "scMoMaT", "--dry-run"]) == 0
     err = capsys.readouterr().err
-    assert err.count(f"# installing CPU builds {note}") == 1
+    # a dry run says what it would install (X29)
+    assert err.count(f"# would install CPU builds {note}") == 1
     assert err.count("NVIDIA GPU") == 1
     # StabMap's env has no CPU build: the GPU build is taken either way, so
     # neither command gives the --flavor advice
     for argv in (["env", "plan", "--methods", "StabMap"],
-                 ["env", "install", "--packed", "--methods", "StabMap"]):
+                 ["env", "install", "--packed", "--methods", "StabMap", "--dry-run"]):
         assert cli.main(argv) == 0
         err = capsys.readouterr().err
         assert ("# This env has a single build (the same archive for CPU and GPU "
@@ -221,7 +222,7 @@ def test_auto_flavour_on_a_cpu_host_says_how_to_get_gpu_builds(linux, monkeypatc
         assert "GPU build" not in err, argv
         assert "--flavor gpu" not in err and "CPU builds" not in err, argv
     for argv in (["env", "plan", "--methods", "StabMap", "--flavor", "cpu"],
-                 ["env", "install", "--packed", "--methods", "StabMap", "--flavor", "gpu"]):
+                 ["env", "install", "--packed", "--methods", "StabMap", "--flavor", "gpu", "--dry-run"]):
         assert cli.main(argv) == 0
         assert "pass --flavor gpu" not in capsys.readouterr().err, argv
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
@@ -233,13 +234,13 @@ def test_auto_flavour_note_on_the_real_install_path(linux, monkeypatch, capsys):
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
     torch = envs.group_for("scMoMaT")          # an env with a published CPU archive
     missing = [{"env": torch, "exists": False, "has_lock": True, "methods": ["scMoMaT"]}]
-    monkeypatch.setattr(envs, "doctor", lambda **kw: [dict(r) for r in missing])
+    monkeypatch.setattr(envs, "_doctor_rows", lambda **kw: [dict(r) for r in missing])
     monkeypatch.setattr(envs, "_find_conda", lambda: "/usr/bin/conda")
     monkeypatch.setattr(envs, "install_packed", lambda env, **kw: True)
     monkeypatch.setattr(envs, "installed_flavor", lambda env, conda=None: "cpu")
     monkeypatch.setattr(envs, "create_all", lambda **kw: [
         {"env": torch, "methods": ["scMoMaT"], "exists": True, "has_lock": True}])
-    envs.install(["scMoMaT"], dry_run=False)          # Python: names the keyword
+    envs.install(["scMoMaT"], dry_run=False).to_dict("records")          # Python: names the keyword
     err = capsys.readouterr().err
     assert err.count("# installing CPU builds (no NVIDIA GPU on this host)") == 1
     assert "pass flavor='gpu'" in err
@@ -248,7 +249,7 @@ def test_auto_flavour_note_on_the_real_install_path(linux, monkeypatch, capsys):
     assert err.count("pass --flavor gpu") == 1
     # an env without a CPU archive gets the GPU build: no CPU-builds note
     missing[0].update(env="scmb_r", methods=["StabMap"])
-    envs.install(["StabMap"], dry_run=False)
+    envs.install(["StabMap"], dry_run=False).to_dict("records")
     assert "installing CPU builds" not in capsys.readouterr().err
 
 
@@ -287,13 +288,15 @@ def test_env_cmd_keeps_the_env_preflight(tmp_path, monkeypatch):
 
 
 def test_cli_runner_help_and_dry_run(tmp_path, capsys):
-    act = next(a for a in _sub("run")._actions if a.dest == "runner")
+    # --cmd-template since 0.4.0 (X24), the name of mtb.run's argument
+    act = next(a for a in _sub("run")._actions if "--cmd-template" in a.option_strings)
     assert "{env_cmd}" in act.help and "no env activation" in act.help
     assert "srun --gres=gpu:1 {env_cmd}" in act.help
     rc = cli.main(["run", "--method", "Matilda", "--category", "vertical",
                    "--input", "rna=/d/rna.h5", "--input", "adt=/d/adt.h5",
                    "--input", "cty=/d/cty.csv",
-                   "--out-dir", str(tmp_path), "--dry-run", "--runner", "srun {env_cmd}"])
+                   "--out-dir", str(tmp_path), "--dry-run", "--cmd-template",
+                   "srun {env_cmd}"])
     out = capsys.readouterr().out
     assert rc == 0 and re.match(r"srun \S*conda run -n matilda python ", out)
     assert "{env_cmd}" in runner.run.__doc__
@@ -374,7 +377,7 @@ def test_scan_reason_names_the_cli_install_check(no_envs, capsys):
                    "--format", "csv", "--columns", "reason"])
     out = capsys.readouterr().out
     # R7-10: the reason leads with the shell install command, and names no Python call
-    assert rc == 0 and "multibench env install --methods Matilda --run." in out
+    assert rc == 0 and "multibench env install --methods Matilda." in out
     assert "mtb.env" not in out
     assert "`" not in out
 

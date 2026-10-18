@@ -191,6 +191,7 @@ def test_no_unsaved_batch_warning_without_a_batch_metric(cite, tmp_path):
         warnings.simplefilter("error")
         # the toy cells give no resolution with one cluster per cell type
         warnings.filterwarnings("ignore", message="No Leiden resolution gave")
+        warnings.filterwarnings("ignore", message="ARI_batch and NMI_batch use")
         new = old.rescore(metrics=["ARI"])
     assert new.records[0]["status"] == "CHAIN_OK"
     with pytest.warns(UserWarning, match="which older versions did not save"):

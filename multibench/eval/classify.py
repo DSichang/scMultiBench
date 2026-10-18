@@ -23,7 +23,7 @@ COLUMNS = ["reference", "batch", "cell", "label", "predicted"]
 
 @_compat.keywords("classify", renamed={"output": "embedding"})
 def classify(embedding, labels=None, *, batch=None, reference=None,
-             obsm: str = "X_emb", label_order=None, seed: int = 0) -> pd.DataFrame:
+             obsm: str | None = None, label_order=None, seed: int = 0) -> pd.DataFrame:
     """Predict the cell type of each query cell from a reference batch.
 
     One batch is the reference: a small neural network learns the cell
@@ -46,9 +46,9 @@ def classify(embedding, labels=None, *, batch=None, reference=None,
     reference : str, optional
         The batch to learn from. ``None`` = every batch in turn, as in the
         article.
-    obsm : str
+    obsm : str | None
         ``.obsm`` key of an AnnData or ``.h5ad`` ``embedding``; ``'X'`` means
-        ``.X``.
+        ``.X``; ``None`` = ``X_emb``, or the only key when there is one.
     label_order : list of str
         Keys of a ``labels`` dict in the method's cell order, as in
         ``mtb.evaluate``; ``None`` works for an unchanged ``mtb.labels_for``
@@ -63,7 +63,9 @@ def classify(embedding, labels=None, *, batch=None, reference=None,
         One row per query cell and reference, with the columns
         ``reference``, ``batch`` (the cell's own batch), ``cell`` (the cell
         id, or the row number when the embedding has none), ``label`` (the
-        true cell type) and ``predicted``.
+        true cell type) and ``predicted``. A query cell of a type the
+        reference batch lacks is left out; ``attrs["left_out"]`` counts them
+        per reference.
 
     Raises
     ------
@@ -175,6 +177,7 @@ def classify(embedding, labels=None, *, batch=None, reference=None,
                      f"they are left out.", UserWarning)
     cell = np.asarray(ids, dtype=object) if ids is not None else np.arange(n_cells)
     frames = []
+    left_out: dict = {}
     for ref in batches if reference is None else [str(reference)]:
         train = keep & (ba == ref)
         types = pd.unique(ct[train])
@@ -185,6 +188,7 @@ def classify(embedding, labels=None, *, batch=None, reference=None,
                 + "; skipped.", UserWarning)
             continue
         query = keep & (ba != ref) & np.isin(ct, types)
+        left_out[ref] = int((keep & (ba != ref) & ~np.isin(ct, types)).sum())
         if not query.any():
             _compat.warn(f"No other batch has a cell type of reference batch {ref}; "
                          f"skipped.", UserWarning)
@@ -193,9 +197,10 @@ def classify(embedding, labels=None, *, batch=None, reference=None,
         frames.append(pd.DataFrame({
             "reference": ref, "batch": ba[query], "cell": cell[query],
             "label": ct[query], "predicted": np.asarray(predicted, dtype=object)}))
-    if not frames:
-        return pd.DataFrame(columns=COLUMNS)
-    return pd.concat(frames, ignore_index=True)[COLUMNS]
+    out = (pd.concat(frames, ignore_index=True)[COLUMNS] if frames
+           else pd.DataFrame(columns=COLUMNS))
+    out.attrs["left_out"] = left_out
+    return out
 
 
 _NOT_EMBEDDING = ("classify needs an embedding; {what} is not one. "
@@ -334,6 +339,9 @@ def classification_metrics(predictions) -> pd.DataFrame:
           predicted as that type, averaged over the types.
         - ``F1``: F1-score, 2 x the cells correctly predicted as a type /
           (its cells + the cells predicted as it), averaged over the types.
+
+        The ``mean`` row is what ``mtb.evaluate(metrics="classification")``
+        returns; this adds one row per reference.
 
     Raises
     ------

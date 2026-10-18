@@ -285,7 +285,7 @@ def test_install_dry_run_states_the_no_gpu_fact_once(tables, monkeypatch, capsys
     monkeypatch.setattr(envs, "create_all", lambda **kw: [
         {"env": "scmb_r", "methods": ["StabMap"], "exists": False, "has_lock": True},
         {"env": "scmb_torch", "methods": ["scMoMaT"], "exists": False, "has_lock": True}])
-    assert cli.main(["env", "install", "--packed", "--methods", "StabMap,scMoMaT"]) == 0
+    assert cli.main(["env", "install", "--packed", "--methods", "StabMap,scMoMaT", "--dry-run"]) == 0
     err = capsys.readouterr().err
     assert _total_lines(err) == [
         "# total for 2 envs: 1.8 GB to download",

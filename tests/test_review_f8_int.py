@@ -287,7 +287,8 @@ def test_the_deprecated_evaluate_flags_warn_in_sentences(monkeypatch, capsys):
     with pytest.raises(SystemExit) as e:
         cli.main(["evaluate", "--embedding", "e.h5", "--labels", "l.csv", "--only", "ARI"])
     assert e.value.code == 2
-    assert "unrecognized arguments: --only ARI" in capsys.readouterr().err
+    # ARI is read as the positional EMBEDDING since 0.4.0 (X19)
+    assert "unrecognized arguments: --only" in capsys.readouterr().err
 
 
 # ================================================================ fetch error
@@ -311,7 +312,7 @@ def test_env_plan_and_install_descriptions_are_short_sentences():
         text = sub.choices[name].description
         assert ";" not in text and _depth(text) <= 1, (name, text)
         assert not re.search(r"\w/\w", text), (name, text)
-    assert "--run refuses unless --force is given." in sub.choices["install"].description
+    assert "the install refuses." in sub.choices["install"].description
 
 
 def test_preflight_is_gone_from_what_users_read():

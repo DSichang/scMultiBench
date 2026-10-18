@@ -421,7 +421,7 @@ _READ_ONLY = [
     ["env", "groups"],
     ["env", "plan", "--category", "vertical"],
     ["env", "doctor", "--category", "vertical"],
-    ["env", "install", "--category", "vertical"],
+    ["env", "install", "--category", "vertical", "--dry-run"],
     ["env", "recipe", "Matilda"],
     ["env", "yml", "Matilda"],
     ["env", "create", "Matilda"],
@@ -485,7 +485,8 @@ def test_env_install_runtime_error_is_on_stderr(monkeypatch, capsys):
     monkeypatch.setattr(envs, "_find_conda", lambda: "/usr/bin/conda")
     monkeypatch.setattr(envs, "installed_envs", lambda conda=None: [])
     monkeypatch.setattr(envs, "create_all", boom)
-    rc = cli.main(["env", "install", "--run", "--methods", "Matilda"])
+    # --build: the lockfile path, which create_all runs (an archive would download)
+    rc = cli.main(["env", "install", "--build", "--methods", "Matilda"])
     cap = capsys.readouterr()
     assert rc == 1 and cap.out == "" and "error: conda/mamba not found" in cap.err
 

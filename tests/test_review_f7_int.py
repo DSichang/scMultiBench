@@ -62,7 +62,7 @@ def test_env_reason_names_the_category_in_a_sentence(monkeypatch):
     monkeypatch.setattr(R, "linux_only_sentence", lambda: None)
     text = W._env_hint("glue", "GLUE", "diagonal")
     assert text == ("Environment glue is not installed. Run multibench env install "
-                    "--methods GLUE --run. Use --category diagonal to install the "
+                    "--methods GLUE. Use --category diagonal to install the "
                     "environments of every diagonal method.")
     assert not re.search(r"\. --category", text)
 
@@ -159,7 +159,7 @@ def test_several_datasets_warning_lists_the_datasets_in_words():
 @pytest.fixture
 def linux_without_conda(monkeypatch):
     monkeypatch.setattr(envs, "_find_conda", lambda: None)
-    monkeypatch.setattr(envs, "doctor", lambda **kw: [
+    monkeypatch.setattr(envs, "_doctor_rows", lambda **kw: [
         {"env": envs.group_for("StabMap"), "exists": False}])
     monkeypatch.setattr(envs, "install_packed",
                         lambda env, **kw: pytest.fail(f"download of {env} started"))
@@ -179,9 +179,9 @@ def test_no_conda_error_names_the_flag_on_the_cli(linux_without_conda, capsys):
 def test_no_conda_error_in_python(linux_without_conda):
     env = envs.group_for("StabMap")
     with pytest.raises(RuntimeError) as e:
-        mtb.env.install(["StabMap"], packed=False, dry_run=False)
+        mtb.env.install(["StabMap"], packed=False, dry_run=False).to_dict("records")
     assert str(e.value) == (f"Conda is not installed on this computer. Environment {env} "
-                            f"has a packed archive. Pass packed=True to install it.")
+                            f"has a packed archive. Leave out build=True to install it.")
     assert str(e.value).startswith(envs.NO_CONDA)
 
 
@@ -312,8 +312,8 @@ def test_method_info_returns_and_raises_read_as_a_card():
     assert "(" not in returns and ";" not in returns
     assert "declared stub" not in raises
     flat = " ".join(doc.split())
-    assert ("params per variant 'category:mods': defaults, tunable, effective "
-            "(mtb.params_for)") in flat
+    # params moved to verbose=True in 0.4.0 (X40)
+    assert "``params`` (per variant, as ``mtb.params_for``)" in flat
 
 
 # ==================================================== docs pages

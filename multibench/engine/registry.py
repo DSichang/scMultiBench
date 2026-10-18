@@ -181,7 +181,12 @@ def check_method(method_id: str) -> str:
 def unknown_method_message(method_id, hint: str | None = None) -> str:
     """``"Unknown method X. Did you mean Y? ... shows all methods."``; ``hint``
     defaults to :func:`closest_method`."""
-    hint = closest_method(method_id) if hint is None else hint
+    if hint is None:
+        # every id the name starts (Seurat: Seurat_v3, Seurat_v4, Seurat_v5, Seurat_WNN)
+        low = str(method_id).lower()
+        prefixed = [s.id for s in load() if s.id.lower().startswith(low)] if low else []
+        hint = (config._and_list(prefixed, "or") if len(prefixed) > 1
+                else closest_method(method_id))
     return (f"Unknown method {method_id}."
             + (f" Did you mean {hint}?" if hint else "")
             + " " + config.hint("mtb.find_methods()", "multibench find")
@@ -258,7 +263,8 @@ def normalize_modalities(modalities, *, base: bool = False) -> list[str]:
     known = known_modalities()
     out: list[str] = []
     for tok in modalities:
-        t = MODALITY_ALIASES.get(str(tok).lower(), str(tok))
+        low = str(tok).lower()               # RNA, ADT: the tokens are lower case
+        t = MODALITY_ALIASES.get(low, low)
         if t not in known and not is_label_role(t):
             raise ValueError(
                 f"Unknown modality {tok}. The tokens are rna, adt (or protein) and "

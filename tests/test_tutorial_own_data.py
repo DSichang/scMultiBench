@@ -454,7 +454,8 @@ HOLDS = {
 }
 #: the tutorials whose run still says that rows of other variants lack files,
 #: with the number of rows: the folder holds the modalities of those variants
-MORE_ROWS = {"diagonal_rna_atac": 2, "diagonal_multi": 2, "mosaic_shared": 3,
+# diagonal_rna_atac: its one-batch folder lists no row for numbered batches (X80)
+MORE_ROWS = {"diagonal_multi": 2, "mosaic_shared": 3,
              "mosaic_unshared": 6, "cross_rna_adt_atac": 4}
 
 
@@ -954,7 +955,8 @@ def test_the_small_dataset_row_names_the_scan_that_has_the_column(tmp_path, monk
     needs = "online_iNMF needs about 5,000 cells in total. On fewer it stops with std::exception."
     assert needs in [v.size_hint for v in registry.get("online_iNMF").variants]
     row = full[(full["method"] == "online_iNMF") & (full["modalities"] == "rna+atac_gas")]
-    assert len(row) == 1 and row["caveat"].iloc[0].startswith(needs)
+    # the example's 2,700 RNA + 2,700 ATAC cells are enough: no size note (X81)
+    assert len(row) == 1 and needs not in row["caveat"].iloc[0]
 
 
 def test_a_wrong_name_after_a_prefix_lists_the_names(tmp_path, monkeypatch):

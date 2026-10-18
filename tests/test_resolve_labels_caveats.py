@@ -93,10 +93,9 @@ def test_gas_fed_to_peak_method_is_flagged(tmp_path):
     d = tmp_path / "GAS"; d.mkdir()
     _h5(d / "rna.h5", 30, 50)
     _h5(d / "atac_gas.h5", 40, 50)                     # gene names, not peaks
-    # moETM wants peaks behind its atac_gas role
-    got = resolve.inputs_for("GAS", "vertical", "moETM", modalities=["rna", "atac_gas"],
-                             data_path=tmp_path, check=True)
-    assert got["atac_gas"].endswith("atac_gas.h5")
+    # moETM wants peaks: given atac_gas.h5 (its role is atac since 0.4.0, X13, and a
+    # vertical folder's atac.h5; here the file is passed by hand)
+    got = {"rna": str(d / "rna.h5"), "atac": str(d / "atac_gas.h5")}
     cav = resolve._preflight_caveats(got, atac="peak", method="moETM")
     assert cav == ["moETM needs peak ATAC. The features of atac_gas.h5 do not look like "
                    "chr:start-end, so it seems to hold gene activity."]

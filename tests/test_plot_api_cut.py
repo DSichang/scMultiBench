@@ -55,7 +55,8 @@ def test_bubble_bar_build_table_are_keyword_only_after_long_df():
     sig = inspect.signature(mtb.plot.bubble).parameters
     assert sig["aggregate"].default == "dataset" and sig["overall"].default == "rank"
     assert "na" not in sig and "show_language" not in sig          # deprecated in 0.4
-    assert inspect.signature(mtb.plot.build_table).parameters["na"].default == "warn"
+    # build_table(na=) is deprecated since 0.4.0 (X41), as bubble(na=)
+    assert "na" not in inspect.signature(mtb.plot.build_table).parameters
     with pytest.raises(TypeError):
         mtb.plot.build_table(_toy_long(), ["ARI"])
     tbl = mtb.plot.build_table(_toy_long(), metrics=["ARI"])

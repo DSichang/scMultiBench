@@ -69,7 +69,7 @@ def _variant_matches(v, category, want, needs_labels, atac) -> bool:
 
 
 @_compat.keywords("find_methods", private="_find_methods", kept={
-    "task": _compat.use("category="), "runnable": _compat.use("scan")})
+    "task": _compat.note("it has no replacement"), "runnable": _compat.use("scan")})
 def find_methods(category: str | None = None, *,
                  needs_labels: bool | None = None,
                  atac: str | None = None,
@@ -632,4 +632,4 @@ def cite(*methods, format: str = "text") -> str:
             url = s.reference.get("repo_url") or "(no repo_url)"
             note = f"{m}: no verified reference; see {url}"
             parts.append(("% " + note) if format == "bibtex" else note)
-    return "\n\n".join(parts) if format == "bibtex" else "\n".join(parts)
+    return _compat.Text("\n\n".join(parts) if format == "bibtex" else "\n".join(parts))

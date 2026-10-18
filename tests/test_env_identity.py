@@ -143,11 +143,11 @@ def test_scan_reports_the_users_env_and_does_not_run_it(fake_root):
     assert row.env_reason == (
         f"Environment matilda was not installed by this version of multibench, so it is "
         f"not used. Rename or remove {fake_root / 'envs' / 'matilda'}, then run multibench env "
-        f"install --methods Matilda --run.")
+        f"install --methods Matilda.")
 
 
 def test_doctor_names_the_users_env(fake_root):
-    rows = {r["env"]: r for r in mtb.env.doctor(methods=["Matilda", "sciPENN"])}
+    rows = {r["env"]: r for r in mtb.env.doctor(methods=["Matilda", "sciPENN"]).to_dict("records")}
     assert rows["matilda"]["exists"] is False
     assert rows["matilda"]["other_env"] == str(fake_root / "envs" / "matilda")
     assert rows["env_sciPENN"]["exists"] is True and rows["env_sciPENN"]["other_env"] is None
@@ -164,12 +164,12 @@ def test_cli_doctor_prints_the_users_env(fake_root, capsys):
 
 
 def test_install_does_not_take_the_users_env_as_installed(fake_root, monkeypatch):
-    row = mtb.env.install(["Matilda"])[0]
+    row = mtb.env.install(["Matilda"], dry_run=True).to_dict("records")[0]
     assert row["state"] == "name taken" and row["exists"] is False
     monkeypatch.setattr(envs, "install_packed",
                         lambda *a, **k: pytest.fail("downloaded despite the env in the way"))
     with pytest.raises(RuntimeError) as e:
-        mtb.env.install(["Matilda"], dry_run=False)
+        mtb.env.install(["Matilda"], dry_run=False).to_dict("records")
     assert str(e.value) == (
         f"Environment matilda was not installed by this version of multibench, so it is "
         f"not used. Rename or remove {fake_root / 'envs' / 'matilda'}, then install again.")
@@ -188,7 +188,7 @@ def test_run_refuses_the_users_env_on_linux(fake_root, tmp_path):
     assert str(e.value) == (
         f"Environment matilda was not installed by this version of multibench, so it is "
         f"not used. Rename or remove {fake_root / 'envs' / 'matilda'}, then call "
-        f"mtb.env.install(['Matilda'], dry_run=False).")
+        f"mtb.env.install(['Matilda']).")
     assert not (tmp_path / "out").exists()
 
 
@@ -210,13 +210,13 @@ def test_run_all_and_the_cli_refuse_the_users_env(fake_root, tmp_path, capsys):
     assert cli.main(argv) == 1
     err = capsys.readouterr().err
     assert (f"so it is not used. Rename or remove {fake_root / 'envs' / 'matilda'}, then "
-            f"run multibench env install --methods Matilda --run.") in err
+            f"run multibench env install --methods Matilda.") in err
     assert not (tmp_path / "cli").exists()
 
 
 def test_cli_install_dry_run_leaves_a_name_taken_env_out(fake_root, capsys):
     from multibench import cli
-    assert cli.main(["env", "install", "--methods", "Matilda", "--packed"]) == 0
+    assert cli.main(["env", "install", "--methods", "Matilda", "--packed", "--dry-run"]) == 0
     out, err = capsys.readouterr()
     assert "[name taken" in out
     assert "# name taken: matilda - rename or remove that env first" in err

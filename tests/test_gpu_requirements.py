@@ -95,18 +95,18 @@ def _must_not_spawn(*a, **k):
 # ------------------------------------------------------------ the snapshot
 
 def test_requires_gpu_set_is_pinned():
-    got = {m for m in mtb.list_methods() if mtb.method_info(m)["requires_gpu"]}
+    got = {m for m in mtb.list_methods() if mtb.method_info(m, verbose=True)["requires_gpu"]}
     assert got == GPU_ONLY, got
 
 
 def test_cpu_params_are_pinned():
-    got = {m: mtb.method_info(m)["cpu_params"] for m in mtb.list_methods()
-           if mtb.method_info(m)["cpu_params"]}
+    got = {m: mtb.method_info(m, verbose=True)["cpu_params"] for m in mtb.list_methods()
+           if mtb.method_info(m, verbose=True)["cpu_params"]}
     assert got == CPU_SWITCH, got
     # exactly what the scripts need: argparse type=bool is truthy for any
     # non-empty string, so scJoint's switch is the EMPTY string
-    assert mtb.method_info("scJoint")["cpu_params"] == {"use_cuda": ""}
-    assert mtb.method_info("scMDC")["cpu_params"] == {"device": "cpu"}
+    assert mtb.method_info("scJoint", verbose=True)["cpu_params"] == {"use_cuda": ""}
+    assert mtb.method_info("scMDC", verbose=True)["cpu_params"] == {"device": "cpu"}
 
 
 def test_gpu_evidence_names_a_cuda_call():
@@ -114,7 +114,7 @@ def test_gpu_evidence_names_a_cuda_call():
     the reference checkout is here, that line really says cuda."""
     root = runner._repo_root_no_fetch()
     for m in mtb.list_methods():
-        info = mtb.method_info(m)
+        info = mtb.method_info(m, verbose=True)
         ev = info["gpu_evidence"]
         if not info["requires_gpu"]:
             assert ev is None, m
@@ -130,11 +130,11 @@ def test_gpu_evidence_names_a_cuda_call():
 
 def test_method_info_keys_and_defaults():
     for m in mtb.list_methods():
-        info = mtb.method_info(m)
+        info = mtb.method_info(m, verbose=True)
         assert isinstance(info["cpu_params"], dict)
         assert isinstance(info["requires_gpu"], bool)
         assert info["gpu_evidence"] is None or isinstance(info["gpu_evidence"], str)
-    info = mtb.method_info("SCALEX")
+    info = mtb.method_info("SCALEX", verbose=True)
     assert info["cpu_params"] == {} and info["requires_gpu"] is False
     assert info["gpu_evidence"] is None
     assert "cpu_params" in (mtb.method_info.__doc__ or "")
@@ -151,9 +151,9 @@ def test_scmm_and_scmvp_keep_their_existing_cpu_treatment():
     for m in ("scMVP", "scMSI"):
         for v in registry.get(m).variants:
             assert v.run_env.get("CUDA_VISIBLE_DEVICES") == ""
-        assert mtb.method_info(m)["cpu_params"] == {}
-        assert mtb.method_info(m)["requires_gpu"] is False
-    assert mtb.method_info("scMM")["cpu_params"] == {}
+        assert mtb.method_info(m, verbose=True)["cpu_params"] == {}
+        assert mtb.method_info(m, verbose=True)["requires_gpu"] is False
+    assert mtb.method_info("scMM", verbose=True)["cpu_params"] == {}
 
 
 def test_cpu_params_keys_are_accepted_params_of_every_variant():
@@ -423,6 +423,6 @@ def test_runtime_hint_names_its_host():
     """The observed times were taken on the GPU benchmark host; a CPU-only
     user must be told so next to the numbers."""
     import multibench as mtb
-    rt = mtb.method_info("scMoMaT")["runtime"]
+    rt = mtb.method_info("scMoMaT", verbose=True)["runtime"]
     assert rt["host"] == "gpu" and "RTX 4090" in rt["note"] and "CPU-only" in rt["note"]
     assert set(rt) >= {"tier", "worst_sec", "observed", "host", "note"}

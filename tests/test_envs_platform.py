@@ -43,7 +43,7 @@ def test_create_all_run_refuses_off_linux(off_linux, monkeypatch):
     monkeypatch.setattr(envs, "_run_all", lambda cmds: pytest.fail("a build was started"))
     with pytest.raises(RuntimeError, match="run only on Linux") as e:
         envs.create_all(methods=["Matilda"], dry_run=False)
-    assert "force=True tries anyway" in str(e.value)
+    assert "force" not in str(e.value)        # hidden since 0.4.0 (X33)
     # the dry run still plans everywhere
     rows = envs.create_all(methods=["Matilda"], dry_run=True)
     assert rows and rows[0]["env"] == "matilda" and rows[0]["exists"] is False
@@ -186,13 +186,18 @@ def test_packed_sizes_tool_builds_from_head_requests(tmp_path):
 def test_env_tables_as_frame(monkeypatch):
     monkeypatch.setattr(envs, "installed_envs", lambda conda=None: [])
     for fn, kw in ((envs.plan, {"category": "vertical"}),
-                   (envs.doctor, {"category": "vertical"}),
                    (envs.status, {})):
         rows = fn(**kw)
         assert isinstance(rows, list) and isinstance(rows[0], dict)     # default kept
         df = fn(**kw, as_frame=True)
         assert isinstance(df, pd.DataFrame)
         assert list(df.columns) == list(rows[0]) and len(df) == len(rows)
+    # doctor returns a frame since 0.4.0 (X26); as_frame= is deprecated, no effect
+    rows = envs._doctor_rows(category="vertical")
+    df = envs.doctor(category="vertical")
+    assert isinstance(df, pd.DataFrame) and df.to_dict("records") == rows
+    with pytest.warns(FutureWarning, match=r"env\.doctor\(as_frame=\) is deprecated"):
+        assert envs.doctor(category="vertical", as_frame=True).equals(df)
 
 
 def test_env_docstrings_have_parameters_and_returns():

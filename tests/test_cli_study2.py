@@ -227,7 +227,7 @@ def test_env_doctor_and_install_warn_off_linux(monkeypatch, capsys):
     assert rc == 0
     assert cap.out.splitlines()[0].startswith("[L] matilda") and "# legend:" in cap.out
     assert cap.err.startswith("warning: ") and "run only on Linux" in cap.err
-    assert "--force" in cap.err
+    assert "--force" not in cap.err            # hidden since 0.4.0 (X33)
     assert "warning" not in cap.out
     # --run refuses with error: on stderr, exit 1, nothing on stdout
     monkeypatch.setattr(envs, "_run_all", lambda cmds: pytest.fail("a build was started"))
@@ -238,7 +238,9 @@ def test_env_doctor_and_install_warn_off_linux(monkeypatch, capsys):
     # --force skips the guard (build stubbed)
     built = []
     monkeypatch.setattr(envs, "_run_all", lambda cmds: built.append(cmds))
-    rc = cli.main(["env", "install", "--run", "--force", "--methods", "Matilda"])
+    # --build: the lockfile path (an archive would download), with a conda to build it
+    monkeypatch.setattr(envs, "_find_conda", lambda: "/usr/bin/conda")
+    rc = cli.main(["env", "install", "--run", "--force", "--build", "--methods", "Matilda"])
     cap = capsys.readouterr()
     assert rc == 0 and built and "[BUILD" in cap.out
 
@@ -247,7 +249,7 @@ def test_env_commands_silent_on_linux(monkeypatch, capsys):
     monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
     monkeypatch.setattr(envs, "installed_envs", lambda conda=None: [])
     for argv in (["env", "doctor", "--methods", "Matilda"], ["env", "plan", "--methods", "Matilda"],
-                 ["env", "install", "--methods", "Matilda"], ["env", "status", "--methods", "Matilda"]):
+                 ["env", "install", "--methods", "Matilda", "--dry-run"], ["env", "status", "--methods", "Matilda"]):
         rc = cli.main(argv)
         cap = capsys.readouterr()
         # env plan / env status are deprecated: their one deprecation line is allowed
@@ -257,9 +259,12 @@ def test_env_commands_silent_on_linux(monkeypatch, capsys):
 
 
 def test_force_flag_everywhere_it_matters():
-    for name in ("install", "create", "create-group"):
+    for name in ("create", "create-group"):
         act = next(a for a in _env_sub(name)._actions if a.dest == "force")
         assert "not Linux" in act.help
+    # env install --force parses, hidden from the help since 0.4.0 (X33)
+    act = next(a for a in _env_sub("install")._actions if a.dest == "force")
+    assert act.help == "==SUPPRESS=="
 
 
 def test_env_install_packed_dry_run_shows_sizes_url_and_total(monkeypatch, capsys):
@@ -276,7 +281,7 @@ def test_env_install_packed_dry_run_shows_sizes_url_and_total(monkeypatch, capsy
     monkeypatch.setattr(envs, "packed_sizes",
                         lambda: {"scmb_torch": {"archive_bytes": 900_000_000,
                                                 "unpacked_bytes": 3_100_000_000}})
-    rc = cli.main(["env", "install", "--packed"])
+    rc = cli.main(["env", "install", "--packed", "--dry-run"])
     cap = capsys.readouterr()
     assert rc == 0
     lines = {l.split()[0]: l for l in cap.out.splitlines()}

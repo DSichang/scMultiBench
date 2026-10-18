@@ -1403,7 +1403,8 @@ def test_changes_page_quotes_the_live_0_3_5_texts(tmp_path, capsys, monkeypatch)
     every = full_scan("D11", "vertical", data_path=tmp_path, modalities="all", verbose=False)
     assert (len(table), len(every)) == (14, 33)
     assert '`mtb.scan("D11", "vertical")` has 14 rows, where 0.3.4 had 33' in changed
-    assert table.attrs == {"held": ["rna", "adt"], "not_listed": 19, "not_held": ["atac"]}
+    assert {k: table.attrs[k] for k in ("held", "not_listed", "not_held")} == \
+        {"held": ["rna", "adt"], "not_listed": 19, "not_held": ["atac"]}
     rows, rows_all, left_out = re.search(
         r'`mtb\.scan\("D11", "vertical"\)` has (\d+) rows, where 0\.3\.4 had (\d+): D11 holds '
         r'RNA and ADT, and the (\d+) rows that read ATAC are left out\.', changed).groups()

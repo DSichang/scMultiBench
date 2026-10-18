@@ -337,7 +337,7 @@ def test_export_dataset_reads_the_atac_kind_from_the_names(tmp_path):
 
 
 @pytest.mark.parametrize("name, new", [("status", "env.doctor"),
-                                       ("plan", "env.install(['Matilda'])")])
+                                       ("plan", "env.install(['Matilda'], dry_run=True)")])
 def test_env_names(name, new):
     rows, msg = _one_warning(lambda: getattr(mtb.env, name)(**({} if name == "status" else
                                                              {"methods": ["Matilda"]})))

@@ -634,11 +634,11 @@ def _fake_env_rows():
 
 def test_cli_env_install_packed_dry_run_labels(monkeypatch, capsys):
     from multibench.engine import envs
-    monkeypatch.setattr(envs, "doctor", lambda **kw: _fake_env_rows())
+    monkeypatch.setattr(envs, "_doctor_rows", lambda **kw: _fake_env_rows())
     monkeypatch.setattr(envs, "create_all", lambda **kw: _fake_env_rows())
     monkeypatch.setattr(envs, "install_packed", lambda env: pytest.fail("must not download"))
     monkeypatch.setattr(envs, "packed_manifest", lambda: {"scmb_torch": "https://x/y.tar.gz"})
-    rc = cli.main(["env", "install", "--packed"])
+    rc = cli.main(["env", "install", "--packed", "--dry-run"])
     cap = capsys.readouterr()
     out = cap.out
     assert rc == 0
@@ -647,27 +647,28 @@ def test_cli_env_install_packed_dry_run_labels(monkeypatch, capsys):
     assert "no archive - lockfile build" in lines["lonely"]
     assert "no archive - NO-LOCK" in lines["nolock"]
     assert "[have" in lines["have_it"]
-    # the "add --run" hint is a diagnostic: stderr, so stdout is the table only
-    assert "dry-run" in cap.err and "--run" in cap.err
+    # the "leave out --dry-run" hint is a diagnostic: stderr, so stdout is the table only
+    assert "dry run" in cap.err and "leave out --dry-run" in cap.err
     assert not any(l.startswith("#") for l in out.splitlines())
     # --build: the lockfile wording
-    rc = cli.main(["env", "install", "--build"])
+    rc = cli.main(["env", "install", "--build", "--dry-run"])
     out = capsys.readouterr().out
     assert "build(dry-run)" in out and "packed" not in out.split("#")[0]
 
 
 def test_cli_env_doctor_next_hint_and_strict(monkeypatch, capsys):
     from multibench.engine import envs
-    monkeypatch.setattr(envs, "doctor", lambda **kw: _fake_env_rows())
+    monkeypatch.setattr(envs, "_doctor_rows", lambda **kw: _fake_env_rows())
     rc = cli.main(["env", "doctor"])
     out = capsys.readouterr().out
     assert rc == 0
     assert "# legend:" in out
-    assert "multibench env install --methods SCALEX,X,Y --run" in out
+    # installing is the default since 0.4.0 (X27): no --run
+    assert "multibench env install --methods SCALEX,X,Y\n" in out
     rc = cli.main(["env", "doctor", "--strict"])
     assert rc == 1
     capsys.readouterr()
-    monkeypatch.setattr(envs, "doctor", lambda **kw: [_fake_env_rows()[-1]])
+    monkeypatch.setattr(envs, "_doctor_rows", lambda **kw: [_fake_env_rows()[-1]])
     rc = cli.main(["env", "doctor", "--strict"])
     out = capsys.readouterr().out
     assert rc == 0 and "# next:" not in out

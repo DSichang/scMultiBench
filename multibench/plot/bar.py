@@ -109,7 +109,8 @@ def _bar(long_df: pd.DataFrame, *, metrics=None, top: int | None = None,
         raise ValueError(
             "long_df has no rows to plot. If it came from load_results, its "
             "UserWarning says why.")
-    family = metrics if isinstance(metrics, str) and metrics in FAMILY_METRICS else None
+    family = (metrics.lower() if isinstance(metrics, str)
+              and metrics.lower() in FAMILY_METRICS else None)
     if family:
         metrics = FAMILY_METRICS[family]
         present = set(long_df["metric"].unique())

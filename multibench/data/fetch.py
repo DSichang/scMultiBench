@@ -183,11 +183,14 @@ def fetch_outputs(dataset: str, methods=None, *, data_path=None,
 
     Use it on a host without the method environments, such as Colab or a
     laptop. ``evaluate`` and ``plot`` then run on the stored outputs.
+    With more than 4,096 cells scanpy's neighbour search is approximate, so the
+    same embedding can score a few hundredths differently on another machine or
+    library version: compare ranks, not third decimals.
 
     Parameters
     ----------
     dataset : str
-        Dataset id with shipped outputs: ``D11``, ``D28``, ``D46`` or ``D52``.
+        Dataset id with shipped outputs: ``D11``, ``D28``, ``D45`` or ``D52``.
     methods : list of str, optional
         Method ids that must be in the tree; checked only, the whole tree
         is downloaded either way.

@@ -143,18 +143,19 @@ def test_peak_name_caveat_has_no_subject_and_no_line_names_the_method_twice(
 
 # ---------------------------------------------------------- named methods, tokens
 def test_a_named_method_keeps_the_row_its_roles_spell(pinned, capsys):
-    """moETM's own spelling, as scan and method_info show it."""
-    assert ["rna", "atac_gas"] in [s["modalities"] for s in
-                                   mtb.method_info("moETM")["supports"]]
+    """moETM's own spelling, as scan and method_info show it (rna+atac since
+    0.4.0, X13: the role names the peaks it reads)."""
+    assert ["rna", "atac"] in [s["modalities"] for s in
+                               mtb.method_info("moETM")["supports"]]
     for call in (full_scan, lambda *a, **k: mtb.run_all(*a, dry_run=True, **k)):
         df = _quiet(call, "D28", "vertical", methods=["moETM"],
-                    modalities=["rna", "atac_gas"], verbose=False)
-        assert list(df["modalities"]) == ["rna+atac_gas"]
-    # without methods= the token still keeps only the gene-activity methods
+                    modalities=["rna", "atac"], verbose=False)
+        assert list(df["modalities"]) == ["rna+atac"]
+    # the gene-activity token keeps only the gene-activity methods
     df = _quiet(full_scan, "D28", "vertical", modalities=["rna", "atac_gas"], verbose=False)
     assert "moETM" not in set(df["method"])
     rc = _quiet(cli.main, ["run-all", "D28", "--category", "vertical", "--methods", "moETM",
-                           "--modalities", "rna,atac_gas", "--dry-run"])
+                           "--modalities", "rna,atac", "--dry-run"])
     assert rc == 0, capsys.readouterr().err
 
 
@@ -164,9 +165,8 @@ def test_a_representation_token_that_drops_a_named_method_says_why(pinned, capsy
             _quiet(call, "D28", "vertical", methods=["moETM"],
                    modalities=["rna", "gene_activity"], verbose=False)
         assert str(e.value) == (
-            "moETM does not read rna+gene_activity in vertical data. moETM reads peaks "
-            "through its atac_gas input. Pass modalities=['rna', 'atac_peak'] or "
-            "['rna', 'atac']."), str(e.value)
+            "moETM does not read rna+gene_activity in vertical data. moETM reads peaks. "
+            "Pass modalities=['rna', 'atac_peak'] or ['rna', 'atac']."), str(e.value)
         assert "method_info(m)['supports']" not in str(e.value)
     with pytest.raises(ValueError, match=r"Matilda reads peaks\. Pass "
                                          r"modalities=\['rna', 'atac_peak'\] or "
@@ -185,8 +185,7 @@ def test_a_representation_token_that_drops_a_named_method_says_why(pinned, capsy
                 "--modalities", "rna,gas"] + (["--dry-run"] if sub == "run-all" else [])
         assert _quiet(cli.main, argv) == 1
         err = capsys.readouterr().err
-        assert "moETM reads peaks through its atac_gas input. Pass --modalities " \
-               "rna,atac_peak or rna,atac." in err, err
+        assert "moETM reads peaks. Pass --modalities rna,atac_peak or rna,atac." in err, err
 
 
 def test_modalities_help_says_the_representation_tokens_select_by_what_is_read():
@@ -412,7 +411,9 @@ def test_demo_datasets_keep_their_pinned_runnable_rows(dataset, pinned):
     got = sorted(f"{r.method}|{r.category}|{r.modalities}" for r in df[df.runnable].itertuples())
     assert got == sorted(PINNED[dataset])
     blocked = df[W._is_wrong_atac(df["reason"])]
-    want = ({"iPOLNG", "moETM", "scMM", "scMDC"} if dataset == "D28" else set())
+    # the vertical peak methods read the atac role since 0.4.0 (X13): on D28 they no
+    # longer take atac_gas.h5 for their peaks, so none is blocked for the wrong ATAC
+    want = set()
     assert set(blocked["method"]) == want
     assert set(blocked["category"]) <= {"vertical"}
 
@@ -422,9 +423,10 @@ def test_the_empty_summary_ends_like_a_full_one():
     empty = W.BatchResult([], "D11", "vertical").summary
     full = W.BatchResult([{"method": "Matilda", "status": "RUN_OK"}], "D11",
                          "vertical").summary
-    # R5-03: reason is the last column
-    assert list(empty.columns)[-3:] == ["label_order_note", "caveat", "reason"]
-    assert list(full.columns)[-3:] == ["label_order_note", "caveat", "reason"]
+    # R5-03: reason is the last column (the diagnostics before caveat since 0.4.0, X35)
+    assert list(empty.columns)[-2:] == ["caveat", "reason"]
+    assert list(full.columns)[-2:] == ["caveat", "reason"]
+    assert list(empty.columns) == list(full.columns)
 
 
 def test_evaluate_count_errors_name_where_the_labels_came_from(tmp_path, capsys):

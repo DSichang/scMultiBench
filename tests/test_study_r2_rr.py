@@ -157,10 +157,15 @@ def test_a_gem_well_suffix_alone_is_the_same_cells(tmp_path):
 
 def test_d28_scans_as_before(root):
     df = full_scan("D28", "diagonal", data_path=root / "data", verbose=False)
-    # the rows for several RNA and ATAC batches read numbered files D28 lacks
+    # the rows for several RNA and ATAC batches read numbered files D28 lacks:
+    # not listed since 0.4.0 (X80), and counted
     several = df.modalities.str.contains(r"\d")
-    assert sorted(df[several].method) == ["GLUE", "iNMF", "online_iNMF", "scJoint"]
-    assert not df[several].files_ok.any()
+    assert df[several].empty and df.attrs["not_listed_batch"] == 4
+    every = full_scan("D28", "diagonal", data_path=root / "data", verbose=False,
+                      modalities="all")
+    several = every.modalities.str.contains(r"\d")
+    assert sorted(every[several].method) == ["GLUE", "iNMF", "online_iNMF", "scJoint"]
+    assert not every[several].files_ok.any()
     blocked = df[~df.files_ok & ~several]
     assert blocked.method.tolist() == ["Seurat_v5"], blocked[["method", "files_reason"]]
 
@@ -229,8 +234,9 @@ def test_disjoint_rna_and_atac_lead_with_the_diagonal_hint(tmp_path):
         mtb.io.export_dataset(rna, tmp_path / "X", atac=_peak_adata([f"a{i}" for i in range(20)]),
                               atac_kind="peak")
     msg = str(e.value)
-    assert msg.startswith("RNA and ATAC have no cells in common. For RNA and ATAC from "
-                          "different cells (diagonal integration), pass category=\"diagonal\".")
+    # 0.4.0 (X10): an example barcode of each, then the two fixes
+    assert msg == ("RNA and ATAC share no barcode (RNA e.g. c0, ATAC e.g. a0). Make the "
+                   "names match; for different cells pass category=\"diagonal\".")
     assert "subset" not in msg.lower()
 
 
@@ -294,7 +300,7 @@ def test_unitednet_still_reads_an_older_rna_cty_file(tmp_path):
     d = tmp_path / "OLD"
     d.mkdir()
     _h5(d / "rna.h5", GENES, cells)
-    _h5(d / "atac_gas.h5", GENES, cells)
+    _h5(d / "atac.h5", GENES, cells)        # the vertical ATAC name (X13)
     _labels(d / "rna_cty.csv", 30)
     got = mtb.inputs_for("OLD", "vertical", "UnitedNet", data_path=tmp_path, check=True)
     assert got["cty"] == str(d / "rna_cty.csv")
@@ -370,8 +376,11 @@ def test_scan_caveat_names_the_unused_batch(root):
     df = full_scan("D52", "cross", data_path=root / "data", verbose=False)
     df = df[df.files_ok]
     by = df.set_index(["method", "modalities"])["caveat"]
-    assert by[("UINMF", "+".join(TWO_BATCHES))].startswith(
-        "UINMF reads batches 1-2 of 3. Batch 3 is not used.")
+    # the two-batch row also says that the three-batch row runs instead (X68)
+    two = by[("UINMF", "+".join(TWO_BATCHES))]
+    assert two.startswith("UINMF reads batches 1-2 of 3. Batch 3 is not used.")
+    assert two.endswith("UINMF runs on rna1+rna2+rna3+adt1+adt2+adt3 instead, so this "
+                        "row is not run.")
     others = [k for k in by.index if k != ("UINMF", "+".join(TWO_BATCHES))]
     assert ("UINMF", "rna1+rna2+rna3+adt1+adt2+adt3") in others
     assert not any("reads batches" in by[k] for k in others)

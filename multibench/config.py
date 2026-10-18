@@ -142,10 +142,18 @@ def category_folder(token: str) -> str:
     the valid tokens for an unknown one (``registry.check_category`` relies on it)."""
     try:
         return _CATEGORY_FOLDERS[token]
-    except KeyError:
+    except (KeyError, TypeError):
+        # an assay name is the usual slip: say where it belongs
+        assay = ". CITE-seq and 10x Multiome are vertical." if str(token).lower().replace(
+            "-", "").replace(" ", "") in _ASSAY_TOKENS else ""
         raise ValueError(
-            f"unknown category {token!r}; valid: {sorted(_CATEGORY_FOLDERS)}"
+            f"unknown category {token!r}; valid: {sorted(_CATEGORY_FOLDERS)}{assay}"
         ) from None
+
+
+#: assay names a category= gets by mistake (lower case, no dash or space)
+_ASSAY_TOKENS = ("citeseq", "multiome", "10xmultiome", "sharesesq", "shareseq",
+                 "teaseq", "asapseq", "dogmaseq", "snareseq")
 
 
 def metric_set_dir(token: str) -> str:
@@ -170,12 +178,6 @@ class Config:
 
     Attributes
     ----------
-    result_path : pathlib.Path
-        Result tables shipped with the package, read by ``mtb.load_results``.
-        Default ``<package root>/multibench/result``.
-    files_path : pathlib.Path
-        Catalog CSVs read by ``mtb.catalog`` (``method.csv``, ``dataset.csv``,
-        ``metric_full.csv``). Default ``<package root>/multibench/files``.
     repo_path : pathlib.Path
         Checkout holding the upstream ``tools_scripts/`` (the method scripts),
         cloned on first use when absent or empty. Default
@@ -401,10 +403,10 @@ def _sources(cfg: Config | None = None) -> list[dict]:
             state = "matches scripts_commit"
         rows.append({"name": "scripts_ref", "value": ref,
                      "source": f"environment variable {SCRIPTS_REF_VAR}; {state}"})
-    rows.append({"name": "result_path", "value": cfg.result_path,
-                 "source": ("default: the tables shipped with the package"
-                            if cfg.result_path == _ROOT / "multibench" / "result"
-                            else "set in Python")})
+    if cfg.result_path != _ROOT / "multibench" / "result":
+        # the shipped tables are inside the wheel: shown only when moved
+        rows.append({"name": "result_path", "value": cfg.result_path,
+                     "source": "set in Python"})
     rows.append({"name": "leiden_flavor", "value": cfg.leiden_flavor,
                  "source": "default" if cfg.leiden_flavor == "leidenalg" else "set in Python"})
     return rows

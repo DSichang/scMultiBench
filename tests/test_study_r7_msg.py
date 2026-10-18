@@ -142,7 +142,7 @@ def _mine(method="PriyaNet", dataset="MYCITE"):
     return pd.DataFrame([
         {"metric": m, "value": v, "method": method, "dataset": dataset,
          "category": "vertical", "clustering": "default", "source": "user",
-         "scored_with": "leidenalg/sweep/0.3.1"}
+         "scored_with": "leidenalg/search/0.4.0"}
         for m, v in zip(("ARI", "NMI", "ASW", "cLISI"), (0.351, 0.5, 0.55, 0.9))])
 
 
@@ -351,14 +351,14 @@ def test_install_refusal_off_linux_has_no_parenthesis_or_semicolon(off_linux, mo
     monkeypatch.setattr(envs, "_run_all", lambda cmds: pytest.fail("a build was started"))
     with pytest.raises(RuntimeError) as e:
         envs.create_all(methods=["Matilda"], dry_run=False)
+    # the hidden force is not offered since 0.4.0 (X33)
     assert str(e.value) == ("Method environments run only on Linux, and this computer runs "
-                            "macOS. Run the install on a Linux machine. force=True tries "
-                            "anyway.")
+                            "macOS. Run the install on a Linux machine.")
     rc = cli.main(["env", "install", "--methods", "Matilda", "--run"])
     err = capsys.readouterr().err
     assert rc == 1
     assert ("Method environments run only on Linux, and this computer runs macOS. Run the "
-            "install on a Linux machine. --force tries anyway.") in err
+            "install on a Linux machine.\n") in err
     assert "(this computer is" not in err and ";" not in err
 
 
@@ -366,16 +366,16 @@ def test_env_reason_on_linux_leads_with_the_install_command(monkeypatch):
     monkeypatch.setattr(R, "linux_only_sentence", lambda: None)
     text = W._env_hint("scmb_r", "StabMap", "mosaic")
     assert text == ("Environment scmb_r is not installed. Run multibench env install "
-                    "--methods StabMap --run. Use --category mosaic to install "
+                    "--methods StabMap. Use --category mosaic to install "
                     "the environments of every mosaic method.")
-    assert "multibench env install --methods StabMap --run." in text[:120]
+    assert "multibench env install --methods StabMap." in text[:120]
     assert W._env_hint("scmb_r", "StabMap", None) == (
         "Environment scmb_r is not installed. Run multibench env install --methods "
-        "StabMap --run.")
+        "StabMap.")
     # every method's install command fits in the first 120 characters
     for m in registry.list_methods():
         env = envs.group_for(m)
-        cmd = f"multibench env install --methods {m} --run."
+        cmd = f"multibench env install --methods {m}."
         assert cmd in W._env_hint(env, m, "vertical")[:120], m
 
 
@@ -394,14 +394,13 @@ def test_run_error_on_linux_is_sentences(tmp_path, monkeypatch):
         mtb.run("totalVI", "vertical", inputs=inp, out_dir=str(tmp_path / "out"))
     assert str(e.value) == (
         f"Environment {env} of totalVI is not installed. Run multibench env install "
-        f"--methods totalVI --run. In Python, call "
-        f"mtb.env.install(['totalVI'], dry_run=False).")
+        f"--methods totalVI. In Python, call mtb.env.install(['totalVI']).")
     monkeypatch.setattr(config, "_CLI", True)
     with pytest.raises(OSError) as e:
         mtb.run("totalVI", "vertical", inputs=inp, out_dir=str(tmp_path / "out"))
     assert str(e.value) == (
         f"Environment {env} of totalVI is not installed. Run multibench env install "
-        f"--methods totalVI --run.")
+        f"--methods totalVI.")
 
 
 # ======================================================================= R7-11

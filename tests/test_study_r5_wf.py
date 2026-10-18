@@ -366,7 +366,7 @@ def test_evaluate_raises_on_a_csv_with_some_foreign_ids(tmp_path):
     half = _barcode_csv(tmp_path / "half.csv", SAMPLES,
                         index=list(a.obs_names[: N // 2]) + [f"x{i}" for i in range(N // 2)])
     with pytest.raises(ValueError, match=r"^batch: 60 of the 120 ids in the first column "
-                                         r"of half\.csv are not cells of the output"):
+                                         r"of half\.csv are not cells of the embedding"):
         mtb.evaluate(a, labels="celltype", batch=str(half), metrics=["iLISI"])
 
 
@@ -375,13 +375,13 @@ def test_a_text_first_column_with_no_cell_warns_and_stays_positional(tmp_path):
     other = _barcode_csv(tmp_path / "other.csv", SAMPLES,
                          index=[f"z{i}" for i in range(N)], seed=None)
     with pytest.warns(UserWarning, match=r"^The first column of other\.csv looks like "
-                                         r"cell ids, but none is a cell of the output\. "
+                                         r"cell ids, but none is a cell of the embedding\. "
                                          r"The file is matched by position\."):
         got = mtb.evaluate(a, labels="celltype", batch=str(other), metrics=["iLISI"])
     pd.testing.assert_frame_equal(
         got, mtb.evaluate(a, labels="celltype", batch="sample", metrics=["iLISI"]))
     # a bare array has no ids: positional, with the same kind of warning
-    with pytest.warns(UserWarning, match=r"looks like cell ids, but the output has no "
+    with pytest.warns(UserWarning, match=r"looks like cell ids, but the embedding has no "
                                          r"cell ids"):
         mtb.evaluate(a.obsm["X_emb"], labels=CELLTYPE, batch=str(other),
                      metrics=["iLISI"])

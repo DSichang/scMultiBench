@@ -12,7 +12,7 @@ same parameter names where a flag exists (``--category``, ``--metrics``,
     multibench info Matilda                            # env, GPU, labels, ATAC input
     multibench params Matilda                          # what --param accepts
     multibench run --method Matilda --category vertical --input rna=... --out-dir runs/Matilda
-    multibench evaluate --embedding runs/Matilda/embedding.h5 --labels data/MYCITE/cty.csv \\
+    multibench evaluate runs/Matilda/embedding.h5 --labels data/MYCITE/cty.csv \\
         --method Matilda --dataset MYCITE --category vertical --out runs/Matilda/long.csv
     multibench plot bubble --category vertical --dataset D11 --out fig.pdf
     multibench cite Matilda MOFA2
@@ -50,6 +50,7 @@ import sys
 import tempfile
 import textwrap
 import warnings
+from io import StringIO
 from pathlib import Path
 
 import h5py
@@ -260,9 +261,8 @@ def _platform_note() -> str | None:
     problem = envs.host_platform_problem()
     if problem:
         print(f"warning: {envs.linux_only_text(problem)} multibench env install "
-              f"--run refuses here, and --force tries anyway. The method list, stored "
-              f"results, scan's file check, evaluate and plot work on this computer.",
-              file=sys.stderr)
+              f"refuses here. The method list, stored results, scan's file check, "
+              f"evaluate and plot work on this computer.", file=sys.stderr)
     return problem
 
 
@@ -572,9 +572,6 @@ def _cmd_convert(args) -> int:
             atac_role = None
         alone = args.labels is None and args.batch is None
         if args.atac_from is not None:
-            if category != "diagonal":
-                _usage_error(args, "--atac-from is for --category diagonal (RNA and "
-                             "ATAC from different cells)")
             whole = alone and args.rna is None and args.adt is None \
                 and args.atac in (None, "X")
             _refuse_canonical(args, args.atac_from, "--atac-from",
@@ -610,6 +607,10 @@ def _cmd_convert(args) -> int:
         wrote = sorted(n for n in after if before.get(n) != after[n])
         kept = sorted(n for n in after if n not in wrote)
         print(f"wrote dataset folder {p} (files: {', '.join(wrote)})")
+        if args.rna is None and (args.adt is not None or args.atac is not None
+                                 or args.atac_from is not None):
+            print("# No RNA written: pass --rna X (or a layer) to write it.",
+                  file=sys.stderr)
         if kept:
             print(f"# already in the folder: {', '.join(kept)} (not written by this call)",
                   file=sys.stderr)
@@ -738,6 +739,12 @@ def _params_rows(method: str, category: str | None, modalities) -> list[dict]:
     picked = [v for v in spec.variants
               if (category is None or v.when.get("category") == category)
               and (want is None or set(v.when.get("modalities", [])) == set(want))]
+    if not picked and want is not None:
+        # the tokens params_for accepts (rna,adt for a three-batch cross variant)
+        try:
+            return [discover.params_for(method, category, list(modalities))]
+        except (KeyError, ValueError):
+            pass
     if not picked:
         if category is not None and category not in spec.wired_categories:
             raise ValueError(schema.no_category_message(method, spec.wired_categories, category))
@@ -761,12 +768,14 @@ def _cmd_params(args) -> int:
     frames = []
     for p in rows:
         tun, eff = p["tunable"], p["effective"]
+        # object columns: an int default prints as 256, not 256.000
         tbl = pd.DataFrame([{"variant": p["variant"], "key": k,
                              "type": t.get("type"),
                              "default": t.get("default"),
                              "effective": eff.get(k)}
                             for k, t in sorted(tun.items())],
-                           columns=["variant", "key", "type", "default", "effective"])
+                           columns=["variant", "key", "type", "default", "effective"],
+                           dtype=object)
         if fmt in ("csv", "tsv"):
             frames.append(tbl)
             continue
@@ -903,6 +912,31 @@ def _filter_own_rows(frames: list, args) -> list:
     return out
 
 
+def _rename_clashes(stored: pd.DataFrame, own: list) -> list:
+    """Your --input rows whose method and dataset the stored table also has,
+    renamed ``<method>_rerun`` (the command line cannot rename them), with one
+    line on stderr."""
+    keys = ["method", "dataset"]
+    have = set(map(tuple, stored[keys].astype(str).drop_duplicates().to_numpy()))
+    out, renamed = [], []
+    for f in own:
+        if not set(keys) <= set(f.columns):
+            out.append(f)
+            continue
+        hit = [tuple(k) in have for k in f[keys].astype(str).to_numpy()]
+        if any(hit):
+            f = f.copy()
+            renamed += sorted(set(f.loc[hit, "method"].astype(str)))
+            f.loc[hit, "method"] = f.loc[hit, "method"].astype(str) + "_rerun"
+        out.append(f)
+    if renamed:
+        names = list(dict.fromkeys(renamed))
+        print(f"# Your rows of {_and_list(names)} are drawn as "
+              f"{_and_list([m + '_rerun' for m in names])}: the stored table has the "
+              f"same method and dataset.", file=sys.stderr)
+    return out
+
+
 def _cmd_plot(args) -> int:
     """``multibench plot {bubble,bar}``: draw the ``--input`` rows, the stored table
     of ``--category`` (:func:`multibench.load_results`), or both concatenated."""
@@ -924,6 +958,8 @@ def _cmd_plot(args) -> int:
     for own in _filter_own_rows(loaded, args):
         own_rows += len(own)
         frames.append(own)
+    if args.category is not None and len(frames) > 1:
+        frames[1:] = _rename_clashes(frames[0], frames[1:])
     if len(frames) == 1:
         df = frames[0]
     else:
@@ -991,29 +1027,26 @@ def _cmd_run(args) -> int:
     params = _parse_params(args.param, args, default_method=args.method)
     inputs = _parse_inputs(args.input, args)
     if args.dry_run:
-        # a rejected --param is an error, not a dry run: before the header
-        from .engine import runner as _runner
-        try:
-            variant = registry.get(args.method).select(
-                args.category,
-                _runner._modality_roles(inputs))
-        except (KeyError, ValueError):
-            variant = None                 # run says what is wrong, after the header
-        if variant is not None:
-            _runner.check_params(args.method, variant, params.get(args.method))
+        # the command is built first: an error prints no dry-run header
+        notes = StringIO()
+        with contextlib.redirect_stderr(notes):
+            argv = multibench.run(args.method, args.category, inputs=inputs,
+                                  out_dir=args.out or workflow.OUT_DIR_PLACEHOLDER,
+                                  params=params.get(args.method),
+                                  cmd_template=args.cmd_template, dry_run=True)
         # the header first, then run's notes, then the command
         print("# Dry run. Nothing was executed.", file=sys.stderr, flush=True)
-        argv = multibench.run(args.method, args.category, inputs=inputs,
-                              out_dir=args.out, params=params.get(args.method),
-                              cmd_template=args.runner, dry_run=True)
+        print(notes.getvalue(), end="", file=sys.stderr, flush=True)
         print("# multibench run would execute:", file=sys.stderr, flush=True)
         print(shlex.join(argv))
         return _EXIT_OK
+    if not args.out:
+        _usage_error(args, "the following arguments are required: --out-dir/--out")
     with _quiet_stdout():
         res = multibench.run(method=args.method, category=args.category,
                            inputs=inputs, out_dir=args.out,
                            params=params.get(args.method) or None,
-                           cmd_template=args.runner)
+                           cmd_template=args.cmd_template)
     print(f"ran {args.method} -> {res.out_dir}")
     return _EXIT_OK
 
@@ -1346,9 +1379,11 @@ def _unknown_method_message(method, name=None, files=()) -> str:
 def _cmd_evaluate(args) -> int:
     """``multibench evaluate``: :func:`multibench.evaluate` on an embedding file; with
     ``--method`` or ``--name``, ``--dataset`` and ``--category`` the long table (``to_long``)."""
-    embedding = args.embedding
+    if args.embedding is not None and args.embedding_arg is not None:
+        _usage_error(args, "give the embedding once: EMBEDDING or --embedding")
+    embedding = args.embedding_arg if args.embedding is None else args.embedding
     if embedding is None:
-        _usage_error(args, "the following arguments are required: --embedding")
+        _usage_error(args, "the following arguments are required: EMBEDDING")
     clusters = args.clusters
     name = args.name
     long_mode = args.method is not None or args.dataset is not None or name is not None
@@ -1441,6 +1476,7 @@ def _size_total_line(rows, sizes: dict, what: str = "download", *,
             n_gpu += 1
 
     layers = envs.layers_for(keys) if layers is None else layers
+    disk_envs = disk                # the envs' own size, as each row shows it
     for entry in layers.values():
         dl += entry.get("archive_bytes") or 0
         disk += entry.get("unpacked_bytes") or 0
@@ -1472,7 +1508,7 @@ def _size_total_line(rows, sizes: dict, what: str = "download", *,
     if n_disk < n:
         # the known part is a lower bound, e.g. for a storage-quota request
         not_measured = f"{_named(no_disk)} {'is' if len(no_disk) == 1 else 'are'} not measured."
-        lines.append(f"# {envs._gb(disk)} on disk for {_named(disk_known)}. {not_measured}"
+        lines.append(f"# {envs._gb(disk_envs)} on disk for {_named(disk_known)}. {not_measured}"
                      if n_disk else f"# The size on disk of {_named(no_disk)} is not measured.")
         lines.append("# Unpacked envs are larger than the download. Check with du after "
                      "the first install.")
@@ -1600,7 +1636,7 @@ def _cmd_env(args) -> int:
             print(note, file=sys.stderr)
         return _EXIT_OK
     if cmd == "doctor":
-        rows = envs.doctor(category=args.category, methods=_csv_list(args.methods))
+        rows = envs._doctor_rows(category=args.category, methods=_csv_list(args.methods))
         for r in rows:
             mark = envs.env_mark(r["exists"], r["has_lock"])
             print(f"[{mark}] {r['env']:18} ({len(r['methods']):2}) <- {', '.join(r['methods'])}"
@@ -1614,17 +1650,18 @@ def _cmd_env(args) -> int:
         print(f"# legend: {envs.MARK_LEGEND}")
         if missing:
             miss_methods = sorted({m for r in missing for m in r["methods"]})
-            print(f"# next: multibench env install --methods {','.join(miss_methods)} "
-                  "--run")
+            where = " (on the Linux machine)" if envs.host_platform_problem() else ""
+            print(f"# next{where}: multibench env install --methods "
+                  f"{','.join(miss_methods)}")
         if args.strict and missing:
             return _EXIT_ERROR
         return _EXIT_OK
     if cmd == "install":
         flavor, packed = args.flavor, not args.build
         with _quiet_stdout():
-            rows = envs.install(_csv_list(args.methods), category=args.category,
-                                packed=packed, dry_run=not args.run, force=args.force,
-                                flavor=flavor)
+            rows = envs._install_rows(_csv_list(args.methods), category=args.category,
+                                      packed=packed, dry_run=args.dry_run,
+                                      force=args.force, flavor=flavor)
         width = max([14] + [len(r["state"]) for r in rows])
         for r in rows:
             extra = ""
@@ -1639,9 +1676,9 @@ def _cmd_env(args) -> int:
             print(f"# name taken: {', '.join(taken)} - rename or remove "
                   f"{'that env' if len(taken) == 1 else 'those envs'} first "
                   "(multibench env doctor shows where)", file=sys.stderr)
-        if not args.run and any(not r["exists"] and r["state"] != "name taken"
+        if args.dry_run and any(not r["exists"] and r["state"] != "name taken"
                                 for r in rows):
-            print("# dry-run - add --run to create the missing envs"
+            print("# dry run - leave out --dry-run to create the missing envs"
                   + (" (packed archives first, lockfile build otherwise)"
                      if packed else " from their lockfiles"), file=sys.stderr)
             if packed:
@@ -1753,16 +1790,17 @@ def _status_epilog() -> str:
     return "\n".join(lines)
 
 
-_CATEGORY_HELP = ("integration category: vertical (several modalities measured in the "
-                  "same cells, e.g. CITE-seq), diagonal (modalities measured in different "
-                  "cells, no pairing), mosaic (several batches, only some share a "
-                  "modality) or cross (several batches, each with the same modalities).")
+_CATEGORY_HELP = ("vertical, diagonal, mosaic or cross (multibench layout explains "
+                  "them).")
 _METHODS_HELP = "comma-separated method ids, as printed by multibench find"
+_LEIDEN_HELP = ("Leiden backend of the clustering: leidenalg (the article's) or igraph "
+                "(faster). Scores can differ by up to about 0.1 between the two "
+                "(default: shown by multibench config)")
 _FLAVOR_HELP = ("which packed archive to take per env: 'cpu' = the '<env>-cpu' archive "
                 "(the same env without the CUDA libraries, 3-4x smaller) where "
                 "published, else the '<env>' archive with a warning, 'gpu' = the "
                 "'<env>' archive, 'auto' (default) = 'cpu' when no NVIDIA GPU is "
-                "visible on this host (mtb.env.host_has_gpu), 'gpu' otherwise. The env "
+                "visible on this host, 'gpu' otherwise. The env "
                 "name is the same whatever the flavour; env doctor shows which "
                 "flavour is installed. Installing on a login node for jobs on GPU "
                 "nodes: pass gpu")
@@ -1800,7 +1838,7 @@ def build_parser() -> argparse.ArgumentParser:
     # ---- list: deprecated, not listed (no help=): multibench find
     pl = sub.add_parser("list", description="Deprecated: use multibench find.")
     pl.add_argument("--category", help=_CATEGORY_HELP)
-    pl.add_argument("--task", action=_Retired, tail=_compat.use("--category"))
+    pl.add_argument("--task", action=_Retired, tail=_compat.note("it has no replacement"))
     pl.add_argument("--runnable", action=_Retired, nargs=0, default=False,
                     tail=_compat.use("multibench scan"))
     pl.set_defaults(func=_cmd_list, _parser=pl, **_retired_command("list", "find"))
@@ -1811,7 +1849,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Print method ids matching all given filters, one per line. "
                     "Every filter is optional; with none, every method is listed.")
     pf.add_argument("--category", help=_CATEGORY_HELP)
-    pf.add_argument("--task", action=_Retired, tail=_compat.use("--category"))
+    pf.add_argument("--task", action=_Retired, tail=_compat.note("it has no replacement"))
     pf.add_argument("--modalities",
                     help="comma-separated modalities the method must consume, e.g. "
                          "rna,adt or rna,atac ('protein' is accepted for adt)")
@@ -1882,7 +1920,7 @@ def build_parser() -> argparse.ArgumentParser:
                           "lists them)")
     pfe.add_argument("--outputs", action="store_true",
                      help="download the stored run-all outputs of each dataset instead "
-                          "(D11, D28, D46, D52; mtb.data.fetch_outputs), under "
+                          "(D11, D28, D45, D52; mtb.data.fetch_outputs), under "
                           "<data root>/outputs/")
     pfe.add_argument("--scripts", action="store_true",
                      help="fetch the method scripts (PYangLab/scMultiBench, with git) "
@@ -2014,8 +2052,9 @@ def build_parser() -> argparse.ArgumentParser:
                                    "\"X[feature_types=Peaks]\". Peaks or gene activity is "
                                    "read from the feature names, or set by --atac-kind")
     pc.add_argument("--atac-from", dest="atac_from", metavar="PATH",
-                    help="mode 2, --category diagonal: another .h5ad or .h5mu with the "
-                         "ATAC cells. --atac selects from it, default X")
+                    help="mode 2: another .h5ad or .h5mu with the ATAC matrix: the "
+                         "ATAC cells for --category diagonal, else the same cells, "
+                         "matched by barcode. --atac selects from it, default X")
     pc.add_argument("--atac-kind", dest="atac_kind", choices=["peak", "gene_activity"],
                     help="mode 2: peak writes atac_peak.h5, and atac.h5 without "
                          "--category. gene_activity writes atac_gas.h5. --category "
@@ -2035,7 +2074,9 @@ def build_parser() -> argparse.ArgumentParser:
                          "One call per batch file. Python: batch_index=N")
     pc.add_argument("--n-batches", dest="n_batches", type=int, metavar="N",
                     help="mode 2, with --batch-index: how many batches the dataset "
-                         "has. Files of a higher batch number in OUT are refused")
+                         "has. Files of a higher batch number in OUT are refused, so "
+                         "a later call cannot leave a stale batch file from an "
+                         "earlier export")
     pc.add_argument("--overwrite", action="store_true",
                     help="mode 2: replace files already in OUT (default: refuse and "
                          "list them). Files of other data that the call does not "
@@ -2125,21 +2166,24 @@ def build_parser() -> argparse.ArgumentParser:
                     "installed. multibench run-all runs every method of a category "
                     "on a laid-out dataset folder.")
     pr.add_argument("--method", required=True, help="method id, as printed by "
-                                                    "multibench list")
+                                                    "multibench find")
     pr.add_argument("--category", required=True, help=_CATEGORY_HELP)
     pr.add_argument("--task", action=_Retired)
     pr.add_argument("--input", action="append", metavar="ROLE=PATH",
                     help="one input as role=path, repeatable, e.g. --input rna=rna.h5 "
                          "--input adt=adt.h5 --input cty=cty.csv. multibench layout "
                          "lists the roles. Non-canonical files are converted")
-    pr.add_argument("--out-dir", "--out", dest="out", required=True,
+    pr.add_argument("--out-dir", "--out", dest="out",
                     help="output directory for this run (embedding.h5, metric.csv, "
-                         "log); --out is an alias")
+                         "log); --out is an alias. Required unless --dry-run, whose "
+                         "command then shows <out_dir>")
     pr.add_argument_group("advanced (HPC)").add_argument(
-        "--runner", metavar="TEMPLATE",
+        "--cmd-template", dest="cmd_template", metavar="TEMPLATE",
         help="template for launching the command: {cmd} = the bare command (no env "
              "activation), {env_cmd} = the command inside the method env, e.g. "
-             "\"srun --gres=gpu:1 {env_cmd}\" (mtb.run(cmd_template=))")
+             "\"srun --gres=gpu:1 {env_cmd}\"")
+    pr.add_argument("--runner", dest="cmd_template", metavar="TEMPLATE", action=_Retired,
+                    tail=_compat.use("--cmd-template"))
     pr.add_argument("--param", "-p", action="append", metavar="KEY=VALUE",
                     help="one hyperparameter override, repeatable: --param epochs=5 "
                          "--param lr=0.001 (METHOD:KEY=VALUE is accepted when METHOD "
@@ -2164,7 +2208,8 @@ def build_parser() -> argparse.ArgumentParser:
         epilog="Exit code 3 means the run finished, but a method failed or a method "
                "named in --methods was skipped. Without --methods, a skipped method is "
                "only logged and marked SKIPPED in summary.csv.")
-    pra.add_argument("dataset", help="dataset id = the folder name under --data-path")
+    pra.add_argument("dataset", help="the dataset folder name under --data-path, or "
+                                     "its path")
     pra.add_argument("--category", required=True, help=_CATEGORY_HELP)
     pra.add_argument("--out-dir", "--out", dest="out",
                     help="directory for all outputs (one sub-folder per method); "
@@ -2220,9 +2265,7 @@ def build_parser() -> argparse.ArgumentParser:
     pra.add_argument("--batch-column", dest="batch_column", metavar="NAME",
                      help=_BATCH_COLUMN_HELP)
     adv.add_argument("--leiden-flavor", dest="leiden_flavor", choices=["igraph", "leidenalg"],
-                     help="Leiden backend of the clustering when scoring (default: "
-                          "shown by multibench config). Scores can differ by up to "
-                          "about 0.1 between the two")
+                     help=_LEIDEN_HELP)
     pra.set_defaults(func=_cmd_run_all, _parser=pra)
 
     # ---- evaluate
@@ -2234,11 +2277,13 @@ def build_parser() -> argparse.ArgumentParser:
                     "--dataset and --category the table is written in the long "
                     "format (metric,value,method,dataset,category,clustering,source,"
                     "scored_with) that multibench plot --input reads.")
-    pe.add_argument("--embedding",
-                    help="required: the embedding, cells x dims: .h5 (dataset 'data', "
+    pe.add_argument("embedding_arg", nargs="?", metavar="EMBEDDING",
+                    help="the embedding, cells x dims: .h5 (dataset 'data', "
                          "the benchmark's embedding.h5), .h5ad (uses --obsm), .npy, "
                          ".csv/.tsv (a first column of barcodes gives the cell ids: "
                          "labels and batches with barcodes are matched by them)")
+    # the 0.4.0 spelling, kept as a hidden alias of EMBEDDING (both work)
+    pe.add_argument("--embedding", help=argparse.SUPPRESS)
     pe.add_argument("--output", dest="embedding", action=_Retired,
                     tail=_compat.use("--embedding"))
     pe.add_argument("--category", help=_CATEGORY_HELP + " Required with --method or "
@@ -2249,9 +2294,9 @@ def build_parser() -> argparse.ArgumentParser:
                     help="cell-type labels CSV with a header row, one row per cell "
                          "in the embedding's order. The labels are column x, the only "
                          "column, or --column. A first column of barcodes is aligned "
-                         "to the obs_names of an .h5ad --embedding, or to the barcodes "
-                         "in the first column of a .csv --embedding. With an .h5ad "
-                         "--embedding, --labels can instead name a column of its obs, "
+                         "to the obs_names of an .h5ad EMBEDDING, or to the barcodes "
+                         "in the first column of a .csv EMBEDDING. With an .h5ad "
+                         "EMBEDDING, --labels can instead name a column of its obs, "
                          "as celltype or "
                          "obs:celltype: give it once, without --column. Repeat --labels "
                          "for several files. They are stacked in the order given, and "
@@ -2264,7 +2309,7 @@ def build_parser() -> argparse.ArgumentParser:
                          "configured data_path, shown by multibench config)")
     pe.add_argument("--batch", help="per-cell batch labels CSV; a first column of "
                                     "barcodes is aligned as for --labels. With an .h5ad "
-                                    "--embedding it can instead name a column of its obs, "
+                                    "EMBEDDING it can instead name a column of its obs, "
                                     "without --batch-column. Without "
                                     "--metrics the batch metrics are then computed too")
     pe.add_argument("--batch-column", dest="batch_column", metavar="NAME",
@@ -2285,24 +2330,21 @@ def build_parser() -> argparse.ArgumentParser:
                                       "when there are two or more batches and "
                                       "--category is not vertical")
     pe.add_argument("--leiden-flavor", dest="leiden_flavor", choices=["igraph", "leidenalg"],
-                    help="Leiden backend of the clustering (default: shown by "
-                         "multibench config). Scores can differ by up to about 0.1 "
-                         "between the two")
+                    help=_LEIDEN_HELP)
     pe.add_argument("--missing-labels", dest="missing_labels", choices=["error", "drop"],
                     default="error",
                     help="what to do when a label is missing. error (default) stops. "
                          "drop scores the labelled cells only and says how many")
     pe.add_argument("--obsm", help="for .h5ad input: the .obsm key holding the "
-                                   "embedding (default X_emb; 'X' = .X)")
+                                   "embedding (default X_emb, or the only key; "
+                                   "'X' = .X)")
     pe.add_argument("--column", metavar="NAME",
                     help="the column to read in each --labels CSV when a file has "
                          "several columns")
-    pe.add_argument("--method", help="package method whose label order is used, or "
-                                     "with --labels any row name. It is also the row "
-                                     "name unless --name is given. Needs --dataset and "
+    pe.add_argument("--method", help="the package method: picks its label order, and "
+                                     "is the default row name. Needs --dataset and "
                                      "--category")
-    pe.add_argument("--name", help="row name in the long table, e.g. SCALEX_rerun; "
-                                   "with --labels, --method can be left out")
+    pe.add_argument("--name", help="the row name in the long table, e.g. SCALEX_rerun")
     pe.add_argument("--dataset", help="label the rows with this dataset id (needs "
                                       "--category, and --method or --name); without "
                                       "--labels its label files are read")
@@ -2315,7 +2357,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Every method runs in its own (or a shared) conda env, unpacked "
                     "from a published archive or built from a committed lockfile. "
                     "Typical flow: env doctor --category C, then env install "
-                    "--category C --run.")
+                    "--category C.")
     ev = pv.add_subparsers(dest="env_cmd", required=True, metavar="<env-command>",
                            title="env commands")
     es = ev.add_parser("status",
@@ -2403,7 +2445,7 @@ def build_parser() -> argparse.ArgumentParser:
         "install", help="unpack or build every needed env (mtb.env.install)",
         description="Install the environments the selected methods need, from the "
                     "published archives (a lockfile build where none is published). "
-                    "Without --run, a dry run prints one line per environment: "
+                    "With --dry-run it prints one line per environment instead: "
                     "'have', 'packed archive published' with the archive's download "
                     "size, unpacked size and URL for this release, or 'no archive - "
                     "lockfile build'. '?' means not measured. A '# total' line goes "
@@ -2411,8 +2453,8 @@ def build_parser() -> argparse.ArgumentParser:
                     "--flavor picks the CPU-only or the CUDA archive. auto picks by "
                     "whether this computer has an NVIDIA GPU. The environment name is "
                     "the same either way. They are linux-64 conda environments. On "
-                    "macOS and Windows a warning comes first, and "
-                    "--run refuses unless --force is given.")
+                    "macOS and Windows a warning comes first, and the install "
+                    "refuses.")
     ei.add_argument("--category", help=_CATEGORY_HELP)
     ei.add_argument("--methods", help=_METHODS_HELP + "; only their envs")
     ei.add_argument("--build", action="store_true",
@@ -2420,9 +2462,11 @@ def build_parser() -> argparse.ArgumentParser:
                          "published archives")
     ei.add_argument("--packed", action="store_true", help=argparse.SUPPRESS)
     ei.add_argument("--flavor", choices=envs.FLAVORS, default="auto", help=_FLAVOR_HELP)
-    ei.add_argument("--run", action="store_true",
-                    help="actually create the envs; without it the command is a dry run")
-    ei.add_argument("--force", action="store_true", help=_FORCE_HELP)
+    ei.add_argument("--dry-run", dest="dry_run", action="store_true",
+                    help="print the plan (state, sizes, URLs) and install nothing")
+    # 0.4.0: installing is the default; --run still parses and changes nothing
+    ei.add_argument("--run", action="store_true", help=argparse.SUPPRESS)
+    ei.add_argument("--force", action="store_true", help=argparse.SUPPRESS)
     ei.set_defaults(func=_cmd_env, _parser=ei)
     ef = ev.add_parser("freeze",
                        description="(Maintainers.) Write the lockfile of an installed env.")

@@ -38,7 +38,7 @@ def _stored(dataset, source="rerun", category="vertical"):
         return mtb.load_results(category, dataset=dataset, source=source)
 
 
-def _mine(method, dataset, scored_with="igraph/sweep/0.3.2",
+def _mine(method, dataset, scored_with="igraph/search/0.4.0",
           metrics=("ARI", "NMI", "ASW", "iASW", "iF1", "cLISI"), base=0.5):
     return pd.DataFrame([
         {"metric": m, "value": base + 0.01 * i, "method": method, "dataset": dataset,
@@ -115,16 +115,16 @@ def test_recommend_long_df_warns_about_igraph_rows_of_a_stored_dataset():
 def test_recommend_backend_line_needs_igraph_rows_a_stored_dataset_and_a_sweep_metric():
     stored = _stored(None)
     cases = {
-        "leidenalg": pd.concat([stored, _mine("P", "D11", scored_with="leidenalg/sweep/0.3.2")]),
+        "leidenalg": pd.concat([stored, _mine("P", "D11", scored_with="leidenalg/search/0.4.0")]),
         "stored only": stored,
         "own dataset": pd.concat([stored, _mine("P", "MYCITE"), _mine("Q", "MYCITE")]),
     }
     for what, df in cases.items():
         _, msgs = _messages(mtb.recommend, "vertical", long_df=df.reset_index(drop=True))
         assert not any("igraph Leiden backend" in m for m in msgs), (what, msgs)
-    # ASW and cLISI do not depend on the Leiden backend
+    # cLISI does not depend on the Leiden backend (ASW does under the 0.4.0 search)
     df = pd.concat([stored, _mine("P", "D11")], ignore_index=True)
-    _, msgs = _messages(mtb.recommend, "vertical", long_df=df, metrics=["ASW", "cLISI"])
+    _, msgs = _messages(mtb.recommend, "vertical", long_df=df, metrics=["cLISI"])
     assert not any("igraph Leiden backend" in m for m in msgs), msgs
 
 
@@ -149,7 +149,7 @@ def _d28_with_mine():
     # S3: her own method on D28, added to the published D28 table, all metrics
     pub = _stored("D28", source="published", category="diagonal")
     metrics = sorted(pub["metric"].unique())
-    mine = _mine("LiNet", "D28", scored_with="leidenalg/sweep/0.3.2", metrics=metrics)
+    mine = _mine("LiNet", "D28", scored_with="leidenalg/search/0.4.0", metrics=metrics)
     return pd.concat([pub, mine.assign(category="diagonal")], ignore_index=True)
 
 

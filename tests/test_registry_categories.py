@@ -73,8 +73,10 @@ def test_loose_select_and_family_helper():
     assert modality_family("atac_gas") == modality_family("atac_peak") == "atac"
     assert modality_family("atac_gas2") == "atac2" and modality_family("rna1") == "rna1"
     spec = registry.get("scMM")
-    assert spec.select("vertical", {"rna", "atac"}, loose=True).when["modalities"] == ["rna", "atac_gas"]
+    # scMM's vertical variant reads the atac role since 0.4.0 (X13)
+    assert spec.select("vertical", {"rna", "atac"}, loose=True).when["modalities"] == ["rna", "atac"]
+    assert spec.select("vertical", {"rna", "atac_gas"}).when["modalities"] == ["rna", "atac"]
     with pytest.raises(KeyError):
-        spec.select("vertical", {"rna", "atac"})            # strict, as before
+        spec.select("vertical", {"rna", "atac_peak"})       # strict, as before
     e = AmbiguousVariantError("x")
     assert isinstance(e, ValueError) and isinstance(e, KeyError) and str(e) == "x"

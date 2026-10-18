@@ -174,6 +174,8 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
         Anything that is neither ``None``, a string nor a collection.
     """
     fams = {k: list(v) for k, v in FAMILY_METRICS.items()}
+    if isinstance(metrics, str) and metrics.lower() in (*fams, "all"):
+        metrics = metrics.lower()          # "Clustering" names the family too
     if metrics is None or (isinstance(metrics, str) and metrics == "all"):
         return MetricSelection("all", None, False)
     if isinstance(metrics, str):
@@ -232,7 +234,7 @@ def _split_multivalue(cell: object) -> list[str]:
     return out
 
 
-_FILES_DIR = {"files_dir": _compat.use("config.DEFAULT.files_path")}
+_FILES_DIR = {"files_dir": _compat.note("leave it out for the package's tables")}
 
 
 @_compat.keywords("catalog.methods", private="_methods", kept=_FILES_DIR,

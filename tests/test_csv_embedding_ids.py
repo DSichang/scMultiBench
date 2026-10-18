@@ -30,13 +30,13 @@ EMB = np.random.default_rng(0).normal(size=(CELLS, 5)) \
     + pd.Categorical(TYPES).codes[:, None] * 4.0
 PERM = np.random.default_rng(1).permutation(CELLS)
 MOVED = "evaluate: matched {0} to the rows of emb.csv by barcode.\n"
-NO_IDS = ("The first column of {0} looks like cell ids, but the output has no cell ids. "
+NO_IDS = ("The first column of {0} looks like cell ids, but the embedding has no cell ids. "
           "The file is matched by position. Check that its rows follow the rows of the "
-          "output.")
+          "embedding.")
 #: the warning of an AnnData output for a file of which no id is one of its cells
 NONE_SHARED = ("The first column of {0} looks like cell ids, but none is a cell of the "
-               "output. The file is matched by position. Check that its rows follow the "
-               "rows of the output, or use the barcodes of the output in that column.")
+               "embedding. The file is matched by position. Check that its rows follow the "
+               "rows of the embedding, or use the barcodes of the embedding in that column.")
 SERIES_NONE_SHARED = ("The {0} Series is matched by position, because none of its ids is a "
                       "cell of emb.csv. Check that it follows the rows of emb.csv.")
 NO_SUFFIX = [b.replace("-1", "") for b in BARS]          # the same cells, written differently
@@ -296,8 +296,8 @@ def test_several_label_files_with_no_id_in_common(tmp_path, capsys, seen):
         mtb.evaluate(emb, labels=[first, second], metrics=["ARI"])
     assert [str(w.message) for w in rec] == [
         "The first column of cty1.csv and cty2.csv looks like cell ids, but none is a cell "
-        "of the output. These files are matched by position. Check that their rows follow "
-        "the rows of the output, or use the barcodes of the output in that column."]
+        "of the embedding. These files are matched by position. Check that their rows follow "
+        "the rows of the embedding, or use the barcodes of the embedding in that column."]
     assert seen["labels"] == list(TYPES)
     assert capsys.readouterr().err == ""
 
@@ -430,9 +430,9 @@ def test_repeated_barcodes_in_the_embedding_are_not_ids(tmp_path, seen):
     with pytest.warns(UserWarning) as rec:
         mtb.evaluate(str(path), labels=_labels(tmp_path), metrics=["ARI"])
     assert [str(w.message) for w in rec] == [
-        "The first column of labels.csv looks like cell ids, but the output repeats cell "
+        "The first column of labels.csv looks like cell ids, but the embedding repeats cell "
         "ids. The file is matched by position. Check that its rows follow the rows of the "
-        "output."]
+        "embedding."]
     assert seen["labels"] == list(TYPES)
 
 

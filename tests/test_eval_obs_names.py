@@ -123,18 +123,18 @@ def test_array_output_with_a_column_name(tmp_path, monkeypatch):
     with pytest.raises(FileNotFoundError) as e:
         mtb.evaluate(emb, labels="celltype", metrics=["ASW"])
     assert str(e.value) == (
-        "labels='celltype' is not a file, and the output has no obs. Pass the values, as "
+        "labels='celltype' is not a file, and the embedding has no obs. Pass the values, as "
         "labels=adata.obs['celltype'].")
     # the example names the column without its prefix
     with pytest.raises(FileNotFoundError) as e:
         mtb.evaluate(emb, labels=lab, batch="obs:donor", metrics=METRICS)
     assert str(e.value) == (
-        "batch='obs:donor' is not a file, and the output has no obs. Pass the values, as "
+        "batch='obs:donor' is not a file, and the embedding has no obs. Pass the values, as "
         "batch=adata.obs['donor'].")
     with pytest.raises(FileNotFoundError) as e:
         mtb.evaluate(emb, labels=lab, clusters="obs:leiden", metrics=["ARI"])
     assert str(e.value) == (
-        "clusters='obs:leiden' is not a file, and the output has no obs. Pass the "
+        "clusters='obs:leiden' is not a file, and the embedding has no obs. Pass the "
         "values, as clusters=adata.obs['leiden'].")
     # a name that reads as a file keeps the text of a missing file
     cwd = Path.cwd()

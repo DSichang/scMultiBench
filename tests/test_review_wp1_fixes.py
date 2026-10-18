@@ -65,7 +65,8 @@ def test_off_linux_the_requested_methods_error_counts_the_rows_without_files(
         mtb.run_all("DG", "diagonal", methods=["iNMF"], out_dir=tmp_path / "o",
                     data_path=tmp_path, verbose=False)
     assert "rna1+rna2+rna3" not in str(e.value)
-    assert "\n1 other row needs files that DG does not have.\n" in str(e.value)
+    # the row for numbered batches of this one-batch folder is not listed (X80)
+    assert "other row" not in str(e.value)
 
 
 def test_params_for_takes_every_token_set_find_methods_takes():

@@ -39,12 +39,13 @@ def test_inputs_for_docstring_promises_absolute_paths():
 
 def test_atac_means_any_atac_role(tmp_path):
     _touch(tmp_path / "SYNMULTI", ["rna.h5", "atac.h5", "cty.csv"])
-    # scMM's vertical variant is declared [rna, atac_gas]; the file is atac.h5 either way
+    # scMM's vertical variant is declared [rna, atac] since 0.4.0 (X13); 0.3's
+    # atac_gas still reaches it; the file is atac.h5 either way
     a = mtb.inputs_for("SYNMULTI", "vertical", "scMM", modalities=["rna", "atac"],
                        data_path=tmp_path, check=True)
     b = mtb.inputs_for("SYNMULTI", "vertical", "scMM", modalities=["rna", "atac_gas"],
                        data_path=tmp_path, check=True)
-    assert a == b and set(a) == {"rna", "atac_gas"} and a["atac_gas"].endswith("/atac.h5")
+    assert a == b and set(a) == {"rna", "atac"} and a["atac"].endswith("/atac.h5")
     # exact tokens still win when they exist; an unrelated set still raises KeyError
     with pytest.raises(KeyError, match="no variant for category='vertical'"):
         mtb.inputs_for("SYNMULTI", "vertical", "scMM", modalities=["adt", "atac"],
@@ -59,10 +60,10 @@ def test_folder_disambiguates_multi_variant_method(tmp_path):
     _touch(tmp_path / "D11", ["rna.h5", "adt.h5", "cty.csv"])
     got = mtb.inputs_for("D11", "vertical", "Matilda", data_path=tmp_path, check=True)
     assert set(got) == {"rna", "adt", "cty"}
-    # scMM as well: vertical rna+adt vs rna+atac_gas, only atac.h5 present
+    # scMM as well: vertical rna+adt vs rna+atac, only atac.h5 present
     _touch(tmp_path / "SYNMULTI", ["rna.h5", "atac.h5", "cty.csv"])
     got = mtb.inputs_for("SYNMULTI", "vertical", "scMM", data_path=tmp_path, check=True)
-    assert set(got) == {"rna", "atac_gas"}
+    assert set(got) == {"rna", "atac"}
 
 
 def test_ambiguity_is_a_valueerror_listing_the_folder(tmp_path):

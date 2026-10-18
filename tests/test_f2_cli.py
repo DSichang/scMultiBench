@@ -109,7 +109,7 @@ def test_gpu_refusal_names_the_cli_command_in_the_cli(tmp_path, no_gpu, monkeypa
 
 
 def test_moetm_gpu_evidence_names_both_scripts():
-    ev = mtb.method_info("moETM")["gpu_evidence"]
+    ev = mtb.method_info("moETM", verbose=True)["gpu_evidence"]
     assert "tools_scripts/moETM/main_moETM_rna_adt.py:109" in ev
     assert "tools_scripts/moETM/main_moETM_rna_atac.py:124" in ev
 
@@ -198,7 +198,8 @@ def test_install_refusal_is_plain_in_python(off_linux, monkeypatch):
     monkeypatch.setattr(envs, "_run_all", lambda cmds: pytest.fail("a build was started"))
     with pytest.raises(RuntimeError) as e:
         envs.create_all(methods=["Matilda"], dry_run=False)
-    assert str(e.value) == PLAIN_REFUSAL.format(force="force=True")
+    # the hidden force= is not offered since 0.4.0 (X33)
+    assert str(e.value) == PLAIN_REFUSAL.replace(" {force} tries anyway.", "")
 
 
 def test_install_refusal_is_plain_on_the_cli(off_linux, monkeypatch, capsys):
@@ -207,7 +208,8 @@ def test_install_refusal_is_plain_on_the_cli(off_linux, monkeypatch, capsys):
     rc = cli.main(["env", "install", "--methods", "Matilda", "--run"])
     err = capsys.readouterr().err
     assert rc == 1
-    assert PLAIN_REFUSAL.format(force="--force") in err
+    assert PLAIN_REFUSAL.replace(" {force} tries anyway.", "") in err
+    assert "--force" not in err
     assert "linux-64 conda envs" not in err and "packed archives +" not in err
     assert err.count("run only on Linux") == 1          # no warning repeating it
 
@@ -252,8 +254,9 @@ def test_evaluate_and_run_help_texts():
     clus = _opt_help(ev, "--clusters")
     assert "they replace the Leiden clusters of ARI, NMI, ASW, iASW and iF1" in clus
     meth = _opt_help(ev, "--method")
-    assert meth.startswith("package method whose label order is used, or with --labels "
-                           "any row name. It is also the row name unless --name is given")
+    # X95: one job per flag
+    assert meth.startswith("the package method: picks its label order, and is the "
+                           "default row name")
     assert "registry" not in meth
     dry = _opt_help(_sub("run"), "--dry-run")
     assert "environment activation included" in dry and "conda run -n" not in dry

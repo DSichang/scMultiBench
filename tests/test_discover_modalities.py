@@ -57,9 +57,10 @@ def test_params_for_ambiguity_is_valueerror_with_the_exact_call():
     assert ("Pass the modalities too, for example "
             "params_for('Matilda', 'vertical', ['rna', 'adt']).") in str(e.value)
     assert "Matilda has 3 vertical variants, rna+adt, rna+atac and rna+adt+atac." in str(e.value)
-    # 'atac' selects the atac_gas variant; unknown category stays KeyError
-    assert mtb.params_for("scMM", "vertical", ["rna", "atac"])["variant"] == "vertical:rna+atac_gas"
-    assert mtb.params_for("scMM", modalities=["rna", "atac"])["variant"] == "vertical:rna+atac_gas"
+    # scMM's vertical variant reads the atac role since 0.4.0 (X13); unknown
+    # category stays KeyError
+    assert mtb.params_for("scMM", "vertical", ["rna", "atac"])["variant"] == "vertical:rna+atac"
+    assert mtb.params_for("scMM", modalities=["rna", "atac"])["variant"] == "vertical:rna+atac"
     with pytest.raises(KeyError, match="totalVI does not run on mosaic data"):
         mtb.params_for("totalVI", "mosaic")
 

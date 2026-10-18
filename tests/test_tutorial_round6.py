@@ -42,8 +42,10 @@ def test_scan_prints_one_count_line_on_the_tutorial_dataset(key, capsys):
 #: the tasks whose folder holds two modalities, and for them one listed
 #: variant per method: the rows scan lists (0.3.5: the variants whose
 #: modalities the folder holds)
+# diagonal_rna_atac: the rows for numbered batches of its one-batch folder are not
+# listed since 0.4.0 (X80)
 ONE_ROW_PER_METHOD = {"vertical_rna_adt": 14, "vertical_rna_atac": 14, "mosaic_rna_adt": 3,
-                      "mosaic_rna_atac": 6, "cross_adt_atac": 5}
+                      "mosaic_rna_atac": 6, "cross_adt_atac": 5, "diagonal_rna_atac": 14}
 
 
 @pytest.mark.parametrize("key", KEYS)

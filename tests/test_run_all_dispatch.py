@@ -97,14 +97,17 @@ def test_valid_override_reaches_the_method_with_timeout(monkeypatch, tmp_path):
     if not tunable:
         pytest.skip(f"{method} exposes no tunable parameters in this build")
     key = sorted(tunable)[0]
+    value = tunable[key].get("default")       # values are type-checked since 0.4.0 (X63)
+    if value is None:
+        pytest.skip(f"{method}'s first parameter has no default to pass")
     calls = []
     monkeypatch.setattr(W, "_run", _fake_run(calls))
     mtb.run_all("D11", "vertical", methods=[method],
-                params={method: {key: tunable[key]}},
+                params={method: {key: value}},
                 out_dir=str(tmp_path), timeout=600,
                 evaluate=False, verbose=False)
     assert len(calls) == 1
-    assert calls[0]["params"] == {key: tunable[key]}, \
+    assert calls[0]["params"] == {key: value}, \
         "override was dropped on the timeout path"
 
 

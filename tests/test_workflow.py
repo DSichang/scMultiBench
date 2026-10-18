@@ -15,7 +15,7 @@ from tests.conftest import full_scan
 def _envs_installed(category=None) -> bool:
     """Every env the category's methods need exists on this host."""
     try:
-        rows = mtb.env.doctor(category=category)
+        rows = mtb.env.doctor(category=category).to_dict("records")
     except Exception:  # noqa: BLE001 - no conda at all
         return False
     return bool(rows) and all(r["exists"] for r in rows)

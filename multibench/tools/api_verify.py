@@ -136,17 +136,17 @@ def _():
 def _(): return list(mtb.env.recipe("Matilda"))[:4]
 @check("env.doctor")
 def _():
-    d = mtb.env.doctor(); miss = [x for x in d if not x.get("exists", True)]
+    d = mtb.env.doctor(); miss = d[~d.exists]
     return f"{len(d)} envs, {len(miss)} missing"
 @check("env.install(dry_run=True) - the plan, nothing built")
 def _():
-    rows = mtb.env.install(["Matilda"])
-    assert rows and rows[0]["env"] == mtb.method_info("Matilda")["env"], rows
-    return f"{rows[0]['env']}: {rows[0]['state']}"
-@check("env.install(dry_run=True, packed=False)")
+    rows = mtb.env.install(["Matilda"], dry_run=True)
+    assert len(rows) and rows.env.iloc[0] == mtb.method_info("Matilda")["env"], rows
+    return f"{rows.env.iloc[0]}: {rows.state.iloc[0]}"
+@check("env.install(dry_run=True, build=True)")
 def _():
-    rows = mtb.env.install(["Matilda"], packed=False)
-    return f"{rows[0]['env']}: {rows[0]['state']}, {len(rows[0]['cmds'])} cmds"
+    rows = mtb.env.install(["Matilda"], build=True, dry_run=True)
+    return f"{rows.env.iloc[0]}: {rows.state.iloc[0]}, {len(rows.cmds.iloc[0])} cmds"
 
 # ---------------- results ----------------
 @check("load_results")
