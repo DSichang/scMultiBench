@@ -1194,7 +1194,24 @@ def _check_unique_barcodes(names) -> None:
                          f"(prefix the sample).")
 
 
-def _align_cells(a, *, master, master_name, role):
+def _strip_to_match(longer: list, shorter: list) -> str | None:
+    """The suffix or prefix whose removal from every name of ``longer`` gives
+    the names of ``shorter``, else ``None``."""
+    a, b = longer[0], shorter[0]
+    if a.startswith(b) and a != b:
+        cut = a[len(b):]
+        if all(x.endswith(cut) for x in longer) and \
+                {x[:-len(cut)] for x in longer} == set(shorter):
+            return cut
+    if a.endswith(b) and a != b:
+        cut = a[:len(a) - len(b)]
+        if all(x.startswith(cut) for x in longer) and \
+                {x[len(cut):] for x in longer} == set(shorter):
+            return cut
+    return None
+
+
+def _align_cells(a, *, master, master_name, role, category=None):
     """``a`` in the master cell order. Other barcodes raise, and so do repeated
     ones (:func:`_check_unique_barcodes`)."""
     names = [str(x) for x in a.obs_names]
@@ -1216,9 +1233,17 @@ def _align_cells(a, *, master, master_name, role):
         if len(stray) == len(names):            # no cell in common
             if "atac" in pair and pair & {"rna", "data"}:
                 theirs, ours = (("ATAC", "RNA") if role == "atac" else ("RNA", "ATAC"))
+                head = (f"RNA and ATAC share no barcode ({ours} e.g. {master[0]}, {theirs} "
+                        f"e.g. {names[0]}).")
+                for longer, shorter, who in ((master, names, ours), (names, master, theirs)):
+                    cut = _strip_to_match(longer, shorter)
+                    if cut:
+                        raise ValueError(f"{head} They match after removing {cut!r} from "
+                                         f"the {who} names.")
+                if category == "vertical":
+                    raise ValueError(f"{head} Make the names match.")
                 raise ValueError(
-                    f"RNA and ATAC share no barcode ({ours} e.g. {master[0]}, {theirs} "
-                    f"e.g. {names[0]}). Make the names match; for different cells pass "
+                    f"{head} Make the names match; for different cells pass "
                     + config.hint('category="diagonal"', "--category diagonal") + ".")
             raise ValueError(f"{role} and {master_name} have no cells in common. {same}")
         if stray:
@@ -1471,7 +1496,8 @@ def _export_dataset(data, dataset_dir: Path | str, *, rna="X",
             order, order_name = [str(x) for x in mats[0][1].obs_names], mats[0][3]
         _check_unique_barcodes(order)
         masters[side] = order
-        sides[side] = [(role, _align_cells(a, master=order, master_name=order_name, role=what),
+        sides[side] = [(role, _align_cells(a, master=order, master_name=order_name, role=what,
+                                              category=category),
                         kw, what, src) for role, a, kw, what, src in mats]
     if not masters:                     # labels only
         if master is None:

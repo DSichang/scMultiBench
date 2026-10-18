@@ -377,3 +377,20 @@ def test_cli_metrics_family_any_case(tmp_path, capsys):
     lab.write_text("x\n" + "\n".join("ab"[i % 2] for i in range(40)) + "\n")
     assert cli.main(["evaluate", str(emb), "--labels", str(lab), "--metrics",
                      "Clustering"]) == 0
+
+
+# X10: barcodes that match after removing a suffix say so; vertical drops the diagonal hint
+def test_export_barcodes_that_differ_by_a_suffix():
+    import numpy as np
+    ad = pytest.importorskip("anndata")
+    from test_study_r2_rr import _peak_adata, _rna_adata
+    rna = _rna_adata([f"AAAC{i:04d}-1" for i in range(30)])
+    atac = _peak_adata([f"AAAC{i:04d}" for i in range(30)])
+    with pytest.raises(ValueError) as e:
+        mtb.io.export_dataset(rna, "/nonexistent/SUF", atac=atac, atac_kind="peak",
+                              category="vertical")
+    assert str(e.value) == ("RNA and ATAC share no barcode (RNA e.g. AAAC0000-1, ATAC e.g. "
+                            "AAAC0000). They match after removing '-1' from the RNA names.")
+    with pytest.raises(ValueError, match=r"\. Make the names match\.$"):
+        mtb.io.export_dataset(rna, "/nonexistent/SUF", atac=_peak_adata(
+            [f"x{i}" for i in range(30)]), atac_kind="peak", category="vertical")
