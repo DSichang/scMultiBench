@@ -2239,5 +2239,5 @@ def _select_object(obj, spec: str, *, what: str):
 
 
 __getattr__ = _compat.module_getattr(__name__, "io", old={
-    "normalize_peak_names": (_normalize_peak_names, _compat.note("run renames the peaks itself")),
+    "normalize_peak_names": (_normalize_peak_names, _compat.note("a run renames the peaks itself")),
 })

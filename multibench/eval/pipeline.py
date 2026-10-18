@@ -931,8 +931,7 @@ _METRICS_KEYWORD = ("0.4", _compat.use("metrics="))
                   kept={"clustering": _compat.use("the default, the article's Leiden clusters"),
                         "label_order": _compat.use("evaluate(..., dataset=, method=)"),
                         "missing_labels": _compat.note(
-                            "keep the cells that have a label, as adata[adata.obs[col].notna()]"),
-                        "data_path": _compat.use("dataset= as the folder path")},
+                            "keep the cells that have a label, as adata[adata.obs[col].notna()]")},
                   removed={"task": _METRICS_KEYWORD, "family": _METRICS_KEYWORD,
                            "only": _METRICS_KEYWORD,
                            "slow_metrics": ("0.3.0", _compat.note(
@@ -1015,8 +1014,8 @@ def evaluate(embedding, labels=None, *, dataset: str | None = None,
 def _evaluate(embedding, labels=None, *, dataset=None, method="embedding", category=None,
               batch=None, metrics=None, obsm=None, verbose=True, clustering=None,
               label_order=None, missing_labels="error", data_path=None) -> pd.DataFrame:
-    """:func:`evaluate` with the deprecated ``clustering=``, ``label_order=``,
-    ``missing_labels=`` and ``data_path=``."""
+    """:func:`evaluate` with the deprecated ``clustering=``, ``label_order=`` and
+    ``missing_labels=``; ``data_path`` is the folder that holds ``dataset``."""
     if not isinstance(method, str) or not method.strip():
         raise TypeError(f"method= takes a name, such as method='Matilda'; got {method!r}.")
     name = None

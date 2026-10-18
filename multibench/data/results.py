@@ -808,7 +808,7 @@ def _available_datasets(
     return _list_datasets(category, base, source, "default")
 
 
-available_datasets = _compat.renamed("available_datasets", "results_coverage",
+available_datasets = _compat.renamed("available_datasets", "mtb.catalog.datasets()",
                                      _available_datasets)
 
 

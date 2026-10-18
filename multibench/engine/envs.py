@@ -1802,7 +1802,7 @@ def _run_all(cmds: list[list[str]]) -> None:
     _conda_prefixes.cache_clear()
 
 
-status = _compat.renamed("env.status", "env.doctor", _status)
+status = _compat.renamed("env.status", "env.install(methods, dry_run=True)", _status)
 
 
 def plan(category=None, methods=None, **kwargs):

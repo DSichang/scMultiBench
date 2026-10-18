@@ -69,7 +69,7 @@ def _variant_matches(v, category, want, needs_labels, atac) -> bool:
 
 
 @_compat.keywords("find_methods", private="_find_methods", kept={
-    "task": _compat.note("it has no replacement"), "runnable": _compat.use("scan"),
+    "task": _compat.note("it has no replacement"), "runnable": _compat.use("mtb.scan"),
     "atac": _compat.use('modalities=["atac_peak"] or ["atac_gas"]'),
     "tunable": _compat.use("mtb.params_for")})
 def find_methods(category: str | None = None, *,

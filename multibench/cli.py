@@ -2176,17 +2176,18 @@ def build_parser() -> argparse.ArgumentParser:
     ev = pv.add_subparsers(dest="env_cmd", required=True, metavar="<env-command>",
                            title="env commands")
     es = ev.add_parser("status",
-                       description="Deprecated: use multibench env doctor. One line "
+                       description="Deprecated: use multibench env install --dry-run. One line "
                                    "per method: installed or not, the "
                                    "environment name and a difficulty tag.",
                        epilog=_status_epilog(), formatter_class=_HelpFormatter)
     es.add_argument("--category", help=_CATEGORY_HELP + " Only that category's methods.")
     es.add_argument("--methods", help=_METHODS_HELP + "; only those")
     es.set_defaults(func=_cmd_env, _parser=es,
-                    **_retired_command("env status", "env doctor"))
-    egr = ev.add_parser("groups", description="Deprecated: use multibench env doctor.")
+                    **_retired_command("env status", "env install --dry-run"))
+    egr = ev.add_parser("groups", description="Deprecated: use multibench env install "
+                                               "--dry-run.")
     egr.set_defaults(func=_cmd_env, _parser=egr,
-                     **_retired_command("env groups", "env doctor"))
+                     **_retired_command("env groups", "env install --dry-run"))
     _NAME_HELP = ("environment name. The default is the environment the package "
                   "uses for METHOD, shown in the env column of multibench scan and "
                   "used by run-all, env install and env create. For example, Matilda uses "
