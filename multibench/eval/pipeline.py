@@ -723,7 +723,8 @@ def _count_error(what: str, n: int, n_cells: int, given, category=None) -> str:
             keys = (names[:len(fit)] if names and len(names) == len(files)
                     else [f.stem for f in fit])
             return (f"The embedding has {n_cells:,} cells = {'+'.join(keys)}. "
-                    + config.hint(f"Pass label_order={keys!r}.",
+                    + config.hint(f"Pass the label files {_and_list(f.name for f in fit)} "
+                                  f"only.",
                                   "Pass --labels for " + " and ".join(
                                       f.name for f in fit) + " only."))
     if what != "labels" or n >= n_cells:
