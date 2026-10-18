@@ -277,3 +277,13 @@ def test_hidden_rows_one_sentence(capsys):
     assert said in capsys.readouterr().out
     cli.main(["scan", "D11", "--category", "vertical"])
     assert said in capsys.readouterr().err
+
+
+# Y08: the Rank key says best and worst, as BubbleTable.ranks counts n = best
+def test_rank_key_says_best_and_worst():
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        fig = mtb.plot.bubble(mtb.load_results("mosaic"))
+    texts = [t.get_text() for t in fig.axes[0].texts if t.get_gid() == "legend"]
+    assert "best" in texts and "worst" in texts

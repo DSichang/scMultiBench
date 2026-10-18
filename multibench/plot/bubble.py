@@ -947,9 +947,9 @@ def _draw(tbl, cmap, title, show_language, gaps):
                                 facecolor="#bbbbbb", edgecolor="#333333",
                                 linewidth=0.4, zorder=2, gid="legend"))
         if n_legend > 1:
-            ax.text(xoff, rank_y - 0.62, str(n_rows), fontsize=6.6,
+            ax.text(xoff, rank_y - 0.62, "worst", fontsize=6.6,
                     ha="center", gid="legend")
-        ax.text(xoff + (n_legend - 1) * 1.0, rank_y - 0.62, "1", fontsize=6.6,
+        ax.text(xoff + (n_legend - 1) * 1.0, rank_y - 0.62, "best", fontsize=6.6,
                 ha="center", gid="legend")
 
     # room under the legends: the Rank labels, or the Score legend's note
