@@ -1107,7 +1107,7 @@ def plot_details(cat):
     pink = ", pink for classification" if cat != "vertical" else ""
     return (
         "The lightest fill is the lowest value in this figure, not zero.",
-        "Metrics are grouped by family: blue for dimension reduction and clustering, "
+        "Metrics are grouped by family: blue for clustering, "
         f"green for batch correction{pink}. Each family starts with an `Overall` bar. "
         "Its length and colour both show the family score.",
         "A column whose rows all hold the same value is drawn grey, and a warning "

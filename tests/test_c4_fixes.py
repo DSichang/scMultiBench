@@ -408,3 +408,25 @@ def test_the_embedding_names_cells_by_the_file_the_method_read(tmp_path):
                                ("GLUE", ["rna", "atac_peak"], peak)):
         obs = _quiet(_fake_run(tmp_path / method, method, mods, n).embedding, method).obs_names
         assert obs[-1].endswith(bars[-1]), (method, obs[-1])
+
+
+# ------------------------------------------- minimal #2: the labels recipe, 10+ batches
+from tests.test_docs_r4 import _read, needs_docs  # noqa: E402
+
+
+@needs_docs
+def test_the_labels_recipe_orders_twelve_batches_by_number(tmp_path):
+    import re
+    from multibench.engine.resolve import _label_sort_key
+    page = _read("tutorials/evaluate.md")
+    block = next(b for b in re.findall(r"```python\n(.*?)```", page, re.S) if "order = {" in b)
+    code = "\n".join(line for line in block.splitlines() if "fetch(" not in line)
+    folder = tmp_path / "SYN12"
+    folder.mkdir()
+    for i in range(1, 13):
+        pd.DataFrame({"x": [f"t{i}"] * 3}).to_csv(folder / f"cty{i}.csv", index=False)
+    ns = {"pd": pd, "folder": folder}
+    exec(code, ns)
+    stems = [f.stem for f in ns["files"]]
+    assert stems == sorted(stems, key=_label_sort_key) == [f"cty{i}" for i in range(1, 13)]
+    assert list(ns["labels"][::3]) == [f"t{i}" for i in range(1, 13)]
