@@ -973,28 +973,21 @@ def _rename_clashes(stored: pd.DataFrame, own: list) -> list:
 
 
 def _rename_repeats(own: list, inputs: list) -> list:
-    """The rows of a later ``--input`` whose method and dataset an earlier one
-    has, renamed ``<method> (<its folder or file name>)``, with one line on stderr."""
+    """The rows of ``--input`` files that share a method and dataset, each renamed
+    ``<method> (<its folder or file name>)``."""
     keys = ["method", "dataset"]
-    seen: set = set()
-    out, said = [], []
+    pairs = [set(map(tuple, f[keys].astype(str).to_numpy())) if set(keys) <= set(f.columns)
+             else set() for f in own]
+    shared = {k for i, p in enumerate(pairs) for k in p
+              if any(k in q for q in pairs[:i] + pairs[i + 1:])}
+    out = []
     for f, path in zip(own, inputs):
-        if set(keys) <= set(f.columns):
-            pairs = [tuple(k) for k in f[keys].astype(str).to_numpy()]
-            hit = [k in seen for k in pairs]
-            if any(hit):
-                tag = Path(path).stem
-                f = f.copy()
-                names = sorted(set(f.loc[hit, "method"].astype(str)))
-                # "<method> (<tag>)": --methods <method> keeps it (registry.method_of)
-                f.loc[hit, "method"] = f.loc[hit, "method"].astype(str) + f" ({tag})"
-                said.append(f"{_and_list(names)} of {path} as "
-                            f"{_and_list([f'{m} ({tag})' for m in names])}")
-            seen |= set(map(tuple, f[keys].astype(str).to_numpy()))
+        if shared and set(keys) <= set(f.columns):
+            hit = [tuple(k) in shared for k in f[keys].astype(str).to_numpy()]
+            f = f.copy()
+            # "<method> (<tag>)": --methods <method> keeps it (registry.method_of)
+            f.loc[hit, "method"] = f.loc[hit, "method"].astype(str) + f" ({Path(path).stem})"
         out.append(f)
-    if said:
-        print(f"# Drawn {'; '.join(said)}: an earlier --input has the same method and "
-              f"dataset.", file=sys.stderr)
     return out
 
 
@@ -1014,22 +1007,11 @@ def _cmd_plot(args) -> int:
             if str(e) == _unpublished_msg(args.category):
                 raise FileNotFoundError(_unpublished_plot_msg(args.category, inputs)) from e
             raise FileNotFoundError(_cli_spelling(str(e))) from e
-    own_rows = 0
     loaded = [_load_long_input(path) for path in inputs]
-    for own in _rename_repeats(_filter_own_rows(loaded, args), inputs):
-        own_rows += len(own)
-        frames.append(own)
+    frames += _rename_repeats(_filter_own_rows(loaded, args), inputs)
     if args.category is not None and len(frames) > 1:
         frames[1:] = _rename_clashes(frames[0], frames[1:])
-    if len(frames) == 1:
-        df = frames[0]
-    else:
-        df = pd.concat(frames, ignore_index=True, sort=False)
-        if args.category is not None and inputs:
-            own_methods = sorted(set().union(*[set(f["method"].astype(str)) for f in frames[1:]]))
-            print(f"# Added your {own_rows} row{'' if own_rows == 1 else 's'} "
-                  f"({', '.join(own_methods)}) to the {len(frames[0])} stored results "
-                  f"of {args.category}.", file=sys.stderr)
+    df = frames[0] if len(frames) == 1 else pd.concat(frames, ignore_index=True, sort=False)
     methods = _csv_list(args.methods)
     if methods:
         # a method id keeps its renamed runs too, as "scJoint (ep40)"
@@ -1054,7 +1036,7 @@ def _cmd_plot(args) -> int:
     with _quiet_stdout():
         if args.kind == "bubble":
             _bubble(df, metrics=metrics, methods=methods, aggregate=args.aggregate,
-                    title=title, save=args.out, overall=args.overall,
+                    title=title, save=args.out, overall=args.overall or "rank",
                     require_complete=args.require_complete, na=args.na or "warn")
         else:
             _bar(df, metrics=metrics, methods=methods, top=args.top, title=title,
@@ -2002,7 +1984,7 @@ def build_parser() -> argparse.ArgumentParser:
     pp.add_argument("--aggregate", choices=["dataset", "summary"], default="dataset",
                     action=_Retired, tail=_compat.use("multibench plot bar"))
     # only a frame of several datasets can tell the two apart: not in --help
-    pp.add_argument("--overall", choices=["rank", "mean_overall"], default="rank",
+    pp.add_argument("--overall", choices=["rank", "mean_overall"], default=None,
                     help=argparse.SUPPRESS)
     pp.add_argument("--require-complete", dest="require_complete", action=_Retired,
                     nargs=0, default=False, tail=_compat.use("--methods"))

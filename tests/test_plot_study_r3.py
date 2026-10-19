@@ -93,7 +93,7 @@ def _plot_cli(tmp_path, capsys, *frames, rc=0):
 
 def test_cli_plot_follows_the_dataset_rule(tmp_path, capsys):
     err = _plot_cli(tmp_path, capsys, _stored("D11"), _mycite(), rc=1)
-    assert "or score your embedding with --dataset D11." in err
+    assert "or score your embedding with multibench evaluate --dataset D11." in err
     err = _plot_cli(tmp_path, capsys, _stored("D11"), _mine("PriyaNet", "D11"))
     assert "warning: The rows for PriyaNet were clustered with the igraph Leiden backend" in err
     assert "multibench evaluate --leiden-flavor leidenalg" in err

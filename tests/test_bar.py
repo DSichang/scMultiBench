@@ -48,7 +48,7 @@ def test_bar_methods_selects_the_bars():
 
 def test_bar_xlabel_names_dataset_or_formula():
     one = mtb.plot.bar(_long(datasets=("D1",)))
-    assert one.axes[0].get_xlabel() == "overall score, scaled 0-1 (D1)"
+    assert one.axes[0].get_xlabel() == "overall score (D1)"
     two = mtb.plot.bar(_long())
     assert "mean of per-dataset overall" in two.axes[0].get_xlabel()
     # the deprecated overall= (0.4.0) keeps its effect

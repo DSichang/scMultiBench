@@ -74,7 +74,7 @@ def test_x86_language_chips_and_summary_scale_have_a_legend():
     assert "Py / R: the method's language; ?: not a package method" in texts      # 0.4.0
     fig, _ = _messages(mtb.plot.bubble, d11)
     assert "Py / R: the method's language" in [t.get_text() for t in fig.axes[0].texts]
-    two = pd.concat([d11, d11.assign(dataset="D11b")])
+    two = pd.concat([d11, d11.assign(dataset="D11b")]).assign(source="user")
     fig, _ = _messages(mtb.plot.bubble, two, aggregate="summary")
     assert "(mean rank over datasets, scaled per column)" in \
         [t.get_text() for t in fig.axes[0].texts]
@@ -162,6 +162,5 @@ def test_cli_plot_two_inputs_of_the_same_methods(tmp_path, capsys):
                    str(tmp_path / "b.csv"), "--out", str(tmp_path / "x.png")])
     err = capsys.readouterr().err
     assert rc == 0, err
-    # c2 (C14): "<method> (<input name>)", which --methods <method> keeps
-    assert "scMM (b), scMSI (b)" in err
-    assert "(b): an earlier --input has the same method and dataset." in err
+    # c3 (C14): every input's rows as "<method> (<input name>)", without a line
+    assert "# Drawn" not in err

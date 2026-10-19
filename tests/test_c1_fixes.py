@@ -92,7 +92,7 @@ def test_the_dry_run_plan_has_seven_columns():
 def test_bar_says_its_scale():
     import matplotlib.pyplot as plt
     fig = mtb.plot.bar(mtb.load_results("mosaic"))
-    assert fig.axes[0].get_xlabel() == "overall score, scaled 0-1 (D45)"
+    assert fig.axes[0].get_xlabel() == "overall score (D45)"
     plt.close(fig)
 
 

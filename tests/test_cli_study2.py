@@ -200,8 +200,7 @@ def test_cli_plot_input_with_category_concatenates_onto_stored(tmp_path, monkeyp
     cap = capsys.readouterr()
     assert rc == 0
     assert sorted(seen["df"]["method"].unique()) == ["A", "B", "Mine"]
-    assert "# Added your 3 rows (Mine) to the 6 stored results of vertical." in cap.err
-    assert "Added your" not in cap.out
+    assert "Added your" not in cap.err + cap.out
 
 
 def test_cli_plot_input_is_repeatable_and_dataset_filters_inputs(tmp_path, monkeypatch, capsys):

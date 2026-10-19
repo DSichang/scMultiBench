@@ -187,12 +187,12 @@ def _bar(long_df: pd.DataFrame, *, metrics=None, methods=None, top: int | None =
         ax.set_yticks(range(n)); ax.set_yticklabels(mean.index, fontsize=9)
         n_datasets = per_ds.shape[1]
         if n_datasets == 1:
-            xlabel = f"overall score, scaled 0-1 ({per_ds.columns[0]})"
+            xlabel = f"overall score ({per_ds.columns[0]})"
         else:
             how = {"rank": "rank of mean ranks"}.get(overall, "mean of per-dataset overall")
-            xlabel = f"overall score, scaled 0-1 ({how}, {n_datasets} datasets)"
+            xlabel = f"overall score ({how}, {n_datasets} datasets)"
         ax.set_xlabel(xlabel, fontsize=9)
-        # the scores lie in [0, 1]; a whisker (mean +/- SD) can reach past either end
+        # the stored scores lie in [0, 1]; your rows and a whisker (mean +/- SD) can reach past either end
         reach = np.nan_to_num(xerr)
         ax.set_xlim(min(0, (mean.to_numpy() - reach).min() - 0.02),
                     max(1, (mean.to_numpy() + reach).max()) + 0.02)

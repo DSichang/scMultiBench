@@ -170,7 +170,9 @@ def test_your_rows_on_another_dataset_are_refused(dataset):
     st, mine = _mine(dataset)
     both = pd.concat([st, mine])
     text = (f"Your rows are on {dataset}, the stored results on D11: plot them apart, "
-            "or score your embedding with dataset='D11'.")
+            "or score your embedding with dataset='D11'." if dataset != "user" else
+            "Your rows were scored without a dataset: score your embedding with "
+            "dataset='D11' to compare it with the stored results.")
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         for call in (lambda: mtb.recommend("vertical", long_df=both),
@@ -189,7 +191,7 @@ def test_the_cli_refusal_names_dataset(tmp_path, capsys):
                    "--category", "vertical", "--out", str(tmp_path / "x.png")])
     err = capsys.readouterr().err
     assert rc != 0 and not (tmp_path / "x.png").exists()
-    assert "or score your embedding with --dataset D11." in err
+    assert "or score your embedding with multibench evaluate --dataset D11." in err
 
 
 # --------------------------------------------------------------- D02
