@@ -391,7 +391,8 @@ def _help(path, flag):
 
 def test_help_texts_put_the_object_first_and_end_in_plain_sentences():
     import argparse
-    assert _help(["scan"], "--assume-gpu") == argparse.SUPPRESS   # hidden since 0.4.0
+    # c2 (C53): shown, as installation.md teaches it
+    assert _help(["scan"], "--assume-gpu").startswith("skip this host's GPU test")
     assert _help(["fetch"], "--ref") == "==SUPPRESS=="          # hidden since 0.4.0 (Y36)
     doc = " ".join(mtb.scan.__doc__.split())
     assert ("``True`` = skip this host's GPU test, to check a job for a GPU node from a "
@@ -525,8 +526,9 @@ def test_quickstart_laptop_tab_runs_on_a_panel_of_14_adts(tmp_path, monkeypatch,
 def test_discover_explains_a_filtered_grand_score():
     text = " ".join((_docs_root() / "tutorials" / "discover.md").read_text().split())
     assert "On each dataset the best method gets 1 and the lowest 0." not in text
-    assert ("On each dataset, the best of the category's scored methods gets 1 and the "
-            "lowest gets 0.") in text
+    # c2 (D01): the stored methods set the scale
+    assert ("On each dataset, the stored methods set the 0-1 scale: the best gets 1 and "
+            "the lowest 0") in text
     assert "a filtered list can start below 1 and end above 0" in text
     # the facts behind it
     with warnings.catch_warnings():

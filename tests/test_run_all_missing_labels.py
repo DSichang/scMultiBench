@@ -394,8 +394,10 @@ def test_several_label_files_are_not_ranked(tmp_path, host, monkeypatch):
                         lambda *a, **k: ranked.append(1) or real(*a, **k))
     (rec,) = res.rescore().records
     assert rec["status"] == "RUN_OK_EVAL_FAILED" and ranked == []
+    # c2 (D28): the files in the order the record was scored with
+    a, b, c = res.records[0]["labels_used"]
     assert rec["error"] == (
-        "ValueError: 2 of the 120 labels in cty1.csv, cty2.csv and cty3.csv are missing, "
+        f"ValueError: 2 of the 120 labels in {a}, {b} and {c} are missing, "
         "for example 'None'. Give every cell a label, then score again.")
     assert "label_order_candidates" not in rec and "metrics" not in rec
     # a real run on this folder stops before the method

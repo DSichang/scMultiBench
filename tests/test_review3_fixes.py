@@ -331,8 +331,9 @@ def _check(capsys, *a, **kw):
     return pm, capsys.readouterr().out.splitlines()
 
 
-GAS_REASON = ("{m} needs peak ATAC (atac1.h5, atac2.h5, atac3.h5), and the folder has gene "
-              "activity (atac_gas1.h5, atac_gas2.h5, atac_gas3.h5).")
+# c2 (C22): the files cross export writes, atac_peak<i>.h5
+GAS_REASON = ("{m} needs peak ATAC (atac_peak1.h5, atac_peak2.h5, atac_peak3.h5), and the "
+              "folder has gene activity (atac_gas1.h5, atac_gas2.h5, atac_gas3.h5).")
 
 
 def test_a_cross_folder_of_gene_activity_holds_atac(linux, tmp_path, capsys):
@@ -653,7 +654,11 @@ def test_the_changes_page_names_the_new_refusals_and_texts(linux, tmp_path, caps
     # the reason that the page quotes is the one the check prints
     _cross(tmp_path, "GA", "atac_gas")
     pm, _ = _check(capsys, "GA", "cross", methods=["StabMap"], data_path=tmp_path)
-    assert f"`{pm['reason'][0]}` 0.3.4 wrote one sentence per file." in messages
+    # the 0.3.5 text; c2 (C22) names the files export writes, atac_peak<i>.h5
+    assert ("`StabMap needs peak ATAC (atac1.h5, atac2.h5, atac3.h5), and the folder has "
+            "gene activity (atac_gas1.h5, atac_gas2.h5, atac_gas3.h5).` 0.3.4 wrote one "
+            "sentence per file.") in messages
+    assert pm["reason"][0].startswith("StabMap needs peak ATAC (atac_peak1.h5, atac_peak2.h5,")
     assert ("A cross folder written with `atac_kind=\"gene_activity\"` holds `atac_gas1.h5`, "
             "`atac_gas2.h5` and so on") in checks
     assert ("It gives the line `adt.X = adt.layers[\"counts\"]` when the object has a "

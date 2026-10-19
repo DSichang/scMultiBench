@@ -1061,7 +1061,8 @@ def test_guides_keep_the_round2_facts_visible():
         for name in ("plot.md", "run.md", "evaluate.md", "discover.md"))
     panel = plot.split('```python title="d11_panel.py"', 1)[1].split("```", 1)[0]
     assert "leidenalg" not in panel
-    assert "### Try it with a PCA of D11" in plot and "mtb.config.DEFAULT.data_path" in plot
+    # c2 (C57): data.fetch returns the folder
+    assert "### Try it with a PCA of D11" in plot and 'd = mtb.data.fetch("D11")' in plot
     assert "{env_cmd}" not in run and "cmd_template" not in run
     assert 'mtb.find_methods("diagonal", modalities=["atac_peak"])' in run
     assert 'scores.to_csv("mine.csv", index=False)' in evaluate

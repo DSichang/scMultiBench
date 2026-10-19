@@ -90,15 +90,15 @@ def test_run_all_batch_override_scores_batch_metrics(cite, tmp_path):
     assert back.records[0]["batch_source"] == "user"
 
 
-def test_run_all_batch_wrong_length_is_eval_failed_not_fatal(cite, tmp_path):
+def test_run_all_batch_wrong_length_is_refused_before_anything_runs(cite, tmp_path):
+    # c2 (D22): refused, as a batch with a missing value is; nothing is written
     data, _ = cite
-    res = mtb.run_all("MYCITE", "vertical", methods=["Matilda"], modalities=["rna", "adt"],
-                      out_dir=tmp_path / "out", data_path=data, verbose=False,
-                      batch=np.ones(N - 1))
-    sm = res.summary
-    assert sm.loc[0, "status"] == "ran"
-    err = res.failures.iloc[0]["error"]
-    assert f"batch has {N - 1} entries, embedding has {N} cells" in err
+    with pytest.raises(ValueError, match=rf"^batch has {N - 1} entries for the {N} cells of "
+                                         r"MYCITE: give one batch per cell\.$"):
+        mtb.run_all("MYCITE", "vertical", methods=["Matilda"], modalities=["rna", "adt"],
+                    out_dir=tmp_path / "out", data_path=data, verbose=False,
+                    batch=np.ones(N - 1))
+    assert not (tmp_path / "out").exists()
 
 
 def test_rescore_with_batch_and_labels(cite, tmp_path):

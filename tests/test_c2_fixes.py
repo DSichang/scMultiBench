@@ -155,7 +155,7 @@ def _mosaic(root):
 def test_a_size_caveat_states_the_folders_number(tmp_path):
     plan = mtb.run_all(_mosaic(tmp_path), "mosaic", dry_run=True, verbose=False)
     cav = plan.set_index("method").loc["Multigrate", "caveat"]
-    assert cav == ("Multigrate needs about 1,300 cells in every batch; batch 1 of this "
+    assert cav == ("Multigrate needs about 1,300 cells in every batch, and batch 1 of this "
                    "folder has 250: leave Multigrate out.")
 
 

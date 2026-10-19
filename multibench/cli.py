@@ -1449,7 +1449,7 @@ def _cmd_evaluate(args) -> int:
         args.category = workflow.known_category(dataset)    # a benchmark dataset has one
     with contextlib.ExitStack() as stack:
         batch = _batch_arg(args, stack)
-        if isinstance(batch, str) and not Path(batch).exists() \
+        if isinstance(batch, str) and not Path(batch).exists() and not Path(batch).suffix \
                 and Path(embedding).suffix.lower() not in (".h5ad", ".h5mu"):
             raise ValueError(f"--batch {batch} is not a file. With a "
                              f"{Path(embedding).suffix or 'matrix'} embedding, --batch "
@@ -1724,7 +1724,7 @@ def _export_arguments(pc) -> None:
     pc.add_argument("--category", help=_CATEGORY_HELP + " Sets the file names. "
                     "vertical writes atac.h5. diagonal writes atac_peak.h5 or "
                     "atac_gas.h5, and the labels as rna_cty.csv and atac_cty.csv. "
-                    "mosaic writes atac<i>.h5, cross atac_peak<i>.h5.")
+                    "mosaic writes atac<i>.h5.")
     pc.add_argument("--rna", help="where the raw-count RNA matrix lives: X (default), "
                                   "obsm:<key>, layer:<key>, mod:<name>, or none. Append "
                                   "[<var column>=<value>] to keep some features, e.g. "
@@ -2023,7 +2023,8 @@ def build_parser() -> argparse.ArgumentParser:
         "run",
         description="Deprecated: use multibench run-all DATASET --methods M.")
     # any wrong call gets the deprecated line, not a list of hidden flags
-    pr.error = lambda message: pr.exit(2, f"multibench run: {pr.description}\n")
+    pr.error = lambda message: pr.exit(2, (f"multibench run: error: {message}\n" if message
+                                           else "") + f"multibench run: {pr.description}\n")
     pr.add_argument("--method", help=argparse.SUPPRESS)
     pr.add_argument("--category", help=argparse.SUPPRESS)
     pr.add_argument("--task", action=_Retired)

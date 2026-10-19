@@ -29,6 +29,8 @@ def _mine(base, name="Mine", scored_with="leidenalg/search/0.4.0"):
     rows = base[base.method == "Matilda"].assign(method=name, source="user")
     if scored_with is not None:
         rows = rows.assign(scored_with=scored_with)
+    else:      # the stored rows carry scored_with since c2 (C15): yours have none
+        rows = rows.drop(columns="scored_with", errors="ignore")
     return rows
 
 
@@ -160,4 +162,6 @@ def test_cli_plot_two_inputs_of_the_same_methods(tmp_path, capsys):
                    str(tmp_path / "b.csv"), "--out", str(tmp_path / "x.png")])
     err = capsys.readouterr().err
     assert rc == 0, err
-    assert "_b: an earlier --input has the same method and dataset." in err
+    # c2 (C14): "<method> (<input name>)", which --methods <method> keeps
+    assert "scMM (b), scMSI (b)" in err
+    assert "(b): an earlier --input has the same method and dataset." in err

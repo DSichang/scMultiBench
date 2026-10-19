@@ -1043,11 +1043,15 @@ def _dataset_labels(dataset, category, method, data_path):
             f"--method {method!r} needs --category to read {own}'s cell order")
             + f": {_and_list(cats, 'or')}.")
     if own is not None and category not in cats:
+        from ..engine.schema import no_category_message
         known = known_category(dataset)
-        fix = (config.hint(f"pass category={known!r}", f"pass --category {known}")
-               if known in cats else f"it runs on {_and_list(cats, 'or')} data")
-        raise ValueError(f"{own} does not run on {category} data; "
-                         + (f"{dataset} is {known}: " if known else "") + f"{fix}.")
+        if known in cats:
+            raise ValueError(f"{own} does not run on {category} data; {dataset} is {known}: "
+                             + config.hint(f"pass category={known!r}.",
+                                           f"pass --category {known}."))
+        raise ValueError(no_category_message(own, cats, category) + config.hint(
+            " For your own embedding, pass the label files as labels=.",
+            " For your own embedding, pass the label files with --labels."))
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message=resolve.DEFAULT_ORDER_WARNING)
         try:

@@ -421,8 +421,8 @@ def test_cli_help_hides_the_deprecated_commands_and_flags():
             assert flag not in text, (cmd, flag)
     # the embedding is the first argument since 0.4.0 (X19); --embedding is hidden
     assert "EMBEDDING" in _help("evaluate") and "--clusters" not in _help("evaluate")
-    # env install --build is hidden in 0.4.0 (maintainer page)
-    assert "--build" not in _help("env", "install") and "--packed" not in _help("env", "install")
+    # env install --build is shown since c2 (D17), the twin of build=; --packed is hidden
+    assert "--packed" not in _help("env", "install")
     # run is a hidden deprecated command in 0.4.0; its help says so
     assert "\n    run " not in top and "\n    convert " not in top
     assert _help("run").split("\n\n")[1].startswith("Deprecated: use multibench run-all")

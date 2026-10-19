@@ -1226,7 +1226,7 @@ To run them all, set `METHODS` to these names in section 2 and run the notebook 
 
     md("""## Troubleshooting
 
-`res.failures` lists each method that failed or was skipped. Its `error` column ends with the method's error output.
+`res.failures` lists each method that failed or was skipped. Its `reason` column ends with the method's error output.
 
 """ + details(
         """| symptom | fix |
@@ -1237,7 +1237,6 @@ To run them all, set `METHODS` to these names in section 2 and run the notebook 
 | a warning that values are not whole numbers | export raw counts, for example with `rna="layer:counts"` |
 | `... matrix/data as cells x features` | the matrix is transposed: export it again with `mtb.io.export_dataset` |
 | a method times out | raise `timeout=` in `run_all` |
-| low `label_order_confidence` | several label files fit the cell count: check `label_order_candidates` in `res.records` |
 | batch metrics use the wrong batches | `res.rescore(batch=my_vector)` scores again without running the methods |"""))
 
     md(f"""## Next steps

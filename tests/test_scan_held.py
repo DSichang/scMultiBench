@@ -43,7 +43,7 @@ LISTED = {
     ("D56mini", "cross"): (30, 9, 9),
     ("D58mini", "cross"): (30, 5, 5),
     ("D59mini", "cross"): (30, 30, 12),
-    ("D11", None): (97, 15, 14),
+    ("D11", None): (97, 14, 14),          # c2 (C55): no scBridge row next to RNA+ADT
 }
 
 
@@ -273,12 +273,13 @@ def test_nothing_held_means_no_filter(tmp_path, no_envs, capsys):
     assert "This folder holds per-batch files" in df["reason"].iloc[0]
 
 
-def test_a_row_that_reads_a_folder_is_always_listed(tmp_path, no_envs):
-    # scBridge reads the folder; D11 holds no ATAC file
+def test_a_row_that_reads_a_folder_follows_the_files_it_reads(tmp_path, no_envs):
+    # c2 (C55): scBridge reads rna.h5 and atac_gas.h5 of the folder, so D11 (no ATAC)
+    # lists it as every other diagonal row: none fits, so every row is listed
     df = full_scan("D11", "diagonal", verbose=False)
     assert "(data_dir)" in set(df["modalities"])
-    assert list(df["method"]) == ["scBridge"] and df.attrs["not_held"] == ["atac"]
-    assert df.attrs["not_listed"] == len(list(W._variant_rows("diagonal"))) - 1
+    assert df.attrs["not_listed"] == 0 and len(df) == len(
+        [r for r in W._variant_rows("diagonal") if not any(m[-1].isdigit() for m in r[3])])
 
 
 def test_a_named_method_keeps_its_rows(no_envs):
@@ -352,18 +353,16 @@ def test_count_line_off_linux_and_with_batches(monkeypatch, capsys):
 
 
 def test_two_families_can_be_lacking(tmp_path, no_envs, capsys):
-    # RNA alone, every category: the one row left reads the folder itself
+    # RNA alone, every category: no row reads RNA alone, so none is left out by its
+    # families (c2, C55: scBridge reads ATAC too); the numbered-batch rows are
     d = tmp_path / "RNA_ONLY"
     d.mkdir()
     _h5(d / "rna.h5", GENES[:30], [f"c{i}" for i in range(20)])
     df = full_scan("RNA_ONLY", data_path=tmp_path)
     line = capsys.readouterr().out
-    assert list(df["modalities"]) == ["(data_dir)"]
-    assert _core(df.attrs) == {"held": ["rna"], "not_listed": 96, "not_held": ["adt", "atac"]}
-    assert line == (
-        "[scan] 0 of 1 method has its input files. 0 of 1 has its environment installed. "
-        "RNA_ONLY holds RNA. Methods and variants that read ADT or ATAC are not listed. "
-        'modalities="all" lists them. mtb.env.install(dry_run=True) checks the environments.\n')
+    assert len(df) == 47 and "(data_dir)" in set(df["modalities"])
+    assert _core(df.attrs) == {"held": ["rna"], "not_listed": 0, "not_held": []}
+    assert line.startswith("[scan] 0 of 47 rows have their input files.")
 
 
 def test_attrs():

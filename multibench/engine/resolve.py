@@ -305,21 +305,22 @@ def _note_local_folder(base: Path, name: str) -> None:
         return
     if os.path.abspath(here) == os.path.abspath(base / name):
         return
-    # once per call: a call resolves the name several times
-    frame = sys._getframe(1)
+    # once per call: a call resolves the name several times. The call is its
+    # outermost package frame, held so that no later call reuses its identity
+    outer, frame = None, sys._getframe(1)
     while frame is not None and frame.f_code.co_filename.startswith(_compat._PACKAGE):
-        frame = frame.f_back
-    key = (id(frame), frame and frame.f_lasti, os.path.abspath(base), name)
-    if _NOTED[0] == key:
+        outer, frame = frame, frame.f_back
+    key = (os.path.abspath(base), name)
+    if _NOTED[0] is outer and _NOTED[1] == key:
         return
-    _NOTED[0] = key
+    _NOTED[:] = [outer, key]
     path = f"./{name}"
     _compat.warn(f"Using {base / name}; {path} also exists: pass "
                  + config.hint(f"{path!r}", path) + " for it.", UserWarning)
 
 
 #: the call that last got the note of :func:`_note_local_folder`
-_NOTED: list = [None]
+_NOTED: list = [None, None]
 
 
 def canonical_dataset(base, dataset: str) -> str:

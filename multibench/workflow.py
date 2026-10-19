@@ -660,7 +660,7 @@ def _missing_files_reason(spec, category: str, mods: list, dataset: str,
         return ""
     numbered = [p for p in missing.values() if p.suffix == ".h5"
                 and (p.parent / f"{p.stem}1.h5").is_file()]
-    if numbered and category in ("vertical", "diagonal"):
+    if numbered and category == "diagonal":
         # a folder of numbered batches: the folder line says what to do
         names = [p.name for p in missing.values() if p.suffix == ".h5"]
         return f"{spec.id} reads {_and_list(names)}."
@@ -1543,14 +1543,14 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
 
 
 def _too_small(variant, inputs: dict, ds_dir: Path):
-    """``"2,000 genes; rna.h5 has 408"`` when the files a row reads are below a
+    """``"2,000 genes, and rna.h5 has 408"`` when the files a row reads are below a
     size its ``size_hint`` names (``min_cells``, ``min_cells_per_batch``,
     ``min_genes``), ``True`` when a size cannot be read, else ``None``."""
     files = [Path(str(p)).name for p in inputs.values() if str(p).endswith(".h5")]
     sizes = _cells_per_file(ds_dir)
     total = sum(sizes.get(f) or 0 for f in files)
     if variant.min_cells and total < variant.min_cells:
-        return f"{variant.min_cells:,} cells; this folder has {total:,}" if total else True
+        return f"{variant.min_cells:,} cells, and this folder has {total:,}" if total else True
     if variant.min_cells_per_batch:
         per: dict = {}
         for f in files:
@@ -1561,7 +1561,7 @@ def _too_small(variant, inputs: dict, ds_dir: Path):
             return True
         b, n = min(per.items(), key=lambda kv: kv[1])
         if n < variant.min_cells_per_batch:
-            return (f"{variant.min_cells_per_batch:,} cells in every batch; batch {b} "
+            return (f"{variant.min_cells_per_batch:,} cells in every batch, and batch {b} "
                     f"of this folder has {n:,}")
     if variant.min_genes:
         for f in files:
@@ -1571,7 +1571,7 @@ def _too_small(variant, inputs: dict, ds_dir: Path):
                 if not sniff:
                     return True
                 if sniff[1] < variant.min_genes:
-                    return f"{variant.min_genes:,} genes; {f} has {sniff[1]:,}"
+                    return f"{variant.min_genes:,} genes, and {f} has {sniff[1]:,}"
     return None
 
 

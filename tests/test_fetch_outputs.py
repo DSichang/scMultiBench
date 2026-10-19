@@ -273,6 +273,6 @@ def test_fetch_of_reference_datasets_goes_through_the_same_downloader(tmp_path, 
         return tgz
 
     monkeypatch.setattr(F, "_download", fake)
-    root = mtb.data.fetch("D11", data_path=tmp_path / "data", quiet=True)
+    folder = mtb.data.fetch("D11", data_path=tmp_path / "data", quiet=True)
     assert calls == [f"{F.RELEASE_URL}/D11.tar.gz"]
-    assert (root / "D11" / "rna.h5").read_text() == "x"
+    assert (folder / "rna.h5").read_text() == "x"            # c2 (C57): the folder

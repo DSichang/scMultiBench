@@ -53,7 +53,8 @@ def test_cli_params_category_and_modalities_select(capsys):
     out = capsys.readouterr().out
     assert rc == 0 and "vertical:rna+adt" in out and "vertical:rna+atac" not in out
     rc = cli.main(["params", "scBridge", "--category", "diagonal"])
-    assert rc == 0 and "scBridge diagonal:-" in capsys.readouterr().out
+    # c2 (D27): the files a folder-reading variant reads
+    assert rc == 0 and "scBridge diagonal:rna+atac_gas" in capsys.readouterr().out
 
 
 def test_cli_params_fixed_in_script_and_knobs_for_untunable_method(capsys):

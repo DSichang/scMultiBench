@@ -47,14 +47,14 @@ def test_each_namespace_lists_its_members():
         assert {n for n in dir(mod) if not n.startswith("__")} == set(names), ns
 
 
-def test_the_command_line_has_fourteen_commands_and_fifty_options():
+def test_the_command_line_has_fourteen_commands_and_fifty_three_options():
     cmds, opts = _visible(cli.build_parser())
     assert cmds == COMMANDS
-    assert len(opts) == 50
+    # c2 (C53, D17): scan --assume-gpu, fetch --scripts and env install --build are shown
+    assert len(opts) == 53
 
 
-@pytest.mark.parametrize("hidden", [("scan", "--assume-gpu"), ("fetch", "--scripts"),
-                                    ("env install", "--build"), ("run-all", "--out")])
+@pytest.mark.parametrize("hidden", [("run-all", "--out")])
 def test_the_cluster_and_maintainer_flags_parse_hidden(hidden):
     _, opts = _visible(cli.build_parser())
     assert hidden not in opts
