@@ -549,7 +549,7 @@ def test_plot_guide_describes_the_averaged_row_labels():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         d11 = mtb.load_results("vertical", dataset="D11")
-        fig = mtb.plot.bubble(pd.concat([d11, d11.assign(dataset="D11b")]))
+        fig = mtb.plot.bubble(pd.concat([d11, d11.assign(dataset="D11b")]).assign(source="user"))
     labels = {t.get_text() for ax in fig.axes for t in ax.get_yticklabels()}
     labels |= set(_figure_texts(fig))
     assert "Matilda · 2 ds" in labels

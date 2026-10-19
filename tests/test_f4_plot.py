@@ -1,7 +1,7 @@
 """Fix round 4, work package 'plot': figure key and warning texts.
 
 R4-12: the chip key says what '?' and 'DR' mean without the word 'registry';
-two own datasets that share no method get a sentence for the same-cells case;
+two own datasets that share no method get one action (c4);
 the incomplete-matrix warning is short sentences; the na='raise' error does not
 offer to hide itself.
 R4-13: recommend's warning lines, DegenerateRerunWarning, evaluate's
@@ -63,12 +63,11 @@ def _two_own_folders():
 @pytest.mark.parametrize("fn,kw", [(_build_table, {}),
                                    (_build_table, {"aggregate": "summary"}),
                                    (mtb.plot.bar, {})])
-def test_two_own_datasets_sharing_no_method_mention_the_same_cells(fn, kw):
+def test_two_own_datasets_sharing_no_method_get_one_action(fn, kw):
+    # c4 (u3): one action, no same-cells sentence
     _, msgs = _messages(fn, _two_own_folders(), **kw)
     (msg,) = [m for m in msgs if m.startswith("The rows come from")]
-    assert msg.endswith("Plot each dataset on its own, or score the same methods on "
-                        "every dataset. If these datasets hold the same cells, give "
-                        "their rows one dataset name first."), msg
+    assert msg.endswith("against each other. Plot each dataset on its own."), msg
 
 
 # --- R4-12 (c): incomplete-matrix warning -------------------------------------
@@ -197,7 +196,7 @@ def test_recommend_unscored_methods_line_is_plain(result_dir):
 def test_recommend_coverage_and_dropped_lines_are_plain(result_dir, layout_tree_foreign):
     layout_tree = layout_tree_foreign
     d28 = mtb.load_results("diagonal")
-    part = pd.concat([d28, d28[~d28.method.isin(["iNMF", "SCALEX"])].assign(dataset="D28b")])
+    part = pd.concat([d28, d28[~d28.method.isin(["iNMF", "SCALEX"])].assign(dataset="D28b")]).assign(source="user")
     _, msg = _recommend("diagonal", long_df=part)
     # 0.4.0: recommend has no coverage column, so the line ends with the counts
     assert ("Some methods have scores on only part of the datasets: SCALEX 1 of 2, "

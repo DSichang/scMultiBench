@@ -258,7 +258,7 @@ def test_recommend_lists_unscored_methods(result_dir):
     # diagonal source='both' lacks GLUE / Seurat_v5 in the re-run rows)
     assert "only part of the datasets" not in msg
     d28 = mtb.load_results("diagonal")
-    part = pd.concat([d28, d28[d28.method != "iNMF"].assign(dataset="D28b")])
+    part = pd.concat([d28, d28[d28.method != "iNMF"].assign(dataset="D28b")]).assign(source="user")
     _, msg_b = _rec("diagonal", long_df=part)
     assert "Some methods have scores on only part of the datasets: iNMF 1 of 2" in msg_b
     assert "coverage column" not in msg_b        # that column left in 0.4.0

@@ -320,7 +320,6 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=Non
         method_datasets = {m: sorted(map(str, g["dataset"].dropna().unique()))
                            for m, g in df.groupby("method")}
 
-    stored = style.stored_datasets(df)
     datasets_per_method = None
     parts = None
     if aggregate == "summary":
@@ -358,8 +357,7 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=Non
                 parts, basis=overall,
                 incomplete_fix=_config.hint(
                     "Pass methods= with the methods scored on every dataset.",
-                    "Pass --methods with the methods scored on every dataset."),
-                stored=stored):
+                    "Pass --methods with the methods scored on every dataset.")):
             _compat.warn(msg, UserWarning)
         lone = style.lone_message({ds: mat.attrs.get("lone", [])
                                    for ds, mat in parts.items()})
@@ -370,8 +368,7 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=Non
         if len(datasets) > 1:
             # the same per-dataset view as the summary, only to see which
             # datasets share methods; the figure itself shows raw values
-            for msg in style.dataset_mode_warnings(style.per_dataset_ranks(df),
-                                                   stored=stored):
+            for msg in style.dataset_mode_warnings(style.per_dataset_ranks(df)):
                 _compat.warn(msg, UserWarning)
         raw_all = df.pivot_table(index="method", columns="metric", values="value",
                                  aggfunc="mean")

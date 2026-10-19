@@ -72,7 +72,7 @@ def _pair():
     """D11 and a second dataset of the same methods (the subsample tables left
     in 0.4.0, X04): D11's rows under another dataset name."""
     d11 = _stored("D11")
-    return pd.concat([d11, d11.assign(dataset="D11b")], ignore_index=True)
+    return pd.concat([d11, d11.assign(dataset="D11b")], ignore_index=True).assign(source="user")
 
 
 def test_dataset_mode_rerun_pair_suggests_plot_bar():

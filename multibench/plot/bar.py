@@ -131,27 +131,29 @@ def _bar(long_df: pd.DataFrame, *, metrics=None, methods=None, top: int | None =
     if repeated.any():
         raise ValueError(_duplicate_rows_message(picked[repeated], keys))
     mean = style.overall(long_df, metrics)       # refuses your rows on another dataset
-    parts = style.per_dataset_ranks(long_df, metrics)
-    lone = style.lone_message({ds: mat.attrs.get("lone", []) for ds, mat in parts.items()})
+    # the methods and metrics of each dataset, for the warnings
+    groups = picked.groupby("dataset") if "dataset" in picked.columns else [("all", picked)]
+    parts = {ds: mat for ds, g in groups
+             if not (mat := g.pivot_table(index="method", columns="metric",
+                                          values="value")).empty}
+    lone = style.lone_message({ds: style.lone_columns(mat) for ds, mat in parts.items()})
     if lone:
         _compat.warn(lone, UserWarning)
-    # bar always ranks within each dataset: the checks of bubble(aggregate="summary")
     for msg in style.coverage_warnings(
             parts, basis=overall or "mean_overall",
             incomplete_fix=_config.hint(
                 "Pass methods= with the methods scored on every dataset.",
-                "Pass --methods with the methods scored on every dataset."),
-            stored=style.stored_datasets(long_df)):
+                "Pass --methods with the methods scored on every dataset.")):
         _compat.warn(msg, UserWarning)
-    shown = long_df if not metrics else long_df[long_df["metric"].isin(metrics)]
-    backend = style.backend_warning(shown)
+    backend = style.backend_warning(picked)
     if backend:
         _compat.warn(backend, UserWarning)
     datasets = list(parts)
     if overall is not None:                 # the 0.3 formulas, until 0.5
-        per_ds = pd.DataFrame({ds: compute_overall(mat) for ds, mat in parts.items()})
+        ranks = style.per_dataset_ranks(long_df, metrics)
+        per_ds = pd.DataFrame({ds: compute_overall(mat) for ds, mat in ranks.items()})
         mean = (per_ds.mean(axis=1) if overall == "mean_overall"
-                else compute_overall(style.mean_rank_matrix(parts)))
+                else compute_overall(style.mean_rank_matrix(ranks)))
         mean = mean.sort_values(ascending=False, kind="mergesort")
     mean = mean[::-1]                       # the best method is drawn on top
     if top:

@@ -279,7 +279,7 @@ def test_c13_e20_numbered_diagonal_folders(tmp_path, capsys):
     mtb.scan(str(_folder(tmp_path, "DIAG2", two)), "diagonal")
     out = capsys.readouterr().out
     assert "This folder holds per-batch files" in out
-    assert "[scan] Conos:" not in out                      # C13: the folder line says it
+    assert "Conos reads" not in out                        # C13: the folder line says it
     three = dict(two, **{f"{m}3.{e}": k for m, e, k in (
         ("rna", "h5", "rna"), ("atac_gas", "h5", "gas"), ("rna_cty", "csv", ""),
         ("atac_cty", "csv", ""))})

@@ -74,7 +74,7 @@ def test_x86_language_chips_and_summary_scale_have_a_legend():
     assert "Py / R: the method's language; ?: not a package method" in texts      # 0.4.0
     fig, _ = _messages(mtb.plot.bubble, d11)
     assert "Py / R: the method's language" in [t.get_text() for t in fig.axes[0].texts]
-    two = pd.concat([d11, d11.assign(dataset="D11b")])
+    two = pd.concat([d11, d11.assign(dataset="D11b")]).assign(source="user")
     fig, _ = _messages(mtb.plot.bubble, two, aggregate="summary")
     assert "(mean rank over datasets, scaled per column)" in \
         [t.get_text() for t in fig.axes[0].texts]

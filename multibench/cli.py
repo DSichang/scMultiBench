@@ -1027,9 +1027,7 @@ def _cmd_plot(args) -> int:
         # load_results and plot.bubble warn themselves; --input frames meet neither
         print("warning: The table has one method. Every rank is the same.",
               file=sys.stderr)
-    title = args.title
-    if title is None:
-        title = " ".join(x for x in (args.category, args.dataset) if x) or None
+    title = args.title                   # None: the title mtb.plot.bar / bubble give
     metrics = _csv_list(args.metrics)
     if metrics is not None and len(metrics) == 1 and metrics[0].lower() in _METRIC_FAMILIES:
         metrics = metrics[0].lower()
@@ -1984,8 +1982,7 @@ def build_parser() -> argparse.ArgumentParser:
     pp.add_argument("--group", choices=["clustering", "batch", "classification"],
                     dest="metrics", action=_Retired, tail=_compat.use("--metrics"))
     pp.add_argument("--top", type=int, action=_Retired, tail=_compat.use("--methods"))
-    pp.add_argument("--title", help="figure title (default: the category and dataset "
-                                    "given, else none)")
+    pp.add_argument("--title", help="figure title (default: the dataset)")
     pp.add_argument("--out", required=True,
                     help="figure file to write; the suffix picks the format "
                          "(.pdf, .png, .svg)")

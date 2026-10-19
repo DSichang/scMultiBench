@@ -175,8 +175,7 @@ def test_plot_warnings_on_mixed_datasets_are_capitalized_sentences():
             assert ", so " not in m.split(".")[0], m
     assert ("The rows come from 2 datasets, D11 and MYCITE, that share no method. The "
             "figure ranks unrelated rows against each other. Plot each dataset on its "
-            "own, or score the same methods on every dataset. If these datasets hold "
-            "the same cells, give their rows one dataset name first.") in seen
+            "own.") in seen
     assert ("Dataset MYCITE has only one method, PriyaNet. Its row is ranked against rows "
             "from other datasets. Plot it with methods scored on the same dataset.") in seen
     assert ("Dataset MYCITE has only one method, PriyaNet. Its rank there is always the "
@@ -185,14 +184,12 @@ def test_plot_warnings_on_mixed_datasets_are_capitalized_sentences():
             "1.0. Plot it with methods scored on the same dataset.") in seen
 
 
-def test_no_overlap_of_own_datasets_keeps_the_same_cells_sentence():
+def test_no_overlap_of_own_datasets_gives_one_action():
     from multibench.plot import style
     parts = {"MINE_A": pd.DataFrame(index=["X"]), "MINE_B": pd.DataFrame(index=["Y"])}
     assert style._no_overlap_message(parts) == (
         "The rows come from 2 datasets, MINE_A and MINE_B, that share no method. The "
-        "figure ranks unrelated rows against each other. Plot each dataset on its own, "
-        "or score the same methods on every dataset. If these datasets hold the same "
-        "cells, give their rows one dataset name first.")
+        "figure ranks unrelated rows against each other. Plot each dataset on its own.")
 
 
 def test_to_long_warning_for_scores_with_no_record_is_sentences():

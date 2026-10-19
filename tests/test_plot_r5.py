@@ -120,7 +120,7 @@ def test_figures_of_five_or_more_metrics_keep_their_size(metrics):
 
 def test_several_datasets_warning_is_plain():
     d11 = _stored("D11", "rerun", "vertical")     # a second dataset of the same methods
-    df = pd.concat([d11, d11.assign(dataset="D11b")], ignore_index=True)
+    df = pd.concat([d11, d11.assign(dataset="D11b")], ignore_index=True).assign(source="user")
     _, msgs = _messages(_build_table, df)
     assert msgs == [
         "This figure averages each method over 2 datasets, D11 and D11b. Its rows "
@@ -142,7 +142,7 @@ def test_several_datasets_warning_with_a_lone_dataset():
 def test_several_datasets_warning_cli_spelling(monkeypatch):
     monkeypatch.setattr(config, "_CLI", True)
     d11 = _stored("D11", "rerun", "vertical")     # a second dataset of the same methods
-    df = pd.concat([d11, d11.assign(dataset="D11b")], ignore_index=True)
+    df = pd.concat([d11, d11.assign(dataset="D11b")], ignore_index=True).assign(source="user")
     _, msgs = _messages(_build_table, df)
     assert msgs == [
         "This figure averages each method over 2 datasets, D11 and D11b. Its rows "

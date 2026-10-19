@@ -277,7 +277,7 @@ def test_bar_group_is_metrics_and_the_styling_keywords_keep_their_effect():
     assert msg == _msg("plot.bar(group=)", "metrics=")
     d11 = mtb.load_results("vertical")                       # one table per category (X04):
     two = pd.concat([d11, d11.assign(dataset="D11b",          # a second dataset draws dots
-                                     value=d11.value[::-1].to_numpy())])
+                                     value=d11.value[::-1].to_numpy())]).assign(source="user")
     plain = _pixels(mtb.plot.bar(two, overall="mean_overall"))
     for kw, value in (("cmap", "Reds"), ("show_datasets", False)):
         fig, msgs = _future(lambda: mtb.plot.bar(two, overall="mean_overall", **{kw: value}))

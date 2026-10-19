@@ -275,3 +275,27 @@ def test_scan_prints_no_reads_line_for_a_folder_of_numbered_batches(tmp_path, ca
     assert not [l for l in lines if " reads rna.h5" in l]
     # the table keeps what each method reads
     assert reason["Conos"].startswith("Conos reads rna.h5 and atac_gas.h5.")
+
+
+# ------------------------------------------- E18, u2 #5, u3 #11: plot.bar
+def test_the_default_bar_runs_no_rank_matrix(monkeypatch):
+    from multibench.plot import style
+
+    def boom(*a, **k):
+        raise AssertionError("the 0.3 ranks ran")
+    monkeypatch.setattr(style, "per_dataset_ranks", boom)
+    st = mtb.load_results("vertical")
+    mtb.plot.bar(st)
+    two = pd.concat([st, st.assign(dataset="D11b")]).assign(source="user")
+    _quiet(mtb.plot.bar, two, metrics="clustering")
+
+
+def test_the_command_line_bar_has_the_python_title(tmp_path, monkeypatch):
+    from matplotlib.figure import Figure
+    titles = []
+    monkeypatch.setattr(Figure, "savefig",
+                        lambda self, *a, **k: titles.append(self.axes[0].get_title("left")))
+    assert cli.main(["plot", "bar", "--category", "mosaic", "--out",
+                     str(tmp_path / "b.png")]) == 0
+    mtb.plot.bar(mtb.load_results("mosaic"), save=str(tmp_path / "p.png"))
+    assert titles == ["overall — D45", "overall — D45"]

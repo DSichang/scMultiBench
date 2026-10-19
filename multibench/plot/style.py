@@ -236,33 +236,16 @@ def overall(df: pd.DataFrame, metrics=None, *, stored=None) -> pd.Series:
     return s.sort_index(key=lambda i: i.astype(str)).sort_values(ascending=False, kind="stable")
 
 
-def stored_datasets(df: pd.DataFrame) -> tuple:
-    """Datasets that hold rows of a stored table (``source`` published or rerun).
-
-    ``()`` when the frame has no ``dataset`` or ``source`` column.
-    """
-    if not {"dataset", "source"} <= set(df.columns):
-        return ()
-    mask = df["source"].isin(STORED_SOURCES)
-    return tuple(sorted(map(str, df.loc[mask, "dataset"].dropna().unique())))
-
-
-def _no_overlap_message(parts: dict, stored=()) -> str | None:
-    """The message for datasets that share no method, else ``None``. Without
-    stored rows (``stored``: their datasets) the datasets may be two folders of
-    the same cells, so it says how to merge them."""
+def _no_overlap_message(parts: dict) -> str | None:
+    """The message for datasets that share no method, else ``None``."""
     n = len(parts)
     per_method = coverage(parts)
     if not (n > 1 and (per_method <= 1).all()):
         return None
     names = [str(ds) for ds in parts]
-    same_cells = ("" if stored else
-                  " If these datasets hold the same cells, give their rows one "
-                  "dataset name first.")
     return (f"The rows come from {n} datasets, {_and_list(names)}, that share no method. "
             f"The figure ranks unrelated rows against each other. "
-            f"Plot each dataset on its own, or score the same methods on every "
-            f"dataset.{same_cells}")
+            f"Plot each dataset on its own.")
 
 
 def _lone_method_messages(parts: dict, consequence: str) -> list:
@@ -275,20 +258,19 @@ def _lone_method_messages(parts: dict, consequence: str) -> list:
             for ds, mat in parts.items() if len(mat.index) == 1]
 
 
-def coverage_warnings(parts: dict, *, basis: str, incomplete_fix: str,
-                      stored=()) -> list:
+def coverage_warnings(parts: dict, *, basis: str, incomplete_fix: str) -> list:
     """The warnings a cross-dataset summary of ``parts`` needs, as messages.
 
-    ``parts`` is the dict from :func:`per_dataset_ranks`, ``basis`` the
-    ``overall=`` in use, ``incomplete_fix`` the caller's remedy sentence and
-    ``stored`` the datasets holding stored rows (:func:`stored_datasets`).
+    ``parts`` is ``{dataset: method x metric frame}``, as :func:`per_dataset_ranks`
+    returns, ``basis`` the ``overall=`` in use and ``incomplete_fix`` the
+    caller's remedy sentence.
     One message when no method spans two datasets, else one when a method
     misses a dataset; plus one per dataset that holds a single method.
     """
     out = []
     n = len(parts)
     per_method = coverage(parts)
-    none_shared = _no_overlap_message(parts, stored)
+    none_shared = _no_overlap_message(parts)
     if none_shared:
         out.append(none_shared)
     elif n > 1 and (per_method < n).any():
@@ -308,7 +290,7 @@ def coverage_warnings(parts: dict, *, basis: str, incomplete_fix: str,
     return out
 
 
-def dataset_mode_warnings(parts: dict, *, stored=()) -> list:
+def dataset_mode_warnings(parts: dict) -> list:
     """The warnings a figure of raw values from several datasets needs.
 
     ``aggregate="dataset"`` of ``plot.build_table``: rows from different
@@ -323,7 +305,7 @@ def dataset_mode_warnings(parts: dict, *, stored=()) -> list:
         return []
     lone = _lone_method_messages(
         parts, "its row is ranked against rows from other datasets")
-    none_shared = _no_overlap_message(parts, stored)
+    none_shared = _no_overlap_message(parts)
     if none_shared:
         return [none_shared] + lone
     msg = (f"This figure averages each method over {n} datasets, {_and_list(parts)}. "

@@ -76,9 +76,7 @@ def test_datasets_sharing_no_method_get_the_stronger_warning():
         strong = [m for m in msgs if m.startswith("The rows come from")]
         assert strong == ["The rows come from 2 datasets, D1 and MINE, that share no "
                           "method. The figure ranks unrelated rows against each other. Plot "
-                          "each dataset on its own, or score the same methods on every "
-                          "dataset. If these datasets hold the same cells, give their "
-                          "rows one dataset name first."], fn
+                          "each dataset on its own."], fn
         # it replaces the incomplete-matrix message, which says less
         assert not any(m.startswith("The summary ranks ") for m in msgs), fn
 
