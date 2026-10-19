@@ -26,8 +26,9 @@ def test_evaluate_returns_the_long_table(tmp_path):
     labels = [str(ds / "cty1.csv"), str(ds / "cty2.csv")]
     out = mtb.evaluate(emb, labels, metrics="ARI", verbose=False)
     assert list(out.columns) == LONG
+    # c1 (C16): no category given, none written
     assert out[["metric", "method", "dataset", "category", "source"]].iloc[0].tolist() == \
-        ["ARI", "embedding", "user", "user", "user"]
+        ["ARI", "embedding", "user", None, "user"]
     assert out["scored_with"].iloc[0].startswith("leidenalg/search/")
 
 
@@ -101,5 +102,5 @@ def test_to_long_is_deprecated_and_takes_the_long_table(tmp_path):
     with pytest.warns(FutureWarning, match=r"^to_long is deprecated and will be removed in "
                                            r"0\.5\. Use mtb\.evaluate"):
         again = mtb.to_long(out, method="X", dataset="D11")
-    assert again[["method", "dataset", "category"]].iloc[0].tolist() == ["X", "D11", "user"]
+    assert again[["method", "dataset", "category"]].iloc[0].tolist() == ["X", "D11", None]
     assert again["value"].tolist() == out["value"].tolist()

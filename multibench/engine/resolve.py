@@ -66,7 +66,7 @@ def _batch_column_advice() -> str:
     """Export without per-batch files, then where the batch column goes."""
     return config.hint('export without batch= and pass the column itself, as '
                        'run_all(batch=adata.obs["donor"])',
-                       "convert without --batch and pass a CSV file of barcode and batch "
+                       "export without --batch and pass a CSV file of barcode and batch "
                        "to run-all --batch")
 
 
@@ -76,8 +76,12 @@ def _one_file_advice(category: str, *, stem: str = "rna", has_adt: bool = False)
     advice = advice[:1].upper() + advice[1:] + "."
     if category == "diagonal":
         several = _several_batch_diagonal_methods()
-        also = (f" {_and_list(several)} also read several RNA and ATAC batches, written "
-                "one batch per call with "
+        counts = {len(_variant_batches(v.when.get("modalities") or []))
+                  for spec in registry.load() for v in spec.variants
+                  if v.when.get("category") == "diagonal"} - {0}
+        n = f"exactly {counts.pop()}" if len(counts) == 1 else "several"
+        also = (f" {_and_list(several)} also read {n} numbered RNA and ATAC batches, "
+                "written one batch per call with "
                 + config.hint("batch_index=", "--batch-index") + "." if several else "")
         return "Diagonal methods read one rna.h5 and one ATAC file. " + advice + also
     cross = config.hint('category="cross"', "--category cross")
@@ -290,10 +294,13 @@ def missing_dataset_message(base, dataset: str) -> str:
 
 def _note_local_folder(base: Path, name: str) -> None:
     """A warning, at every call site (the default filter shows each line once),
-    when a bare dataset name resolves under ``base`` while the working
-    directory holds a folder of the same name."""
+    when a bare dataset name resolves under the default data path while the
+    working directory holds a folder of the same name; none for a folder the
+    caller named by its path."""
     here = Path(name)
     if len(here.parts) != 1 or not here.is_dir():
+        return
+    if os.path.abspath(base) != os.path.abspath(config.DEFAULT.data_path):
         return
     if os.path.abspath(here) == os.path.abspath(base / name):
         return
@@ -1097,8 +1104,13 @@ def _preflight_caveats(resolved, *, atac: str | None = None,
     for role in renamed:
         bad = _unrewritable_peak_name(Path(resolved[role]))
         if bad is not None:
-            out.append(PEAK_NAMES_CAVEAT.format(method=who, file=Path(resolved[role]).name,
-                                                example=bad))
+            text = PEAK_NAMES_CAVEAT.format(method=who, file=Path(resolved[role]).name,
+                                            example=bad)
+            if _names_are_genes(Path(resolved[role])):
+                # gene activity exported as peaks: renaming is the wrong action
+                text = text.replace("Rename them to chr:start-end.",
+                                    "They are genes: export the ATAC as gene activity.")
+            out.append(text)
     if atac is None:
         p = Path(resolved.get("atac_gas", ""))
         if p.name and p.stem != "atac_gas":

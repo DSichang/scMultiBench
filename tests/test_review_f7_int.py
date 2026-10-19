@@ -287,7 +287,7 @@ def test_several_variants_errors_are_sentences(tmp_path, monkeypatch):
     assert msgs[1].endswith("Pass --modalities rna,adt or --modalities rna,atac.")
     monkeypatch.setattr(config, "_CLI", False)
     with pytest.raises(mtb.AmbiguousVariantError) as e:
-        mtb.params_for("Matilda")
+        mtb.params_for("Multigrate")
     msgs.append(str(e.value))
     for msg in msgs:
         for bad in (";", " - ", "e.g.", "[[", "available:"):

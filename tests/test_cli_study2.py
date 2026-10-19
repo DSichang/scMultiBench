@@ -42,7 +42,7 @@ def test_cli_params_prints_every_variant_without_a_selector(capsys):
     assert "# Matilda vertical:rna+atac: 9 tunable" in out
     header = next(l for l in out.splitlines() if l.strip().startswith("key"))
     assert header.split() == ["key", "type", "default"]      # 0.4.0: no script_default
-    assert "epochs" in out and "z_dim" in out and "--param KEY=VALUE" in out
+    assert "epochs" in out and "z_dim" in out and "--param Matilda:KEY=VALUE" in out
     tun = multibench.params_for("Matilda", "vertical", ["rna", "adt"])["tunable"]
     for k in tun:
         assert k in out

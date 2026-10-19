@@ -51,8 +51,9 @@ def test_evaluate_without_dataset_writes_user_rows(tmp_path):
     assert cli.main(["evaluate", str(path), "--labels", str(D11() / "cty.csv"),
                      "--metrics", "ARI", "--out", str(out)]) == 0
     long = pd.read_csv(out)
-    assert long[["method", "dataset", "category", "source"]].iloc[0].tolist() == \
-        ["embedding", "user", "user", "user"]
+    row = long[["method", "dataset", "category", "source"]].iloc[0]
+    assert row.tolist()[:2] == ["embedding", "user"] and row["source"] == "user"
+    assert pd.isna(row["category"])                      # c1 (C16): none given
 
 
 def test_export_writes_the_rna_from_x_by_default(tmp_path, capsys):

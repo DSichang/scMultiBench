@@ -719,8 +719,11 @@ def test_drop_names_a_lost_batch(tmp_path):
     # donor d3 has no labelled cell: two of the three batches are left
     _, said = _drop(emb, labels=_gaps(lab, at=bat == "d3"), batch=bat, **kw)
     assert said == ["Scored the 200 labelled cells of 300, from 2 of the 3 batches."]
-    # only donor d1 is labelled
-    _, said = _drop(emb, labels=_gaps(lab, at=bat != "d1"), batch=bat, **kw)
+    # only donor d1 is labelled: one batch is left, and ASW_batch is refused (c1, C11)
+    with pytest.raises(ValueError, match="needs two or more batches; every cell is in one "
+                                         "batch"):
+        _drop(emb, labels=_gaps(lab, at=bat != "d1"), batch=bat, **kw)
+    _, said = _drop(emb, labels=_gaps(lab, at=bat != "d1"), batch=bat, metrics=["ASW"])
     assert said == ["Scored the 100 labelled cells of 300, all in one batch of 3."]
     # every batch keeps a labelled cell: nothing to add
     _, said = _drop(emb, labels=_gaps(lab), batch=bat, **kw)
@@ -758,14 +761,12 @@ def test_one_labelled_batch_hides_the_other_batches_from_every_score(tmp_path):
     moved[bat != "d1"] = np.random.default_rng(1).normal(size=(200, 8)) * 9
     base = "Scored the 100 labelled cells of 300"
     hidden = ", all in one batch of 3."
-    kw = dict(labels=one, batch=bat, metrics="all")
+    # the default set: one batch with labels leaves the batch metrics out (c1, C11)
+    kw = dict(labels=one, batch=bat)
     got, said = _drop(emb, **kw)
     other, said_other = _drop(moved, **kw)
     _same(got, other)
-    # "all": classification too, NaN for the one batch with labels
-    assert got["metric"].tolist() == ["ARI", "NMI", "ASW", "iASW", "iF1", "cLISI",
-                                  "ASW_batch", "GC", "iLISI",
-                                  "OCA", "ACA", "Spec", "Sens", "F1"]
+    assert got["metric"].tolist() == ["ARI", "NMI", "ASW", "iASW", "iF1", "cLISI"]
     assert said == said_other == [base + hidden]
     # no batch metric is scored: the warning reads the same
     kw = dict(labels=one, batch=bat, metrics=["ASW"])

@@ -298,7 +298,7 @@ def describe_layout(category: str | None = None) -> str:
               config.hint("mtb.scan says which methods can run on the folder, and why "
                           "not the rest (columns runnable, reason).",
                           "multibench scan checks the files and the environment of each "
-                          "method variant (columns files_ok, env_ok)."),
+                          "method variant."),
               config.hint(
                   f"Next: mtb.scan('data/MYDATA', '{cat}'), then, on Linux, "
                   f"mtb.run_all('data/MYDATA', '{cat}', out_dir='out/')",
@@ -919,6 +919,13 @@ def _modality_matcher(modalities, named=None):
             return False
         if exact == set(mods):
             return True
+        # a variant spelled as asked is the one selected (scJoint rna+atac_gas, not
+        # its numbered batches)
+        cats = {v.when.get("category") for v in spec.variants
+                if list(v.when.get("modalities", [])) == list(mods)}
+        if any(set(v.when.get("modalities", [])) == exact for v in spec.variants
+               if v.when.get("category") in cats):
+            return False
         if any(rep and spec.atac != rep for _f, rep, _b in tokens):
             return False
         return (all(any(covers(t, r) for r in mods) for t in tokens)
@@ -1027,6 +1034,22 @@ def _every_combination(modalities) -> tuple:
     return False, modalities
 
 
+def _shown_modalities(df: "pd.DataFrame") -> "pd.DataFrame":
+    """``df`` with a folder-reading row's ``(data_dir)`` shown as the files it
+    reads (scBridge: ``rna+atac_gas``)."""
+    def files(method, category):
+        v = next((v for v in registry.get(method).variants
+                  if v.when.get("category") == category and not v.when.get("modalities")),
+                 None)
+        return "+".join(Path(str(a.const)).stem for a in (v.args if v else ())
+                        if a.const and str(a.const).endswith(".h5")) or "(data_dir)"
+    if "modalities" not in df.columns or not (df["modalities"] == "(data_dir)").any():
+        return df
+    cats = df["category"] if "category" in df.columns else [df.attrs.get("category")] * len(df)
+    return df.assign(modalities=[files(m, c) if mods == "(data_dir)" else mods
+                                 for m, c, mods in zip(df["method"], cats, df["modalities"])])
+
+
 def _row_modalities(text) -> list:
     """A scan row's ``modalities`` as a list; ``[]`` for a row that reads a folder."""
     return [] if text == "(data_dir)" else str(text).split("+")
@@ -1088,6 +1111,9 @@ def _renumber_hint(ds_dir: Path, category: str | None, mods=None) -> str:
     if len(have) < 2:
         return ""
     nums = sorted(have)
+    if nums != list(range(1, len(nums) + 1)):
+        return (f"{ds_dir.name} has batches {_and_list(nums)}: export them to a new "
+                f"folder, numbered 1 to {len(nums)}.")
     patterns = ([[modality_family(m) for m in mods]] if mods else
                 [roles for roles, _methods in batch_patterns(category)])
     for roles in patterns:
@@ -1100,8 +1126,8 @@ def _renumber_hint(ds_dir: Path, category: str | None, mods=None) -> str:
             moved = {perm[i]: have[b] for i, b in enumerate(nums)}
             if moved == want:
                 # the action first: a clipped table column still shows it
-                return (f"Renumber the batches to {_batch_desc(want)} ({ds_dir.name} has "
-                        f"{_batch_desc(have)}).")
+                return (f"Export the batches to a new folder, numbered {_batch_desc(want)} "
+                        f"({ds_dir.name} has {_batch_desc(have)}).")
     return ""
 
 
@@ -1626,9 +1652,15 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
     order = out.sort_values(["runnable", "method", "category"],
                             ascending=[False, True, True]).index
     out = out.loc[order].reset_index(drop=True)
+    out = _shown_modalities(out)
     if not several:
         out = out.drop(columns="category")
     cells = _cells_per_file(ds_dir)
+    # per-batch files where one file is read: said once for the folder
+    per_batch = "" if with_files else (
+        _resolve._per_batch_hint(ds_dir, private.attrs["category"]) or "")
+    if per_batch:
+        out["reason"] = [" ".join(r.replace(per_batch, "").split()) for r in out["reason"]]
     out.attrs = {**df.attrs, "cells": cells}
     if not verbose:
         return out
@@ -1661,12 +1693,14 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
     if cells:
         print(f"[scan] {_cells_line(cells)}", flush=True)
     renumber = "" if n_files else _renumber_hint(ds_dir, private.attrs["category"])
-    if renumber:
-        print(f"[scan] {renumber}", flush=True)
+    for once in (renumber, per_batch):
+        if once:
+            print(f"[scan] {once}", flush=True)
     if not several:                   # one category: why each method cannot run
         for method, reason in sorted(reasons):
-            # the renumber sentence was printed once above
-            reason = reason.replace(renumber, "").strip() if renumber else reason
+            # the renumber and per-batch sentences were printed once above
+            for once in (renumber, per_batch):
+                reason = reason.replace(once, "").strip() if once else reason
             if reason:
                 print(f"[scan] {method}: {reason}", flush=True)
     would = [i for i, r in df.iterrows() if _would_run(r)]
@@ -2040,11 +2074,11 @@ class BatchResult:
     records : list[dict]
         One record per method run, as ``run_all`` builds them.
     dataset : str
-        Dataset folder name the sweep ran on.
+        Dataset folder name the run used.
     category : str
-        Integration category the sweep ran under.
+        Integration category of the run.
     out_dir : path | None
-        Where the sweep wrote its outputs; ``save()`` defaults to it.
+        Where the run wrote its outputs; ``save()`` defaults to it.
 
     Attributes
     ----------
@@ -2057,7 +2091,7 @@ class BatchResult:
     category : str
         Integration category.
     out_dir : path | None
-        The sweep's output root, or ``None`` for an in-memory result.
+        The run's output root, or ``None`` for an in-memory result.
 
     Examples
     --------
@@ -2066,7 +2100,7 @@ class BatchResult:
     >>> res.summary[["method", "status", "ARI", "NMI"]]
     >>> res.failures                              # empty frame when all went well
     >>> fig = res.plot(metrics=["ARI", "NMI", "ASW"])
-    >>> res.rescore(metrics="clustering").save("out/rescored")   # nothing re-run
+    >>> res.rescore().save()                      # nothing re-run
 
     Notes
     -----
@@ -2174,8 +2208,6 @@ class BatchResult:
         See Also
         --------
         BatchResult.plot : draws the bubble figure from this frame.
-
-        mtb.to_long : the wide -> long conversion used for the metrics dict.
         """
         frames = []
         for r in self.records:
@@ -2254,7 +2286,7 @@ class BatchResult:
         ----------
         **kw
             Keyword arguments of ``mtb.plot.bubble``: ``metrics=``,
-            ``methods=``, ``order=``, ``title=``, ``save=`` ...
+            ``methods=``, ``title=`` and ``save=``.
 
         Returns
         -------
@@ -2264,7 +2296,7 @@ class BatchResult:
         Raises
         ------
         ValueError
-            Nothing was scored (see ``failures``), or an unknown name in ``order=`` / ``methods=``.
+            Nothing was scored (see ``failures``), or an unknown name in ``methods=``.
 
         Examples
         --------
@@ -2275,10 +2307,8 @@ class BatchResult:
 
         Notes
         -----
-        **Keywords.** ``metrics=`` sets the column order, ``methods=`` a
-        subset, ``order=`` the row order (unlisted methods follow best-first;
-        unknown names raise ``ValueError``). There is no default title: pass
-        ``title=`` when one is wanted.
+        **Keywords.** ``metrics=`` sets the column order and ``methods=`` a
+        subset. There is no default title: pass ``title=`` when one is wanted.
 
         **Reading the figure.** Size and colour are relative to the methods
         in this figure, so with few methods a small gap fills the whole colour
@@ -2307,7 +2337,7 @@ class BatchResult:
         Parameters
         ----------
         batch : array-like | Series | path | None
-            Batch ids in the order of ``mtb.labels_for(dataset)``, or a
+            Batch ids in the order of the dataset's label files, or a
             barcode-indexed Series or CSV. Every cell needs a batch. ``None`` =
             the batch ``run_all`` was given, else each cell's label file.
         labels : array-like | Series | path | None
@@ -2316,8 +2346,9 @@ class BatchResult:
             orders ranked as ``run_all`` ranks them.
         metrics : str | list[str] | None
             Metric family (``"clustering"``, ``"batch"``, ``"classification"``,
-            ``"all"``) or metric codes; ``None`` = every metric the batch
-            structure allows, as in ``mtb.evaluate``.
+            ``"all"``) or metric codes, which replace those scores and keep the
+            others; ``None`` = every metric the batch structure allows, as in
+            ``mtb.evaluate``.
         verbose : bool
             Print one line per method, and one before each label-order ranking.
 
@@ -2347,14 +2378,21 @@ class BatchResult:
 
         Examples
         --------
-        >>> res = mtb.load_batch("out/")
-        >>> res.rescore(metrics=["ARI", "NMI"]).summary
+        >>> mtb.load_batch("out/").rescore().save()
 
         See Also
         --------
         mtb.evaluate : the scoring function applied per record.
         BatchResult.save : persist the re-scored result.
         """
+        with warnings.catch_warnings():
+            # load_batch chose the data folder: no note on a same-named one here
+            warnings.filterwarnings("ignore", message=r"Using .*; \./.* also exists")
+            return self._rescore(batch=batch, labels=labels, metrics=metrics,
+                                 verbose=verbose)
+
+    def _rescore(self, *, batch, labels, metrics, verbose) -> "BatchResult":
+        """:meth:`rescore`, without the note on a same-named folder here."""
         import copy
         new = BatchResult([], self.dataset, self.category, out_dir=self.out_dir)
         found = [_dataset_root(r, self.dataset) for r in self.records]
@@ -2488,8 +2526,8 @@ class BatchResult:
         -------
         anndata.AnnData
             ``obsm["X_emb"]`` in the method's cell order; ``obs_names`` are
-            the cells' barcodes and ``obs`` holds each cell's ``label`` and
-            ``batch``.
+            the cells' barcodes (``cty2:AAAC...`` where batches share one) and
+            ``obs`` holds each cell's ``label`` and ``batch``.
 
         Raises
         ------
@@ -2654,13 +2692,19 @@ def _embedding_obs(rec, dataset, category, root, n, batch_text=None) -> pd.DataF
         return pd.DataFrame(index=pd.Index([str(i) for i in range(n)]))
     index = (np.concatenate([np.asarray(b, dtype=object) for b in barcodes])
              if all(b is not None for b in barcodes) else np.arange(n).astype(str))
-    obs = pd.DataFrame({"label": np.concatenate(labels), "batch": np.concatenate(batch)},
+    stems = np.concatenate(batch)
+    # one label file is one batch: no batch to name
+    obs = pd.DataFrame({"label": np.concatenate(labels),
+                        "batch": stems if len(names) > 1 else None},
                        index=pd.Index(index, dtype=object))
     if batch_text:
         saved = pd.read_csv(__import__("io").StringIO(batch_text), dtype=str,
                             keep_default_na=False)
         if "cell" in saved.columns and set(obs.index) <= set(saved["cell"]):
             obs["batch"] = saved.set_index("cell")["batch"].reindex(obs.index).to_numpy()
+    if not obs.index.is_unique:
+        # batches that share barcodes: each name gets its label file, as cty2:AAAC...
+        obs.index = pd.Index([f"{s}:{i}" for s, i in zip(stems, obs.index)], dtype=object)
     return obs
 
 
@@ -3581,7 +3625,7 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
     if assume_gpu and not dry_run:
         raise ValueError(
             "assume_gpu=True applies to a dry run only; a real run checks this "
-            "host's GPU. Pass dry_run=True, or run the sweep on the GPU node "
+            "host's GPU. Pass dry_run=True, or run it on the GPU node "
             "without assume_gpu.")
     if skip_existing and params:
         raise ValueError(
@@ -3650,6 +3694,12 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
                 if unlabelled:
                     print(f"[run_all] {unlabelled}", flush=True)
         return plan_df
+    if skip_existing:
+        # a saved output is only scored: it needs no environment
+        saved = [(Path(out_dir) / f"{r['method']}_{dataset}" / registry.get(r["method"]).select(
+            r["category"], set(_row_modalities(r["modalities"]))).output.file).exists()
+            for _, r in plan_df.iterrows()]
+        plan_df = plan_df.assign(runnable=plan_df["runnable"].to_numpy(bool) | saved)
     blocked = plan_df[~plan_df["runnable"]]
     plan_df = plan_df[plan_df["runnable"]]
     if plan_df.empty:

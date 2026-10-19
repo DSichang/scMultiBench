@@ -355,7 +355,8 @@ def params_for(method: str, category: str | None = None,
     Returns
     -------
     dict
-        ``method``, ``variant`` (``'category:mods'``), ``tunable`` (what
+        ``method``, ``variant`` (``'category:mods'``, or several that take
+        the same parameters), ``tunable`` (what
         ``params=`` can set, ``{name: {"type", "default"}}``; ``default`` is
         what a run uses when you pass nothing), ``fixed_in_script`` (what the
         script pins, with ``file:line``), ``upstream_knobs`` (what its library
@@ -367,8 +368,8 @@ def params_for(method: str, category: str | None = None,
         Unknown method, a declared stub, or no variant for ``category`` /
         ``modalities``.
     ValueError
-        Unknown ``category`` or modality token, or several variants fit (the
-        message spells out the call that selects one).
+        Unknown ``category`` or modality token, or several variants with other
+        parameters fit (the message spells out the call that selects one).
 
     Examples
     --------
@@ -421,7 +422,7 @@ def _params_for(method: str, category: str | None = None,
 
     if category is None and modalities is None:
         if len(s.variants) > 1:
-            v = _by_folder(s.variants)
+            v = _by_folder(s.variants) or _agreed(s.variants)
             if v is None:
                 keys = _and_list(_variant_key(x) for x in s.variants)
                 raise AmbiguousVariantError(
@@ -437,7 +438,7 @@ def _params_for(method: str, category: str | None = None,
             from .engine.schema import no_category_message
             raise KeyError(no_category_message(method, s.wired_categories, category))
         if len(cands) > 1:
-            v = _by_folder(cands)
+            v = _by_folder(cands) or _agreed(cands)
             if v is None:
                 mods = _and_list("+".join(x.when.get("modalities", []))
                                           for x in cands)
@@ -462,7 +463,7 @@ def _params_for(method: str, category: str | None = None,
                 f"No variant of {method} takes the modalities "
                 f"{_and_list(sorted(modalities))}. Its variants: {keys}.")
         if len(cands) > 1:
-            v = _by_folder(cands)
+            v = _by_folder(cands) or _agreed(cands)
             if v is None:
                 keys = _and_list(_variant_key(x) for x in cands)
                 raise AmbiguousVariantError(
@@ -481,7 +482,7 @@ def _params_for(method: str, category: str | None = None,
             cands = _same_types([x for x in s.variants
                                  if x.when.get("category") == category], modalities)
             if len(cands) > 1:
-                v = _by_folder(cands)
+                v = _by_folder(cands) or _agreed(cands)
                 if v is None:
                     keys = _and_list("+".join(x.when.get("modalities", [])) for x in cands)
                     raise AmbiguousVariantError(
@@ -493,11 +494,18 @@ def _params_for(method: str, category: str | None = None,
             else:
                 raise
     up = upstream.knobs_for(s.id)
-    return {"method": s.id, "variant": _variant_key(v),
-            "tunable": _tunable(v),
+    vs = v if isinstance(v, list) else [v]
+    return {"method": s.id, "variant": _and_list(_variant_key(x) for x in vs),
+            "tunable": _tunable(vs[0]),
             "fixed_in_script": up["fixed_in_script"],
             "upstream_knobs": up["upstream_knobs"],
             "upstream_url": up["upstream_url"]}
+
+
+def _agreed(variants) -> list | None:
+    """``variants`` when they take the same parameters, else ``None``."""
+    first = _tunable(variants[0])
+    return list(variants) if all(_tunable(x) == first for x in variants[1:]) else None
 
 
 def _same_types(variants, modalities) -> list:

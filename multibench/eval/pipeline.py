@@ -57,7 +57,7 @@ def _long_table(value_df, *, method: str, dataset: str | None = None,
     """The long table of a wide score frame (metrics as the index, one column
     ``Value``), its CSV, or a Series indexed by metric: one row per metric with
     the columns of ``mtb.load_results`` plus ``scored_with``. ``dataset=None``
-    writes ``"all"``, ``category=None`` writes ``"user"``."""
+    writes ``"all"``, ``category=None`` leaves the column empty."""
     if category is not None:
         config.category_folder(category)        # "verticall" is refused here
     if isinstance(value_df, (str, Path)):
@@ -112,7 +112,7 @@ def _long_table(value_df, *, method: str, dataset: str | None = None,
             f"map to the same canonical metric (e.g. 'ari' and 'ARI'); drop one")
     out["method"] = method
     out["dataset"] = "all" if dataset is None else dataset
-    out["category"] = "user" if category is None else category
+    out["category"] = category
     out["source"] = "user"
     stamp = _scored_with(getattr(value_df, "attrs", None))
     out["scored_with"] = UNKNOWN_SCORING if stamp is None else stamp
@@ -1224,6 +1224,11 @@ def _scores(
             shown = _as_written(batch, adata, ids, what="batch")
             raise ValueError(_no_batch_error(
                 ba if shown is None else np.asarray(shown)[keep], no_batch, batch))
+    if group in ("batch", "all") and len(set(np.asarray(ba).astype(str).tolist())) < 2:
+        # batch metrics on one batch: NaN, or a GC of 1.0
+        if metrics is not None:
+            raise ValueError(_classification_error(metrics, "one batch"))
+        group = "clustering"
     odd = io._labels_look_measured(ct)
     if odd:
         # evaluate <- its keyword wrapper <- the caller

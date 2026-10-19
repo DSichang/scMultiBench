@@ -45,18 +45,20 @@ def test_method_info_supports_exposes_labels():
 
 
 def test_params_for_ambiguity_is_valueerror_with_the_exact_call():
+    # c1 (C09): variants with the same parameters answer together; Multigrate's differ
+    assert mtb.params_for("Matilda")["variant"] == (
+        "vertical:rna+adt, vertical:rna+atac and vertical:rna+adt+atac")
     with pytest.raises(ValueError) as e:
-        mtb.params_for("Matilda")
+        mtb.params_for("Multigrate")
     assert isinstance(e.value, AmbiguousVariantError) and isinstance(e.value, KeyError)
     msg = str(e.value)
     assert ("Pass the category and modalities of one, for example "
-            "params_for('Matilda', 'vertical', ['rna', 'adt']).") in msg
-    assert "vertical:rna+adt, vertical:rna+atac and vertical:rna+adt+atac" in msg
+            "params_for('Multigrate', 'mosaic', ['rna1', 'rna2', 'adt2', 'adt3']).") in msg
     with pytest.raises(ValueError) as e:
-        mtb.params_for("Matilda", "vertical")
+        mtb.params_for("Multigrate", "mosaic")
     assert ("Pass the modalities too, for example "
-            "params_for('Matilda', 'vertical', ['rna', 'adt']).") in str(e.value)
-    assert "Matilda has 3 vertical variants, rna+adt, rna+atac and rna+adt+atac." in str(e.value)
+            "params_for('Multigrate', 'mosaic', ['rna1', 'rna2', 'adt2', 'adt3']).") in str(e.value)
+    assert "Multigrate has 4 mosaic variants" in str(e.value)
     # scMM's vertical variant reads the atac role since 0.4.0 (X13); unknown
     # category stays KeyError
     assert mtb.params_for("scMM", "vertical", ["rna", "atac"])["variant"] == "vertical:rna+atac"
@@ -77,12 +79,12 @@ def test_params_for_dataset_disambiguates_by_folder(tmp_path):
     (d / "atac.h5").write_text("")
     assert mtb.params_for("Matilda", dataset="D11",
                           data_path=tmp_path)["variant"] == "vertical:rna+adt+atac"
-    # two satisfiable variants that are not nested -> still ambiguous
-    with pytest.raises(ValueError, match="Pass the category and modalities of one"):
-        mtb.params_for("VIMCCA", dataset="D11", data_path=tmp_path)
+    # two satisfiable variants that are not nested, with the same parameters: both
+    assert mtb.params_for("VIMCCA", dataset="D11", data_path=tmp_path)["variant"] == \
+        "vertical:rna+adt and vertical:rna+atac"
     # missing folder settles nothing
     with pytest.raises(ValueError):
-        mtb.params_for("Matilda", dataset="D99", data_path=tmp_path)
+        mtb.params_for("Multigrate", dataset="D99", data_path=tmp_path)
     # dataset= is deprecated in 0.4.0: it keeps its effect and is out of the docs
     doc = mtb.params_for.__doc__
     assert "dataset" not in doc and "Returns" in doc and "Raises" in doc

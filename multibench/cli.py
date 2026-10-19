@@ -555,7 +555,11 @@ def _cmd_convert(args) -> int:
     unless another flag reads X. Its deprecated name ``convert`` writes one
     canonical ``.h5`` (``to_canonical``) without any :data:`_EXPORT_FLAGS` flag."""
     mode1 = any(getattr(args, f) is not None for f in ("modality", "layer", "obsm", "mod"))
+    if isinstance(args.rna, str) and args.rna.lower() == "none":   # export_dataset(rna=None)
+        args.rna = None
+        args._no_rna = True
     if getattr(args, "_export", False) and args.rna is None and not mode1 \
+            and not getattr(args, "_no_rna", False) \
             and not any(map(_reads_x, (args.adt, args.atac))) \
             and Path(args.src).suffix.lower() != ".h5mu":
         args.rna = "X"                      # as mtb.io.export_dataset(rna="X")
@@ -637,7 +641,8 @@ def _cmd_convert(args) -> int:
         # a batch of a mosaic or cross folder may hold no RNA by design
         one_batch = category in ("mosaic", "cross") and args.batch_index is not None
         has_rna = any(re.fullmatch(r"rna\d*\.h5", n) for n in after)
-        if args.rna is None and not one_batch and not has_rna and (
+        if args.rna is None and not one_batch and not has_rna \
+                and not getattr(args, "_no_rna", False) and (
                 args.adt is not None or args.atac is not None or args.atac_from is not None):
             print("# No RNA written: pass --rna X (or a layer) to write it.",
                   file=sys.stderr)
@@ -810,7 +815,7 @@ def _cmd_params(args) -> int:
             frames.append(tbl)
             continue
         print(f"# {p['method']} {p['variant']}: {len(tun)} tunable parameter(s) "
-              f"(set with --param KEY=VALUE)")
+              f"(set with --param {p['method']}:KEY=VALUE)")
         if len(tun):
             _print_frame(tbl.drop(columns=["variant"]), fmt="table")
         else:
@@ -1709,7 +1714,7 @@ def _export_arguments(pc) -> None:
                     "atac_gas.h5, and the labels as rna_cty.csv and atac_cty.csv. "
                     "mosaic writes atac<i>.h5.")
     pc.add_argument("--rna", help="where the raw-count RNA matrix lives: X (default), "
-                                  "obsm:<key>, layer:<key> or mod:<name>. Append "
+                                  "obsm:<key>, layer:<key>, mod:<name>, or none. Append "
                                   "[<var column>=<value>] to keep some features, e.g. "
                                   "\"X[feature_types=Gene Expression]\"")
     pc.add_argument("--adt", help="the ADT matrix, as for --rna, e.g. obsm:protein")
@@ -1957,7 +1962,7 @@ def build_parser() -> argparse.ArgumentParser:
                     "multibench evaluate and multibench run-all write them), or both: "
                     "--input together with --category adds your rows to the stored "
                     "results.")
-    pp.add_argument("kind", choices=["bubble", "bar"],
+    pp.add_argument("kind", choices=["bubble", "bar"], metavar="{bubble,bar}",
                     help="bubble: paper-style bubble table (methods x metrics, best "
                          "first, Overall bars per family) | bar: one bar per method "
                          "with its across-dataset Overall score")

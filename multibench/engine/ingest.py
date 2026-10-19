@@ -1,18 +1,7 @@
-"""Adapt arbitrary input formats to the canonical scMultiBench .h5.
+"""Write your data as a dataset folder (:func:`export_dataset`); read one of its
+files (:func:`read_canonical`).
 
 Canonical layout: matrix/data (features x cells), matrix/features, matrix/barcodes.
-
-Entry points (exposed as ``mtb.io``):
-
-* :func:`to_canonical` - one matrix (AnnData / .h5ad / .h5mu / .csv / .tsv /
-  .loom) -> one canonical ``.h5``; sparse-safe, gzip-compressed, with
-  ``modality=`` / ``layer=`` / ``obsm=`` / ``mod=`` selectors.
-* :func:`export_dataset` - a whole AnnData/MuData -> a canonical dataset folder
-  (``rna.h5``, ``adt.h5``, the ATAC file, ``cty.csv``), optionally per batch
-  (``rna1.h5`` ...) or as unpaired diagonal data. A MuData's modalities can
-  be named directly (``rna='rna'``).
-* :func:`read_canonical` - the inverse (canonical ``.h5`` -> AnnData).
-
 Label files are single-column CSVs: a header ``x``, then one label per cell.
 """
 from __future__ import annotations
@@ -1040,9 +1029,20 @@ def _case_hint(col, columns) -> str:
     return f" Did you mean {same[0]!r}?" if len(same) == 1 else ""
 
 
+def _vertical_gene_activity_readers() -> list:
+    """The methods with a vertical variant that reads gene-activity ATAC."""
+    from . import registry
+    return [s.id for s in registry.load() if s.atac == "gene_activity"
+            and any(v.when.get("category") == "vertical"
+                    and any(str(m).startswith("atac") for m in v.when.get("modalities", []))
+                    for v in s.variants)]
+
+
 def _obs_column(obs, col, *, what, spec, where):
     if col not in obs.columns:
-        raise KeyError(f"{what}={spec!r}: column {col!r} not in obs: searched {where}; "
+        head = config.hint(f"{what}={spec!r}", f"--{what} {spec}")
+        where = config.hint(where, "the obs of the file") if where == "data.obs" else where
+        raise KeyError(f"{head}: column {col!r} not in obs: searched {where}; "
                        f"available: {list(obs.columns)}"
                        + (f".{hint}" if (hint := _case_hint(col, obs.columns)) else ""))
     return obs[col]
@@ -1260,6 +1260,10 @@ def _align_cells(a, *, master, master_name, role, category=None):
                                          f"the {who} names.")
                 if category == "vertical":
                     raise ValueError(f"{head} Make the names match.")
+                if category == "mosaic":
+                    raise ValueError(
+                        f"{head} Make the names match; for a batch with RNA only, export "
+                        "it without " + config.hint("atac=", "--atac") + ".")
                 raise ValueError(
                     f"{head} Make the names match; for different cells pass "
                     + config.hint('category="diagonal"', "--category diagonal") + ".")
@@ -1459,7 +1463,12 @@ def _export_dataset(data, dataset_dir: Path | str, *, rna="X",
             f"atac_kind= must be one of {list(_ATAC_KINDS)} (got {atac_kind!r}): "
             "'peak' -> atac_peak.h5 (+atac.h5), 'gene_activity' -> atac_gas.h5")
     if atac is None and atac_kind is not None:
-        raise ValueError("atac_kind= given without atac=")
+        raise ValueError(config.hint("atac_kind= given without atac=",
+                                     "--atac-kind given without --atac"))
+    if category == "vertical" and atac is not None and atac_kind == "gene_activity" \
+            and not _vertical_gene_activity_readers():
+        raise ValueError("Vertical methods need peak ATAC, and this ATAC holds gene "
+                         "activity. Export the ATAC as peaks.")
     if rna is None and adt is None and atac is None and labels is None:
         raise ValueError("nothing to export: give at least one of rna=, adt=, atac=, labels=")
     _check_batch_args(batch, batch_index, category, adt=adt, atac=atac, n_batches=n_batches)

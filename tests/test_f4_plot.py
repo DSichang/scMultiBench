@@ -92,9 +92,9 @@ def _incomplete():
 def test_incomplete_matrix_warning_is_short_sentences():
     _, msgs = _messages(_build_table, _incomplete(), aggregate="summary")
     (msg,) = [m for m in msgs if m.startswith("The summary ranks")]
-    assert msg == ("The summary ranks 2 datasets. C has scores on 1 of them. With "
-                   "overall='rank', a missing dataset counts as rank 0, the lowest. "
-                   "With overall='mean_overall', the missing dataset is left out. "
+    # c1 (C21): one sentence, without the cut overall=
+    assert msg == ("The summary ranks 2 datasets. C has scores on 1 of them. A missing "
+                   "dataset counts as rank 0, the lowest. "
                    "Pass methods= with the methods scored on every dataset.")
     assert ";" not in msg and "under" not in msg
     _, msgs = _messages(mtb.plot.bar, _incomplete())
@@ -118,7 +118,7 @@ def test_incomplete_matrix_cli_spelling(tmp_path, capsys):
     assert cli.main(["plot", "bubble", "--input", str(p), "--aggregate", "summary",
                      "--out", str(tmp_path / "f.png")]) == 0
     err = capsys.readouterr().err
-    assert "With --overall rank, a missing dataset counts as rank 0, the lowest." in err
+    assert "A missing dataset counts as rank 0, the lowest." in err
     assert "Pass --methods with the methods scored on every dataset." in err
 
 
@@ -335,9 +335,9 @@ def test_batch_advice_names_run_all_and_evaluate(monkeypatch):
     several = resolve._several_batch_diagonal_methods()
     assert sorted(several) == ["GLUE", "iNMF", "online_iNMF", "scJoint"]
     assert resolve._one_file_advice("diagonal") == (
-        "Diagonal methods read one rna.h5 and one ATAC file. Convert without --batch "
+        "Diagonal methods read one rna.h5 and one ATAC file. Export without --batch "
         "and pass a CSV file of barcode and batch to run-all --batch. "
-        f"{resolve._and_list(several)} also read several RNA and ATAC batches, written "
+        f"{resolve._and_list(several)} also read exactly 3 numbered RNA and ATAC batches, written "
         "one batch per call with --batch-index.")
 
 

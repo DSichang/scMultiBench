@@ -486,7 +486,7 @@ def load_results(
 
     The stored results are the package's own runs of its methods on the
     benchmark datasets, scored with ``mtb.evaluate``. The table concatenates
-    with ``mtb.to_long`` rows of your own.
+    with the long table ``mtb.evaluate`` returns.
 
     Parameters
     ----------
@@ -495,7 +495,7 @@ def load_results(
         ``cross``); ``None`` = every category.
     dataset : str or list of str
         Dataset id(s), e.g. ``"D11"`` or ``["D11", "D28"]``; ``None`` = every
-        dataset of the category. ``mtb.results_coverage`` lists them.
+        dataset of the category. ``mtb.catalog.datasets()`` lists them.
     methods : str or list of str
         Method(s) to keep, in any case or spelling (``"mofa+"`` -> ``MOFA2``);
         ``None`` = every method.
@@ -535,8 +535,7 @@ def load_results(
 
     See Also
     --------
-    mtb.results_coverage : which methods have scores on which dataset.
-    mtb.to_long : turns ``mtb.evaluate`` scores into this shape.
+    mtb.evaluate : scores your own embedding into this shape.
     mtb.plot.bubble : draws the table.
     """
     return _load_results_kept(category, dataset=dataset, methods=methods, metrics=metrics)
@@ -1168,10 +1167,9 @@ def _recommend(
     rows = []
     for m in keep_methods + missing:
         scored = m in grand.index
-        try:
-            spec = registry.get(catalog._canonical_id(m))
-        except KeyError:
-            spec = None
+        # '<id> (this run)' takes the chips of its method
+        own = registry.method_of(m)
+        spec = registry.get(own) if own else None
         if spec is not None:
             in_category = [v for v in spec.variants if v.when.get("category") == category]
             env = envs.group_for(spec.id)

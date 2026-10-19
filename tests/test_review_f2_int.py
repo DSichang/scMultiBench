@@ -358,7 +358,7 @@ def test_caveat_clauses_join_as_sentences():
 def test_cli_messages_name_commands_not_python_calls(tmp_path, capsys):
     rc = cli.main(["params", "Matilda"])
     out = capsys.readouterr().out
-    assert rc == 0 and "(set with --param KEY=VALUE)" in out
+    assert rc == 0 and "(set with --param Matilda:KEY=VALUE)" in out
     assert "run(params" not in out and "mtb.params_for" not in out
     # sciPENN has one cross row, so the header speaks of methods (UINMF has six rows);
     # 0.4: the header is one sentence and names no deprecated command

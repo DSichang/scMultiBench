@@ -262,7 +262,8 @@ def test_read_labels_reads_cty_and_obs_exports(tmp_path):
     assert list(io.read_labels(q)) == ["T", "B"]
 
 
-def test_batch_result_plot_docstring_mentions_order():
+def test_batch_result_plot_docstring_names_the_kept_keywords():
+    # c1 (C05): bubble has no order= since 0.4.0
     import inspect
     doc = inspect.getdoc(mtb.BatchResult.plot)
-    assert "order=" in doc and "unknown names raise" in doc
+    assert "order=" not in doc and "``methods=``" in doc

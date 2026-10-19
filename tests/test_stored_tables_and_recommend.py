@@ -53,7 +53,7 @@ def test_x04_bar_of_one_dataset_has_no_whiskers():
     fig = mtb.plot.bar(mtb.load_results("diagonal"), overall="mean_overall")
     ax = fig.axes[0]
     assert ax.get_title(loc="left") == "overall — D28"
-    assert ax.get_xlabel() == "overall score (D28)"
+    assert ax.get_xlabel() == "overall score, scaled 0-1 (D28)"
     from matplotlib.collections import LineCollection
     assert not [c for c in ax.collections if isinstance(c, LineCollection)
                 and len(c.get_segments())]

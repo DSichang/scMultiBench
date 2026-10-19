@@ -161,9 +161,9 @@ def test_x79_scan_names_the_batch_renumbering(tmp_path, capsys, monkeypatch):
     monkeypatch.chdir(tmp_path)
     mtb.scan("./MYMOSAIC", "mosaic")
     out = capsys.readouterr().out
-    assert ("[scan] Renumber the batches to 1 RNA, 2 RNA+ATAC, 3 ATAC (MYMOSAIC has "
+    assert ("[scan] Export the batches to a new folder, numbered 1 RNA, 2 RNA+ATAC, 3 ATAC (MYMOSAIC has "
             "1 RNA+ATAC, 2 RNA, 3 ATAC).") in out
-    assert out.count("Renumber the batches") == 1                  # Z20 (r3): once
+    assert out.count("Export the batches to a new folder") == 1                  # Z20 (r3): once
 
 
 def test_x11_a_local_folder_shadowed_by_the_data_path_is_named(tmp_path, monkeypatch):
@@ -203,7 +203,7 @@ def test_mosaic_batches_numbered_wrong_say_renumber_in_the_reason(tmp_path, caps
               "cty3.csv"):
         (d / f).write_text("")
     # r3: the action first, so a clipped column keeps it
-    hint = "Renumber the batches to 1 RNA, 2 RNA+ATAC, 3 ATAC (MOSBAD has 1 RNA+ATAC, 2 RNA, 3 ATAC)."
+    hint = "Export the batches to a new folder, numbered 1 RNA, 2 RNA+ATAC, 3 ATAC (MOSBAD has 1 RNA+ATAC, 2 RNA, 3 ATAC)."
     plan = mtb.run_all(str(d), "mosaic", methods=["Cobolt"], out_dir=str(tmp_path / "o"),
                        dry_run=True, verbose=False)
     assert plan.loc[0, "reason"].startswith(hint)
@@ -212,7 +212,7 @@ def test_mosaic_batches_numbered_wrong_say_renumber_in_the_reason(tmp_path, caps
               "--format", "csv"])
     assert hint in capsys.readouterr().out
     cli.main(["scan", str(d), "--category", "mosaic", "--methods", "Cobolt"])
-    assert "Renumber the batches" in capsys.readouterr().out          # the clipped table
+    assert "Export the batches to a new folder" in capsys.readouterr().out          # the clipped table
 
 
 # X23: scan, run_all and the command line say the same, without counts

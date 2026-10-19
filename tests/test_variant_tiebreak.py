@@ -114,8 +114,9 @@ def test_variants_that_are_not_nested_stay_ambiguous(tmp_path, method):
     assert f"{method} has 2 vertical variants, rna+adt and rna+atac." in msg
     assert f"The folder {d} has every input file of both." in msg
     assert "modalities=['rna', 'adt']" in msg
-    with pytest.raises(mtb.AmbiguousVariantError):
-        mtb.params_for(method, "vertical", dataset="TRI", data_path=tmp_path)
+    # c1 (C09): the two take the same parameters
+    assert " and " in mtb.params_for(method, "vertical", dataset="TRI",
+                                     data_path=tmp_path)["variant"]
     got = mtb.inputs_for("TRI", "vertical", method, modalities=["rna", "atac"],
                          data_path=tmp_path)
     assert set(got) == {"rna", "atac"}

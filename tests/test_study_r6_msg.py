@@ -531,7 +531,7 @@ def test_notes_passages_have_no_dash_insertions():
         mtb.BatchResult, mtb.run, mtb.io.export_dataset,
         mtb.BatchResult.rescore, mtb.recommend)}
     assert "the label orderings tried (``label_order_candidates``)" in flat[mtb.BatchResult]
-    assert "Batch ids in the order of ``mtb.labels_for(dataset)``" in \
+    assert "Batch ids in the order of the dataset's label files" in \
         flat[mtb.BatchResult.rescore]
     for doc in flat.values():
         assert " - the evidence" not in doc and "- the flags" not in doc

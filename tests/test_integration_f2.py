@@ -109,10 +109,8 @@ def test_incomplete_matrix_warning_names_the_overall_flag_on_the_cli(monkeypatch
                     if m.startswith("The summary ranks "))
     monkeypatch.setattr(config, "_CLI", False)
     py = incomplete()
-    assert "With overall='rank', a missing dataset counts as rank 0" in py
-    assert "With overall='mean_overall', the missing dataset is left out." in py
+    assert "A missing dataset counts as rank 0, the lowest." in py      # c1 (C21)
+    assert "overall=" not in py
     monkeypatch.setattr(config, "_CLI", True)
     cli = incomplete()
-    assert "With --overall rank, a missing dataset counts as rank 0" in cli
-    assert "With --overall mean_overall, the missing dataset is left out." in cli
-    assert "overall='" not in cli
+    assert "--overall" not in cli and "overall='" not in cli

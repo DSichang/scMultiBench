@@ -118,7 +118,7 @@ def test_batch_with_vertical_or_diagonal_is_refused_before_writing(tmp_path):
     for cat, read, tail in (
             ("vertical", "one rna.h5", 'For RNA+ADT batches, use category="cross".'),
             ("diagonal", "one rna.h5 and one ATAC file",
-             "scJoint, GLUE, iNMF and online_iNMF also read several RNA and ATAC batches, "
+             "scJoint, GLUE, iNMF and online_iNMF also read exactly 3 numbered RNA and ATAC batches, "
              "written one batch per call with batch_index=.")):
         with pytest.raises(ValueError) as ei:
             ingest.export_dataset(a, tmp_path / cat, adt="obsm:protein", batch="obs:batch",

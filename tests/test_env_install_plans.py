@@ -68,7 +68,8 @@ def test_x27_x26_install_acts_by_default_and_returns_a_frame(monkeypatch):
 
 def test_x25_packed_is_build():
     with pytest.warns(FutureWarning, match=r"^env\.install\(packed=\) is deprecated and "
-                                           r"will be removed in 0\.5\. Use build=\.$"):
+                                           r"will be removed in 0\.5; packed=True has no effect, and "
+                                           r"packed=False is build=True\.$"):
         old = mtb.env.install(["SCALEX"], packed=False, dry_run=True)
     new = mtb.env.install(["SCALEX"], build=True, dry_run=True)
     pd.testing.assert_frame_equal(old, new)

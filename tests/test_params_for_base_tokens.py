@@ -19,9 +19,10 @@ def test_base_tokens_select_the_variant(cat, mods, key):
     assert mtb.params_for("Multigrate", cat, mods)["variant"] == key
 
 
-def test_several_variants_of_those_tokens_are_ambiguous():
-    with pytest.raises(mtb.AmbiguousVariantError, match=r"^StabMap has 2 mosaic variants"):
-        mtb.params_for("StabMap", "mosaic", ["rna", "adt", "atac"])
+def test_several_variants_of_those_tokens_answer_together():
+    # c1 (C09): they take the same parameters
+    assert mtb.params_for("StabMap", "mosaic", ["rna", "adt", "atac"])["variant"] == (
+        "mosaic:rna1+rna2+rna3+adt1+atac2 and mosaic:rna1+rna2+adt1+adt3+atac2")
 
 
 def test_tokens_no_variant_reads_still_raise():

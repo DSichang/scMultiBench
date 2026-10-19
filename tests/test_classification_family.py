@@ -145,14 +145,13 @@ def test_explicit_without_two_batches_is_an_error(three):
         "batch=<vector>, or labels as a list of two or more files.")
 
 
-def test_all_with_one_batch_gives_nan_and_one_warning(three):
+def test_all_with_one_batch_is_refused(three):
+    # c1 (C11): the batch metrics on one batch are refused, as classification is
     emb, paths = three
-    df, said = _caught(mtb.evaluate, emb[:30], labels=paths[0], batch=["d1"] * 30,
-                       metrics="all", verbose=False)
-    assert df["metric"].tolist()[-5:] == CODES and _values(df)[CODES].isna().all()
-    mine = [m for m in said if "OCA" in m]
-    assert mine == ["OCA, ACA, Spec, Sens and F1 are NaN: every cell is in one batch. "
-                    "Pass batch= with two or more batches."]
+    with pytest.raises(ValueError, match=r"^metrics='all' needs two or more batches; every "
+                                         r"cell is in one batch\."):
+        mtb.evaluate(emb[:30], labels=paths[0], batch=["d1"] * 30, metrics="all",
+                     verbose=False)
 
 
 def test_a_graph_output(three, tmp_path):

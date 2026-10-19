@@ -253,7 +253,6 @@ def coverage_warnings(parts: dict, *, basis: str, incomplete_fix: str,
     One message when no method spans two datasets, else one when a method
     misses a dataset; plus one per dataset that holds a single method.
     """
-    from .. import config
     out = []
     n = len(parts)
     per_method = coverage(parts)
@@ -268,12 +267,9 @@ def coverage_warnings(parts: dict, *, basis: str, incomplete_fix: str,
         seen = " ".join(
             f"{_and_list(ms)} {'has' if len(ms) == 1 else 'have'} scores on {c} of them."
             for c, ms in by_count.items())
-        out.append(
-            f"The summary ranks {n} datasets. {seen} With "
-            + config.hint("overall='rank'", "--overall rank")
-            + ", a missing dataset counts as rank 0, the lowest. With "
-            + config.hint("overall='mean_overall'", "--overall mean_overall")
-            + ", the missing dataset is left out. " + incomplete_fix)
+        missing = ("A missing dataset is left out." if basis == "mean_overall"
+                   else "A missing dataset counts as rank 0, the lowest.")
+        out.append(f"The summary ranks {n} datasets. {seen} {missing} {incomplete_fix}")
     out += _lone_method_messages(
         parts, "its Overall there is always 1.0" if basis == "mean_overall"
         else "its rank there is always the lowest")

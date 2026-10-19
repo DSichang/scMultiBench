@@ -1357,7 +1357,9 @@ def _frame(rows: list[dict], first: tuple):
 
 
 @_compat.keywords("env.install", private="_install",
-                  kept={"packed": _compat.use("build="), "conda": _compat.use("conda on PATH")},
+                  kept={"packed": _compat.note(
+                      "packed=True has no effect, and packed=False is build=True"),
+                        "conda": _compat.use("conda on PATH")},
                   hidden=("force",))
 def install(methods: list[str] | None = None, *, category: str | None = None,
             dry_run: bool = False, flavor: str = "auto", build: bool = False):
