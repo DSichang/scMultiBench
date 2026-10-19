@@ -645,23 +645,33 @@ def _atac_kind_of(path: Path) -> str:
     return "ATAC"
 
 
-def _missing_files_reason(spec, category: str, mods: list, dataset: str,
-                          data_path) -> str:
-    """The ``reason`` for input files that are not on disk, or ``""``: ``SCALEX needs
-    gene-activity ATAC (atac_gas.h5), and the folder has peaks (atac_peak.h5).``"""
+def _reads_one_of_numbered(missing, category: str) -> bool:
+    """A diagonal method that reads one file of a folder of numbered batches
+    (``rna.h5`` next to ``rna1.h5``): scan's folder line covers it."""
+    return category == "diagonal" and any(
+        p.suffix == ".h5" and (p.parent / f"{p.stem}1.h5").is_file() for p in missing)
+
+
+def _missing_paths(spec, category: str, mods: list, dataset: str, data_path) -> dict:
+    """``{role: path}`` of the input files of a variant that are not on disk; ``{}``
+    when its inputs cannot be resolved (the caller keeps the exception text)."""
     try:
         paths = _resolve.inputs_for(dataset, category, spec.id, modalities=mods or None,
                                     data_path=data_path, check=False)
     except Exception:           # noqa: BLE001 - fall back to the exception text
-        return ""
+        return {}
+    return {r: Path(p) for r, p in paths.items() if not Path(p).exists()}
+
+
+def _missing_files_reason(spec, category: str, mods: list, dataset: str,
+                          data_path) -> str:
+    """The ``reason`` for input files that are not on disk, or ``""``: ``SCALEX needs
+    gene-activity ATAC (atac_gas.h5), and the folder has peaks (atac_peak.h5).``"""
     from .engine.schema import is_label_role
-    missing = {r: Path(p) for r, p in paths.items() if not Path(p).exists()}
+    missing = _missing_paths(spec, category, mods, dataset, data_path)
     if not missing:
         return ""
-    numbered = [p for p in missing.values() if p.suffix == ".h5"
-                and (p.parent / f"{p.stem}1.h5").is_file()]
-    if numbered and category == "diagonal":
-        # a folder of numbered batches: the folder line says what to do
+    if _reads_one_of_numbered(missing.values(), category):
         names = [p.name for p in missing.values() if p.suffix == ".h5"]
         return f"{spec.id} reads {_and_list(names)}."
     atac_parts, other = [], []
@@ -1415,7 +1425,8 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
                "command": ""}
         # check 1, files: both the script and the dataset files, so neither hides
         # the other. files_reason keeps the full text; reason the short form.
-        file_problems, short_problems = [], []
+        # folder_only: said by scan's folder line, not on the method's own line
+        file_problems, short_problems, folder_only = [], [], []
         why_script = _missing_script(v, method=spec.id)
         if why_script:
             file_problems.append(why_script)
@@ -1436,10 +1447,13 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
         except Exception as e:  # missing files, no variant, bad layout
             full = f"{type(e).__name__}: {e}"
             file_problems.append(full)
-            short_problems.append(
-                _renumber_hint(ds_dir, cat, mods)
-                or _missing_files_reason(spec, cat, mods, dataset, data_path)
-                or _short_reason(full, spec.id, dataset))
+            short = (_renumber_hint(ds_dir, cat, mods)
+                     or _missing_files_reason(spec, cat, mods, dataset, data_path)
+                     or _short_reason(full, spec.id, dataset))
+            short_problems.append(short)
+            if _reads_one_of_numbered(
+                    _missing_paths(spec, cat, mods, dataset, data_path).values(), cat):
+                folder_only.append(short)
         if file_problems:
             rec["files_ok"], rec["files_reason"] = False, " ".join(file_problems)
         env_hint = gpu_hint = ""
@@ -1463,7 +1477,8 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
         # the ATAC reason ends with its override, so it comes last
         rec["reason"] = _join_sentences([wrong_ref, *short_problems, rec["env_reason"],
                                          wrong_atac])
-        rec["_other"] = _join_sentences([wrong_ref, *short_problems,
+        rec["_other"] = _join_sentences([wrong_ref, *(p for p in short_problems
+                                                      if p not in folder_only),
                                          gpu_hint if off_linux else rec["env_reason"],
                                          wrong_atac])
         # the command line, also for an env-blocked row; setup steps go to caveat
@@ -1704,11 +1719,6 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
             # the renumber and per-batch sentences were printed once above
             for once in (renumber, per_batch):
                 reason = reason.replace(once, "").strip() if once else reason
-            # "X reads rna.h5 and atac_gas.h5.": the folder line says what to do
-            if (renumber or per_batch) and re.match(
-                    rf"{re.escape(method)} reads [^ ,]+(, [^ ,]+)*( and [^ ,]+)?\.( |$)",
-                    reason):
-                continue
             if reason:
                 print(f"[scan] {method}: {reason}", flush=True)
     would = [i for i, r in df.iterrows() if _would_run(r)]

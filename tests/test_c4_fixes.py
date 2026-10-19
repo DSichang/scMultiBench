@@ -246,3 +246,32 @@ def test_noise_snaps_to_the_stored_value_of_the_same_method_only():
                                                  value=lambda d: d["value"] + 5e-7)
     s = overall(pd.concat([st, other]), ["NMI_batch"])
     assert s["mine"] > s["MultiVI"]
+
+
+# ------------------------------------------- minimal #4: scan's per-method "reads" lines
+def _diag(tmp_path, batches):
+    import anndata as ad
+    rng = np.random.default_rng(0)
+    d = tmp_path / f"DIAG{batches}"
+    for b in range(1, batches + 1):
+        rna = ad.AnnData(rng.poisson(1, (30, 20)).astype(float))
+        rna.obs_names = [f"r{b}_{i}" for i in range(30)]
+        rna.var_names = [f"G{i}" for i in range(20)]
+        rna.obs["celltype"] = ["T", "B"] * 15
+        atac = rna.copy()
+        atac.obs_names = [f"a{b}_{i}" for i in range(30)]
+        _quiet(mtb.io.export_dataset, rna, d, atac=atac, atac_kind="gene_activity",
+               labels="obs:celltype", category="diagonal", batch_index=b)
+    return d
+
+
+@pytest.mark.parametrize("batches", [2, 3])
+def test_scan_prints_no_reads_line_for_a_folder_of_numbered_batches(tmp_path, capsys,
+                                                                     batches):
+    d = _diag(tmp_path, batches)
+    capsys.readouterr()
+    reason = mtb.scan(d, "diagonal").set_index("method")["reason"]
+    lines = capsys.readouterr().out.splitlines()
+    assert not [l for l in lines if " reads rna.h5" in l]
+    # the table keeps what each method reads
+    assert reason["Conos"].startswith("Conos reads rna.h5 and atac_gas.h5.")
