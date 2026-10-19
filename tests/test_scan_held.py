@@ -181,7 +181,10 @@ def test_scan_and_dry_run_are_one_table(ds, cat, mods, capsys):
     would = scan[[W._would_run(r) for _, r in scan.iterrows()]]
     nested = W._nested_rows(would)[0]
     assert set(scan.loc[nested, "method"]) == ({"UINMF"} if ds == "D52" else set())
-    pd.testing.assert_frame_equal(scan.drop(index=nested).reset_index(drop=True), plan)
+    # c1 (C32): the plan holds seven of the columns
+    pd.testing.assert_frame_equal(
+        W._shown_modalities(scan.drop(index=nested).reset_index(drop=True))[W.PLAN_COLUMNS],
+        plan)
     assert scan.attrs == plan.attrs
     assert capsys.readouterr().out == ""
 
@@ -378,7 +381,7 @@ def test_attrs():
         {"held": ["rna", "adt", "atac"], "not_listed": 0, "not_held": []}
     # the dry run carries them, and a selection of rows keeps them
     plan = mtb.run_all("D11", "vertical", dry_run=True, verbose=False)
-    assert plan.attrs == df.attrs and plan[plan["files_ok"]].attrs == df.attrs
+    assert plan.attrs == df.attrs and plan[plan["runnable"]].attrs == df.attrs
     assert W._held_families(config.DEFAULT.data_path / "D11", "vertical") == ["rna", "adt"]
     assert W._held_families(config.DEFAULT.data_path / "D11", None) == ["rna", "adt"]
     # a numbered folder holds no file of an unnumbered role, and the other way
@@ -424,7 +427,7 @@ def _nothing_runnable(**kw):
 def test_the_hint_carries_all(no_envs, capsys):
     lines = _nothing_runnable(modalities="all")
     call = "mtb.run_all('D11', 'vertical', modalities=\"all\", dry_run=True)"
-    assert lines[-1] == (f"{call} shows every row. Its files_ok and env_ok columns say "
+    assert lines[-1] == (f"{call} shows every row. Its reason column says "
                          f"which check failed. mtb.env.install(dry_run=True) checks the environments.")
     n = int(re.fullmatch(r"The first 3 of (\d+) blocked rows:", lines[1]).group(1))
     shown = eval(call, {"mtb": mtb})                      # noqa: S307 - our own hint
@@ -433,8 +436,8 @@ def test_the_hint_carries_all(no_envs, capsys):
     # the default call: the rows it lists, the sentence on the others, the same count
     lines = _nothing_runnable()
     call = "mtb.run_all('D11', 'vertical', dry_run=True)"
-    assert lines[-1] == (f"{call} shows the listed rows. Its files_ok and env_ok columns "
-                         f"say which check failed. mtb.env.install(dry_run=True) checks the environments.")
+    assert lines[-1] == (f"{call} shows the listed rows. Its reason column "
+                         f"says which check failed. mtb.env.install(dry_run=True) checks the environments.")
     assert lines[-2] == ("D11 holds RNA and ADT. Methods and variants that read ATAC are not listed. "
                          'modalities="all" lists them.')
     n = int(re.fullmatch(r"The first 3 of (\d+) blocked methods:", lines[1]).group(1))

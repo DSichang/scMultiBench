@@ -66,18 +66,12 @@ def test_canonical_metric_blank_and_none_return_none():
     assert catalog.canonical_metric(None) is None  # real None, not the string "None"
 
 
-def test_datasets_table_has_simulated_flag(files_dir):
-    df = catalog.datasets(files_dir)
-    assert "simulated" in df.columns
-    assert df["simulated"].dtype == bool
-
-
 def test_datasets_table_columns_and_registry_derived_category(files_dir):
     import multibench as mtb
     df = catalog.datasets(files_dir)
-    for c in ["dataset", "simulated", "category", "has_results"]:
+    for c in ["dataset", "category", "has_results"]:
         assert c in df.columns
-    assert df["simulated"].dtype == bool and df["has_results"].dtype == bool
+    assert df["has_results"].dtype == bool
     # every dataset with stored results gets its category from the result tree
     with_res = df[df.has_results]
     assert with_res.category.notna().all()
@@ -91,7 +85,7 @@ def test_datasets_table_columns_and_registry_derived_category(files_dir):
     # category filter: one mosaic table since 0.4.0 (the D45s subsample left, X04),
     # and the mosaic demo subsets catalog.datasets lists since 0.4.0
     assert set(catalog.datasets(category="mosaic").dataset) == {
-        "D45", "D38mini", "D45mini", "D46mini", "D49mini"}
+        "D45", "D46", "D38mini", "D45mini", "D46mini", "D49mini"}
 
 
 def test_catalog_columns_match_registry(files_dir):

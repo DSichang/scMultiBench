@@ -351,8 +351,8 @@ def test_evaluate_metrics_rejects_unknown_metric_and_bare_code_string():
     with pytest.raises(ValueError) as exc:
         evaluate(emb, labels=ct, metrics=["ARI", "XYZ"])
     msg = str(exc.value)
-    assert "unknown metric(s) ['XYZ']" in msg and "or the codes" in msg
-    assert "ARI" in msg and "kBET" in msg
+    # c1 (C36): one text for an unknown token, alone or in a list
+    assert msg.startswith("Unknown metrics= token XYZ. Pass 'all', 'clustering'")
     # 0.4.0: one code is accepted as it is, as in a list
     pd.testing.assert_frame_equal(evaluate(emb, labels=ct, metrics="ARI"),
                                   evaluate(emb, labels=ct, metrics=["ARI"]))

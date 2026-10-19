@@ -1159,8 +1159,9 @@ def _run_all_command(args, stack) -> int:
                                         args.data_path)
             if bad:          # the scoring of the real run would fail: exit 1 now
                 raise ValueError(bad)
-        _print_frame(df, columns=columns, fmt=args.format,
-                     compact=workflow.compact_columns(df))
+        plan = df if columns else df[workflow.PLAN_COLUMNS]
+        _print_frame(plan, columns=columns, fmt=args.format,
+                     compact=workflow.compact_columns(plan))
         if args.format == "table" and not columns:
             have = df[df["command"].astype(str).str.len() > 0]
             missing = not have["env_ok"].astype(bool).all()
@@ -1686,9 +1687,6 @@ _CATEGORY_HELP = ("vertical, diagonal, mosaic or cross (multibench layout explai
 _METHODS_HELP = "comma-separated method ids, as printed by multibench find"
 #: the tail of the deprecated ``--leiden-flavor`` of run-all and evaluate
 _LEIDEN_TAIL = _compat.use("the default (the article's leidenalg)")
-_LEIDEN_HELP = ("Leiden backend of the clustering: leidenalg, the article's (keep it to "
-                "compare with the stored results), or igraph, faster (default: shown by "
-                "multibench config)")
 _FLAVOR_HELP = ("cpu or gpu build of each env; auto (default) = gpu when this computer "
                 "has an NVIDIA GPU (on a login node for GPU jobs, pass gpu). In the "
                 "plan, any = one build serves both")
@@ -1701,7 +1699,6 @@ _FORCE_HELP = ("try anyway on a computer that is not Linux (method environments 
                "download)")
 #: the family tokens ``--metrics`` accepts besides a comma list of codes
 _METRIC_FAMILIES = ("clustering", "batch", "classification", "all")
-_BATCH_COLUMN_HELP = "the column to read in the --batch CSV when it has several columns"
 
 
 def _export_arguments(pc) -> None:
@@ -1722,9 +1719,9 @@ def _export_arguments(pc) -> None:
                                    "\"X[feature_types=Peaks]\". Peaks or gene activity is "
                                    "read from the feature names, or set by --atac-kind")
     pc.add_argument("--atac-from", dest="atac_from", metavar="PATH",
-                    help="another .h5ad or .h5mu with the ATAC matrix: the ATAC cells "
-                         "for --category diagonal, else the same cells, matched by "
-                         "barcode. --atac selects from it, default X")
+                    help="the file that holds the ATAC matrix, another .h5ad or .h5mu: "
+                         "the ATAC cells for --category diagonal, else the same cells, "
+                         "matched by barcode. --atac selects from it, default X")
     pc.add_argument("--atac-kind", dest="atac_kind", choices=["peak", "gene_activity"],
                     help="peak writes atac_peak.h5, and atac.h5 without --category. "
                          "gene_activity writes atac_gas.h5. --category vertical writes "
@@ -1732,15 +1729,15 @@ def _export_arguments(pc) -> None:
     pc.add_argument("--labels", help="cell-type column: obs:<col>, or <mod>:<col> for a "
                                      "modality of a .h5mu file. Written to cty.csv, for "
                                      "diagonal to rna_cty.csv and atac_cty.csv")
-    pc.add_argument("--batch", help="batch column, as for --labels. Cells are split per "
-                                    "batch into numbered files rna1.h5, rna2.h5, cty1.csv "
-                                    "..., read by mosaic and cross methods")
+    pc.add_argument("--batch", help="split SRC into numbered batches by this column, "
+                                    "as for --labels: rna1.h5, rna2.h5, cty1.csv ..., read "
+                                    "by mosaic and cross methods")
     pc.add_argument("--batch-index", dest="batch_index", type=int, metavar="N",
-                    help="--category mosaic or cross: write the whole file as batch N: "
-                         "rna<N>.h5, adt<N>.h5, atac<N>.h5 and cty<N>.csv. With "
-                         "--category diagonal: rna<N>.h5, atac_gas<N>.h5 or "
-                         "atac_peak<N>.h5, rna_cty<N>.csv and atac_cty<N>.csv. One call "
-                         "per batch file")
+                    help="write all of SRC as batch N, one call per batch: for --category "
+                         "mosaic rna<N>.h5, adt<N>.h5, atac<N>.h5 and cty<N>.csv; for "
+                         "cross the same with atac_peak<N>.h5; for diagonal rna<N>.h5, "
+                         "atac_gas<N>.h5 or atac_peak<N>.h5, rna_cty<N>.csv and "
+                         "atac_cty<N>.csv")
     pc.add_argument("--overwrite", action="store_true",
                     help="replace files already in DATASET_DIR (default: refuse and "
                          "list them). Files of other data that the call does not write "
@@ -2007,37 +2004,20 @@ def build_parser() -> argparse.ArgumentParser:
     # ---- run
     pr = sub.add_parser(
         "run",
-        description="Deprecated: use multibench run-all DATASET --methods M. "
-                    "Run one method in its conda env on the given role=path inputs "
-                    "and write its outputs under --out-dir. Use multibench scan "
-                    "first to see which roles a method needs and whether its env is "
-                    "installed. multibench run-all runs every method of a category "
-                    "on a laid-out dataset folder.")
-    pr.add_argument("--method", required=True, help="method id, as printed by "
-                                                    "multibench find")
-    pr.add_argument("--category", required=True, help=_CATEGORY_HELP)
+        description="Deprecated: use multibench run-all DATASET --methods M.")
+    pr.add_argument("--method", required=True, help=argparse.SUPPRESS)
+    pr.add_argument("--category", required=True, help=argparse.SUPPRESS)
     pr.add_argument("--task", action=_Retired)
     pr.add_argument("--input", action="append", metavar="ROLE=PATH",
-                    help="one input as role=path, repeatable, e.g. --input rna=rna.h5 "
-                         "--input adt=adt.h5 --input cty=cty.csv. multibench layout "
-                         "lists the roles. Non-canonical files are converted")
+                    help=argparse.SUPPRESS)
     pr.add_argument("--out-dir", "--out", dest="out",
-                    help="output directory for this run (embedding.h5, metric.csv, "
-                         "log); --out is an alias. Required unless --dry-run, whose "
-                         "command then shows <out_dir>")
+                    help=argparse.SUPPRESS)
     pr.add_argument("--runner", dest="cmd_template", metavar="TEMPLATE", action=_Retired,
                     tail=_compat.use("a job script that calls multibench run-all"))
     pr.add_argument("--param", "-p", action="append", metavar="KEY=VALUE",
-                    help="one hyperparameter override, repeatable: --param epochs=5 "
-                         "--param lr=0.001 (METHOD:KEY=VALUE is accepted when METHOD "
-                         "is --method). VALUE is parsed as a scalar: 5 -> int, 0.1 -> "
-                         "float, true/false -> bool, else string. A key the method "
-                         "does not accept is rejected, and the error names the "
-                         "accepted ones. multibench params METHOD lists them "
-                         "(mtb.params_for)")
+                    help=argparse.SUPPRESS)
     pr.add_argument("--dry-run", dest="dry_run", action="store_true",
-                    help="print the exact command line the run would execute, "
-                         "environment activation included, and execute nothing")
+                    help=argparse.SUPPRESS)
     pr.set_defaults(func=_cmd_run, _parser=pr, cmd_template=None,
                     **_retired_command("run", "run-all DATASET --methods M"))
 
@@ -2164,6 +2144,8 @@ def build_parser() -> argparse.ArgumentParser:
     pe.add_argument("--name", action=_Retired, tail=_compat.use("--method"))
     pe.add_argument("--out", help="CSV to write (default: print the table)")
     pe.set_defaults(func=_cmd_evaluate, _parser=pe)
+    # EMBEDDING is required; nargs="?" only lets the hidden --embedding stand in for it
+    pe.usage = pe.format_usage().replace("[EMBEDDING]", "EMBEDDING").split(" ", 1)[1].strip()
 
     # ---- env
     pv = sub.add_parser(

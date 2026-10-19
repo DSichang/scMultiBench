@@ -95,7 +95,7 @@ def _must_not_spawn(*a, **k):
 # ------------------------------------------------------------ the snapshot
 
 def test_requires_gpu_set_is_pinned():
-    got = {m for m in mtb.list_methods() if mtb.method_info(m, verbose=True)["requires_gpu"]}
+    got = {m for m in mtb.list_methods() if mtb.method_info(m)["gpu"] == "required"}
     assert got == GPU_ONLY, got
 
 
@@ -116,7 +116,7 @@ def test_gpu_evidence_names_a_cuda_call():
     for m in mtb.list_methods():
         info = mtb.method_info(m, verbose=True)
         ev = info["gpu_evidence"]
-        if not info["requires_gpu"]:
+        if info["gpu"] != "required":
             assert ev is None, m
             continue
         for entry in ev.split(", "):          # moETM names one call per script
@@ -132,13 +132,12 @@ def test_method_info_keys_and_defaults():
     for m in mtb.list_methods():
         info = mtb.method_info(m, verbose=True)
         assert isinstance(info["cpu_params"], dict)
-        assert isinstance(info["requires_gpu"], bool)
         assert info["gpu_evidence"] is None or isinstance(info["gpu_evidence"], str)
     info = mtb.method_info("SCALEX", verbose=True)
-    assert info["cpu_params"] == {} and info["requires_gpu"] is False
+    assert info["cpu_params"] == {} and info["gpu"] != "required"
     assert info["gpu_evidence"] is None
     assert "cpu_params" in (mtb.method_info.__doc__ or "")
-    assert "requires_gpu" in (mtb.method_info.__doc__ or "")
+    assert "requires_gpu" not in (mtb.method_info.__doc__ or "")       # c1 (C33)
 
 
 def test_scmm_and_scmvp_keep_their_existing_cpu_treatment():
@@ -152,7 +151,7 @@ def test_scmm_and_scmvp_keep_their_existing_cpu_treatment():
         for v in registry.get(m).variants:
             assert v.run_env.get("CUDA_VISIBLE_DEVICES") == ""
         assert mtb.method_info(m, verbose=True)["cpu_params"] == {}
-        assert mtb.method_info(m, verbose=True)["requires_gpu"] is False
+        assert mtb.method_info(m)["gpu"] != "required"
     assert mtb.method_info("scMM", verbose=True)["cpu_params"] == {}
 
 

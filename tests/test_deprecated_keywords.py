@@ -54,7 +54,7 @@ def test_x39_no_tasks_column_or_key():
 def test_x40_method_info_default_keys_and_the_verbose_hint():
     info = mtb.method_info("Matilda")
     assert set(info) == {"id", "language", "notes", "categories", "env", "atac",
-                         "needs_labels", "supports", "runtime", "gpu", "requires_gpu",
+                         "needs_labels", "supports", "runtime", "gpu",
                          "cpu_params", "setup_hint", "repo_url", "reference"}
     # 0.4.0: method_info(verbose=) is deprecated; the hint names params_for
     with pytest.raises(KeyError, match=r"'params' is in mtb\.params_for\('Matilda', "

@@ -141,6 +141,12 @@ class MetricSelection:
         return f"MetricSelection(family={self.family!r}, codes={self.codes!r}, explicit={self.explicit})"
 
 
+def _unknown_metrics(kw: str, what: str) -> str:
+    """The one error text of a ``metrics=`` value that names no family or code."""
+    return (f"Unknown {kw}= {what}. Pass 'all', 'clustering', 'batch' or "
+            f"'classification', or metric codes such as {kw}=['ARI', 'NMI'].")
+
+
 def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelection:
     """Resolve the ``metrics=`` knob shared by ``evaluate``, ``load_results`` and ``recommend``.
 
@@ -191,9 +197,7 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
                 hint = (f" {kw}= selects a metric family, not a task. The tasks "
                         f"dimension_reduction and clustering both use the clustering "
                         f"family.")
-            raise ValueError(
-                f"Unknown {kw}= token {metrics}. Pass 'all', 'clustering', 'batch' or "
-                f"'classification', or metric codes such as {kw}=['ARI', 'NMI'].{hint}")
+            raise ValueError(_unknown_metrics(kw, f"token {metrics}") + hint)
     if isinstance(metrics, (bytes, dict)) or not hasattr(metrics, "__iter__"):
         got = type(metrics).__name__
         raise TypeError(
@@ -219,10 +223,9 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
         else:
             codes.append(c)
     if unknown:
-        raise ValueError(
-            f"unknown metric(s) {unknown}; valid: clustering, batch, classification, "
-            f"all, or the codes {valid}"
-            + (f"; present in this frame: {present}" if present else ""))
+        raise ValueError(_unknown_metrics(kw, f"token{'s' if len(unknown) > 1 else ''} "
+                                              f"{', '.join(map(str, unknown))}")
+                         + (f" This frame also has {', '.join(present)}." if present else ""))
     named = [_canonical_metric(m) for m in wanted
              if not (isinstance(m, str) and m.lower() in (*fams, "all"))]
     dup = sorted({c for c in named if named.count(c) > 1})
@@ -333,7 +336,7 @@ _PAPER_COLUMNS = ["assay", "tissue", "n_cells", "n_batches", "source"]
 @_compat.keywords("catalog.datasets", private="_datasets", kept=_FILES_DIR,
                   positional=("files_dir",))
 def datasets(*, category: str | None = None) -> pd.DataFrame:
-    """The benchmark's datasets and the demo subsets ``mtb.data.fetch`` downloads.
+    """The datasets ``mtb.data.fetch`` downloads or ``mtb.load_results`` holds.
 
     Parameters
     ----------
@@ -345,9 +348,9 @@ def datasets(*, category: str | None = None) -> pd.DataFrame:
     -------
     pandas.DataFrame
         One row per dataset: ``dataset``, ``category`` (``;``-joined when the
-        benchmark scored it in several), ``simulated`` (ids starting with
-        ``SD``), ``fetchable`` (``mtb.data.fetch`` downloads it) and
-        ``has_results`` (``mtb.load_results`` has stored results for it).
+        benchmark scored it in several), ``fetchable`` (``mtb.data.fetch``
+        downloads it) and ``has_results`` (``mtb.load_results`` has stored
+        results for it).
 
     Examples
     --------
@@ -397,13 +400,14 @@ def _datasets(files_dir: Path | str | None = None, *,
     out = pd.DataFrame()
     out["dataset"] = raw[name_col].astype(str).str.strip()
     out["category"] = out["dataset"].map(lambda d: ";".join(cat_of[d]) if d in cat_of else None)
-    out["simulated"] = out["dataset"].str.upper().str.startswith("SD")
     out["fetchable"] = out["dataset"].isin(set(AVAILABLE))
     out["has_results"] = out["dataset"].isin(served)
 
     for col in _PAPER_COLUMNS:
         if col in raw.columns and raw[col].notna().any():
             out[col] = raw[col].values
+    # the rows a user can act on: data to fetch or stored results to compare with
+    out = out[out["fetchable"] | out["has_results"]]
     if category is not None:
         config.category_folder(category)
         out = out[out["category"].fillna("").str.split(";").map(lambda cs: category in cs)]

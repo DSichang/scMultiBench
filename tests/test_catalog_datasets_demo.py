@@ -6,8 +6,10 @@ from multibench.data.fetch import AVAILABLE, DEMO_CATEGORIES
 
 def test_columns_and_rows():
     ds = mtb.catalog.datasets()
-    assert list(ds.columns) == ["dataset", "category", "simulated", "fetchable", "has_results"]
-    assert set(DEMO_CATEGORIES) <= set(ds["dataset"]) and len(DEMO_CATEGORIES) == 12
+    # c1 (C34): the rows a user can act on, each with its category
+    assert list(ds.columns) == ["dataset", "category", "fetchable", "has_results"]
+    assert set(DEMO_CATEGORIES) <= set(ds["dataset"]) and len(DEMO_CATEGORIES) == 13
+    assert (ds.fetchable | ds.has_results).all() and ds["category"].notna().all()
     assert ds["dataset"].is_unique
 
 

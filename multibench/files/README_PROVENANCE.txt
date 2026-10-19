@@ -24,8 +24,8 @@ dataset.csv - dataset ids from the benchmark's dataset tree (SD* = simulated).
                that hold a value. Do not fill them from the data tree (n_cells
                of a processed file is not the paper's n_cells). When
                transcribed, record the supplementary-table version here.
-  Computed by catalog.datasets() at call time, not stored in the CSV:
-  simulated    The id starts with 'SD'.
+  Computed by catalog.datasets() at call time, not stored in the CSV (it
+  returns the rows that are fetchable or have stored results):
   category, has_results
                From multibench.available_datasets(category, source='both'):
                which category's published / re-run metric tables contain the

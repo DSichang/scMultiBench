@@ -181,7 +181,7 @@ def _reference_batch(variant):
 
 #: the keys ``method_info`` returns by default: what a user reads before a run
 _INFO_KEYS = ("id", "language", "notes", "categories", "env", "atac", "needs_labels",
-              "supports", "runtime", "gpu", "requires_gpu", "cpu_params",
+              "supports", "runtime", "gpu", "cpu_params",
               "setup_hint", "repo_url", "reference")
 
 
@@ -223,10 +223,10 @@ def method_info(method: str) -> dict:
         atac                    'peak' / 'gene_activity' / None
         needs_labels            any variant reads cell-type labels
         supports                one entry per variant: category, modalities,
-                                output_kind, n_tunable, needs_labels, labels,
+                                output_kind, needs_labels, labels,
                                 reference_batch
         runtime                 tier, worst_sec, observed, host, note
-        gpu, requires_gpu       'required' / 'used when present' / 'not used'
+        gpu                     'required' / 'used when present' / 'not used'
         cpu_params              the flags that turn CUDA off on a CPU host
         setup_hint              a step to take before the first run, or ''
         repo_url                the upstream code the benchmark ran
@@ -279,7 +279,6 @@ def _method_info(method: str, verbose: bool = False) -> dict:
         "supports": [{"category": v.when.get("category"),
                       "modalities": list(v.when.get("modalities", [])),
                       "output_kind": v.output.kind,
-                      "n_tunable": len(v.tunable),
                       "needs_labels": v.needs_labels,
                       "labels": [r for r in v.roles() if is_label_role(r)],
                       "reference_batch": _reference_batch(v)}
@@ -294,7 +293,6 @@ def _method_info(method: str, verbose: bool = False) -> dict:
     info["runtime"] = _runtime_hint(s.id)
     info["gpu"] = s.gpu
     info["cpu_params"] = dict(s.cpu_params)
-    info["requires_gpu"] = bool(s.requires_gpu)
     info["gpu_evidence"] = s.gpu_evidence or None
     info["notes_long"] = up["notes"]
     keys = _INFO_KEYS + (_VERBOSE_KEYS if verbose else ())

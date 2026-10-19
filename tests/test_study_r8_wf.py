@@ -392,7 +392,7 @@ def test_off_linux_a_gpu_block_is_left_out(macos, mydata, monkeypatch):
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
     msg = _nothing_runnable(modalities=["rna", "adt"])
     plan = _plan(modalities=["rna", "adt"])
-    assert any(mtb.method_info(m)["requires_gpu"] for m in plan["method"])   # moETM
+    assert any(mtb.method_info(m)["gpu"] == "required" for m in plan["method"])   # moETM
     assert "NVIDIA GPU" not in msg and "also blocked by something else" not in msg
     assert msg.splitlines()[2].startswith(
         "mtb.run_all('data/MYDATA', 'vertical', modalities=['rna', 'adt'], dry_run=True) "
@@ -410,7 +410,7 @@ def test_on_linux_the_message_is_todays(no_envs, mydata, monkeypatch):
             + "\n".join(f"  {r.method} ({r.modalities}): {r.reason}"
                         for r in order.head(3).itertuples())
             + "\nmtb.run_all('data/MYDATA', 'vertical', modalities=['rna', "
-            "'adt'], dry_run=True) shows every row. Its files_ok and env_ok columns say which check "
+            "'adt'], dry_run=True) shows every row. Its reason column says which check "
             "failed. mtb.env.install(dry_run=True) checks the environments.")
     assert msg == want
     assert "is not installed. Run multibench env install --methods" in msg

@@ -65,4 +65,3 @@ def test_overall_by_basis_formulas():
     assert np.allclose(mo[["A", "B", "C"]], [0.5, 1.0, 0.25])
     with pytest.raises(ValueError, match="overall must be one of"):
         style.overall_by_basis(parts, "median")
-    assert "rank" in style.OVERALL_DOC and "mean_overall" in style.OVERALL_DOC

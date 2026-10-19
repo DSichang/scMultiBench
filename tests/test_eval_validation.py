@@ -96,7 +96,7 @@ def test_only_valid_requests_still_work_and_unknown_lists_valid_names():
     assert _ari(df) == pytest.approx(1.0)
     with pytest.raises(ValueError) as exc:
         evaluate(emb, labels=ct, metrics=["XYZ"])
-    assert "unknown metric(s) ['XYZ']" in str(exc.value) and "GC" in str(exc.value)
+    assert str(exc.value).startswith("Unknown metrics= token XYZ. Pass 'all'")
 
 
 def test_batch_under_clustering_task_warns_instead_of_silently_ignoring():

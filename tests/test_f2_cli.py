@@ -120,7 +120,6 @@ def test_every_method_has_a_gpu_use_value():
     for m in mtb.list_methods():
         info = mtb.method_info(m)
         assert info["gpu"] in GPU_VALUES, (m, info["gpu"])
-        assert (info["gpu"] == "required") == info["requires_gpu"], m
         if info["cpu_params"]:
             assert info["gpu"] == "used when present", m
 

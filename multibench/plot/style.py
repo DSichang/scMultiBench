@@ -64,14 +64,6 @@ def compute_overall(mat: pd.DataFrame) -> pd.Series:
 #: in overall_by_basis
 OVERALL_BASES = ("rank", "mean_overall")
 
-#: the ``overall`` parameter entry, written out in the docstrings of plot.bubble
-#: and plot.bar (the static docs build cannot see a runtime splice); tests pin it
-OVERALL_DOC = """\
-    overall : {"rank", "mean_overall"}
-        Across-dataset *Overall*: ``"rank"`` re-ranks mean ranks (missing
-        dataset = rank 0); ``"mean_overall"`` averages per-dataset Overalls
-        (missing dataset skipped)."""
-
 
 def per_dataset_ranks(long_df: pd.DataFrame, metrics=None) -> dict:
     """Within-dataset max-ranks: ``{dataset: DataFrame(method x metric)}``.

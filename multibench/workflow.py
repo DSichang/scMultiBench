@@ -587,6 +587,9 @@ SCAN_COLUMNS = ["method", "category", "modalities", "env", "output_kind", "n_tun
                 "files_ok", "files_reason", "env_ok", "env_reason", "needs_labels", "atac",
                 "command"]
 
+#: The columns of ``run_all(dry_run=True)``.
+PLAN_COLUMNS = ["method", "modalities", "runnable", "reason", "env", "caveat", "command"]
+
 #: The columns :func:`scan` returns, and ``multibench scan`` prints by default.
 COMPACT_COLUMNS = ["method", "modalities", "runnable", "files_ok", "env_ok",
                    "runtime_tier", "reason"]
@@ -2846,7 +2849,7 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
                    f"Blocked, one line per requested {_rows_word(blocked, 1)}:\n"
                    + "\n".join(_line(r) for _, r in blocked.iterrows()) + lacking)
         return (f"{head}.\n{platform}{listing}"
-                f"\n{where} shows these rows. Its files_ok and env_ok columns say "
+                f"\n{where} shows these rows. Its reason column says "
                 f"which check failed. {doctor} checks the environments.")
     head = f"No method can run on {dataset} ({category})"
     if platform and others is not None:
@@ -2859,8 +2862,7 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
         listing = f"{shown}:\n" + "\n".join(_line(r) for _, r in blocked.head(k).iterrows())
     return (f"{head}.\n{platform}{listing}" + (f"\n{note}" if note else "") +
             f"\n{where} shows {'the listed rows' if note else 'every row'}. Its "
-            f"files_ok and env_ok columns say "
-            f"which check failed. {doctor} checks the environments.")
+            f"reason column says which check failed. {doctor} checks the environments.")
 
 
 def _other_blocks(blocked: pd.DataFrame, others: pd.Series, *, requested: bool) -> str:
@@ -3590,9 +3592,10 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
     >>> res = mtb.run_all("D11", "vertical", methods=["Matilda"], out_dir="out/",
     ...                   params={"Matilda": {"epochs": 10}})
     """
-    return _run_all(dataset, category, out_dir, methods=methods, modalities=modalities,
-                    params=params, batch=batch, evaluate=evaluate, dry_run=dry_run,
-                    timeout=timeout, skip_existing=skip_existing, verbose=verbose)
+    out = _run_all(dataset, category, out_dir, methods=methods, modalities=modalities,
+                   params=params, batch=batch, evaluate=evaluate, dry_run=dry_run,
+                   timeout=timeout, skip_existing=skip_existing, verbose=verbose)
+    return _shown_modalities(out)[PLAN_COLUMNS] if dry_run else out
 
 
 def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalities=None,
