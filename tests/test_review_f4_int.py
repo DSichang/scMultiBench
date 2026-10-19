@@ -160,9 +160,9 @@ def test_names_are_genes_needs_a_file_to_compare_with(tmp_path):
     assert RS._names_are_genes(d / "atac.h5") is None
 
 
-# ------------------------------------------------- the override ends the reason
-def test_the_override_is_the_last_clause_of_a_gpu_blocked_row(tmp_path, pinned,
-                                                              monkeypatch, as_gene_activity):
+# ------------------------------- a GPU-blocked row names no override (0.4.0)
+def test_a_gpu_blocked_row_ends_with_the_export_fix_and_no_override(
+        tmp_path, pinned, monkeypatch, as_gene_activity):
     # a method that needs a GPU and is given the other ATAC form. UnitedNet
     # reads peaks; it is set to gene activity here to meet both conditions
     as_gene_activity("UnitedNet")
@@ -172,7 +172,8 @@ def test_the_override_is_the_last_clause_of_a_gpu_blocked_row(tmp_path, pinned,
                  modalities=["rna", "atac"], data_path=root, verbose=False).iloc[0]
     assert not row["runnable"]
     assert "needs an NVIDIA GPU" in row["reason"]
-    assert row["reason"].endswith("or pass allow_atac_mismatch=True to run UnitedNet anyway.")
+    assert row["reason"].endswith("Export the ATAC as gene activity.")
+    assert "allow_atac_mismatch" not in row["reason"] and "anyway" not in row["reason"]
 
 
 # ------------------------------------------------ one report of an allowed caveat
@@ -306,8 +307,7 @@ def test_strict_line_of_a_named_method_reads_the_row_with_its_files(tmp_path, pi
     assert err.startswith("error: --strict: 0 of 3 rows are runnable. Rows with missing "
                           "input files: 2. Rows with the wrong ATAC kind: 1."), err
     assert re.search(r"^  Matilda: Matilda needs gene-activity ATAC, and atac\.h5 holds "
-                     r"peaks\. Export the ATAC as gene activity, or pass "
-                     r"--allow-atac-mismatch to run Matilda anyway\.$", err, re.M), err
+                     r"peaks\. Export the ATAC as gene activity\.$", err, re.M), err
     assert "row(s)" not in err and ";" not in err.splitlines()[0]
 
 

@@ -378,7 +378,7 @@ def test_plot_page_says_how_to_keep_the_methods_scored_everywhere():
     # every dataset
     assert "require_complete" not in text
     assert ("A method missing from a dataset ranks last there. A warning lists these "
-            "methods; `methods=` keeps the ones scored on every dataset.") in text
+            "methods, and `methods=` keeps the ones scored on every dataset.") in text
     # the subsample tables left in 0.4.0 (X04): the page says a summary needs datasets
     # of your own
     assert "The stored results hold one dataset per category" in text

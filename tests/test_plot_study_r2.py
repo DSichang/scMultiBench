@@ -89,19 +89,19 @@ def _pair():
     return pd.concat([d11, d11.assign(dataset="D11b")], ignore_index=True)
 
 
-def test_dataset_mode_rerun_pair_still_suggests_the_summary():
+def test_dataset_mode_rerun_pair_suggests_plot_bar():
     _, msgs = _messages(_build_table, _pair())
     assert msgs == [
         "This figure averages each method over 2 datasets, D11 and D11b. Its rows "
-        "mix datasets. Pass aggregate='summary' for the rank-averaged summary panel, "
-        "or filter to one dataset."]
+        "mix datasets. mtb.plot.bar ranks the methods within each dataset; or filter "
+        "to one dataset."]
 
 
 def test_dataset_mode_advice_uses_the_cli_spelling(monkeypatch):
     monkeypatch.setattr(config, "_CLI", True)
     _, msgs = _messages(_build_table, _pair())
     assert msgs[0].startswith("This figure averages each method over 2 datasets")
-    assert "Pass --aggregate summary" in msgs[0] and "aggregate='summary'" not in msgs[0]
+    assert "multibench plot bar ranks" in msgs[0] and "mtb.plot.bar" not in msgs[0]
 
 
 def test_no_plot_warning_says_by_construction():

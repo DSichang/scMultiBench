@@ -388,8 +388,7 @@ def test_gene_activity_under_the_peak_name_keeps_its_reason(linux, tmp_path, cap
     assert lines[0] == ("[scan] 1 of 1 method has its input files in PK. 0 of 1 can run on "
                         "this computer. PK holds RNA and ATAC, in batches 1-3.")
     assert lines[2] == ("[scan] StabMap: StabMap needs peak ATAC, and atac_peak1.h5 holds "
-                        "gene activity. Export the ATAC as peaks, or pass "
-                        "allow_atac_mismatch=True to run StabMap anyway.")
+                        "gene activity. Export the ATAC as peaks.")
 
 
 def test_one_missing_atac_file_reads_as_before(linux, tmp_path, capsys):

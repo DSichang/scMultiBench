@@ -237,7 +237,8 @@ def test_duplicate_rows_raise():
 def test_multi_dataset_under_aggregate_dataset_warns():
     import matplotlib; matplotlib.use("Agg")
     two = _three(datasets=("D1", "D2"))
-    with pytest.warns(UserWarning, match="summary"):
+    with pytest.warns(UserWarning, match="mtb.plot.bar ranks the methods within each "
+                                          "dataset"):
         tbl = bubble._build_table(two)
     assert tbl.methods == ["C", "B", "A"]             # bare names, unchanged
     assert tbl.datasets == ("D1", "D2")

@@ -25,7 +25,7 @@ def test_raises_when_no_ranked_dataset_measured_the_modality():
     with pytest.raises(ValueError) as e:
         mtb.recommend("vertical", modalities=["rna", "atac"])
     assert str(e.value) == (
-        "Stored vertical scores come from D11 (rna+adt). None of these datasets "
+        "The stored results of vertical come from D11 (rna+adt). None of these datasets "
         "measured atac, so they cannot rank methods for RNA+ATAC data. Pass scores on "
         "such data as long_df=.")
     # atac= names the modality as well

@@ -118,7 +118,8 @@ def test_x68_size_error_names_the_label_files_that_fit(tmp_path):
     n = sum(len(pd.read_csv(labels[k])) for k in ("cty1", "cty2"))
     emb = np.random.default_rng(0).normal(size=(n, 5))
     with pytest.raises(ValueError, match=rf"^The embedding has {n:,} cells = cty1\+cty2\. "
-                                         r"Pass label_order=\['cty1', 'cty2'\]\.$"):
+                                         r"Pass the label files cty1\.csv and cty2\.csv "
+                                         r"only\.$"):
         mtb.evaluate(emb, labels=labels, category="cross", metrics=["ARI"])
 
 

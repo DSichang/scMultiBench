@@ -66,8 +66,9 @@ def test_metric_selection_is_one_vocabulary():
     assert metric_selection(["clustering", "ARI"]).codes == clu.codes
     mixed = metric_selection(["clustering", "kBET"])
     assert mixed.codes == clu.codes + ["kBET"] and mixed.family == "all"
-    with pytest.raises(TypeError, match="takes None, 'all', 'clustering', 'batch', "
-                                        "'classification' or a list"):
+    with pytest.raises(TypeError, match=r"^metrics= takes None, a family \('all', "
+                                        r"'clustering', 'batch', 'classification'\), a "
+                                        r"metric code, or a list of them\. It got an int\.$"):
         metric_selection(3)
 
 

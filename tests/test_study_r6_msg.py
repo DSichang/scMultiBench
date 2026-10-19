@@ -179,7 +179,7 @@ def test_the_atac_caveats_start_with_the_method(tmp_path, pinned, gas_matilda):
                      verbose=False).iloc[0]
     assert blocked["reason"] == (
         "Matilda needs gene-activity ATAC, and atac.h5 holds peaks. Export the ATAC as gene "
-        "activity, or pass allow_atac_mismatch=True to run Matilda anyway.")
+        "activity.")
 
 
 def test_callers_print_the_method_name_once(tmp_path, pinned, root, monkeypatch, capsys,
@@ -248,8 +248,7 @@ def test_strict_counts_are_unchanged(tmp_path, pinned, root, capsys):
         "whose peak names the method cannot read: 1. Rows whose method scripts are not "
         "fetched: 4. No runnable row for GLUE, Seurat_v3, MultiMAP, scBridge:\n"), err
     assert ("  GLUE: GLUE reads peak names such as chr1:100-200. atac_peak.h5 holds other "
-            "names, for example peak_0. Rename them to chr:start-end, or pass "
-            "--allow-atac-mismatch to run GLUE anyway.\n") in err
+            "names, for example peak_0. Rename them to chr:start-end.\n") in err
     assert "  scBridge: scBridge needs atac_gas.h5, and LUNG_ids has no such file.\n" in err
     rc, _, err = _cli(["scan", "D52", "--category", "cross", "--data-path",
                        str(root / "data"), "--methods", "UINMF,StabMap", "--strict",

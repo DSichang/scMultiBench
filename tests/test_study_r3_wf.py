@@ -131,8 +131,7 @@ def test_scan_blocks_the_other_atac_kind_unless_allowed(tmp_path):
             r = df.loc[m]
             assert not r.runnable and r.files_ok and r.env_ok, m
             assert r.reason == (f"{m} needs gene-activity ATAC, and atac.h5 holds peaks. "
-                                f"Export the ATAC as gene activity, or pass "
-                                f"allow_atac_mismatch=True to run {m} anyway."), r.reason
+                                f"Export the ATAC as gene activity."), r.reason
             assert r.caveat.startswith(f"{m} {GAS_CAV}")
         assert df.loc[["moETM", "scMM", "iPOLNG", "scMVP"], "runnable"].all()
     # R4-01: naming the method no longer runs it; allow_atac_mismatch does
@@ -164,7 +163,9 @@ def test_the_cli_spelling_of_the_reason(tmp_path, monkeypatch):
     df = _quiet(full_scan, "MU_PEAK", "vertical", methods=None, data_path=root,
                 verbose=False)
     r = df[(df.method == "Matilda") & (df.modalities == "rna+atac")].iloc[0]
-    assert r.reason.endswith("or pass --allow-atac-mismatch to run Matilda anyway.")
+    # 0.4.0: the reason offers no override, so both spellings are the same
+    assert r.reason.endswith("Export the ATAC as gene activity.")
+    assert "allow" not in r.reason and "=" not in r.reason
 
 
 class _Res:

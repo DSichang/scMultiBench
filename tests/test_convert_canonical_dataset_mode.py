@@ -64,10 +64,12 @@ def _scan_reasons(folder, category):
 
 
 def _cp(err):
-    """Run the cp command the error prints, as printed."""
-    argv = shlex.split(err.split("Copy it into the folder with: ")[1])
+    """Run the copy command the error prints, as printed, with a shell (an absent
+    folder gets ``mkdir -p DIR && cp ...``)."""
+    command = err.split("Copy it into the folder with: ")[1].strip()
+    argv = shlex.split(command.split(" && ")[-1])
     assert argv[0] == "cp" and len(argv) == 3
-    return subprocess.run(argv, capture_output=True, text=True)
+    return subprocess.run(command, shell=True, capture_output=True, text=True)
 
 
 def _missing(reasons, name):
@@ -131,7 +133,8 @@ def test_the_copy_command_works_when_the_folder_is_absent(tmp_path, capsys, monk
     monkeypatch.chdir(tmp_path)
     _inputs(tmp_path)
     err = _error(capsys, ["export", "c_rna.h5", "NEW/DS", "--category", "vertical"])
-    assert err.endswith("Copy it into the folder with: cp c_rna.h5 NEW/DS/rna.h5")
+    assert err.endswith("Copy it into the folder with: mkdir -p NEW/DS && cp c_rna.h5 "
+                        "NEW/DS/rna.h5")
     done = _cp(err)
     assert done.returncode == 0, done.stderr
     assert (tmp_path / "NEW" / "DS" / "rna.h5").is_file()

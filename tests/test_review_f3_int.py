@@ -101,11 +101,14 @@ def test_gene_names_in_the_peak_file_block_glue_seurat_v3_and_multimap(tmp_path,
     assert sc.index.is_unique
     for m in ("GLUE", "Seurat_v3", "MultiMAP"):
         assert not sc.loc[m, "runnable"] and sc.loc[m, "files_ok"], m
-        assert sc.loc[m, "reason"].endswith(
-            f"pass allow_atac_mismatch=True to run {m} anyway."), m
-    assert sc.loc["GLUE", "reason"].startswith(
-        "GLUE reads peak names such as chr1:100-200. atac_peak.h5 holds other names, for "
-        "example GENE0. Rename them to chr:start-end, or pass ")
+        assert "allow_atac_mismatch" not in sc.loc[m, "reason"], m
+    for m in ("GLUE", "Seurat_v3"):
+        assert sc.loc[m, "reason"] == (
+            f"{m} reads peak names such as chr1:100-200. atac_peak.h5 holds other names, "
+            f"for example GENE0. Rename them to chr:start-end."), m
+    assert sc.loc["MultiMAP", "reason"] == (
+        "MultiMAP needs peak ATAC, and atac_peak.h5 holds gene activity. Export the ATAC "
+        "as peaks.")
     # R4-01: naming the method keeps it blocked; allow_atac_mismatch runs it
     for m in ("GLUE", "Seurat_v3", "MultiMAP"):
         named = _quiet(full_scan, "LUNG_ga", "diagonal", methods=[m], data_path=root,

@@ -250,8 +250,8 @@ def test_a_metrics_token_error_is_plain_outside_its_examples():
     _plain(str(e), "metrics=['ARI', 'NMI']")
     e = _raised(mtb.evaluate, emb, labels=lab, metrics=3)
     assert isinstance(e, TypeError)
-    assert str(e) == ("metrics= takes None, 'all', 'clustering', 'batch', 'classification' "
-                      "or a list of metric codes. It got an int.")
+    assert str(e) == ("metrics= takes None, a family ('all', 'clustering', 'batch', "
+                      "'classification'), a metric code, or a list of them. It got an int.")
     _plain(str(e), lead="metrics=")
     e = _raised(mtb.evaluate, emb, labels=lab, metrics=[])
     _plain(str(e), "metrics=[]", lead=" selects nothing")

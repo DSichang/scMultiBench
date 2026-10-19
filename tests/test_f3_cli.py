@@ -139,11 +139,11 @@ def test_run_all_parser_accepts_batch_and_its_help_is_two_lines():
     assert cli.build_parser().parse_args(
         ["run-all", "D11", "--category", "vertical", "--dry-run"]).batch is None
     lines = _rendered_help(_sub("run-all"), "--batch")
-    # R5-02 added the barcode clause: three lines
+    # two source lines; at 80 columns it renders in three
     assert len(lines) <= 3, lines
     text = " ".join(" ".join(lines).split())
-    assert text.startswith("--batch CSV one batch per cell: a CSV as for evaluate --batch")
-    assert "a first column of barcodes is aligned by barcode" in text
+    assert text.startswith("--batch CSV one batch per cell, in the order of the label files")
+    assert "or by a first column of barcodes" in text
     assert "(default: one batch per label file)" in text
 
 

@@ -134,7 +134,7 @@ def test_named_methods_no_longer_bypass_the_atac_check(tmp_path, pinned):
         assert not df.loc[m, "runnable"] and df.loc[m, "files_ok"], m
         assert df.loc[m, "reason"] == (
             f"{m} needs peak ATAC, and atac2.h5 holds gene activity. Export the ATAC as "
-            f"peaks, or pass allow_atac_mismatch=True to run {m} anyway."), df.loc[m, "reason"]
+            f"peaks."), df.loc[m, "reason"]
     ok = _quiet(full_scan, "GASMOS", "mosaic", methods=["StabMap", "scMoMaT"],
                 data_path=root, verbose=False, allow_atac_mismatch=True)
     ok = ok[ok["files_ok"]]
@@ -155,8 +155,7 @@ def test_strict_gate_with_methods_fails_and_the_flag_passes_it(tmp_path, pinned,
     assert rc == 1 and "Rows with the wrong ATAC kind: 2." in err, err
     for m in ("StabMap", "scMoMaT"):
         assert re.search(rf"^  {m}: {m} needs peak ATAC, and atac2.h5 holds gene activity\. "
-                         r"Export the ATAC as peaks, or pass --allow-atac-mismatch to run "
-                         rf"{m} anyway\.$", err, re.M), err
+                         r"Export the ATAC as peaks\.$", err, re.M), err
     rc = _quiet(cli.main, base + ["--allow-atac-mismatch", "--format", "csv"])
     cap = capsys.readouterr()
     assert rc == 0, cap.err
@@ -220,17 +219,23 @@ def test_named_glue_with_peak_0_names_is_blocked(tmp_path, pinned):
     assert not df.loc["GLUE", "runnable"] and df.loc["GLUE", "files_ok"]
     assert df.loc["GLUE", "reason"] == (
         "GLUE reads peak names such as chr1:100-200. atac_peak.h5 holds other names, for "
-        "example peak_0. Rename them to chr:start-end, or pass allow_atac_mismatch=True to "
-        "run GLUE anyway.")
+        "example peak_0. Rename them to chr:start-end.")
     assert W._is_wrong_atac(df["reason"]).loc[["GLUE", "Seurat_v3"]].all()
 
 
-def test_is_wrong_atac_reads_the_override_not_the_prose():
-    assert W._is_wrong_atac("anything; pass allow_atac_mismatch=True to run X anyway.")
-    assert W._is_wrong_atac("anything; pass --allow-atac-mismatch to run X anyway.")
+def test_is_wrong_atac_reads_the_blocking_atac_reasons_not_other_prose():
+    kind = ("Matilda needs gene-activity ATAC, and atac.h5 holds peaks. Export the ATAC "
+            "as gene activity.")
+    names = ("GLUE reads peak names such as chr1:100-200. atac_peak.h5 holds other "
+             "names, for example peak_0. Rename them to chr:start-end.")
+    assert W._is_wrong_atac(kind) and W._is_wrong_atac(names)
+    assert W._is_wrong_atac("StabMap needs peak ATAC, and atac2.h5 holds gene activity. "
+                            "Export the ATAC as peaks.")
     assert not W._is_wrong_atac("conda env 'x' is not installed")
-    s = pd.Series(["a --allow-atac-mismatch b", "missing adt.h5", None])
-    assert list(W._is_wrong_atac(s)) == [True, False, False]
+    assert not W._is_wrong_atac("moETM needs an NVIDIA GPU.")
+    assert not W._is_wrong_atac("missing atac.h5")
+    s = pd.Series([kind, names, "missing adt.h5", None])
+    assert list(W._is_wrong_atac(s)) == [True, True, False, False]
 
 
 def test_run_dry_run_notes_and_real_run_warns(tmp_path, pinned, monkeypatch, capsys,
@@ -474,9 +479,9 @@ def test_named_blocked_methods_are_logged_and_recorded(tmp_path, monkeypatch, ca
     assert set(fails.index) == {"UnitedNet", "MIRA"}
     assert "logger.py" in fails.loc["MIRA", "error"]
     assert "needs an NVIDIA GPU" in fails.loc["UnitedNet", "error"]
-    # the override ends the reason, after the GPU sentence
-    assert fails.loc["UnitedNet", "error"].endswith(
-        "or pass allow_atac_mismatch=True to run UnitedNet anyway.")
+    # the export fix ends the reason, after the GPU sentence; no override (0.4.0)
+    assert fails.loc["UnitedNet", "error"].endswith("Export the ATAC as gene activity.")
+    assert "allow_atac_mismatch" not in fails.loc["UnitedNet", "error"]
     disk = pd.read_csv(tmp_path / "out" / "summary.csv").set_index("method")
     assert disk.loc["MIRA", "status"] == "SKIPPED"
     blob = json.loads((tmp_path / "out" / "batch_result.json").read_text())

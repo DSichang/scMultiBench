@@ -124,8 +124,8 @@ def test_several_datasets_warning_is_plain():
     _, msgs = _messages(_build_table, df)
     assert msgs == [
         "This figure averages each method over 2 datasets, D11 and D11b. Its rows "
-        "mix datasets. Pass aggregate='summary' for the rank-averaged summary panel, "
-        "or filter to one dataset."]
+        "mix datasets. mtb.plot.bar ranks the methods within each dataset; or filter "
+        "to one dataset."]
 
 
 def test_several_datasets_warning_with_a_lone_dataset():
@@ -146,8 +146,8 @@ def test_several_datasets_warning_cli_spelling(monkeypatch):
     _, msgs = _messages(_build_table, df)
     assert msgs == [
         "This figure averages each method over 2 datasets, D11 and D11b. Its rows "
-        "mix datasets. Pass --aggregate summary for the rank-averaged summary panel, "
-        "or filter with --dataset."]
+        "mix datasets. multibench plot bar ranks the methods within each dataset; or "
+        "filter with --dataset."]
 
 
 # --- R5-11 (b): one method, equal columns ------------------------------------

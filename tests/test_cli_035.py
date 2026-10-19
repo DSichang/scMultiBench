@@ -419,7 +419,7 @@ def test_export_n_batches(tmp_path, capsys):
                               "--overwrite")
     assert rc == 1 and stdout == "" and _not_warnings(err)[0] == (
         f"error: {out} holds rna3.h5 and 1 more file of batch 3, above --n-batches 2. "
-        "Convert into a new folder.")
+        "Export into a new folder.")
     assert {p.name: p.read_bytes() for p in out.iterdir()} == before
     # without --n-batches the call passes, as in 0.3.4
     rc, stdout, _ = convert("me.h5ad", "--batch-index", "1", "--overwrite")

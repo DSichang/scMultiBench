@@ -98,9 +98,8 @@ def test_wrong_kind_and_scripts_ref_keep_both_reasons(tmp_path, monkeypatch, gas
         # the ref is its own blocker, like the wrong ATAC kind: the files are fine
         assert not r["runnable"] and r["files_ok"]
         assert r["reason"].startswith(wrong[:-1])
-        assert ("Matilda needs gene-activity ATAC, and atac.h5 holds peaks. Export the "
-                "ATAC as gene activity, or pass allow_atac_mismatch=True to run Matilda "
-                "anyway.") in r["reason"]
+        assert r["reason"].endswith("Matilda needs gene-activity ATAC, and atac.h5 holds "
+                                    "peaks. Export the ATAC as gene activity.")
         with pytest.raises(ValueError, match=r"^No method can run on MU_PEAK \(vertical\)"):
             mtb.run_all("MU_PEAK", "vertical", tmp_path / "out",
                         modalities=["rna", "atac"], data_path=tmp_path, verbose=False)

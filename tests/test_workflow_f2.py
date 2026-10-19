@@ -125,15 +125,15 @@ def _plot_warnings(fn, **kw):
 def test_plot_incomplete_fix_follows_the_caller(cli_mode, monkeypatch):
     monkeypatch.setattr(config, "_CLI", cli_mode)
     bub = [m for m in _plot_warnings(mtb.plot.bubble, aggregate="summary")
-           if "C" in m and ("require" in m)]
+           if "C" in m and "every dataset" in m]
     bar = [m for m in _plot_warnings(mtb.plot.bar) if "every dataset" in m]
     assert bub and bar
-    if cli_mode:
-        assert "--require-complete" in bub[0] and "require_complete=" not in bub[0]
-        assert "--methods" in bar[0] and "long_df" not in bar[0]
-    else:
-        assert "require_complete=True" in bub[0] and "--require-complete" not in bub[0]
-        assert "methods=" in bar[0] and "--methods" not in bar[0]
+    for msg in (bub[0], bar[0]):
+        assert "require" not in msg
+        if cli_mode:
+            assert "--methods" in msg and "methods=" not in msg and "long_df" not in msg
+        else:
+            assert "methods=" in msg and "--methods" not in msg
 
 
 def test_json_output_keeps_slashes_unescaped(capsys):

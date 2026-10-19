@@ -455,7 +455,7 @@ def test_fetchable_lists_the_release_assets(result_dir):
     assert "D46" in ids and "D46" not in have
     doc = results.fetchable.__doc__
     assert "Dataset ids ``mtb.data.fetch`` can download." in doc
-    assert "``mtb.results_coverage`` lists the datasets with stored scores" in doc
+    assert "``mtb.results_coverage`` lists the datasets with stored results" in doc
 
 
 def test_shipped_tree_is_consistent_across_the_api(result_dir):

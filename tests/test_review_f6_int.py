@@ -275,9 +275,9 @@ def test_the_no_variant_and_missing_folder_errors_are_sentences(tmp_path):
     with pytest.raises(FileNotFoundError) as e:
         full_scan("MYCITE", data_path=tmp_path)
     assert str(e.value) == (f"The folder {tmp_path / 'MYCITE'} does not exist. {tmp_path} "
-                            f"holds D11 and D28. dataset= is the folder name, and "
-                            f"data_path= the folder that holds it. mtb.describe_layout() "
-                            f"shows the layout.")
+                            f"holds D11 and D28. dataset= is the folder's path, or its "
+                            f"name under mtb.config.DEFAULT.data_path. "
+                            f"mtb.describe_layout() shows the layout.")
 
 
 def test_the_label_count_error_is_sentences(tmp_path):

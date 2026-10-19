@@ -95,8 +95,7 @@ def test_incomplete_matrix_warning_is_short_sentences():
     assert msg == ("The summary ranks 2 datasets. C has scores on 1 of them. With "
                    "overall='rank', a missing dataset counts as rank 0, the lowest. "
                    "With overall='mean_overall', the missing dataset is left out. "
-                   "Pass require_complete=True to keep only the methods scored on "
-                   "every dataset.")
+                   "Pass methods= with the methods scored on every dataset.")
     assert ";" not in msg and "under" not in msg
     _, msgs = _messages(mtb.plot.bar, _incomplete())
     (msg,) = [m for m in msgs if m.startswith("The summary ranks")]
@@ -120,7 +119,7 @@ def test_incomplete_matrix_cli_spelling(tmp_path, capsys):
                      "--out", str(tmp_path / "f.png")]) == 0
     err = capsys.readouterr().err
     assert "With --overall rank, a missing dataset counts as rank 0, the lowest." in err
-    assert "Pass --require-complete to keep only the methods scored on every dataset." in err
+    assert "Pass --methods with the methods scored on every dataset." in err
 
 
 # --- R4-12 (d): the n/a error -------------------------------------------------

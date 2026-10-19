@@ -629,7 +629,7 @@ def test_cli_wording(tmp_path, capsys):
     before = _snapshot(out)
     capsys.readouterr()
     argv = ["convert", str(tmp_path / "me.h5ad"), str(out), "--rna", "X"]
-    head = (f"error: {out} holds cty.csv with another number of labels. Convert into a new "
+    head = (f"error: {out} holds cty.csv with another number of labels. Export into a new "
             f"folder.")
     assert _quiet(cli.main, argv + ["--overwrite"]) == 1
     err = capsys.readouterr().err
@@ -638,13 +638,13 @@ def test_cli_wording(tmp_path, capsys):
     err = capsys.readouterr().err
     assert _error_line(err) == head
     assert "overwrite=True" not in err and "this call" not in err and "run_all" not in err
-    assert "Export" not in err
+    assert "Export to a new folder" not in err                  # the Python sentence
     assert _snapshot(out) == before
 
 
 def test_cli_wording_of_labels_alone_on_a_diagonal_folder(tmp_path, capsys):
-    """The command line names the convert command that wrote the folder, and
-    that command with --labels writes both label files."""
+    """The command line names the export command that wrote the folder (here
+    its convert alias), and that command with --labels writes both label files."""
     rna, atac = _cells(120, "RNA")[0], _genes(_cells(90, "ATAC", seed=1)[1])
     del rna.obsm["protein"]
     rna.write_h5ad(tmp_path / "rna.h5ad")
@@ -660,9 +660,9 @@ def test_cli_wording_of_labels_alone_on_a_diagonal_folder(tmp_path, capsys):
                              "obs:celltype", "--overwrite"]) == 1
     err = capsys.readouterr().err
     assert _error_line(err) == (
-        f"error: {out} holds atac_gas.h5 with other cells. To add labels, run the convert "
+        f"error: {out} holds atac_gas.h5 with other cells. To add labels, run the export "
         f"command that wrote the folder again with --labels and --overwrite.")
-    for word in ("labels=", "category=", "batch_index=", "this call", "run_all", "export"):
+    for word in ("labels=", "category=", "batch_index=", "this call", "run_all", "export call"):
         assert word not in err, word
     assert _snapshot(out) == before
     assert _quiet(cli.main, wrote + ["--labels", "obs:celltype", "--overwrite"]) == 0
@@ -680,7 +680,7 @@ def test_cli_wording_of_n_batches(tmp_path, monkeypatch):
     me, _ = _cells(60, "ME", seed=9)
     monkeypatch.setattr(config, "_CLI", True)
     assert _refused(me, f, batch_index=1, n_batches=2, **kw) == (
-        f"{f} holds rna3.h5 and 1 more file of batch 3, above --n-batches 2. Convert into a "
+        f"{f} holds rna3.h5 and 1 more file of batch 3, above --n-batches 2. Export into a "
         f"new folder.")
     g = tmp_path / "ARGS"
     with pytest.raises(ValueError) as e:
