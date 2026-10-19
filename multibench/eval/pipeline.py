@@ -371,17 +371,18 @@ def _has_cell_ids(ids) -> bool:
     return ids is not None and io._looks_like_ids(pd.Series(list(ids), dtype=object))
 
 
-def _file_barcodes(files, counts=None):
+def _file_barcodes(files, counts=None, read=()):
     """The cell ids of label files that have none, from the matrix next to each
-    one with as many cells (``cty2.csv`` -> ``rna2.h5``, ...); ``None`` when one
-    has no such matrix. Where barcodes repeat, each is named by its label file,
-    ``cty2:<barcode>``, as ``BatchResult.embedding`` names it."""
+    one with as many cells (``cty2.csv`` -> ``rna2.h5``, ...; the files a method
+    read, ``read``, first); ``None`` when one has no such matrix. Where barcodes
+    repeat, each is named by its label file, ``cty2:<barcode>``, as
+    ``BatchResult.embedding`` names it."""
     import h5py
     from ..workflow import _label_data_files      # workflow imports this module
     out, stems = [], []
     for i, f in enumerate(files):
         n = counts[i] if counts is not None else len(io.read_labels(f))
-        for m in (x for x in _label_data_files(Path(f)) if x.is_file()):
+        for m in (x for x in _label_data_files(Path(f), read) if x.is_file()):
             try:
                 with h5py.File(m, "r") as h:
                     bars = [b.decode() if isinstance(b, bytes) else str(b)
@@ -530,6 +531,8 @@ class _Cells(NamedTuple):
     whole: bool
     #: the file stems in ``method``'s order when the folder's order differs
     moved: tuple = ()
+    #: the names of the files ``method`` read, whose barcodes name the cells
+    read: frozenset = frozenset()
 
 
 def _label_files(given) -> list:
@@ -1094,7 +1097,7 @@ def _follows_cells(labels, adata, cells: _Cells) -> bool:
 def _cells_ids(cells: _Cells, n: int):
     """The barcodes of ``cells`` in the method's order, when they are ``n``
     cells; else ``None``."""
-    keys = _file_barcodes(cells.files)
+    keys = _file_barcodes(cells.files, read=cells.read)
     return None if keys is None or len(keys) != n else pd.Index(keys)
 
 
@@ -1133,7 +1136,9 @@ def _expected_cells(dataset, category, method, data_path, read, *,
                                                    data_path=data_path, check=False))
         if [f.name for f in folder] != [f.name for f in files]:
             moved = tuple(f.stem for f in files)
-    return _Cells(dataset, files, own, from_files, whole, moved)
+    from ..workflow import _method_files
+    return _Cells(dataset, files, own, from_files, whole, moved,
+                  frozenset(_method_files(dataset, category, own, None, data_path)))
 
 
 def _dataset_labels(dataset, category, method, data_path):

@@ -48,7 +48,7 @@ LISTED = {
 
 
 def _core(attrs):
-    """The attrs these tests pin; 0.4.0 added not_listed_batch and not_listed_methods."""
+    """The attrs these tests pin; 0.4.0 added not_listed_batch."""
     return {k: attrs[k] for k in ("held", "not_listed", "not_held")}
 
 

@@ -126,8 +126,7 @@ def test_columns_order_and_one_row_per_method(linux, monkeypatch):
                for r in pm["reason"][:2])
     for m, reason in zip(pm["method"][2:], pm["reason"][2:]):
         assert reason and reason == by[m]
-    assert set(pm.attrs) == {"held", "not_listed", "not_held", "cells", "not_listed_batch",
-                             "not_listed_methods"}
+    assert set(pm.attrs) == {"held", "not_listed", "not_held", "cells", "not_listed_batch"}
     assert {k: pm.attrs[k] for k in full.attrs} == full.attrs
 
 

@@ -1533,8 +1533,6 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
         df = df[keep].reset_index(drop=True)
         private = private[keep].reset_index(drop=True)
     df.attrs.update(held=held, not_listed=len(left_out), not_listed_batch=n_batch_out,
-                    # the methods with no listed row, as scan's own line counts them
-                    not_listed_methods=len({m for m, _ in left_out} - set(df["method"])),
                     not_held=[f for f in registry._BASE_MODALITIES
                               if any(f in lack for _, lack in left_out)])
     private.attrs.update(dataset=dataset, folder=ds_dir, category=category)
@@ -2159,7 +2157,8 @@ class BatchResult:
         See Also
         --------
         BatchResult.failures : the rows whose status means something went wrong.
-        BatchResult.records : the raw records, with every label order tried.
+        mtb.load_batch : reads a saved folder; its ``batch_result.json`` holds every
+            record, with the label orders tried.
         """
         rows = [{"method": r.get("method"), "status": _status(r.get("status")),
                  "run_sec": r.get("run_sec"),
@@ -2487,7 +2486,7 @@ class BatchResult:
                 _drop_scores(rec)
                 rec["status"] = "RUN_OK_EVAL_FAILED"
                 rec["error"] = _clip_error(f"{type(e).__name__}: {e}")
-            if verbose:
+            if verbose and method not in no_output:      # its error says what is missing
                 print(f"[rescore] {method} -> {_status(rec['status'])} {_ari_tail(rec)}".rstrip(),
                       flush=True)
             if metrics is not None and rec.get("metrics") and r.get("metrics"):
@@ -2604,7 +2603,7 @@ class BatchResult:
         **Saving into a folder that has a result.** When the folder already
         holds ``batch_result.json`` for the same dataset and category, the
         records are merged. A method in this result replaces its earlier
-        record, unless it is ``SKIPPED`` and the earlier one is not; the other
+        record, unless its status is ``skipped`` and the earlier one's is not; the other
         earlier records are kept, every file in the list above is rewritten
         from the merged set, and a line ``# Merged with 1 earlier record in <folder>
         (StabMap).`` names them. This result object is not changed. Jobs
@@ -2681,9 +2680,11 @@ def _embedding_obs(rec, dataset, category, root, n, batch_text=None) -> pd.DataF
                                         data_path=root, check=False)
         names = [Path(p).name for p in files.values()]
     labels, barcodes, batch = [], [], []
+    # the barcodes of the files the method read (atac_gas.h5, not atac_peak.h5)
+    read = _method_files(dataset, category, rec["method"], rec.get("modalities"), root)
     for f in names:
         lab = _eio.read_labels(folder / f)
-        bars = next((b for b in map(_resolve._barcodes_of, _label_data_files(folder / f))
+        bars = next((b for b in map(_resolve._barcodes_of, _label_data_files(folder / f, read))
                      if b is not None and len(b) == len(lab)), None)
         labels.append(np.asarray(lab, dtype=object))
         barcodes.append(bars)
@@ -2993,9 +2994,26 @@ def _batch_segments(dataset, data_path, batch) -> dict | None:
     return out
 
 
-def _label_data_files(label: Path) -> list[Path]:
+def _method_files(dataset, category, method, modalities=None, data_path=None) -> set:
+    """The names of the files ``method`` reads from ``dataset``; ``set()`` when
+    they cannot be resolved (another layout, or no such method)."""
+    if not method or registry.method_of(method) is None:
+        return set()
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            paths = _resolve.inputs_for(dataset, category, registry.method_of(method),
+                                        modalities=modalities or None,
+                                        data_path=data_path, check=False)
+    except (FileNotFoundError, KeyError, ValueError):
+        return set()
+    return {Path(p).name for p in paths.values()}
+
+
+def _label_data_files(label: Path, read=()) -> list[Path]:
     """The data files whose barcodes are the cells of one label file:
-    ``cty2.csv`` -> ``rna2.h5, adt2.h5, ...``; ``atac_cty.csv`` -> the ATAC files."""
+    ``cty2.csv`` -> ``rna2.h5, adt2.h5, ...``; ``atac_cty.csv`` -> the ATAC files,
+    the ones a method read (``read``: file names) first."""
     stem = label.stem
     digits = stem[len(stem.rstrip("0123456789")):]
     base = stem[:len(stem) - len(digits)]
@@ -3007,7 +3025,8 @@ def _label_data_files(label: Path) -> list[Path]:
         stems = ["atac_peak", "atac_gas", "atac", "peak"]
     else:
         stems = []
-    return [label.parent / f"{s}{digits}.h5" for s in stems]
+    files = [label.parent / f"{s}{digits}.h5" for s in stems]
+    return sorted(files, key=lambda f: f.name not in read)
 
 
 def _dataset_folder(dataset, data_path) -> Path:
