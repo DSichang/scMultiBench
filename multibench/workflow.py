@@ -2401,6 +2401,11 @@ class BatchResult:
                                             moved=True, tried=tried[root],
                                             as_written=True)
                 _check_batch(vec, self.dataset)
+                bad = not rows and not by_cell and _batch_length_problem(
+                    [(r.get("method"), r.get("modalities")) for r in self.records
+                     if _scorable(r)], vec, self.dataset, self.category, root)
+                if bad:
+                    raise ValueError(bad)
                 # saved with the result, unless it follows the embedding rows
                 file = None if rows and not by_cell else _batch_csv(vec, self.dataset, root)
                 batch_at[root] = (vec, by_cell, file)
@@ -2488,11 +2493,12 @@ class BatchResult:
         # to score, so say so instead of returning a table without scores
         tried_records = [r for r in new.records if _scorable(r)]
         if tried_records and len(no_output) == len(tried_records):
-            first = tried_records[0]
-            n = len(tried_records)
-            raise FileNotFoundError(f"rescore found the output of none of the {n} "
-                                    f"{'method' if n == 1 else 'methods'}. "
-                                    f"{first['method']}: {first.get('error')}")
+            one = len(tried_records) == 1
+            raise FileNotFoundError(
+                f"No output of {_and_list([r['method'] for r in tried_records])} in "
+                f"{self.out_dir or '.'}: load the folder that holds "
+                f"{'its method folder' if one else 'their method folders'}, or run "
+                f"{'it' if one else 'them'} again.")
         return new
 
     def embedding(self, method: str):
@@ -2932,7 +2938,7 @@ def _load_embedding(mdir: Path, variant):
     if variant.output.kind == "embedding":
         p = mdir / variant.output.file
         if not p.exists():
-            raise FileNotFoundError(f"no output {p} to score - was the run deleted?")
+            raise FileNotFoundError(f"{p} is missing: run the method again.")
         emb = read(p, variant.output.dataset)
     else:
         extra = [mdir / o.file for o in variant.extra_outputs if o.kind == "embedding"]
@@ -3337,22 +3343,16 @@ def _nested_rows(plan: "pd.DataFrame") -> tuple[list, list[str]]:
     return drop, notes
 
 
-def _batch_length_problem(plan, batch, dataset, category, data_path) -> str:
-    """The error when ``batch`` fits neither the dataset's label files nor some
-    row the sweep would run; "" when it fits."""
+def _batch_length_problem(runs, batch, dataset, category, data_path) -> str:
+    """The error when ``batch`` fits neither the dataset's label files nor the
+    cells of some ``(method, modalities)`` of ``runs``; "" when it fits."""
     total = sum(n for _, n in _label_file_sizes(dataset, data_path=data_path))
     if not total or len(batch) == total:
         return ""
-    bad = []
-    for _, r in plan.iterrows():
-        if not _would_run(r) or r["method"] in bad:
-            continue
-        mods = _row_modalities(r["modalities"]) or None
-        own = sum(n for _, n in _label_file_sizes(dataset, category, r["method"],
-                                                  modalities=mods, data_path=data_path))
-        if own and len(batch) != own:
-            bad.append(r["method"])
-    if not bad:
+    own = (sum(n for _, n in _label_file_sizes(dataset, category, m, modalities=list(mods)
+                                               or None, data_path=data_path))
+           for m, mods in {(m, tuple(x or ())) for m, x in runs})
+    if all(n in (0, len(batch)) for n in own):
         return ""
     return (config.hint(f"batch has {len(batch):,} entries",
                         f"--batch gave {len(batch):,} batch ids")
@@ -3635,12 +3635,13 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
     if plan_df.empty:
         # a modalities= selection that matches nothing, without methods=
         raise _no_variant_error(category, methods, modalities)
+    batch_vec = None if batch is None else _batch_vector(batch, dataset, data_path)
+    bad = batch_vec is not None and (evaluate or dry_run) and _batch_length_problem(
+        [(r["method"], _row_modalities(r["modalities"])) for _, r in plan_df.iterrows()
+         if _would_run(r)], batch_vec, dataset, category, data_path)
+    if bad:
+        raise ValueError(bad)
     if dry_run:
-        batch_vec = None if batch is None else _batch_vector(batch, dataset, data_path)
-        bad = batch_vec is not None and _batch_length_problem(plan_df, batch_vec, dataset,
-                                                              category, data_path)
-        if bad:
-            raise ValueError(bad)
         nested_notes = []
         if modalities is None:
             # the rows a real run leaves out: another row of the method holds their files
@@ -3706,11 +3707,6 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
     if unlabelled:
         raise ValueError(unlabelled)
 
-    batch_vec = None if batch is None else _batch_vector(batch, dataset, data_path)
-    bad = batch_vec is not None and evaluate and _batch_length_problem(
-        plan_df, batch_vec, dataset, category, data_path)
-    if bad:
-        raise ValueError(bad)
     # saved in out_dir so that rescore can reuse it
     batch_file = (_batch_csv(batch_vec, dataset, data_path)
                   if batch_vec is not None and evaluate else None)
@@ -3756,8 +3752,10 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
         if saved is not None and _status(saved.get("status")) in ("scored", "ran") and (
                 method_dir / registry.get(method).select(category, set(mods)).output.file
         ).exists():
-            # a saved run is scored again, as rescore does: its record is kept
-            rec = (BatchResult([saved], dataset, category, out_dir)._rescore(
+            # a saved run is scored again, as rescore does: its record is kept,
+            # with its folder as found from here
+            rec = (BatchResult([dict(saved, out_dir=str(method_dir))], dataset, category,
+                               out_dir)._rescore(
                 batch=batch, labels=None, metrics=None, verbose=False).records[0]
                 if evaluate else dict(saved))
             if verbose:

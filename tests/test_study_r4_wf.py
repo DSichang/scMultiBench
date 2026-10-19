@@ -495,7 +495,7 @@ def test_named_blocked_methods_are_logged_and_recorded(tmp_path, monkeypatch, ca
     again = _quiet(mtb.load_batch(tmp_path / "out", methods=["MIRA"]).rescore,
                    metrics=["ARI"])
     assert {r["method"]: r["status"] for r in again.records}["MIRA"] == "SKIPPED"
-    with pytest.raises(FileNotFoundError, match="rescore found the output of none of"):
+    with pytest.raises(FileNotFoundError, match="^No output of "):
         _quiet(back.rescore, metrics=["ARI"])
 
 

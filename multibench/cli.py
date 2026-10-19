@@ -67,9 +67,8 @@ from .engine.runner import _prepared_at, run as _run
 from .eval import io as eio
 from .eval import pipeline
 from .plot.bubble import THIS_RUN
-from .workflow import (_batch_length_problem, _batch_vector, _column_name_error,
-                       _dry_run_notes, _is_wrong_atac, _is_wrong_ref, _rows_word, _scan_note,
-                       _scripts_ref_note)
+from .workflow import (_column_name_error, _dry_run_notes, _is_wrong_atac, _is_wrong_ref,
+                       _rows_word, _scan_note, _scripts_ref_note)
 
 _EXIT_OK = 0
 _EXIT_ERROR = 1
@@ -985,8 +984,9 @@ def _rename_repeats(own: list, inputs: list) -> list:
         if shared and set(keys) <= set(f.columns):
             hit = [tuple(k) in shared for k in f[keys].astype(str).to_numpy()]
             f = f.copy()
-            # "<method> (<tag>)": --methods <method> keeps it (registry.method_of)
-            f.loc[hit, "method"] = f.loc[hit, "method"].astype(str) + f" ({Path(path).stem})"
+            # "<method> (<folder>)": --methods <method> keeps it (registry.method_of)
+            tag = Path(path).parent.name if Path(path).name == "long.csv" else Path(path).stem
+            f.loc[hit, "method"] = f.loc[hit, "method"].astype(str) + f" ({tag})"
         out.append(f)
     return out
 
@@ -1015,9 +1015,12 @@ def _cmd_plot(args) -> int:
     methods = _csv_list(args.methods)
     if methods:
         # a method id keeps its renamed runs too, as "scJoint (ep40)"
+        present = list(dict.fromkeys(df["method"].astype(str)))
         ids = {registry.method_of(m) for m in methods} - {None}
-        methods += [h for h in dict.fromkeys(df["method"].astype(str))
-                    if h not in methods and registry.method_of(h) in ids]
+        runs = [h for h in present if h not in methods and registry.method_of(h) in ids]
+        renamed = {registry.method_of(h) for h in runs}
+        methods = [m for m in methods if m in present
+                   or registry.method_of(m) not in renamed] + runs
     if len(df) == 0:
         raise ValueError("Nothing is left to plot after the filters.")
     if df["method"].nunique() == 1 and args.category is None and args.kind == "bar":
@@ -1111,12 +1114,8 @@ def _run_all_command(args, stack) -> int:
         # the name of an obs column: a dataset folder holds none
         raise FileNotFoundError(_column_name_error("batch", args.batch))
     batch = _batch_arg(args, stack)
-    batch_vec = None
     if batch is not None:
         eio._require_file(batch, "--batch file")   # exit 1 before any method runs
-        if args.dry_run:
-            # a file it cannot read, or ids that are not cells of the dataset, fail
-            batch_vec = _batch_vector(batch, args.dataset, args.data_path)
     if args.dry_run:
         modalities = _modalities_arg(args.modalities)
         with _quiet_stdout():
@@ -1124,7 +1123,7 @@ def _run_all_command(args, stack) -> int:
                                    methods=_csv_list(args.methods),
                                    modalities=modalities,
                                    data_path=args.data_path, params=params,
-                                   dry_run=True, verbose=False,
+                                   dry_run=True, verbose=False, batch=batch,
                                    assume_gpu=args.assume_gpu,
                                    allow_atac_mismatch=args.allow_atac_mismatch)
         k, n = int(df["runnable"].sum()), len(df)
@@ -1144,11 +1143,6 @@ def _run_all_command(args, stack) -> int:
             print(f"# {scripts}", file=sys.stderr)
         for _m, cav in lines:              # each caveat starts with its method
             print(f"# {cav}", file=sys.stderr)
-        if batch_vec is not None:
-            bad = _batch_length_problem(df, batch_vec, args.dataset, args.category,
-                                        args.data_path)
-            if bad:          # the scoring of the real run would fail: exit 1 now
-                raise ValueError(bad)
         plan = df if columns else workflow._shown_modalities(df)[workflow.PLAN_COLUMNS]
         _print_frame(plan, columns=columns, fmt=args.format,
                      compact=workflow.PLAN_COLUMNS[:4])

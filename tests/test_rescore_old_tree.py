@@ -65,9 +65,8 @@ def test_rescore_raises_when_it_finds_no_output(tmp_path):
     with pytest.raises(FileNotFoundError) as e:
         res.rescore(metrics=["ARI"], verbose=False)
     assert str(e.value) == (
-        f"rescore found the output of none of the 2 methods. totalVI: FileNotFoundError: "
-        f"The record of totalVI has no out_dir, and {tree / 'totalVI_MYCITE'} does not "
-        f"exist.")
+        f"No output of totalVI and Matilda in {tree}: load the folder that holds their "
+        f"method folders, or run them again.")
 
 
 def test_a_method_without_output_is_recorded_when_another_scores(tmp_path):
@@ -76,4 +75,4 @@ def test_a_method_without_output_is_recorded_when_another_scores(tmp_path):
     again = mtb.load_batch(tree, data_path=tmp_path / "data").rescore(metrics=["ARI"],
                                                                       verbose=False)
     assert [r["status"] for r in again.records] == ["CHAIN_OK", "RUN_OK_EVAL_FAILED"]
-    assert "no output" in again.records[1]["error"]
+    assert "embedding.h5 is missing: run the method again." in again.records[1]["error"]

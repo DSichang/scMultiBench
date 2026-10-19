@@ -124,3 +124,70 @@ def test_the_bar_axis_does_not_claim_0_1():
                                                  value=lambda d: d["value"] + 0.2)
     fig = _quiet(mtb.plot.bar, pd.concat([st, best]))
     assert fig.axes[0].get_xlabel() == "overall score (D11)"
+
+
+# --------------------------------------------------------------- D03
+def _saved_tree(tmp_path):
+    """A saved run_all folder of D11 (its record names 'Matilda_D11'), under runs/."""
+    from tests.test_c2_fixes import _old_tree
+    out = _old_tree(tmp_path)
+    blob = json.loads((out / "batch_result.json").read_text())
+    blob["records"][0]["out_dir"] = "Matilda_D11"          # as BatchResult.save writes it
+    (out / "batch_result.json").write_text(json.dumps(blob))
+    (tmp_path / "runs").mkdir()
+    return out.rename(tmp_path / "runs" / "D11")
+
+
+@pytest.mark.parametrize("where", ["parent", "elsewhere", "absolute"])
+def test_skip_existing_rescores_from_any_directory(where, tmp_path, monkeypatch):
+    folder = _saved_tree(tmp_path)
+    (tmp_path / "elsewhere").mkdir()
+    cwd, out = {"parent": (tmp_path, "runs/D11"),
+                "elsewhere": (tmp_path / "elsewhere", "../runs/D11"),
+                "absolute": (tmp_path / "elsewhere", str(folder))}[where]
+    monkeypatch.chdir(cwd)
+    for _ in range(2):                                  # and again on what it saved
+        res = _quiet(mtb.run_all, "D11", "vertical", methods=["Matilda"], out_dir=out,
+                     skip_existing=True)
+        s = res.summary.set_index("method")
+        assert (s.loc["Matilda", "status"], s.loc["Matilda", "run_sec"]) == ("scored", 17.0)
+
+
+def test_cli_skip_existing_from_the_parent(tmp_path, monkeypatch):
+    _saved_tree(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    assert _quiet(cli.main, ["run-all", "D11", "--category", "vertical", "--methods",
+                             "Matilda", "--out-dir", "runs/D11", "--skip-existing"]) == 0
+
+
+# --------------------------------------------------------------- E01
+def test_rescore_refuses_a_batch_of_the_wrong_length_before_scoring(tmp_path, monkeypatch):
+    from multibench import workflow
+    scored = []
+    monkeypatch.setattr(workflow, "_score_record", lambda *a, **k: scored.append(a))
+    res = mtb.load_batch(_saved_tree(tmp_path))
+    with pytest.raises(ValueError, match=r"^batch has 2,000 entries for the 2,864 cells of "
+                                         r"D11: give one batch per cell\.$"):
+        _quiet(res.rescore, batch=np.repeat(["a", "b"], 1000))
+    assert not scored
+
+
+# --------------------------------------------------------------- E06
+def test_rescore_without_outputs_names_the_methods_and_the_fix(tmp_path):
+    folder = _saved_tree(tmp_path)
+    (folder / "Matilda_D11" / "embedding.h5").unlink()
+    with pytest.raises(FileNotFoundError) as e:
+        _quiet(mtb.load_batch(folder).rescore)
+    assert str(e.value) == (f"No output of Matilda in {folder}: load the folder that holds "
+                            f"its method folder, or run it again.")
+
+
+# --------------------------------------------------------------- E10 / E22
+def test_cli_dry_run_refuses_a_wrong_length_batch_before_printing(tmp_path, capsys):
+    pd.DataFrame({"donor": ["a", "b"] * 250}).to_csv(tmp_path / "b.csv", index=False)
+    rc = cli.main(["run-all", "D11", "--category", "vertical", "--dry-run", "--methods",
+                   "Matilda", "--batch", str(tmp_path / "b.csv")])
+    cap = capsys.readouterr()
+    assert rc != 0 and cap.out == ""
+    assert cap.err.splitlines()[0] == ("error: --batch gave 500 batch ids for the 2,864 cells "
+                                       "of D11: give one batch per cell.")

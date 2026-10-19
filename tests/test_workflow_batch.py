@@ -124,10 +124,10 @@ def test_rescore_with_batch_and_labels(cite, tmp_path):
     bp = tmp_path / "batch.csv"
     pd.DataFrame({"x": batch}).to_csv(bp, index=False)
     assert res.rescore(batch=bp).records[0]["n_batches"] == 2
-    # wrong length -> RUN_OK_EVAL_FAILED with the precise message, not an exception
-    bad = res.rescore(batch=np.ones(3))
-    assert bad.summary.loc[0, "status"] == "ran"
-    assert "batch has 3 entries" in bad.records[0]["error"]
+    # c3 (E01): a wrong length is refused before any score is dropped
+    with pytest.raises(ValueError, match=rf"^batch has 3 entries for the {N} cells of "
+                                         r"MYCITE: give one batch per cell\.$"):
+        res.rescore(batch=np.ones(3))
     # not persisted until asked; .save() writes the new numbers
     assert mtb.load_batch(tmp_path / "out").records[0]["batch_source"] is None
     re.save(tmp_path / "out2")
@@ -140,9 +140,9 @@ def test_rescore_handles_missing_output(cite, tmp_path):
                       out_dir=tmp_path / "out", data_path=data, verbose=False)
     (tmp_path / "out" / "Matilda_MYCITE" / "embedding.h5").unlink()
     # 0.4: no output to score at all is an error, not a table without scores
-    with pytest.raises(FileNotFoundError, match=r"rescore found the output of none of the "
-                                                r"1 method\. Matilda: FileNotFoundError: "
-                                                r"no output .* to score"):
+    with pytest.raises(FileNotFoundError, match=r"^No output of Matilda in .*out: load the "
+                                                r"folder that holds its method folder, or "
+                                                r"run it again\.$"):
         res.rescore()
 
 

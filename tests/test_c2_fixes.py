@@ -425,7 +425,7 @@ def test_cli_methods_keeps_a_renamed_run(tmp_path, capsys):
                          "--input", str(tmp_path / "ep40" / "long.csv"), "--methods",
                          "scJoint", "--metrics", "clustering",
                          "--out", str(tmp_path / "x.png")]) == 0
-    assert seen["methods"] == ["scJoint", "scJoint (long)"]
+    assert seen["methods"] == ["scJoint (ep10)", "scJoint (ep40)"]
 
 
 def _help(*cmd):
