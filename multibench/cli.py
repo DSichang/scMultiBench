@@ -1036,7 +1036,8 @@ def _cmd_plot(args) -> int:
     # the deprecated flags (warned once) keep their effect until 0.5
     from .plot.bar import _bar
     from .plot.bubble import _bubble
-    with _quiet_stdout():
+    # the deprecated --result-path: its stored rows rank as the stored results
+    with _quiet_stdout(), _setting("result_path", args.result_path and Path(args.result_path)):
         if args.kind == "bubble":
             _bubble(df, metrics=metrics, methods=methods, aggregate=args.aggregate,
                     title=title, save=args.out, overall=args.overall or "rank",

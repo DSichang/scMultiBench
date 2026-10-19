@@ -202,3 +202,47 @@ def test_a_printed_table_leaves_the_category_empty(tmp_path, capsys):
     assert cli.main(["evaluate", str(tmp_path / "e.npy"), "--labels",
                      str(tmp_path / "l.csv"), "--metrics", "ASW"]) == 0
     assert "None" not in capsys.readouterr().out
+
+
+# ------------------------------------------- u4 #1, u5 #8: the stored rows; u5 #2: snap
+from multibench.plot.style import overall  # noqa: E402
+
+
+def test_a_pandas_copy_of_stored_rows_is_your_row():
+    st = mtb.load_results("diagonal")
+    copy = st[st["method"] == "scJoint"].assign(method="scJoint (copy)")   # source "stored"
+    s, base = overall(pd.concat([st, copy])), overall(st)
+    assert np.allclose(s[base.index], base, atol=1e-12)
+    assert s["scJoint (copy)"] == pytest.approx(s["scJoint"])
+
+
+def test_stored_rows_under_a_custom_result_path_stay_stored(tmp_path, monkeypatch):
+    rows = [dict(metric=m, value=v, method=meth, dataset="DX", category="vertical",
+                 source="stored")
+            for meth, v in (("Matilda", 0.9), ("scMM", 0.5), ("sciPENN", 0.2))
+            for m in ("ARI", "NMI")]
+    (tmp_path / "rerun").mkdir()
+    pd.DataFrame(rows).to_csv(tmp_path / "rerun" / "long_all_x.csv", index=False)
+    monkeypatch.setattr(config.DEFAULT, "result_path", tmp_path)
+    st = _quiet(mtb.load_results, "vertical")
+    assert set(st["dataset"]) == {"DX"}
+    mine = st[st["method"] == "scMM"].assign(method="mine", source="user", value=0.7)
+    s = overall(pd.concat([st, mine]))
+    assert s.to_dict() == pytest.approx({"Matilda": 1.0, "mine": 0.75, "scMM": 0.5,
+                                         "sciPENN": 0.0})
+
+
+def test_noise_snaps_to_the_stored_value_of_the_same_method_only():
+    st = mtb.load_results("mosaic")
+    base = overall(st)
+    for shift in (5e-7, -5e-7):
+        near = st[st["method"] == "Cobolt"].assign(
+            method="Cobolt (this run)", source="user", value=lambda d: d["value"] + shift)
+        s = overall(pd.concat([st, near]))
+        assert np.allclose(s[base.index], base, atol=1e-12)
+        assert s["Cobolt (this run)"] == pytest.approx(s["Cobolt"])
+    # your own method 5e-7 above the best stored value is above it: no snap
+    other = st[st["method"] == "MultiVI"].assign(method="mine", source="user",
+                                                 value=lambda d: d["value"] + 5e-7)
+    s = overall(pd.concat([st, other]), ["NMI_batch"])
+    assert s["mine"] > s["MultiVI"]

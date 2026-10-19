@@ -1135,9 +1135,11 @@ def _recommend(
     n_ds = pd.Series([m for ms in kept.values() for m in ms]).value_counts()
     n_total = len(kept)
     codes = sel.codes if sel.explicit else None
-    grand = style.overall(df, codes)        # refuses your rows on another dataset
+    # the stored rows are those of the tables read (the deprecated result_path=)
+    stored = style.stored_pairs(result_path)
+    grand = style.overall(df, codes, stored=stored)   # refuses your rows on another dataset
     if degenerate:
-        grand = style.overall(df[df["dataset"].isin(list(kept))], codes)
+        grand = style.overall(df[df["dataset"].isin(list(kept))], codes, stored=stored)
     keep_methods = list(grand.index) + sorted(
         {m for ms in kept.values() for m in ms} - set(grand.index), key=str)
     if filtered:

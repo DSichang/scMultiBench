@@ -5,6 +5,9 @@ and ``plot.bubble``.
 """
 from __future__ import annotations
 
+import functools
+import warnings
+
 import numpy as np
 import pandas as pd
 
@@ -151,7 +154,29 @@ STORED_SOURCES = ("published", "stored", "rerun")
 SNAP = 1e-6
 
 
-def overall(df: pd.DataFrame, metrics=None) -> pd.Series:
+def stored_pairs(result_path=None) -> frozenset:
+    """``{(dataset, method)}`` of the stored results ``mtb.load_results`` reads
+    under ``mtb.config.DEFAULT.result_path`` (or ``result_path``)."""
+    from ..data.results import _base_path
+    base = _base_path(result_path)
+    # the folders' times: tables written after a first call are read again
+    stamp = tuple(p.stat().st_mtime_ns if p.exists() else 0 for p in (base, base / "rerun"))
+    return _pairs_under(str(base), stamp)
+
+
+@functools.lru_cache(maxsize=8)
+def _pairs_under(base: str, stamp: tuple) -> frozenset:
+    from ..data.results import _load_results
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")     # load_results says them when it is called
+        try:
+            rows = _load_results(None, source="both", result_path=base)
+        except FileNotFoundError:
+            return frozenset()
+    return frozenset(zip(rows["dataset"].astype(str), rows["method"].astype(str)))
+
+
+def overall(df: pd.DataFrame, metrics=None, *, stored=None) -> pd.Series:
     """The overall score per method, best first (ties by name), of
     ``mtb.recommend``, ``plot.bar`` and ``plot.bubble``.
 
@@ -161,15 +186,24 @@ def overall(df: pd.DataFrame, metrics=None) -> pd.Series:
     min-max scaled with the stored rows' range (1 when they tie), then averaged
     over the datasets. Stored rows so keep their article scores, a row equal to
     a stored row gets its score, and one better than all scores above 1.
-    A value of your rows within :data:`SNAP` of a stored value counts as that
-    value.
+
+    A stored row is marked stored (``source``) and is a row of the stored
+    results (``stored``: their :func:`stored_pairs`); a copy under another
+    name is your row. A value of your rows within :data:`SNAP` of the stored
+    value of its method (``"Cobolt (this run)"`` is Cobolt's) on the same
+    dataset and metric counts as that value.
     """
     from .. import config
+    from ..engine.registry import method_of
     if metrics is not None:
         df = df[df["metric"].isin(metrics)]
     df = df.assign(dataset=df["dataset"].astype(str) if "dataset" in df.columns else "all")
-    df = df.assign(_stored=df["source"].isin(STORED_SOURCES) if "source" in df.columns
-                   else False)
+    marked = df["source"].isin(STORED_SOURCES) if "source" in df.columns else False
+    if np.any(marked):
+        pairs = stored_pairs() if stored is None else stored
+        marked &= np.array([(d, str(m)) in pairs
+                            for d, m in zip(df["dataset"], df["method"])], dtype=bool)
+    df = df.assign(_stored=marked)
     have = sorted(set(df.loc[df["_stored"], "dataset"]))
     alone = sorted(set(df["dataset"]) - set(have))
     fix = config.hint(" or ".join(f"dataset={d!r}" for d in have),
@@ -185,13 +219,12 @@ def overall(df: pd.DataFrame, metrics=None) -> pd.Series:
     for ds, g in df.groupby("dataset"):
         m = g.pivot_table(index="method", columns="metric", values="value").round(TIE_DECIMALS)
         anchor = m.loc[g.loc[g["_stored"], "method"].unique()] if have else m
-        own = ~m.index.isin(anchor.index)
-        for c in anchor if have else ():
-            ref = np.unique(anchor[c].dropna().to_numpy())
-            v = m.loc[own, c].to_numpy()
-            if len(ref) and len(v):
-                near = ref[np.abs(np.nan_to_num(v, nan=np.inf)[:, None] - ref).argmin(axis=1)]
-                m.loc[own, c] = np.where(np.abs(v - near) <= SNAP, near, v)
+        if have:
+            for name in m.index.difference(anchor.index):
+                twin = method_of(name)          # your run of a stored method
+                if twin in anchor.index:
+                    ref, v = anchor.loc[twin], m.loc[name]
+                    m.loc[name] = np.where(np.abs(v - ref) <= SNAP, ref, v)
         anchor = anchor.loc[:, anchor.notna().sum() >= min(2, len(anchor))]
         rank = pd.DataFrame({c: [(anchor[c] <= v).sum() + 0.5 * (v not in anchor[c].values)
                                  if pd.notna(v) else np.nan for v in m[c]] for c in anchor},
