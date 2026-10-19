@@ -265,7 +265,8 @@ def test_evaluate_own_method_name_on_the_dataset_route_reads_the_labels(tmp_path
         "# labels: cty.csv from D11, in that order",
         "error: the label files of D11 (cty.csv) hold 2,864 labels for 10 cells in "
         "the embedding file. To score other cells, pass their labels with --labels and a "
-        "dataset name of your own, such as --dataset D11_subset."]
+        "dataset name of your own, such as --dataset D11_subset, and plot them apart from "
+        "the stored results."]
 
 
 def test_evaluate_names_the_mudata_type():

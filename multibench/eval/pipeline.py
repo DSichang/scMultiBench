@@ -721,9 +721,11 @@ def _count_error(what: str, n: int, n_cells: int, given, category=None,
                 f"{dataset}.")
         return head + " " + config.hint(
             f"To score other cells, pass their labels and a dataset name of your own, "
-            f"such as dataset='{dataset}_subset'.",
+            f"such as dataset='{dataset}_subset', and plot them apart from the stored "
+            f"results.",
             f"To score other cells, pass their labels with --labels and a dataset name of "
-            f"your own, such as --dataset {dataset}_subset.")
+            f"your own, such as --dataset {dataset}_subset, and plot them apart from the "
+            f"stored results.")
     fact = config.hint(
         f"{what} has {n:,} entries for {n_cells:,} cells in the embedding",
         f"{_FLAGS[what]} gave {n:,} {_UNITS[what]}{names} for {n_cells:,} cells "

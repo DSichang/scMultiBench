@@ -143,7 +143,7 @@ def test_your_own_cells_on_a_benchmark_name_are_told_to_take_a_name_of_their_own
     assert str(e.value) == (
         "The label files of D11 (cty.csv) hold 2,864 cells; the embedding has 1,718 rows. "
         "To score other cells, pass their labels and a dataset name of your own, such as "
-        "dataset='D11_subset'.")
+        "dataset='D11_subset', and plot them apart from the stored results.")
     got = mtb.evaluate(emb, labels=lab, dataset="D11_subset", category="vertical",
                        method="PCA", metrics=["ASW"], verbose=False)
     assert set(got["dataset"]) == {"D11_subset"}
@@ -164,7 +164,8 @@ def test_the_command_line_checks_a_benchmark_dataset_as_python(tmp_path, capsys)
     assert capsys.readouterr().err.splitlines()[-1] == (
         "error: the label files of D11 (cty.csv) hold 2,864 labels for 1,718 cells in the "
         "embedding file. To score other cells, pass their labels with --labels and a "
-        "dataset name of your own, such as --dataset D11_subset.")
+        "dataset name of your own, such as --dataset D11_subset, and plot them apart from "
+        "the stored results.")
     np.save(tmp_path / "full.npy", rng.normal(size=(2864, 4)))
     rc = cli.main(["evaluate", str(tmp_path / "full.npy"), "--dataset", "D11", "--method",
                    "PCA", "--metrics", "ASW", "--out", str(tmp_path / "o.csv")])
