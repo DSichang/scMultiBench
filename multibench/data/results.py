@@ -1050,6 +1050,20 @@ def _recommend(
                   "both": "stored results"}.get(source, "stored results") \
         if long_df_was_none else "long_df frame"
     label = f"the {table_noun}" if long_df_was_none else "long_df"
+    if not long_df_was_none and "category" in df.columns:
+        # rows scored as another category would be ranked against this one's
+        cats = {str(c) for c in df["category"].dropna()}
+        other = sorted(cats - {category})
+        if len(other) == 1 and category not in cats:
+            raise ValueError(f"long_df holds {other[0]} rows: pass "
+                             f"recommend({other[0]!r}, long_df=...).")
+        if other:
+            one = category if category in cats else other[0]
+            raise ValueError(
+                f"long_df holds {_and_list(other)} rows"
+                + (f" next to {category} ones" if category in cats else "")
+                + f": rank one category at a time, as recommend({one!r}, "
+                f"long_df=long_df[long_df['category'] == {one!r}]).")
 
     from ..engine.registry import list_methods
 
