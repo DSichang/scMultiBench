@@ -646,13 +646,12 @@ def _duplicate_rows_message(dup, keys) -> str:
 
 
 def _method_language(name):
-    """``"python"`` or ``"r"`` (``"StabMap (this run)"`` is StabMap's); None for a
-    name the registry does not know."""
+    """``"python"`` or ``"r"`` (``"StabMap (this run)"`` and ``"scJoint (ep40)"``
+    are the method's, as evaluate reads them); None for a name the registry
+    does not know."""
     from ..engine import registry
-    try:
-        return registry.get(str(name).removesuffix(THIS_RUN)).language.lower()
-    except KeyError:
-        return None
+    own = registry.method_of(name)
+    return None if own is None else registry.get(own).language.lower()
 
 
 def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,

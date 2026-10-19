@@ -346,6 +346,7 @@ def test_chips_unknown_and_known(monkeypatch):
     class _Spec:
         language = "python"; needs_labels = True; variants = []
     monkeypatch.setattr(registry, "get", lambda name: _Spec())
+    monkeypatch.setattr(registry, "method_of", lambda name: name)   # c4: the chip's lookup
     fig = bubble.render(bubble._build_table(_three()))
     texts = [t.get_text() for t in fig.axes[0].texts]
     assert "L" not in texts and texts.count("Py") == 3
