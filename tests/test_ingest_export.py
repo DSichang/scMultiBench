@@ -84,7 +84,7 @@ def test_export_dataset_selectors_and_errors(tmp_path):
     prefixed = ingest.export_dataset(a, tmp_path / "PREFIXED", rna="X", labels="obs:ct")
     assert pd.read_csv(bare / "cty.csv")["x"].tolist() \
         == pd.read_csv(prefixed / "cty.csv")["x"].tolist() == a.obs["ct"].astype(str).tolist()
-    with pytest.raises(ValueError, match="is not a column of data.obs"):
+    with pytest.raises(ValueError, match="is not a column of the AnnData's obs"):
         ingest.export_dataset(a, tmp_path / "E", rna="X", labels="nope")
     with pytest.raises(ValueError, match="nothing to export"):
         ingest.export_dataset(a, tmp_path / "E", rna=None)

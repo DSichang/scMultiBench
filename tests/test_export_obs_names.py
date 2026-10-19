@@ -75,12 +75,12 @@ def test_a_column_whose_name_looks_like_a_file_is_a_column(tmp_path):
 def test_a_name_that_is_no_column(tmp_path):
     a = _cells()
     assert _value_error(tmp_path, a, rna="X", labels="nope") == (
-        "labels='nope' is not a column of data.obs. Columns: celltype, donor.")
+        "labels='nope' is not a column of the AnnData's obs. Columns: celltype, donor.")
     assert _value_error(tmp_path, a, rna="X", batch="sample", category="cross") == (
-        "batch='sample' is not a column of data.obs. Columns: celltype, donor.")
+        "batch='sample' is not a column of the AnnData's obs. Columns: celltype, donor.")
     # Y19 (r3): a spelling that differs only in case or underscores gets a did-you-mean
     assert _value_error(tmp_path, a, rna="X", labels="cell_type") == (
-        "labels='cell_type' is not a column of data.obs. Columns: celltype, donor. "
+        "labels='cell_type' is not a column of the AnnData's obs. Columns: celltype, donor. "
         "Did you mean 'celltype'?")
     # a column of the list, as it is written there
     out = ingest.export_dataset(a, tmp_path / "LISTED", rna="X", labels="celltype")
@@ -90,7 +90,7 @@ def test_a_name_that_is_no_column(tmp_path):
     with pytest.raises(KeyError) as e:
         ingest.export_dataset(a, out, rna="X", labels="obs:nope")
     assert e.value.args[0] == ("labels='obs:nope': column 'nope' not in obs: searched "
-                               "data.obs; available: ['celltype', 'donor']")
+                               "the AnnData's obs; available: ['celltype', 'donor']")
     assert not out.exists()
 
 
@@ -99,16 +99,16 @@ def test_at_most_five_columns_are_listed(tmp_path):
     for i in range(3):
         a.obs[f"qc{i}"] = i
     assert _value_error(tmp_path, a, rna="X", labels="nope") == (
-        "labels='nope' is not a column of data.obs. Columns: celltype, donor, qc0, qc1, "
+        "labels='nope' is not a column of the AnnData's obs. Columns: celltype, donor, qc0, qc1, "
         "qc2.")
     for i in range(3, 1203):
         a.obs[f"qc{i}"] = i
     assert _value_error(tmp_path, a, rna="X", labels="nope") == (
-        "labels='nope' is not a column of data.obs. Columns: celltype, donor, qc0, qc1, "
+        "labels='nope' is not a column of the AnnData's obs. Columns: celltype, donor, qc0, qc1, "
         "qc2 and 1,200 more.")
     a.obs = pd.DataFrame(index=a.obs_names)
     assert _value_error(tmp_path, a, rna="X", labels="nope") == (
-        "labels='nope' is not a column of data.obs, which has no columns.")
+        "labels='nope' is not a column of the AnnData's obs, which has no columns.")
 
 
 def _cli_error(argv, capsys):

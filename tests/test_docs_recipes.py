@@ -671,7 +671,7 @@ def test_csv_recipe_names_another_missing_text(tmp_path, monkeypatch, capsys):
     with pytest.raises(ValueError) as e:
         mtb.io.export_dataset(ns["adata"], "mydata/MYCSV", rna="X", labels="obs:celltype")
     assert str(e.value) == (
-        "labels='obs:celltype': 12 of the 300 labels for the cells (data.obs) are missing "
+        "labels='obs:celltype': 12 of the 300 labels for the cells (the AnnData's obs) are missing "
         "(NaN, None, '' or text such as 'N/A'); give every cell a label, or subset the data "
         "to the labelled cells first")
     assert not Path("mydata").exists()

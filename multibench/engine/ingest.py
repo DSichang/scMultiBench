@@ -1058,10 +1058,15 @@ def _vertical_gene_activity_readers() -> list:
                     for v in s.variants)]
 
 
+#: how a message names the obs of an AnnData passed in (not a variable name the
+#: caller may not use)
+_ADATA_OBS = "the AnnData's obs"
+
+
 def _obs_column(obs, col, *, what, spec, where):
     if col not in obs.columns:
         head = config.hint(f"{what}={spec!r}", f"--{what} {spec}")
-        where = config.hint(where, "the obs of the file") if where == "data.obs" else where
+        where = config.hint(where, "the obs of the file") if where == _ADATA_OBS else where
         raise KeyError(f"{head}: column {col!r} not in obs: searched {where}; "
                        f"available: {list(obs.columns)}"
                        + (f".{hint}" if (hint := _case_hint(col, obs.columns)) else ""))
@@ -1097,7 +1102,7 @@ def _select_obs(data, spec, *, what):
                     f"{col!r}: use " + config.hint(f"{what}='{has[0]}:{col}'",
                                                    f"--{what} {has[0]}:{col}"))
         return _obs_column(data.obs, col, what=what, spec=spec,
-                           where="mdata.obs" if mu else "data.obs")
+                           where="mdata.obs" if mu else _ADATA_OBS)
     if mu:
         name, _, col = spec.partition(":")
         if name in data.mod and col:
@@ -1120,7 +1125,7 @@ def _select_obs(data, spec, *, what):
     cols = [str(c) for c in data.obs.columns]
     raise ValueError(
         config.hint(f"{what}={spec!r}", f"--{what} {spec}") + " is not a column of "
-        + config.hint("mdata.obs" if mu else "data.obs", "the obs of SRC")
+        + config.hint("mdata.obs" if mu else _ADATA_OBS, "the obs of SRC")
         + (f". Columns: {', '.join(cols[:5])}"
            f"{f' and {len(cols) - 5:,} more' if len(cols) > 5 else ''}."
            if cols else ", which has no columns.") + _case_hint(spec, cols))
@@ -2239,13 +2244,13 @@ def _labels_where(data, spec) -> str:
         return "the labels you passed"
     mu = _is_mudata(data)
     if spec.startswith("obs:"):
-        return "mdata.obs" if mu else "data.obs"
+        return "mdata.obs" if mu else _ADATA_OBS
     if spec.startswith("mod:"):
         return f"mdata[{spec[4:].partition('.')[0]!r}].obs"
     if mu:
         name, sep, _ = spec.partition(":")
         return f"mdata[{name!r}].obs" if sep and name in data.mod else "mdata.obs"
-    return "data.obs"
+    return _ADATA_OBS
 
 
 def _export_filename(role: str, number: str, category: str | None) -> str:

@@ -1002,7 +1002,7 @@ def test_a_wrong_name_after_a_prefix_lists_the_names(tmp_path, monkeypatch):
              "obsm key 'nope' not found; available: ['protein']"),
             ('rna="X"', 'rna="layer:nope"', "layer 'nope' not found; available: ['counts']"),
             ('labels="obs:celltype"', 'labels="obs:nope"',
-             "labels='obs:nope': column 'nope' not in obs: searched data.obs; available: "
+             "labels='obs:nope': column 'nope' not in obs: searched the AnnData's obs; available: "
              "['celltype']")]:
         assert src[EXPORT].count(old) == 1
         with pytest.raises(KeyError) as e:

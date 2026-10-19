@@ -435,7 +435,7 @@ def test_labels_with_missing_values_are_refused_in_every_category(tmp_path, cate
     a.obs["ct"] = lab
     kw = {"batch_index": 1} if category in ("cross", "mosaic") else {}
     with pytest.raises(ValueError, match=r"labels='obs:ct': 2 of the 60 labels for the "
-                                         r"(RNA )?cells \((data.obs|data)\) are missing"):
+                                         r"(RNA )?cells \((the AnnData's obs|data)\) are missing"):
         ingest.export_dataset(a, tmp_path / "GAP", adt="obsm:protein", labels="obs:ct",
                               category=category, **kw)
     assert not (tmp_path / "GAP").exists()

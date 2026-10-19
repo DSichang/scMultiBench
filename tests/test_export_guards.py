@@ -299,7 +299,7 @@ def test_a_missing_batch_on_the_command_line(tmp_path, capsys):
 
 
 # ------------------------------------------------------------- a missing label
-WHERE = "labels for the cells (data.obs) are missing"
+WHERE = "labels for the cells (the AnnData's obs) are missing"
 ADVICE = "give every cell a label, or subset the data to the labelled cells first"
 
 
