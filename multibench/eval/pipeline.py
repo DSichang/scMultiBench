@@ -1097,11 +1097,11 @@ def _follows_cells(labels, adata, cells: _Cells) -> bool:
     return _gives_ids(labels, adata)
 
 
-def _cells_ids(cells: _Cells, n: int):
-    """The barcodes of ``cells`` in the method's order, when they are ``n``
-    cells; else ``None``."""
+def _cells_ids(cells: _Cells, shape: tuple):
+    """The barcodes of ``cells`` in the method's order, when they are the cells
+    of an embedding of ``shape`` (cells x dims, or dims x cells); else ``None``."""
     keys = _file_barcodes(cells.files, read=cells.read)
-    return None if keys is None or len(keys) != n else pd.Index(keys)
+    return None if keys is None or len(keys) not in shape[:2] else pd.Index(keys)
 
 
 def _file_list(labels) -> list:
@@ -1274,7 +1274,7 @@ def _scores(
     lab_ids, ba_ids = ids, ids
     if ids is None and table is None and cells is not None:
         # an embedding without ids holds the dataset's cells in the method's order
-        lab_ids, ba_ids = (_cells_ids(cells, emb.shape[0]) if _gives_ids(x, adata) else None
+        lab_ids, ba_ids = (_cells_ids(cells, emb.shape) if _gives_ids(x, adata) else None
                            for x in (labels, batch))
     if _is_label_path_list(labels):
         ct, origin = _stack_label_files(labels, lab_ids, table=table)
