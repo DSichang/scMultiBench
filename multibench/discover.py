@@ -277,7 +277,7 @@ def _method_info(method: str, verbose: bool = False) -> dict:
         "version": ref.get("version"),
         "reference": dict(ref["reference"]) if ref.get("reference") else None,
         "supports": [{"category": v.when.get("category"),
-                      "modalities": list(v.when.get("modalities", [])),
+                      "modalities": v.shown_modalities,
                       "output_kind": v.output.kind,
                       "needs_labels": v.needs_labels,
                       "labels": [r for r in v.roles() if is_label_role(r)],
@@ -323,8 +323,8 @@ def _runtime_hint(method: str) -> dict:
 
 
 def _variant_key(v) -> str:
-    """``'category:mod1+mod2'`` (``-`` for no modalities)."""
-    return registry._variant_key(v.when)
+    """``'category:mod1+mod2'``, with the files a folder-reading variant reads."""
+    return registry._variant_key({**v.when, "modalities": v.shown_modalities})
 
 
 _DATASET_VARIANT = _compat.use("params_for(method, category, modalities)")

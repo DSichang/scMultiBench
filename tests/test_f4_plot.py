@@ -46,7 +46,7 @@ def _mine(method, dataset, base=0.5, metrics=("ARI", "NMI", "ASW", "cLISI")):
 
 def test_chip_note_names_no_registry():
     # the family name stays: build_table's columns carry it
-    assert B.FAMILIES[0][0] == "DR and clustering"
+    assert B.FAMILIES[0][0] == "Clustering"
     notes = " ".join(inspect.getdoc(mtb.plot.bubble).split())
     assert "registry" not in notes
 

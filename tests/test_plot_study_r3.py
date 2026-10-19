@@ -216,5 +216,5 @@ def test_na_warning_cli_spelling(tmp_path, capsys):
 def test_na_cells_keep_their_per_family_lines():
     tbl, _ = _messages(_build_table, _d28_with_mine())
     assert tbl.na_cells == [
-        "Conos: DR and clustering Overall over 4 of 6 metrics (ASW, iASW n/a)",
+        "Conos: Clustering Overall over 4 of 6 metrics (ASW, iASW n/a)",
         "Conos: Batch correction Overall over 5 of 6 metrics (ASW_batch n/a)"]

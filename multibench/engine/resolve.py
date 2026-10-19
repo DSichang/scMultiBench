@@ -4,6 +4,7 @@ from __future__ import annotations
 import functools
 import os
 import re
+import sys
 import warnings
 from pathlib import Path
 
@@ -304,9 +305,21 @@ def _note_local_folder(base: Path, name: str) -> None:
         return
     if os.path.abspath(here) == os.path.abspath(base / name):
         return
+    # once per call: a call resolves the name several times
+    frame = sys._getframe(1)
+    while frame is not None and frame.f_code.co_filename.startswith(_compat._PACKAGE):
+        frame = frame.f_back
+    key = (id(frame), frame and frame.f_lasti, os.path.abspath(base), name)
+    if _NOTED[0] == key:
+        return
+    _NOTED[0] = key
     path = f"./{name}"
     _compat.warn(f"Using {base / name}; {path} also exists: pass "
                  + config.hint(f"{path!r}", path) + " for it.", UserWarning)
+
+
+#: the call that last got the note of :func:`_note_local_folder`
+_NOTED: list = [None]
 
 
 def canonical_dataset(base, dataset: str) -> str:
@@ -803,7 +816,10 @@ GAS_NAMES_UNKNOWN_CAVEAT = ("{method} needs gene-activity ATAC. {file} holds nam
                             "as {example}, not the RNA's genes.")
 #: peak names that ``mtb.run``'s rewrite to chr:start-end cannot fix
 PEAK_NAMES_CAVEAT = ("{method} reads peak names such as chr1:100-200. {file} holds other "
-                     "names, for example {example}. Rename them to chr:start-end.")
+                     "names, for example {example}. {action}")
+#: the action of :data:`PEAK_NAMES_CAVEAT`: for other names, and for gene names
+RENAME_PEAKS = "Rename them to chr:start-end."
+GENES_AS_PEAKS = "They are genes: export the ATAC as gene activity."
 NOT_COUNTS_CAVEAT = "{method} needs raw counts. {file} holds non-integer values."
 DIAGONAL_CTY_CAVEAT = ("{method} needs rna_cty.csv and atac_cty.csv for diagonal. The "
                        "folder has only cty.csv.")
@@ -1104,13 +1120,11 @@ def _preflight_caveats(resolved, *, atac: str | None = None,
     for role in renamed:
         bad = _unrewritable_peak_name(Path(resolved[role]))
         if bad is not None:
-            text = PEAK_NAMES_CAVEAT.format(method=who, file=Path(resolved[role]).name,
-                                            example=bad)
-            if _names_are_genes(Path(resolved[role])):
-                # gene activity exported as peaks: renaming is the wrong action
-                text = text.replace("Rename them to chr:start-end.",
-                                    "They are genes: export the ATAC as gene activity.")
-            out.append(text)
+            # gene activity exported as peaks: renaming is the wrong action
+            genes = _names_are_genes(Path(resolved[role]))
+            out.append(PEAK_NAMES_CAVEAT.format(
+                method=who, file=Path(resolved[role]).name, example=bad,
+                action=GENES_AS_PEAKS if genes else RENAME_PEAKS))
     if atac is None:
         p = Path(resolved.get("atac_gas", ""))
         if p.name and p.stem != "atac_gas":
@@ -1143,7 +1157,7 @@ def _preflight_caveats(resolved, *, atac: str | None = None,
                 elif want == "peak":
                     out.append(GAS_FED_TO_PEAK_CAVEAT.format(method=who,
                                                              file=Path(path).name))
-    seen = set()
+    seen, fractions = set(), []
     for role, path in resolved.items():
         p = Path(path)
         if is_label_role(role) or role == "data_dir" or p in seen:
@@ -1152,7 +1166,11 @@ def _preflight_caveats(resolved, *, atac: str | None = None,
         if p.suffix != ".h5" or not _COUNT_FILE_RE.match(p.stem) or not p.is_file():
             continue
         if _h5_has_fraction(str(p), p.stat().st_mtime_ns):
-            out.append(NOT_COUNTS_CAVEAT.format(method=who, file=p.name))
+            fractions.append(p.name)
+    if fractions:
+        # one sentence for the files of several batches
+        out.append(NOT_COUNTS_CAVEAT.format(method=who, file=_and_list(fractions)).replace(
+            " holds ", " hold " if len(fractions) > 1 else " holds "))
     if category == "diagonal" and resolved:
         ds_dir = next(Path(v) if k == "data_dir" else Path(v).parent
                       for k, v in resolved.items())

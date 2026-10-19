@@ -1,6 +1,6 @@
 """Paper-style bubble table: methods as rows, metrics as columns, grouped by task.
 
-Layout follows the benchmark paper's figures: each task family (DR & clustering,
+Layout follows the benchmark paper's figures: each task family (clustering,
 batch correction, classification) is a colour-banded block - blues, greens and
 pinks respectively - preceded by an *Overall* column drawn as a horizontal bar whose length and
 colour both encode the family score. With ``aggregate="summary"`` (several
@@ -25,7 +25,7 @@ from ..data.catalog import FAMILY_METRICS as _FAMILY_METRICS
 
 # column order within each family: catalog.metrics()'s
 FAMILIES = [
-    ("DR and clustering", list(_FAMILY_METRICS["clustering"]), "Blues"),
+    ("Clustering", list(_FAMILY_METRICS["clustering"]), "Blues"),
     ("Batch correction", list(_FAMILY_METRICS["batch"]), "Greens"),
     ("Classification", list(_FAMILY_METRICS["classification"]), style.PINKS),
 ]
@@ -80,8 +80,8 @@ class BubbleTable:
         Row order: best first, or the ``order`` methods first;
         ``methods.index(name) + 1`` is the row's position (1 = top).
     blocks : list of FamilyBlock
-        One block per metric family present, in paper order: DR and
-        clustering (blues), batch correction (greens), classification
+        One block per metric family present, in paper order: clustering
+        (blues), batch correction (greens), classification
         (pinks), then "Other" (purples) for metrics outside the three. Each
         has its own ``raw``, ``norm``, ``ranks`` and ``overall``.
     norm : pandas.DataFrame

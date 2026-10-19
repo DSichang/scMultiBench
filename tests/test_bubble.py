@@ -428,7 +428,7 @@ def test_na_warn_default_names_method_and_rule():
         tbl = bubble._build_table(_with_gap())
     msg = str([w for w in rec if "has no NMI" in str(w.message)][0].message)
     assert "Pass metrics= without NMI to compare on the same metrics." in msg   # Y29 (r3)
-    assert tbl.na_cells == ["B: DR and clustering Overall over 2 of 3 metrics (NMI n/a)"]
+    assert tbl.na_cells == ["B: Clustering Overall over 2 of 3 metrics (NMI n/a)"]
     # the arithmetic the message describes: B's Overall is the mean over ARI, cLISI ranks
     b = tbl.blocks[0]
     assert b.overall["B"] == pytest.approx(
@@ -448,7 +448,7 @@ def test_na_skip_and_raise():
         warnings.simplefilter("error")
         warnings.simplefilter("ignore", FutureWarning)
         tbl = bubble._build_table(_with_gap(), na="skip")
-    assert tbl.na_cells == ["B: DR and clustering Overall over 2 of 3 metrics (NMI n/a)"]
+    assert tbl.na_cells == ["B: Clustering Overall over 2 of 3 metrics (NMI n/a)"]
     with pytest.raises(ValueError, match=r"Row B \(D1\) has no NMI\."):
         bubble._build_table(_with_gap(), na="raise")
     with pytest.raises(ValueError, match="na must be one of"):

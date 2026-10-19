@@ -264,3 +264,192 @@ def test_an_absent_metric_has_one_text(metrics):
     with pytest.warns(UserWarning) as rec:
         mtb.load_results("cross", metrics=metrics)
     assert [str(w.message) for w in rec] == ["The stored results have no kBET."]
+
+
+# --------------------------------------------------------------- C13, C22, C25, C55
+def test_a_two_batch_diagonal_folder_names_each_methods_files_once(tmp_path):
+    import anndata as ad
+    rng = np.random.default_rng(0)
+    d = tmp_path / "DIAG2"
+    for b in (1, 2):
+        rna = ad.AnnData(rng.poisson(1, (30, 20)).astype(float))
+        rna.obs_names = [f"r{b}_{i}" for i in range(30)]
+        rna.var_names = [f"G{i}" for i in range(20)]
+        rna.obs["celltype"] = ["T", "B"] * 15
+        atac = rna.copy()
+        atac.obs_names = [f"a{b}_{i}" for i in range(30)]
+        mtb.io.export_dataset(rna, d, atac=atac, atac_kind="gene_activity",
+                              labels="obs:celltype", category="diagonal", batch_index=b)
+    reason = mtb.scan(d, "diagonal", verbose=False).set_index("method")["reason"]
+    assert reason["iNMF"].startswith("iNMF reads rna.h5 and atac_gas.h5. Environment")
+
+
+def test_cross_messages_name_the_files_export_writes(tmp_path):
+    from tests.test_f3_int import _h5
+    d = tmp_path / "CROSS"
+    d.mkdir()
+    for b in (1, 2):
+        bars = [f"b{b}c{i}" for i in range(40)]
+        _h5(d / f"rna{b}.h5", [f"g{i}" for i in range(20)], bars)
+        _h5(d / f"atac_peak{b}.h5", [f"chr1:{i}-{i + 9}" for i in range(0, 200, 10)], bars)
+        pd.DataFrame({"x": ["T", "B"] * 20}).to_csv(d / f"cty{b}.csv", index=False)
+    reason = mtb.scan(d, "cross", verbose=False, methods=["StabMap"])["reason"].iloc[0]
+    assert "needs peak ATAC (atac_peak3.h5)" in reason
+    assert "atac_peak<i>.h5 holds peaks: every cross method" in mtb.describe_layout("cross")
+
+
+def test_one_raw_counts_sentence_for_the_files_of_several_batches(tmp_path):
+    from multibench.engine import resolve
+    from tests.test_study_r7_msg import _h5
+    files = {}
+    for b in (1, 2):
+        _h5(tmp_path / f"rna{b}.h5", ["g1", "g2"], [f"c{b}{i}" for i in range(4)], value=0.5)
+        files[f"rna{b}"] = str(tmp_path / f"rna{b}.h5")
+    out = [c for c in resolve._preflight_caveats(files, atac=None, category="cross",
+                                                 method="UINMF") if "raw counts" in c]
+    assert out == ["UINMF needs raw counts. rna1.h5 and rna2.h5 hold non-integer values."]
+
+
+def test_the_shadow_folder_note_once_per_call(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "D11").mkdir()
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False)
+    assert sum("also exists" in str(x.message) for x in w) == 1
+
+
+def test_an_rna_adt_folder_lists_no_atac_variant(tmp_path):
+    from tests.test_f3_int import _h5
+    d = tmp_path / "MYCITE"
+    d.mkdir()
+    bars = [f"c{i}" for i in range(40)]
+    _h5(d / "rna.h5", [f"g{i}" for i in range(20)], bars)
+    _h5(d / "adt.h5", [f"p{i}" for i in range(5)], bars)
+    pd.DataFrame({"x": ["T", "B"] * 20}).to_csv(d / "cty.csv", index=False)
+    assert "scBridge" not in set(mtb.scan(d, verbose=False)["method"])
+
+
+# --------------------------------------------------------------- D27, D26
+def test_a_folder_reading_variant_shows_its_files():
+    assert mtb.params_for("scBridge")["variant"] == "diagonal:rna+atac_gas"
+    assert mtb.method_info("scBridge")["supports"][0]["modalities"] == ["rna", "atac_gas"]
+
+
+def test_the_default_settings_repr_names_the_instance():
+    assert repr(mtb.config.DEFAULT).startswith("mtb.config.DEFAULT(repo_path=")
+
+
+# --------------------------------------------------------------- D20, C21, D21, C26
+def _cite(tmp_path):
+    import anndata as ad
+    a = ad.AnnData(np.random.default_rng(0).poisson(1, (20, 10)).astype(float))
+    a.var_names = [f"G{i}" for i in range(10)]
+    a.obs["celltype"] = ["T", "B"] * 10
+    a.obsm["protein"] = np.ones((20, 3))
+    a.write_h5ad(tmp_path / "my.h5ad")
+    return a
+
+
+def test_export_selector_messages(tmp_path, capsys):
+    a = _cite(tmp_path)
+    with pytest.raises(ValueError) as e:
+        mtb.io.export_dataset(a, tmp_path / "A", adt="protein", labels="obs:celltype")
+    assert str(e.value) == "adt='protein': use adt='obsm:protein'."
+    src = str(tmp_path / "my.h5ad")
+    for argv, text in (([src, str(tmp_path / "B"), "--adt", "protein"],
+                        "error: --adt protein: use --adt obsm:protein."),
+                       ([src, str(tmp_path / "C"), "--rna=", "--adt", "obsm:protein"],
+                        "error: --rna is empty: --rna none writes no RNA, or pass a "
+                        "selector such as X.")):
+        assert cli.main(["export", *argv, "--labels", "obs:celltype"]) != 0
+        assert text in capsys.readouterr().err
+
+
+def test_peaks_given_as_rna_are_refused(tmp_path):
+    import anndata as ad
+    a = ad.AnnData(np.ones((20, 4)))
+    a.var_names = [f"chr1:{i * 100}-{i * 100 + 50}" for i in range(4)]
+    a.obs["celltype"] = ["T", "B"] * 10
+    with pytest.raises(ValueError, match=r"^rna= holds peaks \(chr1:0-50\): pass it as "
+                                         r"atac=\.$"):
+        mtb.io.export_dataset(a, tmp_path / "P", labels="obs:celltype", category="vertical")
+
+
+def test_gene_named_atac_for_vertical_warns_at_export(tmp_path):
+    import anndata as ad
+    r = ad.AnnData(np.ones((20, 4)))
+    r.var_names = [f"G{i}" for i in range(4)]
+    r.obs["celltype"] = ["T", "B"] * 10
+    with pytest.warns(UserWarning, match="^Vertical methods need peak ATAC, and this ATAC "
+                                         "holds gene activity"):
+        mtb.io.export_dataset(r, tmp_path / "G", atac=r.copy(), labels="obs:celltype",
+                              category="vertical")
+
+
+def test_cli_batch_column_on_an_npy(tmp_path, capsys):
+    np.save(tmp_path / "e.npy", _emb(2864))
+    cty = Path(mtb.config.DEFAULT.data_path) / "D11" / "cty.csv"
+    assert cli.main(["evaluate", str(tmp_path / "e.npy"), "--labels", str(cty),
+                     "--batch", "donor", "--method", "PCA", "--metrics", "ASW"]) != 0
+    assert ("--batch donor is not a file. With a .npy embedding, --batch takes a CSV of "
+            "one batch per cell.") in capsys.readouterr().err
+
+
+# --------------------------------------------------------------- C35, C14, C53, D17
+def test_any_wrong_run_call_names_run_all(capsys):
+    with pytest.raises(SystemExit) as e:
+        cli.main(["run", "D11", "--methods", "Matilda"])
+    assert e.value.code == 2
+    assert capsys.readouterr().err.strip().endswith(
+        "multibench run: Deprecated: use multibench run-all DATASET --methods M.")
+
+
+def test_cli_methods_keeps_a_renamed_run(tmp_path, capsys):
+    st = mtb.load_results("diagonal")
+    for tag, d in (("ep10", 0.0), ("ep40", 0.05)):
+        (tmp_path / tag).mkdir()
+        st[st.method.isin(["scJoint", "iNMF"])].assign(
+            source="user", value=lambda x: x.value + d).to_csv(tmp_path / tag / "long.csv",
+                                                              index=False)
+    B = importlib.import_module("multibench.plot.bubble")
+    seen = {}
+    real = B._bubble
+
+    def spy(df, **kw):
+        seen["methods"] = kw.get("methods")
+        return real(df, **kw)
+    import unittest.mock as um
+    with um.patch.object(B, "_bubble", spy):
+        assert cli.main(["plot", "bubble", "--input", str(tmp_path / "ep10" / "long.csv"),
+                         "--input", str(tmp_path / "ep40" / "long.csv"), "--methods",
+                         "scJoint", "--metrics", "clustering",
+                         "--out", str(tmp_path / "x.png")]) == 0
+    assert seen["methods"] == ["scJoint", "scJoint (long)"]
+
+
+def _help(*cmd):
+    import contextlib
+    import io
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf), pytest.raises(SystemExit):
+        cli.main([*cmd, "--help"])
+    return " ".join(buf.getvalue().split())
+
+
+def test_the_taught_flags_are_in_the_help():
+    assert "--assume-gpu skip this host's GPU test" in _help("scan")
+    assert "--scripts also fetch the method scripts" in _help("fetch")
+    assert "--build build every env from its lockfile" in _help("env", "install")
+
+
+# --------------------------------------------------------------- D18, C28
+def test_the_peak_name_caveat_takes_its_action():
+    from multibench.engine import resolve
+    assert resolve.PEAK_NAMES_CAVEAT.endswith("{action}")
+    assert resolve.RENAME_PEAKS == "Rename them to chr:start-end."
+
+
+def test_the_first_family_is_clustering():
+    B = importlib.import_module("multibench.plot.bubble")
+    assert [f[0] for f in B.FAMILIES] == ["Clustering", "Batch correction", "Classification"]

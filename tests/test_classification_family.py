@@ -323,13 +323,13 @@ def _long(codes, methods=("M1", "M2", "M3")):
 
 def test_bubble_has_a_third_block_in_pink():
     tbl = _quiet(mtb.plot.build_table, _long(SCIB + CODES))
-    assert [b.label for b in tbl.blocks] == ["DR and clustering", "Batch correction",
+    assert [b.label for b in tbl.blocks] == ["Clustering", "Batch correction",
                                              "Classification"]
     assert tbl.blocks[2].cmap == "Pinks" and list(tbl.blocks[2].raw.columns) == CODES
     fig = B.render(tbl)
     ax = fig.axes[0]
     assert [t.get_text() for t in ax.texts if t.get_gid() == "family"] == [
-        "DR and clustering", "Batch correction", "Classification"]
+        "Clustering", "Batch correction", "Classification"]
     ramps = [p for p in ax.patches if p.get_gid() == "legend" and p.get_width() == 0.07]
     assert len(ramps) == 3 * 40
     assert sum(t.get_text() == "High" for t in ax.texts) == 3
@@ -341,7 +341,7 @@ def test_bubble_has_a_third_block_in_pink():
 
 def test_bubble_without_the_family_keeps_two_blocks():
     tbl = _quiet(mtb.plot.build_table, _long(SCIB))
-    assert [b.label for b in tbl.blocks] == ["DR and clustering", "Batch correction"]
+    assert [b.label for b in tbl.blocks] == ["Clustering", "Batch correction"]
     ax = B.render(tbl).axes[0]
     assert sum(t.get_text() == "High" for t in ax.texts) == 2
 

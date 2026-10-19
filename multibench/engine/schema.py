@@ -214,6 +214,14 @@ class Variant:
     min_genes: int | None = None       # features of each RNA file
     downloads: list = field(default_factory=list)   # [{file, url}] the first run downloads next to the script
 
+    @property
+    def shown_modalities(self) -> list[str]:
+        """The modalities read; for a variant that reads a folder (scBridge), the
+        stems of the ``.h5`` files it names (``rna``, ``atac_gas``)."""
+        return list(self.when.get("modalities", [])) or [
+            PurePath(str(a.const)).stem for a in self.args
+            if a.const and str(a.const).endswith(".h5")]
+
     def matches(self, category: str, modalities: set[str]) -> bool:
         return (self.when.get("category") == category
                 and set(self.when.get("modalities", [])) == set(modalities))

@@ -218,6 +218,12 @@ class Config:
     leiden_flavor: str = "leidenalg"
     envs_dir: Path = _LazyPath(_default_envs_dir, cache=True)
 
+    def __repr__(self) -> str:
+        # the class left the public names: the repr names the instance
+        return "mtb.config.DEFAULT(" + ", ".join(
+            f"{k}={getattr(self, k)!r}" for k in ("repo_path", "data_path",
+                                                 "leiden_flavor", "envs_dir")) + ")"
+
 
 DEFAULT = Config()
 # a second settings object is not needed: the class leaves the public names

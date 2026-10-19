@@ -974,7 +974,7 @@ def _rename_clashes(stored: pd.DataFrame, own: list) -> list:
 
 def _rename_repeats(own: list, inputs: list) -> list:
     """The rows of a later ``--input`` whose method and dataset an earlier one
-    has, renamed ``<method>_<its folder or file name>``, with one line on stderr."""
+    has, renamed ``<method> (<its folder or file name>)``, with one line on stderr."""
     keys = ["method", "dataset"]
     seen: set = set()
     out, said = [], []
@@ -986,9 +986,10 @@ def _rename_repeats(own: list, inputs: list) -> list:
                 tag = Path(path).stem
                 f = f.copy()
                 names = sorted(set(f.loc[hit, "method"].astype(str)))
-                f.loc[hit, "method"] = f.loc[hit, "method"].astype(str) + f"_{tag}"
+                # "<method> (<tag>)": --methods <method> keeps it (registry.method_of)
+                f.loc[hit, "method"] = f.loc[hit, "method"].astype(str) + f" ({tag})"
                 said.append(f"{_and_list(names)} of {path} as "
-                            f"{_and_list([m + '_' + tag for m in names])}")
+                            f"{_and_list([f'{m} ({tag})' for m in names])}")
             seen |= set(map(tuple, f[keys].astype(str).to_numpy()))
         out.append(f)
     if said:
@@ -1030,6 +1031,11 @@ def _cmd_plot(args) -> int:
                   f"({', '.join(own_methods)}) to the {len(frames[0])} stored results "
                   f"of {args.category}.", file=sys.stderr)
     methods = _csv_list(args.methods)
+    if methods:
+        # a method id keeps its renamed runs too, as "scJoint (ep40)"
+        ids = {registry.method_of(m) for m in methods} - {None}
+        methods += [h for h in dict.fromkeys(df["method"].astype(str))
+                    if h not in methods and registry.method_of(h) in ids]
     if len(df) == 0:
         raise ValueError("Nothing is left to plot after the filters.")
     if df["method"].nunique() == 1 and args.category is None and args.kind == "bar":
@@ -1072,6 +1078,8 @@ def _parse_inputs(pairs, args) -> dict:
 
 def _cmd_run(args) -> int:
     """``multibench run``: :func:`multibench.run` one method on explicit inputs."""
+    if not args.method or not args.category:
+        args._parser.error("")
     args.method = registry.check_method(args.method)     # any case, or a display name
     params = _parse_params(args.param, args, default_method=args.method)
     inputs = _parse_inputs(args.input, args)
@@ -1441,6 +1449,11 @@ def _cmd_evaluate(args) -> int:
         args.category = workflow.known_category(dataset)    # a benchmark dataset has one
     with contextlib.ExitStack() as stack:
         batch = _batch_arg(args, stack)
+        if isinstance(batch, str) and not Path(batch).exists() \
+                and Path(embedding).suffix.lower() not in (".h5ad", ".h5mu"):
+            raise ValueError(f"--batch {batch} is not a file. With a "
+                             f"{Path(embedding).suffix or 'matrix'} embedding, --batch "
+                             f"takes a CSV of one batch per cell.")
         labels = _evaluate_labels(args, stack, method)
         kw = dict(category=args.category, labels=labels, clusters=args.clusters,
                   batch=batch, missing_labels=args.missing_labels)
@@ -1711,7 +1724,7 @@ def _export_arguments(pc) -> None:
     pc.add_argument("--category", help=_CATEGORY_HELP + " Sets the file names. "
                     "vertical writes atac.h5. diagonal writes atac_peak.h5 or "
                     "atac_gas.h5, and the labels as rna_cty.csv and atac_cty.csv. "
-                    "mosaic writes atac<i>.h5.")
+                    "mosaic writes atac<i>.h5, cross atac_peak<i>.h5.")
     pc.add_argument("--rna", help="where the raw-count RNA matrix lives: X (default), "
                                   "obsm:<key>, layer:<key>, mod:<name>, or none. Append "
                                   "[<var column>=<value>] to keep some features, e.g. "
@@ -1854,7 +1867,8 @@ def build_parser() -> argparse.ArgumentParser:
     pfe.add_argument("--outputs", action=_Retired, nargs=0, default=False,
                      tail=_compat.note("use multibench plot for the stored results"))
     # the cluster page: compute nodes without network fetch the scripts first
-    pfe.add_argument("--scripts", action="store_true", help=argparse.SUPPRESS)
+    pfe.add_argument("--scripts", action="store_true",
+                     help="also fetch the method scripts, so compute nodes need no download")
     # a maintainer switch, as MULTIBENCH_SCRIPTS_REF: not in --help
     pfe.add_argument("--ref", metavar="REF", help=argparse.SUPPRESS)
     pfe.add_argument("--data-path", dest="data_path", action=_Retired,
@@ -1906,7 +1920,8 @@ def build_parser() -> argparse.ArgumentParser:
                     tail=_compat.use("the exit code of multibench run-all"))
     # the cluster page: check a job for a GPU node from a login node without one
     ps.add_argument("--assume-gpu", dest="assume_gpu", action="store_true",
-                    help=argparse.SUPPRESS)
+                    help="skip this host's GPU test, to check a job for a GPU node from "
+                         "a login node")
     ps.add_argument("--allow-atac-mismatch", dest="allow_atac_mismatch", action=_Retired,
                     nargs=0, default=False, tail=_ATAC_MISMATCH_TAIL)
     ps.set_defaults(func=_cmd_scan, _parser=ps)
@@ -2007,8 +2022,10 @@ def build_parser() -> argparse.ArgumentParser:
     pr = sub.add_parser(
         "run",
         description="Deprecated: use multibench run-all DATASET --methods M.")
-    pr.add_argument("--method", required=True, help=argparse.SUPPRESS)
-    pr.add_argument("--category", required=True, help=argparse.SUPPRESS)
+    # any wrong call gets the deprecated line, not a list of hidden flags
+    pr.error = lambda message: pr.exit(2, f"multibench run: {pr.description}\n")
+    pr.add_argument("--method", help=argparse.SUPPRESS)
+    pr.add_argument("--category", help=argparse.SUPPRESS)
     pr.add_argument("--task", action=_Retired)
     pr.add_argument("--input", action="append", metavar="ROLE=PATH",
                     help=argparse.SUPPRESS)
@@ -2255,7 +2272,8 @@ def build_parser() -> argparse.ArgumentParser:
     ei.add_argument("--category", help=_CATEGORY_HELP)
     ei.add_argument("--methods", help=_METHODS_HELP + "; only their envs")
     # the maintainer page: build every env from its lockfile instead
-    ei.add_argument("--build", action="store_true", help=argparse.SUPPRESS)
+    ei.add_argument("--build", action="store_true",
+                    help="build every env from its lockfile instead of unpacking the archive")
     ei.add_argument("--packed", action="store_true", help=argparse.SUPPRESS)
     ei.add_argument("--flavor", choices=envs.FLAVORS, default="auto", help=_FLAVOR_HELP)
     ei.add_argument("--dry-run", dest="dry_run", action="store_true",

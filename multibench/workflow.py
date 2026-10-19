@@ -377,7 +377,8 @@ def _atac_lines(category: str) -> list[str]:
     elif gas:
         out.append("atac<i>.h5 holds peaks or gene activity. Each method needs one of them:")
     else:
-        out.append(f"atac<i>.h5 holds peaks: every {category} method that reads ATAC "
+        name = "atac_peak<i>.h5" if category == "cross" else "atac<i>.h5"
+        out.append(f"{name} holds peaks: every {category} method that reads ATAC "
                    f"needs peaks.")
     if category == "diagonal" or gas:
         if peak:
@@ -657,6 +658,12 @@ def _missing_files_reason(spec, category: str, mods: list, dataset: str,
     missing = {r: Path(p) for r, p in paths.items() if not Path(p).exists()}
     if not missing:
         return ""
+    numbered = [p for p in missing.values() if p.suffix == ".h5"
+                and (p.parent / f"{p.stem}1.h5").is_file()]
+    if numbered and category in ("vertical", "diagonal"):
+        # a folder of numbered batches: the folder line says what to do
+        names = [p.name for p in missing.values() if p.suffix == ".h5"]
+        return f"{spec.id} reads {_and_list(names)}."
     atac_parts, other = [], []
     has_other = {}         # (need, kinds found) -> its part: numbered files share one
     for role, p in missing.items():
@@ -665,7 +672,10 @@ def _missing_files_reason(spec, category: str, mods: list, dataset: str,
             continue
         digits = role[len(role.rstrip("0123456789")):]
         stem = role.rstrip("0123456789")
-        want_file = f"atac{digits}.h5" if category == "vertical" else p.name
+        # the name export writes: atac.h5 (vertical), atac_peak<i>.h5 (cross)
+        want_file = (f"atac{digits}.h5" if category == "vertical" else
+                     f"atac_peak{digits}.h5" if category == "cross" and stem == "atac"
+                     else p.name)
         if stem == "atac_peak":
             want = "peak"
         elif stem == "atac_gas" and category != "vertical":
@@ -1024,8 +1034,7 @@ def _shown_modalities(df: "pd.DataFrame") -> "pd.DataFrame":
         v = next((v for v in registry.get(method).variants
                   if v.when.get("category") == category and not v.when.get("modalities")),
                  None)
-        return "+".join(Path(str(a.const)).stem for a in (v.args if v else ())
-                        if a.const and str(a.const).endswith(".h5")) or "(data_dir)"
+        return "+".join(v.shown_modalities if v else ()) or "(data_dir)"
     if "modalities" not in df.columns or not (df["modalities"] == "(data_dir)").any():
         return df
     cats = df["category"] if "category" in df.columns else [df.attrs.get("category")] * len(df)
@@ -1495,7 +1504,7 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
                      UserWarning)
     # last, so every check above saw every variant
     held = _held_families(ds_dir, category)
-    need = [_row_families(m) for m in df["modalities"]]
+    need = [_row_families(m) for m in _shown_modalities(df)["modalities"]]
     keep = ([True] * len(df) if every or modalities is not None
             else _listed(df, need, held, methods))
     left_out = [(m, [f for f in registry._BASE_MODALITIES if f in n and f not in held])

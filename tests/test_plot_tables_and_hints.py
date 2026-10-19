@@ -87,7 +87,7 @@ def test_x87_clustering_columns_follow_catalog_metrics():
 def test_x88_bubble_table_repr_is_short():
     text = repr(_build_table(_d11()))
     assert len(text.splitlines()) == 1 and text.startswith("BubbleTable: 13 methods (")
-    assert "families DR and clustering (6)" in text and "datasets D11" in text
+    assert "families Clustering (6)" in text and "datasets D11" in text
 
 
 @pytest.mark.parametrize("scored_with,expect", [

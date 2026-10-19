@@ -974,7 +974,13 @@ def _select(data, spec, *, what):
     """``(adata, to_canonical kwargs)`` of a selector: ``'X'``,
     ``'obsm:<key>'``, ``'layer:<key>'``, each after an optional
     ``'mod:<name>.'``, then an optional ``[<var column>=<value>]``."""
-    if not isinstance(spec, str) or not spec:
+    if spec == "":
+        raise ValueError(config.hint(
+            f"{what}='' is empty: {what}=None writes no {what.upper()}, or pass a "
+            f"selector such as 'X'.",
+            f"--{what} is empty: --{what} none writes no {what.upper()}, or pass a "
+            f"selector such as X."))
+    if not isinstance(spec, str):
         raise ValueError(f"{what}= must be a selector string like 'X', 'obsm:<key>', "
                          f"'layer:<key>' or 'mod:<name>', got {spec!r}")
     rest, var_filter = _split_var_filter(spec)
@@ -998,9 +1004,15 @@ def _select(data, spec, *, what):
     elif rest.startswith("layer:"):
         kw = {"layer": rest[6:]}
     else:
-        raise ValueError(f"{what}={spec!r}: unknown selector; use 'X', 'obsm:<key>', "
-                         f"'layer:<key>' or 'mod:<name>[.obsm:<key>|.layer:<key>]', "
-                         f"optionally followed by [<var column>=<value>]")
+        kind = next((k for k in ("obsm", "layer") if rest in getattr(
+            adata, "obsm" if k == "obsm" else "layers", {})), None)
+        if kind:
+            raise ValueError(config.hint(f"{what}={spec!r}: use {what}='{kind}:{spec}'.",
+                                         f"--{what} {spec}: use --{what} {kind}:{spec}."))
+        raise ValueError(config.hint(f"{what}={spec!r}", f"--{what} {spec}")
+                         + ": unknown selector; use X, obsm:<key>, layer:<key> or "
+                         "mod:<name>[.obsm:<key>|.layer:<key>], optionally followed by "
+                         "[<var column>=<value>].")
     if var_filter is not None:
         if "obsm" in kw:
             raise ValueError(f"{what}={spec!r}: a [<column>=<value>] filter selects "
@@ -1027,6 +1039,11 @@ def _case_hint(col, columns) -> str:
         return str(name).lower().replace("_", "")
     same = [str(c) for c in columns if key(c) == key(col) and str(c) != str(col)]
     return f" Did you mean {same[0]!r}?" if len(same) == 1 else ""
+
+
+#: the warning for gene-activity ATAC written for vertical methods
+_VERTICAL_GAS = ("Vertical methods need peak ATAC, and this ATAC holds gene activity. "
+                 "Export the ATAC as peaks.")
 
 
 def _vertical_gene_activity_readers() -> list:
@@ -1467,8 +1484,7 @@ def _export_dataset(data, dataset_dir: Path | str, *, rna="X",
                                      "--atac-kind given without --atac"))
     if category == "vertical" and atac is not None and atac_kind == "gene_activity" \
             and not _vertical_gene_activity_readers():
-        _compat.warn("Vertical methods need peak ATAC, and this ATAC holds gene "
-                     "activity. Export the ATAC as peaks.", UserWarning)
+        _compat.warn(_VERTICAL_GAS, UserWarning)
     if rna is None and adt is None and atac is None and labels is None:
         raise ValueError("nothing to export: give at least one of rna=, adt=, atac=, labels=")
     _check_batch_args(batch, batch_index, category, adt=adt, atac=atac, n_batches=n_batches)
@@ -1590,11 +1606,18 @@ def _export_dataset(data, dataset_dir: Path | str, *, rna="X",
                     mudata=_is_mudata(data))
                 if repeated:
                     _compat.warn(repeated, UserWarning)
+            if what == "rna" and feats is not None and _peak_fraction(feats) > 0.5:
+                raise ValueError(config.hint(
+                    f"rna= holds peaks ({feats[0]}): pass it as atac=.",
+                    f"--rna holds peaks ({feats[0]}): pass it with --atac."))
             if what == "atac":
                 # the RNA is prepared first (side 'rna', then the ATAC)
                 rna_feats = next((f for _, r, _, f, _, _ in prepared if r == "rna"), None)
                 if role == "atac":
                     role = _atac_role(feats, rna_feats)
+                    if category == "vertical" and role == "atac_gas" \
+                            and not _vertical_gene_activity_readers():
+                        _compat.warn(_VERTICAL_GAS, UserWarning)
                 _check_peak_names(role, feats, rna_feats=rna_feats, kind_arg=True)
                 if category == "mosaic" and role == "atac_gas":
                     _compat.warn("Every mosaic method reads peak ATAC. " + config.hint(
