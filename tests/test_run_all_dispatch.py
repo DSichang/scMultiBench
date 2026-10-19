@@ -85,7 +85,7 @@ def test_unknown_override_rejected_on_the_timeout_path(monkeypatch, tmp_path):
                       out_dir=str(tmp_path), timeout=600,
                       evaluate=False, verbose=False)
     assert len(res.failures) == 1
-    assert "does not accept" in str(res.failures.iloc[0]["error"])
+    assert "does not accept" in str(res.failures.iloc[0]["reason"])
     assert calls == [], "method was dispatched despite an invalid override"
 
 

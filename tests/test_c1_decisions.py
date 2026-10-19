@@ -89,12 +89,6 @@ def test_an_added_row_is_placed_by_its_rank_against_the_stored_rows_only():
     assert set(mixed[:2]) == {"Other", "Top"} and mixed[2] == first
 
 
-def test_a_table_without_stored_rows_ranks_as_before():
-    stored = mtb.load_results("cross").assign(source="user")
-    assert _build_table(stored).methods == _build_table(stored, anchor=False).methods
-    assert style.anchored(stored, lambda rows: None) is None
-
-
 # --------------------------------------------------------------- C04 and C17
 @pytest.mark.parametrize("category", list(_LAB))
 def test_recommend_and_the_figures_share_one_default(category):
@@ -117,8 +111,7 @@ def test_recommend_with_long_df_ranks_its_methods_only():
 
 
 # --------------------------------------------------------------- C38 summary
-SUMMARY = ["method", "status", "ARI", "NMI", "run_sec", "label_order_confidence",
-           "caveat", "reason"]
+SUMMARY = ["method", "status", "ARI", "NMI", "run_sec", "caveat", "reason"]
 
 
 @pytest.mark.parametrize("code, status", [
@@ -149,7 +142,7 @@ def test_the_summary_columns_and_reasons():
 
 def test_an_empty_summary_has_the_columns():
     assert list(mtb.BatchResult([], "D11", "vertical").summary.columns) == \
-        ["method", "status", "run_sec", "label_order_confidence", "caveat", "reason"]
+        ["method", "status", "run_sec", "caveat", "reason"]
 
 
 def _tree(tmp_path, dims=6):

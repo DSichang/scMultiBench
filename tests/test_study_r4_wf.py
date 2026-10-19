@@ -477,11 +477,11 @@ def test_named_blocked_methods_are_logged_and_recorded(tmp_path, monkeypatch, ca
     assert sm.loc["UnitedNet", "status"] == "skipped" == sm.loc["MIRA", "status"]
     fails = res.failures.set_index("method")
     assert set(fails.index) == {"UnitedNet", "MIRA"}
-    assert "logger.py" in fails.loc["MIRA", "error"]
-    assert "needs an NVIDIA GPU" in fails.loc["UnitedNet", "error"]
+    assert "logger.py" in fails.loc["MIRA", "reason"]
+    assert "needs an NVIDIA GPU" in fails.loc["UnitedNet", "reason"]
     # the export fix ends the reason, after the GPU sentence; no override (0.4.0)
-    assert fails.loc["UnitedNet", "error"].endswith("Export the ATAC as gene activity.")
-    assert "allow_atac_mismatch" not in fails.loc["UnitedNet", "error"]
+    assert fails.loc["UnitedNet", "reason"].endswith("Export the ATAC as gene activity.")
+    assert "allow_atac_mismatch" not in fails.loc["UnitedNet", "reason"]
     disk = pd.read_csv(tmp_path / "out" / "summary.csv").set_index("method")
     assert disk.loc["MIRA", "status"] == "skipped"
     blob = json.loads((tmp_path / "out" / "batch_result.json").read_text())
@@ -551,9 +551,7 @@ def test_a_skipped_record_never_replaces_an_earlier_run(tmp_path):
     _quiet(W.BatchResult([skip, other], "D11", "vertical").save, out)
     back = {r["method"]: r["status"] for r in mtb.load_batch(out).records}
     assert back == {"Matilda": "CHAIN_OK", "totalVI": "SKIPPED"}
-    assert W._earlier_provenance(out) == {"Matilda": {"scripts_commit": "abc",
-                                                      "env_flavor": "gpu",
-                                                      "hostname": "h"}}
+    assert {m: r["hostname"] for m, r in W._saved_records(out).items()} == {"Matilda": "h"}
     # a later run of the method replaces a SKIPPED record
     ran = {"method": "totalVI", "status": "RUN_OK"}
     _quiet(W.BatchResult([ran], "D11", "vertical").save, out)

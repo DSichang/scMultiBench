@@ -288,7 +288,7 @@ def test_reused_output_next_to_a_record_without_a_method_still_runs(tmp_path, mo
     for records in (None, {"a": 1}, [None, "x", 3]):
         (tmp_path / "batch_result.json").write_text(json.dumps(
             {"dataset": "D11", "category": "vertical", "records": records}))
-        assert W._earlier_provenance(tmp_path) == {}
+        assert W._saved_records(tmp_path) == {}
 
 
 def _git_repo(path):

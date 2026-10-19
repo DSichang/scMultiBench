@@ -91,7 +91,7 @@ DATA_KEYWORDS = {"data_path": _compat.use("mtb.config.DEFAULT.data_path"),
 
 
 @_compat.keywords("data.fetch", private="_fetch", kept=DATA_KEYWORDS)
-def fetch(*datasets: str, verbose: bool = True) -> Path:
+def fetch(*datasets: str, verbose: bool = True) -> "Path | list[Path]":
     """Download demo datasets into the data root, skipping those present.
 
     Parameters
@@ -103,9 +103,9 @@ def fetch(*datasets: str, verbose: bool = True) -> Path:
 
     Returns
     -------
-    pathlib.Path
-        The data root, ``mtb.config.DEFAULT.data_path``; each dataset lands
-        in ``<data root>/<dataset>/``.
+    pathlib.Path or list of pathlib.Path
+        The dataset folder, ``<data root>/<dataset>/``; a list of them for
+        several datasets.
 
     Raises
     ------
@@ -117,8 +117,8 @@ def fetch(*datasets: str, verbose: bool = True) -> Path:
     Examples
     --------
     >>> import multibench as mtb
-    >>> mtb.data.fetch("D11")                   # about 11 MB
-    >>> mtb.scan("D11", "vertical")
+    >>> folder = mtb.data.fetch("D11")          # about 11 MB
+    >>> mtb.scan(folder, "vertical")
 
     Notes
     -----
@@ -130,7 +130,7 @@ def fetch(*datasets: str, verbose: bool = True) -> Path:
 
 
 def _fetch(*datasets: str, data_path=None, quiet: bool = False,
-           verbose: bool = True) -> Path:
+           verbose: bool = True) -> "Path | list[Path]":
     """:func:`fetch`, with the deprecated ``data_path=`` and ``quiet=``."""
     import shutil as _shutil
     import tempfile as _tempfile
@@ -163,7 +163,8 @@ def _fetch(*datasets: str, data_path=None, quiet: bool = False,
             (tmp / ds).rename(root / ds)
         finally:
             _shutil.rmtree(tmp, ignore_errors=True)
-    return root
+    folders = [root / ds for ds in datasets]
+    return folders[0] if len(folders) == 1 else folders
 
 
 def _methods_in_tree(folder: Path) -> list:

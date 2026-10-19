@@ -353,8 +353,8 @@ def _count_sweeps(monkeypatch, fail=False):
     return calls
 
 
-def test_rescore_ranks_the_label_orders_again(cross, tmp_path, monkeypatch):
-    # Z01 (r3): the orders are ranked on the current scoring, also without ARI
+def test_rescore_keeps_the_recorded_label_order(cross, tmp_path, monkeypatch):
+    # c2 (D28): the order the record was scored with is not ranked again
     res = _cross_run(cross, tmp_path, "totalVI")
     rec = res.records[0]
     assert rec["labels_used"] == ["cty1.csv", "cty2.csv", "cty3.csv"]
@@ -362,35 +362,31 @@ def test_rescore_ranks_the_label_orders_again(cross, tmp_path, monkeypatch):
     back = mtb.load_batch(tmp_path / "totalVI")
     calls = _count_sweeps(monkeypatch)
     new = back.rescore(metrics=["ASW"])
-    assert len(calls) == 1
+    assert len(calls) == 0
     out = new.records[0]
     assert out["status"] == "CHAIN_OK"
     assert out["metrics"]["ASW"] == rec["metrics"]["ASW"]
     assert out["labels_used"] == rec["labels_used"]
     assert out["label_order_candidates"] == rec["label_order_candidates"]
-    assert new.summary[["label_order_confidence"]].equals(res.summary[["label_order_confidence"]])
     assert [(r["batch_source"], r["n_batches"]) for r in new.records] == \
         [(r["batch_source"], r["n_batches"]) for r in res.records]
 
 
-def test_rescore_candidates_come_from_the_new_scores(cross, tmp_path, monkeypatch, capsys):
-    # Z01 (r3): an old record's candidates are replaced, so the winner's ARI is the ARI
+def test_rescore_keeps_the_recorded_candidates(cross, tmp_path, monkeypatch, capsys):
+    # c2 (D28): no ranking line; the record keeps its candidates
     _cross_run(cross, tmp_path, "totalVI")
     p = tmp_path / "totalVI" / "batch_result.json"
     blob = json.loads(p.read_text())
-    blob["records"][0]["label_order_candidates"] = [
-        {"order": ["cty1.csv", "cty2.csv", "cty3.csv"], "ARI": 0.99},
-        {"order": ["cty2.csv", "cty1.csv", "cty3.csv"], "ARI": 0.01}]
+    old = [{"order": ["cty1.csv", "cty2.csv", "cty3.csv"], "ARI": 0.99},
+           {"order": ["cty2.csv", "cty1.csv", "cty3.csv"], "ARI": 0.01}]
+    blob["records"][0]["label_order_candidates"] = old
     p.write_text(json.dumps(blob))
-    calls = _count_sweeps(monkeypatch)
     new = _quiet(mtb.load_batch(tmp_path / "totalVI").rescore, metrics=["ARI"],
                  verbose=True)
-    assert len(calls) == 1
     out = new.records[0]
-    assert out["label_order_candidates"][0]["ARI"] == out["metrics"]["ARI"]
-    assert len(out["label_order_candidates"]) == 6
-    lines = capsys.readouterr().out.splitlines()
-    assert lines[0].startswith("[rescore] totalVI: ranking 6 label orders")
+    assert out["label_order_candidates"] == old
+    assert out["labels_used"] == ["cty1.csv", "cty2.csv", "cty3.csv"]
+    assert "ranking" not in capsys.readouterr().out
 
 
 def test_rescore_ranks_the_orders_of_a_record_without_one(cross, tmp_path, monkeypatch,
@@ -449,18 +445,6 @@ def test_the_batch_warning_on_the_command_line(monkeypatch):
     assert ("--batch changes nothing here, because --metrics ARI,NMI has no batch "
             "metric. Add ASW_batch, ARI_batch, NMI_batch, GC or iLISI to --metrics, or pass --metrics all.") in \
         [str(w.message) for w in caught]
-
-
-# ======================================================================= R6-06
-def test_label_order_confidence_stays_within_0_and_1():
-    assert W._order_confidence([{"ARI": 0.6335}, {"ARI": -0.0009}]) == 1.0
-    assert W._order_confidence([{"ARI": 0.688}, {"ARI": 0.1101}]) == 0.84
-    rec = {"method": "UINMF", "status": "CHAIN_OK", "labels_used": ["cty1.csv", "cty2.csv"],
-           "metrics": {"ARI": 0.6335},
-           "label_order_candidates": [{"order": ["cty1.csv", "cty2.csv"], "ARI": 0.6335},
-                                      {"order": ["cty2.csv", "cty1.csv"], "ARI": -0.0009}]}
-    sm = W.BatchResult([rec], "D52", "cross").summary
-    assert sm["label_order_confidence"].iloc[0] == 1.0
 
 
 # ================================================================ docstrings

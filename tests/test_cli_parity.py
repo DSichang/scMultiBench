@@ -629,7 +629,7 @@ def test_cli_run_all_dry_run_and_summary(monkeypatch, tmp_path, capsys):
 
     class FakeRes:
         summary = pd.DataFrame({"method": ["SCALEX"], "status": ["ok"]})
-        failures = pd.DataFrame(columns=["method", "status", "error"])
+        failures = pd.DataFrame(columns=["method", "status", "reason"])
         records = []
 
     def fake_run_all(dataset, category, out_dir=None, **kw):

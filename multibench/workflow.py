@@ -587,28 +587,8 @@ SCAN_COLUMNS = ["method", "category", "modalities", "env", "output_kind", "n_tun
                 "files_ok", "files_reason", "env_ok", "env_reason", "needs_labels", "atac",
                 "command"]
 
-#: The columns of ``run_all(dry_run=True)``.
+#: The columns of ``run_all(dry_run=True)``; the first four are scan's.
 PLAN_COLUMNS = ["method", "modalities", "runnable", "reason", "env", "caveat", "command"]
-
-#: The columns :func:`scan` returns, and ``multibench scan`` prints by default.
-COMPACT_COLUMNS = ["method", "modalities", "runnable", "files_ok", "env_ok",
-                   "runtime_tier", "reason"]
-
-
-def compact_columns(df) -> list[str]:
-    """:data:`COMPACT_COLUMNS`, plus ``category`` when the rows span several,
-    ``atac`` when a row reads an ATAC file and ``caveat`` when any row has one."""
-    cols = list(COMPACT_COLUMNS)
-    if "category" in df.columns and df["category"].nunique() > 1:
-        cols.insert(1, "category")
-    if "atac" in df.columns and "modalities" in df.columns and any(
-            "atac" in str(m) for m in df["modalities"]):
-        cols.insert(cols.index("modalities") + 1, "atac")
-    if "caveat" in df.columns and any(str(c).strip() not in ("", "None", "nan")
-                                      for c in df["caveat"]):
-        cols.insert(cols.index("reason") + 1, "caveat")
-    return [c for c in cols if c in df.columns]
-
 
 #: Default ``out_dir`` of the plan's ``command`` column: a preview needs no
 #: real directory.
@@ -1816,21 +1796,6 @@ def _label_candidates(dataset, n, data_path=None):
     return out
 
 
-#: Below this ARI the winning ordering is at chance: no confidence is reported.
-_CHANCE_ARI = 0.05
-
-
-def _order_confidence(cands) -> float | None:
-    """``(best - max(runner_up, 0)) / best`` over the ARI of the ranked label orders;
-    a ratio, as the runner-up sits near ARI 0 and a difference is capped by the winner."""
-    if len(cands) < 2:
-        return None
-    best, second = cands[0]["ARI"], cands[1]["ARI"]
-    if best < _CHANCE_ARI:
-        return None
-    return round(max(0.0, (best - max(second, 0.0)) / best), 4)
-
-
 def _metric_codes(metrics):
     """The metric codes ``metrics=`` selects; ``None`` = every metric, also
     for a value ``evaluate`` will reject (it raises there, with its message)."""
@@ -1955,6 +1920,9 @@ _STATUS = {"CHAIN_OK": "scored", "CHAIN_OK_GRAPH_METHOD": "scored", "RUN_OK": "r
            "RUN_OK_NO_LABEL_MATCH": "ran", "FAIL": "failed", "SKIPPED": "skipped",
            "TIMEOUT": "timeout"}
 
+#: the record codes of a run whose scoring failed: listed in BatchResult.failures
+_RAN_FAILED = ("RUN_OK_EVAL_FAILED", "RUN_OK_NO_LABEL_MATCH")
+
 #: the reason of a record that ran and holds no error of its own
 _RAN_REASON = {"RUN_OK_NO_EMBEDDING": "It writes a graph, not an embedding.",
                "RUN_OK_NO_LABEL_MATCH": "No label file has as many cells as the output."}
@@ -1977,17 +1945,16 @@ def _reason(rec: dict) -> str:
 
 
 #: the columns of BatchResult.summary; the metric columns come after status
-_SUMMARY_COLUMNS = ("method", "status", "run_sec", "label_order_confidence", "caveat",
-                    "reason")
+_SUMMARY_COLUMNS = ("method", "status", "run_sec", "caveat", "reason")
 
 
-#: provenance of a reused output when ``out_dir`` holds no earlier record of it
+#: provenance of a reused output when ``out_dir`` holds no record of it
 _UNKNOWN_PROVENANCE = {"scripts_commit": None, "env_flavor": "unknown", "hostname": ""}
 
 
-def _earlier_provenance(folder: Path) -> dict:
-    """``{method: {scripts_commit, env_flavor, hostname}}`` of the runs saved in
-    ``folder``; records without a method are skipped, an unreadable file gives ``{}``."""
+def _saved_records(folder: Path) -> dict:
+    """``{method: record}`` of the runs saved in ``folder``; records without a
+    method are skipped, an unreadable file gives ``{}``."""
     path = Path(folder) / "batch_result.json"
     try:
         with open(path) as fh:
@@ -1995,9 +1962,8 @@ def _earlier_provenance(folder: Path) -> dict:
     except (OSError, ValueError, AttributeError):
         return {}
     # a saved file may hold any records BatchResult was given
-    return {r["method"]: {k: r.get(k, v) for k, v in _UNKNOWN_PROVENANCE.items()}
-            for r in records if isinstance(r, dict) and r.get("method")
-            and r.get("status") != "SKIPPED"}
+    return {r["method"]: r for r in records if isinstance(r, dict) and r.get("method")
+            and _status(r.get("status")) != "skipped"}
 
 
 def _check_save_target(folder: Path, dataset: str, category: str) -> None:
@@ -2037,9 +2003,8 @@ def _plan_caveats(dataset, category, data_path, methods) -> dict | None:
 
 
 def _scorable(rec: dict) -> bool:
-    """Whether ``rescore`` scores ``rec``: not SKIPPED, FAIL or TIMEOUT."""
-    status = str(rec.get("status", ""))
-    return status != "SKIPPED" and not status.startswith(("FAIL", "TIMEOUT"))
+    """Whether ``rescore`` scores ``rec``: it ran (scored or not)."""
+    return _status(rec.get("status")) in ("scored", "ran")
 
 
 def _rank_line(method):
@@ -2147,8 +2112,6 @@ class BatchResult:
             status                  scored, ran, failed, skipped or timeout
             ARI, NMI, ASW, ...      one column per metric
             run_sec                 seconds of the method run
-            label_order_confidence  how clearly the label order won, 0-1
-                                    (blank: one order only)
             caveat                  scan's caveat for the method, or ""
             reason                  why the method has no scores, or ""
             ```
@@ -2156,7 +2119,7 @@ class BatchResult:
         Examples
         --------
         >>> res = mtb.load_batch("out/")
-        >>> res.summary[["method", "status", "ARI", "label_order_confidence"]]
+        >>> res.summary[["method", "status", "ARI"]]
 
         See Also
         --------
@@ -2165,8 +2128,6 @@ class BatchResult:
         """
         rows = [{"method": r.get("method"), "status": _status(r.get("status")),
                  "run_sec": r.get("run_sec"),
-                 "label_order_confidence": _order_confidence(
-                     r.get("label_order_candidates") or []),
                  # NaN, not None, for a record saved before the field
                  "caveat": np.nan if r.get("caveat") is None else r.get("caveat"),
                  "reason": _reason(r)}
@@ -2176,9 +2137,6 @@ class BatchResult:
                 for r in self.records]
         table = (pd.DataFrame(rows, columns=None if rows else list(_SUMMARY_COLUMNS))
                  .sort_values("method").reset_index(drop=True))
-        # float64 with NaN also when every row is blank (else object, None)
-        table["label_order_confidence"] = pd.to_numeric(
-            table["label_order_confidence"], errors="coerce").astype("float64")
         scores = [c for c in table.columns if c not in _SUMMARY_COLUMNS]
         return table[["method", "status", *scores, *_SUMMARY_COLUMNS[2:]]]
 
@@ -2250,7 +2208,7 @@ class BatchResult:
         Returns
         -------
         pandas.DataFrame
-            Columns ``method, status, error``; empty when nothing failed.
+            Columns ``method, status, reason``; empty when nothing failed.
 
         Examples
         --------
@@ -2269,14 +2227,13 @@ class BatchResult:
         --------
         BatchResult.summary : every method, including the ones that ran but could not be scored.
         """
-        bad = [r for r in self.records
-               if str(r.get("status", "")).startswith(("FAIL", "TIMEOUT"))
-               or r.get("status") in ("RUN_OK_EVAL_FAILED",
-                                      "RUN_OK_NO_LABEL_MATCH")
-               or (r.get("status") == "SKIPPED" and r.get("requested"))]
-        return pd.DataFrame([{"method": r.get("method"), "status": _status(r.get("status")),
-                              "error": _reason(r)} for r in bad],
-                            columns=["method", "status", "error"])
+        rows = [{"method": r.get("method"), "status": _status(r.get("status")),
+                 "reason": _reason(r)} for r in self.records]
+        bad = [row for row, r in zip(rows, self.records)
+               if row["status"] in ("failed", "timeout")
+               or (row["status"] == "skipped" and r.get("requested"))
+               or (row["status"] == "ran" and r.get("status") in _RAN_FAILED)]
+        return pd.DataFrame(bad, columns=["method", "status", "reason"])
 
     def plot(self, **kw):
         """Bubble figure of every method that produced metrics.
@@ -2345,8 +2302,9 @@ class BatchResult:
             the batch ``run_all`` was given, else each cell's label file.
         labels : array-like | Series | path | None
             One cell-type label per cell; a Series or a barcode-indexed CSV is
-            aligned by barcode. ``None`` = the dataset's label files, their
-            orders ranked as ``run_all`` ranks them.
+            aligned by barcode. ``None`` = the dataset's label files, in the
+            order the record was scored with (ranked as ``run_all`` ranks
+            them when it has none).
         metrics : str | list[str] | None
             Metric family (``"clustering"``, ``"batch"``, ``"classification"``,
             ``"all"``) or metric codes, which replace those scores and keep the
@@ -2408,7 +2366,7 @@ class BatchResult:
         labels_at: dict = {}
         batch_at: dict = {}
         used = dict.fromkeys(root for root, r in zip(roots, self.records)
-                             if r.get("status") != "SKIPPED")
+                             if _status(r.get("status")) != "skipped")
         for root in used:
             if labels is not None:
                 # as written: a record names the word for a missing label
@@ -2620,9 +2578,9 @@ class BatchResult:
         before = (load_batch(folder).records if (folder / "batch_result.json").exists()
                   else [])
         # a SKIPPED record never replaces an earlier record of a run
-        ran = {r.get("method") for r in before if r.get("status") != "SKIPPED"}
+        ran = {r.get("method") for r in before if _status(r.get("status")) != "skipped"}
         new = [r for r in self.records
-               if not (r.get("status") == "SKIPPED" and r.get("method") in ran)]
+               if not (_status(r.get("status")) == "skipped" and r.get("method") in ran)]
         mine = {r.get("method") for r in new}
         kept = [r for r in before if r.get("method") not in mine]
         merged = BatchResult(kept + new, self.dataset, self.category,
@@ -3401,6 +3359,7 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
     """Fill ``rec`` with the status and scores of ``emb``. ``labels`` / ``batch`` in
     ``labels_for`` order (``*_by_cell``) go into each label order, else follow the rows."""
     stored_used = rec.get("labels_used")
+    stored_cands = rec.get("label_order_candidates")
     _drop_scores(rec)
     rec["emb_shape"] = list(emb.shape)
     embedding = variant.output.kind == "embedding"
@@ -3474,6 +3433,9 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
         distinct.setdefault((np.asarray(c[1]).astype(str).tobytes(),
                              np.asarray(c[2]).astype(str).tobytes()), c)
     cands = list(distinct.values())
+    # the label order the record was scored with is not ranked again
+    same = [c for c in cands if labels is None and list(c[0]) == list(stored_used or ())]
+    cands = same or cands
     if not cands:
         rec["status"] = "RUN_OK_NO_LABEL_MATCH"
         if not _dataset_folder(dataset, data_path).is_dir():
@@ -3499,8 +3461,8 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
     rec["metrics"] = {k: (None if pd.isna(x) else round(float(x), 4) + 0.0)
                       for k, x in val["Value"].items()}
     rec["labels_used"] = names
-    if len(spread) > 1:
-        rec["label_order_candidates"] = spread
+    if len(spread) > 1 or (same and stored_cands):
+        rec["label_order_candidates"] = spread if len(spread) > 1 else stored_cands
     # the batch vector the batch metrics saw
     winning_batch = next(b for order, _, b in cands if order == names)
     n_batches = int(len(set(np.asarray(winning_batch).tolist())))
@@ -3751,7 +3713,7 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
                   + f" shows {'it' if others == 1 else 'them'}.", flush=True)
     out_dir.mkdir(parents=True, exist_ok=True)
     records = []
-    earlier = _earlier_provenance(out_dir) if skip_existing else {}
+    earlier = _saved_records(out_dir) if skip_existing else {}
     from . import __version__ as _pkg_version
 
     for _, row in plan_df.iterrows():
@@ -3769,6 +3731,19 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
                "multibench_version": _pkg_version,
                "started_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
         start = time.time()
+        saved = earlier.get(method)
+        if saved is not None and _status(saved.get("status")) in ("scored", "ran") and (
+                method_dir / registry.get(method).select(category, set(mods)).output.file
+        ).exists():
+            # a saved run is scored again, as rescore does: its record is kept
+            rec = (BatchResult([saved], dataset, category, out_dir)._rescore(
+                batch=batch, labels=None, metrics=None, verbose=False).records[0]
+                if evaluate else dict(saved))
+            if verbose:
+                print(f"[run_all] {method} ({category}/{dataset}): reusing the saved run "
+                      f"-> {_status(rec['status'])} {_ari_tail(rec)}".rstrip(), flush=True)
+            records.append(rec)
+            continue
         if verbose:
             print(f"[run_all] {method} ({category}/{dataset}) ...", flush=True)
             if rec["caveat"]:              # it starts with the method name
@@ -3841,7 +3816,7 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
             print(f"[run_all]   -> {_status(rec['status'])} ({rec.get('run_sec')}s) {tail}".rstrip(),
                   flush=True)
         if rec.get("reused"):
-            rec.update(earlier.get(method, _UNKNOWN_PROVENANCE))
+            rec.update(_UNKNOWN_PROVENANCE)
         else:
             rec.update(config.run_provenance(row["env"]))   # scripts_commit, env_flavor, hostname
         records.append(rec)

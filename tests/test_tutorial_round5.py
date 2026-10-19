@@ -118,4 +118,4 @@ def test_a_named_skipped_method_has_its_reason_in_summary_and_failures(tmp_path,
     assert f"multibench env install --methods {trio[-1]}" in sm.loc[trio[-1], "reason"]
     assert (sm.drop(index=trio[-1])["reason"] == "").all()
     fails = res.failures.set_index("method")
-    assert fails.loc[trio[-1], "error"] == sm.loc[trio[-1], "reason"]
+    assert fails.loc[trio[-1], "reason"] == sm.loc[trio[-1], "reason"]

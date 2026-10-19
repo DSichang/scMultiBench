@@ -508,7 +508,7 @@ def test_warnings_are_formatted_on_stderr(monkeypatch, capsys):
 def test_run_all_progress_goes_to_stderr(monkeypatch, tmp_path, capsys):
     class FakeRes:
         summary = pd.DataFrame({"method": ["M"], "status": ["CHAIN_OK"]})
-        failures = pd.DataFrame(columns=["method", "status", "error"])
+        failures = pd.DataFrame(columns=["method", "status", "reason"])
         records = []
 
     def fake_run_all(*a, **k):

@@ -112,7 +112,7 @@ def test_a_named_method_without_its_environment_is_in_failures_with_the_reason(
     fails = res.failures.set_index("method")
     assert list(fails.index) == [trio[-1]]
     assert fails.loc[trio[-1], "status"] == "skipped"
-    assert f"multibench env install --methods {trio[-1]}" in fails.loc[trio[-1], "error"]
+    assert f"multibench env install --methods {trio[-1]}" in fails.loc[trio[-1], "reason"]
 
 
 # ------------------------------------------------- R4-08: single-build envs

@@ -81,37 +81,7 @@ def test_failures_excludes_successful_but_unscorable_runs():
     assert set(r.failures["method"]) == {"Broken", "Slow"}
     assert repr(r) == "<BatchResult vertical/D11: 1 scored, 2 ran, 1 failed, 1 timeout>"
 import multibench as mtb
-from multibench.workflow import BatchResult, _order_confidence
-
-
-def test_order_confidence_is_scale_free():
-    """A plain difference is bounded above by the ARI, so a method scoring 0.3 could
-    never look well-separated however unambiguous its ordering. The ratio must."""
-    strong_high = _order_confidence([{"ARI": 0.90}, {"ARI": 0.001}])
-    strong_low = _order_confidence([{"ARI": 0.30}, {"ARI": 0.001}])
-    ambiguous = _order_confidence([{"ARI": 0.30}, {"ARI": 0.28}])
-    assert strong_high > 0.99
-    assert strong_low > 0.99, "a low-ARI method with an unambiguous order must still read high"
-    assert ambiguous < 0.2
-    assert _order_confidence([{"ARI": 0.5}]) is None      # nothing to choose between
-    assert _order_confidence([]) is None
-    # At chance the ratio would compare two noise values (0.0004 vs 0.0002 reads
-    # 0.5 while BOTH orderings are garbage), so it must refuse to answer.
-    assert _order_confidence([{"ARI": 0.0}, {"ARI": 0.0}]) is None
-    assert _order_confidence([{"ARI": 0.0004}, {"ARI": 0.0002}]) is None
-    assert _order_confidence([{"ARI": 0.30}, {"ARI": 0.001}]) > 0.99
-
-
-def test_summary_reports_label_order_and_confidence():
-    recs = [{"method": "M", "status": "CHAIN_OK", "metrics": {"ARI": 0.3},
-             "labels_used": ["rna_cty.csv", "atac_cty.csv"],
-             "label_order_candidates": [{"order": ["rna_cty.csv", "atac_cty.csv"], "ARI": 0.30},
-                                        {"order": ["atac_cty.csv", "rna_cty.csv"], "ARI": 0.001}],
-             "_long": None}]
-    s = BatchResult(recs, "D28", "diagonal").summary
-    assert s.loc[0, "label_order_confidence"] > 0.99
-import pytest
-import multibench as mtb
+from multibench.workflow import BatchResult
 
 
 def test_sweep_rejects_a_param_the_method_does_not_expose():

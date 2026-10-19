@@ -57,8 +57,6 @@ def test_identical_label_files_are_one_ordering(tmp_path, monkeypatch):
     rec = res.records[0]
     assert rec["labels_used"] == ["cty1.csv", "cty2.csv", "cty3.csv"]
     assert "label_order_candidates" not in rec
-    row = res.summary.iloc[0]
-    assert pd.isna(row["label_order_confidence"])
 
 
 def test_rescore_words_the_caveat_as_this_version_does(tmp_path, monkeypatch):

@@ -343,7 +343,7 @@ def _cmd_scan(args) -> int:
                            allow_atac_mismatch=args.allow_atac_mismatch)
     shown = _strict_table(df) if args.strict else df
     _print_frame(shown, columns=_csv_list(args.columns), fmt=args.format,
-                 compact=workflow.compact_columns(df))
+                 compact=workflow.PLAN_COLUMNS[:4])
     note = _scan_note(df, args.dataset, args.data_path, category)
     code = _EXIT_OK
     if args.strict:
@@ -704,7 +704,7 @@ def _cmd_fetch(args) -> int:
             if args.outputs:
                 where = fetch_outputs(ds, data_path=args.data_path)
             else:
-                where = _fetch(ds, data_path=args.data_path) / ds
+                where = _fetch(ds, data_path=args.data_path)
         print(f"{ds}: {where}")
     return _EXIT_OK
 
@@ -1161,7 +1161,7 @@ def _run_all_command(args, stack) -> int:
                 raise ValueError(bad)
         plan = df if columns else workflow._shown_modalities(df)[workflow.PLAN_COLUMNS]
         _print_frame(plan, columns=columns, fmt=args.format,
-                     compact=workflow.compact_columns(plan))
+                     compact=workflow.PLAN_COLUMNS[:4])
         if args.format == "table" and not columns:
             have = df[df["command"].astype(str).str.len() > 0]
             missing = not have["env_ok"].astype(bool).all()
@@ -1257,7 +1257,7 @@ def _not_run_line(res, where) -> str | None:
     the ``SKIPPED`` methods ``--methods`` did not name (they do not set exit 3)."""
     skipped = list(dict.fromkeys(str(r.get("method"))
                                  for r in res.records
-                                 if r.get("status") == "SKIPPED"
+                                 if workflow._status(r.get("status")) == "skipped"
                                  and not r.get("requested")))
     if not skipped:
         return None

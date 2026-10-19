@@ -105,7 +105,7 @@ def test_fetch_wraps_data_fetch(monkeypatch, tmp_path, capsys):
     def fake_fetch(*ids, data_path=None, quiet=False, verbose=True):
         calls.append(("fetch", ids, data_path))
         print("downloading ...")              # library progress: must reach stderr
-        return tmp_path
+        return tmp_path / ids[0]
 
     def fake_outputs(ds, methods=None, *, data_path=None, quiet=False):
         calls.append(("outputs", ds, data_path))
@@ -394,12 +394,12 @@ def test_evaluate_hints_use_flag_names(tmp_path, capsys):
 def test_compact_view_adds_atac_and_caveat_when_they_apply(capsys):
     # 0.4.0: scan prints mtb.scan's table; the compact plan view is run-all --dry-run's
     rc = cli.main(["run-all", "D28", "--category", "diagonal", "--dry-run"])
-    out = capsys.readouterr().out
+    out, err = capsys.readouterr()
     header = out.splitlines()[0].split()
     assert rc == 0
-    # c1 (C32): the seven-column plan, compact
-    assert header == ["method", "modalities", "runnable", "reason", "caveat"]
-    glue = next(l for l in out.splitlines() if l.strip().startswith("GLUE"))
+    # c2 (D16): the plan's first four columns, scan's; caveats on their own lines
+    assert header == ["method", "modalities", "runnable", "reason"]
+    glue = next(l for l in err.splitlines() if l.startswith("# GLUE"))
     assert "GLUE reads the GENCODE" in glue and "peak names" not in glue
     rc = cli.main(["run-all", "D11", "--category", "vertical", "--modalities", "rna,adt",
                    "--dry-run"])
@@ -407,15 +407,7 @@ def test_compact_view_adds_atac_and_caveat_when_they_apply(capsys):
     assert rc == 0 and header == ["method", "modalities", "runnable", "reason"]
 
 
-def test_compact_columns_and_word_boundary_clip():
-    df = pd.DataFrame({"method": ["A", "B"], "modalities": ["rna+adt", "rna+atac"],
-                       "atac": [None, "peak"], "caveat": ["", None], "reason": ["", ""],
-                       "runnable": True, "files_ok": True, "env_ok": True,
-                       "runtime_tier": "fast"})
-    assert workflow.compact_columns(df) == ["method", "modalities", "atac", "runnable",
-                                             "files_ok", "env_ok", "runtime_tier", "reason"]
-    df["caveat"] = ["", "needs peaks"]
-    assert workflow.compact_columns(df)[-1] == "caveat"
+def test_word_boundary_clip():
     clipped = cli._truncate("input files not found on disk: atac_gas.h5 not found here", 40)
     assert clipped == "input files not found on disk..." and len(clipped) <= 40
 
