@@ -211,12 +211,19 @@ def test_obsm_x_on_an_anndata_without_x():
 
 
 def test_label_files_without_ids_are_matched_by_position_without_a_warning():
-    res_obs = pd.Index([f"cty:{i}" for i in range(2864)])
+    # row numbers, as res.embedding names the cells of a folder without barcodes
+    res_obs = pd.Index([str(i) for i in range(2864)])
     import anndata as ad
     a = ad.AnnData(obs=pd.DataFrame(index=res_obs))
     a.obsm["X_emb"] = _emb(2864)
     with warnings.catch_warnings():
         warnings.simplefilter("error")
+        mtb.evaluate(a, dataset="D11", category="vertical", method="Matilda (this run)",
+                     metrics=["ASW"], verbose=False)
+    # v1 NEW-1: ids that are none of the folder's barcodes are refused, not a guess
+    a.obs_names = [f"cty:{i}" for i in range(2864)]
+    with pytest.raises(ValueError, match="^None of the embedding's cell ids is a cell of "
+                                         "cty.csv: the embedding names a cell 'cty:0'"):
         mtb.evaluate(a, dataset="D11", category="vertical", method="Matilda (this run)",
                      metrics=["ASW"], verbose=False)
 

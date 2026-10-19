@@ -273,13 +273,14 @@ def _file_carries_ids(first, ids) -> bool:
 
 
 def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
-                   table=None, cells=None):
+                   table=None, cells=None, read=()):
     """One label-like argument as a 1-D array in the output's cell order: an obs
     column, a Series aligned by id, a file aligned by its id column, else by position.
 
     ``as_written`` reads files for a message naming the missing words;
     ``table`` (a ``.csv`` embedding's barcodes) collects the arguments put in
-    its row order; ``cells`` words the error of ``io._align_vector``.
+    its row order; ``cells`` words the error of ``io._align_vector``; ``read``
+    names the files whose barcodes name the cells (:func:`_file_barcodes`).
     """
     if adata is not None and isinstance(x, str):
         col = _obs_column_name(x, adata)
@@ -308,7 +309,7 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
             table.moved.append(name)
         if what == "labels" and first is None and _has_cell_ids(ids) and unique:
             # no ids: the dataset folder's matrix names the cells
-            first = _folder_ids([x], [len(vals)], ids)
+            first = _folder_ids([x], [len(vals)], ids, read)
         if _has_cell_ids(ids) and not _file_carries_ids(first, ids):
             by_position = "" if len(vals) != len(ids) else ", or " + config.hint(
                 f"pass {what}=pd.read_csv(...).iloc[:, 0].to_numpy()",
@@ -401,13 +402,27 @@ def _file_barcodes(files, counts=None, read=()):
     return keys if keys.is_unique else None
 
 
-def _folder_ids(files, counts, ids):
+def _folder_ids(files, counts, ids, read=()):
     """:func:`_file_barcodes` of ``files`` when the embedding's cells ``ids`` are
-    among them (all of them, or a subset); else ``None``."""
-    keys = _file_barcodes(files, counts)
-    if keys is None or not {str(i) for i in ids} <= set(keys):
-        return None
-    return keys
+    among them (all of them, or a subset); else ``None``. The files a method
+    read (``read``) name the cells first, as ``BatchResult.embedding`` names
+    them, then the folder's default files. Raises when the folder names its
+    cells and none of ``ids`` is among them: by position, the labels would be
+    a guess."""
+    ids = [str(i) for i in ids]
+    found = [k for k in (_file_barcodes(files, counts, r)
+                         for r in dict.fromkeys((frozenset(read), frozenset())))
+             if k is not None]
+    for keys in found:
+        if set(ids) <= set(keys):
+            return keys
+    if found and not any(i in have for have in map(set, found) for i in ids):
+        raise ValueError(
+            f"None of the embedding's cell ids is a cell of "
+            f"{_and_list([Path(f).name for f in files])}: the embedding names a cell "
+            f"{ids[0]!r}, the dataset folder {found[0].iloc[0]!r}. Name the embedding's "
+            f"cells as the folder does.")
+    return None
 
 
 def _no_ids(ids) -> str:
@@ -415,22 +430,24 @@ def _no_ids(ids) -> str:
             else "the embedding has no cell ids")
 
 
-def _stack_label_files(files, ids, as_written=False, table=None):
+def _stack_label_files(files, ids, as_written=False, table=None, read=()):
     """Several label files, stacked in order, and each row's file (1, 2, ...).
 
     When every file has a first column of cell ids, the rows are aligned to
-    ``ids`` by it; otherwise they stay in file order.
+    ``ids`` by it; else by the barcodes of the folder's matrices (``read``, the
+    files a method read, first: :func:`_folder_ids`); otherwise they stay in
+    file order.
     """
-    read = [io.read_labels_ids(f, what="labels", pick=_pick("labels"),
+    rows = [io.read_labels_ids(f, what="labels", pick=_pick("labels"),
                                as_written=as_written) for f in files]
-    vals = np.concatenate([np.asarray(v) for v, _ in read])
-    origin = np.concatenate([np.full(len(v), i + 1) for i, (v, _) in enumerate(read)])
+    vals = np.concatenate([np.asarray(v) for v, _ in rows])
+    origin = np.concatenate([np.full(len(v), i + 1) for i, (v, _) in enumerate(rows)])
     names = [Path(f).name for f in files]
     unique = ids is not None and pd.Index(ids).is_unique
     order = "the rows of the embedding"
-    if all(first is not None for _, first in read):
+    if all(first is not None for _, first in rows):
         name = _and_list(names)
-        keys = pd.concat([first for _, first in read], ignore_index=True)
+        keys = pd.concat([first for _, first in rows], ignore_index=True)
         if table is not None and unique and _file_carries_ids(keys, ids) \
                 and _same_cells(keys, ids, what="labels", table=table, **(
                     dict(name=name, fix=_file_fix()) if len(names) == 1 else
@@ -438,20 +455,20 @@ def _stack_label_files(files, ids, as_written=False, table=None):
             table.moved.extend(names)
         # a caller of evaluate is 5 frames up: by_id_column, this, evaluate, its wrapper
         pos, _ = io.by_id_column(np.arange(len(vals)), pd.concat(
-            [first for _, first in read], ignore_index=True), ids if unique else None,
+            [first for _, first in rows], ignore_index=True), ids if unique else None,
             what="labels", name=name, target="the embedding", order=order,
             no_ids=_no_ids(ids), n_files=len(names), drop=True)
         return vals[pos], origin[pos]
-    if all(first is None for _, first in read) and _has_cell_ids(ids) and unique:
-        # no ids: the dataset folder's matrices name the cells, else by position
-        keys = _folder_ids(files, [len(v) for v, _ in read], ids)
+    if all(first is None for _, first in rows) and _has_cell_ids(ids) and unique:
+        # no ids: the dataset folder's matrices name the cells; without them, by position
+        keys = _folder_ids(files, [len(v) for v, _ in rows], ids, read)
         if keys is not None:
             pos, _ = io.by_id_column(np.arange(len(vals)), keys, ids, what="labels",
                                      name=_and_list(names), target="the embedding",
                                      order=order, no_ids=_no_ids(ids),
                                      n_files=len(names), drop=True)
             return vals[pos], origin[pos]
-    for (v, first), name in zip(read, names):
+    for (v, first), name in zip(rows, names):
         io.by_id_column(v, first, None, what="labels", name=name, target="the embedding",
                         order=order, no_ids=(
                             "the other label files have none" if unique
@@ -568,16 +585,17 @@ def _n_values(labels, adata) -> int | None:
             return None
 
 
-def _as_written(given, adata, ids, *, what):
+def _as_written(given, adata, ids, *, what, read=()):
     """An argument of evaluate() that names files, read again in cell order with
-    each missing value as the word the file holds; ``None`` for values in memory."""
+    each missing value as the word the file holds; ``None`` for values in memory.
+    ``read``: as :func:`_stack_label_files`."""
     if not _label_files(given):
         return None
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")           # the first read said them
         if what == "labels" and _is_label_path_list(given):
-            return _stack_label_files(given, ids, as_written=True)[0]
-        return _obs_or_vector(given, adata, what=what, ids=ids, as_written=True)
+            return _stack_label_files(given, ids, as_written=True, read=read)[0]
+        return _obs_or_vector(given, adata, what=what, ids=ids, as_written=True, read=read)
 
 
 def _measured_warning(given, adata, reason: str, distinct: int, cells: int) -> str:
@@ -1272,15 +1290,17 @@ def _scores(
             + config.hint(f"Leave labels= out to read the label files in that order.",
                           "Leave out --labels to read the label files in that order."))
     lab_ids, ba_ids = ids, ids
+    # the files whose barcodes name the cells: the method's, else the folder's default
+    read = cells.read if cells is not None else ()
     if ids is None and table is None and cells is not None:
         # an embedding without ids holds the dataset's cells in the method's order
         lab_ids, ba_ids = (_cells_ids(cells, emb.shape) if _gives_ids(x, adata) else None
                            for x in (labels, batch))
     if _is_label_path_list(labels):
-        ct, origin = _stack_label_files(labels, lab_ids, table=table)
+        ct, origin = _stack_label_files(labels, lab_ids, table=table, read=read)
     else:
         ct, origin = _obs_or_vector(labels, adata, what="labels", ids=lab_ids,
-                                    table=table, cells=obs_ids), None
+                                    table=table, cells=obs_ids, read=read), None
     # many run outputs are dims x cells; the label count says which axis holds the cells
     if emb.ndim == 2 and emb.shape[0] != len(ct) and emb.shape[1] == len(ct):
         _compat.warn(
@@ -1303,10 +1323,10 @@ def _scores(
         cl = io.read_clustering(clusters)          # the benchmark's h5 layout
     else:
         cl = _obs_or_vector(clusters, adata, what="clusters", ids=ids, table=table,
-                            cells=obs_ids)
+                            cells=obs_ids, read=read)
     if batch is not None:
         ba = _obs_or_vector(batch, adata, what="batch", ids=ba_ids, table=table,
-                            cells=obs_ids)
+                            cells=obs_ids, read=read)
         if group == "clustering" and not want_cls:
             # after the batch is read: a wrong column gets its error alone
             _unused_batch_warning(metrics)
@@ -1347,7 +1367,7 @@ def _scores(
     keep = ~miss
     if miss.any():
         if missing_labels == "error" or miss.all():
-            shown = _as_written(labels, adata, lab_ids, what="labels")
+            shown = _as_written(labels, adata, lab_ids, what="labels", read=read)
             raise ValueError(_no_label_error(
                 ct if shown is None else shown, miss, labels,
                 from_files and from_files.dataset))
@@ -1363,7 +1383,7 @@ def _scores(
         # after the drop: only the cells that are scored need a batch
         no_batch = io.missing_mask(ba)
         if no_batch.any():
-            shown = _as_written(batch, adata, ba_ids, what="batch")
+            shown = _as_written(batch, adata, ba_ids, what="batch", read=read)
             raise ValueError(_no_batch_error(
                 ba if shown is None else np.asarray(shown)[keep], no_batch, batch))
     if group in ("batch", "all") and len(set(np.asarray(ba).astype(str).tolist())) < 2:
