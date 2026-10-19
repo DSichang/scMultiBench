@@ -13,7 +13,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import functools
-import warnings
 import numpy as np
 import pandas as pd
 
@@ -92,8 +91,7 @@ class BubbleTable:
         Unscaled matrix (method x metric) in figure order: metric means, or
         mean within-dataset max-ranks under ``"summary"``.
     overall : pandas.Series
-        Combined Overall per method (mean of the Overalls of the families
-        every row has); it sets
+        The overall score per method, as ``mtb.recommend`` gives it; it sets
         the row order unless ``order`` is given.
     aggregate : str
         ``"dataset"`` (metric markers are circles) or ``"summary"`` (bars,
@@ -271,10 +269,9 @@ def build_table(long_df: pd.DataFrame, **kwargs) -> BubbleTable:
 
 def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None,
                  aggregate: str = "dataset", require_complete: bool = False,
-                 overall: str = "rank", na: str = "warn", anchor: bool = True) -> BubbleTable:
+                 overall: str = "rank", na: str = "warn") -> BubbleTable:
     """:func:`build_table`, with the deprecated ``na=`` of 0.3 (``"warn"``,
-    ``"skip"`` or ``"raise"`` for the ``n/a`` cells); ``anchor=False`` ranks
-    stored and other rows together."""
+    ``"skip"`` or ``"raise"`` for the ``n/a`` cells)."""
     from ..data import catalog
 
     need = {"method", "metric", "value"}
@@ -314,6 +311,7 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=Non
     repeated = df.duplicated(keys, keep=False)
     if repeated.any():
         raise ValueError(_duplicate_rows_message(df[repeated], keys))
+    score = style.overall(df)       # refuses your rows on another dataset
 
     datasets = (tuple(sorted(map(str, df["dataset"].dropna().unique())))
                 if "dataset" in df.columns else ())
@@ -382,14 +380,13 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=Non
         _compat.warn(backend, UserWarning)
 
     def _block(label, cmap, raw):
-        if aggregate == "summary" and overall == "mean_overall":
-            family_ranks = {}
-            for ds, p in parts.items():
-                shared = [c for c in raw.columns if c in p.columns]
-                if shared:
-                    family_ranks[ds] = p[shared]
-            family_overall = style.overall_by_basis(family_ranks, "mean_overall")
-            family_overall = family_overall.reindex(raw.index)
+        if aggregate == "dataset":
+            family_overall = style.overall(df, list(raw.columns)).reindex(raw.index)
+        elif overall == "mean_overall":
+            family_overall = pd.DataFrame({
+                ds: style.compute_overall(p[[c for c in raw.columns if c in p.columns]])
+                for ds, p in parts.items() if set(raw.columns) & set(p.columns)
+            }).mean(axis=1).reindex(raw.index)
         else:
             family_overall = style.compute_overall(raw)
         return FamilyBlock(
@@ -421,19 +418,19 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=Non
     # a family some rows lack (classification of your rows next to stored rows
     # without it) is drawn, but counts in no row's Overall
     counted = [b for b in blocks if b.raw.notna().any(axis=1).all()] or blocks
-    combined = pd.concat([b.overall for b in counted], axis=1).mean(axis=1)
-    # stable sort: tied methods keep alphabetical order, as in plot.bar
-    ranked = combined.sort_values(ascending=False, kind="mergesort").index.tolist()
+    if aggregate == "dataset":
+        combined = score
+    else:
+        combined = pd.concat([b.overall for b in counted], axis=1).mean(axis=1)
+        combined = combined.sort_values(ascending=False, kind="mergesort")
+    # rows without a score (no metric the ranking uses) come last
+    ranked = list(combined.index) + sorted(set(raw_all.index) - set(combined.index), key=str)
+    combined = combined.reindex(ranked)
     if order is not None:
         order = _resolve(order, raw_all.index.tolist(), "method", catalog._canonical_id)
         rows = order + [m for m in ranked if m not in order]
     else:
-        def score(sub):
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                return _build_table(sub, metrics=metrics, aggregate=aggregate,
-                                    overall=overall, na="skip", anchor=False).overall
-        rows = ((style.anchored(df, score) if anchor else None) or (None, ranked))[1]
+        rows = ranked
 
     for b in blocks:
         b.raw = b.raw.reindex(rows)
@@ -1032,8 +1029,9 @@ def bubble(long_df, *, metrics=None, methods=None, title=None, save=None):
     ------
     ValueError
         ``long_df`` lacks ``method`` / ``metric`` / ``value``, repeats a
-        ``(method, dataset, metric)`` row, or ``metrics`` / ``methods`` names
-        a value it does not hold.
+        ``(method, dataset, metric)`` row, holds your rows on another dataset
+        than the stored rows, or ``metrics`` / ``methods`` names a value it
+        does not hold.
 
     Warns
     -----

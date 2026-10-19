@@ -157,7 +157,7 @@ def test_recommend_drops_singleton_datasets_and_warns(layout_tree):
     # (wired for cross) but unscored, and the warning says why
     smt = r[r.method == "scMoMaT"].iloc[0]
     assert pd.isna(smt.grand_score)
-    assert "scMoMaT" in r.attrs["not_scored"]
+    assert "scMoMaT" in r.attrs["missing"]
     assert ("scMoMaT has scores only on datasets left out of the "
             "ranking, so it is listed last.") in str(rec[0].message)
     # a 1.0 is now only ever the best of >= 2 methods on a kept dataset
@@ -248,9 +248,10 @@ def test_recommend_lists_unscored_methods(result_dir):
                                "worst_sec", "env"]
     assert r.grand_score.iloc[: len(r) - len(nan_rows)].notna().all()
     # c1 (C04): every metric present by default; (C17) no line for the unscored rows
-    assert r.attrs["family"] == "all" and r.attrs["metrics"] == "all"
+    assert r.attrs["metrics"] == "all"
     assert r.attrs["source"] == "published"
-    assert r.attrs["not_scored"] == r.attrs["missing"] == sorted(nan_rows.method, key=str.lower)
+    assert r.attrs["missing"] == sorted(nan_rows.method, key=str.lower)
+    assert "not_scored" not in r.attrs and "family" not in r.attrs
     assert "listed last: " not in msg
     # the coverage line appears only where the matrix IS incomplete
     # (the single published vertical dataset scores its 6 methods completely;
@@ -266,7 +267,7 @@ def test_recommend_lists_unscored_methods(result_dir):
 def test_recommend_rerun_missing_only_seurat_wnn(result_dir):
     r, msg = _rec("vertical", modalities=["rna", "adt"])
     assert set(r[r.grand_score.isna()].method) == {"Seurat_WNN"}
-    assert r.attrs["source"] == "rerun" and r.attrs["not_scored"] == ["Seurat_WNN"]
+    assert r.attrs["source"] == "rerun" and r.attrs["missing"] == ["Seurat_WNN"]
     assert "Seurat_WNN has no stored results" not in msg            # c1 (C17)
     assert 'Try source="rerun"' not in msg
 
@@ -274,14 +275,14 @@ def test_recommend_rerun_missing_only_seurat_wnn(result_dir):
 def test_recommend_long_df_records_source_and_family(result_dir):
     long = mtb.load_results("vertical", dataset="D11")
     r, _ = _rec("vertical", long_df=long, metrics="clustering")
-    assert r.attrs["source"] == "long_df" and r.attrs["family"] == "clustering"
+    assert r.attrs["source"] == "long_df" and r.attrs["metrics"] == "clustering"
     r2, _ = _rec("vertical", long_df=long, metrics=["ARI", "NMI"])
-    assert r2.attrs["family"] is None and r2.attrs["metrics"] == ["ARI", "NMI"]
+    assert r2.attrs["metrics"] == ["ARI", "NMI"]
 
 
 def test_recommend_attrs_are_the_documented_keys(result_dir, layout_tree):
     """``frame.attrs`` carries exactly these keys."""
-    keys = {"metrics", "family", "source", "not_scored", "missing", "dropped_methods"}
+    keys = {"metrics", "source", "missing", "dropped_methods"}
     for r, _ in (_rec("cross", source="published", result_path=layout_tree), _rec("vertical")):
         assert set(r.attrs) == keys
 
@@ -334,7 +335,7 @@ def test_recommend_methods_keyword(layout_tree):
     r, msg = _rec("cross", methods=["scmdc", "sciPENN", "scMoMaT"], source="published",
                   result_path=result_dir)
     assert r.method.tolist() == ["sciPENN", "scMDC", "scMoMaT"]        # alias/case tolerant
-    assert r.attrs["not_scored"] == ["scMoMaT"]                        # restricted to the request
+    assert r.attrs["missing"] == ["scMoMaT"]                        # restricted to the request
     assert "StabMap" not in msg and "totalVI" not in msg
     # a requested method without rows is still listed as unscored
     r2, msg2 = _rec("cross", methods=["sciPENN", "scMDC", "totalVI"], source="published",
@@ -366,10 +367,10 @@ def test_recommend_task_error_names_real_metrics(result_dir):
 
 def test_recommend_metrics_batch_on_diagonal_rerun(result_dir):
     r, _ = _rec("diagonal", metrics="batch")
-    assert r.attrs["family"] == "batch" and r.grand_score.notna().any()
+    assert r.attrs["metrics"] == "batch" and r.grand_score.notna().any()
     # the explicit list of the same family scores the same
     m = mtb.catalog.metrics()
     batch = m.loc[m.family == "batch", "metric"].tolist()
     r2, _ = _rec("diagonal", metrics=batch)
-    assert r2.attrs["family"] is None and r2.attrs["metrics"] == batch
+    assert r2.attrs["metrics"] == batch
     pd.testing.assert_frame_equal(r, r2)

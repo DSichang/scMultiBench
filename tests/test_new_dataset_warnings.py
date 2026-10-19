@@ -36,15 +36,17 @@ def _stored_plus_lone_baseline():
         stored = mtb.load_results("mosaic")
     # two stored datasets of the same methods (one table per category since 0.4.0)
     stored = pd.concat([stored, stored.assign(dataset="D45b")], ignore_index=True)
+    # your rows: next to stored rows, rows on another dataset are refused (c2, C18)
+    stored = stored.assign(source="user")
     return pd.concat([stored, pd.DataFrame(_rows("PCA_standin", "LABMOS"))],
                      ignore_index=True)
 
 
 def test_bar_warns_about_a_lone_method_and_the_incomplete_matrix():
-    fig, msgs = _messages(mtb.plot.bar, _stored_plus_lone_baseline())   # overall="rank"
+    fig, msgs = _messages(mtb.plot.bar, _stored_plus_lone_baseline())
     lone = [m for m in msgs if m.startswith("Dataset LABMOS has only one method")]
-    assert lone == ["Dataset LABMOS has only one method, PCA_standin. Its rank "
-                    "there is always the lowest. Plot it with methods scored on the same "
+    assert lone == ["Dataset LABMOS has only one method, PCA_standin. Its Overall "
+                    "there is always 1.0. Plot it with methods scored on the same "
                     "dataset."]
     inc = [m for m in msgs if m.startswith("The summary ranks ")]
     assert len(inc) == 1 and "PCA_standin has scores on 1 of them." in inc[0]

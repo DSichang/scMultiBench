@@ -159,7 +159,8 @@ def _warned(fn, *a, **kw):
 
 
 def test_plot_warnings_on_mixed_datasets_are_capitalized_sentences():
-    df = pd.concat([_stored("D11"), _mine()], ignore_index=True)
+    # your rows on two datasets (next to stored rows, c2 refuses them: C18)
+    df = pd.concat([_stored("D11").assign(source="user"), _mine()], ignore_index=True)
     seen = []
     for fn, kw in [(mtb.plot.bubble, {}), (mtb.plot.build_table, {}),
                    (mtb.plot.build_table, {"aggregate": "summary"}),
@@ -174,7 +175,8 @@ def test_plot_warnings_on_mixed_datasets_are_capitalized_sentences():
             assert ", so " not in m.split(".")[0], m
     assert ("The rows come from 2 datasets, D11 and MYCITE, that share no method. The "
             "figure ranks unrelated rows against each other. Plot each dataset on its "
-            "own, or score your method on D11 and add it to that table.") in seen
+            "own, or score the same methods on every dataset. If these datasets hold "
+            "the same cells, give their rows one dataset name first.") in seen
     assert ("Dataset MYCITE has only one method, PriyaNet. Its row is ranked against rows "
             "from other datasets. Plot it with methods scored on the same dataset.") in seen
     assert ("Dataset MYCITE has only one method, PriyaNet. Its rank there is always the "

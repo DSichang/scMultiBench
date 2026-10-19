@@ -122,7 +122,7 @@ def test_load_results_positional_selectors_fail_loudly(result_dir):
 def test_recommend_default_scores_every_metric_present(result_dir):
     # c1 (C04): the default of the figures
     r = _quiet(results.recommend, "diagonal")
-    assert r.attrs["metrics"] == "all" and r.attrs["family"] == "all"
+    assert r.attrs["metrics"] == "all" and "family" not in r.attrs
     assert "task" not in r.attrs
     assert "runtime_tier" in r.columns and r.runtime_tier.notna().any()
 

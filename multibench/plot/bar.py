@@ -58,8 +58,9 @@ def bar(long_df: pd.DataFrame, *, metrics=None, methods=None, title: str | None 
     ------
     ValueError
         ``long_df`` lacks ``method`` / ``metric`` / ``value``, is empty,
-        repeats a ``(method, dataset, metric)`` row, or ``metrics`` /
-        ``methods`` names a value it does not hold.
+        repeats a ``(method, dataset, metric)`` row, holds your rows on
+        another dataset than the stored rows, or ``metrics`` / ``methods``
+        names a value it does not hold.
 
     Warns
     -----
@@ -78,10 +79,11 @@ def bar(long_df: pd.DataFrame, *, metrics=None, methods=None, title: str | None 
 
 
 def _bar(long_df: pd.DataFrame, *, metrics=None, methods=None, top: int | None = None,
-         title: str | None = None, save: str | None = None, overall: str = "rank",
+         title: str | None = None, save: str | None = None, overall: str | None = None,
          cmap: str = "Blues", show_datasets: bool = True):
-    """:func:`bar`, with the deprecated ``top``, ``overall``, ``cmap`` (the colours
-    when no metric family is drawn) and ``show_datasets``."""
+    """:func:`bar`, with the deprecated ``top``, ``overall`` (the 0.3 formulas
+    ``"rank"`` and ``"mean_overall"``), ``cmap`` (the colours when no metric
+    family is drawn) and ``show_datasets``."""
     import matplotlib.pyplot as plt
     from .bubble import _resolve
     from ..data import catalog
@@ -118,7 +120,7 @@ def _bar(long_df: pd.DataFrame, *, metrics=None, methods=None, top: int | None =
         metrics = _expand_families(metrics, long_df["metric"].dropna().unique().tolist())
         metrics = _resolve(metrics, long_df["metric"].dropna().unique().tolist(),
                            "metric", catalog._canonical_metric)
-    if overall not in style.OVERALL_BASES:
+    if overall is not None and overall not in style.OVERALL_BASES:
         raise ValueError(
             f"overall must be one of {list(style.OVERALL_BASES)}, got {overall!r}")
 
@@ -128,13 +130,14 @@ def _bar(long_df: pd.DataFrame, *, metrics=None, methods=None, top: int | None =
     repeated = _user_repeats(picked, keys)
     if repeated.any():
         raise ValueError(_duplicate_rows_message(picked[repeated], keys))
+    mean = style.overall(long_df, metrics)       # refuses your rows on another dataset
     parts = style.per_dataset_ranks(long_df, metrics)
     lone = style.lone_message({ds: mat.attrs.get("lone", []) for ds, mat in parts.items()})
     if lone:
         _compat.warn(lone, UserWarning)
     # bar always ranks within each dataset: the checks of bubble(aggregate="summary")
     for msg in style.coverage_warnings(
-            parts, basis=overall,
+            parts, basis=overall or "mean_overall",
             incomplete_fix=_config.hint(
                 "Pass methods= with the methods scored on every dataset.",
                 "Pass --methods with the methods scored on every dataset."),
@@ -145,12 +148,11 @@ def _bar(long_df: pd.DataFrame, *, metrics=None, methods=None, top: int | None =
     if backend:
         _compat.warn(backend, UserWarning)
     per_ds = pd.DataFrame({ds: compute_overall(mat) for ds, mat in parts.items()})
-    # best-first with a stable tie-break (same as plot.bubble), then reversed
-    # so the best method is drawn on top
-    mean = style.overall_by_basis(parts, overall)
-    scores, order = style.anchored(long_df, lambda rows: style.overall_by_basis(
-        style.per_dataset_ranks(rows, metrics), overall)) or (mean, style.best_first(mean))
-    mean = scores.reindex(order)[::-1]
+    if overall is not None:
+        mean = (per_ds.mean(axis=1) if overall == "mean_overall"
+                else compute_overall(style.mean_rank_matrix(parts)))
+        mean = mean.sort_values(ascending=False, kind="mergesort")
+    mean = mean[::-1]                       # the best method is drawn on top
     if top:
         mean = mean.tail(top)
     per_ds = per_ds.reindex(mean.index)
@@ -187,8 +189,7 @@ def _bar(long_df: pd.DataFrame, *, metrics=None, methods=None, top: int | None =
         if n_datasets == 1:
             xlabel = f"overall score, scaled 0-1 ({per_ds.columns[0]})"
         else:
-            how = ("mean of per-dataset overall" if overall == "mean_overall"
-                   else "rank of mean ranks")
+            how = {"rank": "rank of mean ranks"}.get(overall, "mean of per-dataset overall")
             xlabel = f"overall score, scaled 0-1 ({how}, {n_datasets} datasets)"
         ax.set_xlabel(xlabel, fontsize=9)
         # the scores lie in [0, 1]; a whisker (mean +/- SD) can reach past either end

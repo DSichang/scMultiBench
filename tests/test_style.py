@@ -41,8 +41,7 @@ def test_compute_overall_from_matrix():
     assert overall["m_lo"] == 0.0
 
 
-def test_overall_by_basis_formulas():
-    import pytest
+def test_per_dataset_ranks_and_the_mean_rank_matrix():
     # two datasets, three methods; B is absent from D2
     long = pd.DataFrame({
         "method":  ["A", "B", "C", "A", "C"],
@@ -54,14 +53,8 @@ def test_overall_by_basis_formulas():
     assert set(parts) == {"D1", "D2"}
     assert list(parts["D1"]["ARI"]) == [1.0, 3.0, 2.0]          # A, B, C ranks in D1
     assert style.coverage(parts).to_dict() == {"A": 2, "B": 1, "C": 2}
-    # 'rank': mean rank (B absent -> 0 in D2): A=(1+2)/2=1.5, B=(3+0)/2=1.5, C=(2+1)/2=1.5
+    # mean rank (B absent -> 0 in D2): A=(1+2)/2=1.5, B=(3+0)/2=1.5, C=(2+1)/2=1.5
     mr = style.mean_rank_matrix(parts)
     assert np.allclose(mr.loc[["A", "B", "C"], "ARI"], [1.5, 1.5, 1.5])
-    rank_ov = style.overall_by_basis(parts, "rank")
-    assert np.allclose(rank_ov[["A", "B", "C"]], [1.0, 1.0, 1.0])   # all tied -> minmax ones
-    # 'mean_overall': D1 overalls minmax([1,3,2]) = [0, 1, .5]; D2 minmax([2,1]) = [1, 0]
-    # A = (0+1)/2 = .5, B = 1 (only D1), C = (.5+0)/2 = .25
-    mo = style.overall_by_basis(parts, "mean_overall")
-    assert np.allclose(mo[["A", "B", "C"]], [0.5, 1.0, 0.25])
-    with pytest.raises(ValueError, match="overall must be one of"):
-        style.overall_by_basis(parts, "median")
+    # the overall score: D1 [0, 1, .5], D2 [1, 0]; a missing dataset is left out
+    assert style.overall(long).round(3).to_dict() == {"B": 1.0, "A": 0.5, "C": 0.25}

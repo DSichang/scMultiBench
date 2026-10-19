@@ -22,9 +22,8 @@ B = importlib.import_module("multibench.plot.bubble")
 
 matplotlib.use("Agg")
 
-NO_OVERLAP = ("The rows come from 2 datasets, D11 and MYCITE, that share no method. The "
-              "figure ranks unrelated rows against each other. Plot each dataset on "
-              "its own, or score your method on D11 and add it to that table.")
+REFUSAL = ("Your rows are on MYCITE, the stored results on D11: plot them apart, or "
+           "score your embedding with dataset='D11'.")
 
 
 def _messages(fn, *args, **kw):
@@ -58,20 +57,19 @@ def _mycite():
 # --- R3-06 -------------------------------------------------------------------
 
 @pytest.mark.parametrize("fn", [_build_table, mtb.plot.bubble, mtb.plot.bar])
-def test_own_dataset_rows_get_the_no_overlap_warning_alone(fn):
+def test_own_dataset_rows_next_to_stored_rows_are_refused(fn):
+    # c2 (C18): refused, where 0.4.0 rc warned that the datasets share no method
     df = pd.concat([_stored("D11"), _mycite()], ignore_index=True)
-    _, msgs = _messages(fn, df)
-    assert NO_OVERLAP in msgs, msgs
-    assert not any("igraph Leiden backend" in m for m in msgs), msgs
+    with pytest.raises(ValueError) as e:
+        _messages(fn, df)
+    assert str(e.value) == REFUSAL
 
 
 @pytest.mark.parametrize("fn", [_build_table, mtb.plot.bubble, mtb.plot.bar])
 def test_same_dataset_igraph_row_still_warns(fn):
-    df = pd.concat([_stored("D11"), _mine("PriyaNet", "D11"), _mycite()],
-                   ignore_index=True)
+    df = pd.concat([_stored("D11"), _mine("PriyaNet", "D11")], ignore_index=True)
     _, msgs = _messages(fn, df)
     hit = [m for m in msgs if "igraph Leiden backend" in m]
-    # only the D11 row is named: the MYCITE rows have no stored row to meet
     assert len(hit) == 1 and hit[0].startswith("The rows for PriyaNet were clustered"), msgs
 
 
@@ -82,19 +80,20 @@ def test_backend_rule_without_a_dataset_column_is_unchanged():
     assert msg and msg.startswith("The rows for PriyaNet were clustered")
 
 
-def _plot_cli(tmp_path, capsys, *frames):
+def _plot_cli(tmp_path, capsys, *frames, rc=0):
     paths = []
     for i, f in enumerate(frames):
         p = tmp_path / f"in{i}.csv"
         f.to_csv(p, index=False)
         paths += ["--input", str(p)]
-    assert cli.main(["plot", "bubble", *paths, "--out", str(tmp_path / "f.png")]) == 0
+    assert (cli.main(["plot", "bubble", *paths, "--out", str(tmp_path / "f.png")]) == 0) \
+        == (rc == 0)
     return capsys.readouterr().err
 
 
 def test_cli_plot_follows_the_dataset_rule(tmp_path, capsys):
-    err = _plot_cli(tmp_path, capsys, _stored("D11"), _mycite())
-    assert "share no method" in err and "igraph Leiden backend" not in err
+    err = _plot_cli(tmp_path, capsys, _stored("D11"), _mycite(), rc=1)
+    assert "or score your embedding with --dataset D11." in err
     err = _plot_cli(tmp_path, capsys, _stored("D11"), _mine("PriyaNet", "D11"))
     assert "warning: The rows for PriyaNet were clustered with the igraph Leiden backend" in err
     assert "multibench evaluate --leiden-flavor leidenalg" in err
@@ -119,7 +118,6 @@ def test_recommend_backend_line_needs_igraph_rows_a_stored_dataset_and_a_sweep_m
     cases = {
         "leidenalg": pd.concat([stored, _mine("P", "D11", scored_with="leidenalg/search/0.4.0")]),
         "stored only": stored,
-        "own dataset": pd.concat([stored, _mine("P", "MYCITE"), _mine("Q", "MYCITE")]),
     }
     for what, df in cases.items():
         _, msgs = _messages(mtb.recommend, "vertical", long_df=df.reset_index(drop=True))

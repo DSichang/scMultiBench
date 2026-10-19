@@ -129,7 +129,7 @@ def test_several_datasets_warning_is_plain():
 
 
 def test_several_datasets_warning_with_a_lone_dataset():
-    diag = _stored(["D24", "D25", "D28"])
+    diag = _stored(["D24", "D25", "D28"]).assign(source="user")   # c2: stored rows refuse LUNG
     own = pd.DataFrame([{"metric": m, "value": v, "method": "PCA_standin",
                          "dataset": "LUNG", "category": "diagonal", "source": "user"}
                         for m, v in (("ARI", 0.3), ("NMI", 0.4), ("cLISI", 0.9))])

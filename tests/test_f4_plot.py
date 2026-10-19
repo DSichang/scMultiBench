@@ -71,17 +71,6 @@ def test_two_own_datasets_sharing_no_method_mention_the_same_cells(fn, kw):
                         "their rows one dataset name first."), msg
 
 
-def test_stored_rows_keep_the_no_overlap_text():
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        stored = mtb.load_results("vertical", dataset="D11")
-    _, msgs = _messages(_build_table,
-                        pd.concat([stored, _mine("RNA PCA", "MYCITE")], ignore_index=True))
-    (msg,) = [m for m in msgs if m.startswith("The rows come from")]
-    assert "same cells" not in msg
-    assert msg.endswith("score your method on D11 and add it to that table.")
-
-
 # --- R4-12 (c): incomplete-matrix warning -------------------------------------
 
 def _incomplete():

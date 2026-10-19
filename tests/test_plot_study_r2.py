@@ -58,28 +58,14 @@ def _mine(method="PCA", dataset="MYCITE", scored_with="igraph/search/0.4.0",
 
 # --- M01: no summary advice when the datasets share no method ----------------
 
-def test_dataset_mode_own_dataset_gets_the_no_overlap_warning():
-    df = pd.concat([_stored("D11"), _mine()], ignore_index=True)
-    _, msgs = _messages(_build_table, df)
-    assert ("The rows come from 2 datasets, D11 and MYCITE, that share no method. The "
-            "figure ranks unrelated rows against each other. Plot each dataset on "
-            "its own, or score your method on D11 and add it to that table.") in msgs
-    assert ("Dataset MYCITE has only one method, PCA. Its row is ranked against "
-            "rows from other datasets. Plot it with methods scored on the same "
-            "dataset.") in msgs
-    assert not any("aggregate='summary'" in m for m in msgs), msgs
-
-
-def test_dataset_mode_lone_dataset_next_to_shared_ones_gets_no_summary_advice():
-    # S3: a stand-in on LUNG added to the three diagonal tables
-    diag = _stored(["D24", "D25", "D28"], source="published", category="diagonal")
-    own = _mine(method="PCA_standin", dataset="LUNG", scored_with="leidenalg/search/0.4.0")
-    _, msgs = _messages(_build_table, pd.concat([diag, own], ignore_index=True))
-    assert not any("aggregate='summary'" in m for m in msgs), msgs
-    assert any(m.startswith("This figure averages each method over 4 datasets")
-               and m.endswith("Plot each dataset on its own.") for m in msgs), msgs
-    assert any(m.startswith("Dataset LUNG has only one method, PCA_standin.")
-               for m in msgs), msgs
+def test_your_rows_on_their_own_dataset_next_to_stored_rows_are_refused():
+    # c2 (C18): refused, where 0.4.0 rc warned about datasets that share no method
+    for df in (pd.concat([_stored("D11"), _mine()], ignore_index=True),
+               pd.concat([_stored(["D24", "D25", "D28"], source="published",
+                                  category="diagonal"),
+                          _mine(method="PCA_standin", dataset="LUNG")], ignore_index=True)):
+        with pytest.raises(ValueError, match="^Your rows are on (MYCITE|LUNG), the stored"):
+            _messages(_build_table, df)
 
 
 def _pair():
@@ -105,8 +91,8 @@ def test_dataset_mode_advice_uses_the_cli_spelling(monkeypatch):
 
 
 def test_no_plot_warning_says_by_construction():
-    lone = pd.concat([_stored("D11"), _mine(scored_with="leidenalg/search/0.4.0")],
-                     ignore_index=True)
+    lone = pd.concat([_stored("D11").assign(source="user"),
+                      _mine(scored_with="leidenalg/search/0.4.0")], ignore_index=True)
     calls = [(_build_table, {}),
              (_build_table, {"aggregate": "summary"}),
              (_build_table, {"aggregate": "summary", "overall": "mean_overall"}),

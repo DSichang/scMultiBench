@@ -49,12 +49,12 @@ def test_bar_methods_selects_the_bars():
 def test_bar_xlabel_names_dataset_or_formula():
     one = mtb.plot.bar(_long(datasets=("D1",)))
     assert one.axes[0].get_xlabel() == "overall score, scaled 0-1 (D1)"
-    rk = mtb.plot.bar(_long())
-    assert "rank of mean ranks" in rk.axes[0].get_xlabel()
+    two = mtb.plot.bar(_long())
+    assert "mean of per-dataset overall" in two.axes[0].get_xlabel()
     # the deprecated overall= (0.4.0) keeps its effect
     with pytest.warns(FutureWarning, match=r"plot\.bar\(overall=\) is deprecated"):
-        two = mtb.plot.bar(_long(), overall="mean_overall")
-    assert "mean of per-dataset overall" in two.axes[0].get_xlabel()
+        rk = mtb.plot.bar(_long(), overall="rank")
+    assert "rank of mean ranks" in rk.axes[0].get_xlabel()
     with pytest.warns(FutureWarning), pytest.raises(ValueError, match="overall must be one of"):
         mtb.plot.bar(_long(), overall="median")
 

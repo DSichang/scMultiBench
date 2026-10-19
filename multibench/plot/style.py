@@ -1,11 +1,7 @@
 """Numeric helpers ported from the R bubble-plot code (helpers.R / scIB_knit_table.R).
 
-This module is also the single source of truth for the cross-dataset summary
-math shared by :func:`multibench.plot.bubble` and :func:`multibench.plot.bar`:
-:func:`per_dataset_ranks`, :func:`mean_rank_matrix` and
-:func:`overall_by_basis`. Both figures call these, so with the same
-``overall=`` and the metrics of one family they order methods identically
-(see the Notes of ``plot.build_table``).
+:func:`overall` is the one overall score of ``mtb.recommend``, ``plot.bar``
+and ``plot.bubble``.
 """
 from __future__ import annotations
 
@@ -60,8 +56,7 @@ def compute_overall(mat: pd.DataFrame) -> pd.Series:
 
 # cross-dataset summary math, shared by bubble and bar
 
-#: the two ways an across-dataset "Overall" can be formed; the formulas are
-#: in overall_by_basis
+#: the deprecated ``overall=`` of the figures: the 0.3 across-dataset formulas
 OVERALL_BASES = ("rank", "mean_overall")
 
 
@@ -152,48 +147,50 @@ def coverage(parts: dict) -> pd.Series:
 STORED_SOURCES = ("published", "stored", "rerun")
 
 
-def best_first(scores: pd.Series) -> list:
-    """The index of ``scores``, highest first; ties keep their order."""
-    return scores.sort_values(ascending=False, kind="mergesort").index.tolist()
+def overall(df: pd.DataFrame, metrics=None) -> pd.Series:
+    """The overall score per method, best first (ties by name), of
+    ``mtb.recommend``, ``plot.bar`` and ``plot.bubble``.
 
-
-def anchored(df: pd.DataFrame, score) -> tuple[pd.Series, list] | None:
-    """``(scores, order)`` of stored rows and others, ``score(rows)`` giving a
-    Series of method scores; ``None`` when ``df`` is not both. The stored
-    methods are scored on the stored rows alone, and each other method on the
-    stored rows and its own, and placed after the stored methods it ranks
-    below there."""
-    if "source" not in df.columns:
-        return None
-    stored = df["source"].isin(STORED_SOURCES)
-    if not stored.any() or stored.all():
-        return None
-    have = set(df.loc[stored, "method"])
-    added = [m for m in dict.fromkeys(df.loc[~stored, "method"]) if m not in have]
-    scores = score(df[stored])
-    order, slot = best_first(scores), {}
-    for m in added:
-        own = score(df[stored | (df["method"] == m)])
-        if m in own.index and pd.notna(own[m]):
-            ranked = best_first(own)
-            scores[m] = own[m]
-            slot[m] = sum(x in have for x in ranked[:ranked.index(m)])
-        else:
-            scores[m], slot[m] = np.nan, len(order)
-    late = sorted(added, key=lambda m: (slot[m], -np.nan_to_num(scores[m], nan=-np.inf)))
-    out = []
-    for k in range(len(order) + 1):
-        out += [m for m in late if slot[m] == k]
-        out += order[k:k + 1]
-    return scores, out
+    Per dataset, each value is ranked against the stored rows (all rows when
+    the table has none): the number of stored values it reaches, plus 0.5 when
+    it equals none. The mean rank over the metrics the stored rows have is
+    min-max scaled with the stored rows' range (1 when they tie), then averaged
+    over the datasets. Stored rows so keep their article scores, a row equal to
+    a stored row gets its score, and one better than all scores above 1.
+    """
+    from .. import config
+    if metrics is not None:
+        df = df[df["metric"].isin(metrics)]
+    df = df.assign(dataset=df["dataset"].astype(str) if "dataset" in df.columns else "all",
+                   _stored=df["source"].isin(STORED_SOURCES) if "source" in df.columns
+                   else False)
+    have = sorted(set(df.loc[df["_stored"], "dataset"]))
+    alone = sorted(set(df["dataset"]) - set(have))
+    if have and alone:
+        raise ValueError(
+            f"Your rows are on {_and_list(alone)}, the stored results on {_and_list(have)}: "
+            "plot them apart, or score your embedding with " + config.hint(
+                " or ".join(f"dataset={d!r}" for d in have),
+                " or ".join(f"--dataset {d}" for d in have)) + ".")
+    per_ds = {}
+    for ds, g in df.groupby("dataset"):
+        m = g.pivot_table(index="method", columns="metric", values="value").round(TIE_DECIMALS)
+        anchor = m.loc[g.loc[g["_stored"], "method"].unique()] if have else m
+        anchor = anchor.loc[:, anchor.notna().sum() >= min(2, len(anchor))]
+        rank = pd.DataFrame({c: [(anchor[c] <= v).sum() + 0.5 * (v not in anchor[c].values)
+                                 if v == v else np.nan for v in m[c]] for c in anchor},
+                            index=m.index)
+        mean = rank.mean(axis=1)
+        lo, hi = mean[anchor.index].min(), mean[anchor.index].max()
+        per_ds[ds] = (mean - lo) / (hi - lo) if hi > lo else mean - lo + 1
+    s = pd.DataFrame(per_ds).mean(axis=1).dropna()
+    return s.iloc[np.lexsort([s.index.to_numpy(dtype=str), -s.to_numpy()])]
 
 
 def stored_datasets(df: pd.DataFrame) -> tuple:
     """Datasets that hold rows of a stored table (``source`` published or rerun).
 
-    ``()`` when the frame has no ``dataset`` or ``source`` column. The
-    cross-dataset warnings use it to name the dataset a user's own method
-    should be scored on.
+    ``()`` when the frame has no ``dataset`` or ``source`` column.
     """
     if not {"dataset", "source"} <= set(df.columns):
         return ()
@@ -203,26 +200,20 @@ def stored_datasets(df: pd.DataFrame) -> tuple:
 
 def _no_overlap_message(parts: dict, stored=()) -> str | None:
     """The message for datasets that share no method, else ``None``. Without
-    stored rows the datasets may be two folders of the same cells, so it says
-    how to merge them."""
+    stored rows (``stored``: their datasets) the datasets may be two folders of
+    the same cells, so it says how to merge them."""
     n = len(parts)
     per_method = coverage(parts)
     if not (n > 1 and (per_method <= 1).all()):
         return None
     names = [str(ds) for ds in parts]
-    stored = [ds for ds in names if ds in set(map(str, stored))]
-    own = [ds for ds in names if ds not in stored]
-    if stored and own:
-        remedy = (f"score your method on {' or '.join(stored)} and add it to "
-                  f"that table")
-    else:
-        remedy = "score the same methods on every dataset"
     same_cells = ("" if stored else
                   " If these datasets hold the same cells, give their rows one "
                   "dataset name first.")
     return (f"The rows come from {n} datasets, {_and_list(names)}, that share no method. "
             f"The figure ranks unrelated rows against each other. "
-            f"Plot each dataset on its own, or {remedy}.{same_cells}")
+            f"Plot each dataset on its own, or score the same methods on every "
+            f"dataset.{same_cells}")
 
 
 def _lone_method_messages(parts: dict, consequence: str) -> list:
@@ -387,10 +378,7 @@ def backend_warning(df: pd.DataFrame) -> str | None:
     its ``scored_with`` starts with ``igraph/`` and its metric came from
     Leiden: iF1, ARI_batch and NMI_batch always; ARI, NMI, ASW and iASW when
     the clusters part is ``search`` (ARI and NMI also ``sweep``, before 0.4).
-    Rows without ``scored_with`` (NaN) never trigger the igraph check. With a ``dataset``
-    column, a row counts only when the frame holds a stored row of the same
-    dataset: rows from a dataset with no stored rows are compared with no
-    stored score, and the no-overlap warning covers them.
+    Rows without ``scored_with`` (NaN) never trigger the igraph check.
     """
     from .. import config
     old = old_scoring_warning(df)
@@ -409,8 +397,6 @@ def backend_warning(df: pd.DataFrame) -> str | None:
         metric.isin(["iF1", "ARI_batch", "NMI_batch"])
         | (metric.isin(["ARI", "NMI", "ASW", "iASW"]) & (clusters == "search"))
         | (metric.isin(["ARI", "NMI"]) & (clusters == "sweep")))
-    if "dataset" in df.columns:
-        hit &= df["dataset"].isin(df.loc[stored, "dataset"].dropna().unique())
     if not hit.any():
         return None
     names = ", ".join(sorted(map(str, df.loc[hit, "method"].unique())))
@@ -421,29 +407,6 @@ def backend_warning(df: pd.DataFrame) -> str | None:
                 "evaluate to compare them.",
                 "Score them with multibench evaluate --leiden-flavor leidenalg "
                 "to compare them."))
-
-
-def overall_by_basis(parts: dict, basis: str = "rank") -> pd.Series:
-    """Across-dataset Overall per method under the given ``basis``.
-
-    ``parts`` is the dict from :func:`per_dataset_ranks`. The two formulas
-    (also in the Notes of ``plot.build_table``):
-
-    - ``"rank"``: ``minmax(mean over metrics of max-rank(mean over datasets
-      of within-dataset max-rank))``; a method absent from a dataset scores
-      rank 0 there (the paper's summary rule).
-    - ``"mean_overall"``: ``mean over datasets of minmax(mean over metrics of
-      within-dataset max-rank)``; a dataset the method lacks is skipped.
-
-    Raises ``ValueError`` for an unknown ``basis``.
-    """
-    if basis not in OVERALL_BASES:
-        raise ValueError(
-            f"overall must be one of {list(OVERALL_BASES)}, got {basis!r}")
-    if basis == "rank":
-        return compute_overall(mean_rank_matrix(parts))
-    per_ds = pd.DataFrame({ds: compute_overall(mat) for ds, mat in parts.items()})
-    return per_ds.mean(axis=1)
 
 
 #: colour ramp names the package defines itself, on top of matplotlib's

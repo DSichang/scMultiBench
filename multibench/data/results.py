@@ -956,13 +956,15 @@ def recommend(
     metrics=None,
     long_df: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    """Methods best first: the row order of ``mtb.plot.bubble`` for the same table.
+    """The overall score and row order of ``mtb.plot.bubble``, best first.
 
     Within each dataset the methods are ranked on each metric; each
-    per-dataset score is the mean rank over the metrics, min-max scaled
-    within the dataset (1 = best, 0 = worst there), and ``grand_score`` is
-    the mean over the datasets. Without ``long_df=``, the methods the package
-    runs for the category without stored results are listed last.
+    per-dataset score is the mean rank over the metrics, min-max scaled so
+    that the best stored method scores 1 and the worst 0, and
+    ``grand_score`` is the mean over the datasets. Your rows are ranked
+    against the stored rows, so these keep their scores and order. Without
+    ``long_df=``, the methods the package runs for the category without
+    stored results are listed last.
 
     Parameters
     ----------
@@ -990,8 +992,9 @@ def recommend(
     ------
     ValueError
         Nothing left to rank, ``long_df`` repeating stored method/dataset
-        rows, or ``modalities`` naming data that none of the ranked datasets
-        measured (pass such scores as ``long_df=``).
+        rows, your rows on another dataset than the stored rows, or
+        ``modalities`` naming data that none of the ranked datasets measured
+        (pass such scores as ``long_df=``).
     KeyError
         Unknown method name in ``methods``, with a did-you-mean hint.
 
@@ -1124,23 +1127,21 @@ def _recommend(
         raise ValueError(
             f"No {category} dataset has {min_methods} or more methods. {counts}."
             f"{one}{hint} Otherwise pass long_df= with more methods.")
-    per_ds = pd.DataFrame({ds: style.compute_overall(mat) for ds, mat in kept.items()})
     # igraph-scored rows ranked against leidenalg-scored stored rows
     backend = style.backend_warning(df[df["dataset"].isin(list(kept))])
-    n_ds = per_ds.notna().sum(axis=1)
-    n_total = per_ds.shape[1]
-
-    def score(rows):
-        mats = [m for m in style.per_dataset_ranks(rows, sel.codes if sel.explicit
-                                                   else None).values()
-                if len(m.index) >= min_methods]
-        return pd.concat([style.compute_overall(m) for m in mats], axis=1).mean(axis=1) \
-            if mats else pd.Series(dtype=float)
-    grand = per_ds.mean(axis=1)
-    grand, keep_methods = style.anchored(df, score) or (grand, style.best_first(grand))
+    n_ds = style.coverage(kept)
+    n_total = len(kept)
+    codes = sel.codes if sel.explicit else None
+    grand = style.overall(df, codes)        # refuses your rows on another dataset
+    if degenerate:
+        grand = style.overall(df[df["dataset"].isin(list(kept))], codes)
+    keep_methods = list(grand.index) + sorted(
+        {m for mat in kept.values() for m in mat.index} - set(grand.index), key=str)
     if filtered:
         allowed = set(find_methods(category=category, modalities=modalities, atac=atac))
-        keep_methods = [m for m in keep_methods if catalog._canonical_id(m) in allowed]
+        # your own methods are not package methods: the filter leaves them
+        from ..engine.registry import method_of
+        keep_methods = [m for m in keep_methods if method_of(m) in allowed | {None}]
         if not keep_methods:
             asked = " and ".join(
                 ([f"consumes modalities {list(modalities)}"] if modalities is not None
@@ -1190,15 +1191,13 @@ def _recommend(
         })
     out = pd.DataFrame(rows)
     out.attrs["metrics"] = list(sel.codes) if sel.explicit else sel.family
-    out.attrs["family"] = None if sel.explicit else sel.family
     out.attrs["source"] = source if long_df_was_none else "long_df"
-    out.attrs["not_scored"] = list(missing)
     out.attrs["missing"] = list(missing)
     out.attrs["dropped_methods"] = list(foreign)
 
     notes = []
     if filtered:
-        unmeasured = _unmeasured_note(category, list(per_ds.columns), want_mods,
+        unmeasured = _unmeasured_note(category, list(kept), want_mods,
                                       long_df_was_none)
         if unmeasured:
             raise ValueError(unmeasured)
