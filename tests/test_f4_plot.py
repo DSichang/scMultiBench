@@ -197,15 +197,12 @@ def _no_log_joins(msg):
 
 
 def test_recommend_unscored_methods_line_is_plain(result_dir):
+    # c1 (C17): the unscored rows are last, without a line every call
     r, msg = _recommend("vertical")
-    unscored = r[r.grand_score.isna()].method.tolist()
-    assert (f"These {len(unscored)} methods have no stored results and are listed "
-            f"last: {', '.join(unscored)}.") in msg
-    assert "Try source" not in msg
-    _no_log_joins(msg)
+    assert r.grand_score.isna().any() and r.grand_score.iloc[-1:].isna().all()
+    assert "listed last" not in msg
     _, msg = _recommend("vertical", modalities=["rna", "adt"])
-    assert "Seurat_WNN has no stored results and is listed last." in msg
-    assert "Try source" not in msg
+    assert "listed last" not in msg
 
 
 def test_recommend_coverage_and_dropped_lines_are_plain(result_dir, layout_tree_foreign):
@@ -215,7 +212,7 @@ def test_recommend_coverage_and_dropped_lines_are_plain(result_dir, layout_tree_
     _, msg = _recommend("diagonal", long_df=part)
     # 0.4.0: recommend has no coverage column, so the line ends with the counts
     assert ("Some methods have scores on only part of the datasets: SCALEX 1 of 2, "
-            "iNMF 1 of 2.\n") in msg
+            "iNMF 1 of 2.") in msg
     _no_log_joins(msg)
     _, msg = _recommend("cross", source="published", result_path=layout_tree)
     assert ("scMoMaT has scores only on datasets left out of the ranking, "

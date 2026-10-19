@@ -365,7 +365,7 @@ def test_run_all_aligns_a_barcode_indexed_series(cite, tmp_path):
     ordered = _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "a", batch=batch, **kw)
     series = _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "b", batch=shuffled,
                     **kw)
-    assert _batch_metrics(ordered)[0] == "CHAIN_OK"
+    assert _batch_metrics(ordered)[0] == "scored"
     assert _batch_metrics(ordered)[1] is not None
     assert _batch_metrics(series) == _batch_metrics(ordered)
     frame = _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "c",
@@ -474,7 +474,7 @@ def test_named_blocked_methods_are_logged_and_recorded(tmp_path, monkeypatch, ca
     assert calls == ["scMVP"]
     assert "[run_all] skipping UnitedNet: " in log and "[run_all] skipping MIRA: " in log
     sm = res.summary.set_index("method")
-    assert sm.loc["UnitedNet", "status"] == "SKIPPED" == sm.loc["MIRA", "status"]
+    assert sm.loc["UnitedNet", "status"] == "skipped" == sm.loc["MIRA", "status"]
     fails = res.failures.set_index("method")
     assert set(fails.index) == {"UnitedNet", "MIRA"}
     assert "logger.py" in fails.loc["MIRA", "error"]
@@ -483,7 +483,7 @@ def test_named_blocked_methods_are_logged_and_recorded(tmp_path, monkeypatch, ca
     assert fails.loc["UnitedNet", "error"].endswith("Export the ATAC as gene activity.")
     assert "allow_atac_mismatch" not in fails.loc["UnitedNet", "error"]
     disk = pd.read_csv(tmp_path / "out" / "summary.csv").set_index("method")
-    assert disk.loc["MIRA", "status"] == "SKIPPED"
+    assert disk.loc["MIRA", "status"] == "skipped"
     blob = json.loads((tmp_path / "out" / "batch_result.json").read_text())
     rec = next(r for r in blob["records"] if r["method"] == "MIRA")
     assert rec["status"] == "SKIPPED" and rec["requested"] is True
@@ -507,9 +507,9 @@ def test_unnamed_gpu_rows_are_skipped_but_not_failures(tmp_path, monkeypatch, ca
     log = capsys.readouterr().out
     sm = res.summary.set_index("method")
     for m in ("moETM", "iPOLNG"):
-        assert sm.loc[m, "status"] == "SKIPPED", m
+        assert sm.loc[m, "status"] == "skipped", m
         assert f"[run_all] skipping {m}: " in log
-    assert sm.loc["MIRA", "status"] == "SKIPPED"
+    assert sm.loc["MIRA", "status"] == "skipped"
     assert res.failures.empty, res.failures
 
 
@@ -563,9 +563,9 @@ def test_a_skipped_record_never_replaces_an_earlier_run(tmp_path):
 
 def test_summary_notes_list_skipped():
     doc = " ".join(inspect.getdoc(W.BatchResult.summary).split())
-    assert "``SKIPPED``" in doc and "why a SKIPPED method did not run" in doc
+    assert "skipped or timeout" in doc and "why the method has no scores" in doc
     doc = " ".join(inspect.getdoc(W.BatchResult.failures).split())
-    assert "``SKIPPED``, for a method that ``methods=`` named" in doc
+    assert "``skipped`` for a method that ``methods=`` named" in doc
 
 
 # ======================================================================= R4-11

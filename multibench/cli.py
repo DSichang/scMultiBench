@@ -25,7 +25,7 @@ traceback. ``2`` is a usage error: an unknown flag, a missing required flag,
 a bad choice, or a flag combination the subcommand rejects. ``3`` means
 ``run-all`` finished and saved its files, but a method failed or a method
 named in ``--methods`` was skipped. Without ``--methods``, a skipped method
-is only logged and marked ``SKIPPED`` in ``summary.csv``. A line on stderr
+is only logged and marked ``skipped`` in ``summary.csv``. A line on stderr
 names the methods.
 
 Data goes to stdout (tables, ids, commands, yml, citations, ``wrote ...``
@@ -1204,14 +1204,8 @@ _FAILED_WORDS = ("failed", "timed out", "not scored", "skipped")
 
 def _failed_word(status) -> str:
     """The word :func:`_failed_line` counts a ``failures`` status under."""
-    s = str(status)
-    if s == "SKIPPED":
-        return "skipped"
-    if s.startswith("TIMEOUT"):
-        return "timed out"
-    if s in ("RUN_OK_EVAL_FAILED", "RUN_OK_NO_LABEL_MATCH"):
-        return "not scored"
-    return "failed"
+    return {"skipped": "skipped", "timeout": "timed out", "ran": "not scored"}.get(
+        workflow._status(status), "failed")
 
 
 def _saved_methods(where, status=None) -> set | None:
@@ -1221,7 +1215,8 @@ def _saved_methods(where, status=None) -> set | None:
     except Exception:  # noqa: BLE001 - no saved file to compare with
         return None
     if status is not None:
-        df = df[df["status"] == status]
+        # a 0.4.0 summary.csv holds the record codes (SKIPPED)
+        df = df[df["status"].map(workflow._status) == status]
     return set(df["method"].astype(str))
 
 
@@ -1252,7 +1247,7 @@ def _failed_line(res, where) -> str | None:
 
 
 def _not_run_line(res, where) -> str | None:
-    """``# Not run: MIRA, moETM (SKIPPED). ...``, or ``None``: the stderr line naming
+    """``# Not run: MIRA, moETM (skipped). ...``, or ``None``: the stderr line naming
     the ``SKIPPED`` methods ``--methods`` did not name (they do not set exit 3)."""
     skipped = list(dict.fromkeys(str(r.get("method"))
                                  for r in res.records
@@ -1260,11 +1255,11 @@ def _not_run_line(res, where) -> str | None:
                                  and not r.get("requested")))
     if not skipped:
         return None
-    saved = _saved_methods(where, status="SKIPPED")
+    saved = _saved_methods(where, status="skipped")
     kept = [m for m in skipped if saved is not None and m not in saved]
     why = (" The reason column of summary.csv says why."
            if saved is None or set(skipped) - set(kept) else "")
-    return f"# Not run: {', '.join(skipped)} (SKIPPED).{why}{_kept_sentence(kept)}"
+    return f"# Not run: {', '.join(skipped)} (skipped).{why}{_kept_sentence(kept)}"
 
 
 @contextlib.contextmanager
@@ -1769,7 +1764,7 @@ def build_parser() -> argparse.ArgumentParser:
                "error: ... on stderr. MULTIBENCH_DEBUG=1 shows the traceback. 2 is a "
                "usage error. 3 means run-all finished, but a method failed or a "
                "method named in --methods was skipped. Without --methods, a skipped "
-               "method is only logged and marked SKIPPED in summary.csv. "
+               "method is only logged and marked skipped in summary.csv. "
                "Run multibench <command> --help for the flags of a command.")
     p.add_argument("--version", action="version",
                    version=f"%(prog)s {__version__}",
@@ -2052,7 +2047,7 @@ def build_parser() -> argparse.ArgumentParser:
         epilog="Exit code 1 means no method could start; 3 means the run finished, "
                "but a method failed or a method named in --methods was skipped. "
                "Without --methods, a skipped method is only logged and marked "
-               "SKIPPED in summary.csv.")
+               "skipped in summary.csv.")
     pra.add_argument("dataset", help="the dataset folder: its path, or its name under the "
                                      "data root (multibench config)")
     pra.add_argument("--category", required=True, help=_CATEGORY_HELP)

@@ -160,6 +160,42 @@ def coverage(parts: dict) -> pd.Series:
 STORED_SOURCES = ("published", "stored", "rerun")
 
 
+def best_first(scores: pd.Series) -> list:
+    """The index of ``scores``, highest first; ties keep their order."""
+    return scores.sort_values(ascending=False, kind="mergesort").index.tolist()
+
+
+def anchored(df: pd.DataFrame, score) -> tuple[pd.Series, list] | None:
+    """``(scores, order)`` of stored rows and others, ``score(rows)`` giving a
+    Series of method scores; ``None`` when ``df`` is not both. The stored
+    methods are scored on the stored rows alone, and each other method on the
+    stored rows and its own, and placed after the stored methods it ranks
+    below there."""
+    if "source" not in df.columns:
+        return None
+    stored = df["source"].isin(STORED_SOURCES)
+    if not stored.any() or stored.all():
+        return None
+    have = set(df.loc[stored, "method"])
+    added = [m for m in dict.fromkeys(df.loc[~stored, "method"]) if m not in have]
+    scores = score(df[stored])
+    order, slot = best_first(scores), {}
+    for m in added:
+        own = score(df[stored | (df["method"] == m)])
+        if m in own.index and pd.notna(own[m]):
+            ranked = best_first(own)
+            scores[m] = own[m]
+            slot[m] = sum(x in have for x in ranked[:ranked.index(m)])
+        else:
+            scores[m], slot[m] = np.nan, len(order)
+    late = sorted(added, key=lambda m: (slot[m], -np.nan_to_num(scores[m], nan=-np.inf)))
+    out = []
+    for k in range(len(order) + 1):
+        out += [m for m in late if slot[m] == k]
+        out += order[k:k + 1]
+    return scores, out
+
+
 def stored_datasets(df: pd.DataFrame) -> tuple:
     """Datasets that hold rows of a stored table (``source`` published or rerun).
 

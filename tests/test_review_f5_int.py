@@ -94,7 +94,7 @@ def test_run_all_reads_r_row_numbers_on_a_folder_with_numbered_barcodes(
     by_one = _quiet(mtb.run_all, str(d), "vertical", tmp_path / "b",
                     batch=_one_column(tmp_path / "b1.csv", batch), **KW)
     assert _batch_metrics(by_r) == _batch_metrics(by_one)
-    assert _batch_metrics(by_r)[0] == "CHAIN_OK"
+    assert _batch_metrics(by_r)[0] == "scored"
     rc = _quiet(cli.main, ["run-all", str(d), "--category", "vertical", "--methods",
                            "Matilda", "--modalities", "rna,adt",
                            "--batch", str(rb), "--dry-run"])
@@ -224,13 +224,13 @@ def test_a_moved_run_all_folder_rescores(swept, tmp_path):
     shutil.rmtree(res.out_dir)
     again = mtb.load_batch(moved)
     assert [r["out_dir"] for r in again.records] == [str(moved / "Matilda_MYCITE")]
-    assert _quiet(again.rescore).summary["status"].tolist() == ["CHAIN_OK"]
+    assert _quiet(again.rescore).summary["status"].tolist() == ["scored"]
 
 
 def test_rescore_with_metrics_that_leave_out_ari(swept):
     res, _, _ = swept
     new = _quiet(res.rescore, metrics=["ASW"])
-    assert new.summary["status"].tolist() == ["CHAIN_OK"]
+    assert new.summary["status"].tolist() == ["scored"]
     assert new.summary["ASW"].notna().all()
 
 

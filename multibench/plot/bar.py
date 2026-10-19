@@ -147,8 +147,10 @@ def _bar(long_df: pd.DataFrame, *, metrics=None, methods=None, top: int | None =
     per_ds = pd.DataFrame({ds: compute_overall(mat) for ds, mat in parts.items()})
     # best-first with a stable tie-break (same as plot.bubble), then reversed
     # so the best method is drawn on top
-    mean = style.overall_by_basis(parts, overall).sort_values(
-        ascending=False, kind="mergesort")[::-1]
+    mean = style.overall_by_basis(parts, overall)
+    scores, order = style.anchored(long_df, lambda rows: style.overall_by_basis(
+        style.per_dataset_ranks(rows, metrics), overall)) or (mean, style.best_first(mean))
+    mean = scores.reindex(order)[::-1]
     if top:
         mean = mean.tail(top)
     per_ds = per_ds.reindex(mean.index)

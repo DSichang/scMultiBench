@@ -132,7 +132,8 @@ def test_a_family_two_rows_have_counts_in_no_overall():
         t = _build_table(pd.concat([stored, mine, cls]))
     order = list(t.methods)
     for m in ("scJoint", "iNMF"):
-        assert order.index(m + "_rerun") == order.index(m) + 1      # same scores, side by side
+        # same scores, side by side (c1: placed by their rank against the stored rows)
+        assert abs(order.index(m + "_rerun") - order.index(m)) == 1
     assert "Classification" in [b.label for b in t.blocks]
     assert not [x for x in w if "Classification" in str(x.message)
                 or "has no OCA" in str(x.message)]

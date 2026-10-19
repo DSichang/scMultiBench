@@ -273,11 +273,9 @@ def test_generated_sounding_passages_are_rewritten():
         for phrase in gone:
             assert phrase not in flat, (name, phrase)
     s = " ".join(docs["summary"].split())
-    assert ("``CHAIN_OK_GRAPH_METHOD`` (a graph method scored on the UMAP it writes), "
-            "``RUN_OK_NO_EMBEDDING`` (only a graph)") in s
+    assert "status scored, ran, failed, skipped or timeout" in s           # c1 (C38)
     f = " ".join(docs["failures"].split())
-    assert ("no label file has as many cells as the output, so nothing was scored. Check "
-            "the folder with ``mtb.inputs_for(check=True)`` and ``mtb.labels_for``.") in f
+    assert "``ran`` for a method whose scoring failed or whose cells match no label file" in f
 
 
 def test_run_records_keep_the_caveat_without_the_notes_on_starting(tmp_path, monkeypatch,

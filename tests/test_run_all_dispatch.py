@@ -128,7 +128,7 @@ def test_timeout_bounds_evaluation_not_just_dispatch(monkeypatch, tmp_path):
     res = mtb.run_all("D11", "vertical", methods=["Matilda"], out_dir=str(tmp_path),
                       timeout=2, evaluate=True, verbose=False)
     elapsed = time.time() - t0
-    assert res.summary.iloc[0]["status"] == "TIMEOUT", res.summary.to_string()
+    assert res.summary.iloc[0]["status"] == "timeout", res.summary.to_string()
     assert elapsed < 30, f"deadline never fired during evaluation ({elapsed:.1f}s)"
 
 

@@ -13,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import functools
+import warnings
 import numpy as np
 import pandas as pd
 
@@ -270,9 +271,10 @@ def build_table(long_df: pd.DataFrame, **kwargs) -> BubbleTable:
 
 def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None,
                  aggregate: str = "dataset", require_complete: bool = False,
-                 overall: str = "rank", na: str = "warn") -> BubbleTable:
+                 overall: str = "rank", na: str = "warn", anchor: bool = True) -> BubbleTable:
     """:func:`build_table`, with the deprecated ``na=`` of 0.3 (``"warn"``,
-    ``"skip"`` or ``"raise"`` for the ``n/a`` cells)."""
+    ``"skip"`` or ``"raise"`` for the ``n/a`` cells); ``anchor=False`` ranks
+    stored and other rows together."""
     from ..data import catalog
 
     need = {"method", "metric", "value"}
@@ -426,7 +428,12 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=Non
         order = _resolve(order, raw_all.index.tolist(), "method", catalog._canonical_id)
         rows = order + [m for m in ranked if m not in order]
     else:
-        rows = ranked
+        def score(sub):
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                return _build_table(sub, metrics=metrics, aggregate=aggregate,
+                                    overall=overall, na="skip", anchor=False).overall
+        rows = ((style.anchored(df, score) if anchor else None) or (None, ranked))[1]
 
     for b in blocks:
         b.raw = b.raw.reindex(rows)

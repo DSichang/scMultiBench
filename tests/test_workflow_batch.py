@@ -59,9 +59,9 @@ def test_run_all_default_batch_is_file_of_origin_or_none(cite, tmp_path):
     res = mtb.run_all("MYCITE", "vertical", methods=["Matilda"], modalities=["rna", "adt"],
                       out_dir=tmp_path / "out", data_path=data, verbose=False)
     sm = res.summary
-    assert sm.loc[0, "status"] == "CHAIN_OK"
-    assert "batch_source" in sm.columns and "n_batches" in sm.columns
-    assert sm.loc[0, "batch_source"] is None and sm.loc[0, "n_batches"] == 1
+    assert sm.loc[0, "status"] == "scored"
+    # c1 (C38): the batch fields are in the record
+    assert res.records[0]["batch_source"] is None and res.records[0]["n_batches"] == 1
     assert sm.loc[0, "ARI"] > 0.9
     assert "ASW_batch" not in sm.columns           # single label file: clustering only
     # .long comes from the attached tidy frame, and the derived fallback agrees
@@ -81,13 +81,13 @@ def test_run_all_batch_override_scores_batch_metrics(cite, tmp_path):
     res = mtb.run_all("MYCITE", "vertical", methods=["Matilda"], modalities=["rna", "adt"],
                       out_dir=tmp_path / "out", data_path=data, verbose=False, batch=batch)
     sm = res.summary
-    assert sm.loc[0, "status"] == "CHAIN_OK"
-    assert sm.loc[0, "batch_source"] == "user" and sm.loc[0, "n_batches"] == 2
+    assert sm.loc[0, "status"] == "scored"
+    assert res.records[0]["batch_source"] == "user" and res.records[0]["n_batches"] == 2
     assert "ASW_batch" in sm.columns and pd.notna(sm.loc[0, "ASW_batch"])
     assert sm.loc[0, "ARI"] > 0.9
     # survives save/load_batch
     back = mtb.load_batch(tmp_path / "out")
-    assert back.summary.loc[0, "batch_source"] == "user"
+    assert back.records[0]["batch_source"] == "user"
 
 
 def test_run_all_batch_wrong_length_is_eval_failed_not_fatal(cite, tmp_path):
@@ -96,7 +96,7 @@ def test_run_all_batch_wrong_length_is_eval_failed_not_fatal(cite, tmp_path):
                       out_dir=tmp_path / "out", data_path=data, verbose=False,
                       batch=np.ones(N - 1))
     sm = res.summary
-    assert sm.loc[0, "status"] == "RUN_OK_EVAL_FAILED"
+    assert sm.loc[0, "status"] == "ran"
     err = res.failures.iloc[0]["error"]
     assert f"batch has {N - 1} entries, embedding has {N} cells" in err
 
@@ -105,32 +105,33 @@ def test_rescore_with_batch_and_labels(cite, tmp_path):
     data, labels = cite
     res = mtb.run_all("MYCITE", "vertical", methods=["Matilda"], modalities=["rna", "adt"],
                       out_dir=tmp_path / "out", data_path=data, verbose=False)
-    assert res.summary.loc[0, "batch_source"] is None
+    assert res.records[0]["batch_source"] is None
     batch = np.tile([1, 2], N // 2)
     re = res.rescore(batch=batch)
     assert isinstance(re, mtb.BatchResult) and re is not res
-    assert re.summary.loc[0, "batch_source"] == "user" and re.summary.loc[0, "n_batches"] == 2
+    assert re.records[0]["batch_source"] == "user" and re.records[0]["n_batches"] == 2
     assert "ASW_batch" in re.summary.columns
     assert re.summary.loc[0, "ARI"] == res.summary.loc[0, "ARI"]   # same labels, same ARI
     # the original is untouched
-    assert res.summary.loc[0, "batch_source"] is None
+    assert res.records[0]["batch_source"] is None
     # user labels bypass the label-order search
     shuffled = labels[::-1]
     re2 = res.rescore(labels=shuffled, metrics=["ARI", "NMI"])
-    assert re2.summary.loc[0, "label_order"] == "(user labels)"
-    assert set(re2.long["metric"]) == {"ARI", "NMI"}
+    assert "+".join(re2.records[0]["labels_used"]) == "(user labels)"
+    # c1 (C10): the named metrics replace theirs, the other scores stay
+    assert set(re2.long["metric"]) == set(res.long["metric"])
     # a batch CSV path is accepted too (read like a label file)
     bp = tmp_path / "batch.csv"
     pd.DataFrame({"x": batch}).to_csv(bp, index=False)
-    assert res.rescore(batch=bp).summary.loc[0, "n_batches"] == 2
+    assert res.rescore(batch=bp).records[0]["n_batches"] == 2
     # wrong length -> RUN_OK_EVAL_FAILED with the precise message, not an exception
     bad = res.rescore(batch=np.ones(3))
-    assert bad.summary.loc[0, "status"] == "RUN_OK_EVAL_FAILED"
+    assert bad.summary.loc[0, "status"] == "ran"
     assert "batch has 3 entries" in bad.records[0]["error"]
     # not persisted until asked; .save() writes the new numbers
-    assert mtb.load_batch(tmp_path / "out").summary.loc[0, "batch_source"] is None
+    assert mtb.load_batch(tmp_path / "out").records[0]["batch_source"] is None
     re.save(tmp_path / "out2")
-    assert mtb.load_batch(tmp_path / "out2").summary.loc[0, "batch_source"] == "user"
+    assert mtb.load_batch(tmp_path / "out2").records[0]["batch_source"] == "user"
 
 
 def test_rescore_handles_missing_output(cite, tmp_path):
@@ -151,4 +152,4 @@ def test_rescore_is_documented():
     for w in ("batch", "labels", "metrics", "save"):
         assert w in doc
     doc = inspect.getdoc(mtb.BatchResult.summary.fget)
-    assert "batch_source" in doc and "n_batches" in doc and "file_of_origin" in doc
+    assert "scored, ran, failed, skipped or timeout" in doc

@@ -122,8 +122,8 @@ def test_rescore_aligns_a_barcode_indexed_labels_series(swept):
     assert _ari(ordered) == _ari(res) > 0.3
     assert _ari(shuffled) == _ari(ordered)
     # the search ran over the file order, and the cells form one batch
-    row = shuffled.summary.iloc[0]
-    assert row["label_order"] == "cty.csv" and row["n_batches"] == 1
+    row = shuffled.records[0]
+    assert row["labels_used"] == ["cty.csv"] and row["n_batches"] == 1
     # a one-column DataFrame is aligned the same way
     frame = _quiet(res.rescore, labels=_meta(np.zeros(N))[["celltype"]])
     assert _ari(frame) == _ari(ordered)
@@ -161,8 +161,8 @@ def test_rescore_labels_as_an_array_keeps_todays_numbers(swept):
     res, _, batch = swept
     arr = _quiet(res.rescore, labels=CELLTYPE)
     # an array follows the embedding rows and bypasses the label-order search
-    row = arr.summary.iloc[0]
-    assert row["label_order"] == "(user labels)" and row["n_batches"] == 1
+    row = arr.records[0]
+    assert row["labels_used"] == ["(user labels)"] and row["n_batches"] == 1
     assert _ari(arr) == _ari(res)
     # a batch array next to it still follows the embedding rows
     assert _batch_metrics(_quiet(res.rescore, labels=CELLTYPE, batch=batch)) == \
@@ -182,7 +182,7 @@ def test_a_labels_series_without_usable_barcodes_is_positional_with_advice(swept
             "have no usable cell ids (missing or repeated barcodes). Check that it "
             "follows the embedding rows.") in msgs
     assert not any("silence" in m for m in msgs)
-    assert got.summary.iloc[0]["label_order"] == "(user labels)"
+    assert "+".join(got.records[0]["labels_used"]) == "(user labels)"
 
 
 PEAKS = [f"chr1:{i * 100}-{i * 100 + 50}" for i in range(30)]
@@ -227,9 +227,11 @@ def test_a_diagonal_labels_series_is_put_in_each_methods_cell_order(tmp_path):
     res, labels = _diagonal_sweep(tmp_path)
     files = _quiet(res.rescore, metrics=["ARI"]).summary.set_index("method")
     mine = _quiet(res.rescore, labels=labels.sample(frac=1.0, random_state=5),
-                  metrics=["ARI"]).summary.set_index("method")
-    assert mine.loc["GLUE", "label_order"] == "rna_cty.csv+atac_cty.csv"
-    assert mine.loc["uniPort", "label_order"] == "atac_cty.csv+rna_cty.csv"
+                  metrics=["ARI"])
+    used = {r["method"]: r["labels_used"] for r in mine.records}
+    mine = mine.summary.set_index("method")
+    assert used["GLUE"] == ["rna_cty.csv", "atac_cty.csv"]
+    assert used["uniPort"] == ["atac_cty.csv", "rna_cty.csv"]
     for m in ("GLUE", "uniPort"):
         assert mine.loc[m, "ARI"] > 0.9
         assert mine.loc[m, "ARI"] == files.loc[m, "ARI"]
@@ -292,7 +294,8 @@ def test_run_all_cli_aligns_a_barcode_csv(batchy, tmp_path, capsys):
     capsys.readouterr()
     a = mtb.load_batch(tmp_path / "o1").summary.iloc[0]
     b = mtb.load_batch(tmp_path / "o2").summary.iloc[0]
-    assert a["status"] == b["status"] == "CHAIN_OK" and a["n_batches"] == 2
+    assert a["status"] == b["status"] == "scored"
+    assert mtb.load_batch(tmp_path / "o1").records[0]["n_batches"] == 2
     assert a["ASW_batch"] < 0.5                  # the ordered file sees the batch shift
     for k in ("ASW_batch", "GC", "iLISI"):
         assert (pd.isna(a[k]) and pd.isna(b[k])) or a[k] == b[k], k
@@ -449,7 +452,7 @@ def test_the_failure_line_keeps_failures_and_skips_apart():
     assert cli._failed_line(res, "out/failures.csv") == (
         "# 1 failed (Seurat_WNN), 1 skipped (totalVI). See out/failures.csv.")
     assert cli._not_run_line(res, "out/summary.csv") == (
-        "# Not run: MIRA (SKIPPED). The reason column of summary.csv says why.")
+        "# Not run: MIRA (skipped). The reason column of summary.csv says why.")
     only = W.BatchResult([_rec("MIRA", "SKIPPED", error="x", requested=True)],
                          "MYCITE", "vertical")
     assert cli._failed_line(only, "f.csv") == "# 1 skipped (MIRA). See f.csv."
@@ -470,10 +473,10 @@ def test_a_run_whose_only_problems_are_unnamed_skips_exits_0_and_names_them(
     err = capsys.readouterr().err
     assert rc == 0, err
     sm = pd.read_csv(out / "summary.csv").set_index("method")
-    skipped = sorted(sm.index[sm["status"] == "SKIPPED"])
+    skipped = sorted(sm.index[sm["status"] == "skipped"])
     assert "totalVI" in skipped and "Matilda" not in skipped
     line = next(l for l in err.splitlines() if l.startswith("# Not run: "))
-    assert line == (f"# Not run: {', '.join(skipped)} (SKIPPED). The reason column of "
+    assert line == (f"# Not run: {', '.join(skipped)} (skipped). The reason column of "
                     f"summary.csv says why.")
     assert "failed" not in err
     # the reason column says why each SKIPPED row did not run, as the log does
@@ -501,7 +504,7 @@ def test_summary_reason_comes_from_the_record_also_for_older_folders(tmp_path):
 
 def test_exit_code_texts_name_the_methods_rule(capsys):
     rule = ("a method failed or a method named in --methods was skipped. Without "
-            "--methods, a skipped method is only logged and marked SKIPPED in "
+            "--methods, a skipped method is only logged and marked skipped in "
             "summary.csv.")
     with pytest.raises(SystemExit):
         cli.main(["run-all", "--help"])
@@ -509,5 +512,5 @@ def test_exit_code_texts_name_the_methods_rule(capsys):
     doc = " ".join(cli.__doc__.split())
     assert ("but a method failed or a method named in ``--methods`` was skipped. "
             "Without ``--methods``, a skipped method is only logged and marked "
-            "``SKIPPED`` in ``summary.csv``.") in doc
+            "``skipped`` in ``summary.csv``.") in doc
     assert "failed or was skipped" not in doc

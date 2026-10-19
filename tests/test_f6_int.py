@@ -56,7 +56,8 @@ def test_batch_column_run_saves_the_column_and_rescore_reuses_it(batchy, tmp_pat
         warnings.filterwarnings("ignore", message="No Leiden resolution gave")
         warnings.filterwarnings("ignore", message="ARI_batch and NMI_batch use")
         again = mtb.load_batch(tmp_path / "o1").rescore().summary.iloc[0]
-    assert (again["batch_source"], again["n_batches"]) == ("user", 2)
+    rec = mtb.load_batch(tmp_path / "o1").rescore(verbose=False).records[0]
+    assert (rec["batch_source"], rec["n_batches"]) == ("user", 2)
     for k in ("ASW_batch", "GC", "iLISI"):
         assert (pd.isna(before[k]) and pd.isna(again[k])) or before[k] == again[k], k
 
@@ -120,7 +121,8 @@ def test_rescore_with_the_saved_batch_and_no_batch_metric_does_not_warn(cite, tm
         new = back.rescore(metrics=["ARI", "NMI"])
     rec = new.records[0]
     assert rec["status"] == "CHAIN_OK"
-    assert set(rec["metrics"]) == {"ARI", "NMI"}
+    # c1 (C10): ARI and NMI are scored again, the other saved scores stay
+    assert set(rec["metrics"]) == set(back.records[0]["metrics"])
     assert round(float(new.summary["ARI"].iloc[0]), 4) == round(
         float(res.summary["ARI"].iloc[0]), 4)
     # the record still says which batch it has, and a later batch metric finds it

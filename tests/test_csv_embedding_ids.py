@@ -524,7 +524,7 @@ def test_method_runs_are_scored_in_file_order_as_before(cite, tmp_path, monkeypa
     kw = dict(methods=["Matilda"], modalities=["rna", "adt"], data_path=data, verbose=False)
     plain = mtb.run_all("MYCITE", "vertical", out_dir=tmp_path / "plain", **kw)
     scores = plain.summary.loc[0, ["ARI", "NMI"]].tolist()
-    assert plain.summary.loc[0, "status"] == "CHAIN_OK" and scores == [1.0, 1.0]
+    assert plain.summary.loc[0, "status"] == "scored" and scores == [1.0, 1.0]
     # the scores of the same embedding and labels, passed in memory by position
     (h5,) = (tmp_path / "plain").rglob("embedding.h5")
     with_arrays = mtb.evaluate(io.read_embedding(h5), labels=labels,

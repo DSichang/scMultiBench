@@ -109,11 +109,11 @@ def test_run_all_exits_3_when_a_method_fails_and_says_why(failing, tmp_path, cap
     err = capsys.readouterr().err
     assert rc == 3, err
     fails = pd.read_csv(out / "failures.csv")
-    assert fails["method"].tolist() == ["Matilda"] and fails["status"].tolist() == ["FAIL"]
+    assert fails["method"].tolist() == ["Matilda"] and fails["status"].tolist() == ["failed"]
     assert (out / "summary.csv").exists() and (out / "batch_result.json").exists()
     # the status line ends with the last line of the error, not after the status
     line = _status_line(err)
-    assert re.fullmatch(r"\[run_all\]   -> FAIL \([0-9.]+s\) ValueError: stand-in method "
+    assert re.fullmatch(r"\[run_all\]   -> failed \([0-9.]+s\) ValueError: stand-in method "
                         r"failed on purpose", line), line
     assert f"# 1 failed (Matilda). See {out / 'failures.csv'}." in err
     assert err.rstrip().endswith("See " + str(out / "failures.csv") + ".")
@@ -123,10 +123,10 @@ def test_run_all_exits_0_when_every_method_is_chain_ok(working, tmp_path, capsys
     rc = _run_all(working, tmp_path / "out")
     err = capsys.readouterr().err
     assert rc == 0, err
-    assert mtb.load_batch(tmp_path / "out").summary.loc[0, "status"] == "CHAIN_OK"
+    assert mtb.load_batch(tmp_path / "out").summary.loc[0, "status"] == "scored"
     assert "failed" not in err
     # a CHAIN_OK line still ends with the ARI, named, to 3 decimals
-    assert re.fullmatch(r"\[run_all\]   -> CHAIN_OK \([0-9.]+s\) ARI -?[0-9]\.[0-9]{3}",
+    assert re.fullmatch(r"\[run_all\]   -> scored \([0-9.]+s\) ARI -?[0-9]\.[0-9]{3}",
                         _status_line(err))
 
 
@@ -135,7 +135,7 @@ def test_run_all_timeout_exits_3_and_the_line_names_the_limit(slow, tmp_path, ca
     err = capsys.readouterr().err
     assert rc == 3, err
     line = _status_line(err)
-    assert line.startswith("[run_all]   -> TIMEOUT (") and "1" in line.split(")", 1)[1]
+    assert line.startswith("[run_all]   -> timeout (") and "1" in line.split(")", 1)[1]
     assert "# 1 timed out (Matilda)." in err
 
 
@@ -167,7 +167,7 @@ def test_exit_code_3_is_documented_in_both_helps(capsys):
     # R5-03: only a skip of a method named in --methods sets exit 3
     assert ("3 means run-all finished, but a method failed or a method named in "
             "--methods was skipped. Without --methods, a skipped method is only logged "
-            "and marked SKIPPED in summary.csv.") in top
+            "and marked skipped in summary.csv.") in top
     assert "``3`` means ``run-all``" in " ".join(cli.__doc__.split())
     with pytest.raises(SystemExit):
         cli.main(["run-all", "--help"])

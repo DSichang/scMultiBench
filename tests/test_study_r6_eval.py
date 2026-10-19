@@ -91,7 +91,8 @@ def test_run_all_batch_column_dry_run_and_run(batchy, tmp_path, capsys):
     capsys.readouterr()
     a = mtb.load_batch(tmp_path / "o1").summary.iloc[0]
     b = mtb.load_batch(tmp_path / "o2").summary.iloc[0]
-    assert a["status"] == b["status"] == "CHAIN_OK" and a["n_batches"] == 2
+    assert a["status"] == b["status"] == "scored"
+    assert mtb.load_batch(tmp_path / "o1").records[0]["n_batches"] == 2
     for k in ("ASW_batch", "GC", "iLISI"):
         assert (pd.isna(a[k]) and pd.isna(b[k])) or a[k] == b[k], k
 

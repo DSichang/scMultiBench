@@ -957,15 +957,13 @@ def recommend(
     metrics=None,
     long_df: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    """Rank the methods of a category, best first.
+    """Methods best first: the row order of ``mtb.plot.bubble`` for the same table.
 
     Within each dataset the methods are ranked on each metric; each
     per-dataset score is the mean rank over the metrics, min-max scaled
     within the dataset (1 = best, 0 = worst there), and ``grand_score`` is
-    the mean over the datasets. The order is the row order of
-    ``mtb.plot.bubble`` and ``mtb.plot.bar`` for the same rows and the same
-    ``metrics=``, so ``long_df=`` gives the numbers behind a figure. Methods
-    the package runs for the category without scores are listed last.
+    the mean over the datasets. Without ``long_df=``, the methods the package
+    runs for the category without stored results are listed last.
 
     Parameters
     ----------
@@ -977,8 +975,8 @@ def recommend(
     methods : list of str
         Rank only these methods, among themselves; ``None`` = every method.
     metrics : None, str or list of str
-        ``None`` = the ``"clustering"`` family (the benchmark's main ranking);
-        or a family, a code, or a list of codes and families.
+        ``None`` = every metric present, as ``mtb.plot.bubble``; or a family, a
+        code, or a list of codes and families.
     long_df : pandas.DataFrame
         A long table to rank instead of the stored results, such as
         ``pd.concat([mtb.load_results(category), mine])``.
@@ -1039,8 +1037,6 @@ def _recommend(
     filtered = want_mods is not None or atac is not None
     if want_mods is None and atac is not None:
         want_mods = {"atac"}
-    if metrics is None:
-        metrics = "clustering"           # the benchmark's headline ranking
     sel = catalog.metric_selection(metrics)
     long_df_was_none = long_df is None
     if long_df is None:
@@ -1132,11 +1128,17 @@ def _recommend(
     per_ds = pd.DataFrame({ds: style.compute_overall(mat) for ds, mat in kept.items()})
     # igraph-scored rows ranked against leidenalg-scored stored rows
     backend = style.backend_warning(df[df["dataset"].isin(list(kept))])
-    grand = per_ds.mean(axis=1)
     n_ds = per_ds.notna().sum(axis=1)
     n_total = per_ds.shape[1]
 
-    keep_methods = list(grand.index)
+    def score(rows):
+        mats = [m for m in style.per_dataset_ranks(rows, sel.codes if sel.explicit
+                                                   else None).values()
+                if len(m.index) >= min_methods]
+        return pd.concat([style.compute_overall(m) for m in mats], axis=1).mean(axis=1) \
+            if mats else pd.Series(dtype=float)
+    grand = per_ds.mean(axis=1)
+    grand, keep_methods = style.anchored(df, score) or (grand, style.best_first(grand))
     if filtered:
         allowed = set(find_methods(category=category, modalities=modalities, atac=atac))
         keep_methods = [m for m in keep_methods if catalog._canonical_id(m) in allowed]
@@ -1149,16 +1151,16 @@ def _recommend(
                 f"{sorted(grand.index)}; methods matching the selection: "
                 f"{sorted(allowed)}")
 
-    # methods run for the category without rows
-    wired = find_methods(category=category, modalities=modalities, atac=atac)
+    # methods run for the category without scores; of long_df's methods only
+    in_frame = {catalog._canonical_id(m) for m in df["method"].unique()}
+    wired = [m for m in find_methods(category=category, modalities=modalities, atac=atac)
+             if long_df_was_none or m in in_frame]
     if want_ids is not None:
         wired = [m for m in wired if m in want_ids]
     scored_ids = {catalog._canonical_id(m) for m in keep_methods}
     missing = sorted((m for m in wired if m not in scored_ids), key=str.lower)
     # rows only in dropped datasets is another reason than no rows
-    in_frame = {catalog._canonical_id(m) for m in df["method"].unique()}
     only_dropped = [m for m in missing if m in in_frame]
-    no_rows = [m for m in missing if m not in in_frame]
 
     from ..engine import registry, envs
     from ..discover import method_info
@@ -1189,8 +1191,6 @@ def _recommend(
             "env": env,
         })
     out = pd.DataFrame(rows)
-    out = out.sort_values("grand_score", ascending=False, kind="mergesort",
-                          na_position="last").reset_index(drop=True)
     out.attrs["metrics"] = list(sel.codes) if sel.explicit else sel.family
     out.attrs["family"] = None if sel.explicit else sel.family
     out.attrs["source"] = source if long_df_was_none else "long_df"
@@ -1232,17 +1232,6 @@ def _recommend(
             f"{_and_list(only_dropped)} {'has' if one else 'have'} scores only on "
             f"datasets left out of the ranking, so {'it is' if one else 'they are'} "
             f"listed last.")
-    if no_rows:
-        scores = ({"published": "published scores"}.get(source, "stored results")
-                  if long_df_was_none else "scores in long_df")
-        head = (f"{no_rows[0]} has no {scores} and is listed last"
-                if len(no_rows) == 1 else
-                f"These {len(no_rows)} methods have no {scores} and are listed "
-                f"last: {', '.join(no_rows)}")
-        notes.append(
-            head + "."
-            + (" Leave out source= to rank the stored results."
-               if source == "published" and long_df_was_none else ""))
     if notes:
         _compat.warn(f"recommend({category!r}):\n  - " + "\n  - ".join(notes),
                      UserWarning)

@@ -126,7 +126,7 @@ def test_run_all_warns_and_is_silent_for_a_series_with_barcodes(cite, tmp_path):
     res, said = _caught(lambda: mtb.run_all("MYCITE", "vertical", batch=pd.Series(batch),
                                             out_dir=tmp_path / "rows", **kw))
     assert said == [TEXT]
-    assert res.summary.loc[0, "n_batches"] == 2
+    assert res.records[0]["n_batches"] == 2
     cells = [f"c{i}" for i in range(CITE_N)]
     for i, value in enumerate((pd.Series(batch, index=cells), batch, list(batch))):
         _, said = _caught(lambda: mtb.run_all("MYCITE", "vertical", batch=value,

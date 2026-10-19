@@ -1912,24 +1912,36 @@ def _evaluate_best_order(emb, category, cands, *, metrics=None, user_batch=False
 
 
 # ------------------------------------------------------------------------ results
-def _with_label_order_note(summary: "pd.DataFrame") -> "pd.DataFrame":
-    """Add ``label_order_note``: why ``label_order_confidence`` is blank. A column of
-    its own, since a sentinel string in the numeric one would break ``> 0.5``."""
-    scored = summary["status"].astype(str).str.startswith("CHAIN_OK")
-    blank = scored & summary["label_order_confidence"].isna()
-    ari = pd.to_numeric(summary.get("ARI"), errors="coerce")
-    why = pd.Series([None] * len(summary), index=summary.index, dtype=object)
-    why[blank & (ari < _CHANCE_ARI)] = "winner at chance"
-    why[blank & ~(ari < _CHANCE_ARI)] = "single ordering"
-    why[~scored] = "not scored"
-    summary["label_order_note"] = why
-    return summary
+#: the summary's status of each record status; the record and the reason keep the detail
+_STATUS = {"CHAIN_OK": "scored", "CHAIN_OK_GRAPH_METHOD": "scored", "RUN_OK": "ran",
+           "RUN_OK_EVAL_FAILED": "ran", "RUN_OK_NO_EMBEDDING": "ran",
+           "RUN_OK_NO_LABEL_MATCH": "ran", "FAIL": "failed", "SKIPPED": "skipped",
+           "TIMEOUT": "timeout"}
+
+#: the reason of a record that ran and holds no error of its own
+_RAN_REASON = {"RUN_OK_NO_EMBEDDING": "It writes a graph, not an embedding.",
+               "RUN_OK_NO_LABEL_MATCH": "No label file has as many cells as the output."}
 
 
-#: the columns of BatchResult.summary after the scores and run_sec
-_SUMMARY_DIAGNOSTICS = ("output_kind", "emb_shape", "label_order",
-                        "label_order_confidence", "label_order_note", "batch_source",
-                        "n_batches")
+def _status(code) -> str:
+    """The summary status of a record status, as ``_STATUS`` maps it."""
+    s = str(code or "")
+    if s in _STATUS.values():
+        return s
+    return _STATUS.get(s) or ("timeout" if s.startswith("TIMEOUT") else "failed")
+
+
+def _reason(rec: dict) -> str:
+    """Why ``rec`` has no scores, or ``""`` when it has them."""
+    code = str(rec.get("status") or "")
+    if _status(code) == "scored":
+        return ""
+    return rec.get("error") or rec.get("note") or _RAN_REASON.get(code, "")
+
+
+#: the columns of BatchResult.summary; the metric columns come after status
+_SUMMARY_COLUMNS = ("method", "status", "run_sec", "label_order_confidence", "caveat",
+                    "reason")
 
 
 #: provenance of a reused output when ``out_dir`` holds no earlier record of it
@@ -2095,26 +2107,14 @@ class BatchResult:
 
             ```text
             method                  method id
-            status                  outcome, below
+            status                  scored, ran, failed, skipped or timeout
             ARI, NMI, ASW, ...      one column per metric
             run_sec                 seconds of the method run
-            output_kind             embedding / graph
-            emb_shape               [cells, dims] of the embedding
-            label_order             label file(s) the metrics used, in order
-            label_order_confidence  how clearly that order won, 0-1 (blank:
-                                    label_order_note says why)
-            label_order_note        why the confidence is blank
-            batch_source            'file_of_origin' / 'user' / None
-            n_batches               distinct batches used (1 = none)
+            label_order_confidence  how clearly the label order won, 0-1
+                                    (blank: one order only)
             caveat                  scan's caveat for the method, or ""
-            reason                  why a SKIPPED method did not run, or ""
+            reason                  why the method has no scores, or ""
             ```
-
-            ``status`` is ``CHAIN_OK`` (ran and scored),
-            ``CHAIN_OK_GRAPH_METHOD`` (a graph method scored on the UMAP it
-            writes), ``RUN_OK_NO_EMBEDDING`` (only a graph), ``RUN_OK_EVAL_FAILED``,
-            ``RUN_OK_NO_LABEL_MATCH``, ``RUN_OK`` (``evaluate=False``),
-            ``TIMEOUT``, ``FAIL`` or ``SKIPPED``.
 
         Examples
         --------
@@ -2126,46 +2126,24 @@ class BatchResult:
         BatchResult.failures : the rows whose status means something went wrong.
         BatchResult.records : the raw records, with every label order tried.
         """
-        rows = []
-        for r in self.records:
-            cands = r.get("label_order_candidates") or []
-            rows.append({k: r.get(k) for k in
-                         ("method", "status", "run_sec", "output_kind", "emb_shape")}
-                        | {"label_order": "+".join(r.get("labels_used") or []) or None,
-                           "label_order_confidence": _order_confidence(cands),
-                           "batch_source": r.get("batch_source"),
-                           "n_batches": r.get("n_batches")}
-                        # + 0.0: an older saved record may hold -0.0
-                        | {m: (v + 0.0 if isinstance(v, float) else v)
-                           for m, v in (r.get("metrics") or {}).items()}
-                        # NaN, not None, for a record saved before the field
-                        | {"caveat": np.nan if r.get("caveat") is None
-                           else r.get("caveat"),
-                           "reason": (r.get("error") or "")
-                           if r.get("status") == "SKIPPED" else ""})
-        if not rows:
-            return pd.DataFrame(columns=["method", "status", "run_sec",
-                                         *_SUMMARY_DIAGNOSTICS, "caveat",
-                                         "reason"]).astype({"label_order_confidence":
-                                                            "float64"})
-        table = pd.DataFrame(rows).sort_values("method").reset_index(drop=True)
+        rows = [{"method": r.get("method"), "status": _status(r.get("status")),
+                 "run_sec": r.get("run_sec"),
+                 "label_order_confidence": _order_confidence(
+                     r.get("label_order_candidates") or []),
+                 # NaN, not None, for a record saved before the field
+                 "caveat": np.nan if r.get("caveat") is None else r.get("caveat"),
+                 "reason": _reason(r)}
+                # + 0.0: an older saved record may hold -0.0
+                | {m: (v + 0.0 if isinstance(v, float) else v)
+                   for m, v in (r.get("metrics") or {}).items()}
+                for r in self.records]
+        table = (pd.DataFrame(rows, columns=None if rows else list(_SUMMARY_COLUMNS))
+                 .sort_values("method").reset_index(drop=True))
         # float64 with NaN also when every row is blank (else object, None)
         table["label_order_confidence"] = pd.to_numeric(
             table["label_order_confidence"], errors="coerce").astype("float64")
-        table = _with_label_order_note(table)
-        # the scores first, then the run's diagnostics
-        diag = [c for c in _SUMMARY_DIAGNOSTICS if c in table.columns]
-        scores = [c for c in table.columns if c not in diag and c not in
-                  ("method", "status", "run_sec", "caveat", "reason")]
-        table = table[["method", "status"] + scores + ["run_sec"] + diag
-                      + ["caveat", "reason"]]
-        # whole numbers stay whole next to the blanks of SKIPPED and FAIL rows
-        for col in ("n_batches",):
-            try:
-                table[col] = pd.to_numeric(table[col]).astype("Int64")
-            except (TypeError, ValueError):     # not whole numbers: left as they are
-                pass
-        return table
+        scores = [c for c in table.columns if c not in _SUMMARY_COLUMNS]
+        return table[["method", "status", *scores, *_SUMMARY_COLUMNS[2:]]]
 
     @property
     def long(self) -> pd.DataFrame:
@@ -2247,18 +2225,10 @@ class BatchResult:
 
         Notes
         -----
-        **Statuses listed.**
-
-        - ``FAIL`` and ``TIMEOUT``.
-        - ``SKIPPED``, for a method that ``methods=`` named and that did not run.
-        - ``RUN_OK_EVAL_FAILED`` - the embedding exists, scoring it failed.
-        - ``RUN_OK_NO_LABEL_MATCH`` - ran, but no label file has as many
-          cells as the output, so nothing was scored. Check the folder with
-          ``mtb.inputs_for(check=True)`` and ``mtb.labels_for``.
-
-        **Not listed.** ``RUN_OK_NO_EMBEDDING``: those methods ran correctly and
-        emit a graph instead of an embedding, so there is nothing for
-        clustering metrics to score. See ``summary`` for them.
+        **Statuses listed.** ``failed``, ``timeout``, ``skipped`` for a method
+        that ``methods=`` named, and ``ran`` for a method whose scoring failed
+        or whose cells match no label file. A method that writes a graph only
+        is not listed.
 
         See Also
         --------
@@ -2269,9 +2239,9 @@ class BatchResult:
                or r.get("status") in ("RUN_OK_EVAL_FAILED",
                                       "RUN_OK_NO_LABEL_MATCH")
                or (r.get("status") == "SKIPPED" and r.get("requested"))]
-        if not bad:
-            return pd.DataFrame(columns=["method", "status", "error"])
-        return pd.DataFrame([{k: r.get(k) for k in ("method", "status", "error")} for r in bad])
+        return pd.DataFrame([{"method": r.get("method"), "status": _status(r.get("status")),
+                              "error": _reason(r)} for r in bad],
+                            columns=["method", "status", "error"])
 
     def plot(self, **kw):
         """Bubble figure of every method that produced metrics.
@@ -2361,8 +2331,8 @@ class BatchResult:
         ------
         FileNotFoundError
             The output of no method is found; the message gives the first
-            method's error. A method that cannot be scored otherwise is
-            recorded as ``RUN_OK_EVAL_FAILED``, with the reason in ``error``.
+            method's error. A method that cannot be scored otherwise gets the
+            status ``ran``, and ``reason`` says why.
         ValueError
             ``labels`` or ``batch`` holds ids that are not cells of the dataset,
             or a cell has no batch.
@@ -2479,8 +2449,15 @@ class BatchResult:
                 rec["status"] = "RUN_OK_EVAL_FAILED"
                 rec["error"] = _clip_error(f"{type(e).__name__}: {e}")
             if verbose:
-                print(f"[rescore] {method} -> {rec['status']} {_ari_tail(rec)}".rstrip(),
+                print(f"[rescore] {method} -> {_status(rec['status'])} {_ari_tail(rec)}".rstrip(),
                       flush=True)
+            if metrics is not None and rec.get("metrics") and r.get("metrics"):
+                # the named metrics replace theirs; the other scores stay
+                rec["metrics"] = {**r["metrics"], **rec["metrics"]}
+                both = pd.concat([BatchResult([r], self.dataset, self.category).long,
+                                  rec["_long"]], ignore_index=True)
+                rec["_long"] = both.drop_duplicates("metric", keep="last").set_index(
+                    "metric").loc[list(dict.fromkeys(both["metric"]))].reset_index()
             new.records.append(rec)
         # a saved batch that fits no label order: the batch metrics are gone
         unused = next((r["note"] for r in new.records
@@ -2643,20 +2620,10 @@ class BatchResult:
         return len(self.records)
 
     def __repr__(self):
-        ok = sum(1 for r in self.records if str(r.get("status", "")).startswith("CHAIN_OK"))
-        noemb = sum(1 for r in self.records if r.get("status") == "RUN_OK_NO_EMBEDDING")
-        nolab = sum(1 for r in self.records if r.get("status") == "RUN_OK_NO_LABEL_MATCH")
-        skipped = sum(1 for r in self.records if r.get("status") == "SKIPPED")
-        fails = self.failures
-        # a named SKIPPED method is in failures too; count it once, as skipped
-        named = int((fails["status"] == "SKIPPED").sum()) if len(fails) else 0
-        bad = len(fails) - named
-        extra = (f", {noemb} ran but not scorable" if noemb else "") + (
-            f", {nolab} ran but no labels matched" if nolab else "") + (
-            f", {skipped} skipped" if skipped else "") + (
-            f" ({named} named)" if named else "")
-        return (f"<BatchResult {self.category}/{self.dataset}: "
-                f"{ok}/{len(self.records)} with metrics{extra}, {bad} failed>")
+        counts = pd.Series([_status(r.get("status")) for r in self.records]).value_counts()
+        text = ", ".join(f"{counts[s]} {s}" for s in dict.fromkeys(_STATUS.values())
+                         if s in counts) or "no method"
+        return f"<BatchResult {self.category}/{self.dataset}: {text}>"
 
 
 def _embedding_obs(rec, dataset, category, root, n, batch_text=None) -> pd.DataFrame:
@@ -3541,10 +3508,11 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
         One batch per cell; a Series or a barcode-indexed CSV is aligned by
         barcode. ``None`` = each cell's label file.
     evaluate : bool
-        Score each embedding; ``False`` only runs (status ``RUN_OK``).
+        Score each embedding; ``False`` only runs (status ``ran``).
     dry_run : bool
         ``True`` = run nothing and return the plan: one row per method
-        variant with its file and environment checks and its ``command``.
+        variant, the columns of ``mtb.scan`` and ``env``, ``caveat`` and
+        ``command``.
     timeout : float | None
         Wall-clock limit per method, in seconds; ``None`` = none.
     skip_existing : bool
@@ -3817,7 +3785,7 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
             _disarm_deadline(deadline)
         if verbose:
             tail = _error_tail(rec["error"]) if rec.get("error") else _ari_tail(rec)
-            print(f"[run_all]   -> {rec['status']} ({rec.get('run_sec')}s) {tail}".rstrip(),
+            print(f"[run_all]   -> {_status(rec['status'])} ({rec.get('run_sec')}s) {tail}".rstrip(),
                   flush=True)
         if rec.get("reused"):
             rec.update(earlier.get(method, _UNKNOWN_PROVENANCE))

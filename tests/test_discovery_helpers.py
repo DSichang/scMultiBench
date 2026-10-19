@@ -247,13 +247,11 @@ def test_recommend_lists_unscored_methods(result_dir):
     assert list(r.columns) == ["method", "grand_score", "needs_labels", "runtime_tier",
                                "worst_sec", "env"]
     assert r.grand_score.iloc[: len(r) - len(nan_rows)].notna().all()
-    assert r.attrs["family"] == "clustering" and r.attrs["metrics"] == "clustering"
+    # c1 (C04): every metric present by default; (C17) no line for the unscored rows
+    assert r.attrs["family"] == "all" and r.attrs["metrics"] == "all"
     assert r.attrs["source"] == "published"
     assert r.attrs["not_scored"] == r.attrs["missing"] == sorted(nan_rows.method, key=str.lower)
-    import re
-    assert re.search(rf"These {len(nan_rows)} methods have no published scores and "
-                     r"are listed last: .*totalVI", msg)
-    assert msg.endswith("Leave out source= to rank the stored results.")
+    assert "listed last: " not in msg
     # the coverage line appears only where the matrix IS incomplete
     # (the single published vertical dataset scores its 6 methods completely;
     # diagonal source='both' lacks GLUE / Seurat_v5 in the re-run rows)
@@ -269,7 +267,7 @@ def test_recommend_rerun_missing_only_seurat_wnn(result_dir):
     r, msg = _rec("vertical", modalities=["rna", "adt"])
     assert set(r[r.grand_score.isna()].method) == {"Seurat_WNN"}
     assert r.attrs["source"] == "rerun" and r.attrs["not_scored"] == ["Seurat_WNN"]
-    assert "Seurat_WNN has no stored results and is listed last." in msg
+    assert "Seurat_WNN has no stored results" not in msg            # c1 (C17)
     assert 'Try source="rerun"' not in msg
 
 
@@ -342,7 +340,7 @@ def test_recommend_methods_keyword(layout_tree):
     r2, msg2 = _rec("cross", methods=["sciPENN", "scMDC", "totalVI"], source="published",
                     result_path=result_dir)
     assert r2.method.tolist() == ["sciPENN", "scMDC", "totalVI"]
-    assert "totalVI has no published scores and is listed last." in msg2
+    assert "totalVI has no published scores" not in msg2            # c1 (C17)
     with pytest.raises(KeyError, match=r"Unknown method Matlida. Did you mean Matilda\?"):
         recommend("cross", methods=["Matlida"], source="published", result_path=result_dir)
     with pytest.raises(ValueError, match=r"none of methods=\['totalVI'\] has rows in the published table for cross"):

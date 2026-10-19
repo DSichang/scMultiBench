@@ -1175,7 +1175,7 @@ def test_labels_later_in_a_vertical_tutorial(key, host, tmp_path, monkeypatch):
     assert pd.read_csv(folder / "cty.csv")["x"].astype(str).tolist() == [
         truth[c] for c in cells]
     summary = _quiet(_run_cell, rescore, ns).set_index("method")
-    assert summary.loc[ran, "status"].tolist() == ["CHAIN_OK"] * len(ran)
+    assert summary.loc[ran, "status"].tolist() == ["scored"] * len(ran)
     assert summary.loc[ran, "ARI"].notna().all() and host == []
 
 
@@ -1226,7 +1226,7 @@ def test_labels_later_on_a_diagonal_folder(key, host, tmp_path, monkeypatch):
         assert labels == [truth[side + batch][c] for c in cells], matrix
     assert len(list(folder.glob("*.csv"))) == len(order)
     summary = _quiet(_run_cell, rescore, ns)
-    assert dict(zip(summary["method"], summary["status"])) == {m: "CHAIN_OK" for m in ran}
+    assert dict(zip(summary["method"], summary["status"])) == {m: "scored" for m in ran}
     assert summary["ARI"].notna().all()
     assert host == []                            # no method ran again
 
@@ -1264,7 +1264,7 @@ def test_labels_later_on_a_folder_with_batches(key, batches, host, tmp_path, mon
         labels = pd.read_csv(folder / f"cty{batch}.csv")["x"].astype(str).tolist()
         assert labels == [source[c] for c in cells], matrix
     summary = _quiet(_run_cell, _later()[1], ns)
-    assert dict(zip(summary["method"], summary["status"])) == {m: "CHAIN_OK" for m in ran}
+    assert dict(zip(summary["method"], summary["status"])) == {m: "scored" for m in ran}
     assert set(summary["n_batches"]) == {batches} and summary["ARI"].notna().all()
     assert host == []                            # no method ran again
 
@@ -1293,7 +1293,7 @@ def test_donor_recipe(host, tmp_path, monkeypatch, capsys):
         assert sorted(p.name for p in Path("mydata/MYDONORS").iterdir()) == [
             "adt.h5", "cty.csv", "rna.h5"]                       # "no batch= here"
         assert sorted(summary["method"]) == sorted(ns["METHODS"])
-        assert set(summary["status"]) == {"CHAIN_OK"}, key
+        assert set(summary["status"]) == {"scored"}, key
         # they are the batch metrics of the summary, with a value for each method
         batch = set(mtb.catalog.metrics().query("family == 'batch'").metric)
         assert [c for c in summary.columns if c in batch] == metrics
@@ -1617,7 +1617,7 @@ def test_the_command_lines_parse(host, tmp_path, monkeypatch, capsys):
     capsys.readouterr()
     assert cli.main(run_all[1:]) == 0
     summary = pd.read_csv("out/MYDATA/summary.csv")
-    assert len(host) == len(summary) > 0 and set(summary["status"]) == {"RUN_OK"}
+    assert len(host) == len(summary) > 0 and set(summary["status"]) == {"ran"}
 
 
 def test_the_donor_file_of_the_command_line(host, tmp_path, monkeypatch, capsys):
@@ -1636,7 +1636,7 @@ def test_the_donor_file_of_the_command_line(host, tmp_path, monkeypatch, capsys)
     cli.build_parser().parse_args(argv)
     assert _quiet(cli.main, argv + ["--out-dir", "out/MYDONORS"]) == 0
     summary = pd.read_csv("out/MYDONORS/summary.csv")
-    assert summary["status"].tolist() == ["CHAIN_OK"] and summary["n_batches"].tolist() == [5]
+    assert summary["status"].tolist() == ["scored"] and summary["n_batches"].tolist() == [5]
     assert summary["ASW_batch"].notna().all()
 
 

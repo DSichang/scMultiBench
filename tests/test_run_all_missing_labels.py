@@ -363,7 +363,7 @@ def test_rescore_records_the_error(cite, tmp_path, host, monkeypatch):
         assert rec["error"] == M2.format(files="cty.csv")
         assert not rec.get("metrics") and rec.get("_long") is None
         assert "labels_used" not in rec
-    assert list(again.failures["status"]) == ["RUN_OK_EVAL_FAILED"] * 2
+    assert list(again.failures["status"]) == ["ran"] * 2
     assert "ARI" not in again.summary.columns
     # the first result is untouched, and complete labels score again
     assert [r["status"] for r in res.records] == ["CHAIN_OK", "CHAIN_OK"]

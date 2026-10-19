@@ -510,9 +510,9 @@ def test_one_name_drives_the_three_cells(key, linux, tmp_path, monkeypatch, caps
     status = dict(zip(mine.summary["method"], mine.summary["status"]))
     assert set(status) == set(t["methods"])
     # scMoMaT writes a graph and a UMAP, which the pretend run does not write
-    assert set(status.values()) <= {"CHAIN_OK", "RUN_OK_NO_EMBEDDING"}, status
+    assert set(status.values()) <= {"scored", "ran"}, status
     if key in SCORED:
-        assert set(status.values()) == {"CHAIN_OK"} and mine.summary["ARI"].notna().all()
+        assert set(status.values()) == {"scored"} and mine.summary["ARI"].notna().all()
         assert ("ASW_batch" in mine.summary) == (t["cat"] == "cross")
     else:
         assert scored and {d for d, _ in scored} == {"MINE"}
@@ -689,7 +689,7 @@ def test_the_donor_sentence_is_visible_and_its_call_adds_the_batch_scores(
     _run_cell(src[RUN].replace(last, last.replace(")\n", f",\n                   {arg})\n")), ns)
     summary = ns["mine"].summary
     assert sorted(summary["method"]) == sorted(GEN.TASKS[key]["methods"])
-    assert set(summary["status"]) == {"CHAIN_OK"}
+    assert set(summary["status"]) == {"scored"}
     assert summary[["ARI", "ASW_batch", "GC"]].notna().all().all()
     # iLISI is a number wherever scib's helper binary runs
     assert summary["iLISI"].notna().all() == (escib._lisi_helper_problem() is None)

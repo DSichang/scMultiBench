@@ -92,7 +92,7 @@ def fail_early(tmp_path, monkeypatch):
 
 def _rescored(out):
     res = mtb.load_batch(out)
-    assert res.summary.loc[0, "status"] == "FAIL"
+    assert res.summary.loc[0, "status"] == "failed"
     batch = pd.Series(["b1", "b2"] * 60)
     return res, res.rescore(batch=batch.to_numpy())
 
@@ -104,7 +104,7 @@ def test_rescore_keeps_a_fail_record_without_output(fail_early, tmp_path):
     rec = new.records[0]
     assert rec["status"] == "FAIL"
     assert rec["error"] == res.records[0]["error"]
-    assert new.failures["status"].tolist() == ["FAIL"]
+    assert new.failures["status"].tolist() == ["failed"]
 
 
 def test_rescore_keeps_a_fail_record_whose_output_exists(fail_after_writing, tmp_path):
@@ -117,4 +117,4 @@ def test_rescore_keeps_a_fail_record_whose_output_exists(fail_after_writing, tmp
     assert not new.records[0].get("metrics")
     assert new.failures["method"].tolist() == ["Matilda"]
     new.save(tmp_path / "rescored")
-    assert pd.read_csv(tmp_path / "rescored" / "failures.csv")["status"].tolist() == ["FAIL"]
+    assert pd.read_csv(tmp_path / "rescored" / "failures.csv")["status"].tolist() == ["failed"]

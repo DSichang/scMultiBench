@@ -91,14 +91,14 @@ def test_run_all_records_the_absolute_data_root(rel):
 def test_rescore_from_another_directory_aligns_the_labels_by_barcode(rel, monkeypatch):
     res, root = rel
     at_root = _quiet(mtb.load_batch("out").rescore, labels=_shuffled_labels())
-    assert at_root.summary.iloc[0]["label_order"] == "cty.csv"
+    assert "+".join(at_root.records[0]["labels_used"]) == "cty.csv"
     assert _ari(at_root) == _ari(res) > 0.3
     monkeypatch.chdir(root / "nb")
     back = mtb.load_batch("../out")
     assert Path(back.records[0]["data_path"]).samefile(root / "data")
     new, caught = _rescore(back, labels=_shuffled_labels())
     assert not _by_position(caught), caught
-    assert new.summary.iloc[0]["label_order"] == "cty.csv"
+    assert "+".join(new.records[0]["labels_used"]) == "cty.csv"
     assert _ari(new) == _ari(at_root)
 
 
@@ -108,7 +108,7 @@ def test_rescore_of_an_in_memory_result_after_a_chdir(rel, monkeypatch):
     monkeypatch.chdir(root / "nb")
     new, caught = _rescore(res, labels=_shuffled_labels())
     assert not _by_position(caught), caught
-    assert new.summary.iloc[0]["label_order"] == "cty.csv" and _ari(new) == _ari(res)
+    assert "+".join(new.records[0]["labels_used"]) == "cty.csv" and _ari(new) == _ari(res)
 
 
 def test_a_copied_result_is_pointed_at_its_data_with_data_path(rel, monkeypatch):
@@ -118,7 +118,7 @@ def test_a_copied_result_is_pointed_at_its_data_with_data_path(rel, monkeypatch)
     monkeypatch.chdir(root / "nb")
     new = _quiet(mtb.load_batch(copy, data_path=root / "data").rescore,
                  labels=_shuffled_labels())
-    assert new.summary.iloc[0]["label_order"] == "cty.csv" and _ari(new) == _ari(res)
+    assert "+".join(new.records[0]["labels_used"]) == "cty.csv" and _ari(new) == _ari(res)
     # the data moved too: only the argument finds it
     shutil.move(str(root / "data"), str(root / "moved"))
     back = mtb.load_batch(copy, data_path=root / "moved")
@@ -126,7 +126,7 @@ def test_a_copied_result_is_pointed_at_its_data_with_data_path(rel, monkeypatch)
     assert back.records[0]["out_dir"] == str(copy / "Matilda_MYCITE")
     new, caught = _rescore(back, labels=_shuffled_labels())
     assert not _by_position(caught), caught
-    assert new.summary.iloc[0]["label_order"] == "cty.csv" and _ari(new) == _ari(res)
+    assert "+".join(new.records[0]["labels_used"]) == "cty.csv" and _ari(new) == _ari(res)
     assert _ari(_quiet(back.rescore)) == _ari(res)
 
 
@@ -155,8 +155,7 @@ def test_a_folder_that_is_not_found_is_named(rel, monkeypatch):
     assert rec["note"] == f"The dataset folder MYCITE is not found in {where}. {MOVED}"
     for k in ("metrics", "batch_source", "n_batches", "labels_used"):
         assert k not in rec, k
-    row = new.summary.iloc[0]
-    assert pd.isna(row["batch_source"]) and pd.isna(row["n_batches"])
+    assert new.summary.iloc[0]["status"] == "ran"
 
 
 def test_unusable_barcodes_keep_their_own_message(rel):
@@ -176,7 +175,7 @@ def test_rescore_from_the_run_folder_and_of_a_fetched_tree_is_unchanged(rel, mon
     # the folder found, as an absolute path (review of round 6)
     assert again.records[0]["data_path"] == again.records[0]["data_root"] == \
         str((root / "data").resolve())
-    assert again.summary.iloc[0]["label_order"] == "cty.csv" and _ari(again) == _ari(res)
+    assert "+".join(again.records[0]["labels_used"]) == "cty.csv" and _ari(again) == _ari(res)
     # a fetch_outputs tree: data_path None (config's), out_dir from another host
     tree = root / "tree"
     shutil.copytree(root / "out", tree)
@@ -192,7 +191,7 @@ def test_rescore_from_the_run_folder_and_of_a_fetched_tree_is_unchanged(rel, mon
     assert back.records[0]["data_path"] is None
     new = _quiet(back.rescore)
     assert new.records[0]["data_path"] is None
-    assert new.summary.iloc[0]["label_order"] == "cty.csv" and _ari(new) == _ari(res)
+    assert "+".join(new.records[0]["labels_used"]) == "cty.csv" and _ari(new) == _ari(res)
 
 
 # ======================================================================= R6-02
@@ -263,7 +262,7 @@ def test_a_folder_without_the_saved_batch_warns_once(batched):
             "Pass batch=<vector>, or metrics='clustering'.") in rec["error"]
     for k in ("batch_source", "n_batches", "metrics"):
         assert k not in rec, k
-    assert pd.isna(failed.summary.iloc[0]["n_batches"])
+    assert failed.summary.iloc[0]["status"] == "ran"
 
 
 def test_the_batch_label_errors_are_short_sentences(monkeypatch):
@@ -369,8 +368,9 @@ def test_rescore_ranks_the_label_orders_again(cross, tmp_path, monkeypatch):
     assert out["metrics"]["ASW"] == rec["metrics"]["ASW"]
     assert out["labels_used"] == rec["labels_used"]
     assert out["label_order_candidates"] == rec["label_order_candidates"]
-    cols = ["label_order", "label_order_confidence", "batch_source", "n_batches"]
-    assert new.summary[cols].equals(res.summary[cols])
+    assert new.summary[["label_order_confidence"]].equals(res.summary[["label_order_confidence"]])
+    assert [(r["batch_source"], r["n_batches"]) for r in new.records] == \
+        [(r["batch_source"], r["n_batches"]) for r in res.records]
 
 
 def test_rescore_candidates_come_from_the_new_scores(cross, tmp_path, monkeypatch, capsys):

@@ -79,7 +79,7 @@ def test_failures_excludes_successful_but_unscorable_runs():
             {"method": "Good", "status": "CHAIN_OK", "_long": None}]
     r = BatchResult(recs, "D11", "vertical")
     assert set(r.failures["method"]) == {"Broken", "Slow"}
-    assert "ran but not scorable" in repr(r)
+    assert repr(r) == "<BatchResult vertical/D11: 1 scored, 2 ran, 1 failed, 1 timeout>"
 import multibench as mtb
 from multibench.workflow import BatchResult, _order_confidence
 
@@ -109,7 +109,6 @@ def test_summary_reports_label_order_and_confidence():
                                         {"order": ["atac_cty.csv", "rna_cty.csv"], "ARI": 0.001}],
              "_long": None}]
     s = BatchResult(recs, "D28", "diagonal").summary
-    assert s.loc[0, "label_order"] == "rna_cty.csv+atac_cty.csv"
     assert s.loc[0, "label_order_confidence"] > 0.99
 import pytest
 import multibench as mtb

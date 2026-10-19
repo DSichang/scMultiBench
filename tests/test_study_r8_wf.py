@@ -49,7 +49,6 @@ def test_an_all_blank_confidence_column_is_float():
     assert col.dtype == "float64", col.dtype
     assert col.isna().all()
     assert not (col > 0.5).any()
-    assert list(res.summary["label_order_note"]) == ["single ordering"] * 2
 
 
 def test_a_mixed_confidence_column_stays_float():
@@ -83,8 +82,8 @@ def test_the_rewritten_passages_keep_their_facts():
            "``out_dir``." in _doc(W.BatchResult.rescore)
     assert "``mtb.run_all`` and ``mtb.load_batch`` build it. It keeps one record per " \
            "method, which ``rescore`` and ``plot`` read." in _doc(W.BatchResult)
-    assert ("how clearly that order won, 0-1 (blank: label_order_note says "
-            "why)") in _doc(W.BatchResult.summary.fget)
+    assert ("how clearly the label order won, 0-1 (blank: one order "
+            "only)") in _doc(W.BatchResult.summary.fget)
 
 
 # ============================================================ R8-01
@@ -128,7 +127,7 @@ def test_the_run_all_line_ends_with_ari_0(swept):
     pytest.importorskip("scib")
     res, out, printed = swept
     (line,) = _result_lines(printed, "[run_all]   -> ")
-    assert line.startswith("[run_all]   -> CHAIN_OK (") and line.endswith("s) ARI 0.000"), line
+    assert line.startswith("[run_all]   -> scored (") and line.endswith("s) ARI 0.000"), line
     # the record, the summary and summary.csv hold 0.0 with a positive sign
     for ari in (res.records[0]["metrics"]["ARI"], res.summary.loc[0, "ARI"],
                 pd.read_csv(out / "summary.csv").loc[0, "ARI"]):
@@ -140,12 +139,12 @@ def test_the_rescore_lines_name_the_ari_or_end_with_the_status(swept, capsys):
     _, out, _ = swept
     new = mtb.load_batch(out).rescore(verbose=True)
     (line,) = _result_lines(capsys.readouterr().out, "[rescore] Matilda -> ")
-    assert line == "[rescore] Matilda -> CHAIN_OK ARI 0.000"
+    assert line == "[rescore] Matilda -> scored ARI 0.000"
     assert math.copysign(1, new.summary.loc[0, "ARI"]) == 1
     # no ARI among the metrics: the line ends with the status
     mtb.load_batch(out).rescore(metrics=["ASW"], verbose=True)
     (line,) = _result_lines(capsys.readouterr().out, "[rescore] Matilda -> ")
-    assert line == "[rescore] Matilda -> CHAIN_OK"
+    assert line == "[rescore] Matilda -> scored"
 
 
 # ============================================================ R8-02

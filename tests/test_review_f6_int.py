@@ -103,8 +103,10 @@ def stacked(tmp_path, monkeypatch):
 
 def _batch_cols(res):
     row = res.summary.iloc[0]
-    return {k: (None if k not in row or pd.isna(row[k]) else row[k])
-            for k in ("ASW_batch", "iLISI", "batch_source", "n_batches")}
+    rec = res.records[0]
+    return {**{k: (None if k not in row or pd.isna(row[k]) else row[k])
+               for k in ("ASW_batch", "iLISI")},
+            **{k: rec.get(k) for k in ("batch_source", "n_batches")}}
 
 
 def _rescore(res, **kw):
@@ -121,7 +123,7 @@ def test_positional_labels_place_the_saved_batch_in_the_stored_order(stacked):
     assert rec["labels_used"] == [f"cty{b}.csv" for b in EMB_ORDER]
     assert rec["batch_source"] == "user" and rec["n_batches"] == 2
     new, caught = _rescore(mtb.load_batch("out"), labels=emb_labels)
-    assert new.summary.iloc[0]["label_order"] == "(user labels)"
+    assert "+".join(new.records[0]["labels_used"]) == "(user labels)"
     assert _batch_cols(new) == _batch_cols(res), caught
 
 
@@ -178,7 +180,7 @@ def test_the_folder_found_is_recorded_as_an_absolute_path(rel, monkeypatch):
     # read from yet another directory, the saved result still finds its data
     monkeypatch.chdir(root)
     again = _quiet(mtb.load_batch("ct2").rescore, labels=_shuffled_labels())
-    assert again.summary.iloc[0]["label_order"] == "cty.csv"
+    assert "+".join(again.records[0]["labels_used"]) == "cty.csv"
 
 
 def test_no_unsaved_batch_warning_without_a_batch_metric(cite, tmp_path):

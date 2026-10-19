@@ -108,10 +108,10 @@ def test_a_named_method_without_its_environment_is_in_failures_with_the_reason(
     res = _quiet(mtb.run_all, "D11", "vertical", tmp_path / "out", methods=trio,
                  evaluate=False, verbose=False)
     status = res.summary.set_index("method")["status"]
-    assert status[trio[-1]] == "SKIPPED"
+    assert status[trio[-1]] == "skipped"
     fails = res.failures.set_index("method")
     assert list(fails.index) == [trio[-1]]
-    assert fails.loc[trio[-1], "status"] == "SKIPPED"
+    assert fails.loc[trio[-1], "status"] == "skipped"
     assert f"multibench env install --methods {trio[-1]}" in fails.loc[trio[-1], "error"]
 
 

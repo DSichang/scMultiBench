@@ -929,7 +929,9 @@ _METRICS_KEYWORD = ("0.4", _compat.use("metrics="))
 
 
 @_compat.keywords("evaluate", private="_evaluate", renamed={"output": "embedding"},
-                  kept={"clustering": _compat.use("the default, the article's Leiden clusters"),
+                  kept={"clustering": _compat.note(
+                            "for your own clusters use "
+                            "sklearn.metrics.adjusted_rand_score(labels, clusters)"),
                         "label_order": _compat.use("evaluate(..., dataset=, method=)"),
                         "missing_labels": _compat.note(
                             "keep the cells that have a label, as adata[adata.obs[col].notna()]")},

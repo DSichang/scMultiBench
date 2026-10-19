@@ -154,14 +154,16 @@ def test_run_all_batch_reaches_the_summary(standin, tmp_path, capsys):
     cap = capsys.readouterr()
     assert rc == 0, cap.err
     sm = mtb.load_batch(tmp_path / "out").summary
-    assert sm.loc[0, "status"] == "CHAIN_OK", sm.loc[0].to_dict()
-    assert sm.loc[0, "batch_source"] == "user" and sm.loc[0, "n_batches"] == 2
+    assert sm.loc[0, "status"] == "scored", sm.loc[0].to_dict()
+    rec = mtb.load_batch(tmp_path / "out").records[0]
+    assert rec["batch_source"] == "user" and rec["n_batches"] == 2
     assert "ASW_batch" in sm.columns and pd.notna(sm.loc[0, "ASW_batch"])
     # without --batch the same folder is one batch, as before
     rc = _run_all(standin, tmp_path / "out1")
     capsys.readouterr()
     sm = mtb.load_batch(tmp_path / "out1").summary
-    assert rc == 0 and sm.loc[0, "n_batches"] == 1 and sm.loc[0, "batch_source"] is None
+    rec = mtb.load_batch(tmp_path / "out1").records[0]
+    assert rc == 0 and rec["n_batches"] == 1 and rec["batch_source"] is None
 
 
 def test_run_all_batch_missing_file_exits_1_before_any_method(standin, tmp_path, capsys,

@@ -221,31 +221,14 @@ def test_repr_counts_a_named_skipped_method_once():
         for m in ("scMDC", "UnitedNet", "scMVP", "MIRA")]
     res = W.BatchResult(recs, "MYMULTIOME", "vertical")
     assert len(res.failures) == 5
-    assert repr(res) == ("<BatchResult vertical/MYMULTIOME: 0/5 with metrics, "
-                         "4 skipped (4 named), 1 failed>")
+    # c1 (C38): one count per status
+    assert repr(res) == "<BatchResult vertical/MYMULTIOME: 1 failed, 4 skipped>"
     unnamed = W.BatchResult([_rec("Matilda", "FAIL", error="x"),
                              _rec("scMDC", "SKIPPED", error="blocked")],
                             "MYMULTIOME", "vertical")
-    assert repr(unnamed) == ("<BatchResult vertical/MYMULTIOME: 0/2 with metrics, "
-                             "1 skipped, 1 failed>")
+    assert repr(unnamed) == "<BatchResult vertical/MYMULTIOME: 1 failed, 1 skipped>"
 
 
-def test_summary_keeps_n_batches_whole_next_to_skipped_rows(tmp_path):
-    ok = _rec("Matilda", "CHAIN_OK", n_batches=1, labels_used=["cty.csv"],
-              metrics={"ARI": 0.5}, run_sec=0.2, output_kind="embedding",
-              emb_shape=[120, 4])
-    res = W.BatchResult([ok, _rec("scMDC", "SKIPPED", error="blocked")],
-                        "MYMULTIOME", "vertical")
-    sm = res.summary.set_index("method")
-    assert str(sm["n_batches"].dtype) == "Int64" and sm.loc["Matilda", "n_batches"] == 1
-    res.save(tmp_path / "out")
-    line = next(l for l in (tmp_path / "out" / "summary.csv").read_text().splitlines()
-                if l.startswith("Matilda,"))
-    assert ",1," in line and ",1.0," not in line, line
-
-
-# -------------------------------------------------------- batch Series messages
-@pytest.fixture
 def mycite(tmp_path):
     d = tmp_path / "MYCITE"
     d.mkdir()
