@@ -299,3 +299,12 @@ def test_the_command_line_bar_has_the_python_title(tmp_path, monkeypatch):
                      str(tmp_path / "b.png")]) == 0
     mtb.plot.bar(mtb.load_results("mosaic"), save=str(tmp_path / "p.png"))
     assert titles == ["overall — D45", "overall — D45"]
+
+
+def test_skip_existing_without_a_saved_run_says_so(tmp_path):
+    with pytest.raises(ValueError) as e:
+        mtb.run_all("D11", "vertical", out_dir=str(tmp_path / "outs"), methods=["Matilda"],
+                    skip_existing=True, verbose=False)
+    assert str(e.value) == (
+        f"No saved output of Matilda in {tmp_path / 'outs'} (it would be "
+        f"{tmp_path / 'outs' / 'Matilda_D11'}). Pass the out_dir of the earlier run.")

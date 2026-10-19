@@ -3705,6 +3705,12 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
         plan_df = plan_df.assign(runnable=plan_df["runnable"].to_numpy(bool) | saved)
     blocked = plan_df[~plan_df["runnable"]]
     plan_df = plan_df[plan_df["runnable"]]
+    if plan_df.empty and skip_existing:
+        first = blocked.iloc[0]["method"]
+        raise ValueError(
+            f"No saved output of {_and_list(dict.fromkeys(blocked['method']))} in {out_dir} "
+            f"(it would be {Path(out_dir) / f'{first}_{dataset}'}). Pass the "
+            + config.hint("out_dir", "--out-dir") + " of the earlier run.")
     if plan_df.empty:
         # not one method could start: the request is wrong, and an empty result
         # would read "0 failed", as success
