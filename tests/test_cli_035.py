@@ -326,7 +326,10 @@ def test_run_all_dry_run_header(no_envs, capsys):
                             "--format", "csv", *extra], capsys)
         rc, scan, _ = _cli(["scan", "D11", "--category", "vertical", "--format", "csv",
                             *extra], capsys)               # deprecated: prints the plan
-        assert plan == scan and len(pd.read_csv(io.StringIO(plan))) == n
+        # c1 (C32): run-all --dry-run prints seven of the deprecated scan's columns
+        full = pd.read_csv(io.StringIO(scan))
+        pd.testing.assert_frame_equal(pd.read_csv(io.StringIO(plan)), full[W.PLAN_COLUMNS])
+        assert len(full) == n
 
 
 def test_run_all_nothing_runnable_names_the_listed_rows(no_envs, tmp_path, capsys):

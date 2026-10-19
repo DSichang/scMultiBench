@@ -49,7 +49,8 @@ def test_metrics_folds_case_like_the_other_metric_arguments():
     emb, lab = _blobs()
     out = evaluate(emb, labels=lab, metrics=["asw"])
     assert out["metric"].tolist() == ["ASW"]
-    with pytest.raises(ValueError, match=r"unknown metric\(s\) \['nope'\]; valid: clustering, batch, classification, all, or the codes \['ARI'"):
+    # c1 (C36): one text for an unknown token, alone or in a list
+    with pytest.raises(ValueError, match=r"^Unknown metrics= token nope\. Pass 'all'"):
         evaluate(emb, labels=lab, metrics=["asw", "nope"])
 
 

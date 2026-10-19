@@ -229,6 +229,8 @@ def test_repr_counts_a_named_skipped_method_once():
     assert repr(unnamed) == "<BatchResult vertical/MYMULTIOME: 1 failed, 1 skipped>"
 
 
+# -------------------------------------------------------- batch Series messages
+@pytest.fixture
 def mycite(tmp_path):
     d = tmp_path / "MYCITE"
     d.mkdir()

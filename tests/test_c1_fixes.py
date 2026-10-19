@@ -175,11 +175,11 @@ def test_the_shadow_folder_note_is_left_out_for_a_path_and_in_rescore(tmp_path, 
     assert not [x for x in w if "also exists" in str(x.message)]
 
 
-def test_a_vertical_gene_activity_export_is_refused(tmp_path):
+def test_a_vertical_gene_activity_export_warns(tmp_path):
     import anndata as ad
     a = ad.AnnData(np.ones((10, 4)))
     a.var_names = ["CD3E", "CD19", "MS4A1", "NKG7"]
-    with pytest.raises(ValueError, match=r"^Vertical methods need peak ATAC, and this ATAC "
+    with pytest.warns(UserWarning, match=r"^Vertical methods need peak ATAC, and this ATAC "
                                          r"holds gene activity\. Export the ATAC as peaks\.$"):
         mtb.io.export_dataset(a, tmp_path / "V", atac="X", rna=None,
                               atac_kind="gene_activity", category="vertical")

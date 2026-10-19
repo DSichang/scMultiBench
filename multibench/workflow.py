@@ -1358,7 +1358,7 @@ def _scan_methods(dataset, category=None, *, methods=None, modalities=None, data
                   params=None, verbose=True, assume_gpu=False, allow_atac_mismatch=False,
                   per_method=True) -> pd.DataFrame:
     """:func:`scan`, with the deprecated ``per_method``: ``False`` returns the full
-    plan of ``run_all(dry_run=True)``."""
+    plan behind ``run_all(dry_run=True)``."""
     if category is None:
         category = known_category(dataset)
     df, private = _scan(dataset, category, methods=methods, modalities=modalities,

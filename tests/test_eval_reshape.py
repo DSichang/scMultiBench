@@ -94,7 +94,7 @@ def test_to_long_dataset_and_category_default_to_placeholders():
     out = to_long(w, method="M")
     assert out.columns.tolist() == ["metric", "value", "method", "dataset", "category",
                                     "source", "scored_with"]
-    assert set(out.dataset) == {"all"} and set(out.category) == {"user"}
+    assert set(out.dataset) == {"all"} and set(out.category) == {"user"}   # deprecated as 0.3
 
 
 def test_to_long_of_a_long_frame_only_sets_the_named_columns():

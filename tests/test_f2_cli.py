@@ -245,10 +245,9 @@ def test_evaluate_and_run_help_texts():
     meth = _opt_help(ev, "--method")
     # 0.4.0: --method names the rows; a package method also sets the label order
     assert meth == ("fills the method column: a package method id, or your own name. A "
-                    "package method also reads --dataset's label files in its cell order")
+                    "package method, also as 'StabMap (this run)', reads --dataset's label "
+                    "files in its cell order, with --category")
     assert "registry" not in meth
-    dry = _opt_help(_sub("run"), "--dry-run")
-    assert "environment activation included" in dry and "conda run -n" not in dry
 
 
 def test_evaluate_own_method_name_on_the_dataset_route_reads_the_labels(tmp_path, capsys):

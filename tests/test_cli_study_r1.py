@@ -397,14 +397,14 @@ def test_compact_view_adds_atac_and_caveat_when_they_apply(capsys):
     out = capsys.readouterr().out
     header = out.splitlines()[0].split()
     assert rc == 0
-    assert header == ["method", "modalities", "atac", "runnable", "files_ok", "env_ok",
-                      "runtime_tier", "reason", "caveat"]
+    # c1 (C32): the seven-column plan, compact
+    assert header == ["method", "modalities", "runnable", "reason", "caveat"]
     glue = next(l for l in out.splitlines() if l.strip().startswith("GLUE"))
     assert "GLUE reads the GENCODE" in glue and "peak names" not in glue
     rc = cli.main(["run-all", "D11", "--category", "vertical", "--modalities", "rna,adt",
                    "--dry-run"])
     header = capsys.readouterr().out.splitlines()[0].split()
-    assert rc == 0 and header == workflow.COMPACT_COLUMNS    # no ATAC row, no caveat
+    assert rc == 0 and header == ["method", "modalities", "runnable", "reason"]
 
 
 def test_compact_columns_and_word_boundary_clip():

@@ -1467,8 +1467,8 @@ def _export_dataset(data, dataset_dir: Path | str, *, rna="X",
                                      "--atac-kind given without --atac"))
     if category == "vertical" and atac is not None and atac_kind == "gene_activity" \
             and not _vertical_gene_activity_readers():
-        raise ValueError("Vertical methods need peak ATAC, and this ATAC holds gene "
-                         "activity. Export the ATAC as peaks.")
+        _compat.warn("Vertical methods need peak ATAC, and this ATAC holds gene "
+                     "activity. Export the ATAC as peaks.", UserWarning)
     if rna is None and adt is None and atac is None and labels is None:
         raise ValueError("nothing to export: give at least one of rna=, adt=, atac=, labels=")
     _check_batch_args(batch, batch_index, category, adt=adt, atac=atac, n_batches=n_batches)

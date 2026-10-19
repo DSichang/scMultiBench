@@ -218,7 +218,7 @@ def test_run_all_dry_run_keeps_blocked_rows_with_reason(no_envs):
     assert len(plan) >= 1
     assert not plan["runnable"].any()
     assert plan["reason"].str.contains("not installed").all()
-    assert "files_ok" in plan.columns and "env_ok" in plan.columns
+    assert list(plan.columns) == W.PLAN_COLUMNS                  # c1 (C32)
 
 
 def test_run_all_dry_run_prints_summary(capsys, no_envs):
@@ -237,11 +237,11 @@ def test_run_all_dry_run_never_returns_empty():
 def test_run_all_dry_run_equals_scan_with_methods():
     plan = mtb.run_all("D11", "vertical", out_dir="/tmp/unused",
                        methods=["Matilda", "totalVI"], dry_run=True, verbose=False)
-    # the plan IS the scan frame (the `command` column included), rendered for out_dir
-    assert list(plan.columns) == W.SCAN_COLUMNS and plan.columns[-1] == "command"
+    # the plan is seven columns of the scan frame (c1, C32), rendered for out_dir
+    assert list(plan.columns) == W.PLAN_COLUMNS and plan.columns[-1] == "command"
     pd.testing.assert_frame_equal(
         plan, full_scan("D11", "vertical", methods=["Matilda", "totalVI"],
-                       out_dir="/tmp/unused", verbose=False))
+                        out_dir="/tmp/unused", verbose=False)[W.PLAN_COLUMNS])
 
 
 def test_run_all_dry_run_unknown_method_still_keyerror():
@@ -263,7 +263,7 @@ def test_scan_is_the_dry_run_frame(no_envs):
     a = full_scan("D11", "vertical", methods=["Matilda"], verbose=False)
     b = mtb.run_all("D11", "vertical", out_dir=None, methods=["Matilda"],
                     dry_run=True, verbose=False)
-    pd.testing.assert_frame_equal(a, b)
+    pd.testing.assert_frame_equal(a[W.PLAN_COLUMNS], b)
     assert len(a) >= 1 and not a["runnable"].any()
     with pytest.raises(ValueError, match="Matilda does not run on diagonal data"):
         full_scan("D28", "diagonal", methods=["Matilda"], verbose=False)

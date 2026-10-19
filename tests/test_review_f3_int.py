@@ -105,7 +105,7 @@ def test_gene_names_in_the_peak_file_block_glue_seurat_v3_and_multimap(tmp_path,
     for m in ("GLUE", "Seurat_v3"):
         assert sc.loc[m, "reason"] == (
             f"{m} reads peak names such as chr1:100-200. atac_peak.h5 holds other names, "
-            f"for example GENE0. Rename them to chr:start-end."), m
+            f"for example GENE0. They are genes: export the ATAC as gene activity."), m
     assert sc.loc["MultiMAP", "reason"] == (
         "MultiMAP needs peak ATAC, and atac_peak.h5 holds gene activity. Export the ATAC "
         "as peaks.")

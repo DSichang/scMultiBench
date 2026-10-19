@@ -28,7 +28,7 @@ def test_embedding_is_an_anndata_with_barcodes_labels_and_batch(tmp_path):
     assert emb.obsm["X_emb"].shape == (n, 3)
     assert list(emb.obs_names) == list(read_canonical(d11 / "rna.h5").obs_names)
     assert emb.obs["label"].tolist() == pd.read_csv(d11 / "cty.csv").iloc[:, -1].tolist()
-    assert set(emb.obs["batch"]) == {"cty"}
+    assert emb.obs["batch"].isna().all()                # c1 (C56): one label file
     assert emb.obsm["X_emb"][1, 0] == 3.0                # the method's row order
 
 

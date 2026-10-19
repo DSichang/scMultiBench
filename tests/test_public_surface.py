@@ -211,7 +211,7 @@ def test_scan_data_path_is_keyword_only_and_the_plan_has_command():
     with pytest.raises(TypeError):
         mtb.scan("D11", "vertical", "data")
     df = mtb.run_all("D11", "vertical", methods=["Matilda"], dry_run=True, verbose=False)
-    assert df.columns[-1] == "command" and len(df.columns) == 18
+    assert df.columns[-1] == "command" and len(df.columns) == 7          # c1 (C32)
     assert list(mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False).columns) == \
         ["method", "modalities", "runnable", "reason"]
 
@@ -221,7 +221,8 @@ def test_run_all_dry_run_is_the_full_plan_and_out_dir_is_required_for_a_real_run
     from tests.conftest import full_scan
     a = mtb.run_all("D11", "vertical", methods=["Matilda"], dry_run=True, verbose=False)
     b = full_scan("D11", "vertical", methods=["Matilda"], verbose=False)
-    pd.testing.assert_frame_equal(a, b)
+    from multibench import workflow as W
+    pd.testing.assert_frame_equal(a, b[W.PLAN_COLUMNS])                 # c1 (C32)
     with pytest.raises(TypeError, match="out_dir"):
         mtb.run_all("D11", "vertical", methods=["Matilda"], verbose=False)
 

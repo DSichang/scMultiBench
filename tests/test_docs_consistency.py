@@ -1663,10 +1663,7 @@ def test_changes_page_two_row_orders_are_refused_in_every_form(tmp_path):
     assert sorted(_barcodes(folder / "atac_gas.h5")) == sorted(cells)
     held = _folder_bytes(folder)
     paired = {"atac": atac, "atac_kind": "gene_activity"}
-    # c1 (C26): a vertical gene-activity export is refused before anything else
-    with pytest.raises(ValueError, match="^Vertical methods need peak ATAC"):
-        mtb.io.export_dataset(rna, folder, overwrite=True, category="vertical", **paired)
-    for form in (paired,
+    for form in (paired, {**paired, "category": "vertical"},
                  {"rna": None, "labels": "obs:celltype"},
                  {"rna": None, "adt": "obsm:protein"}):
         with pytest.raises(ValueError, match="^rna.h5 and atac_gas.h5 of .* hold the same "

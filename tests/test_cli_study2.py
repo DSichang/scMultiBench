@@ -89,7 +89,7 @@ def test_cli_params_errors(capsys):
 
 
 def test_param_help_points_at_the_params_command():
-    for name in ("run", "run-all"):
+    for name in ("run-all",):                    # c1 (C35): run's options are hidden
         act = next(a for a in _sub(name)._actions if a.dest == "param")
         assert "multibench params METHOD" in act.help
         assert "mtb.params_for(METHOD) or" not in act.help

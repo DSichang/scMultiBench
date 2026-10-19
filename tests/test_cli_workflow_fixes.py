@@ -161,8 +161,8 @@ def test_cli_run_all_dry_run_is_compact_too(capsys, tmp_path):
     cap = capsys.readouterr()
     assert rc == 0
     table = cap.out.split("\n# Commands")[0]
-    assert table.splitlines()[0].split() == workflow.compact_columns(
-        full_scan("D11", "vertical", verbose=False))
+    # c1 (C32): the plan's columns, compact
+    assert table.splitlines()[0].split() == ["method", "modalities", "runnable", "reason"]
     assert _widest(table) <= 160
     assert "# Dry run:" in cap.err and "# Dry run" not in cap.out    # one-sentence header
 
@@ -319,7 +319,7 @@ def test_cli_run_param_forwarded_and_prefix_checked(monkeypatch, tmp_path, capsy
 def test_param_help_has_an_example():
     p = cli.build_parser()
     subs = next(a for a in p._actions if a.dest == "command").choices
-    for name in ("run", "run-all"):
+    for name in ("run-all",):                    # c1 (C35): run's options are hidden
         act = next(a for a in subs[name]._actions if a.dest == "param")
         assert "-p" in act.option_strings and "--param" in act.option_strings
         assert "epochs=5" in act.help

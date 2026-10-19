@@ -512,7 +512,7 @@ def test_cli_evaluate_writes_the_long_table_without_names(monkeypatch, tmp_path,
     df = pd.read_csv(out)
     assert list(df.columns) == LONG_COLUMNS and list(df["metric"]) == ["ARI", "NMI", "ASW"]
     assert set(df["method"]) == {"embedding"} and set(df["dataset"]) == {"user"}
-    assert set(df["source"]) == {"user"} and set(df["category"]) == {"user"}
+    assert set(df["source"]) == {"user"} and df["category"].isna().all()   # c1 (C16)
     rc = cli.main(["evaluate", "--embedding", "e.h5", "--labels", "l.csv", "--method", "M",
                    "--out", str(out)])
     assert rc == 0 and set(pd.read_csv(out)["method"]) == {"M"}
@@ -621,9 +621,11 @@ def test_cli_run_bad_input_pair_is_usage_error(capsys):
 
 def test_cli_run_all_dry_run_and_summary(monkeypatch, tmp_path, capsys):
     captured = {}
-    plan = pd.DataFrame({"method": ["SCALEX"], "modalities": ["rna+atac_gas"],
+    plan = pd.DataFrame({"method": ["SCALEX"], "category": ["diagonal"],
+                         "modalities": ["rna+atac_gas"],
                          "runnable": [False], "files_ok": [True], "env_ok": [False],
-                         "reason": ["no env"], "command": ["conda run -n scmb_torch x"]})
+                         "reason": ["no env"], "env": ["scmb_torch"], "caveat": [""],
+                         "command": ["conda run -n scmb_torch x"]})
 
     class FakeRes:
         summary = pd.DataFrame({"method": ["SCALEX"], "status": ["ok"]})

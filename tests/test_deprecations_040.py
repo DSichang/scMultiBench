@@ -9,6 +9,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+from multibench import workflow as W
 # the table behind a bubble figure: mtb.plot.build_table is deprecated in 0.4.0
 from multibench.plot.bubble import _build_table  # noqa: E402
 from multibench import cli
@@ -112,8 +113,9 @@ def test_scan_per_method_still_works():
     pd.testing.assert_frame_equal(got, default)
     assert msg == _msg("scan(per_method=)", "run_all(..., dry_run=True)")
     full, _ = _one_warning(lambda: mtb.scan("D11", "vertical", per_method=False, verbose=False))
-    pd.testing.assert_frame_equal(full, mtb.run_all("D11", "vertical", dry_run=True,
-                                                    verbose=False))
+    # c1 (C32): the dry run returns seven of these columns
+    pd.testing.assert_frame_equal(full[W.PLAN_COLUMNS], mtb.run_all(
+        "D11", "vertical", dry_run=True, verbose=False))
 
 
 def test_batch_result_results_is_records():
@@ -137,7 +139,9 @@ def test_evaluate_output_and_clustering_keywords():
     got, msg = _one_warning(lambda: mtb.evaluate(emb, labels, metrics=["ARI"],
                                                  clustering=clusters, verbose=False))
     assert got.set_index("metric")["value"]["ARI"] == 1.0
-    assert msg == _msg("evaluate(clustering=)", "the default, the article's Leiden clusters")
+    # c1 (C39): the warning names the one sklearn line for your own clusters
+    assert msg == ("evaluate(clustering=) is deprecated and will be removed in 0.5; for your "
+                   "own clusters use sklearn.metrics.adjusted_rand_score(labels, clusters).")
 
 
 # ------------------------------------------------------------------ stored results

@@ -51,9 +51,9 @@ def test_metric_selection_is_one_vocabulary():
     lst = metric_selection(["ari", "kbet"])
     assert lst.codes == ["ARI", "kBET"] and lst.family == "all" and lst.explicit
     assert metric_selection(["gc"]).family == "batch"
-    with pytest.raises(ValueError, match=r"unknown metric\(s\) \['nope'\]; valid: clustering, batch, classification, all, or the codes \['ARI'"):
+    with pytest.raises(ValueError, match=r"^Unknown metrics= token nope\. Pass 'all'"):
         metric_selection(["ARI", "nope"])
-    with pytest.raises(ValueError, match="present in this frame: \\['MyScore'\\]"):
+    with pytest.raises(ValueError, match="This frame also has MyScore"):
         metric_selection(["MyScore", "nope"], extra=["MyScore"])
     assert metric_selection(["MyScore"], extra=["MyScore"]).codes == ["MyScore"]
     with pytest.raises(ValueError, match="metrics=\\[\\] selects nothing"):
@@ -79,7 +79,7 @@ def test_load_results_and_evaluate_share_the_vocabulary(result_dir):
     long = pd.DataFrame({"metric": ["ARI", "MyScore"], "value": [0.5, 0.7],
                          "method": ["M", "M"], "dataset": ["D", "D"],
                          "category": ["vertical", "vertical"]})
-    with pytest.raises(ValueError, match="unknown metric"):
+    with pytest.raises(ValueError, match="Unknown metrics= token Nope"):
         results.recommend("vertical", long_df=long, metrics=["Nope"])
 
 

@@ -74,7 +74,9 @@ def test_run_all_dry_run_is_the_scan_frame():
         assert list(plan.columns)[-1] == "command"      # the CLI csv's column, in scan too
         scan = full_scan(ds, cat, out_dir="/tmp/unused", verbose=False)
         nested = W._nested_rows(scan[[W._would_run(r) for _, r in scan.iterrows()]])[0]
-        pd.testing.assert_frame_equal(plan, scan.drop(index=nested).reset_index(drop=True))
+        pd.testing.assert_frame_equal(
+            plan, W._shown_modalities(scan.drop(index=nested).reset_index(drop=True))[
+                W.PLAN_COLUMNS])                                          # c1 (C32)
 
 
 @pytest.mark.skipif(not (_envs_installed("vertical") and _envs_installed("cross")

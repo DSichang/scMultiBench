@@ -132,7 +132,9 @@ def to_long(value_df, *, method: str, dataset: str | None = None,
     _compat.deprecated("to_long", _compat.use("mtb.evaluate(..., method=, dataset=)"))
     cols = {str(c) for c in getattr(value_df, "columns", [])}
     if not {"metric", "value", "method"} <= cols:
-        return _long_table(value_df, method=method, dataset=dataset, category=category)
+        out = _long_table(value_df, method=method, dataset=dataset, category=category)
+        # as in 0.3, until to_long goes in 0.5
+        return out if category is not None else out.assign(category="user")
     # what evaluate returns in 0.4: only the named columns change
     out = value_df.copy()
     out["method"] = method

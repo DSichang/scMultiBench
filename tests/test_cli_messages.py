@@ -78,7 +78,8 @@ def test_x15_cli_plot_renames_your_clashing_rows(tmp_path, capsys):
 
 
 def test_x17_x18_x53_x95_x97_x98_help_texts():
-    assert "as printed by multibench find" in _help("run")
+    # c1 (C35): run --help is its deprecated line
+    assert "Deprecated: use multibench run-all DATASET --methods M." in _help("run")
     assert ("the dataset folder: its path, or its name under the data root "
             "(multibench config)") in _help("run-all")
     assert "--data-path" not in _help("run-all")
@@ -87,8 +88,8 @@ def test_x17_x18_x53_x95_x97_x98_help_texts():
         _help("scan")
     ev = _help("evaluate")
     assert ("--method METHOD fills the method column: a package method id, or your own "
-            "name. A package method also reads --dataset's label files in its cell "
-            "order") in ev
+            "name. A package method, also as 'StabMap (this run)', reads --dataset's label "
+            "files in its cell order, with --category") in ev
     assert "or with --labels any row name" not in ev
     assert "--leiden-flavor" not in ev                    # hidden in 0.4.0
     assert "--n-batches" not in _help("export")           # hidden in 0.4.0
@@ -205,7 +206,8 @@ def test_cli_evaluate_help_gives_each_flag_one_job(capsys):
     text = " ".join(capsys.readouterr().out.split())
     assert "--name" not in text                           # a hidden alias of --method
     assert ("fills the method column: a package method id, or your own name. A package "
-            "method also reads --dataset's label files in its cell order") in text
+            "method, also as 'StabMap (this run)', reads --dataset's label files in its "
+            "cell order, with --category") in text
 
 
 # Y36 / Y37 / X98: maintainer and multi-dataset flags leave --help; leiden flavor is advanced

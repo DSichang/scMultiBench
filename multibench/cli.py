@@ -1159,7 +1159,7 @@ def _run_all_command(args, stack) -> int:
                                         args.data_path)
             if bad:          # the scoring of the real run would fail: exit 1 now
                 raise ValueError(bad)
-        plan = df if columns else df[workflow.PLAN_COLUMNS]
+        plan = df if columns else workflow._shown_modalities(df)[workflow.PLAN_COLUMNS]
         _print_frame(plan, columns=columns, fmt=args.format,
                      compact=workflow.compact_columns(plan))
         if args.format == "table" and not columns:
@@ -1733,9 +1733,9 @@ def _export_arguments(pc) -> None:
                                     "as for --labels: rna1.h5, rna2.h5, cty1.csv ..., read "
                                     "by mosaic and cross methods")
     pc.add_argument("--batch-index", dest="batch_index", type=int, metavar="N",
-                    help="write all of SRC as batch N, one call per batch: for --category "
-                         "mosaic rna<N>.h5, adt<N>.h5, atac<N>.h5 and cty<N>.csv; for "
-                         "cross the same with atac_peak<N>.h5; for diagonal rna<N>.h5, "
+                    help="write all of SRC as batch N, one call per batch. --category "
+                         "mosaic writes rna<N>.h5, adt<N>.h5, atac<N>.h5 and cty<N>.csv, "
+                         "cross the same with atac_peak<N>.h5, and diagonal rna<N>.h5, "
                          "atac_gas<N>.h5 or atac_peak<N>.h5, rna_cty<N>.csv and "
                          "atac_cty<N>.csv")
     pc.add_argument("--overwrite", action="store_true",
@@ -2112,8 +2112,9 @@ def build_parser() -> argparse.ArgumentParser:
                                       "without --labels its label files are read")
     pe.add_argument("--category", help=_CATEGORY_HELP + " Fills the category column.")
     pe.add_argument("--method", help="fills the method column: a package method id, or "
-                                     "your own name. A package method also reads "
-                                     "--dataset's label files in its cell order")
+                                     "your own name. A package method, also as 'StabMap "
+                                     "(this run)', reads --dataset's label files in its "
+                                     "cell order, with --category")
     pe.add_argument("--task", choices=["clustering", "batch", "all"], action=_Retired,
                     tail=_compat.use("--metrics {value}"))
     pe.add_argument("--data-path", dest="data_path", action=_Retired, tail=_compat.use(

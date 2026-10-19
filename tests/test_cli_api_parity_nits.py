@@ -125,7 +125,7 @@ def test_run_all_dry_run_returns_the_cli_csv_command_column(capsys):
     assert rc == 0
     csv = pd.read_csv(io.StringIO(capsys.readouterr().out)).fillna("")
     assert list(csv["command"]) == list(plan["command"])
-    ok = plan[plan["files_ok"]]
+    ok = plan[plan["command"].astype(bool)]
     assert len(ok) and ok["command"].str.contains("--save_path").all()
     assert ok["command"].str.contains("runs/Matilda_D11").all()
 

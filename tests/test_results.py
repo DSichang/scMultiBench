@@ -125,10 +125,11 @@ def test_zero_row_filter_warns(result_dir):
         df = results.load_results("vertical", dataset="D11", metrics=["kBET"])
     assert len(df) == 0
     # an UNKNOWN metric code is a typo: ValueError listing both vocabularies
-    with pytest.raises(ValueError, match=r"unknown metric\(s\) \['ZZZ'\]; valid: clustering, batch, classification, all, or the codes \['ARI'") as e:
+    # c1 (C36): the one text for an unknown token
+    with pytest.raises(ValueError, match=r"^Unknown metrics= token ZZZ\. Pass 'all'") as e:
         results.load_results("vertical", dataset="D11", metrics=["ZZZ"])
-    assert "present in this frame: ['ARI'" in str(e.value)
-    with pytest.raises(ValueError, match=r"unknown metric\(s\) \['NOPE'\]"):
+    assert "This frame also has ARI" in str(e.value)
+    with pytest.raises(ValueError, match=r"^Unknown metrics= token NOPE\."):
         results.load_results("vertical", dataset="D11", metrics=["ARI", "NOPE"])
 
 
@@ -340,15 +341,12 @@ def test_catalog_datasets_covers_every_dataset_with_results(result_dir, layout_t
     # the subsample tables left in 0.4.0 (X04): no "s" id is listed
     assert not cat.dataset.str.endswith("s").any()
     assert cat[cat.dataset.isin(have)].has_results.all()
-    # the CSV rows come first, the appended ids after them, then (0.4.0) the 12
-    # demo subsets in natural order
+    # c1 (C34): the rows a user can act on, the CSV's first, then the 12 demo
+    # subsets in natural order, each with its category
     ids = cat.dataset.tolist()
     demo = [d for d in ids if "mini" in d]
-    assert len(demo) == 12 and ids[-12:] == demo and ids[-13] == "D24"
-    # the article's datasets keep their category; has_results is the stored results'
-    rows = cat.set_index("dataset")
-    assert rows.loc["D24", "category"] == rows.loc["D25", "category"] == "diagonal"
-    assert not rows.loc["D24", "has_results"] and not rows.loc["D25", "has_results"]
+    assert len(demo) == 12 and ids[-12:] == demo and ids[:5] == ["D11", "D28", "D45", "D46", "D52"]
+    assert (cat.fetchable | cat.has_results).all() and cat.category.notna().all()
     # a configured root with published tables only (the layout tree) marks no
     # dataset as having results
     monkeypatch.setattr(mtb.config.DEFAULT, "result_path", layout_tree)
