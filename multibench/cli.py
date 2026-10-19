@@ -1167,7 +1167,7 @@ def _run_all_command(args, stack) -> int:
                 mods = mods if mods.startswith("(") else f"({mods})"
                 print(f"{r['method']} {mods}{tag}: {r['command']}")
         return _EXIT_OK
-    with _quiet_stdout(), _leiden_flavor(args.leiden_flavor):
+    with _quiet_stdout(), _setting("leiden_flavor", args.leiden_flavor):
         res = workflow._run_all(args.dataset, args.category, out_dir=args.out,
                                 methods=_csv_list(args.methods),
                                 modalities=_modalities_arg(args.modalities),
@@ -1253,36 +1253,38 @@ def _not_run_line(res, where) -> str | None:
 
 
 @contextlib.contextmanager
-def _leiden_flavor(flavor):
-    """Set ``mtb.config.DEFAULT.leiden_flavor`` for one command (``None`` = unchanged)."""
-    if flavor is None:
+def _setting(name: str, value):
+    """Set ``mtb.config.DEFAULT.<name>`` for one command (``None`` = unchanged)."""
+    if value is None:
         yield
         return
-    before = config.DEFAULT.leiden_flavor
-    config.DEFAULT.leiden_flavor = flavor
+    before = getattr(config.DEFAULT, name)
+    setattr(config.DEFAULT, name, value)
     try:
         yield
     finally:
-        config.DEFAULT.leiden_flavor = before
+        setattr(config.DEFAULT, name, before)
 
 
 def _evaluate_labels(args, stack, method):
     """The ``labels=`` value of ``multibench evaluate``: the ``--labels`` file(s), or
-    the label files of ``--dataset``, in ``method``'s cell order when it is a
-    package method (as ``mtb.evaluate(dataset=, method=)`` reads them)."""
+    ``None`` for the label files of ``--dataset``, which evaluate reads in
+    ``method``'s cell order when it is a package method."""
     files = list(args.labels or [])
     if not files:
         if args.dataset is None:
             _usage_error(args, "need --labels CSV (repeatable), or --dataset to read the "
                          "dataset's label files")
         dataset, root = resolve.split_dataset(args.dataset, args.data_path)
-        labels = pipeline._dataset_labels(dataset, args.category, method, root)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")      # evaluate reads them again and says it
+            labels = pipeline._dataset_labels(dataset, args.category, method, root)
         own = registry.method_of(method)
         order = f"in {own}'s cell order" if own else "in that order"
         print(f"# labels: {', '.join(Path(v).name for v in labels.values())} from "
               f"{dataset}, {order}", file=sys.stderr)
         if args.column is None:
-            return labels
+            return None
         files = list(labels.values())
     elif args.data_path is not None:
         _usage_error(args, "--data-path reads the labels from the dataset folder; "
@@ -1419,10 +1421,10 @@ def _cmd_evaluate(args) -> int:
         metrics = metrics[0].lower() if metrics[0].lower() in _METRIC_FAMILIES else metrics[0]
     if args.task is not None and metrics is None:     # an older spelling of --metrics
         metrics = args.task
-    dataset = (None if args.dataset is None
-               else resolve.split_dataset(args.dataset, args.data_path)[0])
-    if dataset is not None and args.category is None and registry.method_of(method):
-        args.category = workflow.known_category(dataset)    # a benchmark dataset has one
+    if args.dataset is not None and args.category is None:
+        # a benchmark dataset has one
+        args.category = workflow.known_category(
+            resolve.split_dataset(args.dataset, args.data_path)[0])
     with contextlib.ExitStack() as stack:
         batch = _batch_arg(args, stack)
         if isinstance(batch, str) and not Path(batch).exists() and not Path(batch).suffix \
@@ -1431,25 +1433,19 @@ def _cmd_evaluate(args) -> int:
                              f"{Path(embedding).suffix or 'matrix'} embedding, --batch "
                              f"takes a CSV of one batch per cell.")
         labels = _evaluate_labels(args, stack, method)
-        kw = dict(category=args.category, labels=labels, clusters=args.clusters,
-                  batch=batch, missing_labels=args.missing_labels)
-        if args.obsm is not None:
-            kw["obsm"] = args.obsm
-        # labels read from --dataset: a count error names that dataset's files
-        token = pipeline._LABELS_FROM.set(None if args.labels else dataset)
-        try:
-            with _quiet_stdout(), _leiden_flavor(args.leiden_flavor):
-                df = pipeline._scores(embedding, metrics=metrics, **kw)
-        finally:
-            pipeline._LABELS_FROM.reset(token)
-    df = pipeline._long_table(df, method=args.name or method,
-                              dataset="user" if dataset is None else dataset,
-                              category=args.category)
+        with _quiet_stdout(), _setting("leiden_flavor", args.leiden_flavor):
+            df = pipeline._evaluate(
+                embedding, labels, dataset=args.dataset, method=method,
+                category=args.category, batch=batch, metrics=metrics, obsm=args.obsm,
+                clustering=args.clusters, missing_labels=args.missing_labels,
+                data_path=args.data_path, from_dataset=not args.labels)
+    df["method"] = args.name or method
     if args.out:
         df.to_csv(args.out, index=False)
         print(f"wrote {args.out}")
     else:
-        print(df.to_string(index=False))
+        # no category is an empty cell, as in the CSV
+        print(df.assign(category=df["category"].fillna("")).to_string(index=False))
     return _EXIT_OK
 
 

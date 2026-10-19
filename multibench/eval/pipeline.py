@@ -4,6 +4,7 @@ from __future__ import annotations
 import contextvars
 import warnings
 from pathlib import Path
+from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
@@ -309,10 +310,11 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
             # no ids: the dataset folder's matrix names the cells
             first = _folder_ids([x], [len(vals)], ids)
         if _has_cell_ids(ids) and not _file_carries_ids(first, ids):
+            by_position = "" if len(vals) != len(ids) else ", or " + config.hint(
+                f"pass {what}=pd.read_csv(...).iloc[:, 0].to_numpy()",
+                "give the embedding as an .npy file") + " to match by position"
             raise ValueError(f"{name} has no cell ids, and the embedding has: put the barcodes "
-                             f"in its first column, or " + config.hint(
-                                 f"pass {what}=pd.read_csv(...).iloc[:, 0].to_numpy()",
-                                 "give the embedding as an .npy file") + " to match by position.")
+                             f"in its first column{by_position}.")
         return io.by_id_column(
             vals, first, ids if unique else None, what=what, name=name,
             target="the embedding", order="the rows of the embedding",
@@ -369,15 +371,16 @@ def _has_cell_ids(ids) -> bool:
     return ids is not None and io._looks_like_ids(pd.Series(list(ids), dtype=object))
 
 
-def _folder_ids(files, counts, ids):
+def _file_barcodes(files, counts=None):
     """The cell ids of label files that have none, from the matrix next to each
-    one with as many cells (``cty2.csv`` -> ``rna2.h5``, ...), when together they
-    are the embedding's cells; else ``None``. Where barcodes repeat, each is
-    named by its label file, ``cty2:<barcode>``, as ``BatchResult.embedding`` names it."""
+    one with as many cells (``cty2.csv`` -> ``rna2.h5``, ...); ``None`` when one
+    has no such matrix. Where barcodes repeat, each is named by its label file,
+    ``cty2:<barcode>``, as ``BatchResult.embedding`` names it."""
     import h5py
     from ..workflow import _label_data_files      # workflow imports this module
     out, stems = [], []
-    for f, n in zip(files, counts):
+    for i, f in enumerate(files):
+        n = counts[i] if counts is not None else len(io.read_labels(f))
         for m in (x for x in _label_data_files(Path(f)) if x.is_file()):
             try:
                 with h5py.File(m, "r") as h:
@@ -394,7 +397,14 @@ def _folder_ids(files, counts, ids):
     keys = pd.Series(out, dtype=object)
     if not keys.is_unique:
         keys = pd.Series([f"{s}:{b}" for s, b in zip(stems, out)], dtype=object)
-    if not keys.is_unique or set(keys) != {str(i) for i in ids}:
+    return keys if keys.is_unique else None
+
+
+def _folder_ids(files, counts, ids):
+    """:func:`_file_barcodes` of ``files`` when the embedding's cells ``ids`` are
+    among them (all of them, or a subset); else ``None``."""
+    keys = _file_barcodes(files, counts)
+    if keys is None or not {str(i) for i in ids} <= set(keys):
         return None
     return keys
 
@@ -503,14 +513,23 @@ def _labels_from_dict(d: dict, label_order) -> list:
 _FLAGS = {"labels": "--labels", "clusters": "--clusters", "batch": "--batch"}
 #: what one value of each argument is called in the command-line messages
 _UNITS = {"labels": "labels", "clusters": "cluster ids", "batch": "batch ids"}
-#: the dataset whose label files ``evaluate(dataset=)`` read, so the errors name
-#: them, not a labels= never given
-_LABELS_FROM = contextvars.ContextVar("cli_labels_from", default=None)
 #: the keys of a labels dict, in the order of its files (label_order's spelling)
 _LABEL_KEYS = contextvars.ContextVar("label_keys", default=None)
-#: ``(dataset, its label files)`` of evaluate(dataset=<benchmark>, labels=...):
-#: the embedding must hold that dataset's cells
-_DATASET_CELLS = contextvars.ContextVar("dataset_cells", default=None)
+
+
+class _Cells(NamedTuple):
+    """The cells ``evaluate(dataset=)`` expects in the embedding."""
+    dataset: str
+    #: its label files, in the cell order of ``method``
+    files: list
+    #: the package method, or ``None`` for your own
+    method: str | None
+    #: labels= is these files (read from the dataset)
+    from_files: bool
+    #: a benchmark dataset: the embedding holds every cell
+    whole: bool
+    #: the file stems in ``method``'s order when the folder's order differs
+    moved: tuple = ()
 
 
 def _label_files(given) -> list:
@@ -577,11 +596,10 @@ def _measured_warning(given, adata, reason: str, distinct: int, cells: int) -> s
     return f"{src} {why}. Check that it holds the cell types."
 
 
-def _no_label_error(shown, miss, given) -> str:
+def _no_label_error(shown, miss, given, dataset=None) -> str:
     """evaluate()'s error for labels missing where ``miss`` is true. ``shown``
-    are the labels as written."""
+    are the labels as written; ``dataset`` the dataset whose label files they are."""
     n, n_cells = int(miss.sum()), len(miss)
-    dataset = _LABELS_FROM.get()
     head = config.hint("labels", f"the label files of {dataset}" if dataset
                        else "--labels") + _named_files(given)
     example = io._missing_example(shown)
@@ -674,18 +692,18 @@ def _files_that_fit(files: list, n_cells: int) -> list:
     return []
 
 
-def _count_error(what: str, n: int, n_cells: int, given, category=None) -> str:
+def _count_error(what: str, n: int, n_cells: int, given, category=None,
+                 cells: _Cells | None = None) -> str:
     """evaluate()'s error for ``n`` values of ``what`` against ``n_cells`` rows.
 
     On the command line it names the flag and the files typed. Too few labels
     get the per-batch fix, or, for one side of a diagonal folder, the "No
-    labels" recipe.
+    labels" recipe. ``cells``: the labels are those of a dataset folder.
     """
-    from . import scib as escib
     files, names = _label_files(given), _named_files(given)
-    dataset = _LABELS_FROM.get() if what == "labels" else None
     side = _diagonal_side(files) if what == "labels" and n < n_cells else None
-    if dataset:
+    if cells is not None and what == "labels":
+        dataset = cells.dataset
         head = config.hint(f"The label files of {dataset}{names} hold {n:,} cells; the "
                            f"embedding has {n_cells:,} rows.",
                            f"the label files of {dataset}{names} hold {n:,} labels for "
@@ -693,13 +711,20 @@ def _count_error(what: str, n: int, n_cells: int, given, category=None) -> str:
         if side and category == "diagonal":
             return (f'{head} {dataset} labels the {side[0]} cells only, see the recipe '
                     f'"No labels" in the docs.')
+        if cells.method:
+            return head + " " + config.hint(
+                f"Check that the embedding is the one of method= on {dataset}.",
+                f"Check that the embedding file holds the embedding of --method on "
+                f"{dataset}.")
         return head + " " + config.hint(
-            f"Check that the embedding is the one of method= on {dataset}.",
-            f"Check that the embedding file holds the embedding of --method on {dataset}.")
-    msg = config.hint(
-        escib.count_error(what, n, n_cells),
+            f"To score other cells, pass their labels and a dataset name of your own, "
+            f"such as dataset='{dataset}_subset'.",
+            f"To score other cells, pass their labels with --labels and a dataset name of "
+            f"your own, such as --dataset {dataset}_subset.")
+    fact = config.hint(
+        f"{what} has {n:,} entries for {n_cells:,} cells in the embedding",
         f"{_FLAGS[what]} gave {n:,} {_UNITS[what]}{names} for {n_cells:,} cells "
-        f"in the embedding file.")
+        f"in the embedding file")
     if what == "labels" and n > n_cells and len(files) > 1:
         fit = _files_that_fit(files, n_cells)
         names = _LABEL_KEYS.get()
@@ -713,17 +738,17 @@ def _count_error(what: str, n: int, n_cells: int, given, category=None) -> str:
                                       f.name for f in fit) + " only."))
     if what != "labels" or n >= n_cells:
         one = {"labels": "label", "clusters": "cluster id", "batch": "batch"}[what]
-        return f"{msg[:-1]}: give one {one} per cell."
+        return f"{fact}: give one {one} per cell."
     batches = _batch_files(files[0], n_cells) if len(files) == 1 else []
     if side and not batches:
-        return (f'{msg} {files[0].name} labels the {side[0]} cells only, see the recipe '
+        return (f'{fact}. {files[0].name} labels the {side[0]} cells only, see the recipe '
                 f'"No labels" in the docs.')
     order = f" ({', '.join(f.name for f in batches)})" if batches else ""
     return config.hint(
-        f"{msg} For a folder with one label file per batch, pass dataset=, category= "
+        f"{fact}. For a folder with one label file per batch, pass dataset=, category= "
         f"and method=." if files else
         f"labels has {n:,} entries for {n_cells:,} embedding rows: give one label per row.",
-        f"{msg} For several label files{order}, repeat --labels in the row order of "
+        f"{fact}. For several label files{order}, repeat --labels in the row order of "
         f"the embedding file, or pass --dataset, --category and --method.")
 
 
@@ -1002,42 +1027,113 @@ def evaluate(embedding, labels=None, *, dataset: str | None = None,
 
 def _evaluate(embedding, labels=None, *, dataset=None, method="embedding", category=None,
               batch=None, metrics=None, obsm=None, verbose=True, clustering=None,
-              label_order=None, missing_labels="error", data_path=None) -> pd.DataFrame:
+              label_order=None, missing_labels="error", data_path=None,
+              from_dataset=False) -> pd.DataFrame:
     """:func:`evaluate` with the deprecated ``clustering=``, ``label_order=`` and
-    ``missing_labels=``; ``data_path`` is the folder that holds ``dataset``."""
+    ``missing_labels=``; ``data_path`` is the folder that holds ``dataset``;
+    ``from_dataset``: ``labels`` are copies of the dataset's label files (the
+    command line's ``--column``)."""
     if not isinstance(missing_labels, str) or missing_labels not in ("error", "drop"):
         raise ValueError(
             f'missing_labels must be "error" or "drop", got {missing_labels!r}.')
     if not isinstance(method, str) or not method.strip():
         raise TypeError(f"method= takes a name, such as method='Matilda'; got {method!r}.")
-    name = from_files = held = None
+    name = cells = None
     if dataset is not None:
         from ..engine import resolve
         from ..workflow import known_category
         name, data_path = resolve.split_dataset(dataset, data_path)
         bench = known_category(name)             # a benchmark dataset has one
         category = bench if category is None else category
+        from_files = labels is None or from_dataset
         if labels is None:
-            labels, from_files = _dataset_labels(name, category, method, data_path), name
-        elif bench is not None:
-            try:            # your labels are for the cells of the benchmark dataset
-                held = _dataset_labels(name, category, method, data_path)
-            except Exception:  # noqa: BLE001 - not fetched: nothing to compare with
-                held = None
-            held = held and (name, list(held.values() if isinstance(held, dict) else held))
+            labels = _dataset_labels(name, category, method, data_path)
+        cells = _expected_cells(name, category, method, data_path,
+                                labels if from_files else None, whole=bench is not None)
     elif labels is None:
         raise ValueError("evaluate needs labels=, one cell type per cell, or dataset= "
                          "to read the label files of a dataset folder.")
-    token, token2 = _LABELS_FROM.set(from_files), _DATASET_CELLS.set(held)
-    try:
-        wide = _scores(embedding, labels, category=category, batch=batch, metrics=metrics,
-                       clusters=clustering, obsm=obsm, label_order=label_order,
-                       verbose=verbose, missing_labels=missing_labels)
-    finally:
-        _LABELS_FROM.reset(token)
-        _DATASET_CELLS.reset(token2)
+    wide = _scores(embedding, labels=labels, category=category, batch=batch,
+                   metrics=metrics, clusters=clustering, obsm=obsm, label_order=label_order,
+                   verbose=verbose, missing_labels=missing_labels, cells=cells)
     return _long_table(wide, method=method, dataset="user" if name is None else name,
                        category=category)
+
+
+def _gives_ids(x, adata) -> bool:
+    """Whether an argument of evaluate names its cells: a Series or DataFrame
+    indexed by cell, or files whose first column holds cell ids. An obs
+    column follows the embedding and names none."""
+    if _carries_ids(x):
+        return True
+    if adata is not None and isinstance(x, str) and _obs_column_name(x, adata) is not None:
+        return False
+    files = _label_files(x)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")     # the read that scores says them
+        try:
+            firsts = [io.read_labels_ids(f, what="labels", pick=_pick("labels"))[1]
+                      for f in files]
+        except (ValueError, KeyError, OSError):
+            return False
+    return bool(files) and all(f is not None and io._looks_like_ids(f) for f in firsts)
+
+
+def _follows_cells(labels, adata, cells: _Cells) -> bool:
+    """Whether ``labels`` can be put in the cells' order: an obs column of the
+    embedding, ids, or the dataset's label files in that order."""
+    if adata is not None and isinstance(labels, str) \
+            and _obs_column_name(labels, adata) is not None:
+        return True
+    files = _file_list(labels) if isinstance(labels, dict) else _label_files(labels)
+    if files and [f.name for f in files] == [f.name for f in cells.files]:
+        return True
+    return _gives_ids(labels, adata)
+
+
+def _cells_ids(cells: _Cells, n: int):
+    """The barcodes of ``cells`` in the method's order, when they are ``n``
+    cells; else ``None``."""
+    keys = _file_barcodes(cells.files)
+    return None if keys is None or len(keys) != n else pd.Index(keys)
+
+
+def _file_list(labels) -> list:
+    """The label files of ``labels``, a ``labels_for`` dict, a list or one path."""
+    if isinstance(labels, (str, Path)):
+        return [Path(labels)]
+    return [Path(p) for p in (labels.values() if isinstance(labels, dict) else labels)]
+
+
+def _expected_cells(dataset, category, method, data_path, read, *,
+                    whole: bool) -> _Cells | None:
+    """The cells evaluate(dataset=) expects, or ``None`` when nothing is known of
+    them: your own labels for your own method on your own folder, or a dataset
+    folder that is not here. ``read``: the label files evaluate read from the
+    dataset, ``None`` when labels= was given."""
+    from ..engine import registry, resolve
+    own = registry.method_of(method)
+    from_files = read is not None
+    if from_files:
+        files = _file_list(read)
+    elif (not whole and own is None) or category is None:
+        return None
+    else:
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")      # said when labels= is left out
+                files = _file_list(_dataset_labels(dataset, category, method, data_path))
+        except FileNotFoundError:
+            return None                              # not fetched: nothing to compare
+    moved = ()
+    if own is not None and not from_files:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            folder = _file_list(resolve.labels_for(dataset, category, None,
+                                                   data_path=data_path, check=False))
+        if [f.name for f in folder] != [f.name for f in files]:
+            moved = tuple(f.stem for f in files)
+    return _Cells(dataset, files, own, from_files, whole, moved)
 
 
 def _dataset_labels(dataset, category, method, data_path):
@@ -1107,10 +1203,12 @@ def _scores(
     label_order=None,
     verbose: bool = True,
     missing_labels: str = "error",
+    cells: _Cells | None = None,
 ) -> pd.DataFrame:
     """The scores of :func:`evaluate` as a wide frame: one row per metric, one
     column ``Value``; ``attrs`` records how they were scored. ``clusters``
-    replaces the Leiden clusters of ARI, NMI, ASW, iASW and iF1."""
+    replaces the Leiden clusters of ARI, NMI, ASW, iASW and iF1; ``cells`` are
+    the cells of ``evaluate(dataset=)``."""
     if not isinstance(missing_labels, str) or missing_labels not in ("error", "drop"):
         raise ValueError(
             f'missing_labels must be "error" or "drop", got {missing_labels!r}.')
@@ -1141,10 +1239,10 @@ def _scores(
         graph = _graph_writer(embedding)           # a file only graph methods write
 
     # named in the error for a Series that lacks some cells
-    cells = "adata.obs_names" if io._is_anndata(embedding) else None
+    obs_ids = "adata.obs_names" if io._is_anndata(embedding) else None
     if isinstance(embedding, (str, Path)) and Path(embedding).suffix.lower() == ".h5ad":
         import anndata as ad      # read once; keeps obs_names and obs
-        embedding = ad.read_h5ad(embedding)
+        embedding = ad.read_h5ad(io._require_file(embedding, "embedding"))
     adata = embedding if io._is_anndata(embedding) else None
     table = None
     if isinstance(embedding, (str, Path)) and Path(embedding).suffix.lower() in {".csv", ".tsv"}:
@@ -1157,11 +1255,24 @@ def _scores(
     else:
         ids = _cell_ids(embedding)
         emb = np.asarray(io.as_matrix(embedding, obsm=obsm))
+    if cells is not None and cells.moved and not _follows_cells(labels, adata, cells):
+        stems = ", ".join(cells.moved)
+        raise ValueError(
+            config.hint("labels= is matched to the cells by position, and ",
+                        "--labels is matched to the cells by position, and ")
+            + f"{cells.method} puts the cells of {cells.dataset} in the order {stems}. "
+            + config.hint(f"Leave labels= out to read the label files in that order.",
+                          "Leave out --labels to read the label files in that order."))
+    lab_ids, ba_ids = ids, ids
+    if ids is None and table is None and cells is not None:
+        # an embedding without ids holds the dataset's cells in the method's order
+        lab_ids, ba_ids = (_cells_ids(cells, emb.shape[0]) if _gives_ids(x, adata) else None
+                           for x in (labels, batch))
     if _is_label_path_list(labels):
-        ct, origin = _stack_label_files(labels, ids, table=table)
+        ct, origin = _stack_label_files(labels, lab_ids, table=table)
     else:
-        ct, origin = _obs_or_vector(labels, adata, what="labels", ids=ids,
-                                    table=table, cells=cells), None
+        ct, origin = _obs_or_vector(labels, adata, what="labels", ids=lab_ids,
+                                    table=table, cells=obs_ids), None
     # many run outputs are dims x cells; the label count says which axis holds the cells
     if emb.ndim == 2 and emb.shape[0] != len(ct) and emb.shape[1] == len(ct):
         _compat.warn(
@@ -1184,10 +1295,10 @@ def _scores(
         cl = io.read_clustering(clusters)          # the benchmark's h5 layout
     else:
         cl = _obs_or_vector(clusters, adata, what="clusters", ids=ids, table=table,
-                            cells=cells)
+                            cells=obs_ids)
     if batch is not None:
-        ba = _obs_or_vector(batch, adata, what="batch", ids=ids, table=table,
-                            cells=cells)
+        ba = _obs_or_vector(batch, adata, what="batch", ids=ba_ids, table=table,
+                            cells=obs_ids)
         if group == "clustering" and not want_cls:
             # after the batch is read: a wrong column gets its error alone
             _unused_batch_warning(metrics)
@@ -1212,23 +1323,26 @@ def _scores(
 
     from . import scib as escib
     n_cells = emb.shape[0]
-    held = _DATASET_CELLS.get()
-    n_held = held and sum(len(io.read_labels(f)) for f in held[1])
-    if held and n_held != n_cells:
-        _LABELS_FROM.set(held[0])           # evaluate resets it
-        raise ValueError(_count_error("labels", n_held, n_cells, held[1], category))
+    if cells is not None and cells.whole:
+        n_held = sum(len(io.read_labels(f)) for f in cells.files)
+        if n_held != n_cells:
+            raise ValueError(_count_error("labels", n_held, n_cells, cells.files, category,
+                                          cells))
+    from_files = cells if cells is not None and cells.from_files else None
     for what, values, given in (("labels", ct, labels), ("clusters", cl, clusters),
                                 ("batch", ba, batch)):
         if values is not None and len(values) != n_cells:
-            raise ValueError(_count_error(what, len(values), n_cells, given, category))
+            raise ValueError(_count_error(what, len(values), n_cells, given, category,
+                                          from_files))
     # checked here: compute() casts labels to str, and "nan" would become a cell type
     miss, dropped = io.missing_mask(ct), None
     keep = ~miss
     if miss.any():
         if missing_labels == "error" or miss.all():
-            shown = _as_written(labels, adata, ids, what="labels")
+            shown = _as_written(labels, adata, lab_ids, what="labels")
             raise ValueError(_no_label_error(
-                ct if shown is None else shown, miss, labels))
+                ct if shown is None else shown, miss, labels,
+                from_files and from_files.dataset))
         # ba is zeros when no batch metric is scored: count the file of origin then
         known = ba if batch is not None else origin if batch_from_files else None
         batches = None if known is None else (
@@ -1241,7 +1355,7 @@ def _scores(
         # after the drop: only the cells that are scored need a batch
         no_batch = io.missing_mask(ba)
         if no_batch.any():
-            shown = _as_written(batch, adata, ids, what="batch")
+            shown = _as_written(batch, adata, ba_ids, what="batch")
             raise ValueError(_no_batch_error(
                 ba if shown is None else np.asarray(shown)[keep], no_batch, batch))
     if group in ("batch", "all") and len(set(np.asarray(ba).astype(str).tolist())) < 2:

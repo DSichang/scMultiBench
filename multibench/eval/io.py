@@ -696,11 +696,12 @@ def _align_vector(x, ids, *, what: str, column: str | None, cells: str | None):
         # ids the output lacks are left out: every cell has its value
         hint = (" Score the cells that have a label only."
                 if what == "labels" and not len(extra) else "")
+        by_position = (f", or {what}.to_numpy() to match positionally"
+                       if len(x) == len(ids) else "")
         raise ValueError(
             f"{what}: cannot align by cell id - {len(missing)} of the output's "
             f"{len(ids)} cells are missing from {what} (first: {_first(missing)}). "
-            f"Pass {what} for every cell of the output, or {what}.to_numpy() to match "
-            f"positionally.{hint}")
+            f"Pass {what} for every cell of the output{by_position}.{hint}")
     return np.asarray(x.reindex(ids).to_numpy())
 
 

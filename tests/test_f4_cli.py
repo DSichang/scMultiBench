@@ -238,14 +238,20 @@ def test_labels_in_the_method_order_pass_and_unknown_methods_are_not_checked(dia
     capsys.readouterr()
 
 
-def test_label_files_with_other_names_are_not_checked(diag, tmp_path, capsys):
+def test_label_files_with_other_names_are_matched_by_position_and_refused(diag, tmp_path,
+                                                                        capsys):
+    """c4: files without cell ids next to a method with its own cell order are
+    refused, whatever their names: only the dataset's own files can be ordered."""
     d, emb = diag
     own = tmp_path / "own"
     own.mkdir()
     (own / "rna_types.csv").write_text((d / "rna_cty.csv").read_text())
     (own / "atac_types.csv").write_text((d / "atac_cty.csv").read_text())
-    assert _evaluate(emb, own / "rna_types.csv", own / "atac_types.csv") == 0
-    capsys.readouterr()
+    assert _evaluate(emb, own / "rna_types.csv", own / "atac_types.csv") == 1
+    assert capsys.readouterr().err.splitlines()[-1] == (
+        "error: --labels is matched to the cells by position, and uniPort puts the cells "
+        "of D28 in the order atac_cty, rna_cty. Leave out --labels to read the label "
+        "files in that order.")
 
 
 def test_folder_outside_the_data_path_is_checked_by_file_names(tmp_path, monkeypatch,

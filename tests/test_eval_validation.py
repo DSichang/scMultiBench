@@ -171,7 +171,8 @@ def test_labels_series_missing_or_extra_ids_raise_naming_them():
         evaluate(df, labels=ser.iloc[:-2], metrics=["ARI"])
     msg = str(exc.value)
     assert "cannot align by cell id" in msg and "2 of the output's 90 cells are missing" in msg
-    assert "cell88" in msg and "cell89" in msg and "labels.to_numpy()" in msg
+    # c4: to_numpy() only fits labels with one entry per cell
+    assert "cell88" in msg and "cell89" in msg and "labels.to_numpy()" not in msg
     # c3 (E08): ids the output lacks are left out when every cell has its label
     extra = pd.concat([ser, pd.Series(["B"], index=["ghost"])])
     assert _ari(evaluate(df, labels=extra, metrics=["ARI"])) == \
@@ -207,7 +208,7 @@ def test_labels_for_some_cells_say_how_to_mark_the_others(tmp_path, capsys):
     evaluate = pipeline._evaluate
     series = ("{0}: cannot align by cell id - 30 of the output's 90 cells are missing "
               "from {0} (first: ['cell60', 'cell61', 'cell62', 'cell63', 'cell64']). Pass "
-              "{0} for every cell of the output, or {0}.to_numpy() to match positionally.")
+              "{0} for every cell of the output.")
     with pytest.raises(ValueError) as exc:
         evaluate(a, labels=some, **kw)
     assert str(exc.value) == series.format("labels") + (
@@ -244,7 +245,7 @@ def test_labels_for_some_cells_say_how_to_mark_the_others(tmp_path, capsys):
     odd = pd.concat([some, pd.Series(["B"], index=["ghost"])])
     with pytest.raises(ValueError) as exc:
         evaluate(a, labels=odd, **kw)
-    assert str(exc.value).endswith("or labels.to_numpy() to match positionally.")
+    assert str(exc.value).endswith("Pass labels for every cell of the output.")
     # batch= has no such way out: both errors keep their text
     with pytest.raises(ValueError) as exc:
         evaluate(a, labels="celltype", batch=some, metrics=["GC"])

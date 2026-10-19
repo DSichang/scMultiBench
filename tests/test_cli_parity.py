@@ -529,7 +529,8 @@ def test_cli_evaluate_clustering_alias(monkeypatch, capsys):
         assert [l for l in err.splitlines() if "deprecated" in l] == [
             f"warning: evaluate {flag} is deprecated and will be removed in 0.5. Use the "
             "default, the article's Leiden clusters."]
-    assert "obsm" not in captured and "column" not in captured
+    # c4: the command line scores through evaluate, which passes obsm=None
+    assert captured.get("obsm") is None and "column" not in captured
     assert captured["metrics"] is None                  # Python's default metric set
     # --clusters (new on this branch) is gone
     with pytest.raises(SystemExit) as ei:
