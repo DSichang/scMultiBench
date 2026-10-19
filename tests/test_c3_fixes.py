@@ -12,6 +12,7 @@ import pytest
 import multibench as mtb
 from multibench import cli
 from multibench.plot.style import overall
+from tests.test_docs_r4 import _read, needs_docs
 
 CATS = {"vertical": "D11", "diagonal": "D28", "mosaic": "D45", "cross": "D52"}
 
@@ -376,3 +377,37 @@ def test_c20_your_rows_have_no_runtime_of_the_package():
     own = [m for m in r.index if m.endswith("(this run)")]
     assert own and r.loc[own, "worst_sec"].isna().all()
     assert r.loc[own[0].removesuffix(" (this run)"), "worst_sec"] > 0
+
+
+# --------------------------------------------------------------- C43
+@needs_docs
+def test_c43_the_labels_recipe_follows_the_package_order():
+    """The recipe of evaluate.md, run on every fetched dataset folder, gives the
+    package's own default order (labels_for without a method) in each category,
+    and labels the obs of an AnnData with barcodes without a NaN."""
+    import re
+    from pathlib import Path
+    from multibench.engine import resolve
+    ad = pytest.importorskip("anndata")
+    page = _read("tutorials/evaluate.md")
+    block = next(b for b in re.findall(r"```python\n(.*?)```", page, re.S) if "order = {" in b)
+    code = "\n".join(line for line in block.splitlines() if "fetch(" not in line)
+    root = mtb.config.DEFAULT.data_path
+    cats = mtb.catalog.datasets().set_index("dataset")["category"]
+    seen = set()
+    for folder in sorted(p for p in root.iterdir() if p.is_dir() and any(p.glob("*cty*.csv"))):
+        category = cats.get(folder.name)
+        if category not in CATS:
+            continue
+        ns = {"pd": pd, "folder": folder}
+        exec(code, ns)
+        want = list(_quiet(resolve.labels_for, folder.name, category, None, data_path=root,
+                           check=False).values())
+        assert [f.name for f in ns["files"]] == [Path(p).name for p in want], folder.name
+        expected = np.concatenate([pd.read_csv(p).iloc[:, 0].to_numpy() for p in want])
+        assert (ns["labels"] == expected).all(), folder.name
+        a = ad.AnnData(obs=pd.DataFrame(index=[f"AAAC{i}-1" for i in range(len(expected))]))
+        a.obs["celltype"] = ns["labels"]
+        assert a.obs["celltype"].notna().all(), folder.name
+        seen.add(category)
+    assert seen == set(CATS)
