@@ -197,11 +197,15 @@ def normalize_paths(inputs: dict, out_dir) -> tuple[dict, str]:
     and a file name (``data_path + "rna.h5"``). ``os.path.abspath`` keeps
     symlinked data roots as written. Values that are not paths pass through.
     """
-    out = os.path.join(os.path.abspath(os.fspath(out_dir)), "")
+    def absolute(path):
+        # a preview's "<out_dir>" placeholder stays as written
+        path = os.fspath(path)
+        return path if path.startswith("<out_dir>") else os.path.abspath(path)
+    out = os.path.join(absolute(out_dir), "")
     vals: dict = {}
     for role, v in inputs.items():
         if isinstance(v, (str, os.PathLike)):
-            p = os.path.abspath(os.fspath(v))
+            p = absolute(v)
             if role == "data_dir" or os.path.isdir(p):
                 p = os.path.join(p, "")
             vals[role] = p

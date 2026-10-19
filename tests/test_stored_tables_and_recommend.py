@@ -83,8 +83,9 @@ def test_x69_uinmf_two_batch_rows_left_the_d52_table():
 
 def test_x05_recommend_docstring_names_the_min_max_scaling():
     doc = " ".join(mtb.recommend.__doc__.split())
+    # c2 (D01): the stored methods set the scale
     assert ("each per-dataset score is the mean rank over the metrics, min-max scaled "
-            "within the dataset (1 = best, 0 = worst there)") in doc
+            "so that the best stored method scores 1 and the worst 0") in doc
 
 
 @pytest.mark.parametrize("fn", ["recommend", "bar"])

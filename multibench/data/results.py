@@ -508,8 +508,8 @@ def load_results(
     -------
     pandas.DataFrame
         One row per score: ``metric, value, method, dataset, category,
-        source``. ``attrs["rerun_version"]`` holds the package version that
-        scored the stored rows.
+        source, scored_with``. ``attrs["rerun_version"]`` holds the package
+        version that scored the stored rows.
 
     Raises
     ------
@@ -543,10 +543,16 @@ def load_results(
 
 def _load_results_kept(*args, **kwargs) -> pd.DataFrame:
     """:func:`_load_results` without the ``clustering`` column when it holds only
-    ``"default"``, as in the re-run tables; the deprecated published variants keep it."""
+    ``"default"``, as in the re-run tables (the deprecated published variants keep
+    it), and with ``scored_with``, as the other long tables have it."""
     out = _load_results(*args, **kwargs)
     if (out["clustering"] == "default").all():
         out = out.drop(columns="clustering")
+    version = out.attrs.get("rerun_version")
+    if isinstance(version, str) and "scored_with" not in out.columns \
+            and (out["source"] == _RERUN_SOURCE).all():
+        # the stored re-runs were scored as evaluate scores: leidenalg, the search
+        out["scored_with"] = f"leidenalg/search/{version}"
     return out
 
 
@@ -672,14 +678,9 @@ def _load_results(
         before = len(out)
         out = out[out["metric"].isin(sel.codes)]
         absent = [c for c in sel.codes if c not in have_metrics]
-        if sel.explicit and absent and not out.empty:
+        if sel.explicit and absent:
             _compat.warn(f"The stored results have no {_and_list(absent)}.",
                          UserWarning)
-        if out.empty and sel.explicit:
-            _compat.warn(
-                f"metric(s) {sel.codes} not present in {where} "
-                f"({_SOURCE_WORD.get(source, source + ' tables')}; "
-                f"available: {have_metrics})", UserWarning)
         elif out.empty and before:
             tables = _SOURCE_WORD.get(source, source + " tables")
             of = " of " + ", ".join(x for x in [category, *map(str, datasets or ())] if x) \

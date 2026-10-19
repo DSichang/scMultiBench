@@ -108,7 +108,8 @@ def test_scored_with_column_passes_through_the_consumers(tmp_path):
     mine = _mine()
     stored = mtb.load_results("vertical", dataset="D11")
     both = pd.concat([stored, mine], ignore_index=True)
-    assert both["scored_with"].notna().sum() == len(mine)
+    # c2 (C15): the stored rows carry it too
+    assert both["scored_with"].notna().all()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         tbl = mtb.plot.build_table(both)
@@ -124,10 +125,8 @@ def test_scored_with_column_passes_through_the_consumers(tmp_path):
     # the provenance survives the documented CSV round trip
     assert back.columns.tolist() == pipeline.LONG_COLUMNS + ["scored_with"]
     assert back["scored_with"].tolist() == mine["scored_with"].tolist()
-    every = mtb.load_results(result_path=path, source="both")
-    assert every["scored_with"].isna().sum() == len(stored)
     # a file without the column still loads with the seven columns
-    stored.to_csv(tmp_path / "stored.csv", index=False)
+    stored.drop(columns="scored_with").to_csv(tmp_path / "stored.csv", index=False)
     assert mtb.load_results(result_path=tmp_path / "stored.csv").columns.tolist() == \
         pipeline.LONG_COLUMNS
 

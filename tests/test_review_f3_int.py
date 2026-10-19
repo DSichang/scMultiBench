@@ -297,14 +297,15 @@ def test_run_all_dry_run_checks_the_batch_length(tmp_path, pinned, capsys):
     rc = _quiet(cli.main, argv + [str(short)])
     err = capsys.readouterr().err
     assert rc == 1
-    assert ("error: --batch gave 3 batch ids for the 2,864 cells of the label files of "
-            "D11. The batch metrics of totalVI would fail.") in err, err
+    assert ("error: --batch gave 3 batch ids for the 2,864 cells of D11: give one batch "
+            "per cell.") in err, err
     full = tmp_path / "full.csv"
     pd.DataFrame({"b": np.tile(["s1", "s2"], 1432)}).to_csv(full, index=False)
     assert _quiet(cli.main, argv + [str(full)]) == 0
-    _quiet(mtb.run_all, "D11", "vertical", methods=["totalVI"], dry_run=True,
-           batch=str(short))
-    assert "[run_all] batch has 3 entries for the 2,864 cells" in capsys.readouterr().out
+    # c2 (D22): the Python dry run refuses it too
+    with pytest.raises(ValueError, match=r"^batch has 3 entries for the 2,864 cells of D11"):
+        _quiet(mtb.run_all, "D11", "vertical", methods=["totalVI"], dry_run=True,
+               batch=str(short))
 
 
 def _cty(path, labels):

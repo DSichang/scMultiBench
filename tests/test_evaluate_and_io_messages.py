@@ -77,15 +77,15 @@ def test_x10_no_shared_barcode_names_both_spellings(tmp_path):
         mtb.io.export_dataset(rna, tmp_path / "V", atac=atac, category="vertical")
 
 
-def test_x12_a_label_file_without_ids_next_to_barcodes_warns(tmp_path):
+def test_x12_a_label_file_without_ids_is_matched_by_position_silently(tmp_path):
+    # c2 (D10): the documented rule, with nothing to do: no warning
     import numpy as np
     a = _adata()
     a.obsm["X_pca"] = np.random.default_rng(1).normal(size=(60, 4))
     lab = tmp_path / "cty.csv"
     pd.DataFrame({"x": ["a", "b", "c"] * 20}).to_csv(lab, index=False)
     _, msgs = _messages(mtb.evaluate, a, labels=str(lab), metrics=["cLISI"], obsm="X_pca")
-    assert ("cty.csv has no cell ids, so its rows are matched to the embedding by "
-            "position.") in msgs
+    assert not any("by position" in m for m in msgs)
     b = _adata(names=False)
     b.obsm["X_pca"] = a.obsm["X_pca"]
     _, msgs = _messages(mtb.evaluate, b, labels=str(lab), metrics=["cLISI"], obsm="X_pca")
@@ -131,9 +131,10 @@ def test_x49_obsm_none_reads_x_emb_only():
     import numpy as np
     a = _adata()
     a.obsm["X_pca"] = np.random.default_rng(2).normal(size=(60, 4))
-    for keys in ("X_pca", "X_pca, X_umap"):
+    # c2 (D08): one key is named; X only when the AnnData has one
+    for keys, pick in (("X_pca", "obsm='X_pca'"), ("X_pca, X_umap", "obsm= with one of them")):
         with pytest.raises(ValueError, match=rf"^The AnnData has no obsm\['X_emb'\]; its obsm "
-                                             rf"keys are {keys}: pass obsm=, or obsm='X' for \.X\.$"):
+                                             rf"keys are {keys}: pass {pick} or obsm='X' for \.X\.$"):
             mtb.evaluate(a, labels=np.repeat(["a", "b", "c"], 20), metrics=["cLISI"])
         a.obsm["X_umap"] = a.obsm["X_pca"][:, :2]
 
@@ -268,26 +269,6 @@ def test_export_dataset_given_a_path():
 
 
 # Y18: one file "has", once per file
-def test_position_note_grammar_and_once(tmp_path):
-    import warnings
-    import numpy as np
-    import pandas as pd
-    ad = pytest.importorskip("anndata")
-    a = ad.AnnData(np.zeros((60, 2)))
-    a.obs_names = [f"c{i}" for i in range(60)]
-    a.obsm["X_pca"] = np.random.default_rng(1).normal(size=(60, 4))
-    d = tmp_path / "LABS"
-    d.mkdir()
-    pd.DataFrame({"x": ["a", "b", "c"] * 20}).to_csv(d / "cty.csv", index=False)
-    with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
-        for _ in range(2):
-            mtb.evaluate(a, labels=mtb.labels_for(str(d)), obsm="X_pca", metrics=["cLISI"])
-    said = [str(x.message) for x in w if "by position" in str(x.message)]
-    assert said == ["cty.csv has no cell ids, so its rows are matched to the embedding by "
-                    "position."]
-
-
 # Y19: a label column that differs in letter case gets a did-you-mean
 def test_label_column_case_did_you_mean(tmp_path):
     import numpy as np

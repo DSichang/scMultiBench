@@ -213,7 +213,7 @@ def test_as_matrix_anndata_missing_obsm_lists_keys():
     a.obsm["X_pca"] = np.zeros((3, 2))
     with pytest.raises(ValueError) as exc:
         io.as_matrix(a, obsm="X_emb")
-    assert "obsm='X_emb' not found" in str(exc.value) and "X_pca" in str(exc.value)
+    assert "has no obsm['X_emb']" in str(exc.value) and "X_pca" in str(exc.value)
 
 
 def test_evaluate_anndata_labels_as_obs_key():

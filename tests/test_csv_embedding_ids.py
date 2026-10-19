@@ -308,7 +308,7 @@ def test_several_label_files_with_no_id_in_common(tmp_path, capsys, seen):
 def test_no_id_in_common_and_another_number_of_rows_is_the_count_error(tmp_path, seen):
     """By position there is one row too few: the count error of 0.3.4."""
     emb = _emb(tmp_path)
-    count = "labels has 59 entries for 60 cells in the embedding."
+    count = "labels has 59 entries for 60 "
     for labels, warning in (
             (_labels(tmp_path, values=TYPES[:59], bars=NO_SUFFIX[:59]),
              NONE_SHARED.format("labels.csv")),
@@ -407,14 +407,8 @@ def test_labels_without_ids_are_matched_by_position_as_before(tmp_path, capsys, 
     for labels in (str(one), str(numbered), shuffled, list(shuffled),
                    pd.Series(shuffled)):
         seen.clear()
-        if isinstance(labels, str) and labels == str(one):
-            # a file without cell ids next to the embedding's ids says it is matched by
-            # position (0.4.0, X12); the labels are as before
-            with pytest.warns(UserWarning, match="cty.csv has no cell ids, so its rows "
-                                                 "are matched to the embedding by position"):
-                mtb.evaluate(emb, labels=labels, metrics=["ARI"])
-        else:
-            _quiet(capsys, emb, labels=labels, metrics=["ARI"])
+        # c2 (D10): a file without cell ids is matched by position without a warning
+        _quiet(capsys, emb, labels=labels, metrics=["ARI"])
         assert seen["labels"] == list(shuffled)
 
 

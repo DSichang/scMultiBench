@@ -1437,6 +1437,8 @@ def _cmd_evaluate(args) -> int:
         metrics = args.task
     dataset = (None if args.dataset is None
                else resolve.split_dataset(args.dataset, args.data_path)[0])
+    if dataset is not None and args.category is None and registry.method_of(method):
+        args.category = workflow.known_category(dataset)    # a benchmark dataset has one
     with contextlib.ExitStack() as stack:
         batch = _batch_arg(args, stack)
         labels = _evaluate_labels(args, stack, method)
@@ -1445,12 +1447,12 @@ def _cmd_evaluate(args) -> int:
         if args.obsm is not None:
             kw["obsm"] = args.obsm
         # labels read from --dataset: a count error names that dataset's files
-        token = pipeline._CLI_LABELS_FROM.set(None if args.labels else dataset)
+        token = pipeline._LABELS_FROM.set(None if args.labels else dataset)
         try:
             with _quiet_stdout(), _leiden_flavor(args.leiden_flavor):
                 df = pipeline._scores(embedding, metrics=metrics, **kw)
         finally:
-            pipeline._CLI_LABELS_FROM.reset(token)
+            pipeline._LABELS_FROM.reset(token)
     df = pipeline._long_table(df, method=args.name or method,
                               dataset="user" if dataset is None else dataset,
                               category=args.category)

@@ -574,29 +574,29 @@ def test_the_command_line_names_the_dataset_whose_label_files_it_read(tmp_path, 
     path = tmp_path / "cty.csv"
     pd.DataFrame({"x": _gaps(lab, "NA")}).to_csv(path, index=False)
     monkeypatch.setattr(config, "_CLI", True)
-    token = pipeline._CLI_LABELS_FROM.set("D11")
+    token = pipeline._LABELS_FROM.set("D11")
     try:
         with pytest.raises(ValueError) as e:
-            mtb.evaluate(emb, labels=[str(path)], metrics=["ASW"])
+            pipeline._scores(emb, labels=[str(path)], metrics=["ASW"])   # as the CLI calls it
         assert str(e.value) == (
             "the label files of D11 (cty.csv): 30 of the 300 cells have no label, for "
             "example 'NA'." + KEEP_FIX_CLI)
         pd.DataFrame({"x": ["NA"] * N}).to_csv(path, index=False)
         with pytest.raises(ValueError) as e:
-            mtb.evaluate(emb, labels=[str(path)], metrics=["ASW"])
+            pipeline._scores(emb, labels=[str(path)], metrics=["ASW"])   # as the CLI calls it
         assert str(e.value) == (
             "the label files of D11 (cty.csv): none of the 300 cells has a label, for "
             "example 'NA'." + NONE_FIX)
     finally:
-        pipeline._CLI_LABELS_FROM.reset(token)
+        pipeline._LABELS_FROM.reset(token)
     # in Python the dataset of an earlier command-line call starts nothing
     monkeypatch.setattr(config, "_CLI", False)
-    token = pipeline._CLI_LABELS_FROM.set("D11")
+    token = pipeline._LABELS_FROM.set("D11")
     try:
         with pytest.raises(ValueError, match=r"^labels \(cty\.csv\): none of the 300 "):
             mtb.evaluate(emb, labels=[str(path)], metrics=["ASW"])
     finally:
-        pipeline._CLI_LABELS_FROM.reset(token)
+        pipeline._LABELS_FROM.reset(token)
 
 
 # ============================================================ "drop"

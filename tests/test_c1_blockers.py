@@ -55,19 +55,20 @@ def test_the_rule_on_diagonal_and_mosaic_folders(dataset, category, method):
 
 
 def test_a_package_method_without_category_is_refused_before_scoring():
-    with pytest.raises(ValueError, match=r"^evaluate\(dataset='D52mini', "
+    # c2 (D13): a benchmark dataset gives its category; a folder of your own does not
+    with pytest.raises(ValueError, match=r"^evaluate\(dataset='MINE', "
                        r"method='StabMap \(this run\)'\) needs category= to read StabMap's "
-                       r"cell order\.$"):
-        mtb.evaluate(np.zeros((3000, 2)), dataset="D52mini", method="StabMap (this run)")
+                       r"cell order: cross or mosaic\.$"):
+        mtb.evaluate(np.zeros((3000, 2)), dataset="MINE", method="StabMap (this run)")
 
 
 def test_the_cli_refuses_it_too(tmp_path, capsys):
     emb = tmp_path / "e.npy"
     np.save(emb, np.zeros((3000, 2)))
-    rc = cli.main(["evaluate", str(emb), "--dataset", "D52mini", "--method", "StabMap"])
+    rc = cli.main(["evaluate", str(emb), "--dataset", "MINE", "--method", "StabMap"])
     assert rc != 0
-    assert "--method 'StabMap' needs --category to read StabMap's cell order." in \
-        capsys.readouterr().err
+    assert "--method 'StabMap' needs --category to read StabMap's cell order: cross or " \
+        "mosaic." in capsys.readouterr().err
 
 
 def _ordered_embedding(dataset, category, method):
@@ -99,7 +100,7 @@ def test_obsm_none_means_x_emb_only():
     a = ad.AnnData(np.zeros((6, 3)))
     a.obsm["protein"] = np.arange(12.0).reshape(6, 2)
     with pytest.raises(ValueError, match=r"^The AnnData has no obsm\['X_emb'\]; its obsm "
-                                         r"keys are protein: pass obsm=, or obsm='X' for \.X\.$"):
+                                         r"keys are protein: pass obsm='protein' or obsm='X' for \.X\.$"):
         eio.as_matrix(a)
     assert eio.as_matrix(a, obsm="protein").shape == (6, 2)
     a.obsm["X_emb"] = np.ones((6, 4))

@@ -1469,8 +1469,12 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
             notes = [n if n != spec.setup_hint else
                      "" if spec.id in _resolve._SAME_CELL_ROLES else _first_sentence(n)
                      for n in _runner.script_notes(spec, v, repo)]
-            if v.size_hint in notes and not _too_small(v, got, ds_dir):
-                notes.remove(v.size_hint)          # the folder is large enough
+            if v.size_hint in notes:
+                # the folder's size against the method's, or nothing when it is large enough
+                small = _too_small(v, got, ds_dir)
+                notes[notes.index(v.size_hint)] = (
+                    "" if small is None else v.size_hint if small is True
+                    else f"{spec.id} needs about {small}: leave {spec.id} out.")
             notes = [n for n in notes if n] + prepared
             if notes:
                 rec["caveat"] = _join_sentences([rec["caveat"], *notes])
@@ -1529,30 +1533,37 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
     return df, private
 
 
-def _too_small(variant, inputs: dict, ds_dir: Path) -> bool:
-    """Whether the files a row reads are below a size its ``size_hint`` names
-    (``min_cells``, ``min_cells_per_batch``, ``min_genes``); an unreadable size
-    counts as below."""
+def _too_small(variant, inputs: dict, ds_dir: Path):
+    """``"2,000 genes; rna.h5 has 408"`` when the files a row reads are below a
+    size its ``size_hint`` names (``min_cells``, ``min_cells_per_batch``,
+    ``min_genes``), ``True`` when a size cannot be read, else ``None``."""
     files = [Path(str(p)).name for p in inputs.values() if str(p).endswith(".h5")]
     sizes = _cells_per_file(ds_dir)
-    if variant.min_cells and sum(sizes.get(f) or 0 for f in files) < variant.min_cells:
-        return True
+    total = sum(sizes.get(f) or 0 for f in files)
+    if variant.min_cells and total < variant.min_cells:
+        return f"{variant.min_cells:,} cells; this folder has {total:,}" if total else True
     if variant.min_cells_per_batch:
         per: dict = {}
         for f in files:
             m = re.search(r"(\d+)\.h5$", f)
             if m:
                 per[m.group(1)] = max(per.get(m.group(1), 0), sizes.get(f) or 0)
-        if not per or min(per.values()) < variant.min_cells_per_batch:
+        if not per or not min(per.values()):
             return True
+        b, n = min(per.items(), key=lambda kv: kv[1])
+        if n < variant.min_cells_per_batch:
+            return (f"{variant.min_cells_per_batch:,} cells in every batch; batch {b} "
+                    f"of this folder has {n:,}")
     if variant.min_genes:
         for f in files:
             if f.startswith("rna"):
                 path = ds_dir / f
                 sniff = path.is_file() and _resolve._sniff_h5(str(path), path.stat().st_mtime_ns)
-                if not sniff or sniff[1] < variant.min_genes:
+                if not sniff:
                     return True
-    return False
+                if sniff[1] < variant.min_genes:
+                    return f"{variant.min_genes:,} genes; {f} has {sniff[1]:,}"
+    return None
 
 
 def _row_paths(row, dataset, data_path) -> dict:
@@ -3318,8 +3329,8 @@ def _nested_rows(plan: "pd.DataFrame") -> tuple[list, list[str]]:
 
 
 def _batch_length_problem(plan, batch, dataset, category, data_path) -> str:
-    """A dry run's note when ``batch`` fits neither the dataset's label files nor
-    some row the sweep would run; "" when it fits."""
+    """The error when ``batch`` fits neither the dataset's label files nor some
+    row the sweep would run; "" when it fits."""
     total = sum(n for _, n in _label_file_sizes(dataset, data_path=data_path))
     if not total or len(batch) == total:
         return ""
@@ -3334,11 +3345,9 @@ def _batch_length_problem(plan, batch, dataset, category, data_path) -> str:
             bad.append(r["method"])
     if not bad:
         return ""
-    who = ", ".join(bad[:3]) + (f" and {len(bad) - 3} more" if len(bad) > 3 else "")
     return (config.hint(f"batch has {len(batch):,} entries",
                         f"--batch gave {len(batch):,} batch ids")
-            + f" for the {total:,} cells of the label files of {dataset}. "
-            f"The batch metrics of {who} would fail.")
+            + f" for the {total:,} cells of {dataset}: give one batch per cell.")
 
 
 #: what scoring writes into a record
@@ -3619,6 +3628,10 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
         raise _no_variant_error(category, methods, modalities)
     if dry_run:
         batch_vec = None if batch is None else _batch_vector(batch, dataset, data_path)
+        bad = batch_vec is not None and _batch_length_problem(plan_df, batch_vec, dataset,
+                                                              category, data_path)
+        if bad:
+            raise ValueError(bad)
         nested_notes = []
         if modalities is None:
             # the rows a real run leaves out: another row of the method holds their files
@@ -3645,11 +3658,6 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
                 print(f"[run_all] {caveat}", flush=True)
             for note in nested_notes:
                 print(f"[run_all] {note}", flush=True)
-            if batch_vec is not None:
-                bad = _batch_length_problem(plan_df, batch_vec, dataset, category,
-                                            data_path)
-                if bad:
-                    print(f"[run_all] {bad}", flush=True)
             gaps = _label_gaps(dataset, data_path)
             if gaps:
                 would = plan_df[[_would_run(r) for _, r in plan_df.iterrows()]]
@@ -3690,6 +3698,10 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
         raise ValueError(unlabelled)
 
     batch_vec = None if batch is None else _batch_vector(batch, dataset, data_path)
+    bad = batch_vec is not None and evaluate and _batch_length_problem(
+        plan_df, batch_vec, dataset, category, data_path)
+    if bad:
+        raise ValueError(bad)
     # saved in out_dir so that rescore can reuse it
     batch_file = (_batch_csv(batch_vec, dataset, data_path)
                   if batch_vec is not None and evaluate else None)

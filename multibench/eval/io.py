@@ -747,20 +747,20 @@ def _own_dtype(x) -> np.ndarray:
 
 
 def _anndata_matrix(adata, obsm: str | None) -> np.ndarray:
-    if obsm == "X":
-        return _own_dtype(adata.X)
+    from .. import config
     key = "X_emb" if obsm is None else obsm
-    if key not in adata.obsm:
-        kind = type(adata).__name__            # AnnData, or MuData for a MuData
-        keys = sorted(map(str, adata.obsm.keys()))
-        if obsm is None:
-            raise ValueError(
-                f"The {kind} has no obsm['X_emb']; its obsm keys are "
-                f"{', '.join(keys) or 'none'}: pass obsm=, or obsm='X' for .X.")
-        raise ValueError(
-            f"obsm={obsm!r} not found in the {kind}; available obsm keys: "
-            f"{keys} (or obsm='X' for .X)")
-    return _own_dtype(adata.obsm[key])
+    has_x = getattr(adata, "X", None) is not None
+    if (obsm == "X" and has_x) or (obsm != "X" and key in adata.obsm):
+        return _own_dtype(adata.X if obsm == "X" else adata.obsm[key])
+    kind = type(adata).__name__            # AnnData, or MuData for a MuData
+    keys = sorted(map(str, adata.obsm.keys()))
+    picks = [config.hint(f"obsm={k!r}", f"--obsm {k}") for k in keys[:1] if len(keys) == 1]
+    picks = picks or ([config.hint("obsm= with one of them", "--obsm with one of them")]
+                      if keys else [])
+    picks += [config.hint("obsm='X' for .X", "--obsm X for .X")] if has_x and obsm != "X" else []
+    what = "no X" if obsm == "X" else f"no obsm[{key!r}]"
+    raise ValueError(f"The {kind} has {what}; its obsm keys are {', '.join(keys) or 'none'}"
+                     + (f": pass {' or '.join(picks)}." if picks else "."))
 
 
 def _read_csv_embedding(path: Path):
