@@ -147,15 +147,15 @@ def _bar(long_df: pd.DataFrame, *, metrics=None, methods=None, top: int | None =
     backend = style.backend_warning(shown)
     if backend:
         _compat.warn(backend, UserWarning)
-    per_ds = pd.DataFrame({ds: compute_overall(mat) for ds, mat in parts.items()})
-    if overall is not None:
+    datasets = list(parts)
+    if overall is not None:                 # the 0.3 formulas, until 0.5
+        per_ds = pd.DataFrame({ds: compute_overall(mat) for ds, mat in parts.items()})
         mean = (per_ds.mean(axis=1) if overall == "mean_overall"
                 else compute_overall(style.mean_rank_matrix(parts)))
         mean = mean.sort_values(ascending=False, kind="mergesort")
     mean = mean[::-1]                       # the best method is drawn on top
     if top:
         mean = mean.tail(top)
-    per_ds = per_ds.reindex(mean.index)
 
     n = len(mean)
     # matplotlib's own defaults, whatever the session's rcParams are:
@@ -167,8 +167,9 @@ def _bar(long_df: pd.DataFrame, *, metrics=None, methods=None, top: int | None =
         # whisker = SD across datasets; none for a method in one dataset, and none
         # under overall="rank", whose bar is not a mean of per-dataset scores
         if overall == "mean_overall":
-            sd = per_ds.std(axis=1, ddof=0).reindex(mean.index)
-            n_scored = per_ds.notna().sum(axis=1).reindex(mean.index)
+            per_ds = per_ds.reindex(mean.index)
+            sd = per_ds.std(axis=1, ddof=0)
+            n_scored = per_ds.notna().sum(axis=1)
             xerr = np.where(n_scored.to_numpy() > 1, sd.to_numpy(), np.nan)
         else:
             xerr = np.full(n, np.nan)
@@ -185,9 +186,9 @@ def _bar(long_df: pd.DataFrame, *, metrics=None, methods=None, top: int | None =
                            edgecolor="#444", linewidth=0.7, zorder=3)
 
         ax.set_yticks(range(n)); ax.set_yticklabels(mean.index, fontsize=9)
-        n_datasets = per_ds.shape[1]
+        n_datasets = len(datasets)
         if n_datasets == 1:
-            xlabel = f"overall score ({per_ds.columns[0]})"
+            xlabel = f"overall score ({datasets[0]})"
         else:
             how = {"rank": "rank of mean ranks"}.get(overall, "mean of per-dataset overall")
             xlabel = f"overall score ({how}, {n_datasets} datasets)"
@@ -199,7 +200,7 @@ def _bar(long_df: pd.DataFrame, *, metrics=None, methods=None, top: int | None =
         ax.grid(axis="x", color="#e8e8e8", zorder=0)
         for side in ("top", "right", "left"):
             ax.spines[side].set_visible(False)
-        heading = title or (f"overall — {per_ds.columns[0]}" if n_datasets == 1
+        heading = title or (f"overall — {datasets[0]}" if n_datasets == 1
                             else f"overall — {n_datasets} datasets")
         if family:
             heading += f"  ({family} metrics)"

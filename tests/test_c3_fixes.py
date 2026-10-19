@@ -182,3 +182,197 @@ def test_cli_dry_run_refuses_a_wrong_length_batch_before_printing(tmp_path, caps
     assert rc != 0 and cap.out == ""
     assert cap.err.splitlines()[0] == ("error: --batch gave 500 batch ids for the 2,864 cells "
                                        "of D11: give one batch per cell.")
+
+
+# --------------------------------------------------------------- E02
+def test_the_embedding_of_a_one_batch_dataset_writes_h5ad(tmp_path):
+    emb = mtb.load_batch(_saved_tree(tmp_path)).embedding("Matilda")
+    assert "batch" not in emb.obs
+    emb.write_h5ad(tmp_path / "e.h5ad")
+
+
+# --------------------------------------------------------------- E05
+@pytest.mark.parametrize("ds,category,method", [("D11", "vertical", "Matilda"),
+                                                ("D45", "mosaic", "Cobolt"),
+                                                ("D52", "cross", "StabMap")])
+def test_dataset_labels_follow_reordered_cells(ds, category, method):
+    """Also where barcodes repeat across batches (D45, D52): the folder's cells are
+    named as BatchResult.embedding names them, cty2:<barcode>."""
+    from multibench import workflow
+    from multibench.eval.pipeline import _dataset_labels, _stack_label_files
+    root = mtb.config.DEFAULT.data_path
+    files = _quiet(_dataset_labels, ds, category, method, None)
+    files = list(files.values()) if isinstance(files, dict) else list(files)
+    n = sum(len(pd.read_csv(f)) for f in files)
+    obs = _quiet(workflow._embedding_obs, {"method": method, "modalities": None}, ds,
+                 category, root, n)
+    perm = np.random.default_rng(1).permutation(n)
+    vals, _ = _stack_label_files(files, list(obs.index[perm]))
+    assert (np.asarray(vals) == obs["label"].to_numpy()[perm]).all()
+
+
+def test_labels_without_ids_next_to_barcodes_name_two_fixes(tmp_path):
+    ad = pytest.importorskip("anndata")
+    a = ad.AnnData(np.random.default_rng(0).normal(size=(30, 4)),
+                   obs=pd.DataFrame({"ct": ["T", "B", "NK"] * 10},
+                                    index=[f"AAAC{i}-1" for i in range(30)]))
+    a.obs[["ct"]].to_csv(tmp_path / "l.csv", index=False)
+    with pytest.raises(ValueError) as e:
+        mtb.evaluate(a, labels=str(tmp_path / "l.csv"), obsm="X", metrics=["ASW"])
+    assert str(e.value) == ("l.csv has no cell ids, and the embedding has: put the barcodes "
+                            "in its first column, or pass labels=pd.read_csv(...).iloc[:, 0]"
+                            ".to_numpy() to match by position.")
+    with pytest.raises(ValueError, match=r"^labels is a Series without cell ids, and the "
+                                         r"embedding has: index it by the barcodes, or pass "
+                                         r"labels\.to_numpy\(\) to match by position\.$"):
+        mtb.evaluate(a, labels=a.obs["ct"].reset_index(drop=True), obsm="X", metrics=["ASW"])
+    by_position = pd.read_csv(tmp_path / "l.csv").iloc[:, 0].to_numpy()
+    assert _quiet(mtb.evaluate, a, labels=by_position, obsm="X", metrics=["ASW"]).equals(
+        _quiet(mtb.evaluate, a, labels="ct", obsm="X", metrics=["ASW"]))
+
+
+# --------------------------------------------------------------- E08
+def test_a_batch_with_every_cell_and_some_others_is_matched_by_id():
+    ad = pytest.importorskip("anndata")
+    ids = [f"AAAC{i}-1" for i in range(30)]
+    a = ad.AnnData(np.random.default_rng(0).normal(size=(30, 4)),
+                   obs=pd.DataFrame({"ct": ["T", "B", "NK"] * 10, "donor": ["a", "b"] * 15},
+                                    index=ids))
+    more = pd.concat([a.obs["donor"], pd.Series(["c"] * 3, index=["X0", "X1", "X2"])])
+    kw = dict(labels="ct", obsm="X", metrics=["iLISI"])
+    assert _quiet(mtb.evaluate, a, batch=more.iloc[::-1], **kw).equals(
+        _quiet(mtb.evaluate, a, batch="donor", **kw))
+    with pytest.raises(ValueError, match=r"^batch has 27 entries for 30 cells in the "
+                                         r"embedding: give one batch per cell\.$"):
+        mtb.evaluate(a.X, labels=a.obs["ct"].to_numpy(), batch=list(a.obs["donor"])[:-3],
+                     metrics=["iLISI"])
+
+
+# --------------------------------------------------------------- scan and run_all texts
+def _folder(root, name, files, n=60):
+    """A dataset folder of ``n`` cells per file: {file: kind} with kind rna, gas or peak."""
+    from tests.test_scan_held import _h5
+    feats = {"rna": [f"GENE{i}" for i in range(40)], "gas": [f"GENE{i}" for i in range(40)],
+             "peak": [f"chr1:{i * 1000}-{i * 1000 + 500}" for i in range(40)]}
+    d = root / name
+    d.mkdir(parents=True)
+    for f, kind in files.items():
+        if f.endswith(".csv"):
+            pd.DataFrame({"x": ["A", "B"] * (n // 2)}).to_csv(d / f, index=False)
+        else:
+            _h5(d / f, feats[kind], [f"{f[:4]}{i}" for i in range(n)])
+    return d
+
+
+def test_e07_paired_files_count_their_cells_once(tmp_path, capsys):
+    d = _folder(tmp_path, "MULTI", {"rna.h5": "rna", "atac.h5": "peak", "cty.csv": ""}, n=600)
+    mtb.run_all(str(d), "vertical", methods=["MIRA"], dry_run=True)
+    out = capsys.readouterr().out
+    assert "MIRA needs about 3,000 cells, and this folder has 600: leave MIRA out." in out
+
+
+def test_c13_e20_numbered_diagonal_folders(tmp_path, capsys):
+    two = {f"{m}{i}.{e}": k for i in (1, 2)
+           for m, e, k in (("rna", "h5", "rna"), ("atac_gas", "h5", "gas"),
+                           ("rna_cty", "csv", ""), ("atac_cty", "csv", ""))}
+    mtb.scan(str(_folder(tmp_path, "DIAG2", two)), "diagonal")
+    out = capsys.readouterr().out
+    assert "This folder holds per-batch files" in out
+    assert "[scan] Conos:" not in out                      # C13: the folder line says it
+    three = dict(two, **{f"{m}3.{e}": k for m, e, k in (
+        ("rna", "h5", "rna"), ("atac_gas", "h5", "gas"), ("rna_cty", "csv", ""),
+        ("atac_cty", "csv", ""))})
+    df = mtb.scan(str(_folder(tmp_path, "DIAG3", three)), "diagonal")
+    out = capsys.readouterr().out
+    # E20: GLUE's variant for three batches speaks for it
+    assert "[scan] GLUE: GLUE needs peak ATAC (atac_peak1.h5, atac_peak2.h5, atac_peak3.h5)" in out
+    assert df.set_index("method").at["GLUE", "modalities"].startswith("rna1+rna2+rna3")
+
+
+def test_c55_no_sentence_on_the_rows_of_a_modality_the_folder_lacks(capsys):
+    mtb.scan("D11", "vertical")
+    mtb.run_all("D11", "vertical", methods=["Matilda", "totalVI"], dry_run=True)
+    assert "not listed" not in capsys.readouterr().out
+
+
+def test_c22_one_sentence_for_the_missing_files_of_one_kind(tmp_path):
+    d = _folder(tmp_path, "CROSS2", {"rna2.h5": "rna", "atac_peak2.h5": "peak",
+                                     "cty2.csv": ""})
+    reason = _quiet(mtb.scan, str(d), "cross", methods=["StabMap"]).at[0, "reason"]
+    assert reason.count("which the folder does not have") <= 1
+    assert "StabMap needs peak ATAC (atac_peak1.h5, atac_peak3.h5), which the folder does " \
+           "not have." in reason, reason
+
+
+# --------------------------------------------------------------- CLI texts
+def test_c21_an_empty_rna_selector_next_to_atac(tmp_path, capsys):
+    ad = pytest.importorskip("anndata")
+    a = ad.AnnData(np.ones((20, 5)))
+    a.write_h5ad(tmp_path / "own.h5ad")
+    assert cli.main(["export", str(tmp_path / "own.h5ad"), str(tmp_path / "OUT"), "--rna=",
+                     "--atac", "X", "--atac-kind", "peak", "--category", "vertical"]) == 1
+    assert capsys.readouterr().err.splitlines()[-1] == (
+        "error: --rna is empty: --rna none writes no RNA, or pass a selector such as X.")
+
+
+def test_e09_cli_messages_name_flags(tmp_path, capsys):
+    assert cli.main(["run-all", "D11", "--category", "vertical", "--methods", "Matilda",
+                     "--out-dir", str(tmp_path / "o"), "--skip-existing", "--param",
+                     "Matilda:epochs=1"]) == 1
+    err = capsys.readouterr().err
+    assert "--skip-existing with --param" in err and "skip_existing=" not in err
+    assert "leave --skip-existing out" in err
+    ad = pytest.importorskip("anndata")
+    a = ad.AnnData(np.ones((20, 5)), obs=pd.DataFrame({"celltype": ["A", "B"] * 10},
+                                                      index=[f"c{i}-1" for i in range(20)]))
+    a.write_h5ad(tmp_path / "e.h5ad")
+    assert cli.main(["evaluate", str(tmp_path / "e.h5ad"), "--obsm", "X", "--labels",
+                     "cell_type"]) == 1
+    err = capsys.readouterr().err
+    assert err.startswith("error: --labels cell_type is neither an obs column")
+    assert "Did you mean 'celltype'?" in err
+
+
+def test_e19_a_refusal_prints_no_traceback_line(tmp_path, capsys):
+    assert cli.main(["run-all", "D11", "--category", "vertical", "--methods", "Matilda",
+                     "--out-dir", str(tmp_path / "o"), "--skip-existing", "--param",
+                     "Matilda:epochs=1"]) == 1
+    assert "MULTIBENCH_DEBUG" not in capsys.readouterr().err
+    assert not cli._refusal(RuntimeError("x"))
+
+
+# --------------------------------------------------------------- E13 / E14
+def test_e13_e14_a_benchmark_dataset_gives_its_category_and_its_cells():
+    ad = pytest.importorskip("anndata")
+    n = len(pd.read_csv(mtb.config.DEFAULT.data_path / "D11" / "cty.csv"))
+    a = ad.AnnData(np.random.default_rng(0).normal(size=(n, 4)),
+                   obs=pd.DataFrame({"ct": ["A", "B"] * (n // 2)}))
+    got = _quiet(mtb.evaluate, a, labels="ct", obsm="X", dataset="D11", method="mine",
+                 metrics=["cLISI"])
+    assert set(got["category"]) == {"vertical"}
+    with pytest.raises(ValueError, match=r"^The label files of D11 \(cty\.csv\) hold 2,864 "
+                                         r"cells; the embedding has 1,000 rows\."):
+        _quiet(mtb.evaluate, a[:1000].copy(), labels="ct", obsm="X", dataset="D11",
+               metrics=["cLISI"])
+
+
+# --------------------------------------------------------------- E18 / C20
+def test_e18_default_calls_rank_once(monkeypatch):
+    from multibench.plot import style
+    pb = importlib.import_module("multibench.plot.bar")
+    calls = []
+    for mod, name in ((style, "compute_overall"), (pb, "compute_overall"),
+                      (style, "mean_rank_matrix")):
+        monkeypatch.setattr(mod, name, lambda *a, _n=name, **k: calls.append(_n))
+    df = pd.concat([mtb.load_results("vertical"), _this_run("vertical")])
+    _quiet(mtb.plot.bar, df)
+    _quiet(mtb.recommend, "vertical", long_df=df)
+    assert calls == []
+
+
+def test_c20_your_rows_have_no_runtime_of_the_package():
+    df = pd.concat([mtb.load_results("vertical"), _this_run("vertical")])
+    r = _quiet(mtb.recommend, "vertical", long_df=df).set_index("method")
+    own = [m for m in r.index if m.endswith("(this run)")]
+    assert own and r.loc[own, "worst_sec"].isna().all()
+    assert r.loc[own[0].removesuffix(" (this run)"), "worst_sec"] > 0

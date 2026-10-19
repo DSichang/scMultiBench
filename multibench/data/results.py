@@ -1108,9 +1108,11 @@ def _recommend(
     if repeated.any():
         raise ValueError(_duplicate_rows_message(df[repeated], keys))
 
-    parts = style.per_dataset_ranks(df, sel.codes if sel.explicit else None)
-    degenerate = sorted(ds for ds, mat in parts.items() if len(mat.index) < min_methods)
-    kept = {ds: mat for ds, mat in parts.items() if ds not in degenerate}
+    # the methods with a score on each dataset
+    scored = df[df["value"].notna()]
+    per_ds = {ds: sorted(set(g["method"])) for ds, g in scored.groupby("dataset")}
+    degenerate = sorted(ds for ds, ms in per_ds.items() if len(ms) < min_methods)
+    kept = {ds: ms for ds, ms in per_ds.items() if ds not in degenerate}
     if not kept:
         hint = ""
         if long_df_was_none and source == "published":
@@ -1121,7 +1123,7 @@ def _recommend(
                 hint = (f" The stored results have {len(have)} methods for {category}: "
                         f"{', '.join(sorted(have, key=str.lower))}. Leave out source= "
                         f"to rank them.")
-        sizes = {ds: len(parts[ds].index) for ds in sorted(parts)}
+        sizes = {ds: len(per_ds[ds]) for ds in sorted(per_ds)}
         counts = ", ".join(f"{ds} has {k}" for ds, k in sizes.items())
         one = (" A min-max score over one method is always 1.0."
                if sizes and max(sizes.values()) == 1 else "")
@@ -1130,14 +1132,14 @@ def _recommend(
             f"{one}{hint} Otherwise pass long_df= with more methods.")
     # igraph-scored rows ranked against leidenalg-scored stored rows
     backend = style.backend_warning(df[df["dataset"].isin(list(kept))])
-    n_ds = style.coverage(kept)
+    n_ds = pd.Series([m for ms in kept.values() for m in ms]).value_counts()
     n_total = len(kept)
     codes = sel.codes if sel.explicit else None
     grand = style.overall(df, codes)        # refuses your rows on another dataset
     if degenerate:
         grand = style.overall(df[df["dataset"].isin(list(kept))], codes)
     keep_methods = list(grand.index) + sorted(
-        {m for mat in kept.values() for m in mat.index} - set(grand.index), key=str)
+        {m for ms in kept.values() for m in ms} - set(grand.index), key=str)
     if filtered:
         allowed = set(find_methods(category=category, modalities=modalities, atac=atac))
         # your own methods are not package methods: the filter leaves them
@@ -1179,7 +1181,9 @@ def _recommend(
             needs = any(v.needs_labels for v in in_category) if in_category \
                 else bool(spec.needs_labels)
             runtime = method_info(spec.id)["runtime"]
-            tier, worst = runtime.get("tier"), runtime.get("worst_sec")
+            # the observed times are the package's runs: none for a run of yours
+            tier, worst = ((runtime.get("tier"), runtime.get("worst_sec"))
+                           if catalog._canonical_id(m) == spec.id else (None, None))
         else:
             env, needs, tier, worst = None, None, None, None
         rows.append({
