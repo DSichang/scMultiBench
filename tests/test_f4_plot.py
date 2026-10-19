@@ -282,7 +282,7 @@ def test_nothing_runnable_tail_is_plain(no_envs, root):
                         data_path=root / "data", **kw)
         lines = str(e.value).splitlines()
         assert lines[-1] == (f"{where} Its files_ok and env_ok columns say which check "
-                             f"failed. mtb.env.doctor() checks the environments.")
+                             f"failed. mtb.env.install(dry_run=True) checks the environments.")
         if before:
             assert lines[-2] == before
         else:
