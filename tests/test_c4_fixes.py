@@ -68,6 +68,12 @@ def test_labels_with_ids_or_in_the_method_order_score_as_the_dataset_route():
     assert _value(mtb.evaluate(emb, labels=files, **KW)) == pytest.approx(want)
     # your own method reads the folder's order: nothing to refuse
     mtb.evaluate(emb, labels=lab_folder, **{**KW, "method": "PCA"})
+    # an obs column follows the embedding's own rows
+    ad = pytest.importorskip("anndata")
+    lab_st = np.concatenate([pd.read_csv(p).iloc[:, 0].to_numpy() for p in st.values()])
+    a = ad.AnnData(obs=pd.DataFrame({"ct": lab_st}, index=[f"c{i}" for i in range(len(emb))]))
+    a.obsm["X_emb"] = emb
+    assert _value(mtb.evaluate(a, labels="ct", **KW)) == pytest.approx(want)
 
 
 def test_a_batch_with_ids_follows_the_method_order():

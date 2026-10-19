@@ -1087,8 +1087,9 @@ def _gives_ids(x, adata) -> bool:
 def _follows_cells(labels, adata, cells: _Cells) -> bool:
     """Whether ``labels`` can be put in the cells' order: an obs column of the
     embedding, ids, or the dataset's label files in that order."""
-    if adata is not None and isinstance(labels, str) \
-            and _obs_column_name(labels, adata) is not None:
+    if adata is not None and isinstance(labels, str) and (
+            _obs_column_name(labels, adata) is not None
+            or _mod_obs_column(labels, adata) is not None):
         return True
     files = _file_list(labels) if isinstance(labels, dict) else _label_files(labels)
     if files and [f.name for f in files] == [f.name for f in cells.files]:
