@@ -53,8 +53,10 @@ def test_evaluate_page_comparability_sentence_is_plain():
     # Y07 (r3): no "Compare ranks."; one true sentence on why the same embedding moves
     assert "most methods give a slightly different embedding on each run." in visible
     assert "Compare ranks." not in visible and "4,096" not in visible
-    assert ("The same embedding can also score a few hundredths differently on another "
-            "machine or cell order") in visible
+    # v1 (u4#6): what holds, in one sentence
+    assert ("With its cells in another order, the same embedding's Leiden-based and "
+            "classification scores can move by up to about 0.05.") in visible
+    assert "likely cause" not in visible
 
 
 @needs_docs
