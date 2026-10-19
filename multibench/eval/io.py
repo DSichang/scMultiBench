@@ -739,31 +739,28 @@ def _labels_look_measured(values) -> tuple[str, int, int] | None:
     return None
 
 
+def _own_dtype(x) -> np.ndarray:
+    """``x`` as an array at its own float dtype (float32 stays float32, as the
+    article's scripts read ``embedding.h5``); any other dtype as float."""
+    x = np.asarray(x.toarray() if hasattr(x, "toarray") else x)
+    return x if np.issubdtype(x.dtype, np.floating) else x.astype(float)
+
+
 def _anndata_matrix(adata, obsm: str | None) -> np.ndarray:
-    given = obsm is not None
-    if obsm is None:
-        # X_emb, the package's own key, else the only key there is (an
-        # AnnData's: a MuData's obsm also holds its modalities)
-        keys = sorted(adata.obsm.keys())
-        only = len(keys) == 1 and type(adata).__name__ == "AnnData"
-        obsm = keys[0] if only and "X_emb" not in keys else "X_emb"
     if obsm == "X":
-        X = adata.X
-        return np.asarray(X.toarray() if hasattr(X, "toarray") else X, dtype=float)
-    try:
-        X = adata.obsm[obsm]
-    except KeyError:
+        return _own_dtype(adata.X)
+    key = "X_emb" if obsm is None else obsm
+    if key not in adata.obsm:
         kind = type(adata).__name__            # AnnData, or MuData for a MuData
-        keys = sorted(adata.obsm.keys())
-        if not given and len(keys) > 1 and kind == "AnnData":
+        keys = sorted(map(str, adata.obsm.keys()))
+        if obsm is None:
             raise ValueError(
-                f"The {kind} has {len(keys)} obsm keys ({', '.join(map(str, keys))}): "
-                f"pass obsm=, or obsm='X' for .X.") from None
+                f"The {kind} has no obsm['X_emb']; its obsm keys are "
+                f"{', '.join(keys) or 'none'}: pass obsm=, or obsm='X' for .X.")
         raise ValueError(
             f"obsm={obsm!r} not found in the {kind}; available obsm keys: "
-            f"{keys} (or obsm='X' for .X)") from None
-    X = X.toarray() if hasattr(X, "toarray") else X
-    return np.asarray(X, dtype=float)
+            f"{keys} (or obsm='X' for .X)")
+    return _own_dtype(adata.obsm[key])
 
 
 def _read_csv_embedding(path: Path):
@@ -811,7 +808,7 @@ def as_matrix(output, *, obsm: str | None = None) -> np.ndarray:
         The embedding in any of the forms above.
     obsm : str | None
         Key of ``.obsm`` to use for AnnData / ``.h5ad`` inputs (``'X'`` = ``.X``);
-        ``None`` = ``X_emb``, or the only key when there is one.
+        ``None`` = ``X_emb``.
 
     Returns
     -------
@@ -821,9 +818,9 @@ def as_matrix(output, *, obsm: str | None = None) -> np.ndarray:
     if isinstance(output, np.ndarray):
         return output
     if hasattr(output, "toarray") and not isinstance(output, pd.DataFrame):
-        return np.asarray(output.toarray(), dtype=float)
+        return _own_dtype(output)
     if isinstance(output, pd.DataFrame):
-        return output.to_numpy(dtype=float)
+        return _own_dtype(output.to_numpy())
     if _is_anndata(output):
         return _anndata_matrix(output, obsm)
     if isinstance(output, (str, Path)):
@@ -836,7 +833,7 @@ def as_matrix(output, *, obsm: str | None = None) -> np.ndarray:
             import anndata as ad
             return _anndata_matrix(ad.read_h5ad(p), obsm)
         if suf == ".npy":
-            return np.asarray(np.load(p), dtype=float)
+            return _own_dtype(np.load(p))
         if suf in {".csv", ".tsv"}:
             return _read_csv_embedding(p)[0]
         if h5py.is_hdf5(p):

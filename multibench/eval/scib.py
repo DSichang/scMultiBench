@@ -271,7 +271,8 @@ def _leiden(adata, resolution: float, key_added: str, flavor: str) -> None:
 
 def _build_adata(emb, celltype, cluster, batch):
     import anndata as ad      # lazily: an evaluation-only dependency
-    adata = ad.AnnData(np.asarray(emb, dtype=float))
+    from .io import _own_dtype
+    adata = ad.AnnData(_own_dtype(emb))
     adata.obsm["X_emb"] = adata.X
     adata.obs["celltype"] = pd.Categorical(np.asarray(celltype).astype(str))
     if cluster is not None:

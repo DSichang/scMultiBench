@@ -1292,10 +1292,7 @@ def _evaluate_labels(args, stack, method):
                          "dataset's label files")
         dataset, root = resolve.split_dataset(args.dataset, args.data_path)
         labels = pipeline._dataset_labels(dataset, args.category, method, root)
-        try:
-            own = registry.check_method(method) if args.category else None
-        except KeyError:
-            own = None
+        own = registry.method_of(method)
         order = f"in {own}'s cell order" if own else "in that order"
         print(f"# labels: {', '.join(Path(v).name for v in labels.values())} from "
               f"{dataset}, {order}", file=sys.stderr)
@@ -2161,7 +2158,7 @@ def build_parser() -> argparse.ArgumentParser:
                     default="error", action=_Retired,
                     tail=_compat.use("label files without missing labels"))
     pe.add_argument("--obsm", help="for .h5ad input: the .obsm key holding the "
-                                   "embedding (default: X_emb, else the only key; X = .X)")
+                                   "embedding (default: X_emb; X = .X)")
     pe.add_argument("--column", metavar="NAME", action=_Retired,
                     tail=_compat.use("a one-column --labels CSV"))
     pe.add_argument("--name", action=_Retired, tail=_compat.use("--method"))

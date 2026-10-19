@@ -979,7 +979,7 @@ def evaluate(embedding, labels=None, *, dataset: str | None = None,
         code (``"ARI"``) or a list of codes and families.
     obsm : str | None
         ``.obsm`` key of an AnnData, MuData or ``.h5ad`` embedding; ``'X'``
-        means ``.X``. ``None`` = ``X_emb``, or the only key.
+        means ``.X``. ``None`` = ``X_emb``.
     verbose : bool
         Print a line when the Leiden search starts on more than 2,000 cells
         or labels are matched by barcode.
@@ -1039,14 +1039,17 @@ def _evaluate(embedding, labels=None, *, dataset=None, method="embedding", categ
 
 
 def _dataset_labels(dataset, category, method, data_path):
-    """The label files of ``dataset``: in ``method``'s cell order when it is a
-    package method, else the folder's; one did-you-mean warning when ``method``
-    is close to a package method that puts the cells in another order."""
+    """The label files of ``dataset``: in ``method``'s cell order when it names a
+    package method (``registry.method_of``), which needs ``category``; else the
+    folder's, with one did-you-mean warning when ``method`` is close to a
+    package method that puts the cells in another order."""
     from ..engine import registry, resolve
-    try:
-        own = registry.check_method(method)
-    except (KeyError, TypeError):
-        own = None
+    own = registry.method_of(method)
+    if own is not None and category is None:
+        raise ValueError(config.hint(
+            f"evaluate(dataset={dataset!r}, method={method!r}) needs category= to read "
+            f"{own}'s cell order.",
+            f"--method {method!r} needs --category to read {own}'s cell order."))
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message=resolve.DEFAULT_ORDER_WARNING)
         try:

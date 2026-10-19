@@ -47,7 +47,7 @@ def classify(output, labels=None, *, batch=None, reference=None,
         article.
     obsm : str | None
         ``.obsm`` key of an AnnData or ``.h5ad`` ``output``; ``'X'`` means
-        ``.X``; ``None`` = ``X_emb``, or the only key when there is one.
+        ``.X``; ``None`` = ``X_emb``.
     label_order : list of str
         Keys of a ``labels`` dict in the method's cell order, as in
         ``mtb.evaluate``; ``None`` works for an unchanged ``mtb.labels_for``

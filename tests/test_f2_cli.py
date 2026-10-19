@@ -273,7 +273,7 @@ def test_evaluate_names_the_mudata_type():
     import anndata as ad
     a = ad.AnnData(np.zeros((6, 2)))
     mdata = md.MuData({"rna": a})
-    with pytest.raises(ValueError, match="not found in the MuData"):
+    with pytest.raises(ValueError, match=r"The MuData has no obsm\['X_emb'\]"):
         mtb.evaluate(mdata, labels=np.array(["A", "B"] * 3), metrics=["ASW"])
 
 

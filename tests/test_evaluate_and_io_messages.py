@@ -83,12 +83,12 @@ def test_x12_a_label_file_without_ids_next_to_barcodes_warns(tmp_path):
     a.obsm["X_pca"] = np.random.default_rng(1).normal(size=(60, 4))
     lab = tmp_path / "cty.csv"
     pd.DataFrame({"x": ["a", "b", "c"] * 20}).to_csv(lab, index=False)
-    _, msgs = _messages(mtb.evaluate, a, labels=str(lab), metrics=["cLISI"])
+    _, msgs = _messages(mtb.evaluate, a, labels=str(lab), metrics=["cLISI"], obsm="X_pca")
     assert ("cty.csv has no cell ids, so its rows are matched to the embedding by "
             "position.") in msgs
     b = _adata(names=False)
     b.obsm["X_pca"] = a.obsm["X_pca"]
-    _, msgs = _messages(mtb.evaluate, b, labels=str(lab), metrics=["cLISI"])
+    _, msgs = _messages(mtb.evaluate, b, labels=str(lab), metrics=["cLISI"], obsm="X_pca")
     assert not any("matched by position" in m for m in msgs)
 
 
@@ -126,19 +126,16 @@ def test_x47_text_returns_echo_as_text():
         assert isinstance(text, str) and repr(text) == str(text) and "\n" in text
 
 
-def test_x49_evaluate_takes_the_only_obsm_key():
+def test_x49_obsm_none_reads_x_emb_only():
+    # c1 (C02): never "the only key"; the message names the keys
     import numpy as np
     a = _adata()
     a.obsm["X_pca"] = np.random.default_rng(2).normal(size=(60, 4))
-    got = mtb.evaluate(a, labels=np.repeat(["a", "b", "c"], 20), metrics=["cLISI"])
-    want = mtb.evaluate(a, labels=np.repeat(["a", "b", "c"], 20), metrics=["cLISI"],
-                        obsm="X_pca")
-    pd.testing.assert_frame_equal(got, want)
-    a.obsm["X_umap"] = a.obsm["X_pca"][:, :2]
-    # round 2 (X49): the message names the keys, not an obsm= the user did not pass
-    with pytest.raises(ValueError, match=r"^The AnnData has 2 obsm keys \(X_pca, X_umap\): "
-                                         r"pass obsm=, or obsm='X' for \.X\.$"):
-        mtb.evaluate(a, labels=np.repeat(["a", "b", "c"], 20), metrics=["cLISI"])
+    for keys in ("X_pca", "X_pca, X_umap"):
+        with pytest.raises(ValueError, match=rf"^The AnnData has no obsm\['X_emb'\]; its obsm "
+                                             rf"keys are {keys}: pass obsm=, or obsm='X' for \.X\.$"):
+            mtb.evaluate(a, labels=np.repeat(["a", "b", "c"], 20), metrics=["cLISI"])
+        a.obsm["X_umap"] = a.obsm["X_pca"][:, :2]
 
 
 def test_x50_x71_classification_docs_and_left_out_cells():

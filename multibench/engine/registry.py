@@ -174,6 +174,19 @@ def check_method(method_id: str) -> str:
     raise KeyError(unknown_method_message(method_id))
 
 
+def method_of(name) -> str | None:
+    """The package method a row name stands for, else ``None``: an id or display
+    name as :func:`check_method` reads it, or one followed by a space and
+    anything (``"StabMap (this run)"``)."""
+    words = str(name).split(" ") if isinstance(name, str) else []
+    for n in range(len(words), 0, -1):
+        try:
+            return check_method(" ".join(words[:n]))
+        except (KeyError, TypeError):
+            pass
+    return None
+
+
 def unknown_method_message(method_id, hint: str | None = None) -> str:
     """``"Unknown method X. Did you mean Y? ... shows all methods."``; ``hint``
     defaults to :func:`closest_method`."""
