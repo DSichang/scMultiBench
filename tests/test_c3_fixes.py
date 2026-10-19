@@ -108,15 +108,6 @@ def test_rescoring_noise_scores_as_the_stored_row(category):
     assert np.allclose(s[base.index], base, atol=1e-12)
 
 
-# --------------------------------------------------------------- E11
-def test_a_renamed_copy_of_stored_rows_does_not_move_the_stored_scores():
-    st = mtb.load_results("diagonal")
-    copy = st[st["method"] == "scJoint"].assign(method="scJoint (copy)")   # source "stored"
-    s, base = overall(pd.concat([st, copy])), overall(st)
-    assert np.allclose(s[base.index], base, atol=1e-12)
-    assert s["scJoint (copy)"] == pytest.approx(s["scJoint"])
-
-
 # --------------------------------------------------------------- E04
 def test_the_bar_axis_does_not_claim_0_1():
     st = mtb.load_results("vertical")

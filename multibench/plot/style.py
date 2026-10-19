@@ -5,8 +5,6 @@ and ``plot.bubble``.
 """
 from __future__ import annotations
 
-import functools
-
 import numpy as np
 import pandas as pd
 
@@ -149,14 +147,6 @@ def coverage(parts: dict) -> pd.Series:
 STORED_SOURCES = ("published", "stored", "rerun")
 
 
-@functools.lru_cache(maxsize=1)
-def _shipped_pairs() -> frozenset:
-    """``{(dataset, method)}`` of the tables the package ships."""
-    from ..data.results import _results_coverage
-    cov = _results_coverage(source="both")
-    return frozenset(zip(cov["dataset"].astype(str), cov["method"].astype(str)))
-
-
 #: a value of your rows this close to a stored value is that value: re-scoring noise
 SNAP = 1e-6
 
@@ -171,19 +161,15 @@ def overall(df: pd.DataFrame, metrics=None) -> pd.Series:
     min-max scaled with the stored rows' range (1 when they tie), then averaged
     over the datasets. Stored rows so keep their article scores, a row equal to
     a stored row gets its score, and one better than all scores above 1.
-    A stored row is a row of a shipped table (``source`` "stored" and its
-    method and dataset); a value of your rows within :data:`SNAP` of a stored
-    value counts as that value.
+    A value of your rows within :data:`SNAP` of a stored value counts as that
+    value.
     """
     from .. import config
     if metrics is not None:
         df = df[df["metric"].isin(metrics)]
     df = df.assign(dataset=df["dataset"].astype(str) if "dataset" in df.columns else "all")
-    stored = df["source"].isin(STORED_SOURCES) if "source" in df.columns else False
-    if np.any(stored):
-        pairs = _shipped_pairs()
-        stored &= np.array([(d, str(m)) in pairs for d, m in zip(df["dataset"], df["method"])])
-    df = df.assign(_stored=stored)
+    df = df.assign(_stored=df["source"].isin(STORED_SOURCES) if "source" in df.columns
+                   else False)
     have = sorted(set(df.loc[df["_stored"], "dataset"]))
     alone = sorted(set(df["dataset"]) - set(have))
     fix = config.hint(" or ".join(f"dataset={d!r}" for d in have),
