@@ -540,7 +540,8 @@ def test_plot_input_rows_partly_removed_warns(tmp_path, monkeypatch, capsys):
                    "--dataset", "D11", "--out", str(tmp_path / "f.pdf")])
     err = capsys.readouterr().err
     assert rc == 0 and sorted(seen["df"]["method"].unique()) == ["A", "Mine"]
-    assert "warning: --dataset dropped 3 of your 6 rows (dataset MYCITE, method Other)" in err
+    # c4 (u4 #9): each flag names what it dropped
+    assert "warning: --dataset dropped 3 of your 6 rows (MYCITE)" in err
     # --methods naming none of your methods removes all of them: an error too
     rc = cli.main(["plot", "bubble", "--input", str(mine), "--category", "vertical",
                    "--dataset", "D11", "--methods", "A", "--out", str(tmp_path / "f.pdf")])

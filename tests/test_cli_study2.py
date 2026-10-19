@@ -33,13 +33,14 @@ def _env_sub(name):
 
 
 # ----------------------------------------------------------------- params
-def test_cli_params_prints_every_variant_without_a_selector(capsys):
+def test_cli_params_answers_as_params_for_without_a_selector(capsys):
     rc = cli.main(["params", "Matilda"])
     out = capsys.readouterr().out
     assert rc == 0
-    # r3 (X64): device is the package's, so 9
-    assert "# Matilda vertical:rna+adt: 9 tunable" in out
-    assert "# Matilda vertical:rna+atac: 9 tunable" in out
+    # r3 (X64): device is the package's, so 9; c4: one table, as params_for, for the
+    # variants that take the same parameters
+    assert ("# Matilda vertical:rna+adt, vertical:rna+atac and vertical:rna+adt+atac: "
+            "9 tunable") in out
     header = next(l for l in out.splitlines() if l.strip().startswith("key"))
     assert header.split() == ["key", "type", "default"]      # 0.4.0: no script_default
     assert "epochs" in out and "z_dim" in out and "--param Matilda:KEY=VALUE" in out
@@ -69,14 +70,15 @@ def test_cli_params_fixed_in_script_and_knobs_for_untunable_method(capsys):
 def test_cli_params_formats(capsys):
     rc = cli.main(["params", "Matilda", "--format", "json"])
     rows = json.loads(capsys.readouterr().out)
-    n = len(multibench.method_info("Matilda")["supports"])      # one row per variant
-    assert rc == 0 and len(rows) == n == 3
+    # c4: the one params_for dict
+    assert rc == 0 and len(rows) == 1
+    assert rows[0]["variant"] == multibench.params_for("Matilda")["variant"]
     assert set(rows[0]) >= {"method", "variant", "tunable", "fixed_in_script"}
     assert "effective" not in rows[0]                           # 0.4.0: dropped
     rc = cli.main(["params", "Matilda", "--format", "csv"])
     out = capsys.readouterr().out
     assert rc == 0 and out.splitlines()[0] == "variant,key,type,default"
-    assert out.count("\n") == 1 + n * 9    # header + 3 variants x 9 keys (no device, r3)
+    assert out.count("\n") == 1 + 9        # header + 9 keys (no device, r3)
 
 
 def test_cli_params_errors(capsys):

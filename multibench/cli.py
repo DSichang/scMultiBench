@@ -765,37 +765,10 @@ def _cmd_info(args) -> int:
     return _EXIT_OK
 
 
-def _params_rows(method: str, category: str | None, modalities) -> list[dict]:
-    """The :func:`multibench.params_for` dict of every variant of ``method`` that
-    matches ``category`` / ``modalities``; a selector left out matches all."""
-    spec = registry.get(method)                       # KeyError (did-you-mean)
-    registry.check_category(category)
-    want = registry.normalize_modalities(modalities) if modalities else None
-    picked = [v for v in spec.variants
-              if (category is None or v.when.get("category") == category)
-              and (want is None or set(v.when.get("modalities", [])) == set(want))]
-    if not picked and want is not None:
-        # the tokens params_for accepts (rna,adt for a three-batch cross variant)
-        try:
-            return [discover._params_for(method, category, list(modalities))]
-        except (KeyError, ValueError):
-            pass
-    if not picked:
-        if category is not None and category not in spec.wired_categories:
-            raise ValueError(schema.no_category_message(method, spec.wired_categories, category))
-        avail = [f"{v.when.get('category')}:{'+'.join(v.when.get('modalities', [])) or '(data_dir)'}"
-                 for v in spec.variants]
-        raise ValueError(f"{method}: no variant for category={category!r} "
-                         f"modalities={list(want) if want else None}; available: {avail}")
-    return [discover._params_for(method, v.when.get("category"),
-                                 list(v.when.get("modalities", [])) or None)
-            for v in picked]
-
-
 def _cmd_params(args) -> int:
-    """``multibench params METHOD``: the :func:`multibench.params_for` tables, one
-    block per matching variant (``--format json``: the dicts)."""
-    rows = _params_rows(args.method, args.category, _csv_list(args.modalities))
+    """``multibench params METHOD``: the :func:`multibench.params_for` table
+    (``--format json``: the dict, in a list)."""
+    rows = [discover._params_for(args.method, args.category, _csv_list(args.modalities))]
     fmt = args.format
     if fmt == "json":
         print(json.dumps(rows, indent=1, default=str))
@@ -920,6 +893,7 @@ def _filter_own_rows(frames: list, args) -> list:
             raise ValueError(
                 f"Your {n} rows are for dataset {_names(whole['dataset'])}, and "
                 f"--dataset {args.dataset} removed all of them. {fix}")
+    by_dataset = keep.copy()
     if methods:
         by_method = whole["method"].astype(str).isin(methods)
         if (keep & ~by_method).any() and not (keep & by_method).any():
@@ -929,15 +903,12 @@ def _filter_own_rows(frames: list, args) -> list:
                 f"Your rows are for {noun} {_and_list(own)}, and --methods {args.methods} "
                 f"removed all of them. Add {_and_list(own)} to --methods.")
         keep &= by_method
-    dropped = whole[~keep]
-    if len(dropped):
-        what = [f"method {_names(dropped['method'])}"]
-        if "dataset" in dropped.columns:
-            what.insert(0, f"dataset {_names(dropped['dataset'])}")
-        flags = " and ".join(f for f, on in (("--dataset", datasets), ("--methods", methods))
-                             if on)
-        print(f"warning: {flags} dropped {len(dropped)} of your {n} rows "
-              f"({', '.join(what)})", file=sys.stderr)
+    # each flag names the rows it dropped
+    for flag, gone, col in (("--dataset", whole[~by_dataset], "dataset"),
+                            ("--methods", whole[by_dataset & ~keep], "method")):
+        if len(gone):
+            print(f"warning: {flag} dropped {len(gone)} of your {n} rows "
+                  f"({_names(gone[col])})", file=sys.stderr)
     out, start = [], 0
     for f in frames:
         stop = start + len(f)
@@ -973,19 +944,26 @@ def _rename_clashes(stored: pd.DataFrame, own: list) -> list:
 
 def _rename_repeats(own: list, inputs: list) -> list:
     """The rows of ``--input`` files that share a method and dataset, each renamed
-    ``<method> (<its folder or file name>)``."""
+    ``<method> (<its folder or file>)``, named below the inputs' common folder
+    (``runs/a/D11`` and ``runs/b/D11``: ``a/D11`` and ``b/D11``)."""
     keys = ["method", "dataset"]
+    # a run folder's long.csv is the folder; a CSV is its name without the suffix
+    places = [Path(os.path.abspath(p)) for p in inputs]
+    places = [p.parent if p.name == "long.csv" else p.with_suffix("") if p.is_file() else p
+              for p in places]
+    common = Path(os.path.commonpath(places)) if len(places) > 1 else None
     pairs = [set(map(tuple, f[keys].astype(str).to_numpy())) if set(keys) <= set(f.columns)
              else set() for f in own]
     shared = {k for i, p in enumerate(pairs) for k in p
               if any(k in q for q in pairs[:i] + pairs[i + 1:])}
     out = []
-    for f, path in zip(own, inputs):
+    for f, place in zip(own, places):
         if shared and set(keys) <= set(f.columns):
             hit = [tuple(k) in shared for k in f[keys].astype(str).to_numpy()]
             f = f.copy()
             # "<method> (<folder>)": --methods <method> keeps it (registry.method_of)
-            tag = Path(path).parent.name if Path(path).name == "long.csv" else Path(path).stem
+            tag = (place.relative_to(common).as_posix() if common and place != common
+                   else place.name)
             f.loc[hit, "method"] = f.loc[hit, "method"].astype(str) + f" ({tag})"
         out.append(f)
     return out
@@ -2264,14 +2242,16 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _refusal(e: Exception) -> bool:
-    """``e`` is a ValueError, KeyError or FileNotFoundError the package raised:
-    its message names the fix, and a traceback adds nothing."""
-    tb = e.__traceback__
-    while tb is not None and tb.tb_next is not None:
-        tb = tb.tb_next
-    return (isinstance(e, (ValueError, KeyError, FileNotFoundError)) and tb is not None
-            and Path(tb.tb_frame.f_code.co_filename).resolve().is_relative_to(
-                Path(__file__).resolve().parent))
+    """``e`` is a refusal: a ValueError, LookupError, TypeError or OSError that a
+    ``raise`` statement of the package raised. Its message names the fix, and a
+    traceback adds nothing; an error inside the package's code keeps the hint."""
+    import traceback
+    frames = traceback.extract_tb(e.__traceback__)
+    if not frames or not isinstance(e, (ValueError, LookupError, TypeError, OSError)):
+        return False
+    last = frames[-1]
+    return (Path(last.filename).resolve().is_relative_to(Path(__file__).resolve().parent)
+            and (last.line or "").startswith("raise "))
 
 
 def main(argv=None) -> int:
