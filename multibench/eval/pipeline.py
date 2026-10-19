@@ -713,6 +713,11 @@ def _files_that_fit(files: list, n_cells: int) -> list:
     return []
 
 
+def _n(n: int, one: str, many: str | None = None) -> str:
+    """``1 cell``, ``2,500 cells``: ``n`` and the word in its number."""
+    return f"{n:,} {one if n == 1 else many or one + 's'}"
+
+
 def _count_error(what: str, n: int, n_cells: int, given, category=None,
                  cells: _Cells | None = None) -> str:
     """evaluate()'s error for ``n`` values of ``what`` against ``n_cells`` rows.
@@ -725,10 +730,10 @@ def _count_error(what: str, n: int, n_cells: int, given, category=None,
     side = _diagonal_side(files) if what == "labels" and n < n_cells else None
     if cells is not None and what == "labels":
         dataset = cells.dataset
-        head = config.hint(f"The label files of {dataset}{names} hold {n:,} cells; the "
-                           f"embedding has {n_cells:,} rows.",
-                           f"the label files of {dataset}{names} hold {n:,} labels for "
-                           f"{n_cells:,} cells in the embedding file.")
+        head = config.hint(f"The label files of {dataset}{names} hold {_n(n, 'cell')}; the "
+                           f"embedding has {_n(n_cells, 'row')}.",
+                           f"the label files of {dataset}{names} hold {_n(n, 'label')} for "
+                           f"{_n(n_cells, 'cell')} in the embedding file.")
         if side and category == "diagonal":
             return (f'{head} {dataset} labels the {side[0]} cells only, see the recipe '
                     f'"No labels" in the docs.')
@@ -745,8 +750,9 @@ def _count_error(what: str, n: int, n_cells: int, given, category=None,
             f"your own, such as --dataset {dataset}_subset, and plot them apart from the "
             f"stored results.")
     fact = config.hint(
-        f"{what} has {n:,} entries for {n_cells:,} cells in the embedding",
-        f"{_FLAGS[what]} gave {n:,} {_UNITS[what]}{names} for {n_cells:,} cells "
+        f"{what} has {_n(n, 'entry', 'entries')} for {_n(n_cells, 'cell')} in the embedding",
+        f"{_FLAGS[what]} gave {_n(n, _UNITS[what][:-1], _UNITS[what])}{names} for "
+        f"{_n(n_cells, 'cell')} "
         f"in the embedding file")
     if what == "labels" and n > n_cells and len(files) > 1:
         fit = _files_that_fit(files, n_cells)
@@ -754,7 +760,7 @@ def _count_error(what: str, n: int, n_cells: int, given, category=None,
         if fit:
             keys = (names[:len(fit)] if names and len(names) == len(files)
                     else [f.stem for f in fit])
-            return (f"The embedding has {n_cells:,} cells = {'+'.join(keys)}. "
+            return (f"The embedding has {_n(n_cells, 'cell')} = {'+'.join(keys)}. "
                     + config.hint(f"Pass the label files {_and_list(f.name for f in fit)} "
                                   f"only.",
                                   "Pass --labels for " + " and ".join(
@@ -770,7 +776,8 @@ def _count_error(what: str, n: int, n_cells: int, given, category=None,
     return config.hint(
         f"{fact}. For a folder with one label file per batch, pass dataset=, category= "
         f"and method=." if files else
-        f"labels has {n:,} entries for {n_cells:,} embedding rows: give one label per row.",
+        f"labels has {_n(n, 'entry', 'entries')} for {_n(n_cells, 'embedding row')}: "
+        f"give one label per row.",
         f"{fact}. For several label files{order}, repeat --labels in the row order of "
         f"the embedding file, or pass --dataset, --category and --method.")
 
@@ -1267,8 +1274,7 @@ def _scores(
     # named in the error for a Series that lacks some cells
     obs_ids = "adata.obs_names" if io._is_anndata(embedding) else None
     if isinstance(embedding, (str, Path)) and Path(embedding).suffix.lower() == ".h5ad":
-        import anndata as ad      # read once; keeps obs_names and obs
-        embedding = ad.read_h5ad(io._require_file(embedding, "embedding"))
+        embedding = io._read_h5ad(embedding, "embedding")   # once; keeps obs_names, obs
     adata = embedding if io._is_anndata(embedding) else None
     table = None
     if isinstance(embedding, (str, Path)) and Path(embedding).suffix.lower() in {".csv", ".tsv"}:

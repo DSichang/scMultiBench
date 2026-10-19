@@ -111,8 +111,7 @@ def classify(output, labels=None, *, batch=None, reference=None,
 
     cells = "adata.obs_names" if io._is_anndata(output) else None
     if isinstance(output, (str, Path)) and Path(output).suffix.lower() == ".h5ad":
-        import anndata as ad
-        output = ad.read_h5ad(output)
+        output = io._read_h5ad(output, "output")
     adata = output if io._is_anndata(output) else None
     table = None
     if isinstance(output, (str, Path)) and Path(output).suffix.lower() in {".csv", ".tsv"}:

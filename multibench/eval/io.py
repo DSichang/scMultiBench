@@ -51,6 +51,18 @@ def _require_file(path: Path | str, what: str = "file") -> Path:
     return p
 
 
+def _read_h5ad(path, what: str = "file"):
+    """The AnnData of the ``.h5ad`` file ``path`` (``what`` names it when it is
+    missing); a damaged or non-``.h5ad`` file raises one sentence, not h5py's."""
+    import anndata as ad
+    p = _require_file(path, what)
+    try:
+        return ad.read_h5ad(p)
+    except OSError:
+        raise ValueError(f"{p.name} cannot be read: it is not an .h5ad file, "
+                         f"or it is damaged.") from None
+
+
 def _refuse_h5mu(path) -> None:
     """``ValueError`` for an ``.h5mu`` path: it holds one AnnData per modality,
     and evaluate takes one of them."""
@@ -833,8 +845,7 @@ def as_matrix(output, *, obsm: str | None = None) -> np.ndarray:
         if suf in {".h5", ".hdf5", ".hdf"}:
             return read_embedding(p)
         if suf == ".h5ad":
-            import anndata as ad
-            return _anndata_matrix(ad.read_h5ad(p), obsm)
+            return _anndata_matrix(_read_h5ad(p, "output"), obsm)
         if suf == ".npy":
             return _own_dtype(np.load(p))
         if suf in {".csv", ".tsv"}:

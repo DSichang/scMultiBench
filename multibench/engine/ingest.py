@@ -358,7 +358,8 @@ def _to_anndata(src):
                "out/<method>/embedding.h5, which mtb.evaluate reads)" if "data" in keys else "")
             + "; pass an AnnData / .h5ad / .csv to convert instead")
     if suffix == ".h5ad":
-        return ad.read_h5ad(p)
+        from ..eval.io import _read_h5ad
+        return _read_h5ad(p, "input file")
     if suffix == ".h5mu":
         try:
             import mudata
