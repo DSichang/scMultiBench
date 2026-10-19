@@ -666,6 +666,7 @@ def _missing_files_reason(spec, category: str, mods: list, dataset: str,
         return f"{spec.id} reads {_and_list(names)}."
     atac_parts, other = [], []
     has_other = {}         # (need, kinds found) -> its part: numbered files share one
+    absent = {}            # need -> the files of a part none of whose kinds is here
     for role, p in missing.items():
         if is_label_role(role) or _schema_base(role) != "atac":
             other.append(p.name)
@@ -707,7 +708,13 @@ def _missing_files_reason(spec, category: str, mods: list, dataset: str,
             for names, f in zip(part[1], found):
                 names.append(f.name)
         else:
-            atac_parts.append(f"{need} ({want_file}), which is not in the folder")
+            if need not in absent:
+                absent[need] = []
+                atac_parts.append(absent[need])
+            absent[need].append(want_file)
+    for need, files in absent.items():
+        atac_parts[atac_parts.index(files)] = (
+            f"{need} ({', '.join(files)}), which the folder does not have")
     for (need, kinds), part in has_other.items():
         has = ", ".join(f"{k} ({', '.join(names)})" for k, names in zip(kinds, part[1]))
         atac_parts[atac_parts.index(part)] = (
@@ -1183,27 +1190,19 @@ def _all_spelling() -> str:
     return config.hint('modalities="all"', "--modalities all")
 
 
-def _lacking(families) -> str:
-    """``ATAC``, ``ADT or ATAC``: the families as words."""
-    return _and_list([_FAMILY_WORDS[f] for f in families], "or")
-
-
 def _not_listed_note(df: "pd.DataFrame", dataset: str, ds_dir: Path,
                      category: str | None = None) -> str:
-    """What the folder holds, what is not listed, and how to list it (the same
-    words in ``scan``, ``run_all`` and on the command line)."""
-    parts = []
-    if df.attrs["not_listed"]:
-        parts.append(_unlisted_sentence(df.attrs["not_held"]))
-    if df.attrs.get("not_listed_batch", 0):
-        parts.append("Variants for numbered batches are not listed.")
-    return (f"{_holds_sentence(dataset, ds_dir, df.attrs['held'], category)} "
-            + " ".join(parts) + f" {_all_spelling()} lists them.")
-
-
-def _unlisted_sentence(lacking) -> str:
-    """``Methods and variants that read ATAC are not listed.``"""
-    return f"Methods and variants that read {_lacking(lacking)} are not listed."
+    """What the folder holds when that has a fix (10x files under dataset names,
+    variants for numbered batches it lacks), else ``""`` (the same words in
+    ``scan``, ``run_all`` and on the command line). The rows that read a
+    modality the folder lacks go unsaid: a named method among them has its own
+    error."""
+    batch = df.attrs.get("not_listed_batch")
+    if not batch and not _tenx_files(ds_dir, _role_files(ds_dir, category)):
+        return ""
+    return (_holds_sentence(dataset, ds_dir, df.attrs["held"], category) + (
+        f" Variants for numbered batches are not listed. {_all_spelling()} lists them."
+        if batch else ""))
 
 
 def _batch_listed(df: "pd.DataFrame", ds_dir: Path, keep, methods=None) -> list:
@@ -1523,15 +1522,15 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
                     not_listed_methods=len({m for m, _ in left_out} - set(df["method"])),
                     not_held=[f for f in registry._BASE_MODALITIES
                               if any(f in lack for _, lack in left_out)])
-    private.attrs.update(dataset=dataset, folder=ds_dir, unlisted=left_out,
-                         category=category)
+    private.attrs.update(dataset=dataset, folder=ds_dir, category=category)
     if verbose:
         n, k_files, k_env = len(df), int(df["files_ok"].sum()), int(df["env_ok"].sum())
         rows = _rows_word(df, n)
         line = (f"[scan] {k_files} of {n} {rows} {_have_their(k_files, n)} input files. "
                 f"{k_env} of {n} {_have_their(k_env, n)} environment installed.")
-        if left_out or n_batch_out:
-            line += " " + _not_listed_note(df, dataset, ds_dir, category)
+        note = (left_out or n_batch_out) and _not_listed_note(df, dataset, ds_dir, category)
+        if note:
+            line += " " + note
         if _runner.linux_only_sentence():
             line += f" {LINUX_ONLY_SUMMARY}"
         elif any(e and e not in installed for e in df["env"]):
@@ -1548,7 +1547,13 @@ def _too_small(variant, inputs: dict, ds_dir: Path):
     ``min_genes``), ``True`` when a size cannot be read, else ``None``."""
     files = [Path(str(p)).name for p in inputs.values() if str(p).endswith(".h5")]
     sizes = _cells_per_file(ds_dir)
-    total = sum(sizes.get(f) or 0 for f in files)
+    # one count per label file: rna.h5 and atac.h5 of cty.csv are the same cells
+    label_of = {m.name: lab.stem for lab in ds_dir.glob("*cty*.csv")
+                for m in _label_data_files(lab)}
+    cells: dict = {}
+    for f in files:
+        cells[label_of.get(f, f)] = max(cells.get(label_of.get(f, f), 0), sizes.get(f) or 0)
+    total = sum(cells.values())
     if variant.min_cells and total < variant.min_cells:
         return f"{variant.min_cells:,} cells, and this folder has {total:,}" if total else True
     if variant.min_cells_per_batch:
@@ -1630,6 +1635,7 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
     rows, reasons, with_files = [], [], set()
     held = set(df.attrs["held"])
     several = df["category"].nunique() > 1
+    batches = len(_resolve._folder_batches(ds_dir))
     for (method, cat), group in df.groupby(["method", "category"], sort=False):
         if group["files_ok"].any():
             with_files.add(method)
@@ -1641,10 +1647,12 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
             rows.append((method, cat, group.at[i, "modalities"], True,
                          _scripts_caveat(group.at[i, "caveat"])))
             continue
-        # the row that speaks for the method: files on disk, families held, fewest
-        # missing, then the most modalities, as run_all runs
+        # the row that speaks for the method: files on disk, the folder's number of
+        # batches, families held, fewest missing, then the most modalities, as
+        # run_all runs
         i = min(group.index, key=lambda i: (
             not _inputs_on_disk(group.loc[i], dataset, data_path),
+            len(set(re.findall(r"\d+", str(group.at[i, "modalities"])))) != batches,
             len(_row_families(group.at[i, "modalities"]) - held),
             _missing_inputs(group.loc[i], dataset, data_path),
             -len(str(group.at[i, "modalities"]).split("+")), i))
@@ -1674,14 +1682,6 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
     line = (f"[scan] {n_files} of {n} {'method' if n == 1 else 'methods'} "
             f"{_have_their(n_files, n)} input files in {dataset}. {k} of {n} can run on "
             f"this computer. {holds}")
-    # the methods with no listed row, and the families they lack
-    listed, gone = set(df["method"]), {}
-    for m, lack in private.attrs["unlisted"]:
-        if m not in listed:
-            gone.setdefault(m, set()).update(lack)
-    if gone:
-        lack = [f for f in registry._BASE_MODALITIES if any(f in v for v in gone.values())]
-        line += f" {_unlisted_sentence(lack)} {_all_spelling()} lists them."
     fit = _category_hint(df, private.attrs["category"])
     if fit:
         line += f" {fit}"
@@ -1704,6 +1704,11 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
             # the renumber and per-batch sentences were printed once above
             for once in (renumber, per_batch):
                 reason = reason.replace(once, "").strip() if once else reason
+            # "X reads rna.h5 and atac_gas.h5.": the folder line says what to do
+            if (renumber or per_batch) and re.match(
+                    rf"{re.escape(method)} reads [^ ,]+(, [^ ,]+)*( and [^ ,]+)?\.( |$)",
+                    reason):
+                continue
             if reason:
                 print(f"[scan] {method}: {reason}", flush=True)
     would = [i for i, r in df.iterrows() if _would_run(r)]
@@ -2514,7 +2519,8 @@ class BatchResult:
         anndata.AnnData
             ``obsm["X_emb"]`` in the method's cell order; ``obs_names`` are
             the cells' barcodes (``cty2:AAAC...`` where batches share one) and
-            ``obs`` holds each cell's ``label`` and ``batch``.
+            ``obs`` holds each cell's ``label``, and its ``batch`` when the
+            cells have several.
 
         Raises
         ------
@@ -2680,10 +2686,9 @@ def _embedding_obs(rec, dataset, category, root, n, batch_text=None) -> pd.DataF
     index = (np.concatenate([np.asarray(b, dtype=object) for b in barcodes])
              if all(b is not None for b in barcodes) else np.arange(n).astype(str))
     stems = np.concatenate(batch)
-    # one label file is one batch: no batch to name
-    obs = pd.DataFrame({"label": np.concatenate(labels),
-                        "batch": stems if len(names) > 1 else None},
-                       index=pd.Index(index, dtype=object))
+    obs = pd.DataFrame({"label": np.concatenate(labels)}, index=pd.Index(index, dtype=object))
+    if len(names) > 1:                  # one label file is one batch: no batch to name
+        obs["batch"] = stems
     if batch_text:
         saved = pd.read_csv(__import__("io").StringIO(batch_text), dtype=str,
                             keep_default_na=False)
@@ -2784,9 +2789,11 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
                               methods, *, data_path=None, modalities=None,
                               allow_atac_mismatch: bool = False,
                               assume_gpu: bool = False, others=None,
-                              every: bool = False, note: str = "") -> str:
+                              every: bool = False, note: str = "",
+                              hidden: bool = False) -> str:
     """The ``ValueError`` text when no requested row can start (run_all's Notes);
-    ``others``: each row's blocks besides the platform."""
+    ``others``: each row's blocks besides the platform; ``hidden``: the plan
+    leaves out some rows."""
     def _line(r):
         return f"  {_row_label(r)}: {r['reason']}"
     # rows whose files are in place first: an env install fixes those
@@ -2820,7 +2827,7 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
     if only_platform:
         head = (f"None of the requested methods ({', '.join(methods)}) can run on "
                 if methods else "No method can run on ") + f"{dataset} ({category})."
-        what = "the plan" if methods else "the listed rows" if note else "every row"
+        what = "the plan" if methods else "the listed rows" if hidden else "every row"
         where = _scan_hint(dataset, category, data_path=data_path, methods=methods,
                            modalities=modalities, allow_atac_mismatch=allow_atac_mismatch,
                            assume_gpu=assume_gpu, every=every, dry_run_cli=True)
@@ -2845,7 +2852,7 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
                  else f"The blocked {rows}" if n == 1 else f"The {n} blocked {rows}")
         listing = f"{shown}:\n" + "\n".join(_line(r) for _, r in blocked.head(k).iterrows())
     return (f"{head}.\n{platform}{listing}" + (f"\n{note}" if note else "") +
-            f"\n{where} shows {'the listed rows' if note else 'every row'}. Its "
+            f"\n{where} shows {'the listed rows' if hidden else 'every row'}. Its "
             f"reason column says which check failed. {doctor} checks the environments.")
 
 
@@ -3145,7 +3152,8 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
                          f"{list(dup[:3])}), so it cannot be aligned to the cells of "
                          f"{dataset}. Give each cell one id, or {by_position}.")
     foreign = index.difference(pd.Index(ids), sort=False)
-    if len(foreign):
+    missing = pd.Index(ids).difference(index, sort=False)
+    if len(foreign) and len(missing):
         from .engine.ingest import suffix_fix
         fix = suffix_fix(what, ids, list(index)) if len(foreign) == len(index) else ""
         if fix:
@@ -3158,7 +3166,6 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
                          f"{'is not a cell' if len(foreign) == 1 else 'are not cells'} "
                          f"of {dataset} (first: {list(foreign[:3])}). Rename the index "
                          f"to the dataset's barcodes, or {by_position}.")
-    missing = pd.Index(ids).difference(index, sort=False)
     if len(missing):
         unit = "a batch id" if what == "batch" else "a label"
         raise ValueError(f"{what}: {len(missing):,} of the {len(ids):,} cells of {dataset} "
@@ -3611,10 +3618,13 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
             "host's GPU. Pass dry_run=True, or run it on the GPU node "
             "without assume_gpu.")
     if skip_existing and params:
-        raise ValueError(
+        raise ValueError(config.hint(
             "skip_existing=True with params=... would return results computed with the "
             "earlier parameters (reuse is keyed on the output file, not on params). "
-            "Use a fresh out_dir per parameter setting, or skip_existing=False.")
+            "Use a fresh out_dir per parameter setting, or skip_existing=False.",
+            "--skip-existing with --param would return results computed with the earlier "
+            "parameters (reuse is keyed on the output file, not on --param). Use a fresh "
+            "--out-dir per setting, or leave --skip-existing out."))
     # the on-disk spelling, once, so out_dir names and records agree (one warning)
     dataset = _resolve.canonical_dataset(
         Path(data_path) if data_path is not None else config.DEFAULT.data_path, dataset)
@@ -3692,7 +3702,9 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
             dataset, category, blocked, methods, data_path=data_path,
             modalities=modalities, allow_atac_mismatch=allow_atac_mismatch,
             assume_gpu=assume_gpu, others=private["_other"], every=every,
-            note="" if methods else not_listed))
+            note="" if methods else not_listed,
+            hidden=bool(plan_df.attrs.get("not_listed")
+                        or plan_df.attrs.get("not_listed_batch"))))
     if modalities is None:
         nested, nested_notes = _nested_rows(plan_df)
         plan_df = plan_df.drop(index=nested)

@@ -243,8 +243,7 @@ def test_the_first_line_names_10x_files(linux, tmp_path, capsys):
     _quiet(mtb.run_all, "TXADT", "vertical", data_path=tmp_path, dry_run=True)
     assert capsys.readouterr().out.splitlines()[1] == (
         "[run_all] TXADT holds no dataset file: rna.h5 and adt.h5 are 10x Genomics files "
-        "under the names of dataset files. Methods and variants that read ATAC are not listed. "
-        'modalities="all" lists them.')
+        "under the names of dataset files.")
     # one of two: the family of the other file is held, and the 10x file is named
     _cite(tmp_path, "MIX")
     _tenx(tmp_path / "MIX" / "rna.h5")
@@ -329,9 +328,9 @@ def test_first_line_counts_the_methods_that_are_not_listed(linux, monkeypatch, c
     every = mtb.scan("D11", "vertical", modalities="all", verbose=False)
     gone = sorted(set(every["method"]) - set(pm["method"]))
     assert len(gone) == 4 and "MIRA" in gone
+    # c3 (C55): no sentence on them; a method named in methods= has its own error
     assert line == ("[scan] 14 of 14 methods have their input files in D11. 14 of 14 can "
-                    "run on this computer. D11 holds RNA and ADT. Methods and variants that "
-                    'read ATAC are not listed. modalities="all" lists them.')
+                    "run on this computer. D11 holds RNA and ADT.")
     # with them: every method, and no such sentence
     pm = mtb.scan("D11", "vertical", per_method=True, modalities="all")
     line = capsys.readouterr().out.splitlines()[0]
@@ -351,19 +350,12 @@ def test_one_method_that_is_not_listed(linux, monkeypatch, capsys):
     line = capsys.readouterr().out.splitlines()[0]
     assert "UnitedNet" not in set(pm["method"]) and len(pm) == 10
     assert line == ("[scan] 10 of 10 methods have their input files in D52mini. 10 of 10 "
-                    "can run on this computer. D52mini holds RNA and ADT, in batches 1-3. "
-                    'Methods and variants that read ATAC are not listed. modalities="all" lists them.')
-    monkeypatch.setattr(config, "_CLI", True)
-    _quiet(mtb.scan, "D52mini", "cross", per_method=True)
-    assert capsys.readouterr().out.splitlines()[0].endswith(
-        " Methods and variants that read ATAC are not listed. --modalities all lists them.")
-    # ADT and ATAC: the methods that read RNA
+                    "can run on this computer. D52mini holds RNA and ADT, in batches 1-3.")
+    # ADT and ATAC: the methods that read RNA are not listed, without a sentence
     _on_disk("D58mini")
-    monkeypatch.setattr(config, "_CLI", False)
-    pm = _quiet(mtb.scan, "D58mini", "cross", per_method=True)
+    _quiet(mtb.scan, "D58mini", "cross", per_method=True)
     assert capsys.readouterr().out.splitlines()[0].endswith(
-        " D58mini holds ADT and ATAC, in batches 1-2. Methods and variants that read RNA "
-        'are not listed. modalities="all" lists them.')
+        " D58mini holds ADT and ATAC, in batches 1-2.")
 
 
 def test_what_the_folder_holds_does_not_follow_the_methods_named(linux, capsys):

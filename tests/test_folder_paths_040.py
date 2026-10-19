@@ -32,8 +32,8 @@ def test_cli_scan_takes_a_folder_path(here, path):
     code, out, err = _cli("scan", path, "--category", "vertical", "--format", "csv")
     assert code == 0, err
     assert "Matilda" in out
-    # the note on the rows that read ATAC names the folder, as the Python call does
-    assert "# MYCITE holds RNA and ADT." in err and "error" not in err
+    # c3 (C55): no note on the rows that read ATAC
+    assert "not listed" not in err and "error" not in err
 
 
 def test_cli_run_all_dry_run_takes_a_folder_path(here):

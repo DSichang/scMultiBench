@@ -37,7 +37,7 @@ ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 N = 60
 CELLS = [f"c{i:03d}" for i in range(N)]
 PEAKS = [f"chr1:{j * 1000}-{j * 1000 + 500}" for j in range(30)]
-DEBUG = "(set MULTIBENCH_DEBUG=1 for the full traceback)\n"
+DEBUG = ""          # c3 (E19): a refusal that names its fix prints no traceback line
 LOOKS = "The {what} values are not whole numbers, so they look log-normalised. "
 NOT_COUNTS = LOOKS + "The methods normalise raw counts themselves. "
 

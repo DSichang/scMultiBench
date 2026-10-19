@@ -95,7 +95,7 @@ def test_files_and_contents(ds, tmp_path, monkeypatch):
         exec(compile(OLD[TASK[ds]]["data"], f"0.3.4 {TASK[ds]}", "exec"), ns)
     with warnings.catch_warnings(record=True) as seen:
         warnings.simplefilter("always")
-        assert mtb.data.write_example(ds, quiet=True) == Path(".")       # Y24 (r3): the folder
+        assert mtb.data.write_example(ds, quiet=True) is None    # c3 (E15): no repr in a cell
     # the cell of the tutorial shows the reader no warning of the package or of anndata
     ours = [str(w.message) for w in seen if "multibench" in (w.filename or "")
             or issubclass(w.category, UserWarning)]
@@ -371,8 +371,9 @@ def test_the_docstring():
     import inspect
     doc = inspect.getdoc(mtb.data.write_example)
     assert doc.splitlines()[0] == "Write the example files of a tutorial dataset as .h5ad files."
-    for section in ("Parameters", "Returns", "Raises", "Examples", "See Also"):
+    for section in ("Parameters", "Raises", "Examples", "See Also"):
         assert f"\n{section}\n{'-' * len(section)}\n" in doc
+    assert "\nReturns\n" not in doc                        # c3 (E15): None
     for word in ("stand-in", "stand in", "tidy"):
         assert word not in doc.lower()
     assert not re.search(r"<[a-z_]+>", re.sub(r"``.*?``", "", doc, flags=re.S))
@@ -396,10 +397,10 @@ def test_import_multibench_stays_light():
         "from __future__ import annotations", "import os", "from pathlib import Path"]
 
 
-def test_write_example_returns_the_folder(tmp_path):
-    # Y24 (r3)
+def test_write_example_returns_nothing(tmp_path):
+    # c3 (E15): the printed line names the file; the tutorial cells show no PosixPath('.')
     import multibench as mtb
     if not (mtb.config.DEFAULT.data_path / "D11").is_dir():
         pytest.skip("D11 is not in the data root")
-    out = mtb.data.write_example("D11", tmp_path / "ex", quiet=True)
-    assert out == tmp_path / "ex" and (out / "my_file.h5ad").is_file()
+    assert mtb.data.write_example("D11", tmp_path / "ex", quiet=True) is None
+    assert (tmp_path / "ex" / "my_file.h5ad").is_file()

@@ -139,7 +139,7 @@ def test_the_batch_gap_is_named(tmp_path, capsys):
 def test_a_shared_barcode_gets_its_batch_and_one_batch_names_none():
     one = mtb.load_batch(Path(__file__).resolve().parent.parent / "data" / "outputs" / "D11")
     m = one.records[0]["method"]
-    assert one.embedding(m).obs["batch"].isna().all()
+    assert "batch" not in one.embedding(m).obs                     # c3 (E02)
 
 
 def test_recommend_gives_this_run_rows_their_method_chips():

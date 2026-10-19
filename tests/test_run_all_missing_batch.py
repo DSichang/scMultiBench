@@ -153,7 +153,7 @@ def test_the_command_line_names_its_flag(cite, tmp_path, capsys):
     for extra in (["--dry-run"], ["--out-dir", str(tmp_path / "out")]):
         rc = _quiet(cli.main, base + extra)
         err = capsys.readouterr().err
-        assert rc == 1 and err.splitlines()[-2] == "error: " + _bv2(
+        assert rc == 1 and err.splitlines()[-1] == "error: " + _bv2(
             3, ", for example 'NA'", head="--batch")
     assert calls == [] and not (tmp_path / "out").exists()
     # one column of a sheet with several

@@ -23,8 +23,8 @@ from multibench.engine import envs, registry
 
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 # the command line's table has a row per variant: the methods are counted too (X23)
-NOTE = ("# D11 holds RNA and ADT. Methods and variants that read ATAC are not listed. "
-        "--modalities all lists them.")
+#: c3 (C55): no line on the rows that read a modality the folder lacks
+NOT_LISTED = "not listed"
 
 
 def _on_disk(ds):
@@ -184,8 +184,7 @@ def test_evaluate_dataset_without_label_files(category, method, files, named, tm
         rc, out, err = _cli(argv + extra, capsys)
         assert rc == 1 and out == ""
         assert _not_warnings(err) == [
-            "error: NOLAB has no label file. Pass --labels.",
-            "(set MULTIBENCH_DEBUG=1 for the full traceback)"]
+            "error: NOLAB has no label file. Pass --labels."]
     # with its label files the folder is read as before
     stems = {"vertical": ["cty"], "diagonal": ["rna_cty", "atac_cty"]}.get(
         category, ["cty1", "cty2"])
@@ -211,10 +210,10 @@ def test_scan_modalities_all_and_the_stderr_note(no_envs, capsys):
     rc, out, err = _cli(["scan", "D11", "--category", "vertical"], capsys)
     assert rc == 0 and len(_scan_rows(out)) == 14
     assert all(l.startswith("[scan] ") for l in err.splitlines())
-    assert NOTE[2:] in err.splitlines()[0]
+    assert NOT_LISTED not in err
     rc, lines = _one_stream(["scan", "D11", "--category", "vertical"])
     head = lines.index(out.splitlines()[0])
-    assert rc == 0 and NOTE[2:] in lines[0] and len(lines) == head + 1 + 14  # before the table
+    assert rc == 0 and len(lines) == head + 1 + 14  # before the table
     assert all(l.startswith("[scan] ") for l in lines[:head])
     rc, out, err = _cli(["scan", "D11", "--category", "vertical", "--modalities", "all"],
                         capsys)
@@ -223,7 +222,7 @@ def test_scan_modalities_all_and_the_stderr_note(no_envs, capsys):
     # the deprecated --format prints the plan: the data on stdout, the note on stderr
     rc, out, err = _cli(["scan", "D11", "--category", "vertical", "--format", "csv"], capsys)
     assert rc == 0 and len(pd.read_csv(io.StringIO(out))) == 14
-    assert _not_warnings(err) == [NOTE]
+    assert _not_warnings(err) == []
     # a list of tokens selects as before, and names nothing
     rc, out, err = _cli(["scan", "D11", "--category", "vertical", "--modalities", "rna,atac"],
                         capsys)
@@ -265,12 +264,12 @@ def test_the_note_follows_the_strict_error(no_envs, capsys):
     assert rc == 1
     strict = next(i for i, l in enumerate(lines) if l.startswith("error: --strict: "))
     assert lines[strict].startswith("error: --strict: 0 of 14 rows are runnable. ")
-    assert lines.index(NOTE) == len(lines) - 1 > strict
+    assert NOT_LISTED not in "\n".join(lines)
     rc, _, err = _cli(["scan", "D11", "--category", "vertical", "--strict"], capsys)
     assert err.splitlines()[0] == ("warning: scan --strict is deprecated and will be removed "
                                    "in 0.5. Use the exit code of multibench run-all.")
     err = "\n".join(_not_warnings(err))
-    assert err.startswith("error: --strict: 0 of ") and err.splitlines()[-1] == NOTE
+    assert err.startswith("error: --strict: 0 of ") and NOT_LISTED not in err
     rc, _, err = _cli(["scan", "D11", "--category", "vertical", "--strict", "--modalities",
                        "all"], capsys)
     err = "\n".join(_not_warnings(err))
@@ -311,9 +310,9 @@ def test_strict_exit_codes_are_unchanged(folder, tmp_path, monkeypatch, capsys):
 # ------------------------------------------------------------------ run-all
 def test_run_all_dry_run_header(no_envs, capsys):
     rc, out, err = _cli(["run-all", "D11", "--category", "vertical", "--dry-run"], capsys)
-    assert rc == 0 and err.splitlines()[:2] == [
-        "# Dry run: 0 of 14 methods can run on D11 (vertical); the reason column says why.",
-        NOTE]
+    assert rc == 0 and err.splitlines()[:1] == [
+        "# Dry run: 0 of 14 methods can run on D11 (vertical); the reason column says why."]
+    assert NOT_LISTED not in err
     assert sum(l.startswith("# Commands of the 14 methods") for l in out.splitlines()) == 1
     rc, out, err = _cli(["run-all", "D11", "--category", "vertical", "--dry-run",
                          "--modalities", "all"], capsys)
@@ -337,14 +336,12 @@ def test_run_all_nothing_runnable_names_the_listed_rows(no_envs, tmp_path, capsy
     rc, _, err = _cli(base, capsys)
     lines = err.splitlines()
     assert rc == 1 and lines[0] == "error: No method can run on D11 (vertical)."
-    # the error's note counts rows only; the scan table's note counts methods too
-    assert lines[-3] == ("D11 holds RNA and ADT. Methods and variants that read ATAC are not listed. "
-                         "--modalities all lists them.")
-    assert lines[-2].startswith("multibench scan D11 --category vertical shows the listed "
+    assert NOT_LISTED not in err
+    assert lines[-1].startswith("multibench scan D11 --category vertical shows the listed "
                                 "rows. ")
     rc, _, err = _cli(base + ["--modalities", "all"], capsys)
     assert rc == 1 and "not listed" not in err
-    assert err.splitlines()[-2].startswith(
+    assert err.splitlines()[-1].startswith(
         "multibench scan D11 --category vertical --modalities all shows every row. ")
     assert not (tmp_path / "out").exists()
 
@@ -441,7 +438,7 @@ def test_export_n_batches(tmp_path, capsys):
                            "--category", "cross", *extra], capsys)
         assert rc == 1 and err.splitlines() == [
             "warning: export --n-batches is deprecated and will be removed in 0.5. Use a "
-            "new dataset folder.", told, "(set MULTIBENCH_DEBUG=1 for the full traceback)"]
+            "new dataset folder.", told]
     # without --rna the RNA is read from X, as export_dataset(rna="X")
     rc, _, err = _cli(["export", str(tmp_path / "me.h5ad"), str(new), "--n-batches", "2"],
                       capsys)

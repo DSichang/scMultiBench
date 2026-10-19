@@ -2269,6 +2269,17 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def _refusal(e: Exception) -> bool:
+    """``e`` is a ValueError, KeyError or FileNotFoundError the package raised:
+    its message names the fix, and a traceback adds nothing."""
+    tb = e.__traceback__
+    while tb is not None and tb.tb_next is not None:
+        tb = tb.tb_next
+    return (isinstance(e, (ValueError, KeyError, FileNotFoundError)) and tb is not None
+            and Path(tb.tb_frame.f_code.co_filename).resolve().is_relative_to(
+                Path(__file__).resolve().parent))
+
+
 def main(argv=None) -> int:
     """Parse ``argv`` (default ``sys.argv[1:]``), run the command, return the exit code.
 
@@ -2301,7 +2312,8 @@ def main(argv=None) -> int:
             raise
         msg = e.args[0] if isinstance(e, KeyError) and e.args else e
         print(f"error: {msg}", file=sys.stderr)
-        print("(set MULTIBENCH_DEBUG=1 for the full traceback)", file=sys.stderr)
+        if not _refusal(e):
+            print("(set MULTIBENCH_DEBUG=1 for the full traceback)", file=sys.stderr)
         return _EXIT_ERROR
     finally:
         warnings.showwarning = prev_show

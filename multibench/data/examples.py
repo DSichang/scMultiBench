@@ -248,13 +248,15 @@ def _write_marked(adata, target: Path, mark: str) -> None:
 
 
 @_compat.keywords("data.write_example", private="_write_example", kept=DATA_KEYWORDS)
-def write_example(dataset: str, folder: Path | str = ".", *, verbose: bool = True) -> Path:
+def write_example(dataset: str, folder: Path | str = ".", *, verbose: bool = True) -> None:
     """Write the example files of a tutorial dataset as .h5ad files.
 
     The files hold a part of the dataset in the shape that your own data
     usually has: one ``.h5ad`` file per object, with the cell types in
     ``obs["celltype"]``. The own-data section of each tutorial reads them
-    until you put your own files in their place.
+    until you put your own files in their place. They are named
+    ``my_*.h5ad``; the printed lines say what each holds. A file of your own
+    with such a name is kept.
 
     Parameters
     ----------
@@ -266,12 +268,6 @@ def write_example(dataset: str, folder: Path | str = ".", *, verbose: bool = Tru
         exist. The default is the current folder.
     verbose : bool
         Print one line per file.
-
-    Returns
-    -------
-    pathlib.Path
-        ``folder``, which holds the files, named ``my_*.h5ad``; the printed
-        lines say what each holds. A file of your own with such a name is kept.
 
     Raises
     ------
@@ -295,7 +291,7 @@ def write_example(dataset: str, folder: Path | str = ".", *, verbose: bool = Tru
 
 
 def _write_example(dataset: str, folder: Path | str = ".", *, data_path=None,
-                   quiet: bool = False, verbose: bool = True) -> Path:
+                   quiet: bool = False, verbose: bool = True) -> None:
     """:func:`write_example`, with the deprecated ``data_path=`` and ``quiet=``."""
     from .. import __version__, config
     quiet = quiet or not verbose
@@ -352,4 +348,3 @@ def _write_example(dataset: str, folder: Path | str = ".", *, data_path=None,
             line = f"wrote {target}: {a.n_obs:,} cells. {', '.join(parts)}."
         if not quiet:
             print(line)
-    return folder

@@ -242,7 +242,7 @@ def test_the_log_of_a_real_run_names_the_listed_variants_only(linux, tmp_path, c
     assert log[:3] == [
         f"[run_all] skipping moETM (rna+adt): {gpu}",
         "[run_all] skipping moETM (rna+atac): moETM needs peak ATAC (atac.h5), which "
-        f"is not in the folder. {gpu}",
+        f"the folder does not have. {gpu}",
         "[run_all] 2 more rows need files this folder does not have. mtb.scan shows them."]
 
 
@@ -287,8 +287,8 @@ def test_a_named_method_keeps_its_rows(no_envs):
     assert sorted(zip(df["method"], df["modalities"])) == [("MIRA", "rna+atac"),
                                                            ("sciPENN", "rna+adt")]
     mira = df.set_index("method").loc["MIRA"]
-    assert mira["reason"].startswith("MIRA needs peak ATAC (atac.h5), which is not in "
-                                     "the folder.")
+    assert mira["reason"].startswith("MIRA needs peak ATAC (atac.h5), which the folder "
+                                     "does not have.")
     assert _core(df.attrs) == {"held": ["rna", "adt"], "not_listed": 0, "not_held": []}
     # a named method with a listed row is listed by that row
     df = full_scan("D11", "vertical", methods=["Matilda", "MIRA"], verbose=False)
@@ -319,8 +319,7 @@ def test_count_line_names_what_is_not_listed(no_envs, capsys, monkeypatch):
     full_scan("D11", "vertical")
     assert capsys.readouterr().out == (
         "[scan] 14 of 14 methods have their input files. 0 of 14 have their environment "
-        "installed. D11 holds RNA and ADT. Methods and variants that read ATAC are not listed. "
-        'modalities="all" lists them. mtb.env.install(dry_run=True) checks the environments.\n')
+        "installed. mtb.env.install(dry_run=True) checks the environments.\n")
     # every modality held: the line of 0.3.4, word for word
     _on_disk("D22mini")
     full_scan("D22mini", "vertical")
@@ -336,8 +335,7 @@ def test_count_line_names_what_is_not_listed(no_envs, capsys, monkeypatch):
     full_scan("D11", "vertical", methods=["totalVI", "Seurat_WNN"])
     assert capsys.readouterr().out == (
         "[scan] 2 of 2 methods have their input files. 0 of 2 have their environment "
-        "installed. D11 holds RNA and ADT. Methods and variants that read ATAC are not listed. "
-        "--modalities all lists them. multibench env install --dry-run checks the environments.\n")
+        "installed. multibench env install --dry-run checks the environments.\n")
 
 
 def test_count_line_off_linux_and_with_batches(monkeypatch, capsys):
@@ -348,8 +346,7 @@ def test_count_line_off_linux_and_with_batches(monkeypatch, capsys):
     full_scan("D52mini", "cross")
     assert capsys.readouterr().out == (
         "[scan] 11 of 11 rows have their input files. 0 of 11 have their environment "
-        "installed. D52mini holds RNA and ADT, in batches 1-3. Methods and variants that "
-        f'read ATAC are not listed. modalities="all" lists them. {W.LINUX_ONLY_SUMMARY}\n')
+        f"installed. {W.LINUX_ONLY_SUMMARY}\n")
 
 
 def test_two_families_can_be_lacking(tmp_path, no_envs, capsys):
@@ -432,13 +429,13 @@ def test_the_hint_carries_all(no_envs, capsys):
     shown = eval(call, {"mtb": mtb})                      # noqa: S307 - our own hint
     assert len(shown) == n == 33
     assert "not listed" not in "\n".join(lines)
-    # the default call: the rows it lists, the sentence on the others, the same count
+    # the default call: the rows it lists, the same count; c3 (C55): no sentence on
+    # the rows that read ATAC
     lines = _nothing_runnable()
     call = "mtb.run_all('D11', 'vertical', dry_run=True)"
     assert lines[-1] == (f"{call} shows the listed rows. Its reason column "
                          f"says which check failed. mtb.env.install(dry_run=True) checks the environments.")
-    assert lines[-2] == ("D11 holds RNA and ADT. Methods and variants that read ATAC are not listed. "
-                         'modalities="all" lists them.')
+    assert "not listed" not in "\n".join(lines)
     n = int(re.fullmatch(r"The first 3 of (\d+) blocked methods:", lines[1]).group(1))
     shown = eval(call, {"mtb": mtb})                      # noqa: S307 - our own hint
     assert len(shown) == n == 14
@@ -453,8 +450,7 @@ def test_the_hint_of_the_command_line_carries_all(no_envs, monkeypatch):
     lines = _nothing_runnable()
     assert lines[-1].startswith("multibench scan D11 --category vertical shows the listed "
                                 "rows. ")
-    assert lines[-2] == ("D11 holds RNA and ADT. Methods and variants that read ATAC are not listed. "
-                         "--modalities all lists them.")
+    assert "not listed" not in "\n".join(lines)
 
 
 def test_named_methods_keep_the_error_of_0_3_4(no_envs):
@@ -476,8 +472,7 @@ def test_dry_run_prints_the_note_after_its_count_line(no_envs, capsys):
     out = capsys.readouterr().out.splitlines()
     assert out[0] == ("[run_all] Dry run: 0 of 14 requested methods can run on D11 "
                       "(vertical); the reason column says why.")
-    assert out[1] == ("[run_all] D11 holds RNA and ADT. Methods and variants that read ATAC "
-                      'are not listed. modalities="all" lists them.')
+    assert len(out) == 1                    # c3 (C55): no sentence on the rows of ATAC
     mtb.run_all("D11", "vertical", dry_run=True, modalities="all")
     out = capsys.readouterr().out
     assert out.startswith("[run_all] Dry run: 0 of 33 requested rows can run on D11 ")

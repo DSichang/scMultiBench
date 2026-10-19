@@ -320,8 +320,8 @@ def test_unitednet_reason_names_atac_first_then_cty(tmp_path):
     d.mkdir()
     _h5(d / "rna.h5", GENES, [f"c{i}" for i in range(30)])
     row = _row("RNAONLY", "vertical", "UnitedNet", tmp_path)
-    assert row["reason"].startswith("UnitedNet needs peak ATAC (atac.h5), which is "
-                                    "not in the folder. cty.csv is missing.")
+    assert row["reason"].startswith("UnitedNet needs peak ATAC (atac.h5), which the "
+                                    "folder does not have. cty.csv is missing.")
 
 
 # --- M22 / R6-10: caveats start with the method, then the problem --------------

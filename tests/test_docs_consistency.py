@@ -1423,8 +1423,7 @@ def test_changes_page_quotes_the_live_0_3_5_texts(tmp_path, capsys, monkeypatch)
     note = ('D11 holds RNA and ADT. 19 rows that read ATAC are not listed. modalities="all" '
             'lists them.')
     assert first.startswith(f"[scan] {count} ")
-    assert ('D11 holds RNA and ADT. Methods and variants that read ATAC are not listed. '
-            'modalities="all" lists them.') in first
+    assert "not listed" not in first          # 0.4.0 (c3, C55): no sentence on them
     assert f"`{count}`" in changed and f"`{note}`" in changed
     # "Only rows whose input files are missing are left out."
     key = ["method", "modalities"]

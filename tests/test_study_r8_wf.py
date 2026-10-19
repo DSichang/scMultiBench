@@ -324,9 +324,9 @@ def test_a_row_that_also_lacks_a_file_is_listed_with_that_reason(macos, mydata):
     # Matilda's two rows that read ATAC; its rna+adt row and totalVI's lack nothing
     assert lines[2] == "2 of 4 requested rows are also blocked by something else:"
     assert lines[3] == ("  Matilda (rna+atac): Matilda needs peak ATAC (atac.h5), "
-                        "which is not in the folder.")
+                        "which the folder does not have.")
     assert lines[4] == ("  Matilda (rna+adt+atac): Matilda needs peak ATAC (atac.h5), "
-                        "which is not in the folder.")
+                        "which the folder does not have.")
     assert lines[5].startswith("mtb.run_all('data/MYDATA', 'vertical', "
                                "methods=['Matilda', 'totalVI'], modalities=\"all\", dry_run=True) "
                                "shows these rows.")

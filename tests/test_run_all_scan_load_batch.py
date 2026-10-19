@@ -216,15 +216,15 @@ def test_mosaic_batches_numbered_wrong_say_renumber_in_the_reason(tmp_path, caps
 
 
 # X23: scan, run_all and the command line say the same, without counts
-def test_hidden_rows_one_sentence(capsys):
+def test_hidden_rows_no_sentence(capsys):
+    # c3 (C55): the rows that read ATAC, which D11 lacks, go unsaid
     from multibench import cli
-    said = "D11 holds RNA and ADT. Methods and variants that read ATAC are not listed."
     mtb.scan("D11", "vertical")
-    assert said in capsys.readouterr().out
+    assert "not listed" not in capsys.readouterr().out
     mtb.run_all("D11", "vertical", out_dir="/o", dry_run=True)
-    assert said in capsys.readouterr().out
+    assert "not listed" not in capsys.readouterr().out
     cli.main(["scan", "D11", "--category", "vertical"])
-    assert said in capsys.readouterr().err
+    assert "not listed" not in capsys.readouterr().err
 
 
 # X68: scan shows the variant run_all runs

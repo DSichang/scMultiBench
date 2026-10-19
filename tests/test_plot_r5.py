@@ -210,9 +210,8 @@ def test_cli_overlay_line_is_plain(tmp_path, monkeypatch, capsys):
                    "--input", str(mine), "--out", str(tmp_path / "x.png")])
     err = capsys.readouterr().err
     assert rc == 0, err
-    assert ("# Added your 3 rows (PCA_LSI_stack) to the 6 stored results of "
-            "diagonal.") in err.splitlines()
-    assert "# overlay" not in err
+    # c3 (C18): the figure shows the rows; no line says they were added
+    assert "# Added" not in err and "# overlay" not in err
 
 
 # --- R5-11 (d): na='raise' does not describe the figure it does not draw -------

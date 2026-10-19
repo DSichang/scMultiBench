@@ -75,7 +75,7 @@ def _cp(err):
 def _missing(reasons, name):
     """The sentences of scan reasons that say ``name`` is not in the folder."""
     return [x for r in reasons for x in r.split(". ")
-            if name in x and any(k in x for k in ("missing", "not in the folder",
+            if name in x and any(k in x for k in ("missing", "does not have",
                                                   "none of them"))]
 
 

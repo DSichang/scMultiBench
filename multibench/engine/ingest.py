@@ -151,6 +151,8 @@ def _check_one_matrix_each(data, specs, given) -> None:
     for what, spec in specs.items():
         if spec is None:
             continue
+        if isinstance(spec, str) and not spec:
+            _select(data, spec, what=what)          # raises: what an empty selector means
         key = _matrix_key(data, spec)
         first = seen.setdefault(key, what)
         if first == what:
