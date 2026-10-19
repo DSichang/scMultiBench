@@ -275,7 +275,8 @@ def test_count_error_speaks_of_the_row_order_of_output(tmp_path, capsys):
     err = capsys.readouterr().err
     assert "batch order" not in err
     assert ("For several label files (cty1.csv, cty2.csv, cty3.csv), repeat --labels in "
-            "the row order of --embedding, or pass --dataset, --category and --method.") in err
+            "the row order of the embedding file, or pass --dataset, --category and "
+            "--method.") in err
 
 
 # ====================================================================== R4-07

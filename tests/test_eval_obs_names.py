@@ -120,7 +120,8 @@ def test_a_file_named_like_a_prefixed_column_is_still_read(tmp_path, monkeypatch
     emb, lab = _cells()
     a = _adata(emb, donor=_donors())
     monkeypatch.chdir(tmp_path)
-    Path("obs:celltype").write_text("x\n" + "".join(f"{v}\n" for v in lab))
+    Path("obs:celltype").write_text("cell,x\n" + "".join(
+        f"{c},{v}\n" for c, v in zip(a.obs_names, lab)))
     _same(mtb.evaluate(a, labels="obs:celltype", metrics=["ASW"]),
           mtb.evaluate(emb, labels=lab, metrics=["ASW"]))
 

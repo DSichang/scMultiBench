@@ -77,7 +77,8 @@ def test_changes_say_how_a_csv_embedding_is_matched(tmp_path, capsys, monkeypatc
     with pytest.raises(ValueError, match="15 cells of emb.csv are not in the labels Series"):
         mtb.evaluate(str(tmp_path / "emb.csv"), labels=pd.Series(
             types, index=bars[:15] + other[15:]), metrics=["ARI"])
-    with pytest.warns(UserWarning, match="is matched by position, because none of its ids"):
+    # 0.4.0 (c3, E05): the ids decide, as for an AnnData
+    with pytest.raises(ValueError, match="cell ids do not match the embedding's"):
         mtb.evaluate(str(tmp_path / "emb.csv"), labels=pd.Series(types, index=other),
                      metrics=["ARI"])
     ad = pytest.importorskip("anndata")

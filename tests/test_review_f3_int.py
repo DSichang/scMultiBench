@@ -444,7 +444,7 @@ def test_evaluate_count_errors_name_where_the_labels_came_from(tmp_path, capsys)
     err = capsys.readouterr().err
     assert rc == 1
     assert ("error: the label files of D46 (cty1.csv, cty2.csv, cty3.csv) hold 21,416 "
-            "labels for 500 cells in --embedding.") in err, err
+            "labels for 500 cells in the embedding file.") in err, err
     assert "--labels" not in err
 
 

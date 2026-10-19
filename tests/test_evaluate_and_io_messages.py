@@ -78,14 +78,15 @@ def test_x10_no_shared_barcode_names_both_spellings(tmp_path):
 
 
 def test_x12_a_label_file_without_ids_is_matched_by_position_silently(tmp_path):
-    # c2 (D10): the documented rule, with nothing to do: no warning
+    # c2 (D10): the documented rule, with nothing to do: no warning; c3 (E05): only
+    # where the embedding has no cell ids (next to barcodes it is refused)
     import numpy as np
     a = _adata()
     a.obsm["X_pca"] = np.random.default_rng(1).normal(size=(60, 4))
     lab = tmp_path / "cty.csv"
     pd.DataFrame({"x": ["a", "b", "c"] * 20}).to_csv(lab, index=False)
-    _, msgs = _messages(mtb.evaluate, a, labels=str(lab), metrics=["cLISI"], obsm="X_pca")
-    assert not any("by position" in m for m in msgs)
+    with pytest.raises(ValueError, match="^cty.csv has no cell ids, and the embedding has"):
+        mtb.evaluate(a, labels=str(lab), metrics=["cLISI"], obsm="X_pca")
     b = _adata(names=False)
     b.obsm["X_pca"] = a.obsm["X_pca"]
     _, msgs = _messages(mtb.evaluate, b, labels=str(lab), metrics=["cLISI"], obsm="X_pca")

@@ -172,10 +172,10 @@ def test_labels_series_missing_or_extra_ids_raise_naming_them():
     msg = str(exc.value)
     assert "cannot align by cell id" in msg and "2 of the output's 90 cells are missing" in msg
     assert "cell88" in msg and "cell89" in msg and "labels.to_numpy()" in msg
+    # c3 (E08): ids the output lacks are left out when every cell has its label
     extra = pd.concat([ser, pd.Series(["B"], index=["ghost"])])
-    with pytest.raises(ValueError) as exc:
-        evaluate(df, labels=extra, metrics=["ARI"])
-    assert "1 id(s) the output lacks" in str(exc.value) and "ghost" in str(exc.value)
+    assert _ari(evaluate(df, labels=extra, metrics=["ARI"])) == \
+        _ari(evaluate(df, labels=ser, metrics=["ARI"]))
     # a dims x cells DataFrame has row ids that are not cells: disjoint sets -> hint
     with pytest.raises(ValueError, match=r"^The labels' cell ids do not match the "
                                          r"embedding's \(embedding e\.g\. d0, labels e\.g\. "
@@ -206,9 +206,8 @@ def test_labels_for_some_cells_say_how_to_mark_the_others(tmp_path, capsys):
     # missing_labels= is deprecated since 0.4: its implementation, without the warning
     evaluate = pipeline._evaluate
     series = ("{0}: cannot align by cell id - 30 of the output's 90 cells are missing "
-              "from {0} (first: ['cell60', 'cell61', 'cell62', 'cell63', 'cell64']) and "
-              "{0} has 0 id(s) the output lacks (first: []). Pass {0} for exactly the "
-              "output's cells, or {0}.to_numpy() to match positionally.")
+              "from {0} (first: ['cell60', 'cell61', 'cell62', 'cell63', 'cell64']). Pass "
+              "{0} for every cell of the output, or {0}.to_numpy() to match positionally.")
     with pytest.raises(ValueError) as exc:
         evaluate(a, labels=some, **kw)
     assert str(exc.value) == series.format("labels") + (
@@ -296,10 +295,12 @@ def test_labels_series_with_default_index_is_positional_and_silent():
     with warnings.catch_warnings(record=True) as rec:
         warnings.simplefilter("always")
         a = evaluate(emb, labels=pd.Series(ct), metrics=["ARI"])
-        b = evaluate(pd.DataFrame(emb, index=ids), labels=pd.Series(ct), metrics=["ARI"])
         c = evaluate(emb, labels=ct, metrics=["ARI"])
     assert not _no_alignment_warning(rec)
-    assert _ari(a) == _ari(b) == _ari(c) == pytest.approx(1.0)
+    assert _ari(a) == _ari(c) == pytest.approx(1.0)
+    # c3 (E05): next to an output with cell ids, the ids decide
+    with pytest.raises(ValueError, match="labels is a Series without cell ids"):
+        evaluate(pd.DataFrame(emb, index=ids), labels=pd.Series(ct), metrics=["ARI"])
 
 
 def test_align_vector_unit():
@@ -421,8 +422,9 @@ def test_evaluate_concat_with_published_builds_the_bubble_table():
 
     emb, ct, bat, _ = _toy()
     # 0.4.0: evaluate returns the long table itself
+    # c3 (E14): dataset="D52" needs the cells of D52, so the toy rows are named after
     mine = evaluate(emb, metrics="all", labels=ct, batch=bat, method="MyMethod",
-                    dataset="D52", category="cross")
+                    category="cross").assign(dataset="D52")
     published = mtb.load_results("cross", dataset="D52")
     both = pd.concat([published, mine], ignore_index=True)
     # one spelling per metric after canonicalisation - no duplicate columns

@@ -33,12 +33,6 @@ MOVED = "evaluate: matched {0} to the rows of emb.csv by barcode.\n"
 NO_IDS = ("The first column of {0} looks like cell ids, but the embedding has no cell ids. "
           "The file is matched by position. Check that its rows follow the rows of the "
           "embedding.")
-#: the warning of an AnnData output for a file of which no id is one of its cells
-NONE_SHARED = ("The first column of {0} looks like cell ids, but none is a cell of the "
-               "embedding. The file is matched by position. Check that its rows follow the "
-               "rows of the embedding, or use the barcodes of the embedding in that column.")
-SERIES_NONE_SHARED = ("The {0} Series is matched by position, because none of its ids is a "
-                      "cell of emb.csv. Check that it follows the rows of emb.csv.")
 NO_SUFFIX = [b.replace("-1", "") for b in BARS]          # the same cells, written differently
 
 
@@ -233,90 +227,31 @@ def test_a_file_with_fewer_cells(tmp_path, seen):
 
 
 # ------------------------------------------------------- no cell id in common
-def test_a_file_with_no_id_in_common_is_matched_by_position(tmp_path, capsys, seen):
-    """The same cells under other names (barcodes without ``-1``): scored by
-    position with a warning, as 0.3.4 did and as an AnnData output does."""
-    emb = _emb(tmp_path)
-    donors = np.array(["d1", "d2", "d3"] * (CELLS // 3))[PERM]
-    for name, kw, said in (
-            ("labels.csv", dict(labels=_labels(tmp_path, bars=NO_SUFFIX, values=TYPES[PERM])),
-             "labels"),
-            ("batch.csv", dict(labels=TYPES, batch=_labels(
-                tmp_path, "batch.csv", bars=NO_SUFFIX, values=donors, column="donor")),
-             "batch"),
-            ("clusters.csv", dict(labels=TYPES, clustering=_labels(
-                tmp_path, "clusters.csv", bars=NO_SUFFIX, values=donors, column="leiden")),
-             "clustering")):
-        seen.clear()
-        with pytest.warns(UserWarning) as rec:
-            # clustering= is deprecated since 0.4: its implementation, without the warning
-            pipeline._evaluate(emb, metrics="all" if said == "batch" else ["ARI"], **kw)
-        assert [str(w.message) for w in rec] == [NONE_SHARED.format(name)]
-        assert seen[said] == list(TYPES[PERM] if said == "labels" else donors)
-        np.testing.assert_allclose(seen["emb"], EMB)
-    assert capsys.readouterr().err == ""                 # nothing was moved
-
-
-def test_an_anndata_output_says_the_same_for_such_a_file(tmp_path, seen):
-    """The path the CSV output reuses: same warning, same order."""
+def test_a_file_with_no_id_in_common_is_refused(tmp_path, seen):
+    """c3 (E05): the same cells under other names (barcodes without ``-1``):
+    the ids decide, so the file is refused, for a CSV and an AnnData output."""
     ad = pytest.importorskip("anndata")
-    adata = ad.AnnData(EMB, obs=pd.DataFrame(index=BARS))
-    labels = _labels(tmp_path, bars=NO_SUFFIX, values=TYPES[PERM])
-    said = {}
-    for kind, output in (("csv", _emb(tmp_path)), ("anndata", adata)):
-        seen.clear()
-        with pytest.warns(UserWarning) as rec:
-            mtb.evaluate(output, labels=labels, obsm="X", metrics=["ARI"])
-        said[kind] = ([str(w.message) for w in rec], seen["labels"])
-    assert said["csv"] == said["anndata"] == ([NONE_SHARED.format("labels.csv")],
-                                              list(TYPES[PERM]))
-
-
-def test_a_series_with_no_id_in_common_is_matched_by_position(tmp_path, capsys, seen):
-    """A Series with another index: by position with a warning, as in 0.3.4."""
-    emb = _emb(tmp_path)
     donors = np.array(["d1", "d2", "d3"] * (CELLS // 3))[PERM]
-    for kw, said, values in (
-            (dict(labels=pd.Series(TYPES[PERM], index=NO_SUFFIX)), "labels", TYPES[PERM]),
-            (dict(labels=TYPES, batch=pd.Series(donors, index=NO_SUFFIX)), "batch", donors),
-            (dict(labels=TYPES, clustering=pd.Series(donors, index=NO_SUFFIX)),
-             "clustering", donors)):
-        seen.clear()
-        with pytest.warns(UserWarning) as rec:
-            pipeline._evaluate(emb, metrics="all" if said == "batch" else ["ARI"], **kw)
-        assert [str(w.message) for w in rec] == [SERIES_NONE_SHARED.format(
-            "clusters" if said == "clustering" else said)]
-        assert seen[said] == list(values)
-    assert capsys.readouterr().err == ""
-
-
-def test_several_label_files_with_no_id_in_common(tmp_path, capsys, seen):
-    emb = _emb(tmp_path)
-    half = CELLS // 2
-    first = _labels(tmp_path, "cty1.csv", values=TYPES[:half], bars=NO_SUFFIX[:half])
-    second = _labels(tmp_path, "cty2.csv", values=TYPES[half:], bars=NO_SUFFIX[half:])
-    with pytest.warns(UserWarning) as rec:
-        mtb.evaluate(emb, labels=[first, second], metrics=["ARI"])
-    assert [str(w.message) for w in rec] == [
-        "The first column of cty1.csv and cty2.csv looks like cell ids, but none is a cell "
-        "of the embedding. These files are matched by position. Check that their rows follow "
-        "the rows of the embedding, or use the barcodes of the embedding in that column."]
-    assert seen["labels"] == list(TYPES)
-    assert capsys.readouterr().err == ""
-
-
-def test_no_id_in_common_and_another_number_of_rows_is_the_count_error(tmp_path, seen):
-    """By position there is one row too few: the count error of 0.3.4."""
-    emb = _emb(tmp_path)
-    count = "labels has 59 entries for 60 "
-    for labels, warning in (
-            (_labels(tmp_path, values=TYPES[:59], bars=NO_SUFFIX[:59]),
-             NONE_SHARED.format("labels.csv")),
-            (pd.Series(TYPES[:59], index=NO_SUFFIX[:59]), SERIES_NONE_SHARED.format("labels"))):
-        with pytest.warns(UserWarning) as rec, pytest.raises(ValueError) as e:
-            mtb.evaluate(emb, labels=labels, metrics=["ARI"])
-        assert [str(w.message) for w in rec] == [warning]
-        assert str(e.value).startswith(count)
+    for output in (_emb(tmp_path), ad.AnnData(EMB, obs=pd.DataFrame(index=BARS))):
+        for name, kw in (
+                ("labels.csv", dict(labels=_labels(tmp_path, bars=NO_SUFFIX,
+                                                   values=TYPES[PERM]))),
+                ("batch.csv", dict(labels=TYPES, batch=_labels(
+                    tmp_path, "batch.csv", bars=NO_SUFFIX, values=donors, column="donor")))):
+            with pytest.raises(ValueError, match=rf"60 of the 60 ids in the first column of "
+                                                 rf"{name} are not cells of the embedding"):
+                mtb.evaluate(output, obsm="X", metrics=["ARI", "iLISI"] if "batch" in kw
+                             else ["ARI"], **kw)
+    with pytest.raises(ValueError, match="60 of the 60 ids in the first column of cty1.csv "
+                                         "and cty2.csv are not cells of the embedding"):
+        mtb.evaluate(_emb(tmp_path), labels=[
+            _labels(tmp_path, "cty1.csv", values=TYPES[:30], bars=NO_SUFFIX[:30]),
+            _labels(tmp_path, "cty2.csv", values=TYPES[30:], bars=NO_SUFFIX[30:])],
+            metrics=["ARI"])
+    # a Series: the ids decide too, and the fix for the suffix is named
+    with pytest.raises(ValueError, match=r"They match after adding '-1' to the labels ids"):
+        mtb.evaluate(_emb(tmp_path), labels=pd.Series(TYPES[PERM], index=NO_SUFFIX),
+                     metrics=["ARI"])
     assert not seen
 
 
@@ -397,17 +332,29 @@ def test_several_label_files_with_other_cells(tmp_path, seen):
 
 
 # --------------------------------------------------- one side without cell ids
-def test_labels_without_ids_are_matched_by_position_as_before(tmp_path, capsys, seen):
+def test_labels_without_ids_next_to_cell_ids(tmp_path, capsys, seen):
+    """c3 (E05): a file or a 0..n-1 Series without cell ids is refused next to an
+    embedding with ids; an array or a list is matched by position."""
     emb = _emb(tmp_path)
     shuffled = TYPES[PERM]
     one = tmp_path / "cty.csv"                           # the benchmark's label file
     pd.DataFrame({"x": shuffled}).to_csv(one, index=False)
     numbered = tmp_path / "numbered.csv"                 # R's row numbers, then the labels
     pd.DataFrame({"x": shuffled}, index=np.arange(1, CELLS + 1)).to_csv(numbered)
-    for labels in (str(one), str(numbered), shuffled, list(shuffled),
-                   pd.Series(shuffled)):
+    sample = tmp_path / "obs.csv"                        # a sample column: no barcodes
+    pd.DataFrame({"sample": ["s1", "s2"] * (CELLS // 2), "x": shuffled}).to_csv(
+        sample, index=False)
+    for path in (one, numbered, sample):
+        with pytest.raises(ValueError, match=rf"^{path.name} has no cell ids, and the "
+                                             r"embedding has: put the barcodes in its first "
+                                             r"column, or pass labels=pd\.read_csv"):
+            mtb.evaluate(emb, labels=str(path), metrics=["ARI"])
+    with pytest.raises(ValueError, match=r"^labels is a Series without cell ids, and the "
+                                         r"embedding has: index it by the barcodes, or pass "
+                                         r"labels\.to_numpy\(\) to match by position\.$"):
+        mtb.evaluate(emb, labels=pd.Series(shuffled), metrics=["ARI"])
+    for labels in (shuffled, list(shuffled), pd.read_csv(one).iloc[:, 0].to_numpy()):
         seen.clear()
-        # c2 (D10): a file without cell ids is matched by position without a warning
         _quiet(capsys, emb, labels=labels, metrics=["ARI"])
         assert seen["labels"] == list(shuffled)
 
@@ -464,15 +411,6 @@ def test_repeated_barcodes_and_a_series_raise_as_for_an_anndata(tmp_path, seen):
     assert seen["labels"] == list(TYPES)
 
 
-def test_a_sample_column_before_the_labels_is_not_a_barcode_column(tmp_path, capsys, seen):
-    """Text that repeats and names no cell: read by position, silently."""
-    path = tmp_path / "obs.csv"
-    pd.DataFrame({"sample": ["s1", "s2"] * (CELLS // 2), "x": TYPES}).to_csv(
-        path, index=False)
-    _quiet(capsys, _emb(tmp_path), labels=str(path), metrics=["ARI"])
-    assert seen["labels"] == list(TYPES)
-
-
 def test_a_dims_by_cells_table_is_still_transposed(tmp_path, capsys, seen):
     """The first column names the dimensions, not the cells: no ids."""
     path = tmp_path / "wide.csv"
@@ -488,19 +426,17 @@ def test_a_dims_by_cells_table_is_still_transposed(tmp_path, capsys, seen):
 
 def test_a_dims_by_cells_table_with_another_number_of_labels(tmp_path, seen):
     """The first column names the dimensions. With a label count that fits
-    neither side, the error is the count error of 0.3.4: it does not call a
-    dimension a cell."""
+    neither side, the barcodes of the labels are not rows of the table: refused
+    without calling a dimension a cell."""
     path = tmp_path / "wide.csv"
     pd.DataFrame(EMB.T, index=[f"dim{i}" for i in range(5)], columns=BARS).to_csv(path)
-    for labels, warning in (
-            (_labels(tmp_path, values=TYPES[:50], bars=BARS[:50]),
-             NONE_SHARED.format("labels.csv")),
-            (pd.Series(TYPES[:50], index=BARS[:50]),
-             SERIES_NONE_SHARED.format("labels").replace("emb.csv", "wide.csv"))):
-        with pytest.warns(UserWarning) as rec, pytest.raises(ValueError) as e:
-            mtb.evaluate(str(path), labels=labels, metrics=["ARI"])
-        assert [str(w.message) for w in rec] == [warning]
-        assert str(e.value) == "labels has 50 entries for 5 cells in the embedding."
+    with pytest.raises(ValueError, match=r"^labels: 50 of the 50 ids in the first column of "
+                                         r"labels\.csv are not cells of the embedding"):
+        mtb.evaluate(str(path), labels=_labels(tmp_path, values=TYPES[:50], bars=BARS[:50]),
+                     metrics=["ARI"])
+    with pytest.raises(ValueError, match=r"^The labels' cell ids do not match the embedding's"):
+        mtb.evaluate(str(path), labels=pd.Series(TYPES[:50], index=BARS[:50]),
+                     metrics=["ARI"])
     assert not seen
 
 

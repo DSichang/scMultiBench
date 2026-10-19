@@ -263,7 +263,8 @@ def test_evaluate_own_method_name_on_the_dataset_route_reads_the_labels(tmp_path
     assert err.splitlines()[:2] == [
         "# labels: cty.csv from D11, in that order",
         "error: the label files of D11 (cty.csv) hold 2,864 labels for 10 cells in "
-        "--embedding. Check that --embedding holds the embedding of --method on D11."]
+        "the embedding file. Check that the embedding file holds the embedding of --method "
+        "on D11."]
 
 
 def test_evaluate_names_the_mudata_type():

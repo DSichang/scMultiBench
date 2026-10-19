@@ -147,11 +147,15 @@ def test_a_repeated_first_column_is_not_taken_for_cell_ids(tmp_path):
     a = _adata(tmp_path)
     p = tmp_path / "sample_x.csv"
     pd.DataFrame({"sample": SAMPLES, "x": SAMPLES}).to_csv(p, index=False)
-    got, warned = _recorded(mtb.evaluate, a, labels="celltype", batch=str(p),
+    # c3 (E05): a file without cell ids next to barcodes is refused
+    with pytest.raises(ValueError, match=r"^sample_x\.csv has no cell ids"):
+        mtb.evaluate(a, labels="celltype", batch=str(p), metrics=["iLISI"])
+    got, warned = _recorded(mtb.evaluate, a.obsm["X_emb"], labels=CELLTYPE, batch=str(p),
                             metrics=["iLISI"])
     assert warned == []
     pd.testing.assert_frame_equal(
-        got, mtb.evaluate(a, labels="celltype", batch="sample", metrics=["iLISI"]))
+        got, mtb.evaluate(a.obsm["X_emb"], labels=CELLTYPE, batch=SAMPLES,
+                          metrics=["iLISI"]))
 
 
 def test_a_repeated_barcode_is_named(cite, tmp_path):
@@ -187,8 +191,8 @@ def test_a_repeated_barcode_is_named(cite, tmp_path):
         mtb.evaluate(a, labels="celltype", batch=str(wide), metrics=["iLISI"])
     assert str(e.value) == ("The batch file wide.csv has several columns: sample, donor, "
                             "day. "
-                            "Pass one column as a Series, for example "
-                            f'pd.read_csv("{wide}")["sample"].')
+                            "Pass one column, for example "
+                            f'pd.read_csv("{wide}")["sample"].to_numpy().')
     assert "column=" not in str(e.value)
 
 

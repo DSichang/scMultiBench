@@ -362,8 +362,9 @@ _COLUMN_HINTS = {"labels": ("celltype", "cell_type", "cell type", "label", "cty"
 
 
 def _series_example(path: Path, names: list, *, index: bool, what: str | None) -> str:
-    """The pandas call that reads one column of ``path`` as a Series, the
-    column whose name suggests ``what``, else the last."""
+    """The pandas call that reads one column of ``path``, the column whose name
+    suggests ``what``, else the last: a Series indexed by the cell ids when the
+    file has them, else an array, which is matched by position."""
     hints = _COLUMN_HINTS.get(what or "", ())
     col = next((n for n in names if any(h in n.lower() for h in hints)), names[-1])
     args = [json.dumps(str(path), ensure_ascii=False)]
@@ -371,7 +372,8 @@ def _series_example(path: Path, names: list, *, index: bool, what: str | None) -
         args.append('sep="\\t"')
     if index:
         args.append("index_col=0")
-    return f"pd.read_csv({', '.join(args)})[{json.dumps(col, ensure_ascii=False)}]"
+    return (f"pd.read_csv({', '.join(args)})[{json.dumps(col, ensure_ascii=False)}]"
+            + ("" if index else ".to_numpy()"))
 
 
 def _n_ids(n: int) -> str:
@@ -399,12 +401,14 @@ def by_id_column(values, first, ids, *, what: str, name: str, target: str,
     - a first column of text whose values are all cells of the target: the
       file is aligned by it, and a repeated id or a cell without a row
       raises ``ValueError``;
-    - text where some values are cells and others are not: ``ValueError``
-      naming a few of the others;
-    - text with no cell, or a target without ids: the file is matched by
-      position (``aligned`` False), with a ``UserWarning`` when the column
-      is unique text (a repeated column such as a sample column is not an
-      id column). ``order`` names the order the rows must then follow;
+    - unique text with a row for every cell and rows of other cells: the
+      file is aligned and the other rows are left out;
+    - unique text where some or all values are not cells, and some cell
+      has no row: ``ValueError`` naming a few of them;
+    - repeated text with no cell (a sample column), or a target without ids:
+      the file is matched by position (``aligned`` False), with a
+      ``UserWarning`` when the column is unique text. ``order`` names the
+      order the rows must then follow;
     - numbers: R's row numbers ``1..n`` or pandas' ``0..n-1``. They align
       the file only when they are exactly the target's ids in some order
       (an AnnData with the default ``obs_names``); otherwise the file is
@@ -437,12 +441,11 @@ def by_id_column(values, first, ids, *, what: str, name: str, target: str,
         if known.all() and keys.is_unique and len(keys) == len(ids):
             return np.asarray(pd.Series(vals, index=keys).reindex(ids).to_numpy()), True
         return vals, False
-    if not known.any():
-        if first.is_unique:
-            _compat.warn(f"The first column of {name} looks like cell ids, but none "
-                         f"is a cell of {target}. {by_position}, or use the barcodes "
-                         f"of {target} in that column.", UserWarning)
-        return vals, False
+    if not known.any() and not first.is_unique:
+        return vals, False                  # a repeated column, such as a sample column
+    if keys.is_unique and ids.isin(keys).all():
+        # every cell has its row; the rows of other cells are left out
+        return np.asarray(pd.Series(vals, index=keys).reindex(ids).to_numpy()), True
     if not known.all():
         other = keys[~known]
         raise ValueError(
@@ -689,16 +692,15 @@ def _align_vector(x, ids, *, what: str, column: str | None, cells: str | None):
             raise ValueError(head + fix)
         raise ValueError(f"{head} Pass {what} indexed like the embedding, or "
                          f"{what}.to_numpy() to match by position.")
-    if len(missing) or len(extra):
-        hint = ""
-        if what == "labels" and not len(extra):
-            hint = " Score the cells that have a label only."
+    if len(missing):
+        # ids the output lacks are left out: every cell has its value
+        hint = (" Score the cells that have a label only."
+                if what == "labels" and not len(extra) else "")
         raise ValueError(
             f"{what}: cannot align by cell id - {len(missing)} of the output's "
-            f"{len(ids)} cells are missing from {what} (first: {_first(missing)}) "
-            f"and {what} has {len(extra)} id(s) the output lacks (first: "
-            f"{_first(extra)}). Pass {what} for exactly the output's cells, or "
-            f"{what}.to_numpy() to match positionally.{hint}")
+            f"{len(ids)} cells are missing from {what} (first: {_first(missing)}). "
+            f"Pass {what} for every cell of the output, or {what}.to_numpy() to match "
+            f"positionally.{hint}")
     return np.asarray(x.reindex(ids).to_numpy())
 
 

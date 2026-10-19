@@ -3,9 +3,9 @@
 ``batch=pd.Series(values)`` has the index 0..n-1. When the cells have
 barcodes, such a Series cannot be matched by barcode: it is taken row by
 row, and a Series that was filtered or sorted before goes to other cells.
-``export_dataset``, ``evaluate`` and ``run_all`` now warn. A column of
-``adata.obs``, which is indexed by barcode, a list and an array give no
-message.
+``export_dataset`` and ``run_all`` now warn, and ``evaluate`` refuses it (c3).
+A column of ``adata.obs``, which is indexed by barcode, a list and an array
+give no message.
 """
 import warnings
 
@@ -91,15 +91,18 @@ def no_scoring(monkeypatch):
         {"Value": [1.0]}, index=pd.Index(["ARI"], name="metric")))
 
 
-def test_evaluate_warns_when_the_output_has_barcodes(tmp_path, no_scoring):
+def test_evaluate_refuses_it_when_the_output_has_barcodes(tmp_path, no_scoring):
+    # c3 (E05): the ids decide; .to_numpy() is the way to match by position
     a = _adata()
     frame = pd.DataFrame(a.obsm["X_emb"], index=a.obs_names)
     frame.to_csv(tmp_path / "emb.csv")
     labels = a.obs["celltype"].to_numpy()
     for output in (a, frame, str(tmp_path / "emb.csv")):
-        _, said = _caught(lambda: mtb.evaluate(output, labels=labels,
-                                               batch=pd.Series(DONORS), metrics="all"))
-        assert said == [TEXT]
+        with pytest.raises(ValueError, match=r"^batch is a Series without cell ids, and the "
+                                             r"embedding has: index it by the barcodes, or "
+                                             r"pass batch\.to_numpy\(\) to match by "
+                                             r"position\.$"):
+            mtb.evaluate(output, labels=labels, batch=pd.Series(DONORS), metrics="all")
 
 
 def test_evaluate_is_silent_for_the_usual_forms(no_scoring):
