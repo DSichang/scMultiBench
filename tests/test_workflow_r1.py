@@ -146,7 +146,8 @@ def test_scan_caveat_carries_the_first_sentence_of_the_setup_hint():
     assert r["files_ok"]
     assert ("GLUE reads the GENCODE v43 human annotation "
             "(gencode.v43.chr_patch_hapl_scaff.annotation.gtf.gz, 53 MB) from "
-            "<repo_path>/tools_scripts/GLUE/.") in r["caveat"]
+            "<repo_path>/tools_scripts/GLUE/: on a host without network, put the file "
+            "there.") in r["caveat"]
     assert "mouse" not in r["caveat"]                   # first sentence only
     # a method without a hint gets no setup note
     tv = full_scan("D11", "vertical", methods=["totalVI"], verbose=False).iloc[0]

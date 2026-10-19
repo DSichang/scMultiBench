@@ -308,3 +308,103 @@ def test_skip_existing_without_a_saved_run_says_so(tmp_path):
     assert str(e.value) == (
         f"No saved output of Matilda in {tmp_path / 'outs'} (it would be "
         f"{tmp_path / 'outs' / 'Matilda_D11'}). Pass the out_dir of the earlier run.")
+
+
+# ------------------------------------------- the command line: refusals, tags, params
+def test_a_refusal_of_any_kind_prints_no_debug_line(tmp_path, capsys, monkeypatch):
+    rc = cli.main(["run-all", "D11", "--category", "vertical", "--methods", "Matilda",
+                   "--param", "Matilda:epochs=2.5", "--dry-run"])
+    err = capsys.readouterr().err
+    assert rc == 1 and err.startswith("error: Matilda: epochs takes a whole number")
+    assert "MULTIBENCH_DEBUG" not in err
+    # an error inside the package's own code keeps the hint
+    try:
+        config._and_list(5)
+    except TypeError as e:
+        assert not cli._refusal(e)
+    # a deliberate OSError (LinuxOnlyError, FileExistsError) is a refusal
+    from multibench.engine import envs
+    try:
+        envs._require_linux("this computer runs macOS")
+    except OSError as e:
+        assert cli._refusal(e)
+
+
+def test_two_run_folders_with_one_name_are_tagged_by_their_place(tmp_path, capsys):
+    long = mtb.load_results("vertical").assign(source="user")
+    for run in ("a", "b"):
+        (tmp_path / "runs" / run / "D11").mkdir(parents=True)
+        long.to_csv(tmp_path / "runs" / run / "D11" / "long.csv", index=False)
+    frames = cli._rename_repeats([long, long], [str(tmp_path / "runs" / r / "D11" /
+                                                     "long.csv") for r in ("a", "b")])
+    assert {m for f in frames for m in f["method"]} >= {"Matilda (a/D11)",
+                                                        "Matilda (b/D11)"}
+    rc = cli.main(["plot", "bar", "--input", str(tmp_path / "runs/a/D11/long.csv"), "--input",
+                   str(tmp_path / "runs/b/D11/long.csv"), "--out", str(tmp_path / "x.png")])
+    assert rc == 0, capsys.readouterr().err
+
+
+def test_params_on_the_command_line_answers_as_params_for(capsys):
+    with pytest.raises(ValueError) as e:
+        mtb.params_for("Multigrate")
+    assert cli.main(["params", "Multigrate"]) == 1
+    err = capsys.readouterr().err
+    assert err.startswith("error: Multigrate has 11 variants")
+    assert err.rstrip().endswith("for example multibench params Multigrate --category mosaic "
+                                 "--modalities rna1,rna2,adt2,adt3.")
+    assert str(e.value).endswith("params_for('Multigrate', 'mosaic', ['rna1', 'rna2', "
+                                 "'adt2', 'adt3']).")
+    assert cli.main(["params", "Matilda"]) == 0
+    assert capsys.readouterr().out.startswith(
+        f"# Matilda {mtb.params_for('Matilda')['variant']}: 9 tunable")
+
+
+def test_a_renamed_run_keeps_its_language_chip():
+    from multibench.plot.bubble import _method_language
+    assert _method_language("scJoint (out_D28_cli)") == _method_language("scJoint") == "python"
+    assert _method_language("scJoint epochs=10") == "python"
+    assert _method_language("MyPCA") is None
+
+
+# ------------------------------------------- rescore, embedding, export
+def test_rescore_of_a_folder_without_outputs_prints_no_status_line(tmp_path, capsys):
+    res = mtb.BatchResult([{"method": "Matilda", "status": "RUN_OK", "out_dir":
+                            str(tmp_path / "Matilda_D11"), "modalities": ["rna", "adt"]}],
+                          "D11", "vertical", out_dir=str(tmp_path))
+    with pytest.raises(FileNotFoundError, match="^No output of Matilda"):
+        _quiet(res.rescore)
+    assert "[rescore] Matilda ->" not in capsys.readouterr().out
+
+
+def test_export_length_errors_name_the_fix(tmp_path):
+    ad = pytest.importorskip("anndata")
+    a = ad.AnnData(np.ones((10, 5), dtype=np.float32))
+    a.obs_names = [f"c{i}" for i in range(10)]
+    a.var_names = [f"g{i}" for i in range(5)]
+    with pytest.raises(ValueError) as e:
+        mtb.io.export_dataset(a, tmp_path / "X", rna="X", labels=["A"] * 9)
+    assert str(e.value) == "labels has 9 entries for 10 cells: give one label per cell."
+
+
+def _fake_run(tmp_path, method, mods, n):
+    import h5py
+    out = tmp_path / f"{method}_D28"
+    out.mkdir(parents=True)
+    with h5py.File(out / "embedding.h5", "w") as f:
+        f.create_dataset("data", data=np.zeros((4, n)))
+    return mtb.BatchResult([{"method": method, "status": "RUN_OK", "out_dir": str(out),
+                             "modalities": mods}], "D28", "diagonal", out_dir=str(tmp_path))
+
+
+def test_the_embedding_names_cells_by_the_file_the_method_read(tmp_path):
+    """u4 #5: scJoint reads atac_gas.h5 (-1 barcodes), GLUE atac_peak.h5 (-2)."""
+    from multibench.engine import resolve
+    folder = mtb.config.DEFAULT.data_path / "D28"
+    n = sum(len(pd.read_csv(folder / f)) for f in ("rna_cty.csv", "atac_cty.csv"))
+    gas = resolve._barcodes_of(folder / "atac_gas.h5")
+    peak = resolve._barcodes_of(folder / "atac_peak.h5")
+    assert gas[0] != peak[0]
+    for method, mods, bars in (("scJoint", ["rna", "atac_gas"], gas),
+                               ("GLUE", ["rna", "atac_peak"], peak)):
+        obs = _quiet(_fake_run(tmp_path / method, method, mods, n).embedding, method).obs_names
+        assert obs[-1].endswith(bars[-1]), (method, obs[-1])

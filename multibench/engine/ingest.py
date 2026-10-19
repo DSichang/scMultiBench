@@ -1347,7 +1347,8 @@ def _as_obs_vector(data, spec, *, what, master):
     if vals.ndim != 1:
         raise ValueError(f"{what}= must be 1-D, got shape {vals.shape}")
     if master is not None and len(vals) != len(master):
-        raise ValueError(f"{what} has {len(vals)} entries for {len(master)} cells")
+        raise ValueError(f"{what} has {len(vals)} entries for {len(master)} cells: give one "
+                         f"{'label' if what == 'labels' else what} per cell.")
     return vals
 
 
@@ -1561,7 +1562,8 @@ def _export_dataset(data, dataset_dir: Path | str, *, rna="X",
             m = masters.get("rna")
             vec = _as_obs_vector(data, labels, what="labels", master=m)
             if m is not None and len(vec) != len(m):
-                raise ValueError(f"labels has {len(vec)} entries for {len(m)} cells")
+                raise ValueError(f"labels has {len(vec)} entries for {len(m)} cells: give "
+                                 f"one label per cell.")
             if len(vec) == 0:
                 raise ValueError(_NO_CELLS)     # labels alone, and none of them
             _check_labels_complete(
@@ -1575,7 +1577,8 @@ def _export_dataset(data, dataset_dir: Path | str, *, rna="X",
         m = masters.get("rna")
         batch_values = _as_obs_vector(data, batch, what="batch", master=m)
         if m is not None and len(batch_values) != len(m):
-            raise ValueError(f"batch has {len(batch_values)} entries for {len(m)} cells")
+            raise ValueError(f"batch has {len(batch_values)} entries for {len(m)} cells: "
+                             f"give one batch per cell.")
         _check_batch_complete(batch_values, spec=batch)
         keys = sorted(set(batch_values.tolist()), key=lambda v: str(v))
         groups = [(str(i + 1), np.flatnonzero(batch_values == k)) for i, k in enumerate(keys)]
