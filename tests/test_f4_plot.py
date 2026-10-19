@@ -255,24 +255,19 @@ def no_envs(monkeypatch):
 
 
 def test_nothing_runnable_tail_is_plain(no_envs, root):
-    # D11 holds no ATAC file: the rows that read one are not listed, and the
-    # line before the tail says so
-    note = ("D11 holds RNA and ADT. Methods and variants that read ATAC are not listed. "
-            'modalities="all" lists them.')
-    for kw, where, before in (
-            ({}, "mtb.run_all('D11', 'vertical', dry_run=True) shows the listed rows.", note),
+    # D11 holds no ATAC file: the rows that read one are not listed, and, since
+    # c3 (C55), no line says so
+    for kw, where in (
+            ({}, "mtb.run_all('D11', 'vertical', dry_run=True) shows the listed rows."),
             ({"methods": ["Matilda"]},
-             "mtb.run_all('D11', 'vertical', methods=['Matilda'], dry_run=True) shows these rows.", None)):
+             "mtb.run_all('D11', 'vertical', methods=['Matilda'], dry_run=True) shows these rows.")):
         with pytest.raises(ValueError) as e:
             mtb.run_all("D11", "vertical", out_dir="/tmp/unused", verbose=False,
                         data_path=root / "data", **kw)
         lines = str(e.value).splitlines()
         assert lines[-1] == (f"{where} Its reason column says which check "
                              f"failed. mtb.env.install(dry_run=True) checks the environments.")
-        if before:
-            assert lines[-2] == before
-        else:
-            assert "not listed" not in str(e.value)
+        assert "not listed" not in str(e.value)
 
 
 def test_dry_run_count_line_is_plain(no_envs, root, capsys, tmp_path):
