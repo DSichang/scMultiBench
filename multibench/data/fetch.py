@@ -97,7 +97,7 @@ def fetch(*datasets: str, verbose: bool = True) -> "Path | list[Path]":
     Parameters
     ----------
     *datasets : str
-        Dataset ids; ``mtb.catalog.datasets()`` marks them ``fetchable``.
+        Dataset ids; ``mtb.catalog.datasets()`` lists them.
     verbose : bool
         Print one "downloading ..." line per dataset.
 

@@ -346,7 +346,7 @@ def test_catalog_datasets_covers_every_dataset_with_results(result_dir, layout_t
     ids = cat.dataset.tolist()
     demo = [d for d in ids if "mini" in d]
     assert len(demo) == 12 and ids[-12:] == demo and ids[:5] == ["D11", "D28", "D45", "D46", "D52"]
-    assert (cat.fetchable | cat.has_results).all() and cat.category.notna().all()
+    assert cat.category.notna().all()
     # a configured root with published tables only (the layout tree) marks no
     # dataset as having results
     monkeypatch.setattr(mtb.config.DEFAULT, "result_path", layout_tree)

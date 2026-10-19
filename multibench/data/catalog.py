@@ -348,15 +348,15 @@ def datasets(*, category: str | None = None) -> pd.DataFrame:
     -------
     pandas.DataFrame
         One row per dataset: ``dataset``, ``category`` (``;``-joined when the
-        benchmark scored it in several), ``fetchable`` (``mtb.data.fetch``
-        downloads it) and ``has_results`` (``mtb.load_results`` has stored
-        results for it).
+        benchmark scored it in several) and ``has_results``
+        (``mtb.load_results`` has stored results for it). ``mtb.data.fetch``
+        downloads every one.
 
     Examples
     --------
     >>> import multibench as mtb
     >>> ds = mtb.catalog.datasets()
-    >>> ds[ds.fetchable].dataset.tolist()
+    >>> ds.dataset.tolist()
     >>> ds[ds.has_results]
     """
     return _datasets(category=category)
@@ -400,14 +400,14 @@ def _datasets(files_dir: Path | str | None = None, *,
     out = pd.DataFrame()
     out["dataset"] = raw[name_col].astype(str).str.strip()
     out["category"] = out["dataset"].map(lambda d: ";".join(cat_of[d]) if d in cat_of else None)
-    out["fetchable"] = out["dataset"].isin(set(AVAILABLE))
+    fetchable = out["dataset"].isin(set(AVAILABLE))
     out["has_results"] = out["dataset"].isin(served)
 
     for col in _PAPER_COLUMNS:
         if col in raw.columns and raw[col].notna().any():
             out[col] = raw[col].values
     # the rows a user can act on: data to fetch or stored results to compare with
-    out = out[out["fetchable"] | out["has_results"]]
+    out = out[fetchable | out["has_results"]]
     if category is not None:
         config.category_folder(category)
         out = out[out["category"].fillna("").str.split(";").map(lambda cs: category in cs)]

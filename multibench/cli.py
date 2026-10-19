@@ -1811,7 +1811,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Download the demo datasets named into the data root, skipping "
                     "those present.")
     pfe.add_argument("datasets", nargs="*", metavar="DATASET",
-                     help="dataset ids, space- or comma-separated (the fetchable column "
+                     help="dataset ids, space- or comma-separated (the dataset column "
                           "of mtb.catalog.datasets())")
     pfe.add_argument("--outputs", action=_Retired, nargs=0, default=False,
                      tail=_compat.note("use multibench plot for the stored results"))
