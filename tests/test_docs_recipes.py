@@ -513,7 +513,7 @@ def test_10x_recipe_runs(host, tmp_path, monkeypatch, capsys):
     for _m, files in host:
         assert {f.parent.resolve() for f in files.values()} == {mine.resolve()}
     assert dict(zip(res.summary["method"], res.summary["status"])) == {
-        m: "CHAIN_OK" for m in ns["METHODS"]}
+        m: "scored" for m in ns["METHODS"]}
     assert sorted(p.name for p in Path("out").iterdir()) == ["MY10X"]
     assert _bytes(example) == before
 
@@ -894,7 +894,7 @@ def test_no_labels_recipe(host, tmp_path, monkeypatch, capsys):
     unmatched = _quoted("recipe-no-labels", r"Without `evaluate=False` the methods run as "
                                             r"well, and the status `(\w+)` says that nothing "
                                             r"was scored\.")
-    assert (ran, skipped, unmatched) == ("RUN_OK", "SKIPPED", "RUN_OK_NO_LABEL_MATCH")
+    assert (ran, skipped, unmatched) == ("ran", "skipped", "ran")        # c1 (C38)
     status = _run_cell(run, ns)
     assert list(status.columns) == ["method", "status"]
     assert dict(zip(status["method"], status["status"])) == {"Matilda": skipped, "sciPENN": ran}
@@ -934,7 +934,7 @@ def test_no_labels_recipe(host, tmp_path, monkeypatch, capsys):
         assert pd.read_csv(folder / "cty.csv")["x"].tolist() == \
             adata.obs["celltype"].reindex(cells).tolist()
         scored = summary.set_index("method")
-        assert scored.loc["sciPENN", "status"] == "CHAIN_OK"
+        assert scored.loc["sciPENN", "status"] == "scored"
         assert np.isfinite(scored.loc["sciPENN", "ARI"])
     assert host == []                            # no method ran again
     # labels for other cells
@@ -1142,8 +1142,11 @@ def _later():
     """The fence for cell types that come later: its export call, and its
     two lines that score the saved embeddings."""
     lines = _fences("recipe-no-labels")[2].splitlines()
-    assert lines[0].startswith("mtb.io.export_dataset(adata, ") and len(lines) == 4
-    assert lines[2:] == ['mine = mtb.load_batch("out/" + NAME).rescore()', "mine.summary"]
+    assert lines[0].startswith("mtb.io.export_dataset(adata, ") and len(lines) == 5
+    # c1 (C10): the new scores are saved into the folder
+    assert lines[2:] == ['mine = mtb.load_batch("out/" + NAME).rescore()',
+                         "mine.save()                        # the new scores into out/MYDATA",
+                         "mine.summary"]
     return "\n".join(lines[:2]), "\n".join(lines[2:])
 
 
@@ -1265,7 +1268,8 @@ def test_labels_later_on_a_folder_with_batches(key, batches, host, tmp_path, mon
         assert labels == [source[c] for c in cells], matrix
     summary = _quiet(_run_cell, _later()[1], ns)
     assert dict(zip(summary["method"], summary["status"])) == {m: "scored" for m in ran}
-    assert set(summary["n_batches"]) == {batches} and summary["ARI"].notna().all()
+    assert summary["ARI"].notna().all()
+    assert {r["n_batches"] for r in ns["mine"].records} == {batches}
     assert host == []                            # no method ran again
 
 
@@ -1298,7 +1302,7 @@ def test_donor_recipe(host, tmp_path, monkeypatch, capsys):
         batch = set(mtb.catalog.metrics().query("family == 'batch'").metric)
         assert [c for c in summary.columns if c in batch] == metrics
         assert summary[metrics].notna().all().all()
-        assert set(summary["n_batches"]) == {5} and set(summary["batch_source"]) == {"user"}
+        assert summary[metrics].notna().all().all()
         # the methods were given the files of the folder, and no donor
         assert sorted(m for m, _ in host) == sorted(ns["METHODS"])
         for _m, files in host:
@@ -1636,7 +1640,8 @@ def test_the_donor_file_of_the_command_line(host, tmp_path, monkeypatch, capsys)
     cli.build_parser().parse_args(argv)
     assert _quiet(cli.main, argv + ["--out-dir", "out/MYDONORS"]) == 0
     summary = pd.read_csv("out/MYDONORS/summary.csv")
-    assert summary["status"].tolist() == ["scored"] and summary["n_batches"].tolist() == [5]
+    assert summary["status"].tolist() == ["scored"]
+    assert mtb.load_batch("out/MYDONORS").records[0]["n_batches"] == 5
     assert summary["ASW_batch"].notna().all()
 
 

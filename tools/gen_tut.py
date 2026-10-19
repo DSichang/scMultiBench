@@ -54,6 +54,7 @@ import warnings
 import nbformat as nbf
 
 import multibench as mtb
+from multibench import workflow
 from multibench.data.examples import EXAMPLES
 from multibench.engine.resolve import labels_for
 
@@ -339,8 +340,9 @@ def would_run(key, methods, dataset=None, **where):
     t = TASKS[key]
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        plan = mtb.run_all(dataset or t["ds"], t["cat"], methods=methods, dry_run=True,
-                           verbose=False, assume_gpu=True, **where)
+        # the full plan behind run_all(dry_run=True): its file and env checks too
+        plan = workflow._run_all(dataset or t["ds"], t["cat"], methods=methods,
+                                 dry_run=True, verbose=False, assume_gpu=True, **where)
     other = [str(r).replace(str(e), "").strip() for r, e in zip(plan.reason, plan.env_reason)]
     rows = plan[[bool(f) and o == "" for f, o in zip(plan.files_ok, other)]]
     return rows.drop(index=workflow._nested_rows(rows)[0])
@@ -462,8 +464,8 @@ FOLDER_NOTE = ("`\"mydata/\" + NAME` is the dataset folder that `scan` and `run_
                "With a new value of `NAME`, the folder holds the files of your data only.")
 CHECK_NOTE = ("The check lists the methods you name. Without `methods=`, it lists every "
               "method that reads the modalities in the folder. `mtb.run_all(..., "
-              "dry_run=True)` has one row per method variant and every column, such as the "
-              "command of each method.")
+              "dry_run=True)` has one row per method variant, with the command of each "
+              "method.")
 LEFTOVER = ("`export_dataset` raises `FileExistsError` when the folder holds files of other "
             "cells that the call does not write. `overwrite=True` does not remove them. Give "
             "`NAME` a new value.")
@@ -947,8 +949,8 @@ def check_own(key):
                 exec(compile(own["export"], f"tutorial_{key}: export cell", "exec"), ns)
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                frame = mtb.run_all("mydata/" + own["name"], t["cat"],
-                                    dry_run=True, verbose=False)
+                frame = workflow._run_all("mydata/" + own["name"], t["cat"],
+                                          dry_run=True, verbose=False)
         finally:
             os.chdir(here)
     warned = [str(w.message) for w in seen if issubclass(w.category, UserWarning)]
@@ -1163,7 +1165,7 @@ envs[["env", "methods", "state"]]''')
     ]
     if "scMoMaT" in methods:
         run_notes.append("scMoMaT writes a graph instead of an embedding. `run_all` scores "
-                         "its UMAP, and its status reads `CHAIN_OK_GRAPH_METHOD`.")
+                         "its UMAP.")
     run_notes += [
         "`res.failures` says why a method failed. `params={\"Method\": {\"key\": value}}` "
         "sets a method's parameters, and `mtb.params_for` lists them. Many methods "
@@ -1319,7 +1321,7 @@ envs[["env", "methods", "state"]]''')
         note = (f"\n\n{and_list(graphs)} return{'s' if len(graphs) == 1 else ''} a neighbour graph, "
                 "not an embedding. The package scores embeddings, so "
                 f"{'its row has' if len(graphs) == 1 else 'their rows have'} the status "
-                "`RUN_OK_NO_EMBEDDING` and no scores, and the figure leaves "
+                "`ran` and no scores, and the figure leaves "
                 f"{'it' if len(graphs) == 1 else 'them'} out.")
     md(f"## 3. Run the method{'s' if len(everyone) > 1 else ''}" + note)
     code(f'''res = mtb.run_all("{ds}", "{cat}", methods=METHODS,
