@@ -16,6 +16,14 @@ import pytest
 
 from multibench.eval import scib as mscib
 
+
+@pytest.fixture(autouse=True)
+def _probe_the_real_scib_afterwards():
+    """The probe is cached: a fake scib's answer must not outlive its test, or
+    a later test scores cLISI and iLISI as NaN."""
+    yield
+    mscib._lisi_helper_problem.cache_clear()
+
 HEALTHY = "#!/bin/sh\necho 'usage: knn_graph.o matrixfile, output_prefix, k'\nexit 0\n"
 
 
