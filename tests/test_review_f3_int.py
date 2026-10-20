@@ -34,7 +34,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, config
+from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, ingest, registry
 from tests.conftest import full_scan
@@ -120,17 +120,6 @@ def test_gene_names_in_the_peak_file_block_glue_seurat_v3_and_multimap(tmp_path,
         assert allowed["runnable"] and allowed["reason"] == "", m
 
 
-def test_strict_counts_unreadable_peak_names_apart(tmp_path, pinned, capsys):
-    root = _diagonal(tmp_path, "LUNG_ids", [f"peak_{i}" for i in range(60)])
-    rc = _quiet(cli.main, ["scan", "LUNG_ids", "--category", "diagonal", "--data-path",
-                           str(root), "--modalities", "rna,atac_peak", "--strict"])
-    err = capsys.readouterr().err
-    # GLUE and Seurat_v3. MultiMAP never reads the names: peak_0 names that
-    # are not the folder's genes are not gene activity (review of wp/f4_int)
-    assert rc == 1 and "Rows whose peak names the method cannot read: 2." in err, err
-    assert "wrong ATAC kind" not in err
-
-
 def test_peak_name_caveat_has_no_subject_and_no_line_names_the_method_twice(
         tmp_path, pinned, capsys):
     root = _diagonal(tmp_path, "LUNG_ids", [f"peak_{i}" for i in range(60)])
@@ -142,89 +131,6 @@ def test_peak_name_caveat_has_no_subject_and_no_line_names_the_method_twice(
     for line in lines:
         for m in ("GLUE", "Seurat_v3"):
             assert not re.search(rf"\b{m} {m}\b", line), line
-
-
-# ---------------------------------------------------------- named methods, tokens
-def test_a_named_method_keeps_the_row_its_roles_spell(pinned, capsys):
-    """moETM's own spelling, as scan and method_info show it (rna+atac since
-    0.4.0, X13: the role names the peaks it reads)."""
-    assert ["rna", "atac"] in [s["modalities"] for s in
-                               mtb.method_info("moETM")["supports"]]
-    for call in (full_scan, lambda *a, **k: mtb.run_all(*a, dry_run=True, **k)):
-        df = _quiet(call, "D28", "vertical", methods=["moETM"],
-                    modalities=["rna", "atac"], verbose=False)
-        assert list(df["modalities"]) == ["rna+atac"]
-    # the gene-activity token keeps only the gene-activity methods
-    df = _quiet(full_scan, "D28", "vertical", modalities=["rna", "atac_gas"], verbose=False)
-    assert "moETM" not in set(df["method"])
-    rc = _quiet(cli.main, ["run-all", "D28", "--category", "vertical", "--methods", "moETM",
-                           "--modalities", "rna,atac", "--dry-run"])
-    assert rc == 0, capsys.readouterr().err
-
-
-def test_a_representation_token_that_drops_a_named_method_says_why(pinned, capsys):
-    for call in (full_scan, lambda *a, **k: mtb.run_all(*a, dry_run=True, **k)):
-        with pytest.raises(ValueError) as e:
-            _quiet(call, "D28", "vertical", methods=["moETM"],
-                   modalities=["rna", "gene_activity"], verbose=False)
-        assert str(e.value) == (
-            "moETM does not read rna+gene_activity in vertical data. moETM reads peaks. "
-            "Pass modalities=['rna', 'atac_peak'] or ['rna', 'atac']."), str(e.value)
-        assert "method_info(m)['supports']" not in str(e.value)
-    with pytest.raises(ValueError, match=r"Matilda reads peaks\. Pass "
-                                         r"modalities=\['rna', 'atac_peak'\] or "
-                                         r"\['rna', 'atac'\]\.$"):
-        _quiet(full_scan, "D11", "vertical", methods=["Matilda"],
-               modalities=["rna", "atac_gas"], verbose=False)
-    # the other direction, on a diagonal method that reads gene activity
-    with pytest.raises(ValueError, match=r"SCALEX reads gene activity\. Pass "
-                                         r"modalities=\['rna', 'atac_gas'\] or "
-                                         r"\['rna', 'atac'\]\.$"):
-        _quiet(full_scan, "D28", "diagonal", methods=["SCALEX"],
-               modalities=["rna", "atac_peak"], verbose=False)
-    # the command line keeps the message and gives its own spelling
-    for sub in ("scan", "run-all"):
-        argv = [sub, "D28", "--category", "vertical", "--methods", "moETM",
-                "--modalities", "rna,gas"] + (["--dry-run"] if sub == "run-all" else [])
-        assert _quiet(cli.main, argv) == 1
-        err = capsys.readouterr().err
-        assert "moETM reads peaks. Pass --modalities rna,atac_peak or rna,atac." in err, err
-
-
-def test_modalities_help_says_the_representation_tokens_select_by_what_is_read():
-    for sub in ("scan", "run-all"):
-        parser = cli.build_parser()
-        action = next(a for a in parser._actions if hasattr(a, "choices") and a.choices
-                      and sub in a.choices)
-        h = next(a.help for a in action.choices[sub]._actions
-                 if "--modalities" in a.option_strings)
-        assert "atac_peak and atac_gas select by what the method reads" in h, sub
-
-
-def test_scan_error_names_the_method_of_another_category_in_a_mixed_list(capsys):
-    rc = _quiet(cli.main, ["scan", "D11", "--category", "diagonal", "--methods",
-                           "GLUE,Matilda"])
-    err = capsys.readouterr().err
-    assert rc == 1
-    # the sentence mtb.scan raises, with the method's own categories
-    assert "error: Matilda does not run on diagonal data. Its categories: vertical." in err
-    assert "GLUE" not in err, err
-
-
-# ---------------------------------------------------------- dry-run caveat lines
-def test_dry_run_prints_the_scripts_note_once_and_no_start_notes(pinned, capsys):
-    _quiet(mtb.run_all, "D11", "vertical", dry_run=True)
-    out = capsys.readouterr().out
-    assert out.count("The method scripts are not in") == 1, out
-    assert "[run_all] The method scripts are not in" in out
-    _quiet(mtb.run_all, "D28", "diagonal", dry_run=True)
-    out = capsys.readouterr().out
-    assert "the command reads" not in out and "start the method with" not in out
-    assert out.count("The method scripts are not in") == 1
-    rc = _quiet(cli.main, ["run-all", "D11", "--category", "vertical", "--dry-run"])
-    err = capsys.readouterr().err
-    assert rc == 0 and err.count("# The method scripts are not in") == 1, err
-    assert not re.search(r"^# \w+ The method scripts are not in", err, re.M)
 
 
 def test_dry_run_prints_no_caveat_for_a_row_it_would_skip(tmp_path, pinned, capsys,
@@ -247,65 +153,6 @@ def test_dry_run_prints_no_caveat_for_a_row_it_would_skip(tmp_path, pinned, caps
 
 # ---------------------------------------------------------- scripts ref
 needs_git = pytest.mark.skipif(shutil.which("git") is None, reason="git not installed")
-
-
-@pytest.fixture
-def scripts_at_head(tmp_path, monkeypatch):
-    repo = tmp_path / "scripts"
-    ep = repo / registry.get("totalVI").variants[0].entrypoint
-    ep.parent.mkdir(parents=True)
-    ep.write_text("print(1)\n")
-    env = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t",
-           "GIT_COMMITTER_EMAIL": "t@t", "HOME": str(repo), "PATH": "/usr/bin:/bin"}
-    for argv in (["git", "init", "-q"], ["git", "add", "."],
-                 ["git", "commit", "-q", "-m", "x"]):
-        subprocess.run(argv, cwd=repo, check=True, env=env)
-    monkeypatch.setattr(config.DEFAULT, "repo_path", repo)
-    monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
-    monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
-    monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
-    monkeypatch.setenv(config.SCRIPTS_REF_VAR, "deadbeef")
-    return repo
-
-
-@needs_git
-def test_a_scripts_ref_mismatch_is_its_own_blocker(scripts_at_head, capsys):
-    sc = full_scan("D11", "vertical", methods=["totalVI"], verbose=False)
-    r = sc.iloc[0]
-    assert not r["runnable"] and r["files_ok"] and r["command"]
-    assert "(MULTIBENCH_SCRIPTS_REF)" in r["reason"]
-    rc = cli.main(["scan", "D11", "--category", "vertical", "--methods", "totalVI",
-                   "--strict"])
-    err = capsys.readouterr().err
-    assert rc == 1
-    assert "Rows whose scripts are not at MULTIBENCH_SCRIPTS_REF: 1." in err \
-        and "input files" not in err
-    rc = cli.main(["run-all", "D11", "--category", "vertical", "--methods", "totalVI",
-                   "--dry-run"])
-    cap = capsys.readouterr()
-    assert rc == 0
-    assert "# Commands of the 1 method whose input files are in place." in cap.out
-    assert "totalVI (rna+adt): " in cap.out
-
-
-# ---------------------------------------------------------- batch
-def test_run_all_dry_run_checks_the_batch_length(tmp_path, pinned, capsys):
-    short = tmp_path / "short.csv"
-    pd.DataFrame({"b": ["s1", "s2", "s1"]}).to_csv(short, index=False)
-    argv = ["run-all", "D11", "--category", "vertical", "--methods", "totalVI",
-            "--dry-run", "--batch"]
-    rc = _quiet(cli.main, argv + [str(short)])
-    err = capsys.readouterr().err
-    assert rc == 1
-    assert ("error: --batch gave 3 batch ids for the 2,864 cells of D11: give one batch "
-            "per cell.") in err, err
-    full = tmp_path / "full.csv"
-    pd.DataFrame({"b": np.tile(["s1", "s2"], 1432)}).to_csv(full, index=False)
-    assert _quiet(cli.main, argv + [str(full)]) == 0
-    # c2 (D22): the Python dry run refuses it too
-    with pytest.raises(ValueError, match=r"^batch has 3 entries for the 2,864 cells of D11"):
-        _quiet(mtb.run_all, "D11", "vertical", methods=["totalVI"], dry_run=True,
-               batch=str(short))
 
 
 def _cty(path, labels):
@@ -434,18 +281,6 @@ def test_the_empty_summary_ends_like_a_full_one():
     assert list(empty.columns)[-2:] == ["caveat", "reason"]
     assert list(full.columns)[-2:] == ["caveat", "reason"]
     assert list(empty.columns) == list(full.columns)
-
-
-def test_evaluate_count_errors_name_where_the_labels_came_from(tmp_path, capsys):
-    emb = tmp_path / "emb_small.npy"
-    np.save(emb, np.random.default_rng(0).normal(size=(500, 4)))
-    rc = _quiet(cli.main, ["evaluate", "--embedding", str(emb), "--dataset", "D46",
-                           "--category", "mosaic", "--method", "scMoMaT"])
-    err = capsys.readouterr().err
-    assert rc == 1
-    assert ("error: the label files of D46 (cty1.csv, cty2.csv, cty3.csv) hold 21,416 "
-            "labels for 500 cells in the embedding file.") in err, err
-    assert "--labels" not in err
 
 
 def test_an_unpacked_size_below_the_archive_reads_unknown(tmp_path, monkeypatch):

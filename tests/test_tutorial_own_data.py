@@ -695,29 +695,6 @@ def test_the_donor_sentence_is_visible_and_its_call_adds_the_batch_scores(
     assert summary["iLISI"].notna().all() == (escib._lisi_helper_problem() is None)
 
 
-def test_the_command_line_of_the_diagonal_tutorial_writes_the_same_folder(tmp_path, monkeypatch):
-    """The collapsed block of the diagonal tutorial gives a command line and
-    says that it writes the same folder from the two files."""
-    import shlex
-    import shutil
-    from multibench import cli
-    key = "diagonal_rna_atac"
-    _on_disk(key)
-    monkeypatch.chdir(tmp_path)
-    src, ns = _sources(key), _namespace(key)
-    assert "The command line writes the same folder from the two files:" in src[0]
-    # 0.4.0: multibench export replaces convert
-    (command,) = re.findall(r"```\n(multibench export .*?)\n```", src[0], re.S)
-    argv = shlex.split(command.replace("\\\n", " "))
-    assert argv[:4] == ["multibench", "export", "my_rna.h5ad", f"mydata/{NAMES[key]}"]
-    for i in (EXAMPLE, READ, EXPORT):
-        _run_cell(src[i], ns)
-    by_cell = _content(Path("mydata") / NAMES[key])
-    shutil.rmtree("mydata")
-    assert cli.main(argv[1:]) == 0
-    assert _content(Path("mydata") / NAMES[key]) == by_cell
-
-
 # ------------------------------------------------- the sentences above the cells
 READ_ONE = ("Read your file. For your own data, change the file name marked `# <-`. On Colab, "
             "upload the file first: click the folder icon on the left, then the upload icon.")

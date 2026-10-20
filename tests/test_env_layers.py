@@ -9,7 +9,6 @@ from pathlib import Path
 
 import pytest
 
-from multibench import cli
 from multibench.engine import envs
 
 ROOT = Path(__file__).resolve().parents[1]

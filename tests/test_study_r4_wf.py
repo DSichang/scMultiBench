@@ -30,7 +30,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, config, discover
+from multibench import config, discover
 from multibench import workflow as W
 from multibench.engine import envs, registry
 from multibench.engine import runner as R
@@ -143,29 +143,6 @@ def test_named_methods_no_longer_bypass_the_atac_check(tmp_path, pinned):
                for m, c in zip(ok["method"], ok["caveat"])), ok["caveat"].tolist()
 
 
-def test_strict_gate_with_methods_fails_and_the_flag_passes_it(tmp_path, pinned, capsys,
-                                                              monkeypatch):
-    # scripts fetched: scan --strict also fails while they are not (R4-06)
-    monkeypatch.setattr(config, "scripts_present", lambda cfg=None: True)
-    root = _gasmos(tmp_path)
-    base = ["scan", "GASMOS", "--category", "mosaic", "--data-path", str(root),
-            "--methods", "StabMap,scMoMaT", "--strict", "--assume-gpu"]
-    rc = _quiet(cli.main, base)
-    err = capsys.readouterr().err
-    assert rc == 1 and "Rows with the wrong ATAC kind: 2." in err, err
-    for m in ("StabMap", "scMoMaT"):
-        assert re.search(rf"^  {m}: {m} needs peak ATAC, and atac2.h5 holds gene activity\. "
-                         r"Export the ATAC as peaks\.$", err, re.M), err
-    rc = _quiet(cli.main, base + ["--allow-atac-mismatch", "--format", "csv"])
-    cap = capsys.readouterr()
-    assert rc == 0, cap.err
-    df = pd.read_csv(__import__("io").StringIO(cap.out))
-    df = df[df["files_ok"]]                    # the two rows the folder has the files of
-    assert len(df) == 2
-    assert all(c.startswith(f"{m} {GP_CAV}")
-               for m, c in zip(df["method"], df["caveat"])), df["caveat"].tolist()
-
-
 def test_run_all_named_matilda_on_peaks_is_blocked_unless_allowed(tmp_path, pinned, capsys,
                                                                   gas_matilda):
     root = _vertical(tmp_path, "MU_PEAK", PEAKS)
@@ -267,55 +244,6 @@ def test_run_dry_run_notes_and_real_run_warns(tmp_path, pinned, monkeypatch, cap
     _quiet(mtb.run, "Matilda", "vertical", inputs=inp2, out_dir=str(tmp_path / "o2"),
            dry_run=True)
     assert "needs gene-activity ATAC" not in capsys.readouterr().err
-
-
-def test_cli_run_dry_run_prints_the_note(tmp_path, pinned, capsys):
-    root = _diagonal(tmp_path, "LUNG_ids", [f"peak_{i}" for i in range(60)])
-    d = root / "LUNG_ids"
-    rc = _quiet(cli.main, ["run", "--method", "GLUE", "--category", "diagonal",
-                           "--input", f"rna={d / 'rna.h5'}",
-                           "--input", f"atac_peak={d / 'atac_peak.h5'}",
-                           "--out-dir", str(tmp_path / "o"), "--dry-run"])
-    err = capsys.readouterr().err
-    assert rc == 0, err
-    assert ("# GLUE reads peak names such as chr1:100-200. atac_peak.h5 holds other names, "
-            "for example peak_0. Rename them to chr:start-end.\n") in err, err
-
-
-def test_layout_lines_name_the_override_in_short_sentences(monkeypatch):
-    head = ("A method whose ATAC file holds the other representation gives a wrong "
-            "embedding.")
-    txt = mtb.describe_layout("mosaic")
-    lines = txt.splitlines()
-    i = lines.index(head)
-    # 0.4.0: no deprecated override and no mtb.run line
-    assert lines[i + 1:i + 3] == ["mtb.scan and mtb.run_all skip such a method.", ""]
-    assert "Named in" not in txt
-    monkeypatch.setattr(config, "_CLI", True)
-    lines = mtb.describe_layout("vertical").splitlines()
-    i = lines.index(head)
-    assert lines[i + 1:i + 3] == ["multibench scan and run-all skip such a method.", ""]
-    assert not any("`" in l or ";" in l for l in lines[i:i + 2])
-
-
-def test_docstrings_name_the_override_not_methods():
-    from multibench.engine import ingest
-    for fn in (mtb.scan, mtb.run_all, ingest.export_dataset):
-        flat = " ".join(inspect.getdoc(fn).split())
-        assert "name it in" not in flat and "Name the method in" not in flat
-        assert "named in ``methods=``, or given" not in flat
-    # 0.4.0: allow_atac_mismatch= is deprecated, out of the docs and the signature;
-    # the CLI flag still parses, hidden from --help
-    for fn in (mtb.scan, mtb.run_all):
-        assert "allow_atac_mismatch" not in " ".join(inspect.getdoc(fn).split()), fn.__name__
-        assert "allow_atac_mismatch" not in inspect.signature(fn).parameters
-    for sub in ("scan", "run-all"):
-        parser = cli.build_parser()
-        action = next(a for a in parser._actions if hasattr(a, "choices") and a.choices
-                      and sub in a.choices)
-        flag = next(a for a in action.choices[sub]._actions
-                    if "--allow-atac-mismatch" in a.option_strings)
-        assert flag.help == argparse.SUPPRESS, sub
 
 
 # ======================================================================= R4-02

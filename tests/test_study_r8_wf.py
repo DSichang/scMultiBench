@@ -22,7 +22,6 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli
 from multibench import workflow as W
 from multibench.engine import envs, runner as R
 from tests.test_f4_cli import working  # noqa: F401 - the stand-in Matilda env fixture
@@ -160,18 +159,6 @@ def test_one_token_is_singular(lung):
                           "instead of modality files. Pass modalities=[] to select it"), msg
 
 
-def test_the_cli_scan_with_a_peak_token_does_not_name_scbridge(lung, capsys):
-    rc = cli.main(["scan", "LUNG", "--category", "diagonal", "--data-path", "data",
-                   "--modalities", "rna,atac_peak"])
-    err = capsys.readouterr().err
-    assert rc == 0, err
-    assert "scBridge" not in err, err
-    rc = cli.main(["scan", "LUNG", "--category", "diagonal", "--data-path", "data",
-                   "--modalities", "rna,atac_gas"])
-    assert "warning: The modalities rna and atac_gas leave out scBridge" in \
-        capsys.readouterr().err
-
-
 # ============================================================ R8-04
 @pytest.fixture
 def no_envs(monkeypatch):
@@ -238,26 +225,6 @@ def test_a_method_the_modalities_drop_raises_with_the_representation_note(lung):
     assert str(e.value).startswith("Matilda does not run on diagonal data. Its categories: "
                                    "vertical. SCALEX does not read rna+atac_peak in "
                                    "diagonal data. SCALEX reads gene activity."), e.value
-
-
-def test_the_cli_run_all_dry_run_exits_1_with_the_sentence(no_envs, labmos, capsys):
-    rc = cli.main(["run-all", "LABMOS", "--category", "mosaic", "--data-path", "data",
-                   "--methods", "StabMap,scMoMaT,totalVI", "--dry-run"])
-    captured = capsys.readouterr()
-    assert rc == 1
-    assert f"error: {_TOTALVI}\n" in captured.err, captured.err
-    assert captured.out == ""
-
-
-def test_the_cli_scan_gives_the_same_sentence(no_envs, labmos, capsys):
-    for methods in ("StabMap,SCALEX", "SCALEX"):
-        rc = cli.main(["scan", "LABMOS", "--category", "mosaic", "--data-path", "data",
-                       "--methods", methods])
-        err = capsys.readouterr().err
-        assert rc == 1
-        (line,) = [l for l in err.splitlines() if l.startswith("error: ")]
-        assert line == "error: SCALEX does not run on mosaic data. Its categories: diagonal."
-        assert "[" not in err and ";" not in err, err
 
 
 def test_the_docstrings_say_a_method_without_a_variant_raises():
@@ -395,29 +362,3 @@ def test_the_scan_frame_keeps_the_linux_sentence(macos, mydata):
     assert list(plan.columns) == W.SCAN_COLUMNS
 
 
-def test_the_dry_run_header_names_no_column(no_envs, mydata, capsys):
-    rc = cli.main(["run-all", "data/MYDATA", "--category", "vertical",
-                   "--modalities", "rna,adt", "--methods", "Matilda,totalVI",
-                   "--dry-run"])
-    err = capsys.readouterr().err
-    assert rc == 0, err
-    head = err.splitlines()[0]
-    assert "files_ok False" not in head
-    # 0.4.0: the header is one sentence
-    assert head == ("# Dry run: 0 of 2 methods can run on data/MYDATA (vertical); the "
-                    "reason column says why."), err
-    rc = cli.main(["run-all", "data/MYDATA", "--category", "vertical",
-                   "--methods", "Matilda", "--dry-run", "--modalities", "all"])
-    head = capsys.readouterr().err.splitlines()[0]
-    assert re.fullmatch(r"# Dry run: \d+ of \d+ rows can run on data/MYDATA \(vertical\); "
-                        r"the reason column says why\.", head), head
-
-
-def test_the_cli_spelling_names_run_all_dry_run(macos, mydata, monkeypatch):
-    # Z13 (r3): the command line's scan prints no commands; run-all --dry-run does
-    from multibench import config
-    monkeypatch.setattr(config, "_CLI", True)
-    msg = _nothing_runnable(modalities=["rna", "adt"], methods=["Matilda", "totalVI"])
-    assert msg.splitlines()[2] == ("multibench run-all data/MYDATA --category vertical "
-                                   "--methods Matilda,totalVI --modalities rna,adt "
-                                   "--dry-run shows the plan.")

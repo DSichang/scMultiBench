@@ -28,7 +28,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, discover
+from multibench import discover
 from multibench import workflow as W
 from multibench.engine import envs, registry
 from tests.conftest import full_scan
@@ -156,18 +156,6 @@ def test_scan_blocks_peak_methods_given_gene_activity(tmp_path):
     assert df.loc[sorted(GAS_METHODS), "runnable"].all()
 
 
-def test_the_cli_spelling_of_the_reason(tmp_path, monkeypatch):
-    from multibench import config
-    root = _vertical(tmp_path, "MU_PEAK", "atac.h5", PEAKS)
-    monkeypatch.setattr(config, "_CLI", True)
-    df = _quiet(full_scan, "MU_PEAK", "vertical", methods=None, data_path=root,
-                verbose=False)
-    r = df[(df.method == "Matilda") & (df.modalities == "rna+atac")].iloc[0]
-    # 0.4.0: the reason offers no override, so both spellings are the same
-    assert r.reason.endswith("Export the ATAC as gene activity.")
-    assert "allow" not in r.reason and "=" not in r.reason
-
-
 class _Res:
     def __init__(self, out):
         self.output = out
@@ -213,22 +201,6 @@ def test_dry_run_prints_the_whole_caveat(tmp_path, capsys):
            dry_run=True, allow_atac_mismatch=True)
     assert (f"[run_all] Matilda {GAS_CAV}"
             in capsys.readouterr().out)
-
-
-def test_scan_strict_counts_the_wrong_atac_kind_apart(tmp_path, capsys):
-    root = _vertical(tmp_path, "MU_PEAK", "atac.h5", PEAKS)
-    base = ["scan", "MU_PEAK", "--category", "vertical", "--data-path", str(root),
-            "--modalities", "rna,atac_gas", "--strict"]
-    rc = _quiet(cli.main, base)
-    err = capsys.readouterr().err
-    assert rc == 1 and "Rows with the wrong ATAC kind: 3." in err, err
-    # R4-01: --methods naming them still fails; --allow-atac-mismatch passes
-    rc = _quiet(cli.main, base + ["--methods", "Matilda,scMDC"])
-    cap = capsys.readouterr()
-    assert rc == 1 and "Rows with the wrong ATAC kind: 2." in cap.err, cap.err
-    rc = _quiet(cli.main, base + ["--methods", "Matilda,scMDC", "--allow-atac-mismatch"])
-    cap = capsys.readouterr()
-    assert rc == 0, cap.err
 
 
 def test_old_records_without_a_caveat_still_summarise():

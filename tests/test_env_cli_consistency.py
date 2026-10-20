@@ -12,7 +12,7 @@ from types import SimpleNamespace
 import pytest
 
 import multibench as mtb
-from multibench import cli, workflow
+from multibench import workflow
 from multibench.engine import runner, envs, registry
 from tests.conftest import full_scan
 
@@ -57,17 +57,6 @@ def test_size_total_counts_unknowns_per_column():
     assert totals["total_disk_bytes"] == 2_000_000_000
 
 
-def test_env_plan_summary_matches_the_question_marks_in_the_rows(capsys):
-    rc = cli.main(["env", "plan", "--category", "cross"])
-    cap = capsys.readouterr()
-    assert rc == 0
-    n, dl, disk = total_unknowns(cap.err)
-    rows = [l for l in cap.out.splitlines() if l.strip()]
-    assert n == len(rows)
-    assert dl == any("? dl" in l for l in rows)
-    assert disk == any("? disk" in l for l in rows)
-
-
 # ----------------------------------------------------------------- recipe
 def test_recipe_pins_python_once():
     spec = registry.get("Matilda").env_spec
@@ -91,35 +80,6 @@ def test_conda_packages_untouched_without_python_version():
     spec = {"conda_packages": ["python=3.8", "numpy"]}
     assert envs._conda_packages(spec) == ["python=3.8", "numpy"]
     assert envs._conda_packages({**spec, "python_version": "3.8"}) == ["numpy"]
-
-
-# ----------------------------------------------------------------- one symbol set
-def test_status_and_doctor_use_the_same_marks_and_legend(capsys):
-    cli.main(["env", "status", "--methods", "Matilda,UINMF"])
-    st = capsys.readouterr()
-    cli.main(["env", "doctor", "--methods", "Matilda,UINMF"])
-    doc = capsys.readouterr()
-    st_marks = {l.split()[1]: l[:3] for l in st.out.splitlines()}          # method -> [x]
-    doc_marks = {}
-    for l in doc.out.splitlines():
-        if l.startswith("["):
-            for m in l.split("<-")[1].split(","):
-                doc_marks[m.strip()] = l[:3]
-    assert st_marks == doc_marks == {"Matilda": "[L]", "UINMF": "[L]"}
-    assert "[ ]" not in st.out
-    assert f"# legend: {envs.MARK_LEGEND}" in st.err
-    assert f"# legend: {envs.MARK_LEGEND}" in doc.out
-    assert "[x]=installed" in envs.MARK_LEGEND and "[L]=missing" in envs.MARK_LEGEND \
-        and "[!]=missing" in envs.MARK_LEGEND
-
-
-def test_status_mark_reflects_lockfile_and_install(monkeypatch, capsys):
-    monkeypatch.setattr(envs, "lockfile", lambda env: None)
-    cli.main(["env", "status", "--methods", "Matilda"])
-    assert capsys.readouterr().out.startswith("[!] Matilda")
-    monkeypatch.setattr(envs, "installed_envs", lambda conda=None: ["matilda"])
-    cli.main(["env", "status", "--methods", "Matilda"])
-    assert capsys.readouterr().out.startswith("[x] Matilda")
 
 
 def test_env_mark_and_status_rows_carry_has_lock():
@@ -188,16 +148,3 @@ def test_scan_reports_the_mira_helper_when_the_checkout_lacks_it(tmp_path, monke
     assert "logger.py" in row["reason"]
 
 
-def test_python_and_cli_install_plans_give_one_total(capsys):
-    # X29 (r3): one row per env; the totals, shared layer counted, come from one helper
-    plan = mtb.env.install(["StabMap", "scMoMaT"], dry_run=True, flavor="gpu")
-    out = capsys.readouterr().out.strip()
-    assert list(plan["env"]) == ["scmb_r", "scmb_torch"]
-    layers = plan.attrs["shared_layers"]
-    assert layers and all(e["envs"] == ["scmb_torch"] for e in layers.values())
-    assert plan.attrs["total_download_bytes"] == (
-        plan["archive_bytes"].sum() + sum(e["archive_bytes"] for e in layers.values()))
-    assert out.startswith("[env] 2 envs: ")
-    assert cli.main(["env", "install", "--methods", "StabMap,scMoMaT", "--flavor", "gpu",
-                     "--dry-run"]) == 0
-    assert "# " + out[len("[env] "):] in capsys.readouterr().err

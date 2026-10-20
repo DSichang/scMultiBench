@@ -65,10 +65,8 @@ def _resolve_role(ds_dir: Path, role: str) -> Path:
 
 def _batch_column_advice() -> str:
     """Export without per-batch files, then where the batch column goes."""
-    return config.hint('export without batch= and pass the column itself, as '
-                       'run_all(batch=adata.obs["donor"])',
-                       "export without --batch and pass a CSV file of barcode and batch "
-                       "to run-all --batch")
+    return ('export without batch= and pass the column itself, as '
+                       'run_all(batch=adata.obs["donor"])')
 
 
 def _one_file_advice(category: str, *, stem: str = "rna", has_adt: bool = False) -> str:
@@ -83,9 +81,9 @@ def _one_file_advice(category: str, *, stem: str = "rna", has_adt: bool = False)
         n = f"exactly {counts.pop()}" if len(counts) == 1 else "several"
         also = (f" {_and_list(several)} also read {n} numbered RNA and ATAC batches, "
                 "written one batch per call with "
-                + config.hint("batch_index=", "--batch-index") + "." if several else "")
+                + "batch_index=" + "." if several else "")
         return "Diagonal methods read one rna.h5 and one ATAC file. " + advice + also
-    cross = config.hint('category="cross"', "--category cross")
+    cross = 'category="cross"'
     return (f"{category.capitalize()} methods read one {stem}.h5. " + advice
             + (f" For RNA+ADT batches, use {cross}." if has_adt else ""))
 
@@ -242,7 +240,7 @@ def _ambiguous_message(method: str, category: str, candidates, folder_note="") -
     ``folder_note`` starts with a space."""
     mods = [list(v.when.get("modalities", [])) for v in candidates]
     names = _and_list("+".join(m) for m in mods)
-    spell = [config.hint(f"modalities={m}", f"--modalities {','.join(m)}") for m in mods]
+    spell = [f"modalities={m}" for m in mods]
     pick = (f"Pass {spell[0]} or {spell[1]}." if len(spell) == 2 else
             f"Pass the modalities of one, for example {spell[0]}.")
     return f"{method} has {len(mods)} {category} variants, {names}.{folder_note} {pick}"
@@ -280,17 +278,15 @@ def missing_dataset_message(base, dataset: str) -> str:
     if len(here.parts) == 1 and near is not None and Path(os.path.abspath(base)) == default:
         path = f"./{near}" if near == here else str(near)
         return (f"The folder {base / dataset} does not exist. {path} exists here: pass "
-                + config.hint(f"{path!r}.", f"{path}."))
+                + f"{path!r}.")
     dirs = sorted(p.name for p in base.iterdir() if p.is_dir()) if base.is_dir() else []
     holds = (f"{base} holds {_and_list(dirs)}." if dirs else
              f"{base} holds no folders." if base.is_dir() else
              f"{base} does not exist either.")
     return (f"The folder {base / dataset} does not exist. {holds} "
-            + config.hint("dataset= is the folder's path, or its name under "
+            + ("dataset= is the folder's path, or its name under "
                           "mtb.config.DEFAULT.data_path. mtb.describe_layout() shows the "
-                          "layout.",
-                          "DATASET is the folder's path, or its name under the data root "
-                          "(multibench config). multibench layout shows the layout."))
+                          "layout."))
 
 
 def _note_local_folder(base: Path, name: str) -> None:
@@ -316,7 +312,7 @@ def _note_local_folder(base: Path, name: str) -> None:
     _NOTED[:] = [outer, key]
     path = f"./{name}"
     _compat.warn(f"Using {base / name}; {path} also exists: pass "
-                 + config.hint(f"{path!r}", path) + " for it.", UserWarning)
+                 + f"{path!r}" + " for it.", UserWarning)
 
 
 #: the call that last got the note of :func:`_note_local_folder`
@@ -557,7 +553,7 @@ def _near_miss_hints(ds_dir: Path, missing: dict, category: str,
             # every vertical ATAC role reads atac.h5, also the peak methods' atac_gas
             hints.append(
                 f"Vertical methods read atac.h5. Rename {same[0]} to atac.h5, or write "
-                f"it with " + config.hint('category="vertical"', "--category vertical")
+                f"it with " + 'category="vertical"'
                 + ".")
             continue
         who = method or "the method"
@@ -566,9 +562,7 @@ def _near_miss_hints(ds_dir: Path, missing: dict, category: str,
         elif reads_both:
             why = f"{who[:1].upper()}{who[1:]} reads both atac_peak.h5 and atac_gas.h5."
         else:
-            why = config.hint(
-                (f'method_info("{method}")["atac"]' if method else 'method_info(m)["atac"]'),
-                f"multibench info {method or 'METHOD'}") + f" says which ATAC {who} needs."
+            why = f'method_info("{method}")["atac"]' if method else 'method_info(m)["atac"]' + f" says which ATAC {who} needs."
         rule = f"{category.capitalize()} methods read {' or '.join(accepted)}."
         if category == "vertical" and not m:
             rule = "Vertical methods read atac.h5."
@@ -612,7 +606,7 @@ def _check_matrix_files(method, dataset, resolved):
                 f'See the recipe "A 10x .h5 file" in the docs.')
         sniff = _sniff_h5(str(p), p.stat().st_mtime_ns)
         if sniff is not None and 0 in sniff[1:]:
-            again = config.hint("mtb.io.export_dataset", "multibench export")
+            again = "mtb.io.export_dataset"
             raise ValueError(
                 f"{method} reads {p.name} of {dataset}, which holds 0 "
                 f"{'features' if sniff[1] == 0 else 'cells'}. Write the folder again "
@@ -638,7 +632,7 @@ def _check_orientation(method, dataset, resolved):
                 f"cells x features, shape {shape}. The file lists {n_feat} features "
                 f"and {n_cell} cells. Its matrix/data needs features x cells, shape "
                 f"({n_feat}, {n_cell}). Export it again with "
-                + config.hint("mtb.io.export_dataset", "multibench export")
+                + "mtb.io.export_dataset"
                 + ", or transpose matrix/data."
             )
 
@@ -771,8 +765,7 @@ def _label_count_text(labels: str, n_lab: int, data: str, n_cell: int, category:
     each = f"each cell of batch {batch}" if batch is not None else "each cell"
     return (f"{labels} has {n_lab} labels, but {data} has {n_cell} cells. Give {each} "
             f"one label, in the order of the cells. "
-            + config.hint(f"mtb.describe_layout({category!r})",
-                          f"multibench layout {category}") + " shows the files.")
+            + f"mtb.describe_layout({category!r})" + " shows the files.")
 
 
 def _data_dir_files(variant, data_dir) -> dict:
@@ -799,8 +792,7 @@ def _check_data_dir(variant, data_dir, method: str = "The method") -> tuple[bool
     return True, ""
 
 
-# Every caveat starts with the method name, so the 40-character clip of the
-# compact CLI table still shows the problem.
+# Every caveat starts with the method name, so a clipped line still shows the problem.
 #: an ``atac_gas`` role fell back to a peak matrix in ``atac.h5``
 PEAK_IN_GAS_CAVEAT = ("{method} needs gene-activity ATAC. The features of atac.h5 look "
                       "like chr:start-end, so it holds peaks.")
@@ -826,8 +818,6 @@ DIAGONAL_CTY_CAVEAT = ("{method} needs rna_cty.csv and atac_cty.csv for diagonal
                        "folder has only cty.csv.")
 #: ``UINMF reads batches 1-2 of 3. Batch 3 is not used.``
 UNUSED_BATCHES_CAVEAT = "{method} reads batches {used} of {n}. {unused}."
-_UNUSED_BATCHES_RE = re.compile(r"\S+ reads batches [\d, and-]+ of \d+\. Batch(?:es)? "
-                                r"[\d, and-]+ (?:is|are) not used\.")
 # file stems (batch digits allowed) whose values must be raw counts
 _COUNT_FILE_RE = re.compile(r"^(rna|adt|atac_peak)\d*$")
 
@@ -1029,8 +1019,7 @@ def _check_atac_gas_cells(method, dataset, resolved) -> None:
         if kind == "order":
             raise ValueError(GAS_OTHER_ORDER_REASON.format(
                 method=method, dataset=dataset, gas=gas.name, peak=peak.name,
-                write=config.hint("mtb.io.export_dataset(..., atac_kind='gene_activity')",
-                                  "multibench export SRC DIR --atac-kind gene_activity")
+                write="mtb.io.export_dataset(..., atac_kind='gene_activity')"
             ).replace("atac_cty.csv", f"atac_cty{digits}.csv"))
 
 
@@ -1089,12 +1078,6 @@ def _unused_batches_note(resolved, method: str = "The method") -> str | None:
     verb = "Batch {} is not used" if len(unused) == 1 else "Batches {} are not used"
     return UNUSED_BATCHES_CAVEAT.format(method=method, used=_span(used), n=len(held),
                                         unused=verb.format(_span(unused)))
-
-
-def unused_batches_in(caveat) -> str | None:
-    """The ``<method> reads batches ... not used.`` note inside a scan ``caveat``, or None."""
-    m = _UNUSED_BATCHES_RE.search(str(caveat or ""))
-    return m.group(0) if m else None
 
 
 def _preflight_caveats(resolved, *, atac: str | None = None,
@@ -1340,9 +1323,8 @@ def _default_order_warning(dataset: str, category, stems: list[str],
         doer = who(names)
         method = repr(names[0]) if len(names) == 1 else "<method>"
         whose = "its" if len(names) == 1 else "their"
-        fix = config.hint(f"mtb.evaluate(..., dataset={dataset!r}, category={cat!r}, "
-                          f"method={method})",
-                          f"--method {method.strip(chr(39))}")
+        fix = (f"mtb.evaluate(..., dataset={dataset!r}, category={cat!r}, "
+                          f"method={method})")
         return f"{head} {where}{doer} them in another order: pass {fix} for {whose} output."
     parts = [f"in {cat}, {who(names)} them in another order" if i == 0
              else f"in {cat}, {_and_list(names)} {'does' if len(names) == 1 else 'do'}"

@@ -23,7 +23,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, config
+from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, ingest, registry
 from multibench.engine import runner as R
@@ -36,27 +36,6 @@ ROOT = __import__("pathlib").Path(__file__).resolve().parent.parent
 
 def _doc(obj) -> str:
     return " ".join(inspect.getdoc(obj).split())
-
-
-# ======================================================================= R7-10
-def test_scan_summary_names_install_on_linux_when_an_environment_is_missing(monkeypatch,
-                                                                            capsys):
-    monkeypatch.setattr(R, "linux_only_sentence", lambda: None)
-    monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
-    full_scan("D11", "vertical", modalities="all")
-    line = capsys.readouterr().out.strip()
-    assert line.startswith("[scan] ") and line.endswith(
-        " have their environment installed. mtb.env.install(dry_run=True) checks the "
-        "environments."), line                  # 0.4: env.doctor is deprecated
-    monkeypatch.setattr(config, "_CLI", True)
-    full_scan("D11", "vertical", modalities="all")
-    assert capsys.readouterr().out.strip().endswith(
-        "multibench env install --dry-run checks the environments.")
-    # every environment installed: nothing to check
-    monkeypatch.setattr(config, "_CLI", False)
-    monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
-    full_scan("D11", "vertical")
-    assert "checks the environments" not in capsys.readouterr().out
 
 
 def test_env_reason_names_the_category_in_a_sentence(monkeypatch):
@@ -110,38 +89,6 @@ def test_missing_batch_file_is_named_as_a_batch_file(tmp_path, monkeypatch):
     assert "labels file" not in msg and ";" not in msg and "(cwd" not in msg
 
 
-def test_missing_batch_file_on_the_cli(tmp_path, monkeypatch, capsys):
-    monkeypatch.chdir(tmp_path)
-    src = ROOT / "data" / "outputs" / "D28"
-    out = tmp_path / "out"
-    shutil.copytree(src / "scalex_D28" if (src / "scalex_D28").is_dir() else
-                    next(p for p in src.iterdir() if p.is_dir()), out)
-    rc = _quiet(cli.main, ["evaluate", "--embedding", str(out / "embedding.h5"),
-                           "--method", "SCALEX", "--dataset", "D28", "--category",
-                           "diagonal", "--batch", "missing.csv", "--metrics", "iLISI"])
-    err = capsys.readouterr().err
-    assert rc == 1
-    assert "error: The --batch file missing.csv does not exist." in err, err
-    assert "labels file" not in err
-
-
-# ============================================================ describe_layout
-def test_diagonal_layout_points_to_its_own_list(monkeypatch):
-    text = mtb.describe_layout("diagonal")
-    # 0.4: mtb.run is deprecated; the layout says that scan and run_all skip a
-    # method whose ATAC file holds the other representation
-    assert "method_info(m)['atac']" not in text
-    assert "need both files:       MultiMAP, Seurat_v3" in text
-    assert "mtb.scan and mtb.run_all skip such a method." in text
-    assert "only warns" not in text
-    monkeypatch.setattr(config, "_CLI", True)
-    cli_text = mtb.describe_layout("diagonal")
-    assert "only warns" not in cli_text
-    assert "multibench info METHOD" not in cli_text
-    monkeypatch.setattr(config, "_CLI", False)
-    assert "only warns" not in mtb.describe_layout("vertical")
-
-
 # ====================================================== several-datasets warning
 def test_several_datasets_warning_lists_the_datasets_in_words():
     with warnings.catch_warnings():
@@ -167,17 +114,6 @@ def linux_without_conda(monkeypatch):
                         lambda env, **kw: pytest.fail(f"download of {env} started"))
 
 
-def test_no_conda_error_names_the_flag_on_the_cli(linux_without_conda, capsys):
-    env = envs.group_for("StabMap")
-    assert env in envs.packed_manifest()
-    rc = cli.main(["env", "install", "--methods", "StabMap", "--build", "--run"])
-    err = capsys.readouterr().err
-    assert rc == 1
-    assert (f"error: Conda is not installed on this computer. Environment {env} has a "
-            f"packed archive. Leave out --build to install it.") in err, err
-    assert ";" not in err and "packed=True" not in err
-
-
 def test_no_conda_error_in_python(linux_without_conda):
     env = envs.group_for("StabMap")
     with pytest.raises(RuntimeError) as e:
@@ -191,20 +127,6 @@ def test_no_conda_error_in_python(linux_without_conda):
 def _lung_data(root):
     d = _lung(root / "data")
     return d
-
-
-def test_modalities_warning_on_the_cli_is_sentences(tmp_path, monkeypatch, capsys):
-    _lung_data(tmp_path)
-    monkeypatch.chdir(tmp_path)
-    rc = cli.main(["scan", "LUNG", "--category", "diagonal", "--data-path", "data",
-                   "--modalities", "rna,atac_gas"])
-    err = capsys.readouterr().err
-    assert rc == 0
-    line = next(l for l in err.splitlines() if "scBridge" in l)
-    assert line.endswith("The modalities rna and atac_gas leave out scBridge, which reads "
-                         "a folder instead of modality files. Pass --modalities \"\" to "
-                         "select it, or leave out --modalities to see every variant."), line
-    assert "modalities=[" not in line and ";" not in line and "scan:" not in line
 
 
 def test_modalities_warning_in_python_is_sentences(tmp_path):
@@ -236,22 +158,6 @@ def _names_warning(fn, *args, **kw):
     return [str(w.message) for w in rec if "feature names" in str(w.message)]
 
 
-@pytest.mark.parametrize("cli_mode", [False, True])
-def test_missing_feature_names_warning_is_sentences(tmp_path, monkeypatch, cli_mode):
-    monkeypatch.setattr(config, "_CLI", cli_mode)
-    msgs = _names_warning(ingest.export_dataset, _citeseq(), tmp_path / "MYCITE",
-                          rna="X", adt="obsm:protein", labels="obs:cell_type")
-    assert len(msgs) == 1, msgs
-    msg = msgs[0]
-    assert msg.startswith("The adt matrix obsm['protein'] has no feature names. The file "
-                          "names them feature_0 to feature_19. ")
-    for bad in (";", " - ", "e.g.", "..feature"):
-        assert bad not in msg, bad
-    assert msg.endswith(".")
-    assert ("adt_names=" in msg) is (not cli_mode)
-    assert "adata.uns['protein_names']" in msg
-
-
 def test_missing_feature_names_of_to_canonical_name_its_argument(tmp_path):
     msgs = _names_warning(ingest.to_canonical, _citeseq(), tmp_path / "adt.h5",
                           modality="adt", obsm="protein")
@@ -266,33 +172,6 @@ def test_missing_feature_names_of_a_bare_array(tmp_path):
     assert msgs == ["The adt matrix array has no feature names. The file names them "
                     "feature_0 to feature_3. Pass adt_names=, or give adt= as a DataFrame "
                     "or AnnData with named features."]
-
-
-# ==================================================== several variants
-def test_several_variants_errors_are_sentences(tmp_path, monkeypatch):
-    d = tmp_path / "AMB"
-    d.mkdir()
-    for f in ("rna.h5", "adt.h5", "atac.h5", "cty.csv"):
-        (d / f).touch()
-    msgs = []
-    for cli_mode in (False, True):
-        monkeypatch.setattr(config, "_CLI", cli_mode)
-        # two variants that are not nested; Matilda's are inside its rna+adt+atac
-        with pytest.raises(mtb.AmbiguousVariantError) as e:
-            mtb.inputs_for("AMB", "vertical", "VIMCCA", data_path=tmp_path)
-        msgs.append(str(e.value))
-    assert msgs[0] == (f"VIMCCA has 2 vertical variants, rna+adt and rna+atac. The folder "
-                       f"{d} has every input file of both. Pass modalities=['rna', 'adt'] "
-                       f"or modalities=['rna', 'atac'].")
-    assert msgs[1].endswith("Pass --modalities rna,adt or --modalities rna,atac.")
-    monkeypatch.setattr(config, "_CLI", False)
-    with pytest.raises(mtb.AmbiguousVariantError) as e:
-        mtb.params_for("Multigrate")
-    msgs.append(str(e.value))
-    for msg in msgs:
-        for bad in (";", " - ", "e.g.", "[[", "available:"):
-            assert bad not in msg, (bad, msg)
-        assert msg.endswith(".")
 
 
 # ==================================================== docstrings

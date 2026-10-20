@@ -20,22 +20,12 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, config
+from multibench import config
 from multibench import workflow as W
 from multibench.data import results
 from multibench.engine import envs, runner
 
 N = 120
-
-
-def _sub(*names):
-    """The argparse sub-parser at ``names`` (e.g. ``'env', 'plan'``)."""
-    parser = cli.build_parser()
-    for name in names:
-        action = next(a for a in parser._actions
-                      if isinstance(a, argparse._SubParsersAction))
-        parser = action.choices[name]
-    return parser
 
 
 def _rendered_help(parser, flag, columns=80):
@@ -84,191 +74,16 @@ _WRITER = textwrap.dedent('''\
     ''') % (N, N // 2, N // 2, N // 2)
 
 
-@pytest.fixture
-def standin(tmp_path, monkeypatch):
-    """MYCITE (rna/adt/cty, 120 cells) and a stand-in ``matilda`` env prefix.
-
-    The prefix's ``bin/python`` runs a small writer with this interpreter: it
-    writes ``embedding.h5`` (two clusters matching the labels) where the
-    runner's ``--save_path`` points. conda is hidden; the runner uses the
-    prefix.
-    """
-    data = tmp_path / "data"
-    d = data / "MYCITE"
-    d.mkdir(parents=True)
-    _h5(d / "rna.h5", 30, "g")
-    _h5(d / "adt.h5", 6, "p")
-    pd.DataFrame({"x": ["A"] * (N // 2) + ["B"] * (N // 2)}).to_csv(d / "cty.csv",
-                                                                    index=False)
-    envs_dir = tmp_path / "envs"
-    writer = tmp_path / "writer.py"
-    writer.write_text(_WRITER)
-    py = envs_dir / "matilda" / "bin" / "python"
-    py.parent.mkdir(parents=True)
-    py.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{writer}" "$@"\n')
-    py.chmod(py.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-    (envs_dir / "matilda" / envs.FLAVOR_FILE).write_text("build\n")   # made by multibench
-    monkeypatch.setattr(config.DEFAULT, "envs_dir", envs_dir)
-    monkeypatch.delenv(config.ENVS_DIR_VAR, raising=False)
-    monkeypatch.setattr(envs.shutil, "which", lambda *a, **k: None)
-    monkeypatch.setattr(config._shutil, "which", lambda *a, **k: None)
-    monkeypatch.delenv("CONDA_EXE", raising=False)
-    monkeypatch.setenv(runner.RUN_MODE_VAR, "prefix")
-    monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
-    _clear_env_caches()
-    yield data
-    _clear_env_caches()
-
-
 def _clear_env_caches():
     """Drop the per-process env probes, so the stand-in prefix is seen (and forgotten)."""
     for fn in (config._conda_envs_dir, envs._conda_prefixes):
         fn.cache_clear()
 
 
-def _run_all(data, out, *extra):
-    return cli.main(["run-all", str(data / "MYCITE"), "--category", "vertical",
-                     "--methods", "Matilda", "--modalities", "rna,adt",
-                     "--out-dir", str(out), "--format", "csv", *extra])
-
-
-def test_run_all_parser_accepts_batch_and_its_help_is_two_lines():
-    args = cli.build_parser().parse_args(
-        ["run-all", "D11", "--category", "vertical", "--batch", "b.csv", "--dry-run"])
-    assert args.batch == "b.csv" and args.dry_run
-    assert cli.build_parser().parse_args(
-        ["run-all", "D11", "--category", "vertical", "--dry-run"]).batch is None
-    lines = _rendered_help(_sub("run-all"), "--batch")
-    # two source lines; at 80 columns it renders in three
-    assert len(lines) <= 3, lines
-    text = " ".join(" ".join(lines).split())
-    assert text.startswith("--batch CSV one batch per cell, in the order of the label files")
-    assert "or by a first column of barcodes" in text
-    assert "(default: one batch per label file)" in text
-
-
-def test_run_all_batch_reaches_the_summary(standin, tmp_path, capsys):
-    bp = tmp_path / "batch.csv"
-    pd.DataFrame({"x": np.tile(["s1", "s2"], N // 2)}).to_csv(bp, index=False)
-    rc = _run_all(standin, tmp_path / "out", "--batch", str(bp))
-    cap = capsys.readouterr()
-    assert rc == 0, cap.err
-    sm = mtb.load_batch(tmp_path / "out").summary
-    assert sm.loc[0, "status"] == "scored", sm.loc[0].to_dict()
-    rec = mtb.load_batch(tmp_path / "out").records[0]
-    assert rec["batch_source"] == "user" and rec["n_batches"] == 2
-    assert "ASW_batch" in sm.columns and pd.notna(sm.loc[0, "ASW_batch"])
-    # without --batch the same folder is one batch, as before
-    rc = _run_all(standin, tmp_path / "out1")
-    capsys.readouterr()
-    sm = mtb.load_batch(tmp_path / "out1").summary
-    rec = mtb.load_batch(tmp_path / "out1").records[0]
-    assert rc == 0 and rec["n_batches"] == 1 and rec["batch_source"] is None
-
-
-def test_run_all_batch_missing_file_exits_1_before_any_method(standin, tmp_path, capsys,
-                                                             monkeypatch):
-    monkeypatch.setattr(W, "_run", lambda *a, **k: pytest.fail("a method was started"))
-    missing = tmp_path / "nope.csv"
-    for extra in ([], ["--dry-run"]):
-        rc = _run_all(standin, tmp_path / "out", "--batch", str(missing), *extra)
-        err = capsys.readouterr().err
-        assert rc == 1, extra
-        assert f"error: The --batch file {missing} does not exist." in err
-        assert "Traceback" not in err
-    assert not (tmp_path / "out").exists()
-
-
-def test_run_all_dry_run_accepts_batch(standin, tmp_path, capsys):
-    bp = tmp_path / "batch.csv"
-    pd.DataFrame({"x": np.tile(["s1", "s2"], N // 2)}).to_csv(bp, index=False)
-    rc = _run_all(standin, tmp_path / "out", "--batch", str(bp), "--dry-run")
-    cap = capsys.readouterr()
-    assert rc == 0 and "Matilda" in cap.out
-    assert not (tmp_path / "out").exists()
-    # the dry run reads the file, so one the real run could not read fails the check
-    bad = tmp_path / "wide.csv"
-    pd.DataFrame({"a": ["1", "1"], "b": ["s1", "s2"], "c": ["u", "v"]}).to_csv(bad, index=False)
-    rc = _run_all(standin, tmp_path / "out", "--batch", str(bad), "--dry-run")
-    assert rc == 1 and "error: " in capsys.readouterr().err
-
-
-# ====================================================================== R3-11
-def test_help_defaults_point_to_multibench_config_not_python():
-    # 0.4.0: --data-path and --leiden-flavor are hidden; the DATASET argument names
-    # where the data root is shown
-    for path in (("scan",), ("run-all",)):
-        text = next(a.help for a in _sub(*path)._actions if a.dest == "dataset")
-        assert "(multibench config)" in text, path
-        assert "mtb." not in text, path
-
-
-def test_evaluate_description_and_load_results_name_scored_with():
-    desc = " ".join(_sub("evaluate").description.split())
-    assert "(metric, value, method, dataset, category, source, scored_with)" in desc
-    doc = results.load_results.__doc__
-    returns = doc.split("Returns\n")[1].split("Raises\n")[0]
-    assert len(returns.split()) - 3 <= 30        # minus the header rule and the type
-
-
 # ====================================================================== R3-13
 SIZES = {"scmb_r": {"archive_bytes": 916_953_088, "unpacked_bytes": None},
          "scmb_torch": {"archive_bytes": 4_537_398_808, "unpacked_bytes": None},
          "scmb_torch-cpu": {"archive_bytes": 922_099_761, "unpacked_bytes": 2_642_831_784}}
-
-
-def _total_lines(err):
-    """The ``# <n> envs: ...`` total lines: since Z27 (r3) the total is one line,
-    and no builds or unknown-size lines follow it."""
-    lines = err.splitlines()
-    i = next(i for i, l in enumerate(lines) if re.match(r"# \d+ envs?: ", l))
-    assert not any("not measured" in l or "has the" in l or "single build" in l
-                   for l in lines[i + 1:])
-    return [lines[i]]
-
-
-@pytest.fixture
-def tables(monkeypatch):
-    envs.packed_sizes.cache_clear()
-    monkeypatch.setattr(envs, "packed_sizes", lambda: SIZES)
-    monkeypatch.setattr(envs, "packed_layers", lambda: {})
-    monkeypatch.setattr(envs, "packed_manifest",
-                        lambda: {k: f"https://x/{k}.tar.gz" for k in SIZES})
-    monkeypatch.setattr(envs, "installed_flavor", lambda env, conda=None: None)
-    monkeypatch.setattr(envs, "installed_envs", lambda conda=None: [])
-    monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
-
-
-def test_plan_gpu_total_is_short_lines_with_the_du_advice(tables, capsys):
-    assert cli.main(["env", "plan", "--methods", "StabMap,scMoMaT", "--flavor", "gpu"]) == 0
-    err = capsys.readouterr().err
-    assert _total_lines(err) == ["# 2 envs: 5.5 GB to download"]
-    assert "sizes are those recorded" not in err and "summed the" not in err
-    assert "--flavor gpu" not in err                  # asked for GPU builds already
-    assert all(";" not in l for l in _total_lines(err))
-
-
-def test_plan_auto_on_a_cpu_host_states_the_reason_and_the_advice_once(tables, monkeypatch,
-                                                                      capsys):
-    monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
-    assert cli.main(["env", "plan", "--methods", "StabMap,scMoMaT"]) == 0
-    err = capsys.readouterr().err
-    assert _total_lines(err) == ["# 2 envs: 1.8 GB to download, at least 2.6 GB on disk"]
-    assert err.count("--flavor gpu") == 1
-    assert "# for jobs on GPU nodes, pass --flavor gpu" in err
-    assert all(";" not in l for l in _total_lines(err))
-
-
-def test_install_dry_run_states_the_no_gpu_fact_once(tables, monkeypatch, capsys):
-    monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
-    monkeypatch.setattr(envs, "create_all", lambda **kw: [
-        {"env": "scmb_r", "methods": ["StabMap"], "exists": False, "has_lock": True},
-        {"env": "scmb_torch", "methods": ["scMoMaT"], "exists": False, "has_lock": True}])
-    assert cli.main(["env", "install", "--packed", "--methods", "StabMap,scMoMaT", "--dry-run"]) == 0
-    err = capsys.readouterr().err
-    assert _total_lines(err) == ["# 2 envs: 1.8 GB to download, at least 2.6 GB on disk"]
-    assert err.count("NVIDIA GPU") == 1 and err.count("--flavor gpu") == 1
-    assert all(";" not in l for l in _total_lines(err))
 
 
 def test_size_total_known_sizes_are_one_line():

@@ -14,7 +14,6 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli
 from multibench import workflow as W
 from multibench.engine import envs, registry, resolve
 from tests.conftest import full_scan
@@ -115,21 +114,6 @@ def test_run_all_names_out_dir_and_records_after_the_folder(tmp_path, monkeypatc
     assert all(r["dataset"] == "MYCITE" for r in res.records)
 
 
-# ----------------------------------------------------------------- dry-run command column
-def test_run_all_dry_run_returns_the_cli_csv_command_column(capsys):
-    plan = mtb.run_all("D11", "vertical", out_dir="runs", methods=["Matilda"],
-                       dry_run=True, verbose=False)
-    assert list(plan.columns)[-1] == "command"
-    rc = cli.main(["run-all", "D11", "--category", "vertical", "--methods", "Matilda",
-                   "--out", "runs", "--dry-run", "--format", "csv"])
-    assert rc == 0
-    csv = pd.read_csv(io.StringIO(capsys.readouterr().out)).fillna("")
-    assert list(csv["command"]) == list(plan["command"])
-    ok = plan[plan["command"].astype(bool)]
-    assert len(ok) and ok["command"].str.contains("--save_path").all()
-    assert ok["command"].str.contains("runs/Matilda_D11").all()
-
-
 def test_scan_without_out_dir_uses_the_placeholder():
     plan = full_scan("D11", "vertical", methods=["Matilda"], verbose=False)
     ok = plan[plan["files_ok"]]
@@ -137,19 +121,3 @@ def test_scan_without_out_dir_uses_the_placeholder():
     assert (plan[~plan["files_ok"]]["command"] == "").all()
 
 
-# ----------------------------------------------------------------- cite delimiters
-def test_cli_cite_accepts_commas_and_spaces(capsys):
-    assert cli.main(["cite", "Matilda,MOFA2", "--format", "text"]) == 0
-    commas = capsys.readouterr().out
-    assert cli.main(["cite", "Matilda", "MOFA2", "--format", "text"]) == 0
-    spaces = capsys.readouterr().out
-    assert commas == spaces == mtb.cite("Matilda", "MOFA2", fmt="text") + "\n"
-    assert cli.main(["cite", "Matilda,", "MOFA2", "--format", "text"]) == 0   # stray comma
-    assert capsys.readouterr().out == spaces
-    assert cli.main(["cite", "Matilda,Matlida"]) == 1
-    assert "Did you mean Matilda" in capsys.readouterr().err
-
-
-def test_cli_scan_unknown_method_message_without_category(capsys):
-    rc = cli.main(["scan", "D11", "--methods", "Matilda"])   # no --category: fine
-    assert rc == 0 and "Matilda" in capsys.readouterr().out

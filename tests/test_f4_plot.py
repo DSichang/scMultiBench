@@ -19,7 +19,7 @@ import pytest
 import multibench as mtb
 # the table behind a bubble figure: mtb.plot.build_table is deprecated in 0.4.0
 from multibench.plot.bubble import _build_table  # noqa: E402
-from multibench import cli, config
+from multibench import config
 from tests.conftest import full_scan
 
 B = importlib.import_module("multibench.plot.bubble")
@@ -100,16 +100,6 @@ def test_incomplete_matrix_groups_methods_by_count():
             "scores on 2 of them.") in msg
 
 
-def test_incomplete_matrix_cli_spelling(tmp_path, capsys):
-    p = tmp_path / "in.csv"
-    _incomplete().to_csv(p, index=False)
-    assert cli.main(["plot", "bubble", "--input", str(p), "--aggregate", "summary",
-                     "--out", str(tmp_path / "f.png")]) == 0
-    err = capsys.readouterr().err
-    assert "A missing dataset counts as rank 0, the lowest." in err
-    assert "Pass --methods with the methods scored on every dataset." in err
-
-
 # --- R4-12 (d): the n/a error -------------------------------------------------
 
 def _with_gap():
@@ -133,20 +123,6 @@ def test_na_raise_does_not_offer_to_hide_the_error():
     assert "to compare on the same metrics" not in msg
     body = warn.replace(" Pass metrics= without NMI to compare on the same metrics.", "")
     assert msg.startswith(body + " ")
-
-
-def test_na_raise_cli_spelling(tmp_path, capsys):
-    p = tmp_path / "in.csv"
-    _with_gap().to_csv(p, index=False)
-    # 0.4.x: plot --na is deprecated and keeps its effect: raise refuses the table
-    rc = cli.main(["plot", "bubble", "--input", str(p), "--na", "raise",
-                   "--out", str(tmp_path / "f.png")])
-    err = capsys.readouterr().err
-    assert rc != 0
-    assert ("warning: plot --na is deprecated and will be removed in 0.5; leave it out for "
-            "a warning that names the n/a cells." in err)
-    assert "Leave out --na to draw the figure with these gaps." in err
-    assert "hide this message" not in err
 
 
 # --- R4-12 (e): extended summaries --------------------------------------------
@@ -293,36 +269,7 @@ def test_prepared_file_note_names_the_method(root):
     assert "shell line" not in cav
 
 
-def test_prepared_file_note_cli_spelling(monkeypatch):
-    from multibench.engine import runner
-    monkeypatch.setattr(config, "_CLI", True)
-    plan = {"atac": {"value": "/o/inputs/a.h5", "convert": True, "normpeaks_from": None},
-            "rna": {"value": "/o/inputs/b.h5", "convert": True, "normpeaks_from": None}}
-    assert runner._prepared_note(plan, "/o", "GLUE") == (
-        "GLUE reads inputs/a.h5, inputs/b.h5. multibench run-all writes those "
-        "files first, so start GLUE with multibench run-all. The "
-        "printed command alone fails in a job script.")
-
-
 # --- R4-13 (f): the batch advice names run_all too ----------------------------
-
-def test_batch_advice_names_run_all_and_evaluate(monkeypatch):
-    from multibench.engine import resolve
-    py = resolve._one_file_advice("vertical", has_adt=True)
-    # the 0.3.5 text names run_all only
-    assert py == ("Vertical methods read one rna.h5. Export without batch= and pass the "
-                  "column itself, as run_all(batch=adata.obs[\"donor\"]). For RNA+ADT "
-                  "batches, use category=\"cross\".")
-    assert "evaluate" not in py
-    monkeypatch.setattr(config, "_CLI", True)
-    several = resolve._several_batch_diagonal_methods()
-    assert sorted(several) == ["GLUE", "iNMF", "online_iNMF", "scJoint"]
-    assert resolve._one_file_advice("diagonal") == (
-        "Diagonal methods read one rna.h5 and one ATAC file. Export without --batch "
-        "and pass a CSV file of barcode and batch to run-all --batch. "
-        f"{resolve._and_list(several)} also read exactly 3 numbered RNA and ATAC batches, written "
-        "one batch per call with --batch-index.")
-
 
 def test_batch_with_atac_warning_names_run_all():
     from multibench.engine import ingest

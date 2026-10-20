@@ -110,7 +110,7 @@ def _bar(long_df: pd.DataFrame, *, metrics=None, methods=None, top: int | None =
         present = set(long_df["metric"].unique())
         if not (set(metrics) & present):
             why = ("The stored results have none. "
-                   + _config.hint("mtb.evaluate", "multibench evaluate")
+                   + "mtb.evaluate"
                    + " computes them on multi-batch data." if family == "classification" else
                    "Batch metrics need a multi-batch dataset - a single-batch design "
                    "has none to compute.")
@@ -141,9 +141,7 @@ def _bar(long_df: pd.DataFrame, *, metrics=None, methods=None, top: int | None =
         _compat.warn(lone, UserWarning)
     for msg in style.coverage_warnings(
             parts, basis=overall or "mean_overall",
-            incomplete_fix=_config.hint(
-                "Pass methods= with the methods scored on every dataset.",
-                "Pass --methods with the methods scored on every dataset.")):
+            incomplete_fix="Pass methods= with the methods scored on every dataset."):
         _compat.warn(msg, UserWarning)
     backend = style.backend_warning(picked)
     if backend:

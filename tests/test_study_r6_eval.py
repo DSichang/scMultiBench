@@ -16,9 +16,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli
 from multibench.eval import io as eio
-from tests.test_f4_cli import _run_all
 from tests.test_study_r4_wf import _quiet, cite  # noqa: F401
 from tests.test_study_r5_wf import (BARS, CELLTYPE, KW, SAMPLES, _adata,  # noqa: F401
                                     _barcode_csv, _one_column, batchy)
@@ -40,122 +38,6 @@ def _h5ad(tmp_path):
     a = _adata(tmp_path)
     a.write_h5ad(tmp_path / "mine_emb.h5ad")
     return a, tmp_path / "mine_emb.h5ad"
-
-
-def _evaluate(h5ad, *flags):
-    return cli.main(["evaluate", "--embedding", str(h5ad), *flags,
-                     "--metrics", ",".join(METRICS)])
-
-
-def _values(path):
-    # iLISI is NaN where the LISI backend is unavailable; evaluate writes the long table
-    return pd.read_csv(path).set_index("metric")["value"].round(6).fillna(-1).to_dict()
-
-
-def _dry_run(data, *flags):
-    return cli.main(["run-all", "MYCITE", "--category", "vertical", "--methods", "Matilda",
-                     "--modalities", "rna,adt", "--data-path", str(data), "--dry-run",
-                     *flags])
-
-
-# ============================================================ --batch-column
-def test_evaluate_batch_column_scores_as_a_one_column_barcode_file(tmp_path):
-    a, h5ad = _h5ad(tmp_path)
-    ids = list(a.obs_names)
-    sheet = _sheet(tmp_path / "obs_sheet.csv", ids)
-    one = _barcode_csv(tmp_path / "b1.csv", SAMPLES, index=ids)
-    lab = _barcode_csv(tmp_path / "cty.csv", CELLTYPE, index=ids)
-    runs = {"one": ["--labels", str(lab), "--batch", str(one)],
-            "sheet": ["--labels", str(lab), "--batch", str(sheet),
-                      "--batch-column", "sample"],
-            # S2's whole call: one sheet for both, each flag with its column
-            "both": ["--labels", str(sheet), "--column", "celltype",
-                     "--batch", str(sheet), "--batch-column", "sample"]}
-    for tag, flags in runs.items():
-        assert _quiet(_evaluate, h5ad, *flags, "--out", str(tmp_path / tag)) == 0, tag
-    want = _values(tmp_path / "one")
-    assert _values(tmp_path / "sheet") == want
-    assert _values(tmp_path / "both") == want
-    assert want["ASW_batch"] < 0.5             # the file sees the sample shift
-    py = mtb.evaluate(a, labels="celltype", batch="sample", metrics=METRICS)
-    assert want == py.set_index("metric")["value"].round(6).fillna(-1).to_dict()
-
-
-def test_run_all_batch_column_dry_run_and_run(batchy, tmp_path, capsys):
-    sheet = _sheet(tmp_path / "obs_sheet.csv", BARS)
-    one = _barcode_csv(tmp_path / "b1.csv", SAMPLES)
-    assert _dry_run(batchy, "--batch", str(sheet), "--batch-column", "sample") == 0
-    assert _run_all(batchy, tmp_path / "o1", "--batch", str(sheet),
-                    "--batch-column", "sample") == 0
-    assert _run_all(batchy, tmp_path / "o2", "--batch", str(one)) == 0
-    capsys.readouterr()
-    a = mtb.load_batch(tmp_path / "o1").summary.iloc[0]
-    b = mtb.load_batch(tmp_path / "o2").summary.iloc[0]
-    assert a["status"] == b["status"] == "scored"
-    assert mtb.load_batch(tmp_path / "o1").records[0]["n_batches"] == 2
-    for k in ("ASW_batch", "GC", "iLISI"):
-        assert (pd.isna(a[k]) and pd.isna(b[k])) or a[k] == b[k], k
-
-
-@pytest.mark.parametrize("command", ["evaluate", "run-all"])
-def test_batch_column_without_batch_is_a_usage_error(command, tmp_path, capsys):
-    argv = (["evaluate", "--embedding", str(tmp_path / "x.h5"), "--labels",
-             str(tmp_path / "cty.csv")] if command == "evaluate"
-            else ["run-all", "MYCITE", "--category", "vertical", "--dry-run"])
-    with pytest.raises(SystemExit) as e:
-        cli.main(argv + ["--batch-column", "sample"])
-    assert e.value.code == 2
-    assert "--batch-column needs --batch" in capsys.readouterr().err
-
-
-def test_batch_column_is_hidden_from_help(capsys):
-    # 0.4.0: --batch-column is deprecated; it parses but --help leaves it out
-    for command in ("evaluate", "run-all"):
-        with pytest.raises(SystemExit):
-            cli.main([command, "--help"])
-        assert "--batch-column" not in capsys.readouterr().out, command
-
-
-# ============================================================ the error text
-def test_a_batch_sheet_without_a_column_names_the_flag(cite, tmp_path, capsys):
-    a, h5ad = _h5ad(tmp_path)
-    sheet = _sheet(tmp_path / "obs_sheet.csv", list(a.obs_names))
-    lab = _barcode_csv(tmp_path / "cty.csv", CELLTYPE, index=list(a.obs_names))
-    assert _evaluate(h5ad, "--labels", str(lab), "--batch", str(sheet)) == 1
-    err = capsys.readouterr().err
-    assert ("error: The --batch file obs_sheet.csv has several columns after the cell "
-            "ids: celltype, sample. Choose one with --batch-column.") in err
-    assert "Unnamed" not in err and "named x" not in err
-    # run-all reads the file in its dry run and says the same
-    data, batch, _ = cite
-    (tmp_path / "d").mkdir()
-    dsheet = _sheet(tmp_path / "d" / "obs_sheet.csv", BARS, batch)
-    assert _dry_run(data, "--batch", str(dsheet)) == 1
-    err = capsys.readouterr().err
-    assert ("error: The --batch file obs_sheet.csv has several columns after the cell "
-            "ids: celltype, sample. Choose one with --batch-column.") in err
-    assert "Unnamed" not in err
-    # a label file keeps pointing to --column and to the label column x
-    assert _evaluate(h5ad, "--labels", str(sheet), "--batch", str(sheet),
-                     "--batch-column", "sample") == 1
-    err = capsys.readouterr().err
-    assert ("error: The --labels file obs_sheet.csv has several columns after the cell "
-            "ids: celltype, sample. Choose one with --column, or name the label column "
-            "x.") in err
-    assert "Unnamed" not in err
-
-
-def test_an_unknown_batch_column_lists_the_columns(tmp_path, capsys):
-    a, h5ad = _h5ad(tmp_path)
-    sheet = _sheet(tmp_path / "obs_sheet.csv", list(a.obs_names))
-    lab = _one_column(tmp_path / "cty.csv", CELLTYPE)
-    assert _evaluate(h5ad, "--labels", str(lab), "--batch", str(sheet),
-                     "--batch-column", "donor") == 1
-    err = capsys.readouterr().err
-    assert ("error: The --batch file obs_sheet.csv has no column named 'donor'. Its "
-            "columns after the cell ids are celltype, sample.") in err
-    assert "error: batch:" not in err
-    assert "Unnamed" not in err
 
 
 def _example(msg: str) -> str:

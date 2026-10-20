@@ -18,7 +18,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, config
+from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, registry
 from multibench.eval import io as eio
@@ -217,29 +217,6 @@ def test_two_methods_that_read_the_label_file(cite, tmp_path, host):
     assert _refused(cite, tmp_path, methods, evaluate=False) == (
         HEAD + ", and Matilda and 1 more method read the label files" + FIX)
     assert host == [] and not (tmp_path / "out").exists()
-
-
-def test_the_command_line_names_its_flags(cite, tmp_path, host, capsys, monkeypatch):
-    _write(cite / "MYCITE" / "cty.csv", _with_gaps())
-    base = ["run-all", "MYCITE", "--category", "vertical", "--data-path", str(cite),
-            "--out-dir", str(tmp_path / "out")]
-    # the message names no flag and no function now: it reads the same as in Python
-    rc = _quiet(cli.main, base + ["--methods", "totalVI"])
-    err = capsys.readouterr().err
-    assert rc == 1 and err.splitlines()[0] == "error: " + M1
-    assert "evaluate" not in err and "run_all" not in err
-    rc = _quiet(cli.main, base + ["--methods", "Matilda,totalVI"])
-    err = capsys.readouterr().err
-    assert rc == 1 and err.splitlines()[0] == "error: " + M1
-    assert "evaluate" not in err and "run_all" not in err
-    rc = _quiet(cli.main, base + ["--methods", "Matilda,totalVI", "--no-evaluate"])
-    err = capsys.readouterr().err
-    assert rc == 1 and err.splitlines()[0] == "error: " + M1_MATILDA
-    assert "evaluate=False" not in err and "run_all" not in err
-    assert host == [] and not (tmp_path / "out").exists()
-    # without the method that reads the file, --no-evaluate runs
-    rc = _quiet(cli.main, base + ["--methods", "totalVI", "--no-evaluate"])
-    assert rc == 0 and host == ["totalVI"]
 
 
 # ------------------------------------------------------------------ a dry run

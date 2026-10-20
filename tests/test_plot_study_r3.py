@@ -16,7 +16,7 @@ import pytest
 import multibench as mtb
 # the table behind a bubble figure: mtb.plot.build_table is deprecated in 0.4.0
 from multibench.plot.bubble import _build_table  # noqa: E402
-from multibench import cli, config
+from multibench import config
 
 B = importlib.import_module("multibench.plot.bubble")
 
@@ -80,25 +80,6 @@ def test_backend_rule_without_a_dataset_column_is_unchanged():
     assert msg and msg.startswith("The rows for PriyaNet were clustered")
 
 
-def _plot_cli(tmp_path, capsys, *frames, rc=0):
-    paths = []
-    for i, f in enumerate(frames):
-        p = tmp_path / f"in{i}.csv"
-        f.to_csv(p, index=False)
-        paths += ["--input", str(p)]
-    assert (cli.main(["plot", "bubble", *paths, "--out", str(tmp_path / "f.png")]) == 0) \
-        == (rc == 0)
-    return capsys.readouterr().err
-
-
-def test_cli_plot_follows_the_dataset_rule(tmp_path, capsys):
-    err = _plot_cli(tmp_path, capsys, _stored("D11"), _mycite(), rc=1)
-    assert "or score your embedding with multibench evaluate --dataset D11." in err
-    err = _plot_cli(tmp_path, capsys, _stored("D11"), _mine("PriyaNet", "D11"))
-    assert "warning: The rows for PriyaNet were clustered with the igraph Leiden backend" in err
-    assert "multibench evaluate --leiden-flavor leidenalg" in err
-
-
 # --- R3-07 -------------------------------------------------------------------
 
 def test_recommend_long_df_warns_about_igraph_rows_of_a_stored_dataset():
@@ -126,15 +107,6 @@ def test_recommend_backend_line_needs_igraph_rows_a_stored_dataset_and_a_sweep_m
     df = pd.concat([stored, _mine("P", "D11")], ignore_index=True)
     _, msgs = _messages(mtb.recommend, "vertical", long_df=df, metrics=["cLISI"])
     assert not any("igraph Leiden backend" in m for m in msgs), msgs
-
-
-def test_recommend_backend_line_cli_spelling(monkeypatch):
-    monkeypatch.setattr(config, "_CLI", True)
-    df = pd.concat([_stored(None), _mine("P", "D11")], ignore_index=True)
-    _, msgs = _messages(mtb.recommend, "vertical", long_df=df)
-    (msg,) = [m for m in msgs if "igraph Leiden backend" in m]
-    assert "multibench evaluate --leiden-flavor leidenalg" in msg
-    assert "mtb.config" not in msg
 
 
 def test_recommend_documents_the_backend_line():
@@ -200,17 +172,6 @@ def test_na_warning_in_summary_mode():
     (msg,) = [m for m in msgs if "has no" in m]
     assert msg.startswith("Your row B has no NMI on Y. In the summary, a missing "
                           "value counts as the lowest rank on that dataset.")
-
-
-def test_na_warning_cli_spelling(tmp_path, capsys):
-    pub = _stored("D28", source="published", category="diagonal")
-    p = tmp_path / "d28.csv"
-    pub.to_csv(p, index=False)
-    assert cli.main(["plot", "bubble", "--input", str(p), "--out",
-                     str(tmp_path / "f.png")]) == 0
-    err = capsys.readouterr().err
-    assert "warning: The stored row Conos (D28, published) has no" in err
-    assert "hide this message" not in err and "na='skip'" not in err
 
 
 def test_na_cells_keep_their_per_family_lines():

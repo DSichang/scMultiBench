@@ -289,10 +289,10 @@ def read_labels_ids(path: Path | str, column: str | None = None, *,
     ...) as the word the file holds, for messages only.
     """
     from .. import config
-    path = _require_file(path, config.hint(f"{what} file", f"--{what} file")
+    path = _require_file(path, f"{what} file"
                          if what else "labels file")
     d = _read_table(path, _sep_for(path))
-    head = (config.hint(f"The {what} file {path.name}", f"The --{what} file {path.name}")
+    head = (f"The {what} file {path.name}"
             if what else str(path))
     first = d.iloc[:, 0] if d.shape[1] > 1 else None
 
@@ -608,9 +608,7 @@ def _multi_dict_message(what: str, d: dict, *, label_order_hint: bool) -> str:
         f"is not alphabetical; for most methods numbered files ascending, cty1, "
         f"cty2, ..., and rna before atac). Pass the paths as a list in that order, "
         f"or "
-        + config.hint("dataset=, category= and method=, which read them in that order.",
-                      "--dataset, --category and --method, which read them in that "
-                      "order."))
+        + "dataset=, category= and method=, which read them in that order.")
 
 
 def _first(ix, n: int = 5) -> list:
@@ -769,10 +767,10 @@ def _anndata_matrix(adata, obsm: str | None) -> np.ndarray:
         return _own_dtype(adata.X if obsm == "X" else adata.obsm[key])
     kind = type(adata).__name__            # AnnData, or MuData for a MuData
     keys = sorted(map(str, adata.obsm.keys()))
-    picks = [config.hint(f"obsm={k!r}", f"--obsm {k}") for k in keys[:1] if len(keys) == 1]
-    picks = picks or ([config.hint("obsm= with one of them", "--obsm with one of them")]
+    picks = [f"obsm={k!r}" for k in keys[:1] if len(keys) == 1]
+    picks = picks or (["obsm= with one of them"]
                       if keys else [])
-    picks += [config.hint("obsm='X' for .X", "--obsm X for .X")] if has_x and obsm != "X" else []
+    picks += ["obsm='X' for .X"] if has_x and obsm != "X" else []
     what = "no X" if obsm == "X" else f"no obsm[{key!r}]"
     raise ValueError(f"The {kind} has {what}; its obsm keys are {', '.join(keys) or 'none'}"
                      + (f": pass {' or '.join(picks)}." if picks else "."))

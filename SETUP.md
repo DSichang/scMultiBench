@@ -17,32 +17,29 @@ needs 26 of those 29, so the disk and time totals are upper bounds.
 
 Plan for **~230 GB free** during the build and ~175 GB after cleaning the cache.
 
-## The two commands
+## The two calls
 
-```bash
-multibench env doctor        # what is needed, what is missing
-multibench env install --run # unpack the published archives (--build: from the lockfiles)
+```python
+import multibench as mtb
+mtb.env.install(dry_run=True)   # what is needed, what is missing, and the sizes
+mtb.env.install()               # unpack the published archives (build=True: from the lockfiles)
 ```
 
-`env install` is a dry run until you add `--run`. The dry run prints, per env, the
-packed-archive download size (`dl`) and the unpacked size (`disk`) from the shipped
-snapshot `multibench/engine/packed_sizes.json` (`?` = not measured yet; `python
-tools/packed_sizes.py` on a host with network fills it) plus a `# total` line.
-`env doctor`'s legend distinguishes installed `[x]`, missing-but-buildable `[L]`, and
-missing-with-no-lockfile `[!]`.
+The dry run returns one row per env, with the packed-archive download size
+(`archive_bytes`) and the unpacked size (`unpacked_bytes`) from the shipped snapshot
+`multibench/engine/packed_sizes.json` (empty = not measured yet; `python
+tools/packed_sizes.py` on a host with network fills it), and its `state`.
 
 **The environments are linux-64 conda envs** - the lockfiles and the packed archives
-both. On macOS / Windows `env doctor` and `env install` print one
-`warning: ... linux-64 ...` line first and `env install --run` refuses (exit 1) unless
-`--force`; dry runs work everywhere. Everything that does not run a method - the
-registry, the stored results, `scan`'s file gate, `evaluate`, the figures - works on
-any machine.
+both. On macOS / Windows `env.install` refuses to install; dry runs work everywhere.
+Everything that does not run a method - the registry, the stored results, `scan`'s
+file gate, `evaluate`, the figures - works on any machine.
 
 `scan()` checks two gates per method - `files_ok` (the dataset folder itself; this
 gate runs on any machine, no environments needed) and `env_ok` (the method's conda
 env exists here) - and marks a method runnable only when both pass, so a sweep
-never starts something it cannot finish. `mtb.plan(dataset, category)` is the
-`run_all` plan with the blocked rows and their reasons kept.
+never starts something it cannot finish. `mtb.run_all(dataset, category, dry_run=True)`
+is the plan with the blocked rows and their reasons kept.
 
 ## Things worth knowing before you start
 

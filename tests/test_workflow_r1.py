@@ -24,7 +24,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, config, workflow as W
+from multibench import config, workflow as W
 from multibench.engine import envs, registry, runner
 from tests.conftest import full_scan
 
@@ -216,14 +216,6 @@ def test_dry_run_says_when_the_method_scripts_are_not_here(no_scripts, capsys):
     assert not no_scripts.exists()                   # nothing fetched or created
 
 
-def test_cli_dry_run_says_it_too(no_scripts, capsys, tmp_path):
-    d = Path(config.DEFAULT.data_path) / "D11"
-    rc = cli.main(["run", "--method", "totalVI", "--category", "vertical",
-                   "--input", f"rna={d / 'rna.h5'}", "--input", f"adt={d / 'adt.h5'}",
-                   "--out", str(tmp_path / "o"), "--dry-run"])
-    assert rc == 0 and "The method scripts are not in" in capsys.readouterr().err
-
-
 def test_scan_notes_missing_scripts_in_caveat_not_files_ok(no_scripts):
     df = full_scan("D11", "vertical", modalities=["rna", "adt"], verbose=False)
     assert df["files_ok"].all()
@@ -376,17 +368,6 @@ def test_scan_reason_leads_with_the_atac_meaning_and_never_cuts_a_path(tmp_path,
     assert f"SCALEX (diagonal) needs atac_gas.h5 in {data / 'LUNG'}." in scalex["files_reason"]
 
 
-def test_cli_json_carries_the_full_reason(tmp_path, no_envs, capsys):
-    data = _lung(tmp_path)
-    rc = cli.main(["scan", "LUNG", "--category", "diagonal", "--data-path", str(data),
-                   "--format", "json"])
-    rows = json.loads(capsys.readouterr().out)
-    assert rc == 0
-    scalex = next(r for r in rows if r["method"] == "SCALEX")
-    assert " ... " not in scalex["reason"] and " ... " not in scalex["files_reason"]
-    assert f"needs atac_gas.h5 in {data / 'LUNG'}." in scalex["files_reason"]
-
-
 # ----------------------------------------------------------------- L32: atac column
 def test_atac_column_is_none_for_a_variant_without_atac():
     df = full_scan("D11", "vertical", methods=["Seurat_WNN"], modalities="all",
@@ -506,16 +487,6 @@ def test_describe_layout_output_is_plain(cat):
     txt = mtb.describe_layout(cat)
     assert "!!" not in txt and "trap" not in txt and "gate" not in txt
     assert _caps(txt.replace("<DATASET>", "").replace("MYDATA", "")) == []
-
-
-def test_cli_table_clips_reasons_at_a_word_boundary():
-    """The table view may shorten a reason, but never inside a file name (L31)."""
-    txt = "needs gene-activity ATAC (atac_gas.h5); folder has peaks (atac_peak.h5); x" * 2
-    clipped = cli._truncate(txt, 80)
-    assert len(clipped) <= 80 and clipped.endswith("...")
-    assert txt.startswith(clipped[:-3])
-    assert txt[len(clipped) - 3] in " ;,)"           # cut after a whole word
-    assert cli._truncate("short", 80) == "short"
 
 
 def test_setup_note_is_dropped_once_the_helper_file_is_in_place(tmp_path, monkeypatch):

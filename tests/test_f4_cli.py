@@ -26,10 +26,10 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, config
+from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, runner
-from tests.test_f3_cli import _clear_env_caches, _h5, _rendered_help, _sub, _WRITER, N
+from tests.test_f3_cli import _clear_env_caches, _h5, _rendered_help, _WRITER, N
 from _serve import serve_archives
 
 pytest.importorskip("scib")
@@ -87,56 +87,8 @@ def working(tmp_path, monkeypatch):
     _clear_env_caches()
 
 
-@pytest.fixture
-def slow(tmp_path, monkeypatch):
-    yield _standin(tmp_path, monkeypatch, _SLOW)
-    _clear_env_caches()
-
-
-def _run_all(data, out, *extra):
-    return cli.main(["run-all", "MYCITE", "--category", "vertical", "--methods", "Matilda",
-                     "--modalities", "rna,adt", "--data-path", str(data),
-                     "--out-dir", str(out), "--format", "csv", *extra])
-
-
 def _status_line(err):
     return next(l for l in err.splitlines() if l.startswith("[run_all]   -> "))
-
-
-def test_run_all_exits_3_when_a_method_fails_and_says_why(failing, tmp_path, capsys):
-    out = tmp_path / "out"
-    rc = _run_all(failing, out)
-    err = capsys.readouterr().err
-    assert rc == 3, err
-    fails = pd.read_csv(out / "failures.csv")
-    assert fails["method"].tolist() == ["Matilda"] and fails["status"].tolist() == ["failed"]
-    assert (out / "summary.csv").exists() and (out / "batch_result.json").exists()
-    # the status line ends with the last line of the error, not after the status
-    line = _status_line(err)
-    assert re.fullmatch(r"\[run_all\]   -> failed \([0-9.]+s\) ValueError: stand-in method "
-                        r"failed on purpose", line), line
-    assert f"# 1 failed (Matilda). See {out / 'failures.csv'}." in err
-    assert err.rstrip().endswith("See " + str(out / "failures.csv") + ".")
-
-
-def test_run_all_exits_0_when_every_method_is_chain_ok(working, tmp_path, capsys):
-    rc = _run_all(working, tmp_path / "out")
-    err = capsys.readouterr().err
-    assert rc == 0, err
-    assert mtb.load_batch(tmp_path / "out").summary.loc[0, "status"] == "scored"
-    assert "failed" not in err
-    # a CHAIN_OK line still ends with the ARI, named, to 3 decimals
-    assert re.fullmatch(r"\[run_all\]   -> scored \([0-9.]+s\) ARI -?[0-9]\.[0-9]{3}",
-                        _status_line(err))
-
-
-def test_run_all_timeout_exits_3_and_the_line_names_the_limit(slow, tmp_path, capsys):
-    rc = _run_all(slow, tmp_path / "out", "--timeout", "1")
-    err = capsys.readouterr().err
-    assert rc == 3, err
-    line = _status_line(err)
-    assert line.startswith("[run_all]   -> timeout (") and "1" in line.split(")", 1)[1]
-    assert "# 1 timed out (Matilda)." in err
 
 
 def test_python_run_all_status_line_ends_with_the_error(failing, tmp_path, capsys):
@@ -160,30 +112,6 @@ def test_error_tail_is_the_last_line_that_says_something():
     assert W._error_tail(None) == "" and W._error_tail("\n \n") == ""
 
 
-def test_exit_code_3_is_documented_in_both_helps(capsys):
-    with pytest.raises(SystemExit):
-        cli.main(["--help"])
-    top = " ".join(capsys.readouterr().out.split())
-    # R5-03: only a skip of a method named in --methods sets exit 3
-    assert ("3 means run-all finished, but a method failed or a method named in "
-            "--methods was skipped. Without --methods, a skipped method is only logged "
-            "and marked skipped in summary.csv.") in top
-    assert "``3`` means ``run-all``" in " ".join(cli.__doc__.split())
-    with pytest.raises(SystemExit):
-        cli.main(["run-all", "--help"])
-    text = " ".join(capsys.readouterr().out.split())
-    # 0.4.0: the epilog names exit code 1 too, once
-    assert ("Exit code 1 means no method could start; 3 means the run finished, but a "
-            "method failed or a method named in --methods was skipped.") in text
-    assert text.count("3 means") == 1, text
-
-
-def test_dry_run_still_exits_0_with_a_blocked_row(working, tmp_path, monkeypatch, capsys):
-    monkeypatch.setattr(W, "_run", lambda *a, **k: pytest.fail("a method was started"))
-    assert _run_all(working, tmp_path / "out", "--dry-run") == 0
-    capsys.readouterr()
-
-
 # ====================================================================== R4-05
 def _diag_folder(root, name="D28", n=40):
     """A diagonal folder: RNA cells (types r0/r1), then ATAC cells (a0/a1)."""
@@ -196,172 +124,6 @@ def _diag_folder(root, name="D28", n=40):
     rng = np.random.default_rng(0)
     emb = np.vstack([rng.normal(8 * i, 1, size=(n // 2, 4)) for i in range(4)])
     return d, emb
-
-
-@pytest.fixture
-def diag(tmp_path, monkeypatch):
-    data = tmp_path / "data"
-    d, emb = _diag_folder(data)
-    monkeypatch.setattr(config.DEFAULT, "data_path", data)
-    np.save(tmp_path / "emb.npy", emb)
-    return d, tmp_path / "emb.npy"
-
-
-def _evaluate(emb, *label_files, method="uniPort", dataset="D28", extra=()):
-    argv = ["evaluate", "--embedding", str(emb)]
-    for f in label_files:
-        argv += ["--labels", str(f)]
-    if method is not None:
-        argv += ["--method", method, "--dataset", dataset, "--category", "diagonal"]
-    return cli.main(argv + ["--metrics", "ASW", *extra])
-
-
-def test_labels_in_the_order_the_method_contradicts_exit_1(diag, capsys):
-    d, emb = diag
-    rc = _evaluate(emb, d / "rna_cty.csv", d / "atac_cty.csv")
-    err = capsys.readouterr().err
-    assert rc == 1
-    assert ("error: uniPort puts the cells of atac_cty before rna_cty. Repeat --labels "
-            "in that order, or drop --labels to read them in that order.") in err
-    # the order uniPort names is accepted
-    assert _evaluate(emb, d / "atac_cty.csv", d / "rna_cty.csv") == 0
-    capsys.readouterr()
-
-
-def test_labels_in_the_method_order_pass_and_unknown_methods_are_not_checked(diag, capsys):
-    d, emb = diag
-    assert _evaluate(emb, d / "rna_cty.csv", d / "atac_cty.csv", method="SCALEX") == 0
-    # a name the package does not know (a stored re-run) is not checked
-    assert _evaluate(emb, d / "atac_cty.csv", d / "rna_cty.csv", method="SCALEX_rerun") == 0
-    # without --method there is nothing to check against
-    assert _evaluate(emb, d / "atac_cty.csv", d / "rna_cty.csv", method=None) == 0
-    capsys.readouterr()
-
-
-def test_label_files_with_other_names_are_matched_by_position_and_refused(diag, tmp_path,
-                                                                        capsys):
-    """c4: files without cell ids next to a method with its own cell order are
-    refused, whatever their names: only the dataset's own files can be ordered."""
-    d, emb = diag
-    own = tmp_path / "own"
-    own.mkdir()
-    (own / "rna_types.csv").write_text((d / "rna_cty.csv").read_text())
-    (own / "atac_types.csv").write_text((d / "atac_cty.csv").read_text())
-    assert _evaluate(emb, own / "rna_types.csv", own / "atac_types.csv") == 1
-    assert capsys.readouterr().err.splitlines()[-1] == (
-        "error: --labels is matched to the cells by position, and uniPort puts the cells "
-        "of D28 in the order atac_cty, rna_cty. Leave out --labels to read the label "
-        "files in that order.")
-
-
-def test_folder_outside_the_data_path_is_checked_by_file_names(tmp_path, monkeypatch,
-                                                                  capsys):
-    monkeypatch.setattr(config.DEFAULT, "data_path", tmp_path / "empty")
-    d, emb = _diag_folder(tmp_path / "elsewhere", name="MYDIAG")
-    np.save(tmp_path / "emb.npy", emb)
-    rc = _evaluate(tmp_path / "emb.npy", d / "rna_cty.csv", d / "atac_cty.csv",
-                   dataset="MYDIAG")
-    err = capsys.readouterr().err
-    assert rc == 1
-    assert ("error: uniPort puts the cells of atac_cty before rna_cty. Repeat --labels "
-            "in that order.") in err
-    assert "drop --labels" not in err          # the folder is not under the data path
-
-
-def test_count_error_speaks_of_the_row_order_of_output(tmp_path, capsys):
-    rng = np.random.default_rng(0)
-    np.save(tmp_path / "emb.npy", rng.normal(size=(90, 4)))
-    folder = tmp_path / "LABMOS"
-    folder.mkdir()
-    for i in range(3):
-        pd.DataFrame({"x": ["a"] * 15 + ["b"] * 15}).to_csv(folder / f"cty{i + 1}.csv",
-                                                           index=False)
-    assert cli.main(["evaluate", "--embedding", str(tmp_path / "emb.npy"),
-                     "--labels", str(folder / "cty1.csv"), "--metrics", "ASW"]) == 1
-    err = capsys.readouterr().err
-    assert "batch order" not in err
-    assert ("For several label files (cty1.csv, cty2.csv, cty3.csv), repeat --labels in "
-            "the row order of the embedding file, or pass --dataset, --category and "
-            "--method.") in err
-
-
-# ====================================================================== R4-07
-def test_run_all_description_names_the_saved_files_and_the_plot_command():
-    desc = " ".join(_sub("run-all").description.split())
-    assert ("on the dataset folder, score each output and save summary.csv, long.csv, "
-            "failures.csv and batch_result.json under --out-dir. multibench plot bubble "
-            "--input OUT draws the figure.") in desc
-    assert "and figure under" not in desc
-
-
-def test_run_all_data_path_and_dry_run_help():
-    p = _sub("run-all")
-    import argparse
-    data = next(a.help for a in p._actions if "--data-path" in a.option_strings)
-    assert data == argparse.SUPPRESS                  # 0.4.0: hidden and deprecated
-    dry = " ".join(next(a.help for a in p._actions if "--dry-run" in a.option_strings)
-                   .split())
-    assert dry == "print the plan (one row per method variant) and the commands; nothing runs"
-    lines = _rendered_help(p, "--dry-run")
-    if "  " not in lines[0].strip():          # the flag alone; the help starts below
-        lines = lines[1:]
-    assert len(lines) <= 2, lines
-    text = p.format_help()
-    assert "--data-path" not in text and "--assume-gpu" not in text
-    assert "mtb." not in text.split("--dry-run", 1)[1]
-    assert "package data path" not in text
-
-
-# ====================================================================== R4-08
-@pytest.fixture
-def linux_cpu(monkeypatch):
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
-    monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
-    monkeypatch.setattr(envs, "installed_flavor", lambda env, conda=None: None)
-    monkeypatch.setattr(envs, "installed_envs", lambda conda=None: [])
-    monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
-
-
-def _parens_with_semicolon(text):
-    return [m for m in re.findall(r"\(([^()]*)\)", text) if ";" in m]
-
-
-def _plan_err(capsys):
-    """stderr of the deprecated ``env plan`` without its one deprecation line."""
-    first, rest = capsys.readouterr().err.split("\n", 1)
-    assert first == ("warning: multibench env plan is deprecated and will be removed in "
-                     "0.5. Use multibench env install.")
-    return rest
-
-
-def test_stabmap_cpu_plan_calls_its_env_a_single_build(linux_cpu, capsys):
-    assert cli.main(["env", "plan", "--methods", "StabMap", "--flavor", "cpu"]) == 0
-    err = _plan_err(capsys)
-    assert "GPU build" not in err
-    # Z27 (r3): one total line, no builds line
-    assert err.splitlines()[0] == "# 1 env: 0.9 GB to download"
-    assert "single build" not in err and not _parens_with_semicolon(err)
-
-
-def test_mosaic_auto_plan_has_short_lines_without_semicolons_in_parentheses(linux_cpu,
-                                                                           capsys):
-    assert cli.main(["env", "plan", "--category", "mosaic"]) == 0
-    err = _plan_err(capsys)
-    assert not _parens_with_semicolon(err), err
-    lines = err.splitlines()
-    # 0.4.0: the total names the shared layer the envs download once
-    assert re.fullmatch(r"# 6 envs: 7\.6 GB to download, at least \d+\.\d GB on disk"
-                        r" \(with the shared layer [^,()]+, \d+\.\d GB, downloaded once\)",
-                        lines[0]), lines[0]
-    assert lines[1] == "# for jobs on GPU nodes, pass --flavor gpu"
-    assert "GPU build" not in err and "only a GPU" not in err
-
-
-def test_gpu_plan_says_gpu_build_only_for_envs_that_have_both(linux_cpu, capsys):
-    assert cli.main(["env", "plan", "--methods", "StabMap,scMoMaT", "--flavor", "gpu"]) == 0
-    err = _plan_err(capsys)
-    assert err.splitlines()[0].startswith("# 2 envs: 5.4 GB to download")
-    assert "GPU build" not in err
 
 
 def test_install_warning_and_unpack_line_for_a_single_build(tmp_path, monkeypatch):
@@ -379,13 +141,6 @@ def test_install_warning_and_unpack_line_for_a_single_build(tmp_path, monkeypatc
         "scmb_torch-cpu is not published yet")
     assert envs._single_build("scmb_r", manifest=manifest)
     assert not envs._single_build("scmb_torch", manifest=manifest)
-
-
-def test_flavor_token_is_left_out_for_a_single_build(monkeypatch):
-    assert cli._flavor_token("gpu", "scmb_r") == ""
-    assert cli._flavor_token("gpu", "scmb_torch") == " flavor=gpu"
-    assert cli._flavor_token("cpu", "scmb_torch") == " flavor=cpu"
-    assert cli._flavor_token(None, "scmb_torch") == ""
 
 
 def test_single_build_install_warns_in_its_own_words_and_unpacks_as_single(
@@ -412,14 +167,3 @@ def test_single_build_install_warns_in_its_own_words_and_unpacks_as_single(
     assert "gpu build" not in out.lower()
 
 
-def test_env_status_shows_no_flavour_for_a_single_build(monkeypatch, capsys):
-    rows = [{"method": "StabMap", "env": "scmb_r", "exists": True, "has_lock": True,
-             "difficulty": "easy", "verified_working": True, "flavor": "gpu"},
-            {"method": "scMoMaT", "env": "scmb_torch", "exists": True, "has_lock": True,
-             "difficulty": "easy", "verified_working": True, "flavor": "cpu"}]
-    monkeypatch.setattr(envs, "_status", lambda: [dict(r) for r in rows])
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
-    assert cli.main(["env", "status", "--methods", "StabMap,scMoMaT"]) == 0
-    out = {l.split()[1]: l for l in capsys.readouterr().out.splitlines()}
-    assert "flavor=" not in out["StabMap"]
-    assert out["scMoMaT"].endswith(" flavor=cpu")

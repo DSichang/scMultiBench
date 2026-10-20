@@ -194,39 +194,6 @@ def test_x13_vertical_peak_methods_read_the_atac_role():
         "modalities"] == ["rna", "atac"]
 
 
-# X79: the renumber hint is each blocked row's reason, so every view shows it
-def test_mosaic_batches_numbered_wrong_say_renumber_in_the_reason(tmp_path, capsys):
-    from multibench import cli
-    d = tmp_path / "MOSBAD"
-    d.mkdir()
-    for f in ("rna1.h5", "atac1.h5", "rna2.h5", "atac3.h5", "cty1.csv", "cty2.csv",
-              "cty3.csv"):
-        (d / f).write_text("")
-    # r3: the action first, so a clipped column keeps it
-    hint = "Export the batches to a new folder, numbered 1 RNA, 2 RNA+ATAC, 3 ATAC (MOSBAD has 1 RNA+ATAC, 2 RNA, 3 ATAC)."
-    plan = mtb.run_all(str(d), "mosaic", methods=["Cobolt"], out_dir=str(tmp_path / "o"),
-                       dry_run=True, verbose=False)
-    assert plan.loc[0, "reason"].startswith(hint)
-    capsys.readouterr()
-    cli.main(["scan", str(d), "--category", "mosaic", "--methods", "Cobolt",
-              "--format", "csv"])
-    assert hint in capsys.readouterr().out
-    cli.main(["scan", str(d), "--category", "mosaic", "--methods", "Cobolt"])
-    assert "Export the batches to a new folder" in capsys.readouterr().out          # the clipped table
-
-
-# X23: scan, run_all and the command line say the same, without counts
-def test_hidden_rows_no_sentence(capsys):
-    # c3 (C55): the rows that read ATAC, which D11 lacks, go unsaid
-    from multibench import cli
-    mtb.scan("D11", "vertical")
-    assert "not listed" not in capsys.readouterr().out
-    mtb.run_all("D11", "vertical", out_dir="/o", dry_run=True)
-    assert "not listed" not in capsys.readouterr().out
-    cli.main(["scan", "D11", "--category", "vertical"])
-    assert "not listed" not in capsys.readouterr().err
-
-
 # X68: scan shows the variant run_all runs
 def test_scan_shows_the_variant_run_all_runs():
     s = mtb.scan("D52mini", "cross", verbose=False)

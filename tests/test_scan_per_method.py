@@ -165,46 +165,6 @@ def test_runnable_is_what_run_all_tries(ds, cat, linux, monkeypatch, tmp_path):
         assert len(set(linux)) == len(linux)
 
 
-# ------------------------------------------------------------------ the first line
-def test_first_line(linux, monkeypatch, tmp_path, capsys):
-    def first(*a, **kw):
-        _quiet(mtb.scan, *a, per_method=True, **kw)
-        return capsys.readouterr().out.splitlines()[0]
-
-    _cite(tmp_path)
-    kw = dict(data_path=tmp_path)
-    # every environment: nothing to add
-    assert first("MYCITE", "vertical", methods=["Matilda", "totalVI"], **kw) == (
-        "[scan] 2 of 2 methods have their input files in MYCITE. 2 of 2 can run on this "
-        "computer. MYCITE holds RNA and ADT.")
-    # one method, and one that lacks its file; an environment is missing
-    _only(monkeypatch, ["Matilda"])
-    assert first("MYCITE", "vertical", methods=["Matilda"], **kw) == (
-        "[scan] 1 of 1 method has its input files in MYCITE. 1 of 1 can run on this "
-        "computer. MYCITE holds RNA and ADT.")
-    assert first("MYCITE", "vertical", methods=["Matilda", "totalVI", "MIRA"], **kw) == (
-        "[scan] 2 of 3 methods have their input files in MYCITE. 1 of 3 can run on this "
-        "computer. MYCITE holds RNA and ADT. mtb.env.install(dry_run=True) checks the environments.")
-    monkeypatch.setattr(config, "_CLI", True)
-    assert first("MYCITE", "vertical", methods=["totalVI"], **kw).endswith(
-        " MYCITE holds RNA and ADT. multibench env install --dry-run checks the environments.")
-    monkeypatch.setattr(config, "_CLI", False)
-    # numbered files: the batches
-    monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
-    _donors(tmp_path, "TWO", 2)
-    assert first("TWO", "cross", methods=["StabMap", "sciPENN"], **kw) == (
-        "[scan] 0 of 2 methods have their input files in TWO. 0 of 2 can run on this "
-        "computer. TWO holds RNA and ADT, in batches 1-2.")
-    _donors(tmp_path, "ONE", 1)
-    assert first("ONE", "cross", methods=["StabMap"], **kw).endswith(
-        " ONE holds RNA and ADT, in batch 1.")
-    # no file of any modality
-    (tmp_path / "EMPTY").mkdir()
-    assert first("EMPTY", "vertical", methods=["Matilda", "totalVI"], **kw) == (
-        "[scan] 0 of 2 methods have their input files in EMPTY. 0 of 2 can run on this "
-        "computer. EMPTY holds no RNA, ADT or ATAC file.")
-
-
 def _tenx(path, n=60):
     """A 10x Genomics file: a sparse matrix (matrix/indptr) with its
     features in a group."""

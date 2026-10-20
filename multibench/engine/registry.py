@@ -198,7 +198,7 @@ def unknown_method_message(method_id, hint: str | None = None) -> str:
                 else closest_method(method_id))
     return (f"Unknown method {method_id}."
             + (f" Did you mean {hint}?" if hint else "")
-            + " " + config.hint("mtb.find_methods()", "multibench find")
+            + " " + "mtb.find_methods()"
             + " shows all methods.")
 
 

@@ -25,7 +25,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, config
+from multibench import config
 from multibench import workflow as W
 from tests.test_docs_consistency import REFERENCE, _resolve
 
@@ -214,47 +214,6 @@ def test_the_list_header_counts_methods_when_each_has_one_row(no_envs, mydata):
     assert msg.splitlines()[-1].startswith(
         "mtb.run_all('data/MYDATA', 'vertical', methods=['Matilda', "
         "'totalVI'], modalities=['rna', 'adt'], dry_run=True) shows these rows.")
-
-
-def test_the_hint_names_every_scan_argument_the_call_set():
-    blocked = pd.DataFrame({"method": ["A", "B"], "modalities": ["rna+adt"] * 2,
-                            "reason": ["r", "r"], "files_ok": [True, True],
-                            "env_ok": [False, False]})
-    msg = W._nothing_runnable_message(
-        "MYDATA", "vertical", blocked, None, data_path=Path("my data"),
-        modalities=["rna", "adt"], allow_atac_mismatch=True, assume_gpu=True)
-    assert msg.splitlines()[-1].startswith(
-        "mtb.run_all('my data/MYDATA', 'vertical', modalities=['rna', 'adt'], "
-        "allow_atac_mismatch=True, assume_gpu=True, dry_run=True) shows every row.")
-    assert "\nThe 2 blocked methods:\n" in msg
-    try:
-        config._CLI = True
-        msg = W._nothing_runnable_message(
-            "MYDATA", "vertical", blocked.head(1), ["A"], data_path="my data",
-            allow_atac_mismatch=True, assume_gpu=True)
-    finally:
-        config._CLI = False
-    assert msg.splitlines()[-1].startswith(
-        "multibench scan 'my data/MYDATA' --category vertical --methods A "
-        "--allow-atac-mismatch --assume-gpu shows these rows.")
-    assert "\nBlocked, one line per requested method:\n" in msg
-
-
-def test_the_cli_hint_carries_the_callers_flags(no_envs, mydata, capsys):
-    rc = cli.main(["run-all", "MYDATA", "--category", "vertical", "--data-path", "data",
-                   "--modalities", "rna,adt", "--out-dir", "out"])
-    err = capsys.readouterr().err
-    assert rc == 1 and "No method can run on MYDATA (vertical)." in err
-    hint = ("multibench scan data/MYDATA --category vertical "
-            "--modalities rna,adt")
-    assert f"\n{hint} shows every row." in err, err
-    n = int(re.search(r"The first 3 of (\d+) blocked methods:", err).group(1))
-    # run as printed, from the same directory
-    rc = cli.main(shlex.split(hint)[1:] + ["--format", "csv"])
-    out = capsys.readouterr().out
-    assert rc == 0
-    shown = pd.read_csv(io.StringIO(out))
-    assert len(shown) == n and set(shown["modalities"]) == {"rna+adt"}
 
 
 def test_a_call_with_default_arguments_keeps_the_hint(no_envs, tmp_path, root):

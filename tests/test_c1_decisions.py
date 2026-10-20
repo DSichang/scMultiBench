@@ -12,7 +12,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, workflow
+from multibench import workflow
 from multibench.engine import registry, resolve
 from multibench.eval import io as eio, pipeline, scib as escib
 from multibench.plot import style

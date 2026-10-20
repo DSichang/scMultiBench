@@ -19,7 +19,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, config, workflow as W
+from multibench import config, workflow as W
 from multibench.engine import envs, ingest
 from tests.conftest import full_scan
 
@@ -49,26 +49,6 @@ def test_diagonal_layout_names_each_method_on_one_line():
     assert "MultiMAP" not in listed["need peaks:"]
 
 
-# ------------------------------------------------------------------- M19
-@pytest.mark.parametrize("cat", CATS)
-def test_cli_layout_names_commands_not_python_calls(cat, capsys):
-    assert cli.main(["layout", cat]) == 0
-    out = capsys.readouterr().out
-    assert "multibench scan" in out and "mtb." not in out
-    assert out.rstrip().splitlines()[-1] == (
-        f"Next: multibench scan data/MYDATA --category {cat}, then, on Linux, "
-        f"multibench run-all data/MYDATA --category {cat} --out-dir out/")
-    py = mtb.describe_layout(cat)
-    assert py.splitlines()[-1] == (f"Next: mtb.scan('data/MYDATA', '{cat}'), then, on Linux, "
-                                   f"mtb.run_all('data/MYDATA', '{cat}', out_dir='out/')")
-
-
-def test_cli_layout_overview_names_commands(capsys):
-    assert cli.main(["layout"]) == 0
-    out = capsys.readouterr().out
-    assert "mtb." not in out and "multibench scan data/MYDATA --category <category>" in out
-
-
 def _cite_h5ad(path, n=60):
     rng = np.random.default_rng(0)
     a = ad.AnnData(rng.poisson(1.0, size=(n, 20)).astype(float))
@@ -81,18 +61,6 @@ def _cite_h5ad(path, n=60):
     return a
 
 
-def test_cli_overwrite_refusal_names_the_flag(tmp_path, capsys):
-    src = tmp_path / "cite.h5ad"
-    _cite_h5ad(src)
-    argv = ["convert", str(src), str(tmp_path / "D"), "--rna", "X", "--adt", "obsm:protein",
-            "--labels", "obs:cell_type"]
-    assert cli.main(argv) == 0
-    capsys.readouterr()
-    assert cli.main(argv) == 1
-    err = capsys.readouterr().err
-    assert "Pass --overwrite to replace them." in err and "overwrite=True" not in err
-
-
 def test_python_overwrite_refusal_names_the_keyword(tmp_path):
     a = _cite_h5ad(tmp_path / "cite.h5ad")
     ingest.export_dataset(a, tmp_path / "D", adt="obsm:protein", labels="obs:cell_type")
@@ -100,60 +68,6 @@ def test_python_overwrite_refusal_names_the_keyword(tmp_path):
         ingest.export_dataset(a, tmp_path / "D", adt="obsm:protein", labels="obs:cell_type")
     assert "Pass overwrite=True to replace them." in str(ei.value)
     assert "--overwrite" not in str(ei.value)
-
-
-def _two_datasets():
-    rows = []
-    for ds, methods in (("D1", ["A", "B", "C"]), ("D2", ["A", "B"])):
-        for i, m in enumerate(methods):
-            for met, v in (("ARI", 0.3 + 0.1 * i), ("NMI", 0.4 + 0.1 * i)):
-                rows.append({"metric": met, "value": v, "method": m, "dataset": ds,
-                             "category": "vertical"})
-    return pd.DataFrame(rows)
-
-
-def _plot_warnings(fn, **kw):
-    import matplotlib
-    matplotlib.use("Agg")
-    with warnings.catch_warnings(record=True) as rec:
-        warnings.simplefilter("always")
-        fn(_two_datasets(), **kw)
-    return [str(w.message) for w in rec]
-
-
-@pytest.mark.parametrize("cli_mode", [False, True])
-def test_plot_incomplete_fix_follows_the_caller(cli_mode, monkeypatch):
-    monkeypatch.setattr(config, "_CLI", cli_mode)
-    bub = [m for m in _plot_warnings(mtb.plot.bubble, aggregate="summary")
-           if "C" in m and "every dataset" in m]
-    bar = [m for m in _plot_warnings(mtb.plot.bar) if "every dataset" in m]
-    assert bub and bar
-    for msg in (bub[0], bar[0]):
-        assert "require" not in msg
-        if cli_mode:
-            assert "--methods" in msg and "methods=" not in msg and "long_df" not in msg
-        else:
-            assert "methods=" in msg and "--methods" not in msg
-
-
-def test_json_output_keeps_slashes_unescaped(capsys):
-    assert cli.main(["scan", "D11", "--category", "vertical", "--format", "json",
-                     "--methods", "Matilda"]) == 0
-    out = capsys.readouterr().out
-    assert "\\/" not in out
-    rows = json.loads(out)
-    assert rows and "/" in rows[0]["command"]
-
-
-def test_run_all_dry_run_note_names_the_cli_doctor(monkeypatch, capsys):
-    monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
-    # Z19 (r3): the header is one sentence; the reason column names the env fix
-    mtb.run_all("D11", "vertical", dry_run=True, methods=["Matilda"])
-    assert "doctor" not in capsys.readouterr().out.splitlines()[0]
-    monkeypatch.setattr(config, "_CLI", True)
-    mtb.run_all("D11", "vertical", dry_run=True, methods=["Matilda"])
-    out = capsys.readouterr().out
-    assert "doctor" not in out.splitlines()[0] and "mtb." not in out
 
 
 # ------------------------------------------------------------------- M23
@@ -201,30 +115,6 @@ def test_vertical_peak_file_under_the_diagonal_name_says_how_to_fix(tmp_path, ga
             assert "to atac_gas.h5" not in row[col], (m, col)
 
 
-def test_vertical_peak_fix_names_the_cli_flag(tmp_path, monkeypatch):
-    _mu_tc(tmp_path)
-    monkeypatch.setattr(config, "_CLI", True)
-    df = full_scan("MU_TC", "vertical", data_path=tmp_path, methods=["scMVP"], verbose=False)
-    assert ("Rename atac_peak.h5 to atac.h5, or write it with --category vertical."
-            in df["reason"].iloc[0])
-
-
-def test_convert_category_help_in_short_sentences():
-    p = next(p for n, p in _subparsers() if n == "convert")
-    act = next(a for a in p._actions if "--category" in a.option_strings)
-    assert act.help.endswith("Sets the file names. vertical writes atac.h5. diagonal "
-                             "writes atac_peak.h5 or atac_gas.h5, and the labels as "
-                             "rna_cty.csv and atac_cty.csv. mosaic writes atac<i>.h5.")
-    assert "cross" not in act.help.split("Sets the file names.")[1]
-
-
-def _subparsers():
-    import argparse
-    parser = cli.build_parser()
-    sub = next(a for a in parser._actions if isinstance(a, argparse._SubParsersAction))
-    return list(sub.choices.items())
-
-
 def test_export_dataset_atac_lines_leave_out_cross():
     doc = ingest.export_dataset.__doc__
     assert "``'cross'``: ``atac_peak" not in doc
@@ -236,39 +126,6 @@ def login_node(monkeypatch):
     """Every env installed, no GPU on this host."""
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
-
-
-def test_strict_assume_gpu_passes_a_gpu_only_method(login_node, capsys):
-    rc = cli.main(["scan", "D45", "--category", "mosaic", "--methods", "SMILE",
-                   "--strict", "--assume-gpu"])
-    cap = capsys.readouterr()
-    assert rc == 0, cap.err
-    # 0.4.0: --strict is deprecated and says so; --assume-gpu is hidden, silent
-    assert cap.err == ("warning: scan --strict is deprecated and will be removed in 0.5. "
-                       "Use the exit code of multibench run-all.\n")
-
-
-def test_strict_counts_the_gpu_test_on_its_own(login_node, capsys):
-    rc = cli.main(["scan", "D45", "--category", "mosaic", "--methods", "SMILE,Cobolt",
-                   "--strict"])
-    err = capsys.readouterr().err
-    assert rc == 1
-    assert "Rows that need a GPU this host lacks: 1." in err
-    assert "environment is not ready" not in err
-    assert "--assume-gpu" in err
-
-
-def test_strict_counts_a_missing_env_and_a_missing_gpu_apart(monkeypatch, capsys):
-    monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
-    monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
-    rc = cli.main(["scan", "D45", "--category", "mosaic", "--methods", "SMILE,Cobolt",
-                   "--strict"])
-    err = capsys.readouterr().err
-    assert rc == 1
-    assert "Rows whose environment is not ready: 2." in err \
-        and "Rows that need a GPU this host lacks: 1." in err
-    # the flag would not make SMILE runnable here: no pointer to it
-    assert "--assume-gpu" not in err
 
 
 def test_scan_assume_gpu_keeps_the_row_and_says_so(login_node):
@@ -307,29 +164,6 @@ def test_run_all_dry_run_takes_assume_gpu(login_node):
         mtb.run_all("D45", "mosaic", "out/", methods=["SMILE"], assume_gpu=True)
 
 
-def test_cli_run_all_dry_run_takes_assume_gpu(login_node, capsys):
-    rc = cli.main(["run-all", "D45", "--category", "mosaic", "--out-dir", "out/",
-                   "--methods", "SMILE", "--dry-run", "--assume-gpu"])
-    cap = capsys.readouterr()
-    assert rc == 0 and "1 of 1 method can run" in cap.err
-    with pytest.raises(SystemExit) as ei:
-        cli.main(["run-all", "D45", "--category", "mosaic", "--out-dir", "out/",
-                  "--methods", "SMILE", "--assume-gpu"])
-    assert ei.value.code == 2
-    assert "--assume-gpu" in capsys.readouterr().err
-
-
-# ------------------------------------------------------------------- M29
-def test_h5mu_labels_spelling_is_one_and_documented():
-    lay = mtb.describe_layout("mosaic")
-    h5mu = [l for l in lay.splitlines() if ".h5mu" in l and "multibench export" in l]
-    assert h5mu and all("--labels rna:cell_type" in l for l in h5mu)
-    epi = [l for l in cli._CONVERT_EPILOG.splitlines() if ".h5mu" in l]
-    assert epi and all("--labels rna:cell_type" in l for l in epi)
-    assert "mod:rna.obs:cell_type" not in cli._CONVERT_EPILOG
-    assert "obs:<col> reads the global obs" in lay
-
-
 def _mdata_with_labels_in_rna_obs():
     mu = pytest.importorskip("mudata")
     rng = np.random.default_rng(0)
@@ -355,19 +189,3 @@ def test_global_obs_miss_names_the_modality_spelling(tmp_path):
     assert "mdata['rna'].obs has 'cell_type': use labels='rna:cell_type'" in msg
 
 
-def test_global_obs_miss_names_the_cli_flag(tmp_path, capsys):
-    m = _mdata_with_labels_in_rna_obs()
-    src = tmp_path / "B.h5mu"
-    m.write(src)
-    rc = cli.main(["convert", str(src), str(tmp_path / "LAB"), "--rna", "mod:rna",
-                   "--atac", "mod:atac", "--atac-kind", "peak", "--labels", "obs:cell_type",
-                   "--category", "mosaic", "--batch-index", "2"])
-    err = capsys.readouterr().err
-    assert rc == 1
-    assert "mdata['rna'].obs has 'cell_type': use --labels rna:cell_type" in err
-    # the spelling the error names works
-    rc = cli.main(["convert", str(src), str(tmp_path / "LAB"), "--rna", "mod:rna",
-                   "--atac", "mod:atac", "--atac-kind", "peak", "--labels", "rna:cell_type",
-                   "--category", "mosaic", "--batch-index", "2"])
-    assert rc == 0, capsys.readouterr().err
-    assert (tmp_path / "LAB" / "cty2.csv").is_file()

@@ -13,7 +13,6 @@ import warnings
 import pytest
 
 import multibench as mtb
-from multibench import cli
 from multibench.engine import envs, ingest
 
 MTB_ALL = {                                       # the 0.4.0 core API (TARGET.txt)
@@ -268,32 +267,8 @@ def test_env_install_is_the_cli_code_path(monkeypatch):
 _MTB_REF = re.compile(r"mtb\.([A-Za-z_][\w.]*)")
 
 
-def _help_texts(parser):
-    yield parser.description or ""
-    yield parser.epilog or ""
-    for a in parser._actions:
-        if a.help and a.help is not argparse_SUPPRESS:
-            yield a.help
-        if isinstance(a, argparse_SubParsersAction):
-            for sub in a.choices.values():
-                yield from _help_texts(sub)
-
-
 import argparse as _argparse  # noqa: E402
 argparse_SUPPRESS = _argparse.SUPPRESS
 argparse_SubParsersAction = _argparse._SubParsersAction
 
 
-def test_every_help_line_names_an_existing_function():
-    missing = []
-    for text in _help_texts(cli.build_parser()):
-        for ref in _MTB_REF.findall(text):
-            obj = mtb
-            for part in ref.rstrip(".").split("."):
-                obj = getattr(obj, part, None)
-                if obj is None:
-                    missing.append(ref)
-                    break
-    assert missing == []
-    for gone in ("command_preview", "plan_commands", "runtime_hint", "--only"):
-        assert gone not in "\n".join(_help_texts(cli.build_parser()))

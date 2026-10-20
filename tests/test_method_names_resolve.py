@@ -11,7 +11,6 @@ from __future__ import annotations
 import pytest
 
 import multibench as mtb
-from multibench import cli
 from multibench.engine import registry
 
 
@@ -76,8 +75,3 @@ def test_scan_and_run_all_take_any_case(tmp_path):
                     params={"TOTALVI": {"nonsense": 1}}, dry_run=True, verbose=False)
 
 
-def test_cli_run_takes_any_case(capsys):
-    assert cli.main(["run", "--method", "totalvi", "--category", "vertical",
-                     "--out-dir", "/o", "--input", "rna=/a.h5", "--input", "adt=/b.h5",
-                     "--dry-run"]) == 0
-    assert "scmb_scvi" in capsys.readouterr().out

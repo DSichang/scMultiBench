@@ -260,8 +260,8 @@ def _repo_root_no_fetch() -> Path:
     return p
 
 
-#: The shell command that fetches the method scripts ahead of a run.
-FETCH_SCRIPTS_CMD = "multibench fetch --scripts"
+#: The command that fetches the method scripts by hand, ahead of a run.
+FETCH_SCRIPTS_CMD = config.FETCH_SCRIPTS
 
 
 def linux_only_sentence() -> str | None:
@@ -452,8 +452,7 @@ def _check_input(role: str, val, *, real: bool) -> str:
 
 def _missing_input_notes(method: str, inputs: dict) -> list[str]:
     """One note per input path that does not exist, for ``run(dry_run=True)``."""
-    scan = config.hint("mtb.scan", "multibench scan")
-    return [f"{method} reads {val}, which does not exist. {scan} shows what the "
+    return [f"{method} reads {val}, which does not exist. mtb.scan shows what the "
             f"folder holds."
             for val in inputs.values()
             if isinstance(val, (str, os.PathLike)) and not Path(val).exists()]
@@ -837,10 +836,8 @@ def _run(method: str, category: str, *, inputs: dict, out_dir: str,
         env_name = envs.group_for(method)
         linux_only = linux_only_sentence()
         if linux_only:
-            this = config.hint("this call", "this command")
-            preview_with = config.hint("dry_run=True", "--dry-run")
             raise envs.LinuxOnlyError(
-                f"{linux_only} Run {this} on a Linux machine. {preview_with} "
+                f"{linux_only} Run this call on a Linux machine. dry_run=True "
                 f"previews the method's command here.")
         have = envs.installed_envs()
         if env_name not in have:
@@ -851,14 +848,11 @@ def _run(method: str, category: str, *, inputs: dict, out_dir: str,
         if other is not None:
             raise EnvironmentError(envs.other_env_text(
                 env_name, other,
-                config.hint(f"call mtb.env.install([{method!r}]).",
-                            f"run multibench env install --methods {method}.")))
+                f"call mtb.env.install([{method!r}])."))
         if have and env_name not in have:
-            py = f" In Python, call mtb.env.install([{method!r}])."
             raise EnvironmentError(
                 f"Environment {env_name} of {method} is not installed. Run "
-                f"multibench env install --methods {method}."
-                + config.hint(py, ""))
+                f"mtb.env.install([{method!r}]).")
 
     inputs, out_str = normalize_paths(inputs, out_dir)
     out = Path(out_str)
@@ -969,11 +963,9 @@ def _prepared_note(plan: dict, out_str: str, method: str) -> str | None:
     if not files:
         return None
     that = "that file" if len(files) == 1 else "those files"
-    return f"{method} reads {', '.join(files)}. " + config.hint(
-        f"mtb.run_all writes {that} first, so start {method} with mtb.run_all. "
-        f"The printed command alone fails in a job script.",
-        f"multibench run-all writes {that} first, so start {method} with "
-        f"multibench run-all. The printed command alone fails in a job script.")
+    return (f"{method} reads {', '.join(files)}. mtb.run_all writes {that} first, so "
+            f"start {method} with mtb.run_all. The printed command alone fails in a job "
+            f"script.")
 
 
 def _fetch_scripts(repo_path) -> Path:

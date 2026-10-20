@@ -23,28 +23,12 @@ import h5py
 import numpy as np
 import pandas as pd
 
-from multibench import cli, config
+from multibench import config
 from tests.test_docs_r4 import _docs_root, _flat, _read, _visible, needs_docs
 from tests.test_f4_cli import _diag_folder
 
 
 # ---- get started (R5-15) -------------------------------------------------
-
-def _cli_block():
-    text = _read("quickstart.md").split("### From the command line", 1)[1]
-    return text.split('```bash title="terminal"', 1)[1].split("```", 1)[0]
-
-
-@needs_docs
-def test_quickstart_cli_block_runs_and_plots_without_label_files():
-    """The command-line block of the Quickstart runs SCALEX with run-all and
-    plots its folder: no label file and no data path to type."""
-    block = _cli_block()
-    assert "--labels" not in block and "<data_path>" not in block
-    cmds = [" ".join(c.split()) for c in block.replace("\\\n", " ").splitlines()]
-    assert "multibench run-all D28 --category diagonal --methods SCALEX --out-dir out/" in cmds
-    assert "multibench plot bubble --input out/ --out mine.pdf" in cmds
-
 
 @needs_docs
 def test_evaluate_page_comparability_sentence_is_plain():
@@ -71,16 +55,6 @@ def test_evaluate_page_says_a_barcode_csv_is_aligned_by_id():
 # ---- API overview, Changes, code font (R5-16, R5-18) ---------------------
 
 @needs_docs
-def test_api_page_exit_code_3_follows_the_cli_rule():
-    api = _flat("api.md")
-    assert "failed or was skipped" not in api
-    assert ("`3` when `run-all` finished but a method failed or a method in "
-            "`--methods` was skipped.") in api
-    # the CLI says the same (R5-03)
-    assert "a method named in ``--methods`` was skipped" in " ".join(cli.__doc__.split())
-
-
-@needs_docs
 def test_changes_page_lists_round_5_changes():
     text = _flat("changes.md")
     assert "failed or was skipped" not in text
@@ -97,15 +71,6 @@ def test_changes_page_lists_round_5_changes():
                    "`mosaic has no published tables.`"):
         assert phrase in text, phrase
     assert "needs an NVIDIA GPU; this computer has none" not in text
-
-
-@needs_docs
-def test_changes_page_quotes_the_live_stderr_lines():
-    bad = pd.DataFrame({"method": ["Seurat_WNN", "totalVI"], "status": ["FAIL", "SKIPPED"]})
-    res = type("R", (), {"failures": bad, "records": []})()
-    line = cli._failed_line(res, "out/failures.csv")
-    shown = "# 1 failed (Seurat_WNN), 1 skipped (totalVI)."
-    assert line.startswith(shown) and f"`{shown}`" in _flat("changes.md")
 
 
 @needs_docs

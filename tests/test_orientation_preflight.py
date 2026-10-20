@@ -129,62 +129,6 @@ def _matrix(path, feats, n_cells):
             [f"c{i}" for i in range(n_cells)], dtype="S8"))
 
 
-@pytest.mark.parametrize("other,second,methods", [
-    ("adt.h5", ("Antibody Capture", [f"AB{i}" for i in range(8)]), ["Seurat_WNN", "totalVI"]),
-    ("atac.h5", ("Peaks", PEAKS), ["VIMCCA", "scMM"]),
-])
-def test_a_10x_file_under_a_dataset_name_fails_the_file_check(
-        other, second, methods, ready, tmp_path, capsys):
-    """0.3.4 passed the RNA + ADT folder, and gave h5py's sentence about a
-    group for the RNA + ATAC one."""
-    d = tmp_path / "TENX"
-    d.mkdir()
-    shutil.copy(_tenx(tmp_path / "filtered_feature_bc_matrix.h5", second), d / "rna.h5")
-    shutil.copy(tmp_path / "filtered_feature_bc_matrix.h5", d / other)
-    kw = dict(methods=methods, data_path=tmp_path)
-    short = f"rna.h5 {TENX}"
-    full = [f"ValueError: {m} reads rna.h5 of TENX, which {TENX}" for m in methods]
-    df = full_scan("TENX", "vertical", verbose=False, **kw)
-    assert list(df["method"]) == methods and not df["files_ok"].any()
-    assert list(df["reason"]) == [short, short]
-    assert list(df["files_reason"]) == full
-    plan = mtb.run_all("TENX", "vertical", out_dir=tmp_path / "out", dry_run=True, **kw)
-    assert not plan["files_ok"].any() and not plan["runnable"].any()
-    assert list(plan["reason"]) == [short, short]
-    assert list(plan["files_reason"]) == full
-    mtb.scan("TENX", "vertical", **kw)
-    for m in methods:
-        with pytest.raises(ValueError) as e:
-            mtb.inputs_for("TENX", "vertical", m, data_path=tmp_path, check=True)
-        assert str(e.value) == f"{m} reads rna.h5 of TENX, which {TENX}"
-        got = mtb.inputs_for("TENX", "vertical", m, data_path=tmp_path, check=False)
-        assert sorted(set(got.values())) == sorted([str(d / other), str(d / "rna.h5")])
-    # without a category and as diagonal, scan looks into an ATAC file under
-    # another name than the one a method reads: on the RNA + ATAC folder 0.3.4
-    # raised h5py's TypeError there, for the whole call
-    for cat in (None, "diagonal"):
-        df = full_scan("TENX", cat, data_path=tmp_path)
-        assert len(df) and not df["files_ok"].any()
-        assert not (df["reason"] + df["files_reason"]).str.contains("Accessing a group").any()
-    plan = mtb.run_all("TENX", "diagonal", out_dir=tmp_path / "out", dry_run=True,
-                       data_path=tmp_path)
-    assert len(plan) and not plan["runnable"].any()
-    mtb.scan("TENX", "diagonal", data_path=tmp_path)
-    printed = capsys.readouterr()
-    assert f"[scan] {methods[0]}: {short}\n" in printed.out
-    assert "Accessing a group" not in printed.out + printed.err
-    assert not (tmp_path / "out").exists()
-    # the way out is the one that to_canonical and mtb.run give for the file itself
-    assert ingest._tenx_message("f.h5") == f"f.h5 {TENX}"
-    # on the command line: the same sentence, which names the recipe
-    with pytest.MonkeyPatch.context() as m:
-        m.setattr(config, "_CLI", True)
-        df = full_scan("TENX", "vertical", verbose=False, **kw)
-    assert list(df["reason"]) == [f"rna.h5 {TENX_CLI}"] * 2
-    assert list(df["files_reason"]) == [
-        f"ValueError: {m} reads rna.h5 of TENX, which {TENX_CLI}" for m in methods]
-
-
 def test_a_10x_atac_file_is_named_where_a_method_reads_another_atac_file(
         ready, tmp_path, capsys):
     """A 10x file under atac.h5 next to a real rna.h5 and adt.h5. 0.3.4 raised
@@ -219,37 +163,6 @@ def test_a_10x_atac_file_is_named_where_a_method_reads_another_atac_file(
     assert _resolve._sniff_features(str(path), path.stat().st_mtime_ns) == ()
     assert _resolve._all_features(str(path), path.stat().st_mtime_ns) == ()
     assert _resolve._peak_fraction_of(path) is None
-
-
-def test_the_reason_starts_with_the_file_when_the_data_path_has_a_space(
-        ready, tmp_path, capsys):
-    """The reason column cuts a path to its file name, and takes a path to
-    end at white space: a sentence that led with the full path began
-    "My Data/TENX/rna.h5 is a 10x Genomics file"."""
-    base = tmp_path / "My Data"
-    (base / "TENX").mkdir(parents=True)
-    _tenx(base / "TENX" / "rna.h5", ("Antibody Capture", [f"AB{i}" for i in range(8)]))
-    shutil.copy(base / "TENX" / "rna.h5", base / "TENX" / "adt.h5")
-    (base / "ZERO").mkdir()
-    _matrix(base / "ZERO" / "rna.h5", [], 100)
-    _matrix(base / "ZERO" / "adt.h5", [f"AB{i}" for i in range(8)], 100)
-    zero = "rna.h5 holds 0 features. Write the folder again with mtb.io.export_dataset."
-    for name, short in (("TENX", f"rna.h5 {TENX}"), ("ZERO", zero)):
-        kw = dict(methods=["totalVI"], data_path=base)
-        df = full_scan(name, "vertical", verbose=False, **kw)
-        assert list(df["reason"]) == [short]
-        assert "My Data" not in df["files_reason"][0]
-        pm = mtb.scan(name, "vertical", **kw)
-        assert list(pm["reason"]) == [short]
-        assert capsys.readouterr().out.splitlines()[-1] == f"[scan] totalVI: {short}"
-        with pytest.raises(ValueError) as e:
-            mtb.run_all(name, "vertical", out_dir=tmp_path / "out", **kw)
-        assert f"  totalVI (rna+adt): {short}\n" in str(e.value)
-    with pytest.MonkeyPatch.context() as m:
-        m.setattr(config, "_CLI", True)
-        df = mtb.scan("TENX", "vertical", verbose=False, methods=["totalVI"], data_path=base)
-    assert list(df["reason"]) == [f"rna.h5 {TENX_CLI}"]
-    assert not (tmp_path / "out").exists()
 
 
 def test_the_files_a_folder_method_names_are_checked_too(tmp_path):
@@ -308,50 +221,3 @@ def test_scan_and_inputs_for_describe_the_check_of_matrix_files_alike():
     assert "are dataset files" not in scan_doc + inputs_doc
 
 
-def test_a_matrix_file_without_features_fails_the_file_check(ready, tmp_path, capsys,
-                                                            monkeypatch):
-    """A split that left no feature: 0.3.4 wrote the file, and the check
-    counted the method among those with their input files."""
-    d = tmp_path / "ZERO"
-    d.mkdir()
-    _matrix(d / "rna.h5", [f"G{i}" for i in range(50)], 100)
-    _matrix(d / "atac.h5", [], 100)
-    with h5py.File(d / "atac.h5", "r") as f:
-        assert f["matrix/data"].shape == (0, 100)
-    kw = dict(methods=["VIMCCA", "scMM"], data_path=tmp_path)
-    short = "atac.h5 holds 0 features. Write the folder again with mtb.io.export_dataset."
-    df = full_scan("ZERO", "vertical", verbose=False, **kw)
-    assert not df["files_ok"].any() and list(df["reason"]) == [short, short]
-    assert list(df["files_reason"]) == [
-        f"ValueError: {m} reads atac.h5 of ZERO, which holds 0 features. Write the folder "
-        f"again with mtb.io.export_dataset." for m in ("VIMCCA", "scMM")]
-    plan = mtb.run_all("ZERO", "vertical", out_dir=tmp_path / "out", dry_run=True,
-                       verbose=False, **kw)
-    assert not plan["runnable"].any() and list(plan["reason"]) == [short, short]
-    with pytest.raises(ValueError) as e:            # the real run starts no method
-        mtb.run_all("ZERO", "vertical", out_dir=tmp_path / "out", **kw)
-    assert (f"  VIMCCA (rna+atac): {short}\n  scMM (rna+atac): {short}\n"
-            in str(e.value))
-    assert not (tmp_path / "out").exists()
-    capsys.readouterr()
-    pm = mtb.scan("ZERO", "vertical", **kw)
-    assert capsys.readouterr().out.splitlines() == [
-        "[scan] 0 of 2 methods have their input files in ZERO. 0 of 2 can run on this "
-        "computer. ZERO holds RNA and ATAC.",
-        "[scan] Cells per file: rna.h5 100, atac.h5 100.",
-        f"[scan] VIMCCA: {short}", f"[scan] scMM: {short}"]
-    assert list(pm["reason"]) == [short, short]
-    with pytest.raises(ValueError) as e:
-        mtb.inputs_for("ZERO", "vertical", "VIMCCA", data_path=tmp_path, check=True)
-    assert str(e.value) == ("VIMCCA reads atac.h5 of ZERO, which holds 0 features. Write "
-                            "the folder again with mtb.io.export_dataset.")
-    assert mtb.inputs_for("ZERO", "vertical", "VIMCCA", data_path=tmp_path, check=False) == {
-        "rna": str(d / "rna.h5"), "atac": str(d / "atac.h5")}
-    # a file without cells, and the command line's name for the export
-    _matrix(d / "atac.h5", PEAKS, 100)
-    _matrix(d / "rna.h5", [f"G{i}" for i in range(50)], 0)
-    monkeypatch.setattr(config, "_CLI", True)
-    with pytest.raises(ValueError) as e:
-        mtb.inputs_for("ZERO", "vertical", "VIMCCA", data_path=tmp_path, check=True)
-    assert str(e.value) == ("VIMCCA reads rna.h5 of ZERO, which holds 0 cells. Write the "
-                            "folder again with multibench export.")

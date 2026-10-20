@@ -13,7 +13,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, workflow
+from multibench import workflow
 from multibench.eval import pipeline
 
 ad = pytest.importorskip("anndata")
@@ -195,21 +195,6 @@ def test_cells_in_the_folders_order_are_told_to_pass_an_array():
     assert as_array == pytest.approx(by_id, abs=1e-9) and by_id["cLISI"] > 0.95
 
 
-def test_the_command_line_refuses_repeated_ids_and_takes_the_npy(tmp_path, capsys):
-    x, rna, gas = _d28_raw()
-    _named(x, rna + gas, np.arange(len(x))).write_h5ad(tmp_path / "raw.h5ad")
-    args = ["--dataset", "D28", "--category", "diagonal", "--method", "mine",
-            "--metrics", "cLISI"]
-    assert _quiet(cli.main, ["evaluate", str(tmp_path / "raw.h5ad"), *args]) == 1
-    assert capsys.readouterr().err.splitlines()[-1].endswith(
-        "The cells are in the folder's order: save the embedding as an .npy file to "
-        "match them by position.")
-    np.save(tmp_path / "raw.npy", x)
-    assert _quiet(cli.main, ["evaluate", str(tmp_path / "raw.npy"), *args,
-                             "--out", str(tmp_path / "o.csv")]) == 0
-    assert _values(pd.read_csv(tmp_path / "o.csv"))["cLISI"] > 0.95
-
-
 def test_own_names_are_told_the_folders_names():
     x, rna, gas = _d28_raw()
     with pytest.raises(ValueError, match=r"^None of the embedding's cell ids is a cell of "
@@ -219,16 +204,3 @@ def test_own_names_are_told_the_folders_names():
                                     np.arange(len(x))), **KW28)
 
 
-def test_the_command_line_scores_a_shuffled_embedding_as_in_order(tmp_path):
-    e = _embedding("D28", "diagonal", "scJoint")
-    perm = np.random.default_rng(2).permutation(e.n_obs)
-    e.write_h5ad(tmp_path / "in_order.h5ad")
-    e[perm].copy().write_h5ad(tmp_path / "shuffled.h5ad")
-    got = {}
-    for name in ("in_order", "shuffled"):
-        rc = _quiet(cli.main, ["evaluate", str(tmp_path / f"{name}.h5ad"), "--dataset", "D28",
-                               "--category", "diagonal", "--method", "scJoint", "--metrics",
-                               "cLISI,GC", "--out", str(tmp_path / f"{name}.csv")])
-        assert rc == 0
-        got[name] = _values(pd.read_csv(tmp_path / f"{name}.csv"))
-    assert got["shuffled"] == pytest.approx(got["in_order"], abs=0.005)

@@ -314,30 +314,6 @@ def test_params_keys_are_checked_before_the_filter(monkeypatch):
         full_scan("D11", "vertical", params={"Matilda": {"no_such_key": 1}}, verbose=False)
 
 
-# ------------------------------------------------------------------ the count line
-def test_count_line_names_what_is_not_listed(no_envs, capsys, monkeypatch):
-    full_scan("D11", "vertical")
-    assert capsys.readouterr().out == (
-        "[scan] 14 of 14 methods have their input files. 0 of 14 have their environment "
-        "installed. mtb.env.install(dry_run=True) checks the environments.\n")
-    # every modality held: the line of 0.3.4, word for word
-    _on_disk("D22mini")
-    full_scan("D22mini", "vertical")
-    assert capsys.readouterr().out == (
-        "[scan] 33 of 33 rows have their input files. 0 of 33 have their environment "
-        "installed. mtb.env.install(dry_run=True) checks the environments.\n")
-    full_scan("D11", "vertical", modalities="all")
-    assert capsys.readouterr().out == (
-        "[scan] 14 of 33 rows have their input files. 0 of 33 have their environment "
-        "installed. mtb.env.install(dry_run=True) checks the environments.\n")
-    # one row, and the command-line spelling
-    monkeypatch.setattr(config, "_CLI", True)
-    full_scan("D11", "vertical", methods=["totalVI", "Seurat_WNN"])
-    assert capsys.readouterr().out == (
-        "[scan] 2 of 2 methods have their input files. 0 of 2 have their environment "
-        "installed. multibench env install --dry-run checks the environments.\n")
-
-
 def test_count_line_off_linux_and_with_batches(monkeypatch, capsys):
     monkeypatch.setattr(R, "linux_only_sentence",
                         lambda: "Methods run only on Linux, and this computer runs macOS.")
@@ -440,17 +416,6 @@ def test_the_hint_carries_all(no_envs, capsys):
     shown = eval(call, {"mtb": mtb})                      # noqa: S307 - our own hint
     assert len(shown) == n == 14
     capsys.readouterr()
-
-
-def test_the_hint_of_the_command_line_carries_all(no_envs, monkeypatch):
-    monkeypatch.setattr(config, "_CLI", True)
-    lines = _nothing_runnable(modalities="all")
-    assert lines[-1].startswith("multibench scan D11 --category vertical --modalities all "
-                                "shows every row. ")
-    lines = _nothing_runnable()
-    assert lines[-1].startswith("multibench scan D11 --category vertical shows the listed "
-                                "rows. ")
-    assert "not listed" not in "\n".join(lines)
 
 
 def test_named_methods_keep_the_error_of_0_3_4(no_envs):

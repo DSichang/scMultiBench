@@ -19,7 +19,6 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from multibench import cli
 from multibench.engine import ingest
 from multibench.eval import io as eio
 
@@ -211,32 +210,6 @@ def test_a_nameless_matrix_without_features_gets_no_line_about_its_names(tmp_pat
         assert list(ingest.read_canonical(two / "adt.h5").var_names) == ["feature_0", "feature_1"]
 
 
-def test_a_matrix_without_features_on_the_command_line(tmp_path, capsys):
-    """The command line reads files: it names no argument of export_dataset.
-    The file it was given was saved after the split and holds no feature
-    type to count, so the text sends the reader to the object before it."""
-    rna, none = _split_without_peaks()
-    rna.write_h5ad(tmp_path / "rna.h5ad")
-    none.write_h5ad(tmp_path / "none.h5ad")
-    assert ad.read_h5ad(tmp_path / "none.h5ad").var["feature_types"].value_counts().sum() == 0
-    src, out = str(tmp_path / "rna.h5ad"), str(tmp_path / "OUT")
-    for argv, what in (
-            (["export", str(tmp_path / "none.h5ad"), out, "--rna", "X"], "rna "),
-            (["export", src, out, "--rna", "X", "--atac-from", str(tmp_path / "none.h5ad"),
-              "--atac-kind", "peak", "--category", "diagonal"], "atac "),
-            (["export", str(tmp_path / "none.h5ad"), out + "/", "--modality", "atac_peak"], "")):
-        with warnings.catch_warnings():
-            warnings.simplefilter("error")
-            # 0.4.0: export replaces convert; --modality is a deprecated hidden flag
-            warnings.filterwarnings("ignore", r".* is deprecated and will be removed in 0\.5",
-                                    FutureWarning)
-            rc = cli.main(argv)
-        err = capsys.readouterr().err
-        assert rc == 1 and not (tmp_path / "OUT").exists()
-        assert next(ln for ln in err.splitlines() if ln.startswith("error: ")) \
-            == "error: " + NO_FEATURES.format(what=what) + TYPE
-
-
 # ------------------------------------------------------------- a missing batch
 @pytest.mark.parametrize("gap,seen", [
     (np.nan, ""), (None, ""), ("", ""), ("  ", ""), ("nan", ", for example 'nan'"),
@@ -281,21 +254,6 @@ def test_a_complete_batch_column_writes_every_cell(tmp_path):
     cells = [ingest.read_canonical(out / f"rna{b}.h5").n_obs for b in (1, 2)]
     assert cells == [30, 30] and sorted(p.name for p in out.iterdir()) == [
         "cty1.csv", "cty2.csv", "rna1.h5", "rna2.h5"]
-
-
-def test_a_missing_batch_on_the_command_line(tmp_path, capsys):
-    a = _cite()
-    a.obs["donor"] = ["d1", None] * 30
-    a.write_h5ad(tmp_path / "a.h5ad")
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        rc = cli.main(["convert", str(tmp_path / "a.h5ad"), str(tmp_path / "OUT"), "--rna", "X",
-                       "--batch", "obs:donor", "--category", "cross"])
-    err = capsys.readouterr().err
-    assert rc == 1 and not (tmp_path / "OUT").exists()
-    assert next(ln for ln in err.splitlines() if ln.startswith("error: ")) == (
-        "error: --batch obs:donor: 30 of the 60 cells have no batch. Give every cell a "
-        "batch.")
 
 
 # ------------------------------------------------------------- a missing label
@@ -511,20 +469,6 @@ def test_adt_in_x_next_to_a_protein_matrix(tmp_path):
     ingest.export_dataset(a, tmp_path / "X", rna=None, adt="X")
     assert ingest.read_canonical(tmp_path / "KEY" / "adt.h5").n_vars == 4
     assert ingest.read_canonical(tmp_path / "X" / "adt.h5").n_vars == 20
-
-
-def test_adt_in_x_on_the_command_line(tmp_path, capsys):
-    a = _cite()
-    a.obsm["protein"] = np.ones((a.n_obs, 4))
-    a.write_h5ad(tmp_path / "a.h5ad")
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        rc = cli.main(["convert", str(tmp_path / "a.h5ad"), str(tmp_path / "OUT"), "--adt", "X"])
-    err = capsys.readouterr().err
-    assert rc == 1 and not (tmp_path / "OUT").exists()
-    assert next(ln for ln in err.splitlines() if ln.startswith("error: ")) == (
-        "error: --adt X takes X, and the object also holds obsm['protein']. If that is the "
-        "protein matrix, pass --adt obsm:protein.")
 
 
 def test_to_canonical_keeps_its_text_and_ignores_embeddings(tmp_path):

@@ -31,7 +31,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, config, workflow as W
+from multibench import config, workflow as W
 from multibench.engine import envs, registry, resolve, runner
 from multibench.plot import bubble as B
 from tests.conftest import full_scan
@@ -91,19 +91,6 @@ def test_unitednet_refuses_the_removed_rna_cty_key_naming_cty(tmp_path):
     assert argv[i + 1] == str(d / "rna_cty.csv")
 
 
-def test_cli_run_refuses_the_removed_rna_cty_key(tmp_path):
-    d = _old_unitednet_folder(tmp_path)
-    argv = ["run", "--method", "UnitedNet", "--category", "vertical"]
-    for k, v in _old_inputs(d).items():
-        argv += ["--input", f"{k}={v}"]
-    argv += ["--out-dir", str(tmp_path / "o"), "--dry-run"]
-    err = io.StringIO()
-    with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
-        assert cli.main(argv) == 1
-    assert ("error: The inputs key 'rna_cty' of UnitedNet was removed in 0.4. Use 'cty'."
-            in err.getvalue())
-
-
 def test_labels_for_gives_an_older_folder_the_cty_key(tmp_path):
     d = _old_unitednet_folder(tmp_path)
     got = mtb.labels_for("OLD", "vertical", "UnitedNet", data_path=tmp_path)
@@ -154,38 +141,6 @@ def test_dataset_mode_keeps_the_metric_value():
     plt.close(fig)
     assert ("cLISI is 0.000 for every method. That column is grey. Leave it out with "
             "metrics=.") in msgs
-
-
-def test_cli_plot_bubble_with_one_method_warns_once(tmp_path, capsys):
-    path = tmp_path / "mine.csv"
-    pd.DataFrame(_rows("MyMethod", "MINE")).to_csv(path, index=False)
-    rc = cli.main(["plot", "bubble", "--input", str(path), "--out", str(tmp_path / "b.png")])
-    err = capsys.readouterr().err
-    assert rc == 0, err
-    assert err.count("Only one method") == 1, err
-    assert "Only one method, MyMethod, is in this figure" in err
-    rc = cli.main(["plot", "bar", "--input", str(path), "--out", str(tmp_path / "r.png")])
-    err = capsys.readouterr().err
-    assert rc == 0, err
-    assert "warning: The table has one method. Every rank is the same.\n" in err
-
-
-# ====================================================== cell checks in run()
-def test_run_refuses_seurat_v5_on_files_from_different_cells(tmp_path, capsys):
-    inp = mtb.inputs_for("D28", "diagonal", "Seurat_v5", check=False)
-    want = ("Seurat_v5 needs RNA and ATAC from the same cells as its bridge. In D28, "
-            "rna.h5 and atac_peak.h5 share 0 of 6,408 and 4,606 cells.")
-    for dry in (True, False):
-        with pytest.raises(ValueError) as e:
-            mtb.run("Seurat_v5", "diagonal", inputs=inp, out_dir=str(tmp_path / "o"),
-                    dry_run=dry)
-        assert str(e.value) == want
-    assert not (tmp_path / "o").exists()
-    rc = cli.main(["run", "--method", "Seurat_v5", "--category", "diagonal",
-                   "--input", f"rna={inp['rna']}", "--input", f"atac_peak={inp['atac_peak']}",
-                   "--out-dir", str(tmp_path / "o"), "--dry-run"])
-    err = capsys.readouterr().err
-    assert rc == 1 and want in err
 
 
 def _diagonal(root, name, gas_order):
@@ -303,23 +258,6 @@ def _git_repo(path):
                           capture_output=True, text=True).stdout.strip()
 
 
-@needs_git
-def test_config_prints_the_scripts_commit_as_its_own_row(tmp_path, monkeypatch, capsys):
-    head = _git_repo(tmp_path / "repo")
-    monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
-    monkeypatch.setattr(config.DEFAULT, "repo_path", tmp_path / "repo")
-    assert cli.main(["config"]) == 0
-    lines = capsys.readouterr().out.splitlines()
-    i = next(k for k, line in enumerate(lines) if line.startswith("repo_path"))
-    assert "method scripts" not in lines[i + 1] and len(lines[i + 1]) < 110
-    assert re.fullmatch(rf"scripts_commit\s+{head}", lines[i + 2])
-    assert lines[i + 3].strip() == f"(the method scripts in {tmp_path / 'repo' / 'tools_scripts'})"
-    assert cli.main(["config", "--format", "json"]) == 0
-    rows = {r["name"]: r for r in json.loads(capsys.readouterr().out)}
-    assert rows["scripts_commit"]["value"] == head
-    assert "method scripts" not in rows["repo_path"]["source"]
-
-
 def test_config_says_when_the_scripts_are_not_fetched(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
     monkeypatch.setattr(config.DEFAULT, "repo_path", tmp_path / "none")
@@ -352,58 +290,6 @@ def test_caveat_clauses_join_as_sentences():
     # R6-10: the caveat parts are sentences, joined with a space
     assert W._join_sentences(["A sentence.", "", "GLUE needs b"]) == "A sentence. GLUE needs b."
     assert W._join_sentences(["Only one."]) == "Only one."
-
-
-# ====================================================================== M13
-def test_cli_messages_name_commands_not_python_calls(tmp_path, capsys):
-    rc = cli.main(["params", "Matilda"])
-    out = capsys.readouterr().out
-    assert rc == 0 and "(set with --param Matilda:KEY=VALUE)" in out
-    assert "run(params" not in out and "mtb.params_for" not in out
-    # sciPENN has one cross row, so the header speaks of methods (UINMF has six rows);
-    # 0.4: the header is one sentence and names no deprecated command
-    rc = cli.main(["run-all", "D52", "--category", "cross", "--methods", "sciPENN",
-                   "--dry-run"])
-    err = capsys.readouterr().err
-    assert rc == 0
-    assert re.search(r"^# Dry run: [01] of 1 method can run on D52 \(cross\)", err, re.M), err
-    assert "multibench run " not in err and "run()" not in err
-    assert "method_info(" not in mtb.env.DIFFICULTY["blocked-script"]
-
-
-# ====================================================== M28 and the help texts
-def _actions():
-    import argparse
-
-    def walk(parser, path):
-        for a in parser._actions:
-            if isinstance(a, argparse._SubParsersAction):
-                for n, sp in a.choices.items():
-                    yield from walk(sp, path + [n])
-            elif a.help:
-                yield path, a
-    return list(walk(cli.build_parser(), []))
-
-
-def _help(path, flag):
-    return next(a.help for p, a in _actions() if p == path and flag in a.option_strings)
-
-
-def test_help_texts_put_the_object_first_and_end_in_plain_sentences():
-    import argparse
-    # c2 (C53): shown, as installation.md teaches it
-    assert _help(["scan"], "--assume-gpu").startswith("skip this host's GPU test")
-    assert _help(["fetch"], "--ref") == "==SUPPRESS=="          # hidden since 0.4.0 (Y36)
-    doc = " ".join(mtb.scan.__doc__.split())
-    assert ("``True`` = skip this host's GPU test, to check a job for a GPU node from a "
-            "login node.") in doc
-    doubled = [(" ".join(p), a.option_strings or [a.dest], a.help) for p, a in _actions()
-               if re.search(r"\)\s*\(", a.help)]
-    assert doubled == []
-    assert _help(["params"], "--category").endswith(
-        "(multibench layout explains them). Only that category's variants.")       # X53
-    # 0.4: --task (and the list alias) are deprecated and hidden from the help
-    assert _help(["list"], "--task") == argparse.SUPPRESS
 
 
 # ====================================================================== M25

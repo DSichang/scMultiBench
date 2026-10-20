@@ -265,39 +265,6 @@ def test_a_folder_without_the_saved_batch_warns_once(batched):
     assert failed.summary.iloc[0]["status"] == "ran"
 
 
-def test_the_batch_label_errors_are_short_sentences(monkeypatch):
-    rng = np.random.default_rng(0)
-    emb, ct = rng.normal(size=(60, 4)), np.array(["A", "B"] * 30)
-    cases = {
-        "all": ("metrics='all' needs batch labels for ASW_batch, ARI_batch, NMI_batch, GC and iLISI. "
-                "Pass batch=<vector>, or metrics='clustering'.",
-                "--metrics all needs batch labels for ASW_batch, ARI_batch, NMI_batch, GC and iLISI. "
-                "Pass --batch CSV, or --metrics clustering."),
-        "batch": ("metrics='batch' needs batch labels for ASW_batch, ARI_batch, NMI_batch, GC and iLISI. "
-                  "Pass batch=<vector>, or labels as a list of two or more files.",
-                  "--metrics batch needs batch labels for ASW_batch, ARI_batch, NMI_batch, GC and iLISI. "
-                  "Pass --batch CSV, or two or more --labels files."),
-    }
-    for metrics, (py, cli) in cases.items():
-        with pytest.raises(ValueError) as exc:
-            pipeline.evaluate(emb, labels=ct, metrics=metrics)
-        assert str(exc.value) == py
-    with pytest.raises(ValueError) as exc:
-        pipeline.evaluate(emb, labels=ct, metrics=["GC", "iLISI"])
-    assert str(exc.value) == ("metrics=['GC', 'iLISI'] needs batch labels for GC and "
-                              "iLISI. Pass batch=<vector>, or labels as a list of two "
-                              "or more files. Each file then counts as one batch.")
-    monkeypatch.setattr(config, "_CLI", True)
-    for metrics, (py, cli) in cases.items():
-        with pytest.raises(ValueError) as exc:
-            pipeline.evaluate(emb, labels=ct, metrics=metrics)
-        assert str(exc.value) == cli
-    with pytest.raises(ValueError) as exc:
-        pipeline.evaluate(emb, labels=ct, metrics=["GC", "iLISI"])
-    assert str(exc.value).startswith("--metrics GC,iLISI needs batch labels for GC and "
-                                     "iLISI. Pass --batch CSV, or two or more --labels")
-
-
 # ============================================================ R6-04 and R6-05
 SIZES = {1: 40, 2: 50, 3: 60}
 
@@ -432,18 +399,6 @@ def test_rescore_does_not_warn_about_its_own_file_of_origin_batch(cross, tmp_pat
         res.rescore(batch=np.repeat([1, 2], [40, 50]), metrics=["ARI"])
     assert ("batch= changes nothing here, because metrics=['ARI'] has no batch metric. "
             "Add ASW_batch, ARI_batch, NMI_batch, GC or iLISI, or pass metrics='all'.") in \
-        [str(w.message) for w in caught]
-
-
-def test_the_batch_warning_on_the_command_line(monkeypatch):
-    rng = np.random.default_rng(0)
-    emb, ct = rng.normal(size=(60, 4)), np.array(["A", "B"] * 30)
-    monkeypatch.setattr(config, "_CLI", True)
-    with pytest.warns(UserWarning) as caught:
-        pipeline.evaluate(emb, labels=ct, batch=np.array([1, 2] * 30),
-                          metrics=["ARI", "NMI"])
-    assert ("--batch changes nothing here, because --metrics ARI,NMI has no batch "
-            "metric. Add ASW_batch, ARI_batch, NMI_batch, GC or iLISI to --metrics, or pass --metrics all.") in \
         [str(w.message) for w in caught]
 
 

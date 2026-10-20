@@ -206,8 +206,7 @@ def overall(df: pd.DataFrame, metrics=None, *, stored=None) -> pd.Series:
     df = df.assign(_stored=marked)
     have = sorted(set(df.loc[df["_stored"], "dataset"]))
     alone = sorted(set(df["dataset"]) - set(have))
-    fix = config.hint(" or ".join(f"dataset={d!r}" for d in have),
-                      " or ".join(f"multibench evaluate --dataset {d}" for d in have))
+    fix = " or ".join(f"dataset={d!r}" for d in have)
     if have and alone == ["user"]:
         raise ValueError(f"Your rows were scored without a dataset: score your embedding "
                          f"with {fix} to compare it with the stored results.")
@@ -311,14 +310,10 @@ def dataset_mode_warnings(parts: dict) -> list:
     msg = (f"This figure averages each method over {n} datasets, {_and_list(parts)}. "
            "Its rows mix datasets. ")
     if (coverage(parts) >= 2).all() and not lone:
-        msg += config.hint(
-            "mtb.plot.bar ranks the methods within each dataset; or filter to one "
-            "dataset.",
-            "multibench plot bar ranks the methods within each dataset; or filter "
-            "with --dataset.")
+        msg += ("mtb.plot.bar ranks the methods within each dataset; or filter to one "
+            "dataset.")
     else:
-        msg += config.hint("Plot each dataset on its own.",
-                           "Plot each dataset on its own with --dataset.")
+        msg += "Plot each dataset on its own."
     return [msg] + lone
 
 
@@ -433,11 +428,8 @@ def backend_warning(df: pd.DataFrame) -> str | None:
     names = ", ".join(sorted(map(str, df.loc[hit, "method"].unique())))
     return (f"The rows for {names} were clustered with the igraph Leiden backend. "
             f"The stored results used leidenalg, which can move ARI by up to "
-            f"about 0.1. " + config.hint(
-                "Set mtb.config.DEFAULT.leiden_flavor = 'leidenalg' before "
-                "evaluate to compare them.",
-                "Score them with multibench evaluate --leiden-flavor leidenalg "
-                "to compare them."))
+            f"about 0.1. " + ("Set mtb.config.DEFAULT.leiden_flavor = 'leidenalg' before "
+                "evaluate to compare them."))
 
 
 #: colour ramp names the package defines itself, on top of matplotlib's

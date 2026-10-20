@@ -16,7 +16,6 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli
 from multibench.engine import ingest
 from multibench.engine import resolve
 from tests.conftest import full_scan
@@ -232,34 +231,6 @@ def test_scan_checks_diagonal_label_rows_and_flags_a_lone_cty(tmp_path):
                                      "The folder has only cty.csv. ")
 
 
-def test_cli_success_line_lists_only_what_this_call_wrote(tmp_path, capsys):
-    rna, atac = _rna(), _atac()
-    rna.write_h5ad(tmp_path / "rna.h5ad")
-    atac.write_h5ad(tmp_path / "atac.h5ad")
-    out = tmp_path / "data" / "LUNG"
-    rc = cli.main(["convert", str(tmp_path / "rna.h5ad"), str(out), "--rna", "X",
-                   "--atac-from", str(tmp_path / "atac.h5ad"), "--atac-kind", "peak",
-                   "--labels", "obs:cell_type", "--category", "diagonal"])
-    cap = capsys.readouterr()
-    assert rc == 0
-    assert "(files: atac_cty.csv, atac_peak.h5, rna.h5, rna_cty.csv)" in cap.out
-    # a second call refuses, --overwrite replaces only its own files
-    rc = cli.main(["convert", str(tmp_path / "rna.h5ad"), str(out), "--rna", "X",
-                   "--labels", "obs:cell_type", "--category", "diagonal"])
-    assert rc == 1 and "--overwrite" in capsys.readouterr().err
-    rc = cli.main(["convert", str(tmp_path / "rna.h5ad"), str(out), "--rna", "X",
-                   "--labels", "obs:cell_type", "--category", "diagonal", "--overwrite"])
-    cap = capsys.readouterr()
-    assert rc == 0 and "(files: rna.h5, rna_cty.csv)" in cap.out
-    assert ("# already in the folder: atac_cty.csv, atac_peak.h5 (not written by this call)"
-            in cap.err)
-    # 0.4.0 (X77): --atac-from also reads the same cells of a paired category,
-    # matched by barcode; these are other cells, which the error names
-    rc = cli.main(["convert", str(tmp_path / "rna.h5ad"), str(tmp_path / "Z"), "--rna", "X",
-                   "--atac-from", str(tmp_path / "atac.h5ad"), "--atac-kind", "peak"])
-    assert rc == 1 and "share no barcode" in capsys.readouterr().err
-
-
 # ------------------------------------------------------------------ L06 / L07 mosaic
 def _mosaic_batches():
     cite = _cite(90, seed=0, batches=1)
@@ -301,31 +272,6 @@ def test_batch_index_argument_checks(tmp_path):
     assert not (tmp_path / "B").exists()
 
 
-def test_mosaic_batch_split_writes_atac_i(tmp_path, capsys):
-    m = _rna(90)
-    m.obsm["peaks"] = pd.DataFrame(_counts(90, len(PEAKS), 7, 0.3), index=m.obs_names,
-                                   columns=PEAKS)
-    m.obsm["protein"] = pd.DataFrame(_counts(90, 6, 8, 4.0), index=m.obs_names,
-                                     columns=[f"CD{i}" for i in range(6)])
-    m.obs["batch"] = np.repeat(["x", "y", "z"], 30)
-    m.write_h5ad(tmp_path / "mos.h5ad")
-    rc = cli.main(["convert", str(tmp_path / "mos.h5ad"), str(tmp_path / "MOS"), "--rna", "X",
-                   "--adt", "obsm:protein", "--atac", "obsm:peaks", "--atac-kind", "peak",
-                   "--labels", "obs:cell_type", "--batch", "obs:batch", "--category", "mosaic"])
-    assert rc == 0
-    names = sorted(os.listdir(tmp_path / "MOS"))
-    assert {"atac1.h5", "atac2.h5", "atac3.h5"} <= set(names)
-    assert not any(n.startswith("atac_peak") for n in names)
-    # the folder holds the D46 pattern (rna1-3, adt1, atac2): scan finds it
-    sc = full_scan("MOS", "mosaic", data_path=tmp_path)
-    ok = sc[sc["method"].isin(["StabMap", "scMoMaT"])
-            & (sc["modalities"] == "rna1+rna2+rna3+adt1+atac2")]     # the D46 pattern
-    assert len(ok) == 2 and ok["files_ok"].all(), ok["files_reason"].tolist()
-    with pytest.warns(UserWarning, match="Every mosaic method reads peak ATAC"):
-        ingest.export_dataset(m, tmp_path / "G", rna=None, atac="obsm:peaks",
-                              atac_kind="gene_activity", batch="obs:batch", category="mosaic")
-
-
 # ------------------------------------------------------------------ L08 var filter
 def _arc(n=50):
     rng = np.random.default_rng(9)
@@ -351,16 +297,6 @@ def test_var_filter_splits_genes_and_peaks(tmp_path):
     with pytest.raises(KeyError, match="var column 'kind' not found"):
         ingest.export_dataset(_arc(), tmp_path / "E", rna="X[kind=Genes]")
     assert not (tmp_path / "E").exists()
-
-
-def test_var_filter_on_the_command_line(tmp_path):
-    _arc().write_h5ad(tmp_path / "arc.h5ad")
-    rc = cli.main(["convert", str(tmp_path / "arc.h5ad"), str(tmp_path / "ARC"),
-                   "--rna", "X[feature_types=Gene Expression]",
-                   "--atac", "X[feature_types=Peaks]", "--atac-kind", "peak",
-                   "--labels", "obs:ct", "--category", "vertical"])
-    assert rc == 0
-    assert ingest.read_canonical(tmp_path / "ARC" / "atac.h5").shape == (50, len(PEAKS))
 
 
 # ------------------------------------------------------------------ L09 MuData labels

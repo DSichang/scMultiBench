@@ -18,7 +18,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, config
+from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, registry
 
@@ -142,25 +142,6 @@ def test_a_batch_file_names_the_word_it_holds(cite, tmp_path):
         mtb.run_all("MYCITE", "vertical", batch=sheet, **kw)
     assert str(e.value) == _bv2(2, ", for example 'None'")
     assert calls == []
-
-
-def test_the_command_line_names_its_flag(cite, tmp_path, capsys):
-    data, calls = cite
-    sheet = tmp_path / "donor.csv"
-    _donor("NA", 1200 // 400).to_frame().to_csv(sheet)
-    base = ["run-all", "MYCITE", "--category", "vertical", "--data-path", str(data),
-            "--methods", "totalVI", "--batch", str(sheet)]
-    for extra in (["--dry-run"], ["--out-dir", str(tmp_path / "out")]):
-        rc = _quiet(cli.main, base + extra)
-        err = capsys.readouterr().err
-        assert rc == 1 and err.splitlines()[-1] == "error: " + _bv2(
-            3, ", for example 'NA'", head="--batch")
-    assert calls == [] and not (tmp_path / "out").exists()
-    # one column of a sheet with several
-    wide = pd.DataFrame({"celltype": ["A"] * N, "donor": _donor(np.nan)}, index=BARS)
-    wide.to_csv(sheet)
-    rc = _quiet(cli.main, base + ["--batch-column", "donor", "--dry-run"])
-    assert rc == 1 and "error: " + _bv2(5, NAN, head="--batch") in capsys.readouterr().err
 
 
 def test_rescore_stops_on_a_missing_batch(cite, tmp_path):

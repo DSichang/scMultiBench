@@ -39,17 +39,3 @@ def test_load_results_unknown_dataset_still_fails_loudly():
         mtb.load_results("cross", dataset="D99")
 
 
-def test_cli_plot_category_relies_on_api_warning(tmp_path):
-    out = tmp_path / "b.png"
-    r = subprocess.run([sys.executable, "-m", "multibench", "plot", "bubble",
-                        "--category", "cross", "--dataset", "D52", "--source", "published",
-                        "--out", str(out)],
-                       capture_output=True, text=True)
-    assert r.returncode == 0, r.stderr
-    # the published table (deprecated --source, 0.4) holds one method: the API
-    # warnings only: load_results' note once, and the figure's own
-    # one-method warning (grey fills); never the CLI's --input note
-    assert r.stderr.count("The published table for cross/D52 has one method") == 1, r.stderr
-    assert "Leave out --source to read them." in r.stderr
-    assert r.stderr.count("Only one method, scMoMaT, is in this figure") == 1, r.stderr
-    assert "this table has one method" not in r.stderr

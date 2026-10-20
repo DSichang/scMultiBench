@@ -27,7 +27,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, config, discover
+from multibench import config, discover
 from multibench import workflow as W
 from multibench.engine import envs, registry
 from multibench.engine import resolve as RS
@@ -279,41 +279,6 @@ def test_run_all_raises_names_the_batch_series_error():
     assert "a ``batch`` that does not fit the cells" in " ".join(raises.split())
 
 
-# ------------------------------------------- --strict reads the row on the disk
-def test_strict_line_of_a_named_method_reads_the_row_with_its_files(tmp_path, pinned,
-                                                                    capsys, gas_matilda):
-    root = _vertical(tmp_path, "MYMO2", PEAKS)          # Multiome: no adt.h5
-    rc = _quiet(cli.main, ["scan", "MYMO2", "--category", "vertical", "--data-path",
-                           str(root), "--methods", "Matilda", "--strict",
-                           "--modalities", "all"])
-    err = capsys.readouterr().err
-    assert rc == 1
-    # Matilda's three vertical rows: the two that read ADT lack adt.h5
-    assert err.startswith("error: --strict: 0 of 3 rows are runnable. Rows with missing "
-                          "input files: 2. Rows with the wrong ATAC kind: 1."), err
-    assert re.search(r"^  Matilda: Matilda needs gene-activity ATAC, and atac\.h5 holds "
-                     r"peaks\. Export the ATAC as gene activity\.$", err, re.M), err
-    assert "row(s)" not in err and ";" not in err.splitlines()[0]
-
-
-# -------------------------------------------------- run-all: earlier record kept
-def test_failed_line_says_when_the_folder_kept_an_earlier_record(tmp_path):
-    ok = _rec("StabMap", "CHAIN_OK", n_batches=1, labels_used=["cty.csv"],
-              metrics={"ARI": 0.5})
-    out = tmp_path / "runs"
-    W.BatchResult([ok], "MYMULTIOME", "vertical").save(out)
-    again = W.BatchResult([_rec("StabMap", "SKIPPED", error="blocked", requested=True)],
-                          "MYMULTIOME", "vertical")
-    again.save(out)
-    line = cli._failed_line(again, out / "failures.csv")
-    # R5-03: a skip is counted as skipped, not failed
-    assert line == "# 1 skipped (StabMap). The folder keeps the earlier record of StabMap."
-    fail = W.BatchResult([_rec("Matilda", "FAIL", error="boom")], "MYMULTIOME", "vertical")
-    fail.save(out)
-    assert cli._failed_line(fail, out / "failures.csv") == (
-        f"# 1 failed (Matilda). See {out / 'failures.csv'}.")
-
-
 # -------------------------------------------------------------- single builds
 def test_a_single_build_env_reports_single(tmp_path, monkeypatch):
     monkeypatch.setattr(config.DEFAULT, "envs_dir", tmp_path / "envs")
@@ -327,26 +292,6 @@ def test_a_single_build_env_reports_single(tmp_path, monkeypatch):
     assert envs.installed_flavor("scmb_r") == "single"      # a record saying gpu
     assert envs.installed_flavor("matilda") == "gpu"        # a real GPU build
     assert config.run_provenance("scmb_r")["env_flavor"] == "single"
-
-
-# ------------------------------------------------------------ plain vocabulary
-def test_no_user_visible_text_says_registry(monkeypatch, capsys):
-    for argv in (["find", "--help"], ["cite", "--help"], ["evaluate", "--help"]):
-        with pytest.raises(SystemExit):
-            cli.main(argv)
-        assert "registry" not in capsys.readouterr().out.lower(), argv
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: "macOS")
-    cli._platform_note()
-    err = capsys.readouterr().err
-    assert "The method list, stored results" in err and "registry" not in err
-    assert inspect.getdoc(mtb.find_methods).startswith("Return the method ids")
-    # 0.4: list_methods, catalog.canonical_id and env.status are deprecated;
-    # the names that replace them are checked
-    for fn in (mtb.run, mtb.inputs_for, mtb.labels_for, mtb.method_info, mtb.params_for,
-               mtb.sweep, mtb.env.recipe, mtb.to_long, mtb.find_methods, mtb.recommend,
-               mtb.load_results, mtb.catalog.methods, mtb.catalog.metrics,
-               mtb.env.doctor, mtb.cite):
-        assert "registry" not in inspect.getdoc(fn).lower(), fn.__name__
 
 
 def test_cite_example_cites_only_the_methods_that_finished():

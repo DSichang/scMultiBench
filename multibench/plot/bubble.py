@@ -332,8 +332,7 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=Non
                 raise ValueError(
                     f"No method has results on all {n} datasets "
                     f"({', '.join(map(str, parts))}). "
-                    + _config.hint("Pass require_complete=False.",
-                                   "Leave out --require-complete."))
+                    + "Pass require_complete=False.")
             if len(keep) < len(datasets_per_method):
                 dropped = datasets_per_method[datasets_per_method < n].sort_values()
                 groups = {}
@@ -342,12 +341,11 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=Non
                     groups.setdefault(lacks, []).append(str(m))
                 n_dropped = len(dropped)
                 _compat.warn(
-                    _config.hint("require_complete=True", "--require-complete")
+                    "require_complete=True"
                     + f" dropped {n_dropped} method{'' if n_dropped == 1 else 's'}: "
                     + " ".join(f"{_and_distinct(ms)} lack{'s' if len(ms) == 1 else ''} "
                                f"{_and_distinct(ds)}." for ds, ms in groups.items())
-                    + " " + _config.hint("Pass require_complete=False",
-                                         "Leave out --require-complete")
+                    + " " + "Pass require_complete=False"
                     + " to keep them.",
                     UserWarning)
                 df = df[df["method"].isin(keep)]
@@ -355,9 +353,7 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=Non
                 datasets_per_method = style.coverage(parts)
         for msg in style.coverage_warnings(
                 parts, basis=overall,
-                incomplete_fix=_config.hint(
-                    "Pass methods= with the methods scored on every dataset.",
-                    "Pass --methods with the methods scored on every dataset.")):
+                incomplete_fix="Pass methods= with the methods scored on every dataset."):
             _compat.warn(msg, UserWarning)
         lone = style.lone_message({ds: mat.attrs.get("lone", [])
                                    for ds, mat in parts.items()})
@@ -476,7 +472,7 @@ def _no_comparison_message(methods, constant: dict, aggregate: str = "dataset",
         return None
     which = "That column is" if len(constant) == 1 else "Those columns are"
     fix = (" Leave " + ("it" if len(constant) == 1 else "them") + " out with "
-           + _config.hint("metrics=", "--metrics") + ".")
+           + "metrics=" + ".")
     if aggregate == "summary":
         # columns that share a mean rank are named together
         groups = {}
@@ -600,12 +596,9 @@ def _na_message(missing: list, df: pd.DataFrame, aggregate: str,
         # what to do about it; na="raise" draws no figure
         gaps = _and_list(dict.fromkeys(c for _, per_ds, _w in missing
                                        for _, codes in per_ds for c in codes))
-        sentences.append(_config.hint(
-            f"Pass metrics= without {gaps} to compare on the same metrics.",
-            f"Pass --metrics without {gaps} to compare on the same metrics."))
+        sentences.append(f"Pass metrics= without {gaps} to compare on the same metrics.")
     if na == "raise":
-        sentences.append(_config.hint("Pass na='warn' to draw the figure with these gaps.",
-                                      "Leave out --na to draw the figure with these gaps."))
+        sentences.append("Pass na='warn' to draw the figure with these gaps.")
     return " ".join(sentences)
 
 
@@ -634,10 +627,8 @@ def _duplicate_rows_message(dup, keys) -> str:
         first = str(mixed["method"].iloc[0])
         return (f"Your rows and the stored results both have "
                 f"{_and_distinct(mixed['method'])}{where}. "
-                + _config.hint(f"Give your rows another name, e.g. "
-                               f"rows.assign(method=rows.method + {THIS_RUN!r}).",
-                               f"Give your rows another name, such as "
-                               f"\"{first}{THIS_RUN}\", with evaluate --method."))
+                + (f"Give your rows another name, e.g. "
+                               f"rows.assign(method=rows.method + {THIS_RUN!r})."))
     what = _and_list(keys)
     example = ", ".join(str(dup[k].iloc[0]) for k in keys)
     return (f"{len(dup)} rows repeat the same {what}, for example {example}. The figure "

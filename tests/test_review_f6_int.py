@@ -37,8 +37,7 @@ from multibench.engine import envs
 from multibench.plot import build_table
 from tests.test_docs_r4 import _flat, needs_docs
 from tests.test_study_r4_wf import ALL_ENVS, _h5, _quiet, _Res, cite  # noqa: F401
-from tests.test_study_r6_msg import (_cli, _lung_ids, needs_git, pinned,  # noqa: F401
-                                     wrong_ref)
+from tests.test_study_r6_msg import _lung_ids, needs_git, pinned, wrong_ref
 from tests.test_study_r6_wf import KW, _shuffled_labels, rel  # noqa: F401
 
 #: 0.4: data_path= of load_batch is deprecated, so the fix names the config
@@ -221,24 +220,6 @@ def test_row_numbers_out_of_order_are_not_an_index(tmp_path):
                             "cell order.")
 
 
-# ============================================================ messages
-def test_the_run_all_line_for_rows_without_files_is_sentences(monkeypatch, tmp_path,
-                                                              capsys):
-    monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
-    monkeypatch.setattr(W, "_run", lambda **kw: _Res(np.zeros((1, 2))))
-    monkeypatch.setattr(config, "_CLI", True)
-    # Multigrate has four mosaic rows, and D45 holds the files of one
-    _quiet(mtb.run_all, "D45", "mosaic", tmp_path / "out", methods=["Multigrate"],
-           evaluate=False, modalities="all")
-    assert ("[run_all] 3 more rows need files this folder does not have. multibench "
-            "scan shows them.") in capsys.readouterr().out
-    # scMDC has two cross rows (RNA + ADT, RNA + ATAC), and D52 holds RNA + ADT
-    _quiet(mtb.run_all, "D52", "cross", tmp_path / "out2", methods=["scMDC"],
-           evaluate=False, modalities="all")
-    assert ("[run_all] 1 more row needs files this folder does not have. multibench "
-            "scan shows it.") in capsys.readouterr().out
-
-
 def test_files_reason_parts_are_joined_as_sentences(tmp_path, pinned, monkeypatch):
     d = tmp_path / "data" / "CITE"
     d.mkdir(parents=True)
@@ -305,91 +286,6 @@ def test_the_scbridge_error_names_the_method_once(tmp_path):
     assert not str(e.value).startswith("scBridge/")
 
 
-def test_plot_unknown_names_are_one_sentence_form(tmp_path, capsys):
-    long = pd.DataFrame({"metric": ["ARI", "NMI"] * 2, "value": [0.5, 0.6, 0.4, 0.3],
-                         "method": ["A", "A", "B", "B"], "dataset": "D11",
-                         "category": "vertical"})
-    with pytest.raises(ValueError) as e:
-        build_table(long, methods=["Matlida"])
-    assert str(e.value) == ("Unknown method Matlida. Did you mean Matilda? The table has "
-                            "A and B.")
-    csv = tmp_path / "long.csv"
-    long.to_csv(csv, index=False)
-    for kind in ("bubble", "bar"):
-        rc, _, err = _cli(["plot", kind, "--input", str(csv), "--methods", "Matlida",
-                           "--out", str(tmp_path / f"{kind}.png")], capsys)
-        assert rc == 1 and err.startswith(
-            "error: Unknown method Matlida. Did you mean Matilda? The table has A and "
-            "B.\n"), err
-    empty = tmp_path / "empty.csv"
-    long.iloc[:0].to_csv(empty, index=False)
-    rc, _, err = _cli(["plot", "bar", "--input", str(empty), "--out",
-                       str(tmp_path / "e.png")], capsys)
-    assert rc == 1 and err.startswith("error: Nothing is left to plot after the filters.")
-    with pytest.raises(KeyError) as e:
-        mtb.load_results("vertical", methods=["Matlida"])
-    assert e.value.args[0] == ("Unknown method Matlida. Did you mean Matilda? "
-                               "mtb.find_methods() shows all methods.")
-
-
-def test_the_overlay_error_names_several_methods(tmp_path, monkeypatch, capsys):
-    from multibench import plot as plot_ns
-    stored = pd.DataFrame({"metric": ["ARI"], "value": [0.5], "method": ["A"],
-                           "dataset": ["D11"], "category": ["vertical"]})
-    monkeypatch.setattr(multibench, "load_results", lambda **kw: stored)
-    monkeypatch.setattr(plot_ns, "bubble", lambda df, **kw: pytest.fail("must not draw"))
-    mine = tmp_path / "mine.csv"
-    stored.assign(method="PriyaNet_bc").pipe(
-        lambda f: pd.concat([f, f.assign(method="RNA_PCA")])).to_csv(mine, index=False)
-    rc, _, err = _cli(["plot", "bubble", "--input", str(mine), "--category", "vertical",
-                       "--methods", "Matilda,totalVI", "--out", str(tmp_path / "f.pdf")],
-                      capsys)
-    assert rc == 1 and ("error: Your rows are for methods PriyaNet_bc and RNA_PCA, and "
-                        "--methods Matilda,totalVI removed all of them. Add PriyaNet_bc "
-                        "and RNA_PCA to --methods.") in err
-
-
-def test_the_dry_run_commands_header_counts_methods(monkeypatch, capsys):
-    monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
-    # three methods with one cross row each: the header counts methods
-    rc, out, err = _cli(["run-all", "D52", "--category", "cross", "--dry-run", "--methods",
-                         "sciPENN,totalVI,Concerto"], capsys)
-    assert rc == 0
-    # 0.4: the header is one sentence
-    assert ("# Dry run: 0 of 3 methods can run on D52 (cross); the reason column says "
-            "why.") in err
-    assert re.search(r"^# Commands of the 3 methods whose input files are in place\. "
-                     r"\[env missing\] marks a method whose environment", out, re.M), out
-    # the whole category: several methods have more than one row, so it counts rows
-    rc, out, err = _cli(["run-all", "D52", "--category", "cross", "--dry-run",
-                         "--modalities", "all"], capsys)
-    n = len(list(W._variant_rows("cross")))
-    # the plan leaves out UINMF's two-batch row, as a run does
-    n -= 1
-    assert rc == 0 and (f"# Dry run: 0 of {n} rows can run on D52 (cross); the reason "
-                        "column says why.") in err
-    assert re.search(r"^# Commands of the \d+ rows whose input files are in place\. "
-                     r"\[env missing\] marks a row whose environment", out, re.M), out
-    # UINMF's two-batch row is inside its three-batch row, which is the one
-    # that runs: the caveat of the row left out is not printed
-    assert "UINMF reads batches 1-2 of 3" not in err
-
-
-@needs_git
-def test_strict_without_methods_prints_the_scripts_ref_fix(wrong_ref, capsys):
-    repo, head = wrong_ref
-    rc, _, err = _cli(["scan", "D52", "--category", "cross", "--strict",
-                       "--modalities", "all"], capsys)
-    assert rc == 1
-    ref = (f"The method scripts are at {head}, not deadbeef (MULTIBENCH_SCRIPTS_REF). "
-           f"Unset MULTIBENCH_SCRIPTS_REF, or set MULTIBENCH_REPO_PATH to a new folder and "
-           f"run multibench fetch --scripts.")
-    n = len(list(W._variant_rows("cross")))                # every cross row
-    assert n == 30
-    assert f"Rows whose scripts are not at MULTIBENCH_SCRIPTS_REF: {n}." in err, err
-    assert f"The reason column says why.\n{ref}\n" in err, err
-
-
 # =========================================================== docstrings
 def test_docstrings_quote_the_current_texts():
     flat = {k: " ".join(inspect.getdoc(o).split()) for k, o in {
@@ -407,42 +303,6 @@ def test_docstrings_quote_the_current_texts():
 
 
 # ============================================================ docs pages
-
-
-@needs_docs
-def test_the_changes_page_quotes_the_live_texts(tmp_path, monkeypatch):
-    from multibench.eval import io as eio
-    text = _flat("changes.md")
-    for tone in ("are plain sentences", "are short sentences", "in sentences,",
-                 "folder and ends with", "`batch: obs_sheet.csv"):
-        assert tone not in text, tone
-    sheet = tmp_path / "obs_sheet.csv"
-    pd.DataFrame({"celltype": ["A", "B"], "sample": ["s1", "s2"]},
-                 index=["AAAC-1", "AAAG-1"]).to_csv(sheet)
-    monkeypatch.setattr(config, "_CLI", True)
-    with pytest.raises(ValueError) as e:
-        eio.read_labels_ids(sheet, what="batch", pick=lambda ex: "Choose one with "
-                                                                 "--batch-column.")
-    assert f"`{e.value}`" in text
-    monkeypatch.setattr(config, "_CLI", False)
-    with pytest.raises(ValueError) as e:
-        _quiet(mtb.run_all, "D52", "cross", out_dir=tmp_path / "o", methods=["Matilda"],
-               verbose=False)
-    assert f"`{e.value}`" in text
-    long = pd.DataFrame({"metric": ["ARI"] * 2, "value": [0.5, 0.4], "method": ["A", "B"],
-                         "dataset": "D11"})
-    with pytest.raises(ValueError) as e:
-        build_table(long, methods=["Matlida"])
-    assert f"`{e.value}`" in text
-    for name in ("D11", "D28", "D52"):
-        (tmp_path / "data" / name).mkdir(parents=True)
-    monkeypatch.chdir(tmp_path)
-    with pytest.raises(FileNotFoundError) as e:
-        full_scan("MYCITE", data_path="data")
-    quoted = "The folder data/MYCITE does not exist. data holds D11, D28 and D52. "
-    assert str(e.value).startswith(quoted) and f"`{quoted}...`" in text
-    assert ("`cty.csv has 15 labels, but rna.h5 has 20 cells. Give each cell one label, "
-            "in the order of the cells. ...`") in text
 
 
 @needs_docs

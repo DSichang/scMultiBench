@@ -22,7 +22,6 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from multibench import cli
 from multibench.engine import ingest
 
 ad = pytest.importorskip("anndata")
@@ -224,25 +223,3 @@ def test_unique_names_give_no_message(tmp_path):
     assert _export(tmp_path, a, rna="X", adt="obsm:protein", labels="obs:celltype")[1] == []
 
 
-def test_the_command_line(tmp_path, capsys):
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        _cite().write_h5ad(tmp_path / "cite.h5ad")
-        _genes().write_h5ad(tmp_path / "genes.h5ad")
-    capsys.readouterr()
-    assert cli.main(["convert", str(tmp_path / "cite.h5ad"), str(tmp_path / "A"), "--rna",
-                     "X[feature_types=Gene Expression]"]) == 0
-    assert (f"warning: --rna X[feature_types=Gene Expression] {TWO} {SPLIT}\n"
-            ) in capsys.readouterr().err
-    assert cli.main(["convert", str(tmp_path / "genes.h5ad"), str(tmp_path / "B"), "--rna",
-                     "X"]) == 0
-    assert (f"warning: --rna X {TWO} Run var_names_make_unique() on the object in Python "
-            f"and save the file again.\n") in capsys.readouterr().err
-    # as it says: the object read in Python, made unique and saved again
-    genes = ad.read_h5ad(tmp_path / "genes.h5ad")
-    genes.var_names_make_unique()
-    genes.write_h5ad(tmp_path / "genes.h5ad")
-    capsys.readouterr()
-    assert cli.main(["convert", str(tmp_path / "genes.h5ad"), str(tmp_path / "C"), "--rna",
-                     "X"]) == 0
-    assert "repeated" not in capsys.readouterr().err

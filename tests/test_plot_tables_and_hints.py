@@ -151,16 +151,3 @@ def test_rank_key_says_best_and_worst():
     assert "best" in texts and "worst" in texts
 
 
-# Y23: two --input trees of the same methods are drawn side by side
-def test_cli_plot_two_inputs_of_the_same_methods(tmp_path, capsys):
-    import pandas as pd
-    from multibench import cli
-    stored = mtb.load_results("vertical", dataset="D11")
-    for name in ("a", "b"):
-        stored.assign(source="user").to_csv(tmp_path / f"{name}.csv", index=False)
-    rc = cli.main(["plot", "bubble", "--input", str(tmp_path / "a.csv"), "--input",
-                   str(tmp_path / "b.csv"), "--out", str(tmp_path / "x.png")])
-    err = capsys.readouterr().err
-    assert rc == 0, err
-    # c3 (C14): every input's rows as "<method> (<input name>)", without a line
-    assert "# Drawn" not in err

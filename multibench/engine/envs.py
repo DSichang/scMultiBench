@@ -96,37 +96,6 @@ def _require_linux(force: bool) -> None:
 NO_CONDA = "Conda is not installed on this computer."
 
 
-#: What the ``difficulty`` tag of ``env_specs.yaml`` means: how hard the env
-#: is to build from its recipe, not how well the method works.
-DIFFICULTY = {
-    "easy": "modern python/torch stack; builds from the lockfile",
-    "old-scvi": "pins an old scvi-tools (<0.20) / old anndata - needs its own env, "
-                "cannot share the modern torch env",
-    "old-tensorflow": "pins TensorFlow 1.x/2.4 - needs its own env with matching CUDA",
-    "R": "an R env (Seurat/MOFA2/rliger ...); R packages installed by "
-         "install.packages() are restored by the env's post-install script",
-    "verified": "env built from the lockfile on a fresh machine and the method "
-                "ran end-to-end on its reference dataset",
-    "blocked-script": "the env builds, but the upstream script cannot run "
-                      "unmodified from the public checkout; it needs extra files "
-                      "(the method's setup_hint and scan's files_reason say which)",
-    "unknown": "no recipe declared for the method",
-}
-
-#: The ``*`` suffix ``env status`` appends to the difficulty tag.
-VERIFIED_STAR = ("* = verified_working: the env ran the method end-to-end on "
-                 "its reference dataset")
-
-#: The marks of the ``env status`` and ``env doctor`` listings.
-MARK_LEGEND = ("[x]=installed  [L]=missing, lockfile ready (run multibench env "
-               "install)  [!]=missing, no lockfile")
-
-
-def env_mark(exists: bool, has_lock: bool) -> str:
-    """The :data:`MARK_LEGEND` mark of an env row: ``"x"``, ``"L"`` or ``"!"``."""
-    return "x" if exists else ("L" if has_lock else "!")
-
-
 _SIZES_JSON = Path(__file__).resolve().parent / "packed_sizes.json"
 
 
@@ -310,7 +279,7 @@ def auto_flavor_note(flavor: str, *, planning: bool = False,
     ``dry_run`` says what would be installed."""
     if flavor != "auto" or resolve_flavor(flavor) != "cpu":
         return None
-    gpu = config.hint("flavor='gpu'", "--flavor gpu")
+    gpu = "flavor='gpu'"
     if planning:
         return f"# for jobs on GPU nodes, pass {gpu}"
     verb = "would install" if dry_run else "installing"
@@ -447,22 +416,6 @@ def _is_python_pin(package: str) -> bool:
     return name == "python"
 
 
-def _environment_yml(spec: dict, env_name: str) -> str:
-    channels = list(spec.get("conda_channels", [])) or ["conda-forge"]
-    lines = [f"name: {env_name}", "channels:"]
-    lines += [f"  - {c}" for c in channels]
-    lines.append("dependencies:")
-    if spec.get("python_version"):
-        lines.append(f"  - python={spec['python_version']}")
-    for c in _conda_packages(spec):
-        lines.append(f"  - {c}")
-    pip_pkgs = list(spec.get("pip_packages", [])) + list(spec.get("pip_git", []))
-    if pip_pkgs:
-        lines += ["  - pip", "  - pip:"]
-        lines += [f"    - {p}" for p in pip_pkgs]
-    return "\n".join(lines) + "\n"
-
-
 def create_commands(method: str, env_name: str | None = None,
                     conda: str | None = None) -> list[list[str]]:
     """The create+install commands of a method's hand-written recipe, into
@@ -471,15 +424,6 @@ def create_commands(method: str, env_name: str | None = None,
     if not r:
         raise ValueError(f"no recipe declared for {method!r}")
     return _install_commands(r, env_name or default_env_name(method), conda)
-
-
-def environment_yml(method: str, env_name: str | None = None) -> str:
-    """A method's recipe as an ``environment.yml`` string, named ``env_name``
-    (default :func:`default_env_name`)."""
-    r = recipe(method)
-    if not r:
-        raise ValueError(f"no recipe declared for {method!r}")
-    return _environment_yml(r, env_name or default_env_name(method))
 
 
 # --- shared group environments --------------------------------------------
@@ -889,7 +833,7 @@ def plan_totals(rows, sizes: dict | None = None, *, layers: dict | None = None
     once. ``totals``: ``total_download_bytes``, ``total_disk_bytes`` (``None`` when
     an env is not measured) and ``shared_layers`` (``{name: {archive_bytes,
     unpacked_bytes, envs}}``); ``line``: ``"2 envs: 5.4 GB to download, 5.6 GB on
-    disk"``. The install plan and ``multibench env install --dry-run`` both use it."""
+    disk"``. The install plan uses it."""
     sizes = packed_sizes() if sizes is None else sizes
     keys = [archive_key(r["env"], r.get("flavor")) for r in rows]
     layers = layers_for(keys) if layers is None else layers
@@ -1162,19 +1106,6 @@ def lockfile(env_name: str) -> Path | None:
     """Path of the shipped lockfile ``env_locks/<env_name>.yml``, or ``None``."""
     p = _LOCKS_DIR / f"{env_name}.yml"
     return p if p.exists() else None
-
-
-def required_envs(category: str | None = None,
-                  methods: list[str] | None = None) -> list[str]:
-    """The distinct envs (:func:`group_for`) the given methods, or all, run in."""
-    if methods is None:
-        methods = registry.list_methods(category=category)
-    seen: list[str] = []
-    for m in methods:
-        e = group_for(m)
-        if e not in seen:
-            seen.append(e)
-    return seen
 
 
 def split_lock(text: str):
@@ -1467,8 +1398,7 @@ def _install_rows(methods: list[str] | None = None, *, category: str | None = No
                 if r["env"] in packed_manifest():
                     raise RuntimeError(
                         f"{NO_CONDA} Environment {r['env']} has a packed archive. "
-                        + config.hint("Leave out build=True to install it.",
-                                      "Leave out --build to install it."))
+                        + "Leave out build=True to install it.")
                 raise RuntimeError(
                     f"{NO_CONDA} Environment {r['env']} has no packed archive. Install "
                     f"conda first.")

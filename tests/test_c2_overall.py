@@ -13,7 +13,6 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli
 from multibench.data.catalog import FAMILY_METRICS
 from multibench.plot import style
 from multibench.plot.bubble import _build_table
@@ -184,16 +183,6 @@ def test_your_rows_on_another_dataset_are_refused(dataset):
     matplotlib.pyplot.close(mtb.plot.bubble(pd.concat([mine, mine.assign(method="Two")])))
 
 
-def test_the_cli_refusal_names_dataset(tmp_path, capsys):
-    _, mine = _mine("MYCITE")
-    mine.to_csv(tmp_path / "mine.csv", index=False)
-    rc = cli.main(["plot", "bubble", "--input", str(tmp_path / "mine.csv"),
-                   "--category", "vertical", "--out", str(tmp_path / "x.png")])
-    err = capsys.readouterr().err
-    assert rc != 0 and not (tmp_path / "x.png").exists()
-    assert "or score your embedding with multibench evaluate --dataset D11." in err
-
-
 # --------------------------------------------------------------- D02
 def _with_classification():
     st, tables = _tables("diagonal")
@@ -225,13 +214,3 @@ def test_bar_of_a_family_only_your_rows_have():
     assert names and all(n.endswith(" (this run)") for n in names)
 
 
-def test_cli_metrics_all_with_classification_in_your_rows(tmp_path, capsys):
-    both = _with_classification()
-    mine = both[both["source"] == "user"].drop(columns=["category"], errors="ignore")
-    mine.to_csv(tmp_path / "mine.csv", index=False)
-    rc = cli.main(["plot", "bubble", "--category", "diagonal", "--dataset", "D28",
-                   "--input", str(tmp_path / "mine.csv"), "--metrics", "all",
-                   "--out", str(tmp_path / "x.png")])
-    err = capsys.readouterr().err
-    assert rc == 0, err
-    assert (tmp_path / "x.png").exists()

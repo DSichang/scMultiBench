@@ -12,7 +12,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, workflow
+from multibench import workflow
 from multibench.engine import registry, resolve
 from multibench.eval import io as eio, pipeline, scib as escib
 from multibench.plot import style
@@ -60,15 +60,6 @@ def test_a_package_method_without_category_is_refused_before_scoring():
                        r"method='StabMap \(this run\)'\) needs category= to read StabMap's "
                        r"cell order: cross or mosaic\.$"):
         mtb.evaluate(np.zeros((3000, 2)), dataset="MINE", method="StabMap (this run)")
-
-
-def test_the_cli_refuses_it_too(tmp_path, capsys):
-    emb = tmp_path / "e.npy"
-    np.save(emb, np.zeros((3000, 2)))
-    rc = cli.main(["evaluate", str(emb), "--dataset", "MINE", "--method", "StabMap"])
-    assert rc != 0
-    assert "--method 'StabMap' needs --category to read StabMap's cell order: cross or " \
-        "mosaic." in capsys.readouterr().err
 
 
 def _ordered_embedding(dataset, category, method):

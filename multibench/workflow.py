@@ -243,8 +243,7 @@ def describe_layout(category: str | None = None) -> str:
     ``mtb.io.export_dataset`` writes them, the ATAC representation each
     method needs, the ``.h5`` and label formats, the install command and, for
     mosaic and cross, each batch pattern the methods accept. The lists are
-    read from the method registry at call time. ``multibench layout`` prints
-    the same text with ``multibench`` commands.
+    read from the method registry at call time.
 
     Vertical reads ``atac.h5``; ``method_info(m)["atac"]`` says whether it
     must hold peaks or gene activity. Diagonal reads ``atac_peak.h5`` (peaks)
@@ -283,27 +282,18 @@ def describe_layout(category: str | None = None) -> str:
     cat = category or "<category>"
     lines += ["Each .h5 file holds matrix/data (features x cells, the transpose of "
               "AnnData.X),"]
-    lines += [config.hint("matrix/features and matrix/barcodes. mtb.io.export_dataset "
-                          "writes the whole folder",
-                          "matrix/features and matrix/barcodes. multibench export "
+    lines += [("matrix/features and matrix/barcodes. mtb.io.export_dataset "
                           "writes the whole folder"),
-              config.hint("from an AnnData or MuData.",
-                          "from an .h5ad or .h5mu file. multibench export --help has "
-                          "examples."),
+              "from an AnnData or MuData.",
               "A label file is a single-column CSV: one header line, then one label "
               "per cell.",
               "",
               "Each method runs in its own environment, on Linux. Install one with:",
-              "  multibench env install --methods X",
-              config.hint("mtb.scan says which methods can run on the folder, and why "
-                          "not the rest (columns runnable, reason).",
-                          "multibench scan checks the files and the environment of each "
-                          "method variant."),
-              config.hint(
-                  f"Next: mtb.scan('data/MYDATA', '{cat}'), then, on Linux, "
-                  f"mtb.run_all('data/MYDATA', '{cat}', out_dir='out/')",
-                  f"Next: multibench scan data/MYDATA --category {cat}, then, on Linux, "
-                  f"multibench run-all data/MYDATA --category {cat} --out-dir out/")]
+              "  mtb.env.install(['X'])",
+              ("mtb.scan says which methods can run on the folder, and why "
+                          "not the rest (columns runnable, reason)."),
+              (f"Next: mtb.scan('data/MYDATA', '{cat}'), then, on Linux, "
+                  f"mtb.run_all('data/MYDATA', '{cat}', out_dir='out/')")]
     return _compat.Text("\n".join(lines))
 
 
@@ -389,8 +379,7 @@ def _atac_lines(category: str) -> list[str]:
             "embedding."]
     # method_info(m)['atac'] names one representation, so it cannot tell a method
     # that reads both files
-    out += config.hint(["mtb.scan and mtb.run_all skip such a method."],
-                       ["multibench scan and run-all skip such a method."])
+    out += ["mtb.scan and mtb.run_all skip such a method."]
     if category == "diagonal":
         out.append(OLDER_NAMES)
     return out
@@ -401,22 +390,21 @@ _METHOD_INFO_ATAC = "method_info(m)['atac']"
 
 
 def _check_atac_call() -> str:
-    return config.hint(_METHOD_INFO_ATAC, "multibench info METHOD")
+    return _METHOD_INFO_ATAC
 
 
-#: How ``describe_layout`` shows a batch's modalities as ``convert`` flags. A
+#: How ``describe_layout`` passes a batch's modalities to ``export_dataset``. A
 #: ``.h5mu`` batch keeps its labels in the RNA modality's obs (muon's layout).
-_CONVERT_FLAGS = {
-    ("rna",): ("h5ad", "--rna X"),
-    ("adt", "rna"): ("h5ad", "--rna X --adt obsm:protein"),
-    ("atac", "rna"): ("h5mu", "--rna mod:rna --atac mod:atac --atac-kind peak"),
+_EXPORT_ARGS = {
+    ("rna",): ("adata", "rna='X'"),
+    ("adt", "rna"): ("adata", "rna='X', adt='obsm:protein'"),
+    ("atac", "rna"): ("mdata", "rna='rna', atac='atac', atac_kind='peak'"),
 }
-_CONVERT_LABELS = {"h5ad": "obs:cell_type", "h5mu": "rna:cell_type"}
+_EXPORT_LABELS = {"adata": "obs:cell_type", "mdata": "rna:cell_type"}
 
 
 def _batch_recipe(category: str, patterns) -> list[str]:
-    """One ``multibench export`` line per batch of the most varied pattern,
-    plus the ``export_dataset`` form of the first batch."""
+    """One ``mtb.io.export_dataset`` line per batch of the most varied pattern."""
     from .engine.schema import _batch_of, base_modality
 
     def per_batch(roles):
@@ -426,32 +414,27 @@ def _batch_recipe(category: str, patterns) -> list[str]:
         return {b: tuple(sorted(ms)) for b, ms in per.items()}
 
     usable = [p for p, _ in patterns
-              if all(ms in _CONVERT_FLAGS for ms in per_batch(p).values())]
+              if all(ms in _EXPORT_ARGS for ms in per_batch(p).values())]
     if not usable:
         return []
     batches = per_batch(max(usable, key=lambda p: len(set(per_batch(p).values()))))
     lines = ["Write one file per batch, numbered to match the pattern:"]
     same = len(set(batches.values())) == 1
     for b, ms in batches.items():
-        ext, flags = _CONVERT_FLAGS[ms]
-        lines.append(f"  multibench export batch{b}.{ext} data/MYDATA {flags} "
-                     f"--labels {_CONVERT_LABELS[ext]} --category {category} "
-                     f"--batch-index {b}")
+        obj, args = _EXPORT_ARGS[ms]
+        lines.append(f"  mtb.io.export_dataset({obj}{b}, 'data/MYDATA', {args}, "
+                     f"labels='{_EXPORT_LABELS[obj]}', category='{category}', "
+                     f"batch_index={b})")
         if same:
             rest = [str(k) for k in batches if k != b]
             if rest:
                 lines.append(f"  (the same for batch{'es' if len(rest) > 1 else ''} "
-                             f"{' and '.join(rest)}, with --batch-index "
+                             f"{' and '.join(rest)}, with batch_index="
                              f"{' and '.join(rest)})")
             break
-    if any(_CONVERT_FLAGS[ms][0] == "h5mu" for ms in batches.values()):
-        lines.append("  In a .h5mu file, rna:cell_type reads the RNA modality's obs. "
-                     "obs:<col> reads the global obs.")
-    if not config._CLI:
-        first = next(iter(batches.values()))
-        kw = "rna='X', adt='obsm:protein'" if "adt" in first else "rna='X'"
-        lines.append(f"  in Python: mtb.io.export_dataset(adata, 'data/MYDATA', {kw}, "
-                     f"labels='obs:cell_type', category='{category}', batch_index=1)")
+    if any(_EXPORT_ARGS[ms][0] == "mdata" for ms in batches.values()):
+        lines.append("  In a MuData, labels='rna:cell_type' reads the RNA modality's obs. "
+                     "'obs:<col>' reads the global obs.")
     return lines
 
 
@@ -541,10 +524,8 @@ def _missing_script(variant, *, method: str | None = None) -> str:
                     if not (root / entry).parent.joinpath(h).exists()
                     and not (method and _runner.shipped_helper(method, h))]
             if gone:
-                who = config.hint(
-                    (f"mtb.method_info({method!r})" if method else "method_info(m)")
-                    + "['setup_hint']",
-                    f"multibench info {method or 'METHOD'}")
+                who = ((f"mtb.method_info({method!r})" if method else "method_info(m)")
+                    + "['setup_hint']")
                 name = f"{method}'s script" if method else f"The script {entry.name}"
                 files = " and ".join(gone)
                 one = len(gone) == 1
@@ -603,12 +584,11 @@ def _env_hint(env: str, method: str, category: str | None, other=None) -> str:
     if _runner.linux_only_sentence():
         return f"Environment {env} runs only on Linux, not on this computer."
     if other is not None:
-        return envs.other_env_text(env, other, f"run multibench env install --methods "
-                                                f"{method}.")
-    alt = (f" Use --category {category} to install the environments of every "
+        return envs.other_env_text(env, other, f"run mtb.env.install([{method!r}]).")
+    alt = (f" mtb.env.install(category={category!r}) installs the environments of every "
            f"{category} method." if category else "")
     return (f"Environment {env} is not installed. Run "
-            f"multibench env install --methods {method}.{alt}")
+            f"mtb.env.install([{method!r}]).{alt}")
 
 
 #: ``.format(method=)`` caveat of a GPU-only row that ``scan(assume_gpu=True)``
@@ -703,8 +683,7 @@ def _missing_files_reason(spec, category: str, mods: list, dataset: str,
         if same and category == "vertical":
             atac_parts.append(
                 f"{spec.id} reads {want_file} for vertical. Rename {same[0].name} to "
-                f"{want_file}, or write it with " + config.hint('category="vertical"',
-                                                                "--category vertical"))
+                f"{want_file}, or write it with " + 'category="vertical"')
         elif same:
             atac_parts.append(f"{spec.id} reads {want_file}: rename {same[0].name} to "
                               f"{want_file}")
@@ -751,11 +730,8 @@ def _dropped_dirs_message(modalities, dropped: list) -> str:
     mods = _and_list([str(m) for m in modalities])
     head = (f"The modality {mods} leaves" if len(modalities) == 1
             else f"The modalities {mods} leave")
-    fix = config.hint(
-        f"Pass modalities=[] to select {'it' if one else 'them'}, or leave out "
-        f"modalities= to see every variant.",
-        f'Pass --modalities "" to select {"it" if one else "them"}, or leave out '
-        f"--modalities to see every variant.")
+    fix = (f"Pass modalities=[] to select {'it' if one else 'them'}, or leave out "
+        f"modalities= to see every variant.")
     return (f"{head} out {_and_list(dropped)}, which "
             f"{'reads' if one else 'read'} a folder instead of modality files. {fix}")
 
@@ -778,7 +754,7 @@ _WRONG_ATAC_BODY = (r"needs (gene-activity|peak) ATAC\. The features of (\S+) (?
                     r"(peaks|gene activity)\.")
 _WRONG_ATAC_RE = re.compile(r"^\S+ " + _WRONG_ATAC_BODY)
 #: What a peak-name caveat (``_resolve.PEAK_NAMES_CAVEAT``) says after the method
-#: name; ``cli._strict_problem`` counts these rows apart.
+#: name.
 PEAK_NAMES_REASON = "reads peak names such as "
 _PEAK_NAMES_RE = re.compile(r"^\S+ " + re.escape(PEAK_NAMES_REASON)
                             + r"(\S+)\. (\S+) holds other names")
@@ -834,15 +810,6 @@ def _run_caveat(caveat) -> str:
     cuts = [i for i in (text.find(_runner.SCRIPTS_NOT_HERE), _runner._prepared_at(text))
             if i >= 0]
     return text[:min(cuts)].rstrip() if cuts else text
-
-
-def _is_wrong_ref(reason) -> "pd.Series | bool":
-    """Whether a scan ``reason`` (or a Series of them) says the method scripts
-    are not at ``$MULTIBENCH_SCRIPTS_REF`` (``config.scripts_ref_problem``)."""
-    tag = f"({config.SCRIPTS_REF_VAR})"
-    if isinstance(reason, pd.Series):
-        return reason.astype(str).str.contains(tag, regex=False)
-    return tag in str(reason or "")
 
 
 def _scripts_caveat(caveat) -> str:
@@ -982,9 +949,7 @@ def _representation_note(category, methods, modalities) -> str:
         via = f" through its {other} input" if other else ""
         fixed = [_TOKEN_OF_REP[spec.atac] if rep(t) else t for t in tokens]
         base = ["atac" if rep(t) else t for t in tokens]
-        notes.append(f"{spec.id} reads {_resolve._READS[spec.atac]}{via}. Pass " + config.hint(
-            f"modalities={fixed!r} or {base!r}.",
-            f"--modalities {','.join(fixed)} or {','.join(base)}."))
+        notes.append(f"{spec.id} reads {_resolve._READS[spec.atac]}{via}. Pass " + f"modalities={fixed!r} or {base!r}.")
     return " ".join(notes)
 
 
@@ -1007,11 +972,8 @@ def _no_variant_error(category, methods, modalities) -> ValueError:
                      f"{mods} in {where}." if dropped else
                      f"No method reads {mods} in {where}.")
         one = dropped[0] if len(dropped) == 1 else None
-        parts.append(_representation_note(category, dropped, modalities) or config.hint(
-            f"mtb.method_info({one!r})['supports'] lists what {one} reads." if one else
-            "mtb.method_info(m)['supports'] lists what each method reads.",
-            f"multibench info {one} lists what {one} reads." if one else
-            "multibench info METHOD lists what each method reads."))
+        parts.append(_representation_note(category, dropped, modalities) or (f"mtb.method_info({one!r})['supports'] lists what {one} reads." if one else
+            "mtb.method_info(m)['supports'] lists what each method reads."))
     return ValueError(" ".join(parts) or f"No method runs on {where}.")
 
 
@@ -1197,14 +1159,14 @@ def _holds_sentence(dataset: str, ds_dir: Path, held, category: str | None = Non
 
 def _all_spelling() -> str:
     """How a caller asks for every combination."""
-    return config.hint('modalities="all"', "--modalities all")
+    return 'modalities="all"'
 
 
 def _not_listed_note(df: "pd.DataFrame", dataset: str, ds_dir: Path,
                      category: str | None = None) -> str:
     """What the folder holds when that has a fix (10x files under dataset names,
     variants for numbered batches it lacks), else ``""`` (the same words in
-    ``scan``, ``run_all`` and on the command line). The rows that read a
+    ``scan`` and ``run_all``). The rows that read a
     modality the folder lacks go unsaid: a named method among them has its own
     error."""
     batch = df.attrs.get("not_listed_batch")
@@ -1247,21 +1209,7 @@ def _category_hint(df: "pd.DataFrame", category: str | None) -> str:
         return ""
     (cat,) = fit
     return (f"The files fit {cat}: pass "
-            + config.hint(f'category="{cat}"', f"--category {cat}") + ".")
-
-
-def _scan_note(df: "pd.DataFrame", dataset: str, data_path=None,
-               category: str | None = None) -> str:
-    """:func:`_not_listed_note` from a scan frame and the dataset as typed (the
-    command line); ``""`` when every row is listed."""
-    if not df.attrs.get("not_listed") and not df.attrs.get("not_listed_batch"):
-        return ""
-    dataset, data_path = _resolve.split_dataset(dataset, data_path)
-    base = Path(data_path) if data_path is not None else config.DEFAULT.data_path
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")       # scan warned about the spelling
-        dataset = _resolve.canonical_dataset(base, dataset)
-    return _not_listed_note(df, dataset, base / dataset, category)
+            + f'category="{cat}"' + ".")
 
 
 #: the tails of the deprecated keywords of scan and run_all
@@ -1481,7 +1429,7 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
                                                       if p not in folder_only),
                                          gpu_hint if off_linux else rec["env_reason"],
                                          wrong_atac])
-        # the command line, also for an env-blocked row; setup steps go to caveat
+        # the method's command, also for an env-blocked row; setup steps go to caveat
         if rec["files_ok"] and got is not None:
             rec["command"], prepared = _command_line(spec.id, cat, got, out_dir=out_dir,
                                                      dataset=dataset,
@@ -1547,8 +1495,7 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
         if _runner.linux_only_sentence():
             line += f" {LINUX_ONLY_SUMMARY}"
         elif any(e and e not in installed for e in df["env"]):
-            doctor = config.hint("mtb.env.install(dry_run=True)",
-                             "multibench env install --dry-run")
+            doctor = "mtb.env.install(dry_run=True)"
             line += f" {doctor} checks the environments."
         print(line, flush=True)
     return df, private
@@ -1702,8 +1649,7 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
     if _runner.linux_only_sentence():
         line += f" {LINUX_ONLY_CHECK}"
     elif any(e and e not in installed for e in df["env"]):
-        doctor = config.hint("mtb.env.install(dry_run=True)",
-                             "multibench env install --dry-run")
+        doctor = "mtb.env.install(dry_run=True)"
         line += f" {doctor} checks the environments."
     print(line, flush=True)
     if cells:
@@ -2608,7 +2554,7 @@ class BatchResult:
         from the merged set, and a line ``# Merged with 1 earlier record in <folder>
         (StabMap).`` names them. This result object is not changed. Jobs
         running at the same time should use one ``out_dir`` each; combine
-        them with ``multibench plot --input dir1 --input dir2``.
+        their ``long`` tables with ``pandas.concat`` to plot them together.
 
         See Also
         --------
@@ -2763,10 +2709,8 @@ def _error_tail(error, width: int = 200) -> str:
 
 def _scan_hint(dataset: str, category: str, *, data_path=None, methods=None,
                modalities=None, allow_atac_mismatch: bool = False,
-               assume_gpu: bool = False, every: bool = False, dry_run_cli: bool = False) -> str:
-    """The ``mtb.run_all(..., dry_run=True)`` call (or ``multibench scan`` command;
-    ``dry_run_cli``: ``multibench run-all ... --dry-run``, which prints the commands)
-    that shows the rows of a ``run_all`` call, with every non-default argument as
+               assume_gpu: bool = False, every: bool = False) -> str:
+    """The ``mtb.run_all(..., dry_run=True)`` call that shows the rows of a ``run_all`` call, with every non-default argument as
     the caller gave it. A folder outside the default data path is named by its
     path, as the docs teach (relative to the working directory when inside it)."""
     if data_path is not None and (os.path.realpath(data_path)
@@ -2774,26 +2718,18 @@ def _scan_hint(dataset: str, category: str, *, data_path=None, methods=None,
         folder = os.path.join(os.fspath(data_path), str(dataset))
         rel = os.path.relpath(folder)
         dataset = folder if rel.startswith("..") else rel
-    py, cli = [repr(dataset), repr(category)], [dataset, "--category", category]
+    py = [repr(dataset), repr(category)]
     if methods:
         py.append(f"methods={list(methods)}")
-        cli += ["--methods", ",".join(methods)]
     if modalities:
         py.append(f"modalities={list(modalities)}")
-        cli += ["--modalities", ",".join(modalities)]
     elif every:
         py.append('modalities="all"')
-        cli += ["--modalities", "all"]
     if allow_atac_mismatch:
         py.append("allow_atac_mismatch=True")
-        cli.append("--allow-atac-mismatch")
     if assume_gpu:
         py.append("assume_gpu=True")
-        cli.append("--assume-gpu")
-    cli_text = " ".join(shlex.quote(str(a)) for a in cli)
-    return config.hint(f"mtb.run_all({', '.join(py + ['dry_run=True'])})",
-                       f"multibench run-all {cli_text} --dry-run" if dry_run_cli
-                       else f"multibench scan {cli_text}")
+    return f"mtb.run_all({', '.join(py + ['dry_run=True'])})"
 
 
 def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame,
@@ -2811,8 +2747,7 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
     blocked = blocked.assign(_files=~blocked["files_ok"].astype(bool)).sort_values(
         ["_files", "method"], kind="stable").drop(columns="_files")
     platform = _platform_line(blocked)
-    doctor = config.hint("mtb.env.install(dry_run=True)",
-                             "multibench env install --dry-run")
+    doctor = "mtb.env.install(dry_run=True)"
     where = _scan_hint(dataset, category, data_path=data_path, methods=methods,
                        modalities=modalities, allow_atac_mismatch=allow_atac_mismatch,
                        assume_gpu=assume_gpu, every=every)
@@ -2841,7 +2776,7 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
         what = "the plan" if methods else "the listed rows" if hidden else "every row"
         where = _scan_hint(dataset, category, data_path=data_path, methods=methods,
                            modalities=modalities, allow_atac_mismatch=allow_atac_mismatch,
-                           assume_gpu=assume_gpu, every=every, dry_run_cli=True)
+                           assume_gpu=assume_gpu, every=every)
         return f"{head}\n{platform}" + (f"{note}\n" if note else "") + f"{where} shows {what}."
     if methods:
         head = (f"None of the requested methods ({', '.join(methods)}) can run on "
@@ -2911,7 +2846,7 @@ def _check_params_shape(params, methods, fn: str) -> None:
         return
     flat = {k: v for k, v in params.items() if not isinstance(v, dict)}
     if all(":" in str(k) for k in flat):
-        # 'Multigrate:epochs' (the CLI's --param spelling): split it for the example
+        # 'Multigrate:epochs': split it for the example
         nested: dict = {}
         for k, v in flat.items():
             m, key = str(k).split(":", 1)
@@ -3136,8 +3071,7 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
     """``(x per cell, aligned by id)``: an id-carrying Series, DataFrame or CSV in
     ``labels_for`` order."""
     from .eval.pipeline import _carries_ids, _pick
-    if not config._CLI and _eio._names_no_file(x):
-        # the name of a column: the command line says so before it reads --batch
+    if _eio._names_no_file(x):
         raise FileNotFoundError(_column_name_error(what, x))
     order = order or f"the order of the label files of {dataset}"
     folder = _dataset_folder(dataset, data_path)
@@ -3206,11 +3140,8 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
 def _column_name_error(what: str, x: str) -> str:
     """The error for ``batch=`` / ``labels=`` given the name of an obs column."""
     col = x[4:] if x.startswith("obs:") else x
-    return config.hint(
-        f"{what}={x!r} is not a file. Pass the column itself, as "
-        f"{what}=adata.obs[{col!r}].",
-        f"--{what} {x} is not a file. Pass a CSV file, as "
-        f'adata.obs[[{col!r}]].to_csv("{what}.csv") writes in Python.')
+    return (f"{what}={x!r} is not a file. Pass the column itself, as "
+        f"{what}=adata.obs[{col!r}].")
 
 
 def _has_gap(values) -> bool:
@@ -3224,7 +3155,7 @@ def _check_batch(vec, dataset: str) -> None:
         return
     miss = _eio.missing_mask(vec)
     raise ValueError(
-        config.hint("batch", "--batch") + f": {int(miss.sum()):,} of the "
+        "batch" + f": {int(miss.sum()):,} of the "
         f"{len(miss):,} cells of {dataset} have no batch{_eio._missing_example(vec)}. "
         f"Give every cell a batch.")
 
@@ -3374,7 +3305,7 @@ def _nested_rows(plan: "pd.DataFrame") -> tuple[list, list[str]]:
         left = [rows.at[i, "modalities"] for i in inside]
         notes.append(f"{method} runs on {_and_list(kept)}, not on "
                      f"{_and_list(left)}, whose files are part of it. Pass "
-                     + config.hint("modalities=", "--modalities")
+                     + "modalities="
                      + " to run a smaller combination.")
     return drop, notes
 
@@ -3390,8 +3321,7 @@ def _batch_length_problem(runs, batch, dataset, category, data_path) -> str:
            for m, mods in {(m, tuple(x or ())) for m, x in runs})
     if all(n in (0, len(batch)) for n in own):
         return ""
-    return (config.hint(f"batch has {len(batch):,} entries",
-                        f"--batch gave {len(batch):,} batch ids")
+    return (f"batch has {len(batch):,} entries"
             + f" for the {total:,} cells of {dataset}: give one batch per cell.")
 
 
@@ -3420,8 +3350,7 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
     if not embedding and _without_classification(metrics, True) is None:
         from .eval.classify import _graph_text
         raise ValueError(_graph_text(rec.get("method")) + " "
-                         + config.hint("Pass metrics='clustering'.",
-                                       "Pass --metrics clustering."))
+                         + "Pass metrics='clustering'.")
     n = emb.shape[0]
     rows = labels is not None and not labels_by_cell      # labels in embedding row order
     segments = None
@@ -3647,13 +3576,9 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
             "host's GPU. Pass dry_run=True, or run it on the GPU node "
             "without assume_gpu.")
     if skip_existing and params:
-        raise ValueError(config.hint(
-            "skip_existing=True with params=... would return results computed with the "
+        raise ValueError("skip_existing=True with params=... would return results computed with the "
             "earlier parameters (reuse is keyed on the output file, not on params). "
-            "Use a fresh out_dir per parameter setting, or skip_existing=False.",
-            "--skip-existing with --param would return results computed with the earlier "
-            "parameters (reuse is keyed on the output file, not on --param). Use a fresh "
-            "--out-dir per setting, or leave --skip-existing out."))
+            "Use a fresh out_dir per parameter setting, or skip_existing=False.")
     # the on-disk spelling, once, so out_dir names and records agree (one warning)
     dataset = _resolve.canonical_dataset(
         Path(data_path) if data_path is not None else config.DEFAULT.data_path, dataset)
@@ -3729,7 +3654,7 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
         raise ValueError(
             f"No saved output of {_and_list(dict.fromkeys(blocked['method']))} in {out_dir} "
             f"(it would be {Path(out_dir) / f'{first}_{dataset}'}). Pass the "
-            + config.hint("out_dir", "--out-dir") + " of the earlier run.")
+            + "out_dir" + " of the earlier run.")
     if plan_df.empty:
         # not one method could start: the request is wrong, and an empty result
         # would read "0 failed", as success
@@ -3773,7 +3698,7 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
         if others:
             rows = "row needs" if others == 1 else "rows need"
             print(f"[run_all] {others} more {rows} files this folder does not have. "
-                  + config.hint("mtb.scan", "multibench scan")
+                  + "mtb.scan"
                   + f" shows {'it' if others == 1 else 'them'}.", flush=True)
     out_dir.mkdir(parents=True, exist_ok=True)
     records = []

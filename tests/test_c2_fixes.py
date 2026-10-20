@@ -12,7 +12,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, workflow
+from multibench import workflow
 from tests.test_c1_decisions import _tree
 
 
@@ -24,28 +24,6 @@ def _old_tree(tmp_path):
                               started_at="2026-10-17T16:00:33", labels_used=["cty.csv"])
     (out / "batch_result.json").write_text(json.dumps(blob))
     return out
-
-
-# --------------------------------------------------------------- D03
-@pytest.mark.parametrize("how", ["python", "cli"])
-def test_skip_existing_rescores_the_saved_record(tmp_path, monkeypatch, how):
-    from multibench.engine import envs
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: "Methods run only on Linux.")
-    out = _old_tree(tmp_path)
-    ref = tmp_path / "ref"
-    shutil.copytree(out, ref)
-    want = mtb.load_batch(ref).rescore(verbose=False).records[0]
-    if how == "python":
-        mtb.run_all("D11", "vertical", methods=["Matilda"], out_dir=out,
-                    skip_existing=True, verbose=False)
-    else:
-        assert cli.main(["run-all", "D11", "--category", "vertical", "--methods", "Matilda",
-                         "--out-dir", str(out), "--skip-existing"]) == 0
-    got = mtb.load_batch(out).records[0]
-    for key in ("run_sec", "multibench_version", "started_at", "status", "metrics",
-                "labels_used", "scored_by_version"):
-        assert got.get(key) == want.get(key), key
-    assert (got["run_sec"], got["multibench_version"]) == (17.0, "0.3.9")
 
 
 # --------------------------------------------------------------- D28
@@ -249,15 +227,6 @@ def test_a_package_method_on_the_wrong_category():
                             "category='cross'.")
 
 
-def test_a_benchmark_dataset_gives_the_category(tmp_path, capsys):
-    out = mtb.evaluate(_emb(2864), dataset="D11", method="sciPENN", metrics=["ARI"],
-                       verbose=False)
-    assert out["category"].tolist() == ["vertical"]
-    np.save(tmp_path / "e.npy", _emb(2864))
-    assert cli.main(["evaluate", str(tmp_path / "e.npy"), "--dataset", "D11",
-                     "--method", "sciPENN", "--metrics", "ARI"]) == 0
-
-
 # --------------------------------------------------------------- C15, D29
 def test_every_long_table_has_scored_with():
     st = mtb.load_results("vertical")
@@ -347,32 +316,6 @@ def test_the_default_settings_repr_names_the_instance():
     assert repr(mtb.config.DEFAULT).startswith("mtb.config.DEFAULT(repo_path=")
 
 
-# --------------------------------------------------------------- D20, C21, D21, C26
-def _cite(tmp_path):
-    import anndata as ad
-    a = ad.AnnData(np.random.default_rng(0).poisson(1, (20, 10)).astype(float))
-    a.var_names = [f"G{i}" for i in range(10)]
-    a.obs["celltype"] = ["T", "B"] * 10
-    a.obsm["protein"] = np.ones((20, 3))
-    a.write_h5ad(tmp_path / "my.h5ad")
-    return a
-
-
-def test_export_selector_messages(tmp_path, capsys):
-    a = _cite(tmp_path)
-    with pytest.raises(ValueError) as e:
-        mtb.io.export_dataset(a, tmp_path / "A", adt="protein", labels="obs:celltype")
-    assert str(e.value) == "adt='protein': use adt='obsm:protein'."
-    src = str(tmp_path / "my.h5ad")
-    for argv, text in (([src, str(tmp_path / "B"), "--adt", "protein"],
-                        "error: --adt protein: use --adt obsm:protein."),
-                       ([src, str(tmp_path / "C"), "--rna=", "--adt", "obsm:protein"],
-                        "error: --rna is empty: --rna none writes no RNA, or pass a "
-                        "selector such as X.")):
-        assert cli.main(["export", *argv, "--labels", "obs:celltype"]) != 0
-        assert text in capsys.readouterr().err
-
-
 def test_peaks_given_as_rna_are_refused(tmp_path):
     import anndata as ad
     a = ad.AnnData(np.ones((20, 4)))
@@ -392,62 +335,6 @@ def test_gene_named_atac_for_vertical_warns_at_export(tmp_path):
                                          "holds gene activity"):
         mtb.io.export_dataset(r, tmp_path / "G", atac=r.copy(), labels="obs:celltype",
                               category="vertical")
-
-
-def test_cli_batch_column_on_an_npy(tmp_path, capsys):
-    np.save(tmp_path / "e.npy", _emb(2864))
-    cty = Path(mtb.config.DEFAULT.data_path) / "D11" / "cty.csv"
-    assert cli.main(["evaluate", str(tmp_path / "e.npy"), "--labels", str(cty),
-                     "--batch", "donor", "--method", "PCA", "--metrics", "ASW"]) != 0
-    assert ("--batch donor is not a file. With a .npy embedding, --batch takes a CSV of "
-            "one batch per cell.") in capsys.readouterr().err
-
-
-# --------------------------------------------------------------- C35, C14, C53, D17
-def test_any_wrong_run_call_names_run_all(capsys):
-    with pytest.raises(SystemExit) as e:
-        cli.main(["run", "D11", "--methods", "Matilda"])
-    assert e.value.code == 2
-    assert capsys.readouterr().err.strip().endswith(
-        "multibench run: Deprecated: use multibench run-all DATASET --methods M.")
-
-
-def test_cli_methods_keeps_a_renamed_run(tmp_path, capsys):
-    st = mtb.load_results("diagonal")
-    for tag, d in (("ep10", 0.0), ("ep40", 0.05)):
-        (tmp_path / tag).mkdir()
-        st[st.method.isin(["scJoint", "iNMF"])].assign(
-            source="user", value=lambda x: x.value + d).to_csv(tmp_path / tag / "long.csv",
-                                                              index=False)
-    B = importlib.import_module("multibench.plot.bubble")
-    seen = {}
-    real = B._bubble
-
-    def spy(df, **kw):
-        seen["methods"] = kw.get("methods")
-        return real(df, **kw)
-    import unittest.mock as um
-    with um.patch.object(B, "_bubble", spy):
-        assert cli.main(["plot", "bubble", "--input", str(tmp_path / "ep10" / "long.csv"),
-                         "--input", str(tmp_path / "ep40" / "long.csv"), "--methods",
-                         "scJoint", "--metrics", "clustering",
-                         "--out", str(tmp_path / "x.png")]) == 0
-    assert seen["methods"] == ["scJoint (ep10)", "scJoint (ep40)"]
-
-
-def _help(*cmd):
-    import contextlib
-    import io
-    buf = io.StringIO()
-    with contextlib.redirect_stdout(buf), pytest.raises(SystemExit):
-        cli.main([*cmd, "--help"])
-    return " ".join(buf.getvalue().split())
-
-
-def test_the_taught_flags_are_in_the_help():
-    assert "--assume-gpu skip this host's GPU test" in _help("scan")
-    assert "--scripts also fetch the method scripts" in _help("fetch")
-    assert "--build build every env from its lockfile" in _help("env", "install")
 
 
 # --------------------------------------------------------------- D18, C28

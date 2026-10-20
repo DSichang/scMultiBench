@@ -32,7 +32,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, config
+from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, ingest, registry, resolve, schema
 from multibench.eval import io as eio
@@ -320,32 +320,6 @@ def test_the_anchors_exist_once(tmp_path):
         mtb.io.read_canonical(src)
     assert str(e.value) == f'{src} is a 10x Genomics file. See the recipe "A 10x .h5 file" in the docs.'
     assert not (tmp_path / "out").exists()
-
-
-def test_a_10x_file_is_not_read_as_a_dataset_file(tmp_path, monkeypatch, capsys):
-    """The recipe opens by saying that the package does not read the file,
-    and the command-line block says so for ``multibench export`` (0.4.0: was
-    convert). A run and an export that are given the file stop and write
-    nothing."""
-    from multibench.engine import runner
-    _says("recipe-10x-h5", "`scan`, `run_all` and `multibench export` do not read this file. "
-                           "Read it with scanpy first.")
-    _says("recipe-donors", "`multibench export` reads `.h5ad` files, not a 10x `.h5` file.")
-    monkeypatch.chdir(tmp_path)
-    src = "filtered_feature_bc_matrix.h5"
-    _tenx(src, GENES, PEAKS, "atac", n_cells=20)
-    # the call that run_all makes for each method
-    with pytest.raises(ValueError, match=rf'{re.escape(src)} is a 10x Genomics file\. See the '
-                                         r'recipe "A 10x \.h5 file" in the docs\.$'):
-        runner.run("scMDC", "vertical", inputs={"rna": src, "adt": src}, out_dir="out",
-                   dry_run=True)
-    for argv in (["export", src, "OUT/"],
-                 ["export", src, "OUT", "--rna", "X"]):
-        assert cli.main(argv) == 1
-        assert capsys.readouterr().err.splitlines()[0] == (
-            f'error: {src} is a 10x Genomics file. See the recipe "A 10x .h5 file" in the '
-            f'docs.')
-    assert sorted(p.name for p in Path(".").iterdir()) == [src]
 
 
 def test_the_fences_are_the_ones_these_tests_run():
@@ -1585,64 +1559,6 @@ def test_batch_counts_follow_the_registry():
                 if v.when.get("category") == "vertical"}
     assert frozenset({"adt", "atac"}) not in vertical
     assert {frozenset(k.split("_")[1:]) for k in VERTICAL} == vertical
-
-
-# ------------------------------------------------------------ the command line
-def _commands():
-    """The command lines of the collapsed block, one list of arguments each."""
-    block = _recipe("recipe-donors").split('??? note "From the command line"', 1)[1]
-    (code,) = re.findall(r"^    ```\n(.*?)^    ```", block, flags=re.S | re.M)
-    return [shlex.split(c) for c in code.replace("\\\n", " ").splitlines()]
-
-
-def test_the_command_lines_parse(host, tmp_path, monkeypatch, capsys):
-    """The two commands of the block, on two files of other cells: the first
-    writes a diagonal folder without label files, the second runs the methods
-    on it without scores."""
-    monkeypatch.chdir(tmp_path)
-    convert, run_all = _commands()
-    assert convert[:2] == ["multibench", "export"] and run_all[:2] == ["multibench", "run-all"]
-    _says("recipe-donors", "Without cell types, leave `--labels` out and run without scores.")
-    assert "--labels" not in convert and "--no-evaluate" in run_all
-    parser = cli.build_parser()
-    for argv in (convert, run_all):
-        parser.parse_args(argv[1:])
-    rna, atac = _cells(60), _cells(50, seed=1)
-    atac.obs_names = [f"A{i:04d}-1" for i in range(50)]
-    # "Save the objects first, for example with rna.write_h5ad("my_rna.h5ad")."
-    assert '`rna.write_h5ad("my_rna.h5ad")`' in _said("recipe-donors")
-    rna.write_h5ad("my_rna.h5ad")
-    atac.write_h5ad("my_atac.h5ad")
-    assert cli.main(convert[1:]) == 0
-    folder = Path("mydata") / "MYDATA"
-    assert sorted(p.name for p in folder.iterdir()) == ["atac_gas.h5", "rna.h5"]
-    assert len(_h5(folder / "rna.h5", "barcodes")) == 60
-    assert len(_h5(folder / "atac_gas.h5", "barcodes")) == 50
-    capsys.readouterr()
-    assert cli.main(run_all[1:]) == 0
-    summary = pd.read_csv("out/MYDATA/summary.csv")
-    assert len(host) == len(summary) > 0 and set(summary["status"]) == {"ran"}
-
-
-def test_the_donor_file_of_the_command_line(host, tmp_path, monkeypatch, capsys):
-    """The last sentence of the block: the file that ``--batch`` takes is
-    the donor column written with its barcodes."""
-    monkeypatch.chdir(tmp_path)
-    write = 'adata.obs[["donor"]].to_csv("donor.csv")'
-    assert f"`multibench run-all --batch donor.csv` takes the file that `{write}` writes." \
-        in " ".join(_recipe("recipe-donors").split())
-    adata = _cite(150, donors="ABCDE")
-    mtb.io.export_dataset(adata, "mydata/MYDONORS", rna="X", adt="obsm:protein",
-                          labels="obs:celltype")
-    eval(write, {"adata": adata})
-    argv = ["run-all", "MYDONORS", "--category", "vertical", "--data-path", "mydata",
-            "--methods", "sciPENN", "--batch", "donor.csv"]
-    cli.build_parser().parse_args(argv)
-    assert _quiet(cli.main, argv + ["--out-dir", "out/MYDONORS"]) == 0
-    summary = pd.read_csv("out/MYDONORS/summary.csv")
-    assert summary["status"].tolist() == ["scored"]
-    assert mtb.load_batch("out/MYDONORS").records[0]["n_batches"] == 5
-    assert summary["ASW_batch"].notna().all()
 
 
 # ------------------------------------------------- the two Details paragraphs

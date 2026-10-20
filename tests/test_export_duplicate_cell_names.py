@@ -80,12 +80,3 @@ def test_the_advice_works(tmp_path):
     assert _labels(out) == [f"a{i}" for i in range(6)]
 
 
-@pytest.mark.filterwarnings("ignore")
-def test_the_command_line_says_the_same(tmp_path, capsys):
-    from multibench import cli
-    _mdata(NAMES, True).write(tmp_path / "m.h5mu")
-    rc = cli.main(["convert", str(tmp_path / "m.h5mu"), str(tmp_path / "OUT"), "--rna",
-                   "mod:rna", "--labels", "atac:ct", "--category", "vertical"])
-    assert rc == 1
-    assert capsys.readouterr().err.splitlines()[0] == f"error: {REPEAT}"
-    assert not (tmp_path / "OUT").exists()

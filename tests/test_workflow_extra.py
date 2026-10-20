@@ -185,26 +185,6 @@ def test_describe_layout_rejects_typo():
     assert mtb.describe_layout(None)            # None still prints everything
 
 
-def test_describe_layout_export_route(monkeypatch):
-    txt = mtb.describe_layout("cross")
-    # the export route per batch file; the storage dtype / compression are
-    # export_dataset's own parameters, no longer repeated here (L33)
-    assert "export_dataset" in txt and "--batch-index" in txt
-    # the vertical text keeps every needed fact, in plain case (L61)
-    vert = mtb.describe_layout("vertical")
-    for s_ in ("features x cells", "transpose", "single-column CSV",
-               "mtb.io.export_dataset writes the whole folder"):
-        assert s_ in vert
-    assert "to_canonical" not in vert                    # deprecated in 0.4.0
-    assert "runnable" in vert and "reason" in vert       # scan's columns since 0.4
-    # 0.4.0: the command line's route is multibench export (convert is deprecated)
-    from multibench import config
-    monkeypatch.setattr(config, "_CLI", True)
-    cli_vert = mtb.describe_layout("vertical")
-    assert "multibench export writes the whole folder" in cli_vert
-    assert "convert" not in cli_vert
-
-
 def test_method_info_runtime_validates_method_id():
     with pytest.raises(KeyError, match="Did you mean StabMap"):
         mtb.method_info("StabMapp")

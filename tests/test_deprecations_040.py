@@ -12,7 +12,6 @@ import multibench as mtb
 from multibench import workflow as W
 # the table behind a bubble figure: mtb.plot.build_table is deprecated in 0.4.0
 from multibench.plot.bubble import _build_table  # noqa: E402
-from multibench import cli
 
 
 def _future(call):
@@ -397,69 +396,6 @@ def test_names_left_the_top_level():
     assert [n for n in dir(mtb.data) if not n.startswith("_")] == sorted(mtb.data.__all__)
 
 
-def _help(*argv):
-    out = io.StringIO()
-    with contextlib.redirect_stdout(out), pytest.raises(SystemExit):
-        cli.main([*argv, "--help"])
-    return out.getvalue()
-
-
-def test_cli_help_hides_the_deprecated_commands_and_flags():
-    top = _help()
-    assert "\n    list " not in top and "find" in top
-    env = _help("env")
-    for hidden in ("status", "groups", "plan", "recipe", "yml", "create", "create-group",
-                   "freeze"):
-        assert f"\n    {hidden} " not in env, hidden
-    for cmd, flags in (("find", ("--task", "--runnable")), ("run", ("--task",)),
-                       ("evaluate", ("--output", "--clustering", "--cluster ", "--task",
-                                     "--only")),
-                       ("plot", ("--source", "--result-path", "--na", "--group")),
-                       ("env", ()), ):
-        text = _help(*cmd.split())
-        for flag in flags:
-            assert flag not in text, (cmd, flag)
-    # the embedding is the first argument since 0.4.0 (X19); --embedding is hidden
-    assert "EMBEDDING" in _help("evaluate") and "--clusters" not in _help("evaluate")
-    # env install --build is shown since c2 (D17), the twin of build=; --packed is hidden
-    assert "--packed" not in _help("env", "install")
-    # run is a hidden deprecated command in 0.4.0; its help says so
-    assert "\n    run " not in top and "\n    convert " not in top
-    assert _help("run").split("\n\n")[1].startswith("Deprecated: use multibench run-all")
-
-
-def _cli(*argv):
-    out, err = io.StringIO(), io.StringIO()
-    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-        code = cli.main(list(argv))
-    return code, out.getvalue(), err.getvalue()
-
-
-def test_cli_deprecated_commands_warn_once_and_work():
-    code, out, err = _cli("list", "--category", "vertical")
-    assert code == 0 and out.split() == mtb.find_methods("vertical")
-    assert err.count("warning:") == 1
-    assert "warning: multibench list is deprecated and will be removed in 0.5. Use multibench " \
-           "find." in err
-    code, out, err = _cli("find", "--category", "vertical", "--runnable")
-    assert out.split() == mtb.find_methods("vertical")
-    assert err.strip() == "warning: find --runnable is deprecated and will be removed in " \
-                          "0.5. Use multibench scan."
-    code, out, err = _cli("find", "--task", "dimension_reduction")
-    assert out.split() == ["Matilda", "sciPENN"]
-    assert err.strip() == "warning: find --task is deprecated and will be removed in 0.5; " \
-                          "it has no replacement."          # task took metric families (X58)
-    code, out, err = _cli("env", "groups")
-    assert code == 0 and "scmb_torch" in out
-    assert "multibench env groups is deprecated and will be removed in 0.5. Use multibench " \
-           "env install --dry-run." in err
-
-
-def test_cli_cite_prints_text_by_default():
-    _, out, _ = _cli("cite", "Matilda")
-    assert out.strip() == mtb.cite("Matilda")
-
-
 # ------------------------------------------------------- stored demo outputs
 def test_fetch_outputs_is_deprecated_and_still_served():
     import importlib
@@ -468,19 +404,6 @@ def test_fetch_outputs_is_deprecated_and_still_served():
     got, msg = _one_warning(lambda: mtb.data.fetch_outputs)
     assert got is F.fetch_outputs
     assert msg == _msg("data.fetch_outputs", note="use mtb.load_results for the stored results")
-
-
-def test_cli_fetch_outputs_is_hidden_and_warns_once(monkeypatch, tmp_path):
-    import importlib
-    F = importlib.import_module("multibench.data.fetch")
-    calls = []
-    monkeypatch.setattr(F, "fetch_outputs",
-                        lambda ds, **kw: calls.append(ds) or tmp_path / "outputs" / ds)
-    assert "--outputs" not in _help("fetch") and "stored outputs" not in _help()
-    code, out, err = _cli("fetch", "D11", "--outputs")
-    assert code == 0 and calls == ["D11"]
-    assert err.strip() == ("warning: fetch --outputs is deprecated and will be removed in 0.5; "
-                           "use multibench plot for the stored results.")
 
 
 def test_bubble_table_matrix_is_norm():

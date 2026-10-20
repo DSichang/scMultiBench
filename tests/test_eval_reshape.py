@@ -170,24 +170,6 @@ def test_to_long_accepts_plain_read_csv_of_evaluate_frame(tmp_path):
     pd.testing.assert_frame_equal(out, same)
 
 
-def test_to_long_accepts_cli_evaluate_out_read_back_plainly(tmp_path):
-    from multibench import cli
-    import numpy as np
-    lab = np.repeat(["a", "b"], 20)
-    emb = tmp_path / "e.npy"
-    np.save(emb, np.random.default_rng(0).normal(size=(40, 3)) + (lab == "b")[:, None] * 5.0)
-    labels = tmp_path / "cty.csv"
-    pd.DataFrame({"x": lab}).to_csv(labels, index=False)
-    f = tmp_path / "wide.csv"
-    # 0.4.0: evaluate --out writes the long table (and has no --clusters)
-    assert cli.main(["evaluate", "--embedding", str(emb), "--labels", str(labels),
-                     "--metrics", "ARI,NMI", "--out", str(f)]) == 0
-    out = to_long(pd.read_csv(f), method="M", dataset="D", category="vertical")
-    assert out.metric.tolist() == ["ARI", "NMI"]
-    assert out.columns.tolist() == ["metric", "value", "method", "dataset", "category",
-                                    "source", "scored_with"]
-
-
 FIX = "pd.read_csv(path, index_col=0)"
 
 

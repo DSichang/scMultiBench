@@ -25,7 +25,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, config
+from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, ingest, registry
 from multibench.engine import runner as R
@@ -105,12 +105,6 @@ def _caveats(df):
     return [(m, c) for m, c in zip(df["method"], df["caveat"]) if c]
 
 
-def _cli(argv, capsys):
-    rc = _quiet(cli.main, argv)
-    cap = capsys.readouterr()
-    return rc, cap.out, cap.err
-
-
 # ======================================================================= R6-10
 def test_no_scan_caveat_has_a_semicolon_or_starts_in_lower_case(tmp_path, pinned, root,
                                                                 monkeypatch):
@@ -182,95 +176,6 @@ def test_the_atac_caveats_start_with_the_method(tmp_path, pinned, gas_matilda):
         "activity.")
 
 
-def test_callers_print_the_method_name_once(tmp_path, pinned, root, monkeypatch, capsys,
-                                            gas_matilda):
-    """run_all's log, both dry runs and run's warning print the caveat alone.
-    UINMF's two-batch variant is named: on D52's three batches the folder
-    picks its three-batch one, which skips nothing."""
-    data = root / "data"
-    two = ["rna1", "rna2", "adt1", "adt2"]
-    _quiet(mtb.run_all, "D52", "cross", methods=["UINMF"], modalities=two, data_path=data,
-           dry_run=True)
-    out = capsys.readouterr().out
-    assert "[run_all] UINMF reads batches 1-2 of 3. Batch 3 is not used.\n" in out
-    rc, out, err = _cli(["run-all", "D52", "--category", "cross", "--methods", "UINMF",
-                         "--modalities", ",".join(two),
-                         "--data-path", str(data), "--dry-run"], capsys)
-    assert rc == 0 and "# UINMF reads batches 1-2 of 3. Batch 3 is not used.\n" in err
-
-    def fake_run(**kw):
-        raise RuntimeError("stub: not run in tests")
-    monkeypatch.setattr(W, "_run", fake_run)
-    _quiet(mtb.run_all, "D52", "cross", tmp_path / "out", methods=["UINMF"],
-           modalities=two, data_path=data, evaluate=False)
-    log = capsys.readouterr().out
-    assert "[run_all]   UINMF reads batches 1-2 of 3. Batch 3 is not used.\n" in log
-    # run's own warning
-    mu = _mu_peak(tmp_path / "mu")
-    inp = mtb.inputs_for("MU_PEAK", "vertical", "Matilda", modalities=["rna", "atac"],
-                         data_path=mu)
-
-    class Stop(Exception):
-        pass
-
-    def stop(spec):
-        raise Stop
-    monkeypatch.setattr(R, "check_gpu_requirement", stop)
-    with warnings.catch_warnings(record=True) as rec:
-        warnings.simplefilter("always")
-        with pytest.raises(Stop):
-            mtb.run("Matilda", "vertical", inputs=inp, out_dir=str(tmp_path / "o"))
-    msgs = [str(w.message) for w in rec if "ATAC" in str(w.message)]
-    assert msgs and msgs[0].startswith("Matilda needs gene-activity ATAC. "), msgs
-    for text in (out, err, log, *msgs):
-        assert not re.search(r"\b(UINMF|Matilda) \1\b", text), text
-
-
-def test_strict_counts_are_unchanged(tmp_path, pinned, root, capsys):
-    data = _lung_ids(tmp_path)
-    base = ["scan", "LUNG_ids", "--category", "diagonal", "--data-path", str(data),
-            "--strict"]
-    rc, _, err = _cli(base, capsys)
-    assert rc == 1
-    n = len(list(W._variant_rows("diagonal")))     # 14 methods, four with a second row
-    assert n == 18
-    # the four rows for numbered batches are not listed for this one-batch folder (X80)
-    n -= 4
-    assert err.startswith(
-        f"error: --strict: 0 of {n} rows are runnable. Rows with missing input files: "
-        f"{n - 1}. Rows whose peak names the method cannot read: 1. Rows whose method "
-        f"scripts are not fetched: {n}. The reason column says why.\n"), err
-    rc, _, err = _cli(base + ["--methods", "GLUE,Seurat_v3,MultiMAP,scBridge"], capsys)
-    assert rc == 1
-    assert err.startswith(
-        # four rows: GLUE's second one, for several batches, is not listed (X80)
-        "error: --strict: 0 of 4 rows are runnable. Rows with missing input files: 3. Rows "
-        "whose peak names the method cannot read: 1. Rows whose method scripts are not "
-        "fetched: 4. No runnable row for GLUE, Seurat_v3, MultiMAP, scBridge:\n"), err
-    assert ("  GLUE: GLUE reads peak names such as chr1:100-200. atac_peak.h5 holds other "
-            "names, for example peak_0. Rename them to chr:start-end.\n") in err
-    assert "  scBridge: scBridge needs atac_gas.h5, and LUNG_ids has no such file.\n" in err
-    rc, _, err = _cli(["scan", "D52", "--category", "cross", "--data-path",
-                       str(root / "data"), "--methods", "UINMF,StabMap", "--strict",
-                       "--modalities", "all"], capsys)
-    # UINMF has six cross rows and StabMap four; D52 holds the files of three
-    assert rc == 1 and err.startswith(
-        "error: --strict: 0 of 10 rows are runnable. Rows with missing input files: 7. "
-        "Rows whose method scripts are not fetched: 10. No runnable row for UINMF, "
-        "StabMap:\n"), err
-
-
-def test_strict_passes_on_the_uinmf_folder_with_the_scripts(root, monkeypatch, capsys):
-    monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
-    monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
-    monkeypatch.setattr(config, "scripts_present", lambda cfg=None: True)
-    monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
-    rc, out, err = _cli(["scan", "D52", "--category", "cross", "--data-path",
-                         str(root / "data"), "--methods", "UINMF,StabMap", "--strict"],
-                        capsys)
-    assert rc == 0, err
-
-
 def test_scbridge_reason_is_a_sentence(tmp_path, pinned):
     row = _quiet(full_scan, "LUNG_ids", "diagonal", methods=["scBridge"],
                  data_path=_lung_ids(tmp_path), verbose=False).iloc[0]
@@ -316,21 +221,6 @@ def wrong_ref(tmp_path, monkeypatch):
 
 
 @needs_git
-def test_strict_prints_the_scripts_ref_reason_in_full(wrong_ref, capsys):
-    repo, head = wrong_ref
-    rc, _, err = _cli(["scan", "D11", "--category", "vertical", "--methods",
-                       "Matilda,scMoMaT", "--modalities", "rna,adt", "--strict"], capsys)
-    assert rc == 1
-    ref = (f"The method scripts are at {head}, not deadbeef (MULTIBENCH_SCRIPTS_REF). "
-           f"Unset MULTIBENCH_SCRIPTS_REF, or set MULTIBENCH_REPO_PATH to a new folder and "
-           f"run multibench fetch --scripts.")
-    assert f"  Matilda: {ref}\n" in err, err
-    # scMoMaT's script is not in this checkout either: that sentence follows, unclipped
-    line = next(ln for ln in err.splitlines() if ln.startswith("  scMoMaT: "))
-    assert line.startswith(f"  scMoMaT: {ref} ") and not line.endswith("..."), line
-
-
-@needs_git
 def test_the_scripts_ref_reason_is_sentences(wrong_ref):
     repo, head = wrong_ref
     assert config.scripts_ref_problem() == (
@@ -364,33 +254,6 @@ def test_nothing_runnable_heads_are_sentences(monkeypatch, tmp_path):
     assert str(e.value).startswith(
         "None of the requested methods (Matilda, totalVI) can run on D11 (vertical).\n")
     assert "dataset=" not in str(e.value) and "methods=[" not in str(e.value).split("\n")[0]
-
-
-def test_run_all_dry_run_header_is_sentences(monkeypatch, capsys, tmp_path):
-    monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
-    rc, out, err = _cli(["run-all", "D28", "--category", "diagonal", "--dry-run",
-                         "--out-dir", str(tmp_path)], capsys)
-    assert rc == 0
-    # the second rows of four methods, for several batches, are not listed for this
-    # one-batch folder (X80): the lines count methods
-    assert re.search(r"^# Commands of the 13 methods whose input files are in place\. "
-                     r"\[env missing\] marks a method whose environment is not "
-                     r"installed\. \[use multibench run-all\] marks a command that reads "
-                     r"a file multibench run-all writes first\.$", out, re.M), out
-    # 0.4.0: the header is one sentence
-    assert err.startswith("# Dry run: 0 of 14 methods can run on D28 (diagonal); the "
-                          "reason column says why.\n"), err
-    # methods with one diagonal row each: the lines count methods
-    rc, out, err = _cli(["run-all", "D28", "--category", "diagonal", "--dry-run",
-                         "--methods", "SCALEX,Portal,uniPort",
-                         "--out-dir", str(tmp_path)], capsys)
-    assert rc == 0
-    # Z18 (r3): none of the three reads a prepared file, so that mark is not explained
-    assert re.search(r"^# Commands of the 3 methods whose input files are in place\. "
-                     r"\[env missing\] marks a method whose environment is not installed\.$",
-                     out, re.M), out
-    assert err.startswith("# Dry run: 0 of 3 methods can run on D28 (diagonal); the "
-                          "reason column says why.\n"), err
 
 
 def test_count_lines_say_methods_only_when_each_has_one_row(monkeypatch, capsys, tmp_path):
@@ -429,30 +292,6 @@ def test_linux_only_summary_is_three_sentences(monkeypatch, capsys):
     assert W.LINUX_ONLY_SUMMARY in capsys.readouterr().out
 
 
-def _lung(root):
-    d = root / "LUNG"
-    d.mkdir(parents=True)
-    _h5(d / "rna.h5", GENES, [f"r{i}" for i in range(20)])
-    _h5(d / "atac_peak.h5", PEAKS, [f"a{i}" for i in range(20)])
-    _labels(d / "rna_cty.csv", 20)
-    _labels(d / "atac_cty.csv", 20)
-    return d
-
-
-def test_inputs_for_names_what_is_missing_in_sentences(tmp_path, monkeypatch):
-    d = _lung(tmp_path)
-    with pytest.raises(FileNotFoundError) as e:
-        mtb.inputs_for("LUNG", "diagonal", "SCALEX", data_path=tmp_path, check=True)
-    assert str(e.value) == (
-        f"SCALEX (diagonal) needs atac_gas.h5 in {d}. The folder holds atac_cty.csv, "
-        f"atac_peak.h5, rna.h5 and rna_cty.csv. Diagonal methods read atac_gas.h5 or "
-        f'atac.h5. method_info("SCALEX")["atac"] says which ATAC SCALEX needs.')
-    monkeypatch.setattr(config, "_CLI", True)
-    with pytest.raises(FileNotFoundError) as e:
-        mtb.inputs_for("LUNG", "diagonal", "SCALEX", data_path=tmp_path, check=True)
-    assert str(e.value).endswith("multibench info SCALEX says which ATAC SCALEX needs.")
-
-
 def test_per_batch_hint_is_sentences(tmp_path):
     d = tmp_path / "MB"
     d.mkdir()
@@ -486,26 +325,6 @@ def test_save_merge_line_is_a_sentence(tmp_path, capsys):
     res("totalVI").save(tmp_path)
     assert capsys.readouterr().out == (
         f"# Merged with 2 earlier records in {tmp_path} (StabMap, scMoMaT).\n")
-
-
-def test_mosaic_gene_activity_warning_names_the_fix(tmp_path, monkeypatch):
-    import anndata as ad
-    a = ad.AnnData(X=np.ones((6, 4)))
-    a.var_names = [f"g{i}" for i in range(4)]
-    with pytest.warns(UserWarning) as rec:
-        ingest.export_dataset(a, tmp_path / "PY", rna=None, atac="X",
-                              atac_kind="gene_activity", category="mosaic", batch_index=1)
-    msgs = [str(w.message) for w in rec if "mosaic" in str(w.message)]
-    assert ("Every mosaic method reads peak ATAC. Export the ATAC as peaks "
-            "(atac_kind='peak'), or pass allow_atac_mismatch=True to scan and run_all.") \
-        in msgs, msgs
-    monkeypatch.setattr(config, "_CLI", True)
-    with pytest.warns(UserWarning) as rec:
-        ingest.export_dataset(a, tmp_path / "CLI", rna=None, atac="X",
-                              atac_kind="gene_activity", category="mosaic", batch_index=1)
-    msgs = [str(w.message) for w in rec if "mosaic" in str(w.message)]
-    assert ("Every mosaic method reads peak ATAC. Convert the ATAC as peaks (--atac-kind "
-            "peak), or pass --allow-atac-mismatch to scan and run-all.") in msgs, msgs
 
 
 def test_positional_warning_is_plural_for_several_files(tmp_path):

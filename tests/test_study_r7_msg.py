@@ -19,7 +19,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, config
+from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, ingest, registry
 from multibench.engine import runner as R
@@ -68,26 +68,6 @@ def pinned(monkeypatch, tmp_path):
     monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
 
 
-# ======================================================================= R7-03
-@pytest.mark.parametrize("method", ["MultiMAP", "Seurat_v3"])
-def test_both_file_variants_say_they_read_both_files(tmp_path, monkeypatch, method, pinned):
-    _lung(tmp_path)
-    both = f"{method} reads both atac_peak.h5 and atac_gas.h5."
-    for cli_mode in (False, True):
-        monkeypatch.setattr(config, "_CLI", cli_mode)
-        with pytest.raises(FileNotFoundError) as e:
-            mtb.inputs_for("LUNG", "diagonal", method, data_path=tmp_path, check=True)
-        msg = str(e.value)
-        assert "reads both atac_peak.h5 and atac_gas.h5" in msg
-        assert msg.endswith(both), msg
-        assert "method_info" not in msg and "multibench info" not in msg, msg
-    monkeypatch.setattr(config, "_CLI", False)
-    row = _quiet(full_scan, "LUNG", "diagonal", methods=[method], data_path=tmp_path,
-                 verbose=False).iloc[0]
-    assert both in row["files_reason"], row["files_reason"]
-    assert "method_info" not in row["files_reason"]
-
-
 def test_single_file_variant_keeps_the_method_info_pointer(tmp_path, pinned):
     _lung(tmp_path)
     with pytest.raises(FileNotFoundError) as e:
@@ -104,18 +84,6 @@ WRONG_REF = "The method scripts are at 0000000, not deadbeef (MULTIBENCH_SCRIPTS
 def wrong_ref(monkeypatch):
     monkeypatch.setattr(config, "scripts_ref_problem", lambda repo=None: WRONG_REF)
     return WRONG_REF
-
-
-def test_cli_run_all_dry_run_starts_with_the_header(wrong_ref, capsys):
-    rc = _quiet(cli.main, ["run-all", "D11", "--category", "vertical", "--methods",
-                           "totalVI", "--dry-run"])
-    err = capsys.readouterr().err
-    assert rc == 0
-    lines = err.splitlines()
-    assert lines[0] == ("# Dry run: 0 of 1 method can run on D11 (vertical); the reason "
-                        "column says why."), err                   # 0.4.0: one sentence
-    assert err.count(WRONG_REF) == 1, err
-    assert f"# {WRONG_REF}" in lines[1:], err
 
 
 def test_python_run_all_dry_run_prints_the_ref_note_only_when_verbose(wrong_ref, capsys):
@@ -229,24 +197,6 @@ def test_full_folder_error_is_sentences_in_python(tmp_path):
     assert "[" not in msg and ";" not in msg
 
 
-def test_full_folder_error_is_sentences_on_the_cli(tmp_path, capsys):
-    a = _cite()
-    src = tmp_path / "cite.h5ad"
-    a.write_h5ad(src)
-    out = tmp_path / "MYCITE"
-    argv = ["convert", str(src), str(out), "--rna", "X", "--adt", "obsm:protein",
-            "--labels", "obs:cell_type"]
-    assert _quiet(cli.main, argv) == 0
-    capsys.readouterr()
-    rc = _quiet(cli.main, argv)
-    err = capsys.readouterr().err
-    assert rc == 1
-    line = next(ln for ln in err.splitlines() if "already holds" in ln)
-    assert line.endswith("already holds rna.h5, adt.h5 and cty.csv. Pass --overwrite to "
-                         "replace them."), line
-    assert "[" not in line and ";" not in line
-
-
 def test_one_existing_file_is_named_alone(tmp_path):
     a = _cite()
     out = tmp_path / "ONE"
@@ -289,14 +239,6 @@ def test_raw_counts_warning_names_the_mudata_form_for_a_mudata_selector(tmp_path
                     "example with rna='mod:gex.layer:counts'."]
 
 
-def test_raw_counts_warning_uses_the_cli_spelling(tmp_path, monkeypatch):
-    monkeypatch.setattr(config, "_CLI", True)
-    a = _cite(log=True)
-    (msg,) = _count_warnings(ingest.export_dataset, a, tmp_path / "LOG",
-                             adt="obsm:protein", labels="obs:cell_type")
-    assert msg.endswith("Export raw counts, for example with --rna layer:counts.")
-
-
 # ======================================================================= R7-10
 @pytest.mark.parametrize("host,name", [("darwin/arm64", "macOS"), ("win32/AMD64", "Windows"),
                                        ("cygwin/x86_64", "Windows"),
@@ -314,23 +256,6 @@ def off_linux(monkeypatch):
     monkeypatch.setattr(envs, "host_platform_problem", lambda: DARWIN)
 
 
-def test_run_refusal_off_linux_has_no_parenthesis_or_semicolon(off_linux, tmp_path,
-                                                                monkeypatch):
-    monkeypatch.setattr(R.envs, "installed_envs", lambda conda=None: ["base"])
-    inp = mtb.inputs_for("D11", "vertical", "totalVI")
-    with pytest.raises(OSError) as e:
-        mtb.run("totalVI", "vertical", inputs=inp, out_dir=str(tmp_path / "out"))
-    assert str(e.value) == ("Methods run only on Linux, and this computer runs macOS. Run "
-                            "this call on a Linux machine. dry_run=True previews the "
-                            "method's command here.")
-    monkeypatch.setattr(config, "_CLI", True)
-    with pytest.raises(OSError) as e:
-        mtb.run("totalVI", "vertical", inputs=inp, out_dir=str(tmp_path / "out"))
-    assert str(e.value) == ("Methods run only on Linux, and this computer runs macOS. Run "
-                            "this command on a Linux machine. --dry-run previews the "
-                            "method's command here.")
-
-
 def test_run_all_refusal_off_linux_has_no_parenthesis_or_semicolon(off_linux, tmp_path,
                                                                     monkeypatch):
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
@@ -340,23 +265,6 @@ def test_run_all_refusal_off_linux_has_no_parenthesis_or_semicolon(off_linux, tm
     assert "(this computer is" not in msg
     assert "Methods run only on Linux, and this computer runs macOS." in msg
     assert ";" not in msg, msg
-
-
-def test_install_refusal_off_linux_has_no_parenthesis_or_semicolon(off_linux, monkeypatch,
-                                                                   capsys):
-    monkeypatch.setattr(envs, "installed_envs", lambda conda=None: [])
-    monkeypatch.setattr(envs, "_run_all", lambda cmds: pytest.fail("a build was started"))
-    with pytest.raises(RuntimeError) as e:
-        envs.create_all(methods=["Matilda"], dry_run=False)
-    # the hidden force is not offered since 0.4.0 (X33)
-    assert str(e.value) == ("Method environments run only on Linux, and this computer runs "
-                            "macOS. Run the install on a Linux machine.")
-    rc = cli.main(["env", "install", "--methods", "Matilda", "--run"])
-    err = capsys.readouterr().err
-    assert rc == 1
-    assert ("Method environments run only on Linux, and this computer runs macOS. Run the "
-            "install on a Linux machine.\n") in err
-    assert "(this computer is" not in err and ";" not in err
 
 
 def test_env_reason_on_linux_leads_with_the_install_command(monkeypatch):
@@ -381,23 +289,6 @@ def test_scan_env_reason_on_linux(monkeypatch):
     row = _quiet(full_scan, "D11", "vertical", methods=["totalVI"], verbose=False).iloc[0]
     assert row["env_reason"].startswith(f"Environment {row['env']} is not installed. ")
     assert "doctor" not in row["env_reason"]
-
-
-def test_run_error_on_linux_is_sentences(tmp_path, monkeypatch):
-    monkeypatch.setattr(R.envs, "installed_envs", lambda conda=None: ["base"])
-    inp = mtb.inputs_for("D11", "vertical", "totalVI")
-    env = envs.group_for("totalVI")
-    with pytest.raises(OSError) as e:
-        mtb.run("totalVI", "vertical", inputs=inp, out_dir=str(tmp_path / "out"))
-    assert str(e.value) == (
-        f"Environment {env} of totalVI is not installed. Run multibench env install "
-        f"--methods totalVI. In Python, call mtb.env.install(['totalVI']).")
-    monkeypatch.setattr(config, "_CLI", True)
-    with pytest.raises(OSError) as e:
-        mtb.run("totalVI", "vertical", inputs=inp, out_dir=str(tmp_path / "out"))
-    assert str(e.value) == (
-        f"Environment {env} of totalVI is not installed. Run multibench env install "
-        f"--methods totalVI.")
 
 
 # ======================================================================= R7-11

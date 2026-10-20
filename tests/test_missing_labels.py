@@ -547,48 +547,6 @@ def test_missing_labels_value_is_checked_before_anything_else():
     assert str(e.value) == 'missing_labels must be "error" or "drop", got \'keep\'.'
 
 
-def test_the_command_line_names_its_flags(tmp_path, monkeypatch):
-    emb, lab = _cells()
-    path = tmp_path / "cty.csv"
-    pd.DataFrame({"x": _gaps(lab)}).to_csv(path, index=False)
-    monkeypatch.setattr(config, "_CLI", True)
-    with pytest.raises(ValueError) as e:
-        mtb.evaluate(emb, labels=str(path), metrics=["ASW"])
-    assert str(e.value) == (
-        "--labels (cty.csv): 30 of the 300 cells have no label." + KEEP_FIX_CLI)
-    assert "missing_labels=" not in str(e.value)
-    assert "--missing-labels" not in str(e.value)
-    # no cell with a label: the same flag starts the message
-    pd.DataFrame({"x": ["NA"] * N}).to_csv(path, index=False)
-    with pytest.raises(ValueError) as e:
-        mtb.evaluate(emb, labels=str(path), metrics=["ASW"])
-    assert str(e.value) == (
-        "--labels (cty.csv): none of the 300 cells has a label, for example 'NA'."
-        + NONE_FIX)
-
-
-def test_the_command_line_names_the_dataset_whose_label_files_it_read(tmp_path, monkeypatch):
-    """``multibench evaluate --dataset`` reads the label files of the dataset:
-    the message names them, not a --labels that was never typed."""
-    emb, lab = _cells()
-    path = tmp_path / "cty.csv"
-    pd.DataFrame({"x": _gaps(lab, "NA")}).to_csv(path, index=False)
-    monkeypatch.setattr(config, "_CLI", True)
-    # as multibench evaluate --dataset D11 reads them (c4: an argument, no ContextVar)
-    cells = pipeline._Cells("D11", [path], None, from_files=True, whole=False)
-    with pytest.raises(ValueError) as e:
-        pipeline._scores(emb, labels=[str(path)], metrics=["ASW"], cells=cells)
-    assert str(e.value) == (
-        "the label files of D11 (cty.csv): 30 of the 300 cells have no label, for "
-        "example 'NA'." + KEEP_FIX_CLI)
-    pd.DataFrame({"x": ["NA"] * N}).to_csv(path, index=False)
-    with pytest.raises(ValueError) as e:
-        pipeline._scores(emb, labels=[str(path)], metrics=["ASW"], cells=cells)
-    assert str(e.value) == (
-        "the label files of D11 (cty.csv): none of the 300 cells has a label, for "
-        "example 'NA'." + NONE_FIX)
-
-
 # ============================================================ "drop"
 def test_drop_equals_scoring_the_labelled_cells(tmp_path):
     emb, lab = _cells()

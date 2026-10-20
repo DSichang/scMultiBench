@@ -68,16 +68,3 @@ def test_package_code_that_means_the_default_order_is_silent():
         workflow._dataset_cell_ids("D52", None)
 
 
-def test_cli_evaluate_with_name_does_not_warn_about_a_registry_method(tmp_path, capsys):
-    # X67 (r3): with --name the embedding is your own method's
-    import numpy as np
-    from multibench import cli
-    from multibench.engine import resolve
-    resolve._ORDER_NOTED.clear()
-    n = sum(len(open(p).read().splitlines()) - 1
-            for p in mtb.labels_for("D52mini", "cross").values())
-    emb = tmp_path / "e.npy"
-    np.save(emb, np.random.default_rng(0).normal(size=(n, 4)))
-    assert cli.main(["evaluate", str(emb), "--dataset", "D52mini", "--category", "cross",
-                     "--name", "MyPCA", "--metrics", "ARI"]) == 0
-    assert "StabMap" not in capsys.readouterr().err

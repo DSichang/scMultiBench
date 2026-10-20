@@ -17,7 +17,7 @@ import pytest
 import multibench as mtb
 # the table behind a bubble figure: mtb.plot.build_table is deprecated in 0.4.0
 from multibench.plot.bubble import _build_table  # noqa: E402
-from multibench import cli, config
+from multibench import config
 
 matplotlib.use("Agg")
 
@@ -139,17 +139,6 @@ def test_several_datasets_warning_with_a_lone_dataset():
     assert not any("paper's" in m for m in msgs), msgs
 
 
-def test_several_datasets_warning_cli_spelling(monkeypatch):
-    monkeypatch.setattr(config, "_CLI", True)
-    d11 = _stored("D11", "rerun", "vertical")     # a second dataset of the same methods
-    df = pd.concat([d11, d11.assign(dataset="D11b")], ignore_index=True).assign(source="user")
-    _, msgs = _messages(_build_table, df)
-    assert msgs == [
-        "This figure averages each method over 2 datasets, D11 and D11b. Its rows "
-        "mix datasets. multibench plot bar ranks the methods within each dataset; or "
-        "filter with --dataset."]
-
-
 # --- R5-11 (b): one method, equal columns ------------------------------------
 
 def _rows(method, values):
@@ -191,28 +180,6 @@ def test_equal_mean_rank_warning_is_plain():
 
 
 # --- R5-11 (c): the CLI overlay line -----------------------------------------
-
-def test_cli_overlay_line_is_plain(tmp_path, monkeypatch, capsys):
-    from multibench import plot as plot_ns
-
-    def _long(method):
-        return pd.DataFrame({"metric": ["ARI", "NMI", "ASW"], "value": [0.5, 0.6, 0.7],
-                             "method": method, "dataset": "D1", "category": "diagonal"})
-    from multibench.data import results as results_mod
-    # the CLI reads the stored table through the private loader (no source= warning)
-    monkeypatch.setattr(results_mod, "_load_results",
-                        lambda *a, **kw: pd.concat([_long("A"), _long("B")],
-                                                   ignore_index=True))
-    monkeypatch.setattr(plot_ns, "bubble", lambda df, **kw: None)
-    mine = tmp_path / "mine.csv"
-    _long("PCA_LSI_stack").to_csv(mine, index=False)
-    rc = cli.main(["plot", "bubble", "--category", "diagonal", "--dataset", "D1",
-                   "--input", str(mine), "--out", str(tmp_path / "x.png")])
-    err = capsys.readouterr().err
-    assert rc == 0, err
-    # c3 (C18): the figure shows the rows; no line says they were added
-    assert "# Added" not in err and "# overlay" not in err
-
 
 # --- R5-11 (d): na='raise' does not describe the figure it does not draw -------
 

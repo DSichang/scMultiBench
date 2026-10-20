@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, workflow
+from multibench import workflow
 from multibench.engine import registry, resolve
 from multibench.eval import io as eio, pipeline, scib as escib
 from multibench.plot import style
@@ -47,11 +47,6 @@ def test_the_packed_warning_says_what_it_does():
             mtb.env.install(["Matilda"], packed=True, dry_run=True)
         except OSError:
             pass
-
-
-def test_the_params_header_names_the_method(capsys):
-    cli.main(["params", "Matilda"])
-    assert "(set with --param Matilda:KEY=VALUE)" in capsys.readouterr().out
 
 
 def test_params_for_returns_the_parameters_the_variants_share():
@@ -197,28 +192,9 @@ def test_mosaic_rna_next_to_other_cells_atac_names_the_mosaic_fix(tmp_path):
                               category="mosaic", batch_index=2)
 
 
-def test_run_help_is_one_deprecated_line_and_embedding_is_required(capsys):
-    with pytest.raises(SystemExit):
-        cli.main(["run", "--help"])
-    out = capsys.readouterr().out
-    assert "Deprecated: use multibench run-all DATASET --methods M." in out
-    assert "--input" not in out
-    with pytest.raises(SystemExit):
-        cli.main(["evaluate", "--help"])
-    usage = capsys.readouterr().out.split("\n\n")[0]
-    assert "EMBEDDING" in usage and "[EMBEDDING]" not in usage
-
-
 def test_one_text_for_an_unknown_metric():
     for metrics in ("bogus", ["bogus"]):
         with pytest.raises(ValueError, match=r"^Unknown metrics= token bogus\. Pass 'all'"):
             mtb.evaluate(np.eye(4), ["a", "b", "a", "b"], metrics=metrics, verbose=False)
 
 
-def test_export_help_says_the_difference_first(capsys):
-    with pytest.raises(SystemExit):
-        cli.main(["export", "--help"])
-    out = " ".join(capsys.readouterr().out.split())
-    assert "--atac-from PATH the file that holds the ATAC matrix" in out
-    assert "--batch BATCH split SRC into numbered batches by this column" in out
-    assert "--batch-index N write all of SRC as batch N" in out

@@ -10,7 +10,6 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli
 from multibench.plot.style import overall
 from tests.test_docs_r4 import _read, needs_docs
 
@@ -24,38 +23,12 @@ def _quiet(f, *a, **k):
         return f(*a, **k)
 
 
-def _bars(fig):
-    ax = fig.axes[0]
-    return ([t.get_text() for t in ax.get_yticklabels()],
-            [round(p.get_width(), 9) for p in ax.patches])
-
-
 def _this_run(category):
     """Rows of two stored methods, a little worse, as '<method> (this run)'."""
     st = mtb.load_results(category)
     two = st[st["method"].isin(sorted(st["method"].unique())[:2])]
     return two.assign(method=two["method"] + " (this run)", source="user",
                       value=two["value"] * 0.98)
-
-
-# --------------------------------------------------------------- D01
-@pytest.mark.parametrize("category", list(CATS))
-def test_cli_plot_bar_draws_the_python_bar(category, tmp_path, monkeypatch):
-    pb = importlib.import_module("multibench.plot.bar")
-    run = _this_run(category)
-    run.to_csv(tmp_path / "run.csv", index=False)
-    want = _bars(_quiet(mtb.plot.bar, pd.concat([mtb.load_results(category), run])))
-    seen = {}
-    real = pb._bar
-    monkeypatch.setattr(pb, "_bar", lambda *a, **k: seen.setdefault("fig", real(*a, **k)))
-    assert _quiet(cli.main, ["plot", "bar", "--category", category, "--input",
-                             str(tmp_path / "run.csv"), "--out", str(tmp_path / "b.png")]) == 0
-    assert _bars(seen["fig"]) == want
-
-
-def test_cli_plot_bubble_still_draws(tmp_path):
-    assert _quiet(cli.main, ["plot", "bubble", "--category", "vertical",
-                             "--out", str(tmp_path / "b.png")]) == 0
 
 
 # --------------------------------------------------------------- C18
@@ -66,33 +39,6 @@ def test_rows_scored_without_a_dataset_are_told_to_score_with_one():
         _quiet(mtb.plot.bubble, pd.concat([st, mine]))
     assert str(e.value) == ("Your rows were scored without a dataset: score your embedding "
                             "with dataset='D11' to compare it with the stored results.")
-
-
-def test_the_cli_names_the_evaluate_command_and_prints_no_added_line(tmp_path, capsys):
-    st = mtb.load_results("vertical")
-    st[st["method"] == "Matilda"].assign(method="PCA", dataset="MINE", source="user").to_csv(
-        tmp_path / "mine.csv", index=False)
-    rc = cli.main(["plot", "bubble", "--category", "vertical", "--input",
-                   str(tmp_path / "mine.csv"), "--out", str(tmp_path / "b.png")])
-    err = capsys.readouterr().err
-    assert rc != 0 and "score your embedding with multibench evaluate --dataset D11." in err
-    assert "# Added" not in err
-
-
-# --------------------------------------------------------------- C14
-def test_cli_two_inputs_with_the_same_methods_name_both(tmp_path, monkeypatch, capsys):
-    pb = importlib.import_module("multibench.plot.bubble")
-    seen = {}
-    monkeypatch.setattr(pb, "_bubble", lambda df, **kw: seen.update(df=df))
-    st = mtb.load_results("vertical")
-    for name in ("epochs_10", "epochs_40"):
-        st.assign(source="user").to_csv(tmp_path / f"{name}.csv", index=False)
-    assert cli.main(["plot", "bubble", "--input", str(tmp_path / "epochs_10.csv"), "--input",
-                     str(tmp_path / "epochs_40.csv"), "--methods", "scMM",
-                     "--out", str(tmp_path / "x.png")]) == 0
-    names = set(seen["df"]["method"])
-    assert {"scMM (epochs_10)", "scMM (epochs_40)"} <= names and "scMM" not in names
-    assert "# Drawn" not in capsys.readouterr().err
 
 
 # --------------------------------------------------------------- E03
@@ -145,13 +91,6 @@ def test_skip_existing_rescores_from_any_directory(where, tmp_path, monkeypatch)
         assert (s.loc["Matilda", "status"], s.loc["Matilda", "run_sec"]) == ("scored", 17.0)
 
 
-def test_cli_skip_existing_from_the_parent(tmp_path, monkeypatch):
-    _saved_tree(tmp_path)
-    monkeypatch.chdir(tmp_path)
-    assert _quiet(cli.main, ["run-all", "D11", "--category", "vertical", "--methods",
-                             "Matilda", "--out-dir", "runs/D11", "--skip-existing"]) == 0
-
-
 # --------------------------------------------------------------- E01
 def test_rescore_refuses_a_batch_of_the_wrong_length_before_scoring(tmp_path, monkeypatch):
     from multibench import workflow
@@ -172,17 +111,6 @@ def test_rescore_without_outputs_names_the_methods_and_the_fix(tmp_path):
         _quiet(mtb.load_batch(folder).rescore)
     assert str(e.value) == (f"No output of Matilda in {folder}: load the folder that holds "
                             f"its method folder, or run it again.")
-
-
-# --------------------------------------------------------------- E10 / E22
-def test_cli_dry_run_refuses_a_wrong_length_batch_before_printing(tmp_path, capsys):
-    pd.DataFrame({"donor": ["a", "b"] * 250}).to_csv(tmp_path / "b.csv", index=False)
-    rc = cli.main(["run-all", "D11", "--category", "vertical", "--dry-run", "--methods",
-                   "Matilda", "--batch", str(tmp_path / "b.csv")])
-    cap = capsys.readouterr()
-    assert rc != 0 and cap.out == ""
-    assert cap.err.splitlines()[0] == ("error: --batch gave 500 batch ids for the 2,864 cells "
-                                       "of D11: give one batch per cell.")
 
 
 # --------------------------------------------------------------- E02
@@ -303,43 +231,6 @@ def test_c22_one_sentence_for_the_missing_files_of_one_kind(tmp_path):
     assert reason.count("which the folder does not have") <= 1
     assert "StabMap needs peak ATAC (atac_peak1.h5, atac_peak3.h5), which the folder does " \
            "not have." in reason, reason
-
-
-# --------------------------------------------------------------- CLI texts
-def test_c21_an_empty_rna_selector_next_to_atac(tmp_path, capsys):
-    ad = pytest.importorskip("anndata")
-    a = ad.AnnData(np.ones((20, 5)))
-    a.write_h5ad(tmp_path / "own.h5ad")
-    assert cli.main(["export", str(tmp_path / "own.h5ad"), str(tmp_path / "OUT"), "--rna=",
-                     "--atac", "X", "--atac-kind", "peak", "--category", "vertical"]) == 1
-    assert capsys.readouterr().err.splitlines()[-1] == (
-        "error: --rna is empty: --rna none writes no RNA, or pass a selector such as X.")
-
-
-def test_e09_cli_messages_name_flags(tmp_path, capsys):
-    assert cli.main(["run-all", "D11", "--category", "vertical", "--methods", "Matilda",
-                     "--out-dir", str(tmp_path / "o"), "--skip-existing", "--param",
-                     "Matilda:epochs=1"]) == 1
-    err = capsys.readouterr().err
-    assert "--skip-existing with --param" in err and "skip_existing=" not in err
-    assert "leave --skip-existing out" in err
-    ad = pytest.importorskip("anndata")
-    a = ad.AnnData(np.ones((20, 5)), obs=pd.DataFrame({"celltype": ["A", "B"] * 10},
-                                                      index=[f"c{i}-1" for i in range(20)]))
-    a.write_h5ad(tmp_path / "e.h5ad")
-    assert cli.main(["evaluate", str(tmp_path / "e.h5ad"), "--obsm", "X", "--labels",
-                     "cell_type"]) == 1
-    err = capsys.readouterr().err
-    assert err.startswith("error: --labels cell_type is neither an obs column")
-    assert "Did you mean 'celltype'?" in err
-
-
-def test_e19_a_refusal_prints_no_traceback_line(tmp_path, capsys):
-    assert cli.main(["run-all", "D11", "--category", "vertical", "--methods", "Matilda",
-                     "--out-dir", str(tmp_path / "o"), "--skip-existing", "--param",
-                     "Matilda:epochs=1"]) == 1
-    assert "MULTIBENCH_DEBUG" not in capsys.readouterr().err
-    assert not cli._refusal(RuntimeError("x"))
 
 
 # --------------------------------------------------------------- E13 / E14

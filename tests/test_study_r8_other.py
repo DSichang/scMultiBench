@@ -19,7 +19,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, config
+from multibench import config
 from multibench.eval import pipeline as P
 
 matplotlib.use("Agg")
@@ -171,18 +171,6 @@ def test_one_method_warning_joins_several_datasets_with_and(monkeypatch):
     _plain(msg)
 
 
-def test_cli_one_method_bar_line_is_a_sentence(tmp_path, capsys):
-    path = tmp_path / "one.csv"
-    pd.DataFrame({"method": ["M"] * 2, "dataset": ["D1"] * 2, "metric": ["ARI", "NMI"],
-                  "value": [0.3, 0.4]}).to_csv(path, index=False)
-    rc = cli.main(["plot", "bar", "--input", str(path), "--out", str(tmp_path / "b.png")])
-    err = capsys.readouterr().err
-    assert rc == 0, err
-    line = next(l for l in err.splitlines() if "one method" in l)
-    assert line == "warning: The table has one method. Every rank is the same."
-    _plain(line[len("warning: "):])
-
-
 def test_label_order_errors_are_plain_sentences():
     d = {"atac_cty": "a.csv", "rna_cty": "b.csv"}
     with pytest.raises(ValueError) as e:
@@ -243,49 +231,3 @@ def test_scripts_fetch_errors_are_plain_and_fit_the_fail_line(monkeypatch, tmp_p
     capsys.readouterr()
 
 
-# ============================================================ R8-08 help
-def _subparser(name):
-    p = cli.build_parser()
-    sub = next(a for a in p._actions if a.__class__.__name__ == "_SubParsersAction")
-    return sub.choices[name]
-
-
-def _help_texts():
-    # 0.4.0: export replaces convert (a hidden deprecated alias)
-    scan, conv = _subparser("scan"), _subparser("export")
-    texts = {"scan": scan.description, "export": conv.description}
-    for a in conv._actions:
-        if a.dest in ("src", "out"):
-            texts[a.dest] = a.help
-    return texts
-
-
-def _depth(text):
-    depth = deepest = 0
-    for ch in text:
-        depth += (ch == "(") - (ch == ")")
-        deepest = max(deepest, depth)
-    return deepest
-
-
-def test_scan_and_export_help_are_short_sentences():
-    texts = _help_texts()
-    assert set(texts) == {"scan", "export", "src", "out"}
-    for name, text in texts.items():
-        assert ";" not in text, (name, text)
-        assert _depth(text) <= 1, (name, text)
-        # no slash lists such as .csv/.tsv or --rna/--adt
-        assert not re.search(r"[\w.]/[-.\w]", text), (name, text)
-    # the option help printed under the descriptions follows the same rules;
-    # matrix/data is the path inside a .h5 file, not a slash list
-    for name in ("scan", "export"):
-        for a in _subparser(name)._actions:
-            if a.help and a.dest != "help":
-                text = a.help.replace("matrix/data", "")
-                assert ";" not in text and _depth(text) <= 1, (name, a.dest, text)
-                assert not re.search(r"[\w.]/[-.\w]", text), (name, a.dest, text)
-                assert " | " not in text, (name, a.dest, text)
-    assert "preflight" not in texts["scan"]
-    # 0.4.0: scan prints mtb.scan's table, as its help says
-    assert "as mtb.scan returns it" in texts["scan"]
-    assert "Give raw counts" in texts["export"]

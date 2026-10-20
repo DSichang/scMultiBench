@@ -7,7 +7,6 @@ prints.
 Every test needs the docs source (SCMULTIBENCH_DOCS=<docs dir>) and is
 skipped without it.
 """
-from multibench import cli
 from multibench.engine import registry, resolve, schema
 from tests.test_docs_r4 import _flat, needs_docs
 from tests.test_f6_cli import _lung
@@ -51,29 +50,6 @@ def test_changes_page_quotes_the_live_texts():
                                                  unused="Batch 3 is not used"),
             resolve.NOT_COUNTS_CAVEAT.format(method="totalVI", file="rna.h5")):
         assert f"`{shown}`" in text, shown
-
-
-@needs_docs
-def test_changes_page_run_dry_run_lines_follow_the_cli(tmp_path, monkeypatch, capsys):
-    _lung(tmp_path)
-    monkeypatch.chdir(tmp_path)
-    missing = "data/LUNG/atac_gas.h5"
-    assert cli.main(["run", "--method", "SCALEX", "--category", "diagonal",
-                     "--input", "rna=data/LUNG/rna.h5", "--input", f"atac_gas={missing}",
-                     "--out", "runs/SCALEX", "--dry-run"]) == 0
-    err = capsys.readouterr().err.splitlines()
-    # run is deprecated in 0.4.0: one warning line, then the dry-run lines as before
-    assert err[0].startswith("warning: multibench run is deprecated")
-    assert sum("deprecated" in line for line in err) == 1
-    err = err[1:]
-    note = f"SCALEX reads {missing}, which does not exist."
-    assert err[0] == "# Dry run. Nothing was executed."
-    assert any(line.startswith(f"# {note}") for line in err), err
-    assert err[-1] == "# multibench run would execute:"
-    text = _flat("changes.md")
-    assert f"`{note}`" in text
-    assert ("print `# Dry run. Nothing was executed.` first. `run --dry-run` then prints "
-            "its notes, `# multibench run would execute:` and the command.") in text
 
 
 @needs_docs

@@ -22,7 +22,7 @@ Multitask benchmarking of single-cell multimodal omics integration methods.
 
 Each method you run has its own paper; please cite it alongside the
 benchmark. `print(mtb.cite("Matilda", "MOFA2"))` prints the benchmark's
-reference and one line per method (`multibench cite Matilda MOFA2` for BibTeX).
+reference and one line per method (`mtb.cite("Matilda", "MOFA2", format="bibtex")` for BibTeX).
 
 The benchmark and the method scripts live in
 [PYangLab/scMultiBench](https://github.com/PYangLab/scMultiBench).

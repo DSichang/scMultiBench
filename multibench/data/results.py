@@ -734,7 +734,7 @@ def _warn_single_method(out: pd.DataFrame, source: str, category, datasets,
     if datasets:          # no dataset filter: the selection is the category
         where += f"/{_and_list(datasets)}"
     names = {"published": "published", "rerun": "re-run"}
-    fix = config.hint("Leave out source= to read them.", "Leave out --source to read them.")
+    fix = "Leave out source= to read them."
     _compat.warn(
         f"The {names[source]} table for {where} has one method, "
         f"{out['method'].iloc[0]}. Every rank in it is the same. The {names[other]} "
@@ -766,7 +766,7 @@ def _other_source_hint(category, datasets, wanted_methods, base: Path) -> str:
     ds = sorted(cov["dataset"].astype(str).unique())
     return (f". The stored results hold {len(ds)} dataset{'' if len(ds) == 1 else 's'} "
             f"({', '.join(ds)}). "
-            + config.hint("Leave out source= to read them.", "Leave out --source to read them."))
+            + "Leave out source= to read them.")
 
 
 def _list_datasets(category, base: Path, source: str, clustering: str) -> list[str]:

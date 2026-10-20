@@ -17,7 +17,6 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli
 
 
 def _docs_root():
@@ -140,21 +139,6 @@ def test_step1_details_carry_the_donor_counts():
     assert (f"The `cross` category has {n_c} RNA + ADT methods, which integrate the donors "
             "as batches, and stored results on D52.") in details
     assert "These methods read batches 1-3." in details
-
-
-# ---- R4-17: job.sh says what exit 3 means ---------------------------------
-@needs_docs
-def test_job_script_names_exit_code_3_above_run_all(capsys):
-    text = _read("installation.md")
-    job = text.split('```bash title="job.sh (Slurm)"', 1)[1].split("```", 1)[0].splitlines()
-    i = next(k for k, l in enumerate(job) if l.startswith("multibench run-all"))
-    line = "# exits 3 when the method fails, so Slurm marks the job as failed"
-    assert job[i - 1] == line and len(line) <= 80
-    # the package side of the same fact
-    with pytest.raises(SystemExit):
-        cli.main(["run-all", "--help"])
-    assert "3 means the run finished, but a method failed" in " ".join(
-        capsys.readouterr().out.split())
 
 
 # ---- R4-18: the ATAC override; one Multiome folder serves every method ------

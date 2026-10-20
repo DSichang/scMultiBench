@@ -108,24 +108,6 @@ def test_scan_has_no_setup_note_for_the_checked_bridge_requirement(root):
     assert mtb.method_info("Seurat_v5")["setup_hint"]           # still in method_info
 
 
-def test_run_off_linux_names_the_cli_flag_under_the_cli(tmp_path, monkeypatch):
-    """The off-Linux refusal names --dry-run when the command line runs it."""
-    from multibench import config
-    from multibench.engine import envs, runner
-    monkeypatch.setattr(envs, "host_platform_problem",
-                        lambda: "method environments are linux-64 conda envs (packed "
-                                "archives + lockfiles); this host is darwin/arm64")
-    monkeypatch.setattr(runner.envs, "installed_envs", lambda conda=None: [])
-    monkeypatch.setattr(config, "_CLI", True)
-    with pytest.raises(OSError) as e:
-        mtb.run("totalVI", "vertical", inputs=mtb.inputs_for("D11", "vertical", "totalVI"),
-                out_dir=str(tmp_path / "out"))
-    assert ("Run this command on a Linux machine. --dry-run previews the method's "
-            "command here.") in str(e.value)
-    # R3-16: off Linux the refusal is the platform sentence alone
-    assert "env doctor" not in str(e.value) and "env install" not in str(e.value)
-
-
 def test_off_linux_messages_say_to_make_the_commands_on_the_linux_machine(
         tmp_path, monkeypatch, capsys):
     """scan's command column and a dry run hold this computer's absolute

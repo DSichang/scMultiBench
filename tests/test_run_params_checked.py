@@ -10,7 +10,6 @@ from __future__ import annotations
 import pytest
 
 import multibench as mtb
-from multibench import cli
 
 INPUTS = {"rna": "/d/rna.h5", "adt": "/d/adt.h5", "cty": "/d/cty.csv"}
 # r3: device is the package's (X64); the list alone, without the empty-set note (Z16)
@@ -36,14 +35,6 @@ def test_a_known_key_still_reaches_the_command():
     argv = mtb.run("Matilda", "vertical", inputs=INPUTS, out_dir="/o", params={"epochs": 3},
                    dry_run=True)
     assert argv[-2:] == ["--epochs", "3"] or "--epochs" in argv
-
-
-def test_cli_param_refuses_an_unknown_key(capsys):
-    rc = cli.main(["run", "--method", "Matilda", "--category", "vertical", "--out-dir", "/o",
-                   "--input", "rna=/d/rna.h5", "--input", "adt=/d/adt.h5",
-                   "--input", "cty=/d/cty.csv", "--param", "nonsense=1", "--dry-run"])
-    assert rc == 1
-    assert f"error: Matilda does not accept ['nonsense']; {ACCEPTS}" in capsys.readouterr().err
 
 
 def test_run_all_says_the_same():

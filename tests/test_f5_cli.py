@@ -20,7 +20,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, config
+from multibench import config
 from multibench.engine import envs
 from multibench.data import results as R
 from tests.test_f4_cli import _diag_folder
@@ -69,120 +69,6 @@ def test_the_condition_is_read_from_the_shipped_tree(tmp_path, monkeypatch):
         _published("vertical", result_path=tmp_path / "result")
 
 
-def _mosaic_rows(path):
-    pd.DataFrame({"metric": ["ARI", "NMI"], "value": [0.5, 0.6], "method": "Mine",
-                  "dataset": "LAB", "category": "mosaic"}).to_csv(path, index=False)
-    return path
-
-
-def test_plot_overlay_on_mosaic_names_source_rerun_first(tmp_path, capsys):
-    own = _mosaic_rows(tmp_path / "mine.csv")
-    rc = cli.main(["plot", "bar", "--input", str(own), "--category", "mosaic",
-                   "--source", "published", "--out", str(tmp_path / "o.png")])
-    err = capsys.readouterr().err
-    assert rc == 1
-    assert (
-        "\nerror: mosaic has no published tables. Leave out --source to plot your rows "
-        "with the stored results, or drop --category to plot your rows alone.") in err
-    assert "--result-path" not in err and "scib_metric" not in err
-
-
-def test_plot_stored_mosaic_without_input_names_source_rerun(tmp_path, capsys):
-    rc = cli.main(["plot", "bubble", "--category", "mosaic", "--source", "published",
-                   "--out", str(tmp_path / "o.png")])
-    err = capsys.readouterr().err
-    assert rc == 1
-    assert ("\nerror: mosaic has no published tables. Leave out --source to plot the "
-            "stored results.") in err
-
-
-def test_plot_wrong_result_path_keeps_the_flag_advice(tmp_path, capsys):
-    rc = cli.main(["plot", "bar", "--category", "vertical", "--result-path", str(tmp_path),
-                   "--out", str(tmp_path / "o.png")])
-    err = capsys.readouterr().err
-    assert rc == 1
-    assert "--result-path" in err and "mosaic" not in err
-
-
-# ====================================================================== R5-07
-@pytest.fixture
-def diag(tmp_path, monkeypatch):
-    data = tmp_path / "data"
-    d, emb = _diag_folder(data)
-    monkeypatch.setattr(config.DEFAULT, "data_path", data)
-    np.save(tmp_path / "emb.npy", emb)
-    return d, tmp_path / "emb.npy"
-
-
-def _evaluate(emb, *label_files, method="uniPort", name=None, out=None):
-    argv = ["evaluate", "--embedding", str(emb)]
-    for f in label_files:
-        argv += ["--labels", str(f)]
-    argv += ["--method", method, "--dataset", "D28", "--category", "diagonal",
-             "--metrics", "ASW"]
-    if name is not None:
-        argv += ["--name", name]
-    if out is not None:
-        argv += ["--out", str(out)]
-    return cli.main(argv)
-
-
-def test_name_keeps_the_order_check_of_the_package_method(diag, capsys):
-    d, emb = diag
-    rc = _evaluate(emb, d / "rna_cty.csv", d / "atac_cty.csv", name="uniPort_rerun")
-    err = capsys.readouterr().err
-    assert rc == 1
-    assert "error: uniPort puts the cells of atac_cty before rna_cty." in err
-
-
-def test_name_without_labels_reads_the_labels_in_the_method_order(diag, tmp_path, capsys):
-    d, emb = diag
-    out = tmp_path / "mine.csv"
-    assert _evaluate(emb, method="SCALEX", name="SCALEX_rerun", out=out) == 0
-    err = capsys.readouterr().err
-    assert "# labels: rna_cty.csv, atac_cty.csv from D28, in SCALEX's cell order" in err
-    df = pd.read_csv(out)
-    assert set(df["method"]) == {"SCALEX_rerun"}
-
-
-def test_name_needs_a_package_method(diag, capsys):
-    d, emb = diag
-    rc = _evaluate(emb, d / "rna_cty.csv", d / "atac_cty.csv", method="uniPort_rerun",
-                   name="mine")
-    err = capsys.readouterr().err
-    assert rc == 1
-    assert ("error: uniPort_rerun is not a package method. Did you mean uniPort? For "
-            "your own embedding, leave out --method: --name mine --labels ") in err
-
-
-def test_name_without_method_reads_the_dataset_labels(diag, capsys):
-    d, emb = diag
-    rc = cli.main(["evaluate", "--embedding", str(emb), "--name", "x", "--dataset", "D28",
-                   "--category", "diagonal", "--metrics", "ASW"])
-    assert rc == 0 and "from D28, in that order" in capsys.readouterr().err
-
-
-def test_unknown_method_with_labels_is_still_only_a_row_name(diag, tmp_path, capsys):
-    d, emb = diag
-    out = tmp_path / "mine.csv"
-    assert _evaluate(emb, d / "rna_cty.csv", d / "atac_cty.csv", method="SCALEX_rerun",
-                     out=out) == 0
-    capsys.readouterr()
-    assert set(pd.read_csv(out)["method"]) == {"SCALEX_rerun"}
-
-
-def test_evaluate_help_names_both_flags():
-    parser = cli.build_parser()
-    sub = next(a for a in parser._actions if a.__class__.__name__ == "_SubParsersAction")
-    pe = sub.choices["evaluate"]
-    helps = {a.option_strings[0]: a.help for a in pe._actions if a.option_strings}
-    # 0.4.0: --method fills the method column; --name is its hidden deprecated alias
-    import argparse
-    assert helps["--method"].startswith(
-        "fills the method column: a package method id, or your own name.")
-    assert helps["--name"] == argparse.SUPPRESS
-
-
 # ====================================================================== R5-10
 from multibench import workflow as W                                  # noqa: E402
 from multibench.engine import envs, registry, runner                  # noqa: E402
@@ -200,75 +86,6 @@ def _strings(node):
             for part in sub.values:
                 if isinstance(part, ast.Constant) and isinstance(part.value, str):
                     yield part.value
-
-
-def test_no_cli_variant_of_config_hint_has_a_backtick():
-    found = []
-    for path in sorted(_PKG.rglob("*.py")):
-        tree = ast.parse(path.read_text())
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call) or len(node.args) < 2:
-                continue
-            fn = node.func
-            name = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", "")
-            if name == "hint" and any("`" in t for t in _strings(node.args[1])):
-                found.append(f"{path.relative_to(_PKG)}:{node.lineno}")
-    assert found == []
-
-
-def test_no_help_text_of_any_parser_has_a_backtick():
-    """The --help of every command and subcommand, as a shell prints it."""
-    from tests.test_content_scope import _walk_parsers
-    bad = [(name, line.strip()) for name, p in _walk_parsers(cli.build_parser())
-           for line in p.format_help().splitlines() if "`" in line]
-    assert bad == []
-
-
-def test_no_runtime_string_of_cli_py_has_a_backtick():
-    """Docstrings and argparse help texts are reference text; everything else
-    in cli.py is printed at run time."""
-    tree = ast.parse((_PKG / "cli.py").read_text())
-    skip = set()
-    for node in ast.walk(tree):
-        body = getattr(node, "body", None)
-        if isinstance(node, (ast.Module, ast.FunctionDef, ast.ClassDef)) and body \
-                and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant):
-            skip.add(id(body[0].value))
-        if isinstance(node, ast.Call):
-            for kw in node.keywords:
-                if kw.arg in ("help", "description", "epilog"):
-                    skip.update(id(n) for n in ast.walk(kw.value))
-        if isinstance(node, ast.Assign) and any(
-                isinstance(t, ast.Name) and t.id.endswith(("_HELP", "_EPILOG"))
-                for t in node.targets):
-            skip.update(id(n) for n in ast.walk(node.value))
-    bad = [(n.lineno, n.value[:60]) for n in ast.walk(tree)
-           if isinstance(n, ast.Constant) and isinstance(n.value, str) and "`" in n.value
-           and id(n) not in skip]
-    assert bad == []
-
-
-def _plan(*files):
-    return {f"r{i}": {"value": f"/o/{f}", "convert": True, "normpeaks_from": None}
-            for i, f in enumerate(files)}
-
-
-def test_prepared_note_starts_with_the_method(monkeypatch):
-    py = runner._prepared_note(_plan("inputs/atac_peak_normpeaks.h5"), "/o", "GLUE")
-    assert py == ("GLUE reads inputs/atac_peak_normpeaks.h5. mtb.run_all writes that file "
-                  "first, so start GLUE with mtb.run_all. The printed command alone "
-                  "fails in a job script.")
-    monkeypatch.setattr(config, "_CLI", True)
-    cli_note = runner._prepared_note(_plan("inputs/atac_peak_normpeaks.h5"), "/o", "GLUE")
-    assert cli_note == ("GLUE reads inputs/atac_peak_normpeaks.h5. multibench run-all "
-                        "writes that file first, so start GLUE with multibench run-all. "
-                        "The printed command alone fails in a job script.")
-    # the matchers find it at the start of a caveat or after another sentence
-    counts = "GLUE needs raw counts. rna.h5 holds non-integer values."
-    assert runner._prepared_at(cli_note) == 0
-    assert runner._prepared_at(counts + " " + cli_note) == len(counts + " ")
-    assert runner._prepared_at("GLUE reads peak names such as chr1:100-200.") == -1
-    assert W._run_caveat(counts + " " + cli_note) == counts
 
 
 def test_peak_name_note_and_warning_end_with_the_fix(tmp_path, pinned, capsys):
@@ -303,20 +120,6 @@ def test_scan_reason_is_sentences_with_their_own_subjects(tmp_path, monkeypatch)
     assert ";" not in moetm["reason"]
 
 
-def test_scan_env_reason_on_linux_names_the_command_without_backticks(monkeypatch, capsys):
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
-    monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
-    rc = cli.main(["scan", "D11", "--category", "vertical", "--methods", "Matilda",
-                   "--modalities", "rna,adt", "--format", "json"])
-    import json
-    row = json.loads(capsys.readouterr().out)[0]
-    assert rc == 0
-    assert row["reason"] == (
-        "Environment matilda is not installed. Run multibench env install --methods "
-        "Matilda. Use --category vertical to install the environments of "
-        "every vertical method.")
-
-
 def test_count_lines_say_rows_without_plural_brackets(monkeypatch, capsys, tmp_path):
     monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
@@ -337,24 +140,6 @@ def test_count_lines_say_rows_without_plural_brackets(monkeypatch, capsys, tmp_p
         assert "(s)" not in text and "variant" not in text
 
 
-def test_cli_dry_run_headers_are_sentences(monkeypatch, capsys, tmp_path):
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
-    monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
-    rc = cli.main(["run-all", "D11", "--category", "vertical", "--methods", "Matilda",
-                   "--modalities", "rna,adt", "--dry-run"])
-    cap = capsys.readouterr()
-    assert rc == 0
-    # 0.4.0: one sentence, as the Python dry run says it
-    assert cap.err.startswith(
-        "# Dry run: 0 of 1 method can run on D11 (vertical); the reason column says why.\n")
-    # Z18 (r3): a mark is explained only when a row carries it
-    assert ("# Commands of the 1 method whose input files are in place. [env missing] marks "
-            "a method whose environment is not installed.\n") in cap.out
-    assert "[use multibench run" not in cap.out
-    for text in (cap.out, cap.err):
-        assert "`" not in text and "(s)" not in text
-
-
 def test_platform_line_is_two_sentences(monkeypatch, tmp_path):
     monkeypatch.setattr(envs, "host_platform_problem", lambda: DARWIN)
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
@@ -363,19 +148,6 @@ def test_platform_line_is_two_sentences(monkeypatch, tmp_path):
     assert str(e.value).splitlines()[1] == (
         "Methods run only on Linux, and this computer runs macOS. On this computer you "
         "can check files, score embeddings and plot. Run the methods on a Linux machine.")
-
-
-def test_strict_counts_are_labelled(monkeypatch, capsys):
-    monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
-    monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
-    rc = cli.main(["scan", "D45", "--category", "mosaic", "--methods", "SMILE,Cobolt",
-                   "--strict"])
-    warn, first = capsys.readouterr().err.splitlines()[:2]
-    assert rc == 1
-    assert warn.startswith("warning: scan --strict is deprecated")      # 0.4.0
-    assert first.startswith("error: --strict: 0 of 2 rows are runnable. Rows whose "
-                            "environment is not ready: 2. Rows that need a GPU this host "
-                            "lacks: 1.")
 
 
 def test_env_plan_size_lines_name_the_envs():

@@ -24,7 +24,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, config
+from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, ingest, registry
 
@@ -135,17 +135,6 @@ def test_the_warning_for_a_table_has_no_layer_to_name(tmp_path):
     assert msgs == [LOOKS.format(what="adt") + "Pass the raw counts as adt=."]
 
 
-def test_the_command_line_keeps_its_selector_for_the_atac_file(tmp_path, monkeypatch):
-    """``--atac-from`` hands the ATAC over as an object, and ``--atac`` is
-    the selector for that file: ``--atac layer:counts`` reads its layer."""
-    monkeypatch.setattr(config, "_CLI", True)
-    other = _atac(cells=[f"o{i}" for i in range(N)])
-    msgs = _warned(ingest.export_dataset, _rna(log=False), tmp_path / "A", rna="X",
-                   atac=other, atac_kind="peak", category="diagonal")
-    assert msgs == [NOT_COUNTS.format(what="atac") + "Export raw counts, for example with "
-                                                     "--atac layer:counts."]
-
-
 def test_following_the_advice_writes_the_counts_of_that_object(tmp_path):
     rna, adt, atac = _rna(), _adt(), _atac()
     adt.X = adt.layers["counts"]
@@ -194,38 +183,6 @@ def test_two_modalities_from_one_matrix_are_refused(tmp_path):
     assert _refused(tmp_path, None, rna=rna, adt=rna) == (
         "rna= and adt= name the same matrix. Pass the ADT as its own object, as "
         "adt=<AnnData>.")
-
-
-def test_the_refusal_on_the_command_line(tmp_path, monkeypatch):
-    monkeypatch.setattr(config, "_CLI", True)
-    assert _refused(tmp_path, _rna(), rna="X", adt="X") == (
-        "--rna X and --adt X name the same matrix. Name where the ADT is, as "
-        "--adt obsm:<key>.")
-    assert _refused(tmp_path, _rna(), rna="layer:counts", atac="layer:counts",
-                    atac_kind="peak") == (
-        "--rna layer:counts and --atac layer:counts name the same matrix. Name where the "
-        "ATAC is in SRC, with --atac.")
-    # the filter is shown for a file whose features have that type
-    arc = _rna()
-    arc.var["feature_types"] = ["Gene Expression"] * 30 + ["Peaks"] * 10
-    assert _refused(tmp_path, arc, rna="layer:counts", atac="layer:counts",
-                    atac_kind="peak") == (
-        "--rna layer:counts and --atac layer:counts name the same matrix. Name where the "
-        "ATAC is, as --atac \"X[feature_types=Peaks]\".")
-    arc.var["feature_types"] = ["Gene Expression"] * 30 + ["Antibody Capture"] * 10
-    assert _refused(tmp_path, arc, rna="layer:counts", atac="layer:counts",
-                    atac_kind="peak").endswith("Name where the ATAC is in SRC, with --atac.")
-
-
-def test_export_refuses_one_matrix_twice_and_writes_nothing(tmp_path, capsys):
-    src = tmp_path / "rna.h5ad"
-    _rna(log=False).write_h5ad(src)
-    out = tmp_path / "OUT"
-    assert cli.main(["export", str(src), str(out), "--rna", "X", "--adt", "X"]) == 1
-    assert capsys.readouterr().err == (
-        "error: --rna X and --adt X name the same matrix. Name where the ADT is, as "
-        "--adt obsm:<key>.\n" + DEBUG)
-    assert not out.exists()
 
 
 def test_a_refused_call_leaves_the_folder_as_it_was(tmp_path):
@@ -464,58 +421,6 @@ def test_a_side_without_any_column_keeps_the_one_sentence(tmp_path):
     assert e.value.args[0] == (
         "labels='obs:cell_type': column 'cell_type' not in obs of the ATAC object (atac); "
         "available: []. Without cell types for the ATAC cells, leave labels= out.")
-
-
-def test_the_command_line_converts_each_side_with_its_own_labels(tmp_path, capsys):
-    """The message of ``multibench export`` says to convert each side with
-    its own command and its own ``--labels``. It does not print the two
-    commands; the two below follow it, and they write the folder with the
-    labels of each side on its own cells."""
-    rna, atac = _two_cohorts()
-    rna.write_h5ad(tmp_path / "rna.h5ad")
-    atac.write_h5ad(tmp_path / "atac.h5ad")
-    out = tmp_path / "DIAG"
-    assert cli.main(["export", str(tmp_path / "rna.h5ad"), str(out), "--rna", "X",
-                     "--atac-from", str(tmp_path / "atac.h5ad"), "--atac-kind",
-                     "gene_activity", "--labels", "obs:cell_type", "--category",
-                     "diagonal"]) == 1
-    first = ("multibench export RNA_FILE OUT --rna X --labels obs:cell_type --category "
-             "diagonal")
-    second = ("multibench export ATAC_FILE OUT --atac X --atac-kind gene_activity --labels "
-              "obs:<its column> --category diagonal --overwrite")
-    assert capsys.readouterr().err == (
-        "error: --labels obs:cell_type: column 'cell_type' not in obs of the ATAC object "
-        "(atac); available: ['predicted.id', 'prediction.score']. Convert each side with "
-        "its own command and its own --labels.\n" + DEBUG)
-    assert not out.exists()
-    for command, src, col in ((first, "rna.h5ad", None), (second, "atac.h5ad", "predicted.id")):
-        argv = command.replace("<its column>", col or "").split()[1:]
-        argv[1:3] = [str(tmp_path / src), str(out)]
-        assert cli.main(argv) == 0
-    capsys.readouterr()
-    assert sorted(p.name for p in out.iterdir()) == ["atac_cty.csv", "atac_gas.h5", "rna.h5",
-                                                     "rna_cty.csv"]
-    assert pd.read_csv(out / "rna_cty.csv")["x"].tolist() == rna.obs["cell_type"].tolist()
-    assert pd.read_csv(out / "atac_cty.csv")["x"].tolist() == atac.obs["predicted.id"].tolist()
-    assert list(ingest.read_canonical(out / "rna.h5").obs_names) == list(rna.obs_names)
-    assert list(ingest.read_canonical(out / "atac_gas.h5").obs_names) == list(atac.obs_names)
-    assert np.array_equal(_dense(out / "atac_gas.h5"), atac.X)
-
-
-def test_the_command_line_names_the_kind_and_the_side(tmp_path, monkeypatch):
-    """Peaks, and the RNA file is the one without the column: the message
-    names the RNA object, and the same advice. It prints no command."""
-    monkeypatch.setattr(config, "_CLI", True)
-    rna, atac = _two_cohorts()
-    atac.var_names = PEAKS + [f"chr2:{j}-{j + 9}" for j in range(10)]
-    with pytest.raises(KeyError) as e:
-        ingest.export_dataset(rna, tmp_path / "DIAG", rna="X", atac=atac, atac_kind="peak",
-                              labels="obs:predicted.id", category="diagonal")
-    assert e.value.args[0] == (
-        "--labels obs:predicted.id: column 'predicted.id' not in obs of the RNA object "
-        "(data); available: ['cell_type']. Convert each side with its own command and its "
-        "own --labels.")
-    assert "multibench convert" not in e.value.args[0]
 
 
 # ------------------------------------------------------- 6(a): the order line

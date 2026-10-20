@@ -17,7 +17,6 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli
 from multibench.eval import io, pipeline
 from multibench.eval import scib as escib
 
@@ -184,19 +183,6 @@ def test_several_label_files_are_matched_by_their_barcodes(tmp_path, capsys, see
     assert capsys.readouterr().err == (
         "evaluate: matched cty1.csv and 1 more to the rows of emb.csv by barcode.\n")
     assert seen["labels"] == list(TYPES)
-
-
-def test_the_command_line_matches_by_barcode(tmp_path, capsys):
-    emb = _emb(tmp_path)
-    out = tmp_path / "scores.csv"
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        rc = cli.main(["evaluate", "--embedding", emb, "--labels",
-                       _labels(tmp_path, "shuffled.csv", PERM), "--metrics", "ARI,NMI",
-                       "--out", str(out)])
-    assert rc == 0
-    assert capsys.readouterr().err == MOVED.format("shuffled.csv")
-    assert pd.read_csv(out)["value"].tolist() == [1.0, 1.0]
 
 
 # ------------------------------------------------------------- other cells

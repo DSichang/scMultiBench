@@ -153,16 +153,6 @@ def test_doctor_names_the_users_env(fake_root):
     assert rows["env_sciPENN"]["exists"] is True and rows["env_sciPENN"]["other_env"] is None
 
 
-def test_cli_doctor_prints_the_users_env(fake_root, capsys):
-    from multibench import cli
-    cli.main(["env", "doctor", "--methods", "Matilda"])
-    out = capsys.readouterr().out
-    assert out.splitlines()[0].startswith("[L] matilda")
-    assert (f"#   Environment matilda was not installed by this version of multibench, so "
-            f"it is not used. Rename or remove {fake_root / 'envs' / 'matilda'}, then "
-            f"install.") in out
-
-
 def test_install_does_not_take_the_users_env_as_installed(fake_root, monkeypatch):
     row = mtb.env.install(["Matilda"], dry_run=True).to_dict("records")[0]
     assert row["state"] == "name taken" and row["exists"] is False
@@ -190,37 +180,6 @@ def test_run_refuses_the_users_env_on_linux(fake_root, tmp_path):
         f"not used. Rename or remove {fake_root / 'envs' / 'matilda'}, then call "
         f"mtb.env.install(['Matilda']).")
     assert not (tmp_path / "out").exists()
-
-
-# --- the same user env, seen from run_all and the command line (no pin) -----
-def test_run_all_and_the_cli_refuse_the_users_env(fake_root, tmp_path, capsys):
-    from multibench import cli
-    with pytest.raises(ValueError) as e:
-        mtb.run_all("D11", "vertical", methods=["Matilda"], modalities=["rna", "adt"],
-                    out_dir=tmp_path / "ra", verbose=False)
-    assert "was not installed by this version of multibench" in str(e.value)
-    assert cli.main(["scan", "D11", "--category", "vertical", "--methods", "Matilda"]) == 0
-    assert "Environment matilda was not installed by this version of multibench" in \
-        capsys.readouterr().out
-    inputs = mtb.inputs_for("D11", "vertical", "Matilda", modalities=["rna", "adt"])
-    argv = ["run", "--method", "Matilda", "--category", "vertical",
-            "--out-dir", str(tmp_path / "cli")]
-    for role, path in inputs.items():
-        argv += ["--input", f"{role}={path}"]
-    assert cli.main(argv) == 1
-    err = capsys.readouterr().err
-    assert (f"so it is not used. Rename or remove {fake_root / 'envs' / 'matilda'}, then "
-            f"run multibench env install --methods Matilda.") in err
-    assert not (tmp_path / "cli").exists()
-
-
-def test_cli_install_dry_run_leaves_a_name_taken_env_out(fake_root, capsys):
-    from multibench import cli
-    assert cli.main(["env", "install", "--methods", "Matilda", "--packed", "--dry-run"]) == 0
-    out, err = capsys.readouterr()
-    assert "[name taken" in out
-    assert "# name taken: matilda - rename or remove that env first" in err
-    assert "add --run" not in err and "to download" not in err
 
 
 def test_run_refuses_off_linux_also_when_the_env_is_installed(fake_root, tmp_path,

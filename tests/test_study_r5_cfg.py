@@ -22,7 +22,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, config
+from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, ingest, registry
 
@@ -32,83 +32,6 @@ MATILDA = ["scan", "D11", "--category", "vertical", "--methods", "Matilda",
            "--modalities", "rna,adt", "--format", "csv"]
 # a sentence with its own subject, as every other reason of the column (R5-10)
 REASON = "The method scripts are not fetched. Run multibench fetch --scripts."
-
-
-# ================================================= R5-04: scan --strict table
-@pytest.fixture
-def no_scripts(tmp_path, monkeypatch):
-    """Every env installed, a GPU, and an empty ``repo_path``."""
-    monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
-    monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
-    monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
-    monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
-    repo = tmp_path / "emptyrepo"
-    repo.mkdir()
-    monkeypatch.setattr(config.DEFAULT, "repo_path", repo)
-    return repo
-
-
-def _table(out: str) -> pd.DataFrame:
-    return pd.read_csv(io.StringIO(out), keep_default_na=False)
-
-
-def test_strict_table_agrees_with_its_error(no_scripts, capsys):
-    assert cli.main(MATILDA + ["--strict"]) == 1
-    cap = capsys.readouterr()
-    assert "Rows whose method scripts are not fetched: 1." in cap.err
-    df = _table(cap.out)
-    assert list(df["runnable"]) == [False]
-    assert list(df["reason"]) == [REASON]
-    # the caveat is unchanged
-    assert "The method scripts are not in" in df["caveat"].iloc[0]
-
-
-def test_strict_table_every_row_without_methods(no_scripts, capsys):
-    argv = ["scan", "D11", "--category", "vertical", "--modalities", "rna,adt",
-            "--format", "csv"]
-    assert cli.main(argv) == 0
-    plain = _table(capsys.readouterr().out)
-    assert plain["runnable"].any()
-    assert cli.main(argv + ["--strict"]) == 1
-    strict = _table(capsys.readouterr().out)
-    assert list(strict["method"]) == list(plain["method"])
-    assert not strict["runnable"].any()
-    was = plain["runnable"].astype(bool)
-    assert (strict.loc[was, "reason"] == REASON).all()
-    # a row blocked by something else keeps its own reason
-    assert list(strict.loc[~was, "reason"]) == list(plain.loc[~was, "reason"])
-
-
-def test_strict_table_text_format(no_scripts, capsys):
-    assert cli.main(MATILDA[:-2] + ["--strict"]) == 1
-    lines = capsys.readouterr().out.splitlines()
-    head = lines[0].split()
-    row = next(line for line in lines if line.lstrip().startswith("Matilda"))
-    assert row.split()[head.index("runnable")] == "False"
-    assert "method scripts are not fetched" in row
-
-
-def test_without_strict_the_table_and_python_scan_keep_the_row_runnable(no_scripts,
-                                                                        capsys):
-    assert cli.main(MATILDA) == 0
-    df = _table(capsys.readouterr().out)
-    assert list(df["runnable"]) == [True] and list(df["reason"]) == [""]
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        row = mtb.scan("D11", "vertical", methods=["Matilda"], modalities=["rna", "adt"],
-                       verbose=False).iloc[0]
-    # 0.4: the one-row-per-method table has no caveat column: its reason says it
-    assert row["runnable"] and row["reason"].startswith("The method scripts are not in ")
-    assert row["reason"].endswith("run multibench fetch --scripts first.")
-
-
-def test_strict_table_unchanged_once_the_scripts_are_present(no_scripts, monkeypatch,
-                                                             capsys):
-    monkeypatch.setattr(config, "scripts_present", lambda *a, **k: True)
-    assert cli.main(MATILDA) == 0
-    plain = capsys.readouterr().out
-    assert cli.main(MATILDA + ["--strict"]) == 0
-    assert capsys.readouterr().out == plain
 
 
 # ================================================= R5-05: download errors
@@ -165,17 +88,6 @@ def test_fetch_outputs_names_the_url(tmp_path, monkeypatch, dead, why):
     assert msg.endswith(f"unpack it into {dest}, so that {dest / 'batch_result.json'} "
                         f"exists.")
     assert not root.exists()
-
-
-def test_cli_fetch_prints_the_sentence(tmp_path, monkeypatch, capsys):
-    monkeypatch.setattr(F, "_download", _http_404)
-    monkeypatch.setattr(config.DEFAULT, "data_path", tmp_path / "data")
-    assert cli.main(["fetch", "D46"]) == 1
-    err = capsys.readouterr().err
-    url = f"{F.RELEASE_URL}/D46.tar.gz"
-    assert f"downloading D46 (97 MB) from {url} ...\n" in err
-    assert f"error: Could not download D46 from {url} (HTTP 404). " in err
-    assert "HTTP Error 404: Not Found" not in err
 
 
 def test_raises_tables_list_the_download_error():
@@ -271,21 +183,3 @@ def test_gene_activity_with_peak_names_is_plain(tmp_path):
         assert "did you mean" not in m and " but " not in m
 
 
-def test_cli_convert_spells_the_flags(tmp_path, capsys):
-    src = tmp_path / "multi.h5ad"
-    a = _adata(GENES)
-    a.obsm["atac"] = np.ones((4, 4))
-    a.uns["atac_names"] = PEAK_IDS
-    a.write_h5ad(src)
-    p = tmp_path / "atac.h5ad"
-    _adata(PEAK_IDS).write_h5ad(p)
-    assert cli.main(["convert", str(p), str(tmp_path / "o.h5"),
-                     "--modality", "atac_peak"]) == 0
-    err = capsys.readouterr().err
-    assert re.search(r"warning: Only 0% of the ATAC feature names .* multibench scan "
-                     r"names these methods\. If the matrix holds gene activity, pass "
-                     r"--modality atac_gas\.", err), err
-    assert cli.main(["convert", str(src), str(tmp_path / "D"), "--rna", "X",
-                     "--atac", "obsm:atac", "--atac-kind", "peak"]) == 0
-    err = capsys.readouterr().err
-    assert "rename them to chr:start-end" in err and "--atac-kind" not in err

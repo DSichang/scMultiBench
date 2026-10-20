@@ -78,16 +78,6 @@ def test_evaluate_raises_on_a_missing_batch_whole_message():
     assert str(e.value) == _bv1()
 
 
-def test_the_command_line_names_its_flag(tmp_path, monkeypatch):
-    emb, lab = _cells()
-    path = tmp_path / "donors.csv"
-    pd.DataFrame({"x": _gaps(_donors(), "")}).to_csv(path, index=False)
-    monkeypatch.setattr(config, "_CLI", True)
-    with pytest.raises(ValueError) as e:
-        mtb.evaluate(emb, labels=lab, batch=str(path), metrics=["ASW_batch"])
-    assert str(e.value) == "--" + _bv1(" (donors.csv)")
-
-
 def test_a_batch_file_names_the_word_it_holds(tmp_path):
     """Donors written NA or None in a file: the reader reads NaN, and the
     message names the word, whichever way the file is matched to the cells."""
@@ -112,28 +102,6 @@ def test_a_batch_file_names_the_word_it_holds(tmp_path):
     assert str(e.value) == (
         "batch (b1.csv): 15 of the 150 cells have no batch, for example 'NA'. Give "
         "every cell a batch.")
-
-
-def test_the_copy_of_a_batch_column_keeps_the_words_of_the_sheet(tmp_path, monkeypatch):
-    """``--batch-column`` hands evaluate a copy of the sheet with one column.
-    The copy reads as the column does, and the message names the sheet's word."""
-    import contextlib
-    emb, lab = _cells()
-    donors = _gaps(_donors(), "None")
-    sheet = tmp_path / "sheet.csv"
-    pd.DataFrame({"barcode": [f"cell{i}" for i in range(N)], "run": np.arange(N) % 7,
-                  "sample": donors}).to_csv(sheet, index=False)
-    monkeypatch.setattr(config, "_CLI", True)
-    with contextlib.ExitStack() as stack:
-        copy = pipeline._one_column_file(sheet, "sample", stack)
-        assert pd.read_csv(copy, keep_default_na=False)["x"].tolist() == donors.tolist()
-        want, _ = eio.read_labels_ids(sheet, "sample")
-        got, first = eio.read_labels_ids(copy)
-        assert pd.Series(got).equals(pd.Series(want)) and pd.isna(got).sum() == 30
-        assert first.tolist() == [f"cell{i}" for i in range(N)]
-        with pytest.raises(ValueError) as e:
-            mtb.evaluate(_adata(emb), labels=lab, batch=copy, metrics=["ASW_batch"])
-    assert str(e.value) == "--" + _bv1(" (sheet.csv)", ", for example 'None'")
 
 
 def test_a_complete_batch_changes_nothing(tmp_path):

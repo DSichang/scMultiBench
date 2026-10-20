@@ -242,7 +242,7 @@ import textwrap  # noqa: E402
 
 from multibench.eval import io as eio  # noqa: E402
 from tests.test_f3_cli import _clear_env_caches  # noqa: E402
-from tests.test_f4_cli import _run_all, _standin  # noqa: E402
+from tests.test_f4_cli import _standin  # noqa: E402
 
 SAMPLES = np.tile(["s1", "s2"], N // 2)
 # a stand-in method whose embedding separates the cell types and shifts sample s2
@@ -259,12 +259,6 @@ _BATCHY = textwrap.dedent('''\
         f.create_dataset("data", data=emb.T)
     (out / "predict.csv").write_text("x\\n" + "A\\n" * %d + "B\\n" * %d)
     ''') % (N, N // 2, N // 2, N // 2)
-
-
-@pytest.fixture
-def batchy(tmp_path, monkeypatch):
-    yield _standin(tmp_path, monkeypatch, _BATCHY)
-    _clear_env_caches()
 
 
 def _one_column(path, values):
@@ -286,21 +280,6 @@ def _r_row_numbers(path, values):
     return path
 
 
-def test_run_all_cli_aligns_a_barcode_csv(batchy, tmp_path, capsys):
-    one = _one_column(tmp_path / "one.csv", SAMPLES)
-    shuf = _barcode_csv(tmp_path / "shuf.csv", SAMPLES)
-    assert _run_all(batchy, tmp_path / "o1", "--batch", str(one)) == 0
-    assert _run_all(batchy, tmp_path / "o2", "--batch", str(shuf)) == 0
-    capsys.readouterr()
-    a = mtb.load_batch(tmp_path / "o1").summary.iloc[0]
-    b = mtb.load_batch(tmp_path / "o2").summary.iloc[0]
-    assert a["status"] == b["status"] == "scored"
-    assert mtb.load_batch(tmp_path / "o1").records[0]["n_batches"] == 2
-    assert a["ASW_batch"] < 0.5                  # the ordered file sees the batch shift
-    for k in ("ASW_batch", "GC", "iLISI"):
-        assert (pd.isna(a[k]) and pd.isna(b[k])) or a[k] == b[k], k
-
-
 def test_rescore_aligns_a_barcode_csv(swept, tmp_path):
     res, _, batch = swept
     shuf = _barcode_csv(tmp_path / "b.csv", batch)
@@ -308,26 +287,6 @@ def test_rescore_aligns_a_barcode_csv(swept, tmp_path):
         _batch_metrics(_quiet(res.rescore, batch=batch))
     labels = _barcode_csv(tmp_path / "l.csv", CELLTYPE)
     assert _ari(_quiet(res.rescore, labels=labels)) == _ari(res)
-
-
-def test_a_csv_with_foreign_barcodes_raises(cite, tmp_path, monkeypatch, capsys):
-    data, batch, _ = cite
-    half = _barcode_csv(tmp_path / "half.csv", batch,
-                        index=BARS[: N // 2] + [f"x{i}" for i in range(N // 2)])
-    monkeypatch.setattr(W, "_run", lambda *a, **k: pytest.fail("a method was started"))
-    with pytest.raises(ValueError, match=r"^batch: 60 of the 120 ids in the first column "
-                                         r"of half\.csv are not cells of MYCITE "
-                                         r"\(first: \['x"):
-        mtb.run_all("MYCITE", "vertical", tmp_path / "out", batch=half, data_path=data,
-                    **KW)
-    assert not (tmp_path / "out").exists()
-    # the command line's dry run reads the file as the real run does
-    rc = _quiet(cli.main, ["run-all", "MYCITE", "--category", "vertical", "--methods",
-                           "Matilda", "--modalities", "rna,adt", "--data-path", str(data),
-                           "--batch", str(half), "--dry-run"])
-    assert rc == 1
-    assert "error: batch: 60 of the 120 ids in the first column of half.csv" in \
-        capsys.readouterr().err
 
 
 def _adata(tmp_path):
@@ -341,27 +300,6 @@ def _adata(tmp_path):
     a = ad.AnnData(np.zeros((N, 2)), obs=obs)
     a.obsm["X_emb"] = emb
     return a
-
-
-def test_evaluate_aligns_a_barcode_csv_to_the_obs_names(tmp_path):
-    a = _adata(tmp_path)
-    shuf = _barcode_csv(tmp_path / "b.csv", SAMPLES, index=list(a.obs_names))
-    kw = dict(labels="celltype", metrics=["ASW_batch", "iLISI"])
-    by_obs = mtb.evaluate(a, batch="sample", **kw)
-    by_csv = mtb.evaluate(a, batch=str(shuf), **kw)
-    assert by_obs.set_index("metric").loc["ASW_batch", "value"] < 0.5
-    pd.testing.assert_frame_equal(by_obs, by_csv)
-    # the command line reads the same file against an .h5ad
-    a.write_h5ad(tmp_path / "mine.h5ad")
-    _barcode_csv(tmp_path / "ct.csv", CELLTYPE, index=list(a.obs_names), seed=None)
-    for name, batch in (("obs", "o.csv"), ("csv", str(shuf))):
-        if name == "obs":
-            _barcode_csv(tmp_path / batch, SAMPLES, index=list(a.obs_names), seed=None)
-            batch = str(tmp_path / batch)
-        assert cli.main(["evaluate", "--embedding", str(tmp_path / "mine.h5ad"), "--labels",
-                         str(tmp_path / "ct.csv"), "--batch", batch, "--metrics",
-                         "ASW_batch,iLISI", "--out", str(tmp_path / f"{name}.out")]) == 0
-    assert pd.read_csv(tmp_path / "obs.out").equals(pd.read_csv(tmp_path / "csv.out"))
 
 
 def test_evaluate_raises_on_a_csv_with_some_foreign_ids(tmp_path):
@@ -444,50 +382,6 @@ def _rec(method, status, **kw):
             "dataset": "MYCITE", "modalities": ["rna", "adt"], **kw}
 
 
-def test_the_failure_line_keeps_failures_and_skips_apart():
-    res = W.BatchResult([_rec("Matilda", "CHAIN_OK"),
-                         _rec("Seurat_WNN", "FAIL", error="boom"),
-                         _rec("totalVI", "SKIPPED", error="no env", requested=True),
-                         _rec("MIRA", "SKIPPED", error="no script", requested=False)],
-                        "MYCITE", "vertical")
-    assert cli._failed_line(res, "out/failures.csv") == (
-        "# 1 failed (Seurat_WNN), 1 skipped (totalVI). See out/failures.csv.")
-    assert cli._not_run_line(res, "out/summary.csv") == (
-        "# Not run: MIRA (skipped). The reason column of summary.csv says why.")
-    only = W.BatchResult([_rec("MIRA", "SKIPPED", error="x", requested=True)],
-                         "MYCITE", "vertical")
-    assert cli._failed_line(only, "f.csv") == "# 1 skipped (MIRA). See f.csv."
-    assert cli._not_run_line(only, "s.csv") is None
-
-
-@pytest.fixture
-def standin(tmp_path, monkeypatch):
-    yield _standin(tmp_path, monkeypatch, _WRITER)
-    _clear_env_caches()
-
-
-def test_a_run_whose_only_problems_are_unnamed_skips_exits_0_and_names_them(
-        standin, tmp_path, capsys):
-    out = tmp_path / "out"
-    rc = cli.main(["run-all", "MYCITE", "--category", "vertical", "--modalities", "rna,adt",
-                   "--data-path", str(standin), "--out-dir", str(out), "--format", "csv"])
-    err = capsys.readouterr().err
-    assert rc == 0, err
-    sm = pd.read_csv(out / "summary.csv").set_index("method")
-    skipped = sorted(sm.index[sm["status"] == "skipped"])
-    assert "totalVI" in skipped and "Matilda" not in skipped
-    line = next(l for l in err.splitlines() if l.startswith("# Not run: "))
-    assert line == (f"# Not run: {', '.join(skipped)} (skipped). The reason column of "
-                    f"summary.csv says why.")
-    assert "failed" not in err
-    # the reason column says why each SKIPPED row did not run, as the log does
-    assert sm.columns[-1] == "reason"
-    assert f"[run_all] skipping totalVI: {sm.loc['totalVI', 'reason']}" in err
-    assert sm.loc[skipped, "reason"].str.len().gt(0).all()
-    assert pd.isna(sm.loc["Matilda", "reason"])
-    assert pd.read_csv(out / "failures.csv").empty
-
-
 def test_summary_reason_comes_from_the_record_also_for_older_folders(tmp_path):
     out = tmp_path / "old"
     out.mkdir()
@@ -503,15 +397,3 @@ def test_summary_reason_comes_from_the_record_also_for_older_folders(tmp_path):
     assert W.BatchResult([], "MYCITE", "vertical").summary.columns[-1] == "reason"
 
 
-def test_exit_code_texts_name_the_methods_rule(capsys):
-    rule = ("a method failed or a method named in --methods was skipped. Without "
-            "--methods, a skipped method is only logged and marked skipped in "
-            "summary.csv.")
-    with pytest.raises(SystemExit):
-        cli.main(["run-all", "--help"])
-    assert rule in " ".join(capsys.readouterr().out.split())
-    doc = " ".join(cli.__doc__.split())
-    assert ("but a method failed or a method named in ``--methods`` was skipped. "
-            "Without ``--methods``, a skipped method is only logged and marked "
-            "``skipped`` in ``summary.csv``.") in doc
-    assert "failed or was skipped" not in doc

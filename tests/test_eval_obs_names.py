@@ -172,17 +172,6 @@ def test_array_output_with_a_column_name(tmp_path, monkeypatch):
           mtb.evaluate(emb, labels=lab, metrics=["ASW"]))
 
 
-def test_the_command_line_keeps_the_missing_file_text(tmp_path, monkeypatch):
-    emb, lab = _cells()
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(config, "_CLI", True)
-    with pytest.raises(FileNotFoundError) as e:
-        mtb.evaluate(emb, labels="celltype", metrics=["ASW"])
-    assert str(e.value) == (
-        f"The --labels file celltype does not exist. From the working directory "
-        f"{Path.cwd()}, the path resolves to {Path('celltype').resolve()}.")
-
-
 def test_names_no_file(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     for name in ("donor", "obs:donor", "cell type", "leiden_r0.5", "rna:celltype"):

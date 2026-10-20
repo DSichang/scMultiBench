@@ -83,13 +83,6 @@ def test_dataset_mode_rerun_pair_suggests_plot_bar():
         "to one dataset."]
 
 
-def test_dataset_mode_advice_uses_the_cli_spelling(monkeypatch):
-    monkeypatch.setattr(config, "_CLI", True)
-    _, msgs = _messages(_build_table, _pair())
-    assert msgs[0].startswith("This figure averages each method over 2 datasets")
-    assert "multibench plot bar ranks" in msgs[0] and "mtb.plot.bar" not in msgs[0]
-
-
 def test_no_plot_warning_says_by_construction():
     lone = pd.concat([_stored("D11").assign(source="user"),
                       _mine(scored_with="leidenalg/search/0.4.0")], ignore_index=True)
@@ -209,11 +202,3 @@ def test_backend_warning_needs_a_sweep_metric_on_show():
     assert not any("igraph Leiden backend" in m for m in msgs), msgs
 
 
-def test_backend_warning_cli_spelling(monkeypatch):
-    monkeypatch.setattr(config, "_CLI", True)
-    df = pd.concat([_stored("D11"), _mine(method="MyMethod", dataset="D11")],
-                   ignore_index=True)
-    _, msgs = _messages(_build_table, df)
-    hit = [m for m in msgs if "igraph Leiden backend" in m]
-    assert hit and hit[0].endswith("Score them with multibench evaluate "
-                                   "--leiden-flavor leidenalg to compare them.")

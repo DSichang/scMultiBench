@@ -15,7 +15,6 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli
 from multibench import workflow as W
 from multibench.data import catalog
 B = importlib.import_module("multibench.plot.bubble")   # the module
@@ -358,16 +357,6 @@ def test_bar_scores_the_family_in_pink():
         "mtb.evaluate computes them on multi-batch data.")
 
 
-def test_cli_bar_names_the_command(tmp_path, capsys):
-    long = tmp_path / "long.csv"
-    _long(SCIB).assign(category="cross").to_csv(long, index=False)
-    code = cli.main(["plot", "bar", "--input", str(long), "--group", "classification",
-                     "--out", str(tmp_path / "x.png")])
-    err = capsys.readouterr().err
-    assert code == 1 and "multibench evaluate computes them" in err
-    assert "mtb." not in err
-
-
 def test_bubble_grey_columns_with_a_method_without_values():
     lg = pd.concat([_long(SCIB + CODES, methods=("M1",)), _long(SCIB, methods=("M2",))])
     lg.loc[lg.method == "M2", "value"] += 0.01
@@ -397,30 +386,3 @@ def test_stored_tables_have_no_classification():
         "iASW, iF1)."]
 
 
-# ---------------------------------------------------------------- command line
-def test_cli_evaluate_metrics_classification(three, tmp_path, capsys):
-    emb, paths = three
-    h5 = tmp_path / "embedding.h5"
-    with h5py.File(h5, "w") as f:
-        f.create_dataset("data", data=emb.T)
-    args = ["evaluate", "--embedding", str(h5)]
-    for p in paths:
-        args += ["--labels", str(p)]
-    assert cli.main(args + ["--metrics", "classification"]) == 0
-    printed = capsys.readouterr().out.split()
-    assert [w for w in printed if w in CODES] == CODES
-    code = cli.main(["evaluate", "--embedding", str(h5), "--labels",
-                     str(paths[0]), "--metrics", "classification"])
-    err = capsys.readouterr().err
-    assert code == 1
-    assert ("error: --metrics classification needs two or more batches. Pass --batch "
-            "CSV, or two or more --labels files.") in err
-
-
-def test_cli_help_names_the_family(capsys):
-    with pytest.raises(SystemExit):
-        cli.main(["evaluate", "--help"])
-    assert "classification" in capsys.readouterr().out
-    ns = cli.build_parser().parse_args(["plot", "bar", "--input", "x.csv", "--group",
-                                        "classification", "--out", "x.png"])
-    assert ns.metrics == "classification"          # --group is a deprecated --metrics

@@ -7,7 +7,6 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli
 from multibench.engine import envs
 
 from test_fetch_outputs import F, served  # noqa: F401 - the local outputs archive
@@ -20,36 +19,6 @@ def test_fetch_outputs_takes_method_names_in_any_case(served):  # noqa: F811
     assert (out / "batch_result.json").is_file()
     with pytest.raises(KeyError, match="no shipped output for"):
         F.fetch_outputs("D11", methods=["totalVI"], data_path=data, quiet=True)
-
-
-def test_cli_dry_run_refuses_a_bad_param_before_its_header(tmp_path, capsys):
-    (tmp_path / "DS").mkdir()
-    rc = cli.main(["run-all", str(tmp_path / "DS"), "--category", "vertical", "--methods",
-                   "Matilda", "--param", "Matilda:epochz=1", "--dry-run"])
-    err = capsys.readouterr().err
-    assert rc == 1 and "Dry run" not in err
-    assert err.startswith("error: Matilda does not accept ['epochz']")
-
-
-@pytest.fixture
-def h5mu(tmp_path):
-    md = pytest.importorskip("mudata")
-    obs = pd.DataFrame({"celltype": ["A", "B"] * 10}, index=[f"c{i}" for i in range(20)])
-    rna = ad.AnnData(np.ones((20, 5), dtype="float32"), obs=obs)
-    rna.var_names = [f"g{i}" for i in range(5)]
-    adt = ad.AnnData(np.ones((20, 3), dtype="float32"), obs=pd.DataFrame(index=obs.index))
-    adt.var_names = [f"p{i}" for i in range(3)]
-    path = tmp_path / "one.h5mu"
-    md.MuData({"rna": rna, "adt": adt}).write(path)
-    return path
-
-
-def test_convert_labels_alone_on_a_mudata_names_its_selector(h5mu, tmp_path, capsys):
-    with pytest.raises(SystemExit):
-        cli.main(["convert", str(h5mu), str(tmp_path / "CV"), "--category", "vertical",
-                  "--labels", "rna:celltype"])
-    assert ("error: --labels alone writes only the label file. Add --rna mod:rna to "
-            "export the matrix too.") in capsys.readouterr().err
 
 
 def test_off_linux_the_requested_methods_error_counts_the_rows_without_files(

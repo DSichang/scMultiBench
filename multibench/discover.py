@@ -402,10 +402,7 @@ def _params_for(method: str, category: str | None = None,
     def _example(v):
         from . import config
         mods = list(v.when.get("modalities", []))
-        return config.hint(
-            f"params_for({method!r}, {v.when.get('category')!r}, {mods})",
-            f"multibench params {method} --category {v.when.get('category')}"
-            + (f" --modalities {','.join(mods)}" if mods else ""))
+        return f"params_for({method!r}, {v.when.get('category')!r}, {mods})"
 
     ds_dir = None
     if dataset is not None:
@@ -589,8 +586,7 @@ def cite(*methods, format: str = "text") -> str:
     **Two spellings.** Both forms return the same text, and ``cite(None)`` is
     ``cite()``:
 
-    - ``cite('Matilda', 'MOFA2')`` - one id per argument, like the CLI
-      ``multibench cite Matilda MOFA2``.
+    - ``cite('Matilda', 'MOFA2')`` - one id per argument.
     - ``cite(['Matilda', 'MOFA2'])`` - one list or tuple.
 
     **Formats.**

@@ -151,15 +151,6 @@ def test_a_file_named_like_a_column_is_read(cite, tmp_path):
     assert len(plan) == 1
 
 
-def test_the_command_line_keeps_the_file_errors_of_its_other_flags(cite, monkeypatch):
-    # under the command line _cell_vector leaves the name to the file check
-    data, _ = cite
-    monkeypatch.setattr(config, "_CLI", True)
-    with pytest.raises(FileNotFoundError) as e:
-        W._batch_vector("donor", "MYCITE", data)
-    assert str(e.value).startswith("The --batch file donor does not exist.")
-
-
 def test_the_column_itself_works(cite, tmp_path):
     data, calls = cite
     donor = pd.Series(["d1", "d2"] * (N // 2), index=BARS, name="donor")

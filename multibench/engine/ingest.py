@@ -96,7 +96,7 @@ def _warn_not_counts(X, name: str, hint: str, *,
 def _counts_of_object_advice(what: str, spec) -> str | None:
     """The last sentence of the raw-count warning for a modality passed as its
     own object; ``None`` for a selector, which reads ``data`` instead."""
-    if isinstance(spec, str) or config._CLI:
+    if isinstance(spec, str):
         return None
     if _is_anndata(spec) and "counts" in getattr(spec, "layers", {}):
         return f"Set {what}.X = {what}.layers[\"counts\"] first."
@@ -113,18 +113,16 @@ def _raw_count_hint(arg: str, spec, *, to_canonical: bool = False):
     ``obsm`` entry (``protein_counts`` for the ADT)."""
     if to_canonical:
         key, pre, var_filter = spec, "", None
-        shown = lambda k: config.hint(f"obsm='{k}'", f"--obsm {k}")     # noqa: E731
-        layer = config.hint("layer='counts'", "--layer counts")
+        shown = lambda k: f"obsm='{k}'"     # noqa: E731
+        layer = "layer='counts'"
     else:
         mod, base, var_filter = _parse_selector(spec if isinstance(spec, str) else "")
         pre = f"mod:{mod}." if mod else ""
         key = base[5:] if base.startswith("obsm:") else None
-        shown = lambda k: config.hint(f"{arg}='{pre}obsm:{k}'",          # noqa: E731
-                                      f"--{arg} {pre}obsm:{k}")
+        shown = lambda k: f"{arg}='{pre}obsm:{k}'"
         counts = f"{pre}layer:counts" + (f"[{var_filter[0]}={var_filter[1]}]"
                                          if var_filter else "")
-        layer = config.hint(f"{arg}='{counts}'",
-                            f"--{arg} \"{counts}\"" if var_filter else f"--{arg} {counts}")
+        layer = f"{arg}='{counts}'"
     if key is None:
         return layer, None
     if arg == "adt" and key != "protein_counts":
@@ -161,15 +159,12 @@ def _check_one_matrix_each(data, specs, given) -> None:
             # the protein matrix is probably one of these: the message that names them
             raise ValueError(_adt_in_x_message(given["adt"], _adt_obsm_keys(data)))
         # a selector as it was written, an object by its keyword alone
-        py, cli = ([f"{w}={given[w]!r}" if isinstance(given[w], str) else f"{w}="
-                    for w in (first, what)],
-                   [f"--{w} {given[w]}" if isinstance(given[w], str) else f"--{w}"
-                    for w in (first, what)])
-        pair = config.hint(" and ".join(py), " and ".join(cli))
-        if what == "adt" and (isinstance(given[what], str) or specs[what] is data
-                              or config._CLI):
+        py = [f"{w}={given[w]!r}" if isinstance(given[w], str) else f"{w}="
+              for w in (first, what)]
+        pair = " and ".join(py)
+        if what == "adt" and (isinstance(given[what], str) or specs[what] is data):
             # a selector reads data: it is the way out only where one can be read
-            place = config.hint("adt='obsm:<key>'", "--adt obsm:<key>")
+            place = "adt='obsm:<key>'"
             how = f"Name where the ADT is, as {place}."
         elif what == "adt":
             how = "Pass the ADT as its own object, as adt=<AnnData>."
@@ -177,15 +172,11 @@ def _check_one_matrix_each(data, specs, given) -> None:
             # the filter is shown only for a file whose features have that type
             types = getattr(data, "var", {}).get("feature_types", ())
             tenx = _TENX_TYPE[what] in set(map(str, types))
-            how = config.hint(
-                f"Name where the ATAC is, as {what}=\"X[feature_types={_TENX_TYPE[what]}]\"."
+            how = (f"Name where the ATAC is, as {what}=\"X[feature_types={_TENX_TYPE[what]}]\"."
                 if tenx else
                 "For an ATAC-only file pass rna=None." if first == "rna" and _peak_fraction(
                     [str(x) for x in getattr(data, "var_names", ())]) > 0.5 else
-                "Pass the ATAC as its own object, as atac=<AnnData>.",
-                f"Name where the ATAC is, as --atac \"X[feature_types={_TENX_TYPE[what]}]\"."
-                if tenx else
-                "Name where the ATAC is in SRC, with --atac.")
+                "Pass the ATAC as its own object, as atac=<AnnData>.")
         raise ValueError(f"{pair} name the same matrix. {how}")
 
 
@@ -447,33 +438,23 @@ def _check_one_feature_type(adata, *, arg, spec, role=None) -> None:
     subset = "adata[:, adata.var['feature_types'] == " + repr(one) + "]"
     if not set(counts.index) & set(_TENX_TYPE.values()):
         kind = f"{family.upper()} features" if family else "features of one modality"
-        where = (config.hint(f"{arg}={_shown(spec) if spec is not None else type(adata).__name__}",
-                             f"--{arg} {spec}") + (" selects" if spec is not None and
+        where = (f"{arg}={_shown(spec) if spec is not None else type(adata).__name__}" + (" selects" if spec is not None and
                                                    _split_var_filter(spec)[1] is None
                                                    else " holds")
                  if arg is not None else "The matrix holds")
-        own = arg is not None and spec is None and not config._CLI
-        raise ValueError(f"{where} {head} If all are {kind}, " + config.hint(
-            f"run del {arg}.var['feature_types'] first." if own else
-            "delete the column var['feature_types'] first.",
-            "delete the var column feature_types in Python and save the file again."))
+        own = arg is not None and spec is None
+        raise ValueError(f"{where} {head} If all are {kind}, " + (f"run del {arg}.var['feature_types'] first." if own else
+            "delete the column var['feature_types'] first."))
     if arg is None:                             # to_canonical, and what mtb.run converts
-        flags = f'--{family or "rna"} "X[feature_types={one}]"'
-        if family == "atac":                    # --atac does not go without its kind
-            flags += " --atac-kind " + ("gene_activity" if role == "atac_gas" else "peak")
-        raise ValueError(f"The matrix holds {head} " + config.hint(
-            f"Pass one type, as {subset}.",
-            f"Write a dataset folder, as multibench export SRC OUT {flags}."))
+        raise ValueError(f"The matrix holds {head} Pass one type, as {subset}.")
     if spec is not None and _split_var_filter(spec)[1] is None:
         filtered = f"{spec}[feature_types={one}]"
-        filtered = config.hint(f"{arg}='{filtered}'", f'--{arg} "{filtered}"')
-        raise ValueError(config.hint(f"{arg}={spec!r}", f"--{arg} {spec}")
+        filtered = f"{arg}='{filtered}'"
+        raise ValueError(f"{arg}={spec!r}"
                          + f" selects {head} Add a filter, as {filtered}.")
     shown = repr(spec) if spec is not None else type(adata).__name__
     raise ValueError(
-        config.hint(f"{arg}={shown}", f"--{arg} {spec}") + f" holds {head} " + config.hint(
-            f"Pass one type, as {arg}={subset}.",
-            f"Save one type first, as {subset}.write_h5ad(\"one_type.h5ad\")."))
+        f"{arg}={shown}" + f" holds {head} " + f"Pass one type, as {arg}={subset}.")
 
 
 def _pick_matrix(adata, *, layer=None, obsm=None, feature_names=None, what=None,
@@ -507,7 +488,7 @@ def _pick_matrix(adata, *, layer=None, obsm=None, feature_names=None, what=None,
             names = [f"feature_{i}" for i in range(n_feat)]
             slot, uns = f"obsm[{obsm!r}]", f"adata.uns[{obsm + '_names'!r}]"
             store = f"store {slot} as a DataFrame, or put the names in {uns}"
-            fix = (f"Pass {names_arg}=, {store}." if names_arg and not config._CLI
+            fix = (f"Pass {names_arg}=, {store}." if names_arg
                    else f"{store[:1].upper()}{store[1:]}.")
             if n_feat:                  # 0 features have no names, and are refused
                 _compat.warn(_no_names_message(what or "obsm", slot, n_feat, fix),
@@ -543,14 +524,12 @@ def _duplicate_names_warning(feats, *, arg, spec, role, obsm=None,
     dup = names[names.duplicated()].unique()
     if not len(dup):
         return None
-    selector = spec if isinstance(spec, str) else getattr(spec, "_selector", None)
-    where = config.hint(
-        f"{arg}={spec!r}" if isinstance(spec, str) else f"{arg}={type(spec).__name__}",
-        f"--{arg} {selector or 'X'}")
+    selector = spec if isinstance(spec, str) else None
+    where = f"{arg}={spec!r}" if isinstance(spec, str) else f"{arg}={type(spec).__name__}"
     kind = "peak" if role == "atac_peak" else "feature"
     head = (f"{where} has {len(dup):,} repeated {kind} {'name' if len(dup) == 1 else 'names'}"
             f", for example {dup[0]}.")
-    when = config.hint("before the export", "in Python and save the file again")
+    when = "before the export"
     if role == "atac_peak":
         # a peak name is a region: no advice that renames one
         return f"{head} Keep one column for each peak."
@@ -565,11 +544,10 @@ def _duplicate_names_warning(feats, *, arg, spec, role, obsm=None,
     if obsm is not None or (base or "").startswith("obsm:") \
             or not (isinstance(spec, str) or _is_anndata(spec)):
         return f"{head} Give each column its own name."
-    if not isinstance(spec, str) and not config._CLI:
+    if not isinstance(spec, str):
         return f"{head} Run {arg}.var_names_make_unique() {when}."
     if var_filter is None:
-        return f"{head} Run var_names_make_unique() on {obj} " + config.hint(
-            "you export.", "in Python and save the file again.")
+        return f"{head} Run var_names_make_unique() on {obj} " + "you export."
     # on the whole object the call also renames a feature of another type
     return f'{head} Split the object first, as in the recipe "A 10x .h5 file" in the docs.'
 
@@ -620,11 +598,11 @@ def _check_peak_names(modality, feats, *, rna_feats=None, kind_arg=False):
         return
     frac = _peak_fraction(feats)
     if kind_arg:
-        as_peak = config.hint("atac_kind='peak'", "--atac-kind peak")
-        as_gas = config.hint("atac_kind='gene_activity'", "--atac-kind gene_activity")
+        as_peak = "atac_kind='peak'"
+        as_gas = "atac_kind='gene_activity'"
     else:
-        as_peak = config.hint("modality='atac_peak'", "--modality atac_peak")
-        as_gas = config.hint("modality='atac_gas'", "--modality atac_gas")
+        as_peak = "modality='atac_peak'"
+        as_gas = "modality='atac_gas'"
     if modality == "atac_gas" and frac > 0.5:
         _compat.warn(
             f"{frac:.0%} of the ATAC feature names look like peaks such as "
@@ -635,7 +613,7 @@ def _check_peak_names(modality, feats, *, rna_feats=None, kind_arg=False):
                 "chr1:100-200")
         rename = (". If they are peaks, rename them to chr:start-end. Some methods read "
                   "the peak positions from the names, and "
-                  f"{config.hint('mtb.scan', 'multibench scan')} names these methods.")
+                  f"{'mtb.scan'} names these methods.")
         gas = f" If the matrix holds gene activity, pass {as_gas}."
         genes = set(rna_feats or ())
         share = sum(1 for x in feats if x in genes) / len(feats) if len(feats) else 0.0
@@ -664,8 +642,7 @@ def _atac_role(feats, rna_feats) -> str:
             else "not peaks such as chr1:100-200")
     raise ValueError(
         f"The ATAC feature names are {what}. Pass "
-        + config.hint("atac_kind='peak' or atac_kind='gene_activity'.",
-                      "--atac-kind peak or --atac-kind gene_activity."))
+        + "atac_kind='peak' or atac_kind='gene_activity'.")
 
 
 def _write_canonical(out: Path, X, feats, bars, *, dtype, compression, block):
@@ -824,7 +801,7 @@ def _to_canonical(src, out: Path | str | None = None, modality: str | None = Non
             first = next(iter(adata.mod), "rna")
             raise ValueError(
                 f"A MuData holds the modalities {list(adata.mod)}: pass one, "
-                + config.hint(f"e.g. mdata[{first!r}].", f"e.g. --rna mod:{first}."))
+                + f"e.g. mdata[{first!r}].")
         if mod not in adata.mod:
             raise KeyError(f"mod {mod!r} not in MuData; found: {list(adata.mod)}")
         adata = adata.mod[mod]
@@ -978,11 +955,8 @@ def _select(data, spec, *, what):
     ``'obsm:<key>'``, ``'layer:<key>'``, each after an optional
     ``'mod:<name>.'``, then an optional ``[<var column>=<value>]``."""
     if spec == "":
-        raise ValueError(config.hint(
-            f"{what}='' is empty: {what}=None writes no {what.upper()}, or pass a "
-            f"selector such as 'X'.",
-            f"--{what} is empty: --{what} none writes no {what.upper()}, or pass a "
-            f"selector such as X."))
+        raise ValueError(f"{what}='' is empty: {what}=None writes no {what.upper()}, or pass a "
+            f"selector such as 'X'.")
     if not isinstance(spec, str):
         raise ValueError(f"{what}= must be a selector string like 'X', 'obsm:<key>', "
                          f"'layer:<key>' or 'mod:<name>', got {spec!r}")
@@ -1010,9 +984,8 @@ def _select(data, spec, *, what):
         kind = next((k for k in ("obsm", "layer") if rest in getattr(
             adata, "obsm" if k == "obsm" else "layers", {})), None)
         if kind:
-            raise ValueError(config.hint(f"{what}={spec!r}: use {what}='{kind}:{spec}'.",
-                                         f"--{what} {spec}: use --{what} {kind}:{spec}."))
-        raise ValueError(config.hint(f"{what}={spec!r}", f"--{what} {spec}")
+            raise ValueError(f"{what}={spec!r}: use {what}='{kind}:{spec}'.")
+        raise ValueError(f"{what}={spec!r}"
                          + ": unknown selector; use X, obsm:<key>, layer:<key> or "
                          "mod:<name>[.obsm:<key>|.layer:<key>], optionally followed by "
                          "[<var column>=<value>].")
@@ -1065,8 +1038,8 @@ _ADATA_OBS = "the AnnData's obs"
 
 def _obs_column(obs, col, *, what, spec, where):
     if col not in obs.columns:
-        head = config.hint(f"{what}={spec!r}", f"--{what} {spec}")
-        where = config.hint(where, "the obs of the file") if where == _ADATA_OBS else where
+        head = f"{what}={spec!r}"
+        where = where if where == _ADATA_OBS else where
         raise KeyError(f"{head}: column {col!r} not in obs: searched {where}; "
                        f"available: {list(obs.columns)}"
                        + (f".{hint}" if (hint := _case_hint(col, obs.columns)) else ""))
@@ -1099,8 +1072,7 @@ def _select_obs(data, spec, *, what):
                 raise KeyError(
                     f"{what}={spec!r}: column {col!r} not in obs: searched mdata.obs; "
                     f"available: {list(data.obs.columns)}. mdata[{has[0]!r}].obs has "
-                    f"{col!r}: use " + config.hint(f"{what}='{has[0]}:{col}'",
-                                                   f"--{what} {has[0]}:{col}"))
+                    f"{col!r}: use " + f"{what}='{has[0]}:{col}'")
         return _obs_column(data.obs, col, what=what, spec=spec,
                            where="mdata.obs" if mu else _ADATA_OBS)
     if mu:
@@ -1116,7 +1088,7 @@ def _select_obs(data, spec, *, what):
                    f"mdata[{name!r}].obs has {list(obs.columns)}")
             if col in data.obs.columns:
                 msg += (f". The global mdata.obs has {col!r}: pass "
-                        + config.hint(f"{what}='obs:{col}'", f"--{what} obs:{col}"))
+                        + f"{what}='obs:{col}'")
             raise KeyError(msg)
     if spec in data.obs.columns:
         return data.obs[spec]
@@ -1124,8 +1096,8 @@ def _select_obs(data, spec, *, what):
         raise ValueError(_file_name_message(spec, what))
     cols = [str(c) for c in data.obs.columns]
     raise ValueError(
-        config.hint(f"{what}={spec!r}", f"--{what} {spec}") + " is not a column of "
-        + config.hint("mdata.obs" if mu else _ADATA_OBS, "the obs of SRC")
+        f"{what}={spec!r}" + " is not a column of "
+        + "mdata.obs" if mu else _ADATA_OBS
         + (f". Columns: {', '.join(cols[:5])}"
            f"{f' and {len(cols) - 5:,} more' if len(cols) > 5 else ''}."
            if cols else ", which has no columns.") + _case_hint(spec, cols))
@@ -1137,12 +1109,10 @@ def _is_file_name(spec: str) -> bool:
 
 
 def _file_name_message(spec: str, what: str) -> str:
-    return config.hint(
-        f'{what}={spec!r} is a file name. Add the column first, as in the recipe '
+    return (f'{what}={spec!r} is a file name. Add the column first, as in the recipe '
         f'"Labels in a CSV file" in the docs.' if what == "labels" else
         f"{what}={spec!r} is a file name. Add the column to the object first, and pass "
-        f"{what}='obs:<col>'.",
-        f"--{what} {spec} is a file name. Pass a column of SRC, as --{what} obs:<col>.")
+        f"{what}='obs:<col>'.")
 
 
 def _link_or_copy(src: Path, dst: Path):
@@ -1288,10 +1258,10 @@ def _align_cells(a, *, master, master_name, role, category=None):
                 if category == "mosaic":
                     raise ValueError(
                         f"{head} Make the names match; for a batch with RNA only, export "
-                        "it without " + config.hint("atac=", "--atac") + ".")
+                        "it without " + "atac=" + ".")
                 raise ValueError(
                     f"{head} Make the names match; for different cells pass "
-                    + config.hint('category="diagonal"', "--category diagonal") + ".")
+                    + 'category="diagonal"' + ".")
             raise ValueError(f"{role} and {master_name} have no cells in common. {same}")
         if stray:
             head = (f"{role} has {len(names):,} cells, and {len(stray):,} of them are not "
@@ -1489,8 +1459,7 @@ def _export_dataset(data, dataset_dir: Path | str, *, rna="X",
             f"atac_kind= must be one of {list(_ATAC_KINDS)} (got {atac_kind!r}): "
             "'peak' -> atac_peak.h5 (+atac.h5), 'gene_activity' -> atac_gas.h5")
     if atac is None and atac_kind is not None:
-        raise ValueError(config.hint("atac_kind= given without atac=",
-                                     "--atac-kind given without --atac"))
+        raise ValueError("atac_kind= given without atac=")
     if category == "vertical" and atac is not None and atac_kind == "gene_activity" \
             and not _vertical_gene_activity_readers():
         _compat.warn(_VERTICAL_GAS, UserWarning)
@@ -1618,9 +1587,7 @@ def _export_dataset(data, dataset_dir: Path | str, *, rna="X",
                 if repeated:
                     _compat.warn(repeated, UserWarning)
             if what == "rna" and feats is not None and _peak_fraction(feats) > 0.5:
-                raise ValueError(config.hint(
-                    f"rna= holds peaks ({feats[0]}): pass it as atac=.",
-                    f"--rna holds peaks ({feats[0]}): pass it with --atac."))
+                raise ValueError(f"rna= holds peaks ({feats[0]}): pass it as atac=.")
             if what == "atac":
                 # the RNA is prepared first (side 'rna', then the ATAC)
                 rna_feats = next((f for _, r, _, f, _, _ in prepared if r == "rna"), None)
@@ -1631,17 +1598,11 @@ def _export_dataset(data, dataset_dir: Path | str, *, rna="X",
                         _compat.warn(_VERTICAL_GAS, UserWarning)
                 _check_peak_names(role, feats, rna_feats=rna_feats, kind_arg=True)
                 if category == "mosaic" and role == "atac_gas":
-                    _compat.warn("Every mosaic method reads peak ATAC. " + config.hint(
-                        "Export the ATAC as peaks (atac_kind='peak'), or pass "
-                        "allow_atac_mismatch=True to scan and run_all.",
-                        "Convert the ATAC as peaks (--atac-kind peak), or pass "
-                        "--allow-atac-mismatch to scan and run-all."),
+                    _compat.warn("Every mosaic method reads peak ATAC. " + ("Export the ATAC as peaks (atac_kind='peak'), or pass "
+                        "allow_atac_mismatch=True to scan and run_all."),
                         UserWarning)
             if role in _COUNT_ROLES:
-                # the command line's --atac-from hands over an object and its selector
                 selector = {"rna": rna, "adt": adt, "atac": atac}[what]
-                if not isinstance(selector, str) and config._CLI:
-                    selector = getattr(selector, "_selector", None)
                 hint, how = _raw_count_hint(what, selector)
                 _warn_not_counts(X, what, hint,
                                  how=_counts_of_object_advice(what, given[what]) or how)
@@ -1688,7 +1649,7 @@ def _export_dataset(data, dataset_dir: Path | str, *, rna="X",
     if existing and not overwrite:
         raise FileExistsError(
             f"{out} already holds {config._and_list(existing)}. Pass "
-            f"{config.hint('overwrite=True', '--overwrite')} to replace "
+            f"{'overwrite=True'} to replace "
             f"{'it' if len(existing) == 1 else 'them'}.")
     # --- cells that the folder already holds keep the row order of its files
     follow = _row_order(out, units, diagonal=diagonal)
@@ -1755,7 +1716,7 @@ def _check_batch_complete(vals, *, spec) -> None:
     miss = eio.missing_mask(vals)
     if miss.any():
         raise ValueError(
-            config.hint(f"batch={_shown(spec)}", f"--batch {spec}")
+            f"batch={_shown(spec)}"
             + f": {int(miss.sum()):,} of the {len(vals):,} cells have no batch"
             f"{eio._missing_example(vals)}. Give every cell a batch.")
 
@@ -1764,17 +1725,17 @@ def _adt_in_x_message(spec, keys, own: bool = False) -> str:
     """The error for ``adt`` reading ``X`` of an object whose ``obsm`` may hold
     the protein matrix. ``own``: the ADT came as its own object."""
     one = len(keys) == 1
-    head = (config.hint(f"adt={_shown(spec)}", f"--adt {spec}") + " takes X, and the object "
+    head = (f"adt={_shown(spec)}" + " takes X, and the object "
             + (f"also holds obsm[{keys[0]!r}]." if one else
                f"also holds {len(keys)} obsm entries, for example {keys[0]!r}."))
-    if own and not config._CLI:
+    if own:
         return (f"{head} If X is the protein matrix, run del adt.obsm[{keys[0]!r}] first."
                 if one else
                 f"{head} If X is the protein matrix, delete them first, as del "
                 f"adt.obsm[{keys[0]!r}].")
     key = keys[0] if one else "<key>"
     return (f"{head} If {'that' if one else 'one'} is the protein matrix, pass "
-            + config.hint(f"adt='obsm:{key}'", f"--adt obsm:{key}") + ".")
+            + f"adt='obsm:{key}'" + ".")
 
 
 #: file stems of the dataset layout, in the order messages list them
@@ -1916,20 +1877,16 @@ def _leftover_message(out: Path, found, *, n_batches, held=()) -> str:
         what = (f"{names(other_batch)} of {'batch' if len(theirs) == 1 else 'batches'} "
                 f"{_span(theirs)}")
         if n_batches is not None:
-            what += ", above " + config.hint(f"n_batches={n_batches}",
-                                             f"--n-batches {n_batches}")
+            what += ", above " + f"n_batches={n_batches}"
     elif other_cells:
         what = f"{names(other_cells)} with other cells"
     else:
         what = f"{names(other_count)} with another number of labels"
     if held:
-        how = config.hint(
-            "To add labels, run the export call that wrote the folder again with labels= "
-            "and overwrite=True.",
-            "To add labels, run the export command that wrote the folder again with "
-            "--labels and --overwrite.")
+        how = ("To add labels, run the export call that wrote the folder again with labels= "
+            "and overwrite=True.")
     else:
-        how = config.hint("Export to a new folder.", "Export into a new folder.")
+        how = "Export to a new folder."
     return f"{out} holds {what}. {how}"
 
 
@@ -1958,9 +1915,7 @@ def _row_order(out: Path, units, *, diagonal) -> dict:
             if _cell_order(bars, first)[0] != "same":
                 raise ValueError(
                     f"{ref} and {name} of {out} hold the same cells in different orders. "
-                    + config.hint("Export this data again in one call, into a new folder.",
-                                  "Export this data again in one command, into a new "
-                                  "folder."))
+                    + "Export this data again in one call, into a new folder.")
         kind, idx = _cell_order(units[unit][0], first)
         if kind == "order":
             follow[unit] = (idx, [name for name, _ in refs])
@@ -1999,23 +1954,19 @@ def _check_batch_args(batch, batch_index, category, *, adt, atac, n_batches=None
                 f"category='diagonal' (got category={category!r})")
     if n_batches is not None:
         if batch_index is None:
-            raise ValueError(config.hint(
-                "n_batches= goes with batch_index= only. Leave n_batches= out.",
-                "--n-batches goes with --batch-index only. Leave --n-batches out."))
+            raise ValueError("n_batches= goes with batch_index= only. Leave n_batches= out.")
         if isinstance(n_batches, bool) or not isinstance(n_batches, (int, np.integer)) \
                 or n_batches < 1:
-            raise ValueError(config.hint("n_batches=", "--n-batches")
+            raise ValueError("n_batches="
                              + f" must be a positive integer, got {n_batches!r}")
         if batch_index > n_batches:
             raise ValueError(
-                config.hint(f"batch_index={batch_index} is larger than "
-                            f"n_batches={n_batches}.",
-                            f"--batch-index {batch_index} is larger than "
-                            f"--n-batches {n_batches}."))
+                f"batch_index={batch_index} is larger than "
+                            f"n_batches={n_batches}.")
     if batch is not None and category in ("vertical", "diagonal"):
         from .resolve import _one_file_advice
         raise ValueError(
-            config.hint("batch=", "--batch") + " writes per-batch files (rna1.h5, "
+            "batch=" + " writes per-batch files (rna1.h5, "
             "rna2.h5, ...). "
             + _one_file_advice(category, has_adt=adt is not None and atac is None))
     if batch is not None and category is None and atac is not None:
@@ -2152,7 +2103,7 @@ def _diagonal_labels(data, spec, sides) -> dict:
                 ser = data.obs[col_each]
             else:
                 raise KeyError(
-                    config.hint(f"labels={spec!r}", f"--labels {spec}")
+                    f"labels={spec!r}"
                     + f": column {col_each!r} not in obs of the "
                     f"{side.upper()} object ({src}); available: {list(a.obs.columns)}. "
                     + (_other_column_advice(data, col_each, side, sides)
@@ -2183,29 +2134,24 @@ def _other_column_advice(data, col: str, side: str, sides) -> str:
     """Advice for a side whose object lacks the label column ``col`` but has
     others, where its cell types may be; ``""`` when there is no way out."""
     role, a, _kw, _what, src = sides[side][0]
-    if not len(a.obs.columns) or (config._CLI and _is_mudata(data)):
+    if not len(a.obs.columns):
         return ""
     obj = src if src.startswith("mdata[") else side
-    return config.hint(
-        f"Copy its cell-type column first, as {obj}.obs[{col!r}] = "
-        f"{obj}.obs['<its column>'].",
-        "Convert each side with its own command and its own --labels.")
+    return (f"Copy its cell-type column first, as {obj}.obs[{col!r}] = "
+        f"{obj}.obs['<its column>'].")
 
 
 def _no_cell_types_advice(side: str) -> str:
     """Advice for a diagonal side without cell types."""
     return (f"Without cell types for the {side.upper()} cells, leave "
-            + config.hint("labels= out.", "--labels out."))
+            + "labels= out.")
 
 
 def _mod_prefix_message(spec: str, col: str | None) -> str:
     """The error for ``labels='<mod>:<col>'`` on data that is not a MuData;
     ``col`` when it is a column of every object, else ``None``."""
-    return config.hint(
-        f"labels={spec!r} names a modality of a MuData, and this data is not one. "
-        + (f"Write labels='obs:{col}'." if col else "Write labels='obs:<col>'."),
-        f"--labels {spec} names a modality of a .h5mu file, and SRC is not one. "
-        + (f"Write --labels obs:{col}." if col else "Write --labels obs:<col>."))
+    return (f"labels={spec!r} names a modality of a MuData, and this data is not one. "
+        + (f"Write labels='obs:{col}'." if col else "Write labels='obs:<col>'."))
 
 
 def _diagonal_label_advice(data, spec, sides) -> str:
@@ -2258,27 +2204,6 @@ def _export_filename(role: str, number: str, category: str | None) -> str:
     if role.startswith("atac") and category in ("vertical", "mosaic"):
         return f"atac{number}.h5"
     return f"{role}{number}.h5"
-
-
-def _select_object(obj, spec: str, *, what: str):
-    """An AnnData of the matrix ``spec`` selects from ``obj``, with its
-    ``.obs``: the ``atac=`` of the command line's ``--atac-from``."""
-    import anndata as ad
-
-    user_spec = spec
-    if _is_mudata(obj):
-        spec = _mudata_selector(obj, spec)
-    a, kw = _select(obj, spec, what=what)
-    if "obsm" not in kw:
-        # 'X' never reaches _pick_matrix, and only here is the selector as written
-        _check_one_feature_type(a, arg=what, spec=user_spec)
-    if kw:
-        X, feats = _pick_matrix(a, layer=kw.get("layer"), obsm=kw.get("obsm"), what=what)
-        b = ad.AnnData(X, obs=a.obs.copy())
-        b.var_names = [str(x) for x in feats]
-        a = b
-    a._selector = spec          # for the raw-count hint of export_dataset
-    return a
 
 
 __getattr__ = _compat.module_getattr(__name__, "io", old={

@@ -372,23 +372,3 @@ def test_diagonal_export_still_refuses_a_batch_column_and_a_bad_batch_index(tmp_
     assert not (tmp_path / "B").exists()
 
 
-def test_export_passes_a_diagonal_batch_index_through(tmp_path, monkeypatch, capsys):
-    from pathlib import Path
-    from multibench import cli
-    from multibench.engine import ingest
-    seen = {}
-    monkeypatch.setattr(ingest, "_to_anndata", lambda src: "ADATA")
-
-    def fake_export(data, out, **kw):
-        seen.update(kw)
-        Path(out).mkdir(parents=True, exist_ok=True)
-        return Path(out)
-    monkeypatch.setattr(ingest, "_export_dataset", fake_export)
-    rc = cli.main(["export", "B.h5ad", str(tmp_path / "LAB"), "--rna", "X",
-                   "--category", "diagonal", "--batch-index", "2"])
-    assert rc == 0 and seen["batch_index"] == 2 and seen["category"] == "diagonal"
-    with pytest.raises(SystemExit) as e:
-        cli.main(["export", "B.h5ad", str(tmp_path / "LAB"), "--rna", "X",
-                  "--category", "vertical", "--batch-index", "2"])
-    err = capsys.readouterr().err
-    assert e.value.code == 2 and "--category diagonal for data in several batches" in err

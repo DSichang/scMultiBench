@@ -16,7 +16,6 @@ import warnings
 import pytest
 
 import multibench as mtb
-from multibench import cli
 from multibench.engine import registry
 from tests.conftest import full_scan
 
@@ -59,21 +58,6 @@ def test_two_representations_select_the_methods_that_read_both_files(data):
     # inputs_for agrees (it did before, and still does)
     inp = mtb.inputs_for("D28", "diagonal", "MultiMAP", modalities=BOTH, data_path=data)
     assert {"atac_peak", "atac_gas"} <= set(inp)
-
-
-def test_the_cli_round_trip_of_a_two_file_row(data, tmp_path, capsys):
-    rc = cli.main(["scan", "D28", "--category", "diagonal", "--data-path", str(data),
-                   "--modalities", "rna,atac_peak,atac_gas", "--format", "csv",
-                   "--columns", "method,modalities"])
-    out = capsys.readouterr().out
-    assert rc == 0 and "MultiMAP,rna+atac_peak+atac_gas" in out
-    rc = cli.main(["run-all", "D28", "--category", "diagonal", "--data-path", str(data),
-                   "--modalities", "rna,atac_peak,atac_gas", "--dry-run",
-                   "--out-dir", str(tmp_path / "out"), "--format", "csv",
-                   "--columns", "method,modalities"])
-    out = capsys.readouterr().out
-    assert rc == 0
-    assert "MultiMAP,rna+atac_peak+atac_gas" in out and "Seurat_v3" in out
 
 
 def test_a_two_file_method_gets_no_representation_caveat(data):
@@ -156,68 +140,6 @@ def test_method_info_notes_and_setup_hint_hold_no_internal_names(method):
         assert info["notes"].endswith("using shared and unshared features; R.")
 
 
-# ------------------------------------------------------------------ L30 prepared inputs
-def test_a_command_that_reads_a_prepared_file_says_so(data, tmp_path, capsys):
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        sc = full_scan("D28", "diagonal", data_path=data, verbose=False)
-    row = sc.set_index("method").loc["Seurat_v3"]
-    assert "/inputs/atac_peak_normpeaks.h5" in row["command"]
-    assert ("Seurat_v3 reads inputs/atac_peak_normpeaks.h5. mtb.run_all writes that "
-            "file first, so start Seurat_v3 with mtb.run_all. The printed "
-            "command alone fails in a job script.") in row["caveat"]
-    # GLUE reads a renamed peak copy as well (R3-04); a command that reads
-    # only the dataset's own files has no such note
-    # (GLUE's other diagonal row, for several batches, lacks its files here)
-    glue = sc.set_index(["method", "modalities"]).loc[("GLUE", "rna+atac_peak"), "caveat"]
-    assert "inputs/atac_peak_normpeaks.h5" in glue
-    assert "reads inputs/" not in sc.set_index("method").loc["MultiMAP", "caveat"]
-    # the CLI marks the line in its '# commands' block
-    rc = cli.main(["run-all", str(data / "D28"), "--category", "diagonal",
-                   "--methods", "Seurat_v3,MultiMAP", "--dry-run", "--out-dir", str(tmp_path)])
-    out = capsys.readouterr().out
-    assert rc == 0
-    lines = {m.group(1): ln for ln in out.splitlines()
-             if (m := re.match(r"(\S+) \(rna\+", ln))}
-    assert "[use multibench run-all]" in lines["Seurat_v3"]
-    assert "[use multibench run-all]" not in lines["MultiMAP"]
-
-
-# ------------------------------------------------------------------ L39/L41 CLI help
-@pytest.mark.parametrize("cmd", ["evaluate", "run-all"])
-def test_leiden_flavor_is_hidden_from_help(cmd, capsys):
-    # 0.4: --leiden-flavor is a hidden deprecated flag of both commands
-    with pytest.raises(SystemExit):
-        cli.main([cmd, "--help"])
-    text = " ".join(capsys.readouterr().out.split())
-    assert "--leiden-flavor" not in text
-    assert "leidenalg matches both stored tables" not in text
-    assert "backend of the published tables" not in text
-
-
-# ------------------------------------------- L11 cross: every batch, the same modalities
-def test_cross_is_described_as_batches_with_the_same_modalities(capsys):
-    """Cross was RNA + ADT only. The registry now holds cross variants for
-    RNA + ATAC, ADT + ATAC and all three, so the description names what they
-    share: every batch measures the same modalities. "All modalities" stays
-    wrong (a cross dataset may hold two of the three)."""
-    from multibench.engine import registry
-    sets = {frozenset(registry.base_modality(r) for r in v.when["modalities"])
-            for s in registry.load() for v in s.variants if v.when.get("category") == "cross"}
-    assert sets == {frozenset(x) for x in (("rna", "adt"), ("rna", "atac"), ("adt", "atac"),
-                                           ("rna", "adt", "atac"))}
-    text = mtb.list_categories()["cross"]
-    assert "Several batches that all measure the same modalities" in text
-    assert "each measured with RNA and ADT" not in text and "all modalities" not in text
-    with pytest.raises(SystemExit):
-        cli.main(["scan", "--help"])
-    help_text = " ".join(capsys.readouterr().out.split())
-    # one line in every --category help since 0.4.0 (X53); multibench layout explains
-    assert "vertical, diagonal, mosaic or cross (multibench layout explains them)" in \
-        help_text
-    assert "several batches with all modalities" not in help_text
-
-
 # ------------------------------------------------------------------ L48 BatchResult.plot
 def test_batchresult_plot_reads_the_fill_as_scaled_per_column():
     doc = " ".join(mtb.BatchResult.plot.__doc__.split())
@@ -250,26 +172,6 @@ def test_the_loom_hint_names_the_distribution(tmp_path, monkeypatch):
     monkeypatch.setattr("importlib.util.find_spec", lambda name, *a: None)
     with pytest.raises(ImportError, match=r"pip install 'multibench-sc\[loom\]'"):
         runner._check_input("rna", str(tmp_path / "x.loom"), real=False)
-
-
-# ------------------------------------------------------------------ n/a hint on the CLI
-def test_the_na_hint_uses_the_spelling_of_the_caller(tmp_path, capsys):
-    import matplotlib
-    matplotlib.use("Agg")
-    args = ["plot", "bubble", "--category", "diagonal", "--dataset", "D28",
-            "--metrics", "ARI,NMI,ASW", "--out", str(tmp_path / "f.png")]
-    # 0.4: --na / na= of bubble are deprecated, so no message offers them
-    assert cli.main(args) == 0
-    err = capsys.readouterr().err
-    assert "hide this message" not in err and "na='skip'" not in err
-    assert cli.main(args + ["--na", "skip"]) == 0
-    assert ("warning: plot --na is deprecated and will be removed in 0.5; leave it out for a "
-            "warning that names the n/a cells." in capsys.readouterr().err)
-    with warnings.catch_warnings(record=True) as rec:
-        warnings.simplefilter("always")
-        mtb.plot.bubble(mtb.load_results("diagonal", dataset="D28"),
-                        metrics=["ARI", "NMI", "ASW"])
-    assert not [w for w in rec if "hide this message" in str(w.message)]
 
 
 # ------------------------------------------------------------------ plain vocabulary

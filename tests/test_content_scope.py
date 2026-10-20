@@ -28,7 +28,6 @@ import pytest
 import yaml
 
 import multibench as mtb
-from multibench import cli
 from multibench.engine import registry
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -129,12 +128,6 @@ def test_api_return_values_stay_in_scope():
             check(f"describe_layout({c!r})", mtb.describe_layout(c))
         for name in ("methods", "datasets", "metrics"):
             check(f"catalog.{name}()", getattr(mtb.catalog, name)().to_string())
-    assert not found, "\n".join(found)
-
-
-def test_cli_help_stays_in_scope():
-    found = [f"{name}: {_hits(p.format_help())}"
-             for name, p in _walk_parsers(cli.build_parser()) if _hits(p.format_help())]
     assert not found, "\n".join(found)
 
 

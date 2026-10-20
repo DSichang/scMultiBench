@@ -23,7 +23,6 @@ from pathlib import Path
 import pytest
 
 import multibench as mtb
-from multibench import cli
 from multibench.engine import envs
 from tests.test_prefix_mode import (_tiny_archive, envs_dir, make_prefix,  # noqa: F401 - fixtures
                                     no_conda)
@@ -63,22 +62,6 @@ def gpu_host(monkeypatch):
 @pytest.fixture
 def cpu_host(monkeypatch):
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
-
-
-# ---------------------------------------------------------------- the flavour vocabulary
-def test_flavors_and_check():
-    assert envs.FLAVORS == ("auto", "cpu", "gpu")
-    env = next(a for a in cli.build_parser()._actions if a.dest == "command").choices["env"]
-    sub = next(a for a in env._actions if a.dest == "env_cmd").choices
-    assert sub["plan"]._option_string_actions["--flavor"].choices is envs.FLAVORS
-    assert sub["install"]._option_string_actions["--flavor"].choices is envs.FLAVORS
-    for f in envs.FLAVORS:
-        assert envs.check_flavor(f) == f
-    with pytest.raises(ValueError) as e:
-        envs.check_flavor("cuda")
-    assert str(e.value) == "flavor='cuda': choose one of 'auto', 'cpu', 'gpu'"
-    with pytest.raises(ValueError, match="flavor=None: choose one of 'auto', 'cpu', 'gpu'"):
-        envs.resolve_flavor(None)
 
 
 def test_resolve_flavor_both_ways(monkeypatch):
@@ -436,132 +419,7 @@ def test_env_tables_show_the_installed_flavour(envs_dir):
         assert "flavor" in df.columns
 
 
-# ---------------------------------------------------------------- CLI
-@pytest.fixture
-def cli_linux(monkeypatch):
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
-
-
-def test_cli_install_flavor_flag(cli_linux, monkeypatch, capsys):
-    seen = {}
-
-    def fake_install(methods, **kw):
-        seen.update(kw)
-        return []
-    monkeypatch.setattr(envs, "_install_rows", fake_install)
-    for argv, want in ((["env", "install", "--packed", "--dry-run"], "auto"),
-                       (["env", "install", "--packed", "--flavor", "cpu", "--dry-run"], "cpu"),
-                       (["env", "install", "--flavor", "gpu", "--methods", "Matilda", "--dry-run"], "gpu")):
-        assert cli.main(argv) == 0
-        assert seen["flavor"] == want, argv
-        capsys.readouterr()
-    with pytest.raises(SystemExit) as e:
-        cli.main(["env", "install", "--flavor", "cuda", "--dry-run"])
-    assert e.value.code == 2
-    assert "invalid choice: 'cuda'" in capsys.readouterr().err
-
-
-def test_cli_install_help_explains_auto(capsys):
-    for sub in ("install", "plan"):
-        with pytest.raises(SystemExit) as e:
-            cli.main(["env", sub, "--help"])
-        assert e.value.code == 0
-        out = " ".join(capsys.readouterr().out.split())     # argparse wraps lines
-        assert "--flavor {auto,cpu,gpu}" in out
-        # round 2 (Y34): one short sentence
-        assert "auto (default) = gpu when this computer has an NVIDIA GPU" in out
-        assert "any = one build serves both" in out and "mtb.env.host_has_gpu" not in out
     # 0.4.0: install's description leaves --flavor to the option's own help
-
-
-def test_cli_install_dry_run_total_names_the_flavour(cli_linux, plan_rows, monkeypatch, capsys):
-    monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
-    assert cli.main(["env", "install", "--packed", "--flavor", "cpu", "--dry-run"]) == 0
-    cap = capsys.readouterr()
-    lines = {l.split()[0]: l for l in cap.out.splitlines()}
-    assert "0.8 GB dl" in lines["matilda"] and "2.5 GB disk" in lines["matilda"] \
-        and "https://x/matilda-cpu.tar.gz" in lines["matilda"]
-    assert "4.5 GB dl" in lines["scmb_torch"] and "https://x/scmb_torch.tar.gz" in lines["scmb_torch"]
-    # Z27 (r3): one total line, the layer counted; the builds are in the rows' URLs
-    assert "# 3 envs: 6.2 GB to download, at least 2.5 GB on disk\n" in cap.err
-    assert "NVIDIA GPU" not in cap.err and "the CPU build" not in cap.err
-    # auto on a CPU host says so once (the install note); gpu sums the CUDA
-    # archives and never falls back
-    assert cli.main(["env", "install", "--packed", "--dry-run"]) == 0
-    err = capsys.readouterr().err
-    assert "# 3 envs: 6.2 GB to download, at least 2.5 GB on disk\n" in err
-    assert err.count("NVIDIA GPU") == 1 and err.count("--flavor gpu") == 1
-    assert cli.main(["env", "install", "--packed", "--flavor", "gpu", "--dry-run"]) == 0
-    assert "# 3 envs: 8.4 GB to download, at least 9.0 GB on disk\n" in \
-        capsys.readouterr().err
-    monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
-    assert cli.main(["env", "install", "--packed", "--dry-run"]) == 0
-    assert "# 3 envs: 8.4 GB to download" in capsys.readouterr().err
-
-
-def _after_plan_warning(err):
-    """stderr of the deprecated ``env plan`` after its one deprecation line."""
-    first, rest = err.split("\n", 1)
-    assert first == ("warning: multibench env plan is deprecated and will be removed in "
-                     "0.5. Use multibench env install.")
-    return rest
-
-
-def test_cli_plan_flavor(cli_linux, fake_tables, monkeypatch, capsys):
-    monkeypatch.setattr(envs, "installed_flavor", lambda env, conda=None: None)
-    assert cli.main(["env", "plan", "--methods", "Matilda,SCALEX,UINMF", "--flavor", "cpu"]) == 0
-    cap = capsys.readouterr()
-    lines = {l.split()[0]: l for l in cap.out.splitlines()}
-    assert "0.8 GB dl" in lines["matilda"] and "2.5 GB disk" in lines["matilda"]
-    assert "4.5 GB dl" in lines["scmb_torch"] and "0.9 GB dl" in lines["scmb_r"]
-    assert _after_plan_warning(cap.err).startswith(
-        "# 3 envs: 6.2 GB to download, at least 2.5 GB on disk\n")
-    assert cli.main(["env", "plan", "--methods", "Matilda", "--flavor", "gpu"]) == 0
-    cap = capsys.readouterr()
-    assert "3.0 GB dl" in cap.out and "9.0 GB disk" in cap.out
-    assert _after_plan_warning(cap.err) == "# 1 env: 3.0 GB to download, 9.0 GB on disk\n"
-    monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
-    assert cli.main(["env", "plan", "--methods", "Matilda"]) == 0        # auto
-    cap = capsys.readouterr()
-    assert "0.8 GB dl" in cap.out
-    assert ("# 1 env: 0.8 GB to download, 2.5 GB on disk\n# for jobs on GPU nodes, pass "
-            "--flavor gpu") in cap.err
-
-
-def test_cli_status_doctor_plan_print_the_record(cli_linux, envs_dir, capsys):
-    torch = envs.group_for("SCALEX")
-    (make_prefix(envs_dir, torch) / envs.FLAVOR_FILE).write_text("cpu\n")
-    make_prefix(envs_dir, "matilda")
-    assert cli.main(["env", "status", "--methods", "SCALEX,Matilda,UINMF"]) == 0
-    out = capsys.readouterr().out.splitlines()
-    by = {l.split()[1]: l for l in out}
-    assert by["SCALEX"].startswith("[x]") and by["SCALEX"].endswith(" flavor=cpu")
-    assert by["Matilda"].startswith("[x]") and "flavor=" not in by["Matilda"]
-    assert by["UINMF"].startswith("[L]") and "flavor=" not in by["UINMF"]
-    assert cli.main(["env", "doctor", "--methods", "SCALEX,Matilda,UINMF"]) == 0
-    out = capsys.readouterr().out
-    torch_line = [l for l in out.splitlines() if l.startswith(f"[x] {torch}")][0]
-    assert torch_line.endswith(" flavor=cpu")
-    assert [l for l in out.splitlines() if l.startswith("[x] matilda")][0].count("flavor") == 0
-    assert cli.main(["env", "plan", "--methods", "SCALEX,Matilda", "--flavor", "gpu"]) == 0
-    out = capsys.readouterr().out
-    assert [l for l in out.splitlines() if l.startswith(torch)][0].endswith(" flavor=cpu")
-    assert "flavor" not in [l for l in out.splitlines() if l.startswith("matilda")][0]
-    assert cli.main(["env", "install", "--packed", "--methods", "SCALEX,Matilda", "--dry-run"]) == 0
-    out = capsys.readouterr().out
-    assert [l for l in out.splitlines() if l.startswith(torch)][0].endswith("[have          ] <- SCALEX flavor=cpu")
-    assert [l for l in out.splitlines() if l.startswith("matilda")][0].endswith("<- Matilda")
-
-
-def test_size_total_line_without_flavor_is_unchanged():
-    rows = [{"env": "a"}, {"env": "b", "flavor": "cpu"}]
-    sizes = {"a": {"archive_bytes": 1_000_000_000, "unpacked_bytes": 2_000_000_000},
-             "b": {"archive_bytes": 5_000_000_000, "unpacked_bytes": None},
-             "b-cpu": {"archive_bytes": 1_000_000_000, "unpacked_bytes": None}}
-    assert envs.plan_totals(rows, sizes, layers={})[1] == \
-        "2 envs: 2.0 GB to download, at least 2.0 GB on disk"
-    assert cli._flavor_token("cpu") == " flavor=cpu" and cli._flavor_token(None) == ""
-    assert cli._flavor_token("tpu") == ""
 
 
 # ---------------------------------------------------------------- the shipped placeholders

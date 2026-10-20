@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, config
+from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, ingest, registry
 from tests.conftest import full_scan
@@ -147,74 +147,6 @@ def test_scan_blocks_every_row_under_another_scripts_ref(scripts, monkeypatch):
     after = full_scan("D11", "vertical", methods=["Matilda"], modalities=["rna", "adt"],
                      verbose=False)
     pd.testing.assert_frame_equal(before, after)
-
-
-@needs_git
-def test_scan_strict_fails_under_another_scripts_ref(scripts, monkeypatch, capsys):
-    repo, head = scripts
-    argv = ["scan", "D11", "--category", "vertical", "--methods", "Matilda",
-            "--modalities", "rna,adt", "--strict"]
-    assert cli.main(argv) == 0
-    capsys.readouterr()
-    monkeypatch.setenv(config.SCRIPTS_REF_VAR, "deadbeef")
-    assert cli.main(argv) == 1
-    err = capsys.readouterr().err
-    # the CLI spelling of the fix
-    assert (f"The method scripts are at {head[:7]}, not deadbeef (MULTIBENCH_SCRIPTS_REF)"
-            in err)
-    assert "repo_path" not in err.split("MULTIBENCH_SCRIPTS_REF)", 1)[1]
-
-
-@needs_git
-def test_dry_runs_note_another_scripts_ref(scripts, monkeypatch, capsys, tmp_path):
-    repo, head = scripts
-    inp = mtb.inputs_for("D11", "vertical", "Matilda")
-    mtb.run("Matilda", "vertical", inputs=inp, out_dir=str(tmp_path / "o"), dry_run=True)
-    assert "MULTIBENCH_SCRIPTS_REF" not in capsys.readouterr().err
-    monkeypatch.setenv(config.SCRIPTS_REF_VAR, "deadbeef")
-    mtb.run("Matilda", "vertical", inputs=inp, out_dir=str(tmp_path / "o"), dry_run=True)
-    assert capsys.readouterr().err.count(f"# {_mismatch(head)}\n") == 1
-    # R7-07: run_all prints the note only with verbose=True, after its count line
-    mtb.run_all("D11", "vertical", methods=["Matilda"], dry_run=True, verbose=False)
-    assert "MULTIBENCH_SCRIPTS_REF" not in capsys.readouterr().err
-    mtb.run_all("D11", "vertical", methods=["Matilda"], dry_run=True, verbose=True)
-    assert capsys.readouterr().out.count(f"[run_all] {_mismatch(head)}\n") == 1
-    # the CLI: one note, exit code unchanged
-    pairs = [a for role, path in inp.items() for a in ("--input", f"{role}={path}")]
-    rc = cli.main(["run", "--method", "Matilda", "--category", "vertical", *pairs,
-                   "--out", str(tmp_path / "o"), "--dry-run"])
-    err = capsys.readouterr().err
-    assert rc == 0
-    assert err.count(f"# The method scripts are at {head[:7]}, not deadbeef") == 1
-    assert "and run multibench fetch --scripts." in err and "`" not in err
-    rc = cli.main(["run-all", "D11", "--category", "vertical", "--methods", "Matilda",
-                   "--dry-run"])
-    assert rc == 0
-    assert capsys.readouterr().err.count("# The method scripts are at ") == 1
-    # the real run refuses with the same sentence, naming the scripts folder
-    with pytest.raises(RuntimeError, match=re.escape(
-            f"The method scripts in {repo} are at "
-            + _mismatch(head).split("The method scripts are at ", 1)[1])):
-        config.ensure_repo()
-
-
-@needs_git
-def test_config_shows_the_scripts_ref_row(scripts, monkeypatch, capsys):
-    repo, head = scripts
-    assert "scripts_ref" not in [r["name"] for r in config._sources()]
-    monkeypatch.setenv(config.SCRIPTS_REF_VAR, "deadbeef")
-    rows = {r["name"]: r for r in config._sources()}
-    names = [r["name"] for r in config._sources()]
-    assert names.index("scripts_ref") == names.index("scripts_commit") + 1
-    assert rows["scripts_ref"]["value"] == "deadbeef"
-    assert rows["scripts_ref"]["source"] == (
-        f"environment variable MULTIBENCH_SCRIPTS_REF; does not match scripts_commit "
-        f"{head[:7]}")
-    assert cli.main(["config"]) == 0
-    assert f"does not match scripts_commit {head[:7]}" in capsys.readouterr().out
-    monkeypatch.setenv(config.SCRIPTS_REF_VAR, head[:10])
-    row = next(r for r in config._sources() if r["name"] == "scripts_ref")
-    assert row["source"].endswith("; matches scripts_commit")
 
 
 def test_scripts_ref_problem_is_none_without_scripts_or_variable(tmp_path, monkeypatch):

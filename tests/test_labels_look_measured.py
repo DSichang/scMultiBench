@@ -17,7 +17,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, config
+from multibench import config
 from multibench.eval import io
 from multibench.eval import scib as escib
 
@@ -121,29 +121,6 @@ def test_the_cells_that_are_scored_count(tmp_path):
         warnings.simplefilter("always")
         mtb.evaluate(EMB, labels=labels, metrics=["ARI"], missing_labels="drop")
     assert [str(w.message) for w in rec if "measured" in str(w.message)] == []
-
-
-# -------------------------------------------------------------- command line
-def test_the_command_line_names_its_options(tmp_path, capsys, monkeypatch):
-    emb = tmp_path / "emb.npy"
-    np.save(emb, EMB)
-    obs = tmp_path / "obs.csv"
-    pd.DataFrame({"celltype": TYPES, "nCount_RNA": COUNTS},
-                 index=[f"cell{i}-1" for i in range(N)]).to_csv(obs)
-    capsys.readouterr()
-    assert cli.main(["evaluate", "--embedding", str(emb), "--labels", str(obs), "--column",
-                     "nCount_RNA", "--metrics", "ARI"]) == 0
-    err = capsys.readouterr().err
-    assert err.splitlines()[-1] == (
-        f"warning: --labels (obs.csv) has 60 different labels for 60 cells. {CHECK}")
-    # 0.4.0: --column is hidden and deprecated; only its own warning names it
-    deprecated = "warning: evaluate --column is deprecated and will be removed in 0.5."
-    assert [line for line in err.splitlines() if "--column" in line] == [
-        deprecated + " Use a one-column --labels CSV."]
-    assert config._CLI is False
-    assert cli.main(["evaluate", "--embedding", str(emb), "--labels", str(obs), "--column",
-                     "celltype", "--metrics", "ARI"]) == 0
-    assert "measured" not in capsys.readouterr().err
 
 
 # ------------------------------------------------------------ shipped datasets

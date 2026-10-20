@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from multibench import cli, config
+from multibench import config
 from multibench.engine import ingest
 
 from tests.test_docs_r4 import needs_docs
@@ -108,23 +108,6 @@ def test_the_entry_the_adt_hint_names_is_not_named_to_itself(tmp_path):
     assert msgs == [_in_obsm("adt")]
 
 
-def test_one_file_from_obsm(tmp_path, monkeypatch):
-    cite = _cite()
-    msgs = _warned(ingest.to_canonical, cite, tmp_path / "a.h5", modality="atac_peak",
-                   obsm="peaks")
-    assert msgs == [_in_obsm("atac_peak", "obsm='<key>'")]
-    msgs = _warned(ingest.to_canonical, cite, tmp_path / "b.h5", modality="adt", obsm="protein")
-    assert msgs == [NOT_COUNTS.format(what="adt") + "Export raw counts, for example with "
-                                                    "obsm='protein_counts'."]
-    msgs = _warned(ingest.to_canonical, cite, tmp_path / "c.h5", modality="rna")
-    assert msgs == [NOT_COUNTS.format(what="rna") + "Export raw counts, for example with "
-                                                    "layer='counts'."]
-    monkeypatch.setattr(config, "_CLI", True)
-    msgs = _warned(ingest.to_canonical, cite, tmp_path / "d.h5", modality="atac_peak",
-                   obsm="peaks")
-    assert msgs == [_in_obsm("atac_peak", "--obsm <key>")]
-
-
 # ------------------------------------------------- 1: a feature filter
 @pytest.mark.parametrize("col", ["feature_types", "kind"])
 @pytest.mark.parametrize("what, value, part", [("rna", "Gene Expression", _rna),
@@ -172,67 +155,6 @@ def test_the_hints_of_a_mudata_keep_the_modality(tmp_path):
     assert np.array_equal(_dense(tmp_path / "E" / "adt.h5"), _adt().layers["counts"])
 
 
-# ------------------------------------------------ 1: the command line
-def _export(capsys, *argv):
-    assert cli.main(["export", *map(str, argv)]) == 0
-    return [line for line in capsys.readouterr().err.splitlines() if "whole numbers" in line]
-
-
-def test_export_names_the_obsm_entry_and_quotes_the_filter(tmp_path, capsys):
-    _cite().write_h5ad(tmp_path / "cite.h5ad")
-    _tenx("kind").write_h5ad(tmp_path / "tenx.h5ad")
-    lines = _export(capsys, tmp_path / "cite.h5ad", tmp_path / "A", "--rna", "layer:counts",
-                     "--atac", "obsm:peaks", "--atac-kind", "peak")
-    assert lines == ["warning: " + _in_obsm("atac", "--atac obsm:<key>")]
-    lines = _export(capsys, tmp_path / "tenx.h5ad", tmp_path / "B", "--adt",
-                     "X[kind=Antibody Capture]")
-    assert len(lines) == 1 and lines[0].endswith(
-        NOT_COUNTS.format(what="adt") + "Export raw counts, for example with "
-        "--adt \"layer:counts[kind=Antibody Capture]\".")
-    # export reads the RNA from X unless --adt reads X: name the counts for it too
-    assert _export(capsys, tmp_path / "tenx.h5ad", tmp_path / "C", "--adt",
-                    "layer:counts[kind=Antibody Capture]", "--rna",
-                    "layer:counts[kind=Gene Expression]") == []
-    assert np.array_equal(_dense(tmp_path / "C" / "adt.h5"), _adt().layers["counts"])
-
-
-def test_export_follows_the_selector_of_the_atac_file(tmp_path, capsys):
-    """``--atac`` is the selector for the ``--atac-from`` file: the hint
-    follows it as it does for SRC."""
-    other = [f"o{i}" for i in range(N)]
-    holder = _rna(cells=other)
-    holder.obsm["peaks"] = _table(_atac(cells=other))
-    holder.obsm["peak_counts"] = _table(_atac(cells=other), counts=True)
-    holder.write_h5ad(tmp_path / "holder.h5ad")
-    tenx = _tenx("kind")
-    tenx.obs_names = other
-    tenx.write_h5ad(tmp_path / "tenx.h5ad")
-    _atac(cells=other).write_h5ad(tmp_path / "atac.h5ad")
-    _rna(log=False).write_h5ad(tmp_path / "rna.h5ad")
-    base = [tmp_path / "rna.h5ad", None, "--rna", "X", "--atac-kind", "peak", "--category",
-            "diagonal", "--atac-from"]
-
-    def run(name, *rest):
-        return _export(capsys, *[tmp_path / name if a is None else a for a in base], *rest)
-
-    lines = run("A", tmp_path / "holder.h5ad", "--atac", "obsm:peaks")
-    assert lines == ["warning: " + _in_obsm("atac", "--atac obsm:<key>")]
-    assert run("B", tmp_path / "holder.h5ad", "--atac", "obsm:peak_counts") == []
-    assert np.array_equal(_dense(tmp_path / "B" / "atac_peak.h5"), _atac().layers["counts"])
-    lines = run("C", tmp_path / "tenx.h5ad", "--atac", "X[kind=Peaks]")
-    assert len(lines) == 1 and lines[0].endswith(
-        "Export raw counts, for example with --atac \"layer:counts[kind=Peaks]\".")
-    assert run("D", tmp_path / "tenx.h5ad", "--atac", "layer:counts[kind=Peaks]") == []
-    assert np.array_equal(_dense(tmp_path / "D" / "atac_peak.h5"), _atac().layers["counts"])
-    # no --atac, and X: the layer of that file, as before
-    for n, rest in (("E", ()), ("F", ("--atac", "X"))):
-        lines = run(n, tmp_path / "atac.h5ad", *rest)
-        assert len(lines) == 1 and lines[0].endswith(
-            "Export raw counts, for example with --atac layer:counts.")
-    assert run("G", tmp_path / "atac.h5ad", "--atac", "layer:counts") == []
-    assert np.array_equal(_dense(tmp_path / "G" / "atac_peak.h5"), _atac().layers["counts"])
-
-
 # ------------------------------------------- 3(a): data passed once more
 def test_data_passed_as_the_second_modality_is_named_as_such(tmp_path):
     """The 0.3.5 text names the two arguments and no longer says that they
@@ -257,22 +179,6 @@ def test_adt_names_names_a_uns_key_only_when_the_string_is_one(tmp_path):
                          ("CD3,CD4", "'<key>'")):
         assert _refused(tmp_path, cite, adt="obsm:protein", adt_names=names) == (
             head.format(names, shown))
-
-
-# -------------------------------- 3(c): the diagonal label error of export
-def test_export_names_the_labels_flag(tmp_path, capsys):
-    rna, atac = _two_cohorts()
-    atac.obs = atac.obs[[]]
-    rna.write_h5ad(tmp_path / "rna.h5ad")
-    atac.write_h5ad(tmp_path / "atac.h5ad")
-    assert cli.main(["export", str(tmp_path / "rna.h5ad"), str(tmp_path / "OUT"), "--rna",
-                     "X", "--atac-from", str(tmp_path / "atac.h5ad"), "--atac-kind",
-                     "gene_activity", "--labels", "obs:cell_type", "--category",
-                     "diagonal"]) == 1
-    assert capsys.readouterr().err == (
-        "error: --labels obs:cell_type: column 'cell_type' not in obs of the ATAC object "
-        "(atac); available: []. Without cell types for the ATAC cells, leave --labels "
-        "out.\n" + DEBUG)
 
 
 # ------------------------------------------------ 2: the Changes page

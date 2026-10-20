@@ -34,7 +34,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, config
+from multibench import config
 from multibench import workflow as W
 from multibench.data import results as RS
 from multibench.engine import envs
@@ -145,16 +145,6 @@ def test_a_folder_variant_is_listed_by_its_method_name(macos_no_gpu, monkeypatch
     assert line.startswith("  scBridge: ") and "scBridge needs an NVIDIA GPU" in line, msg
 
 
-# ============================================================ describe_layout
-@pytest.mark.parametrize("cli_mode", [False, True])
-@pytest.mark.parametrize("category", [None, "vertical", "diagonal", "mosaic", "cross"])
-def test_the_layout_text_joins_no_two_facts_with_a_semicolon(monkeypatch, category,
-                                                             cli_mode):
-    monkeypatch.setattr(config, "_CLI", cli_mode)
-    joined = [l for l in mtb.describe_layout(category).splitlines() if ";" in l]
-    assert not joined, joined
-
-
 def test_the_category_descriptions_have_no_semicolon():
     assert not [c for c, d in mtb.list_categories().items() if ";" in d]
 
@@ -202,16 +192,6 @@ def test_missing_tables_are_named_in_plain_sentences(kw, start):
     assert "result_path=" not in msg                  # 0.4: no longer suggested
     _plain(msg)
     assert "scib_metric" not in msg and str(RS._SHIPPED_BASE) not in msg
-
-
-def test_the_cli_names_no_result_path_flag(capsys, tmp_path):
-    # 0.4: --result-path is deprecated and hidden, so the error no longer offers it
-    rc = cli.main(["plot", "bubble", "--category", "cross", "--dataset", "D53",
-                   "--out", str(tmp_path / "x.png")])
-    err = capsys.readouterr().err
-    assert rc == 1
-    assert "error: The stored results of cross hold D52, not D53." in err, err
-    assert "--result-path" not in err and "result_path=" not in err, err
 
 
 # ====================================================== old-style messages
@@ -271,33 +251,6 @@ def test_an_empty_bar_table_is_plain():
     assert isinstance(e, ValueError)
     assert str(e).startswith("long_df has no rows to plot. ")
     _plain(str(e), lead="long_df")
-
-
-def test_the_empty_cli_table_is_a_sentence(capsys):
-    cli._print_frame(pd.DataFrame(columns=["method", "modalities", "files_ok"]))
-    out = capsys.readouterr().out.strip()
-    assert out == "The table has no rows. Its columns are method, modalities, files_ok."
-    _plain(out)
-
-
-def test_the_deprecated_evaluate_flags_warn_in_sentences(monkeypatch, capsys):
-    from multibench.eval import pipeline
-    # the CLI scores with the internal wide frame and prints the long table
-    monkeypatch.setattr(pipeline, "_scores", lambda *a, **kw: pd.DataFrame(
-        {"Value": [0.5, 0.6, 0.7]}, index=["ARI", "NMI", "ASW"]))
-    assert cli.main(["evaluate", "--embedding", "e.h5", "--labels", "l.csv",
-                     "--task", "clustering"]) == 0
-    err = capsys.readouterr().err
-    # 0.4: the warning names its command
-    assert ("warning: evaluate --task is deprecated and will be removed in 0.5. Use "
-            "--metrics clustering.\n") in err, err
-    assert "deprecated;" not in err
-    # 0.4: --only is removed; argparse refuses it
-    with pytest.raises(SystemExit) as e:
-        cli.main(["evaluate", "--embedding", "e.h5", "--labels", "l.csv", "--only", "ARI"])
-    assert e.value.code == 2
-    # ARI is read as the positional EMBEDDING since 0.4.0 (X19)
-    assert "unrecognized arguments: --only" in capsys.readouterr().err
 
 
 # ================================================================ fetch error

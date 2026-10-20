@@ -86,29 +86,3 @@ def test_the_still_raised_variant_error_is_a_value_error():
     assert issubclass(AmbiguousVariantError, ValueError)
 
 
-@pytest.mark.parametrize("argv, flag", [
-    (["find", "--tunable"], "find --tunable"),
-    (["config", "--get", "data_path"], "config --get"),
-    (["cite", "--all"], "cite --all"),
-    (["env", "doctor", "--methods", "Matilda"], "multibench env doctor"),
-])
-def test_command_line_names_warn_once_with_their_command(argv, flag, capsys):
-    from multibench import cli
-    assert cli.main(argv) == 0
-    err = capsys.readouterr().err
-    assert err.count("is deprecated and will be removed in 0.5") == 1, err
-    assert f"warning: {flag} is deprecated" in err
-
-
-def test_convert_is_export_under_its_old_name(tmp_path, capsys):
-    from multibench import cli
-    mtb.data.write_example("D11", tmp_path, verbose=False)
-    assert cli.main(["convert", str(tmp_path / "my_file.h5ad"), str(tmp_path / "A"),
-                     "--rna", "X", "--adt", "obsm:protein"]) == 0
-    assert ("warning: multibench convert is deprecated and will be removed in 0.5. Use "
-            "multibench export.") in capsys.readouterr().err
-    assert cli.main(["export", str(tmp_path / "my_file.h5ad"), str(tmp_path / "B"),
-                     "--adt", "obsm:protein"]) == 0
-    names = lambda p: sorted(x.name for x in p.iterdir())                # noqa: E731
-    assert names(tmp_path / "A") == names(tmp_path / "B") == ["adt.h5", "rna.h5"]
-    assert "is deprecated" not in capsys.readouterr().err   # export: RNA from X by default

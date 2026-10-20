@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, config
+from multibench import config
 from multibench.eval import pipeline
 
 
@@ -89,20 +89,6 @@ def test_a_batch_with_ids_follows_the_method_order():
     assert got == pytest.approx(want)
 
 
-def test_the_command_line_refuses_labels_in_another_order(tmp_path, capsys):
-    st, fo, lab_folder, keys, emb = _d52mini()
-    np.save(tmp_path / "e.npy", emb)
-    pd.DataFrame({"x": lab_folder}).to_csv(tmp_path / "all.csv", index=False)
-    rc = cli.main(["evaluate", str(tmp_path / "e.npy"), "--labels", str(tmp_path / "all.csv"),
-                   "--dataset", "D52mini", "--category", "cross", "--method", "StabMap",
-                   "--metrics", "ASW"])
-    assert rc == 1
-    assert capsys.readouterr().err.splitlines()[-1] == (
-        "error: --labels is matched to the cells by position, and StabMap puts the cells "
-        "of D52mini in the order cty3, cty1, cty2. Leave out --labels to read the label "
-        "files in that order.")
-
-
 # --------------------------------------- u3 #1, u1 #1, u2 #2-#4: a subset of the cells
 @pytest.fixture
 def folder(tmp_path):
@@ -159,26 +145,6 @@ def test_your_own_cells_on_a_benchmark_name_are_told_to_take_a_name_of_their_own
         mtb.evaluate(emb, dataset="D11", method="Matilda", metrics=["ASW"])
 
 
-def test_the_command_line_checks_a_benchmark_dataset_as_python(tmp_path, capsys):
-    """u2 #2, #3: the CLI refuses the subset as Python does and fills the category."""
-    rng = np.random.default_rng(0)
-    np.save(tmp_path / "sub.npy", rng.normal(size=(1718, 4)))
-    pd.DataFrame({"x": np.repeat(["a", "b"], 859)}).to_csv(tmp_path / "l.csv", index=False)
-    rc = cli.main(["evaluate", str(tmp_path / "sub.npy"), "--labels", str(tmp_path / "l.csv"),
-                   "--method", "PCA", "--dataset", "D11", "--metrics", "ASW"])
-    assert rc == 1
-    assert capsys.readouterr().err.splitlines()[-1] == (
-        "error: the label files of D11 (cty.csv) hold 2,864 labels for 1,718 cells in the "
-        "embedding file. To score other cells, pass their labels with --labels and a "
-        "dataset name of your own, such as --dataset D11_subset, and plot them apart from "
-        "the stored results.")
-    np.save(tmp_path / "full.npy", rng.normal(size=(2864, 4)))
-    rc = cli.main(["evaluate", str(tmp_path / "full.npy"), "--dataset", "D11", "--method",
-                   "PCA", "--metrics", "ASW", "--out", str(tmp_path / "o.csv")])
-    assert rc == 0
-    assert set(pd.read_csv(tmp_path / "o.csv")["category"]) == {"vertical"}
-
-
 def test_a_barcoded_batch_next_to_an_npy_follows_the_folder(tmp_path, folder):
     """u3 #5: the folder's barcodes give the cells of an embedding without ids."""
     path, a = folder
@@ -194,21 +160,6 @@ def test_a_barcoded_batch_next_to_an_npy_follows_the_folder(tmp_path, folder):
                         method="PCA", batch=batch.to_numpy(), metrics=["iLISI"],
                         verbose=False)
     assert _value(got, "iLISI") == pytest.approx(_value(want, "iLISI"))
-
-
-def test_a_missing_embedding_file_is_named(tmp_path, capsys):
-    rc = cli.main(["evaluate", str(tmp_path / "nothere.h5ad"), "--labels", "celltype"])
-    assert rc == 1
-    assert capsys.readouterr().err.startswith(
-        f"error: The embedding {tmp_path / 'nothere.h5ad'} does not exist.")
-
-
-def test_a_printed_table_leaves_the_category_empty(tmp_path, capsys):
-    np.save(tmp_path / "e.npy", np.random.default_rng(0).normal(size=(40, 3)))
-    pd.DataFrame({"x": np.repeat(["a", "b"], 20)}).to_csv(tmp_path / "l.csv", index=False)
-    assert cli.main(["evaluate", str(tmp_path / "e.npy"), "--labels",
-                     str(tmp_path / "l.csv"), "--metrics", "ASW"]) == 0
-    assert "None" not in capsys.readouterr().out
 
 
 # ------------------------------------------- u4 #1, u5 #8: the stored rows; u5 #2: snap
@@ -297,17 +248,6 @@ def test_the_default_bar_runs_no_rank_matrix(monkeypatch):
     _quiet(mtb.plot.bar, two, metrics="clustering")
 
 
-def test_the_command_line_bar_has_the_python_title(tmp_path, monkeypatch):
-    from matplotlib.figure import Figure
-    titles = []
-    monkeypatch.setattr(Figure, "savefig",
-                        lambda self, *a, **k: titles.append(self.axes[0].get_title("left")))
-    assert cli.main(["plot", "bar", "--category", "mosaic", "--out",
-                     str(tmp_path / "b.png")]) == 0
-    mtb.plot.bar(mtb.load_results("mosaic"), save=str(tmp_path / "p.png"))
-    assert titles == ["overall — D45", "overall — D45"]
-
-
 def test_skip_existing_without_a_saved_run_says_so(tmp_path):
     with pytest.raises(ValueError) as e:
         mtb.run_all("D11", "vertical", out_dir=str(tmp_path / "outs"), methods=["Matilda"],
@@ -315,55 +255,6 @@ def test_skip_existing_without_a_saved_run_says_so(tmp_path):
     assert str(e.value) == (
         f"No saved output of Matilda in {tmp_path / 'outs'} (it would be "
         f"{tmp_path / 'outs' / 'Matilda_D11'}). Pass the out_dir of the earlier run.")
-
-
-# ------------------------------------------- the command line: refusals, tags, params
-def test_a_refusal_of_any_kind_prints_no_debug_line(tmp_path, capsys, monkeypatch):
-    rc = cli.main(["run-all", "D11", "--category", "vertical", "--methods", "Matilda",
-                   "--param", "Matilda:epochs=2.5", "--dry-run"])
-    err = capsys.readouterr().err
-    assert rc == 1 and err.startswith("error: Matilda: epochs takes a whole number")
-    assert "MULTIBENCH_DEBUG" not in err
-    # an error inside the package's own code keeps the hint
-    try:
-        config._and_list(5)
-    except TypeError as e:
-        assert not cli._refusal(e)
-    # a deliberate OSError (LinuxOnlyError, FileExistsError) is a refusal
-    from multibench.engine import envs
-    try:
-        envs._require_linux("this computer runs macOS")
-    except OSError as e:
-        assert cli._refusal(e)
-
-
-def test_two_run_folders_with_one_name_are_tagged_by_their_place(tmp_path, capsys):
-    long = mtb.load_results("vertical").assign(source="user")
-    for run in ("a", "b"):
-        (tmp_path / "runs" / run / "D11").mkdir(parents=True)
-        long.to_csv(tmp_path / "runs" / run / "D11" / "long.csv", index=False)
-    frames = cli._rename_repeats([long, long], [str(tmp_path / "runs" / r / "D11" /
-                                                     "long.csv") for r in ("a", "b")])
-    assert {m for f in frames for m in f["method"]} >= {"Matilda (a/D11)",
-                                                        "Matilda (b/D11)"}
-    rc = cli.main(["plot", "bar", "--input", str(tmp_path / "runs/a/D11/long.csv"), "--input",
-                   str(tmp_path / "runs/b/D11/long.csv"), "--out", str(tmp_path / "x.png")])
-    assert rc == 0, capsys.readouterr().err
-
-
-def test_params_on_the_command_line_answers_as_params_for(capsys):
-    with pytest.raises(ValueError) as e:
-        mtb.params_for("Multigrate")
-    assert cli.main(["params", "Multigrate"]) == 1
-    err = capsys.readouterr().err
-    assert err.startswith("error: Multigrate has 11 variants")
-    assert err.rstrip().endswith("for example multibench params Multigrate --category mosaic "
-                                 "--modalities rna1,rna2,adt2,adt3.")
-    assert str(e.value).endswith("params_for('Multigrate', 'mosaic', ['rna1', 'rna2', "
-                                 "'adt2', 'adt3']).")
-    assert cli.main(["params", "Matilda"]) == 0
-    assert capsys.readouterr().out.startswith(
-        f"# Matilda {mtb.params_for('Matilda')['variant']}: 9 tunable")
 
 
 def test_a_renamed_run_keeps_its_language_chip():

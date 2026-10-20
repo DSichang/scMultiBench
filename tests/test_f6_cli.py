@@ -21,83 +21,13 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, config
+from multibench import config
 from multibench.engine import registry
 from tests.test_f4_cli import _diag_folder
 
 pytest.importorskip("scib")
 
 _DATA = Path(mtb.__file__).resolve().parent.parent / "data"
-
-
-@pytest.fixture
-def diag(tmp_path, monkeypatch):
-    data = tmp_path / "data"
-    d, emb = _diag_folder(data)
-    monkeypatch.setattr(config.DEFAULT, "data_path", data)
-    np.save(tmp_path / "emb.npy", emb)
-    return d, tmp_path / "emb.npy"
-
-
-def _err(capsys, argv):
-    rc = cli.main(argv)
-    return rc, capsys.readouterr().err
-
-
-# ====================================================================== R6-07
-def test_name_alone_with_labels_writes_rows_with_that_name(diag, tmp_path, capsys):
-    d, emb = diag
-    out = tmp_path / "mine.csv"
-    # 0.4.0: --method is the row name (--name is its deprecated alias)
-    rc = cli.main(["evaluate", "--embedding", str(emb), "--method", "RNA+ATAC PCA",
-                   "--labels", str(d / "rna_cty.csv"), "--labels", str(d / "atac_cty.csv"),
-                   "--dataset", "MYDIAG", "--category", "diagonal", "--metrics", "ASW",
-                   "--out", str(out)])
-    assert rc == 0
-    df = pd.read_csv(out)
-    assert set(df["method"]) == {"RNA+ATAC PCA"} and set(df["dataset"]) == {"MYDIAG"}
-    assert "needs_labels" not in df.columns          # no package method to ask
-
-
-def test_name_without_method_or_labels_reads_the_dataset_labels(diag, capsys):
-    # 0.4.0 (Y09): --dataset and --category read the label files, as labels_for does
-    d, emb = diag
-    rc, err = _err(capsys, ["evaluate", "--embedding", str(emb), "--method", "x",
-                            "--dataset", "D28", "--category", "diagonal", "--metrics",
-                            "ASW"])
-    assert rc == 0
-    assert "# labels: rna_cty.csv, atac_cty.csv from D28, in that order" in err
-
-
-def test_unknown_method_with_name_says_leave_out_method(diag, capsys):
-    d, emb = diag
-    rc, err = _err(capsys, ["evaluate", "--embedding", str(emb), "--method", "MyPCA",
-                            "--name", "RNA+ADT PCA", "--labels", "cty.csv",
-                            "--dataset", "MYCITE", "--category", "vertical"])
-    assert rc == 1
-    assert ('error: MyPCA is not a package method. For your own embedding, leave out '
-            '--method: --name "RNA+ADT PCA" --labels cty.csv.') in err
-    # a close name adds the did-you-mean sentence
-    rc, err = _err(capsys, ["evaluate", "--embedding", str(emb), "--method", "Matlida",
-                            "--name", "x", "--labels", "cty.csv",
-                            "--dataset", "MYCITE", "--category", "vertical"])
-    assert rc == 1 and "Matlida is not a package method. Did you mean Matilda? " in err
-    assert "leave out --method: --name x --labels cty.csv." in err
-
-
-def test_unknown_method_without_labels_names_the_rename(diag, capsys):
-    d, emb = diag
-    # 0.4.0: --method takes any row name; a name close to a package method that
-    # orders the cells otherwise gets a did-you-mean warning, and the folder order
-    rc, err = _err(capsys, ["evaluate", "--embedding", str(emb), "--method", "uniPort_rerun",
-                            "--dataset", "D28", "--category", "diagonal", "--metrics", "ASW"])
-    assert rc == 0, err
-    assert "warning: Did you mean" in err and "uniPort puts the cells of D28 in another order" in err
-    assert "# labels: rna_cty.csv, atac_cty.csv from D28, in that order" in err
-    # a name close to a method that does not run on diagonal: just the row name
-    rc, err = _err(capsys, ["evaluate", "--embedding", str(emb), "--method", "Matlida",
-                            "--dataset", "D28", "--category", "diagonal", "--metrics", "ASW"])
-    assert rc == 0 and "warning:" not in err
 
 
 def test_check_method_is_short_sentences():
@@ -116,97 +46,11 @@ def test_no_category_message_names_the_categories():
     assert e.value.args[0] == "SCALEX does not run on vertical data. Its categories: diagonal."
 
 
-def _messages_of(calls):
-    out = []
-    for call in calls:
-        with pytest.raises((KeyError, ValueError)) as e, warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            call()
-        out.append(e.value.args[0])
-    return out
-
-
-def test_no_unknown_method_or_no_category_message_has_variant_or_qsemicolon(tmp_path,
-                                                                            capsys):
-    rna, adt = str(_DATA / "D11" / "rna.h5"), str(_DATA / "D11" / "adt.h5")
-    msgs = _messages_of([
-        lambda: registry.check_method("stabmapp"),
-        lambda: mtb.method_info("stabmapp"),
-        lambda: mtb.catalog.canonical_id("Matlida", strict=True),
-        lambda: mtb.load_results("vertical", methods=["Matlida"]),
-        lambda: mtb.labels_for("D11", "vertical", "SCALEX", data_path=_DATA),
-        lambda: mtb.inputs_for("D11", "vertical", "SCALEX", data_path=_DATA),
-        lambda: mtb.run("SCALEX", "vertical", inputs={"rna": rna, "adt": adt},
-                        out_dir=str(tmp_path / "o"), dry_run=True),
-        lambda: mtb.params_for("SCALEX", "vertical"),
-    ])
-    np.save(tmp_path / "emb.npy", np.zeros((10, 3)))
-    for argv in (["info", "stabmapp"], ["params", "Matilda", "--category", "cross"],
-                 ["evaluate", "--embedding", str(tmp_path / "emb.npy"), "--method", "SCALEX",
-                  "--dataset", str(_DATA / "D11"), "--category", "vertical"],
-                 ["evaluate", "--embedding", str(tmp_path / "emb.npy"), "--method",
-                  "uniPort_rerun", "--dataset", "D11", "--category", "vertical"]):
-        rc, err = _err(capsys, argv)
-        assert rc == 1
-        msgs.append(err)
-    assert len(msgs) == 12
-    for m in msgs:
-        assert "?;" not in m and "variant" not in m, m
-    assert ("error: SCALEX does not run on vertical data. Its categories: diagonal. For "
-            "your own embedding, pass the label files with --labels.") in msgs[10]
-    assert "error: Unknown method stabmapp. Did you mean StabMap? multibench find shows " \
-           "all methods." in msgs[8]
-
-
-def _d11_emb(tmp_path):
-    n = len(pd.read_csv(_DATA / "D11" / "cty.csv"))
-    emb = tmp_path / "emb.npy"
-    np.save(emb, np.random.default_rng(0).normal(size=(n, 4)).astype("float32"))
-    return emb
-
-
-def test_name_with_package_method_writes_no_needs_labels(tmp_path):
-    emb = _d11_emb(tmp_path)
-    out = tmp_path / "m.csv"
-    assert cli.main(["evaluate", "--embedding", str(emb), "--method", "Matilda", "--name",
-                     "Matilda_rerun", "--dataset", str(_DATA / "D11"), "--category",
-                     "vertical", "--metrics", "ASW", "--out", str(out)]) == 0
-    mine = pd.read_csv(out)
-    assert set(mine["method"]) == {"Matilda_rerun"}
-    assert "needs_labels" not in mine.columns
-    # the same columns as the long table without --name
-    out2 = tmp_path / "plain.csv"
-    assert cli.main(["evaluate", "--embedding", str(emb), "--method", "Matilda",
-                     "--dataset", str(_DATA / "D11"), "--category", "vertical",
-                     "--metrics", "ASW", "--out", str(out2)]) == 0
-    assert list(pd.read_csv(out2).columns) == list(mine.columns)
-
-
-def test_name_help_says_method_can_be_left_out():
-    parser = cli.build_parser()
-    ev = next(a for a in parser._actions if a.dest == "command").choices["evaluate"]
-    act = next(a for a in ev._actions if a.dest == "name")
-    import argparse
-    assert act.help == argparse.SUPPRESS       # 0.4.0: --method is the row name; --name hidden
-
-
 # ====================================================================== R6-08
 def _user_rows(method="uniPort", dataset="D28", metrics=("ARI", "NMI", "ASW")):
     return pd.DataFrame({"metric": list(metrics), "value": [0.3, 0.5, 0.6][:len(metrics)],
                          "method": method, "dataset": dataset, "category": "diagonal",
                          "clustering": "default", "source": "user"})
-
-
-def test_cli_overlay_with_a_stored_name_says_rename_with_name(tmp_path, capsys):
-    up = tmp_path / "up.csv"
-    _user_rows().to_csv(up, index=False)
-    rc, err = _err(capsys, ["plot", "bubble", "--input", str(up), "--category", "diagonal",
-                            "--dataset", "D28", "--out", str(tmp_path / "f.png")])
-    # the command line renames the rows itself since 0.4.0 (X15) and says so
-    assert rc == 0, err
-    assert ("# Your rows of uniPort are drawn as uniPort (this run): the stored results "
-            "have the same method and dataset.") in err
-    assert "error:" not in err
 
 
 def test_python_overlay_with_a_stored_name_names_to_long():
@@ -261,25 +105,6 @@ def test_python_dry_run_notes_a_missing_input(tmp_path, capsys):
     assert "rna.h5, which" not in err
 
 
-def test_cli_dry_run_prints_the_header_first_and_the_path_as_given(tmp_path, capsys,
-                                                                  monkeypatch):
-    _lung(tmp_path)
-    monkeypatch.chdir(tmp_path)
-    rc = cli.main(["run", "--method", "SCALEX", "--category", "diagonal",
-                   "--input", "rna=data/LUNG/rna.h5",
-                   "--input", "atac_gas=data/LUNG/atac_gas.h5",
-                   "--out-dir", "runs/x", "--dry-run"])
-    cap = capsys.readouterr()
-    assert rc == 0
-    lines = cap.err.splitlines()
-    assert lines[0].startswith("warning: multibench run is deprecated")      # 0.4.0
-    assert lines[1] == "# Dry run. Nothing was executed."
-    assert ("# SCALEX reads data/LUNG/atac_gas.h5, which does not exist. multibench scan "
-            "shows what the folder holds.") in lines
-    assert lines[-1] == "# multibench run would execute:"
-    assert "main_SCALEX.py" in cap.out
-
-
 def test_dry_run_with_existing_inputs_has_no_missing_note(tmp_path, capsys):
     inp = mtb.inputs_for("D28", "diagonal", "SCALEX", data_path=_DATA)
     mtb.run("SCALEX", "diagonal", inputs=inp, out_dir=str(tmp_path / "o"), dry_run=True)
@@ -324,16 +149,3 @@ def test_plot_messages_are_sentences(tmp_path, capsys):
         assert ";" not in text.split("overall=")[0] and "(s)" not in text
 
 
-def test_cli_require_complete_warning_uses_the_flags(tmp_path, capsys):
-    rows = []
-    for m, dss in (("A", ("D1", "D2")), ("C", ("D1",))):
-        for ds in dss:
-            rows += [{"method": m, "metric": k, "value": 0.2, "dataset": ds}
-                     for k in ("ARI", "NMI")]
-    p = tmp_path / "in.csv"
-    pd.DataFrame(rows).to_csv(p, index=False)
-    rc, err = _err(capsys, ["plot", "bubble", "--input", str(p), "--aggregate", "summary",
-                            "--require-complete", "--out", str(tmp_path / "f.png")])
-    assert rc == 0
-    assert ("warning: --require-complete dropped 1 method: C lacks D2. "
-            "Leave out --require-complete to keep them.") in err

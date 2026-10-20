@@ -12,7 +12,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli, config, workflow
+from multibench import config, workflow
 from multibench.engine import envs, ingest, resolve
 from tests.conftest import full_scan
 
@@ -338,27 +338,6 @@ def test_every_caveat_leads_with_its_warning():
         assert text.startswith("{method} " + head), text
 
 
-def test_compact_cli_table_keeps_expects_gene_activity(tmp_path, capsys, monkeypatch,
-                                                       gas_matilda):
-    monkeypatch.setattr(workflow, "_installed_envs", lambda: frozenset())
-    cells = [f"c{i}" for i in range(30)]
-    d = tmp_path / "MYMULTIOME"
-    d.mkdir()
-    _h5(d / "rna.h5", GENES, cells)
-    _h5(d / "atac.h5", PEAKS, cells)
-    _labels(d / "cty.csv", 30)
-    rc = cli.main(["scan", str(d), "--category", "vertical", "--modalities", "rna,atac"])
-    cap = capsys.readouterr()
-    assert rc == 0
-    # 0.4.0: scan prints mtb.scan's per-method table, whose reason column is
-    # clipped; the [scan] line on stderr gives the ATAC reason in full
-    line = next(ln for ln in cap.out.splitlines() if ln.strip().startswith("Matilda"))
-    assert line.split()[:3] == ["Matilda", "rna+atac", "False"]
-    line = next(ln for ln in cap.err.splitlines() if ln.startswith("[scan] Matilda: "))
-    assert "Matilda needs gene-activity ATAC, and atac.h5 holds peaks." in line
-    assert "resolved to a peak matrix" not in cap.out + cap.err
-
-
 # --- M31: a variant that reads fewer batches than the folder holds ------------
 TWO_BATCHES = ["rna1", "rna2", "adt1", "adt2"]        # UINMF's two-batch cross variant
 
@@ -418,19 +397,6 @@ def test_read_canonical_example_builds_the_path_from_data_path():
         in doc
     assert "sparse=" not in doc                    # deprecated in 0.4.0
     assert '"data/D11/rna.h5"' not in doc
-
-
-def test_cli_dry_run_prints_the_unused_batch(root, capsys, tmp_path):
-    rc = cli.main(["run-all", "D52", "--category", "cross", "--data-path", str(root / "data"),
-                   "--dry-run", "--out-dir", str(tmp_path / "out"),
-                   "--modalities", ",".join(TWO_BATCHES)])
-    assert rc == 0
-    err = capsys.readouterr().err
-    assert "# UINMF reads batches 1-2 of 3. Batch 3 is not used.\n" in err
-    # the whole category: UINMF's three-batch row runs, so nothing is unused
-    rc = cli.main(["run-all", "D52", "--category", "cross", "--data-path", str(root / "data"),
-                   "--dry-run", "--out-dir", str(tmp_path / "out")])
-    assert rc == 0 and "reads batches" not in capsys.readouterr().err
 
 
 def test_run_all_prints_the_unused_batch(root, tmp_path, capsys, monkeypatch):

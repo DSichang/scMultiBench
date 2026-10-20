@@ -9,57 +9,10 @@ from __future__ import annotations
 
 import warnings
 
-from multibench import cli, config
+from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs
 from tests.test_study_r4_wf import ALL_ENVS, _gasmos
-
-
-def _rec(method, status, **kw):
-    return {"method": method, "status": status, "category": "vertical",
-            "dataset": "MYCITE", "modalities": ["rna", "adt"], "error": kw.pop("error", None),
-            **kw}
-
-
-def test_failed_line_does_not_count_unnamed_skipped_methods():
-    res = W.BatchResult([_rec("Matilda", "CHAIN_OK"),
-                         _rec("totalVI", "FAIL", error="boom"),
-                         _rec("scMDC", "SKIPPED", error="needs a GPU", requested=False)],
-                        "MYCITE", "vertical")
-    assert cli._failed_line(res, "out/failures.csv") == (
-        "# 1 failed (totalVI). See out/failures.csv.")
-
-
-def test_failed_line_counts_a_named_skipped_method():
-    res = W.BatchResult([_rec("Matilda", "CHAIN_OK"),
-                         _rec("UnitedNet", "SKIPPED", error="needs a GPU", requested=True)],
-                        "MYCITE", "vertical")
-    # R5-03: a named skip is counted as skipped, not failed
-    assert cli._failed_line(res, "f.csv") == "# 1 skipped (UnitedNet). See f.csv."
-
-
-def test_strict_with_allow_atac_mismatch_still_needs_fetched_scripts(tmp_path, monkeypatch,
-                                                                     capsys):
-    monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
-    monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
-    monkeypatch.setattr(config.DEFAULT, "repo_path", tmp_path / "no_scripts")
-    monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
-    monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
-    root = _gasmos(tmp_path)
-    argv = ["scan", "GASMOS", "--category", "mosaic", "--data-path", str(root),
-            "--methods", "StabMap,scMoMaT", "--strict", "--assume-gpu",
-            "--allow-atac-mismatch"]
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        rc = cli.main(argv)
-    err = capsys.readouterr().err
-    # each of the two has four mosaic rows; the folder holds the files of one
-    assert rc == 1 and "Rows whose method scripts are not fetched: 8." in err, err
-    assert err.rstrip().endswith("Run multibench fetch --scripts first."), err
-    monkeypatch.setattr(config, "scripts_present", lambda cfg=None: True)
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        assert cli.main(argv) == 0, capsys.readouterr().err
 
 
 def test_run_all_dry_run_names_a_scripts_folder_without_scripts(tmp_path, monkeypatch,

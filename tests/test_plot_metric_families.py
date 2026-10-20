@@ -4,7 +4,6 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import cli
 
 
 def _long():
@@ -41,8 +40,3 @@ def test_bubble_and_bar_take_it(tmp_path):
     mtb.plot.bar(_long(), metrics="clustering")
 
 
-def test_cli_plot_metrics_family(tmp_path):
-    src = tmp_path / "long.csv"
-    _long().to_csv(src, index=False)
-    assert cli.main(["plot", "bubble", "--input", str(src), "--metrics", "clustering",
-                     "--out", str(tmp_path / "b.png")]) == 0

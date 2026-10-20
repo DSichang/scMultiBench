@@ -128,21 +128,6 @@ def test_to_canonical_mod_is_deprecated(tmp_path):
             mtb.io.to_canonical(a, tmp_path / "x.h5", mod="rna")
 
 
-def test_cli_find_atac_and_export_mod_are_hidden(capsys):
-    from multibench import cli
-    with pytest.raises(SystemExit):
-        cli.main(["find", "--help"])
-    assert "--atac" not in capsys.readouterr().out
-    with pytest.raises(SystemExit):
-        cli.main(["export", "--help"])          # export replaces convert (0.4.0)
-    assert "--mod " not in capsys.readouterr().out
-    assert cli.main(["find", "--category", "diagonal", "--atac", "peak"]) == 0
-    out = capsys.readouterr()
-    assert "warning: find --atac is deprecated and will be removed in 0.5. Use --modalities " \
-           "atac_peak or atac_gas." in out.err
-    assert out.out.split() == mtb.find_methods("diagonal", modalities=["atac_peak"])
-
-
 # Y35: mtb.DegenerateRerunWarning leaves the surface and still works
 def test_degenerate_rerun_warning_is_deprecated():
     from multibench.data.results import DegenerateRerunWarning

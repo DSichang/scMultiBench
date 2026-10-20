@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "multibench-sc"
 dynamic = ["version"]
-description = "Runs and scores the single-cell multimodal integration methods of the scMultiBench benchmark from Python or the command line."
+description = "Runs and scores the single-cell multimodal integration methods of the scMultiBench benchmark from Python."
 requires-python = ">=3.9"
 license = {text = "Apache-2.0"}
 readme = "README.md"
@@ -21,9 +21,6 @@ Paper = "https://doi.org/10.1038/s41592-025-02856-3"
 dev = ["pytest>=7.4"]
 eval = []  # kept for compatibility: evaluation now ships with the core install
 loom = ["loompy>=3.0"]
-
-[project.scripts]
-multibench = "multibench.cli:main"
 
 [tool.setuptools]
 packages = ["multibench", "multibench.data", "multibench.eval", "multibench.plot", "multibench.engine"]
