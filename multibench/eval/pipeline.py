@@ -273,14 +273,14 @@ def _file_carries_ids(first, ids) -> bool:
 
 
 def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
-                   table=None, cells=None, read=()):
+                   table=None, cells=None, read=(), others=None):
     """One label-like argument as a 1-D array in the output's cell order: an obs
     column, a Series aligned by id, a file aligned by its id column, else by position.
 
     ``as_written`` reads files for a message naming the missing words;
     ``table`` (a ``.csv`` embedding's barcodes) collects the arguments put in
     its row order; ``cells`` words the error of ``io._align_vector``; ``read``
-    names the files whose barcodes name the cells (:func:`_file_barcodes`).
+    and ``others`` name the files whose barcodes name the cells (:func:`_folder_ids`).
     """
     if adata is not None and isinstance(x, str):
         col = _obs_column_name(x, adata)
@@ -307,9 +307,9 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
                 and _same_cells(first, ids, what=what, name=name, table=table,
                                 fix=_file_fix()):
             table.moved.append(name)
-        if what == "labels" and first is None and _has_cell_ids(ids) and unique:
+        if what == "labels" and first is None and _has_cell_ids(ids):
             # no ids: the dataset folder's matrix names the cells
-            first = _folder_ids([x], [len(vals)], ids, read)
+            first = _folder_ids([x], [len(vals)], ids, read, others)
         if _has_cell_ids(ids) and not _file_carries_ids(first, ids):
             by_position = "" if len(vals) != len(ids) else ", or " + config.hint(
                 f"pass {what}=pd.read_csv(...).iloc[:, 0].to_numpy()",
@@ -378,6 +378,19 @@ def _file_barcodes(files, counts=None, read=()):
     read, ``read``, first); ``None`` when one has no such matrix. Where barcodes
     repeat, each is named by its label file, ``cty2:<barcode>``, as
     ``BatchResult.embedding`` names it."""
+    raw = _raw_barcodes(files, counts, read)
+    if raw is None:
+        return None
+    out, stems = raw
+    keys = pd.Series(out, dtype=object)
+    if not keys.is_unique:
+        keys = pd.Series([f"{s}:{b}" for s, b in zip(stems, out)], dtype=object)
+    return keys if keys.is_unique else None
+
+
+def _raw_barcodes(files, counts=None, read=()):
+    """``(barcodes, label file stem of each)`` of :func:`_file_barcodes`, the
+    barcodes as the matrices write them; ``None`` when a file has no matrix."""
     import h5py
     from ..workflow import _label_data_files      # workflow imports this module
     out, stems = [], []
@@ -396,33 +409,71 @@ def _file_barcodes(files, counts=None, read=()):
                 break
         else:
             return None
-    keys = pd.Series(out, dtype=object)
-    if not keys.is_unique:
-        keys = pd.Series([f"{s}:{b}" for s, b in zip(stems, out)], dtype=object)
-    return keys if keys.is_unique else None
+    return out, stems
 
 
-def _folder_ids(files, counts, ids, read=()):
+def _folder_ids(files, counts, ids, read=(), others=None):
     """:func:`_file_barcodes` of ``files`` when the embedding's cells ``ids`` are
-    among them (all of them, or a subset); else ``None``. The files a method
-    read (``read``) name the cells first, as ``BatchResult.embedding`` names
-    them, then the folder's default files. Raises when the folder names its
-    cells and none of ``ids`` is among them: by position, the labels would be
-    a guess."""
+    distinct cells among them (all of them, or a subset); ``None`` when the
+    folder does not name its cells. The files a method read (``read``) name the
+    cells first, as ``BatchResult.embedding`` names them, then the folder's
+    default files. Any other ids raise: by position, the labels would be a
+    guess. ``others()``: ``{read files: [package methods]}`` of the dataset,
+    to name the method whose output names the cells so."""
     ids = [str(i) for i in ids]
-    found = [k for k in (_file_barcodes(files, counts, r)
-                         for r in dict.fromkeys((frozenset(read), frozenset())))
-             if k is not None]
+    reads = list(dict.fromkeys((frozenset(read), frozenset())))
+    found = [k for k in (_file_barcodes(files, counts, r) for r in reads) if k is not None]
+    unique = len(set(ids)) == len(ids)
     for keys in found:
-        if set(ids) <= set(keys):
+        if unique and set(ids) <= set(keys):
             return keys
-    if found and not any(i in have for have in map(set, found) for i in ids):
-        raise ValueError(
-            f"None of the embedding's cell ids is a cell of "
-            f"{_and_list([Path(f).name for f in files])}: the embedding names a cell "
-            f"{ids[0]!r}, the dataset folder {found[0].iloc[0]!r}. Name the embedding's "
-            f"cells as the folder does.")
-    return None
+    if not found:
+        return None
+    raise ValueError(_folder_ids_error(files, counts, ids, reads, found, others))
+
+
+def _folder_ids_error(files, counts, ids, reads, found, others) -> str:
+    """The error of :func:`_folder_ids`: what is wrong with ``ids``, then the one
+    fix that works - the package method whose output names the cells so, an
+    array when the cells are in the folder's order, else the folder's names."""
+    names = _and_list([Path(f).name for f in files])
+    have = set().union(*map(set, found))
+    seen, dup = set(), None
+    for i in ids:
+        if i in seen:
+            dup = i
+            break
+        seen.add(i)
+    miss = [i for i in ids if i not in have]
+    if dup is not None:
+        head = f"The embedding repeats cell ids, such as {dup!r}"
+    elif len(miss) == len(ids):
+        head = f"None of the embedding's cell ids is a cell of {names}, such as {miss[0]!r}"
+    else:
+        head = (f"{len(miss):,} of the embedding's {len(ids):,} cell ids are not cells of "
+                f"{names}, such as {miss[0]!r}")
+    other = others() if others else {}
+    if dup is None:
+        made = [m for read, ms in other.items() for m in ms
+                if (k := _file_barcodes(files, counts, read)) is not None
+                and set(ids) <= set(k)]
+        if made:
+            m = made[0]
+            named = (f"{m}'s output" if len(made) == 1 else
+                     f"the output of {_and_list(made, 'or')}" if len(made) <= 3 else
+                     f"the output of {', '.join(made[:3])} or {len(made) - 3} more")
+            return (f"{head}. These cells are named as {named}: " + config.hint(
+                f"pass method= the method that made it, such as method={m!r} "
+                f"(or '{m} (this run)').",
+                f"pass --method with the method that made it, such as --method {m}."))
+    for read in dict.fromkeys([*reads, *other]):
+        raw = _raw_barcodes(files, counts, read)
+        if raw is not None and len(raw[0]) == len(ids) and list(raw[0]) == ids:
+            return (f"{head}. The cells are in the folder's order: " + config.hint(
+                "pass the embedding as an array, as np.asarray(adata.obsm[key]) or "
+                "adata.X, to match them by position.",
+                "save the embedding as an .npy file to match them by position."))
+    return f"{head}. Name the embedding's cells as the folder does, such as {found[0].iloc[0]!r}."
 
 
 def _no_ids(ids) -> str:
@@ -430,13 +481,13 @@ def _no_ids(ids) -> str:
             else "the embedding has no cell ids")
 
 
-def _stack_label_files(files, ids, as_written=False, table=None, read=()):
+def _stack_label_files(files, ids, as_written=False, table=None, read=(), others=None):
     """Several label files, stacked in order, and each row's file (1, 2, ...).
 
     When every file has a first column of cell ids, the rows are aligned to
     ``ids`` by it; else by the barcodes of the folder's matrices (``read``, the
-    files a method read, first: :func:`_folder_ids`); otherwise they stay in
-    file order.
+    files a method read, first: :func:`_folder_ids`, which refuses ids that are
+    not distinct cells of the folder); otherwise they stay in file order.
     """
     rows = [io.read_labels_ids(f, what="labels", pick=_pick("labels"),
                                as_written=as_written) for f in files]
@@ -459,9 +510,9 @@ def _stack_label_files(files, ids, as_written=False, table=None, read=()):
             what="labels", name=name, target="the embedding", order=order,
             no_ids=_no_ids(ids), n_files=len(names), drop=True)
         return vals[pos], origin[pos]
-    if all(first is None for _, first in rows) and _has_cell_ids(ids) and unique:
+    if all(first is None for _, first in rows) and _has_cell_ids(ids):
         # no ids: the dataset folder's matrices name the cells; without them, by position
-        keys = _folder_ids(files, [len(v) for v, _ in rows], ids, read)
+        keys = _folder_ids(files, [len(v) for v, _ in rows], ids, read, others)
         if keys is not None:
             pos, _ = io.by_id_column(np.arange(len(vals)), keys, ids, what="labels",
                                      name=_and_list(names), target="the embedding",
@@ -550,6 +601,8 @@ class _Cells(NamedTuple):
     moved: tuple = ()
     #: the names of the files ``method`` read, whose barcodes name the cells
     read: frozenset = frozenset()
+    #: the data root ``dataset`` is read from
+    data_path: object = None
 
 
 def _label_files(given) -> list:
@@ -585,7 +638,7 @@ def _n_values(labels, adata) -> int | None:
             return None
 
 
-def _as_written(given, adata, ids, *, what, read=()):
+def _as_written(given, adata, ids, *, what, read=(), others=None):
     """An argument of evaluate() that names files, read again in cell order with
     each missing value as the word the file holds; ``None`` for values in memory.
     ``read``: as :func:`_stack_label_files`."""
@@ -594,8 +647,10 @@ def _as_written(given, adata, ids, *, what, read=()):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")           # the first read said them
         if what == "labels" and _is_label_path_list(given):
-            return _stack_label_files(given, ids, as_written=True, read=read)[0]
-        return _obs_or_vector(given, adata, what=what, ids=ids, as_written=True, read=read)
+            return _stack_label_files(given, ids, as_written=True, read=read,
+                                      others=others)[0]
+        return _obs_or_vector(given, adata, what=what, ids=ids, as_written=True, read=read,
+                              others=others)
 
 
 def _measured_warning(given, adata, reason: str, distinct: int, cells: int) -> str:
@@ -1166,7 +1221,22 @@ def _expected_cells(dataset, category, method, data_path, read, *,
             moved = tuple(f.stem for f in files)
     from ..workflow import _method_files
     return _Cells(dataset, files, own, from_files, whole, moved,
-                  frozenset(_method_files(dataset, category, own, None, data_path)))
+                  frozenset(_method_files(dataset, category, own, None, data_path)),
+                  data_path)
+
+
+def _method_reads(cells: _Cells, category) -> dict:
+    """``{names of the files read: [package methods]}`` of the methods of
+    ``category`` on ``cells.dataset``; for an error that names the method whose
+    output an embedding's cell names come from."""
+    from ..engine.registry import list_methods
+    from ..workflow import _method_files
+    out: dict = {}
+    for m in list_methods(category=category) if category else ():
+        read = frozenset(_method_files(cells.dataset, category, m, None, cells.data_path))
+        if read:
+            out.setdefault(read, []).append(m)
+    return out
 
 
 def _dataset_labels(dataset, category, method, data_path):
@@ -1298,15 +1368,18 @@ def _scores(
     lab_ids, ba_ids = ids, ids
     # the files whose barcodes name the cells: the method's, else the folder's default
     read = cells.read if cells is not None else ()
+    others = (lambda: _method_reads(cells, category)) if cells is not None else None
     if ids is None and table is None and cells is not None:
         # an embedding without ids holds the dataset's cells in the method's order
         lab_ids, ba_ids = (_cells_ids(cells, emb.shape) if _gives_ids(x, adata) else None
                            for x in (labels, batch))
     if _is_label_path_list(labels):
-        ct, origin = _stack_label_files(labels, lab_ids, table=table, read=read)
+        ct, origin = _stack_label_files(labels, lab_ids, table=table, read=read,
+                                        others=others)
     else:
         ct, origin = _obs_or_vector(labels, adata, what="labels", ids=lab_ids,
-                                    table=table, cells=obs_ids, read=read), None
+                                    table=table, cells=obs_ids, read=read,
+                                    others=others), None
     # many run outputs are dims x cells; the label count says which axis holds the cells
     if emb.ndim == 2 and emb.shape[0] != len(ct) and emb.shape[1] == len(ct):
         _compat.warn(
@@ -1373,7 +1446,8 @@ def _scores(
     keep = ~miss
     if miss.any():
         if missing_labels == "error" or miss.all():
-            shown = _as_written(labels, adata, lab_ids, what="labels", read=read)
+            shown = _as_written(labels, adata, lab_ids, what="labels", read=read,
+                                others=others)
             raise ValueError(_no_label_error(
                 ct if shown is None else shown, miss, labels,
                 from_files and from_files.dataset))
@@ -1389,7 +1463,8 @@ def _scores(
         # after the drop: only the cells that are scored need a batch
         no_batch = io.missing_mask(ba)
         if no_batch.any():
-            shown = _as_written(batch, adata, ba_ids, what="batch", read=read)
+            shown = _as_written(batch, adata, ba_ids, what="batch", read=read,
+                                others=others)
             raise ValueError(_no_batch_error(
                 ba if shown is None else np.asarray(shown)[keep], no_batch, batch))
     if group in ("batch", "all") and len(set(np.asarray(ba).astype(str).tolist())) < 2:

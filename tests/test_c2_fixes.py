@@ -223,7 +223,7 @@ def test_label_files_without_ids_are_matched_by_position_without_a_warning():
     # v1 NEW-1: ids that are none of the folder's barcodes are refused, not a guess
     a.obs_names = [f"cty:{i}" for i in range(2864)]
     with pytest.raises(ValueError, match="^None of the embedding's cell ids is a cell of "
-                                         "cty.csv: the embedding names a cell 'cty:0'"):
+                                         "cty.csv, such as 'cty:0'"):
         mtb.evaluate(a, dataset="D11", category="vertical", method="Matilda (this run)",
                      metrics=["ASW"], verbose=False)
 
