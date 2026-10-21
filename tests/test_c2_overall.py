@@ -2,8 +2,9 @@
 plot.bubble (D01), its refusal of your rows on another dataset (C18), and the
 classification-only family of your rows (D02).
 
-The proof of D01 runs 36 cases: the four stored tables x {every metric, clustering,
-batch, classification} x {+run, +copy, +copy stored}, where they have rows."""
+The proof of D01 runs 42 cases: the four stored tables x {every metric, clustering,
+batch, classification} x {+run, +copy, +copy stored}, where they have rows (D11 has
+no batch or classification scores; the other three have both)."""
 import importlib
 import warnings
 
@@ -32,11 +33,12 @@ def _stored(category):
 
 def _run_rows(stored, category):
     """Your rows: three stored methods' rows (equal values) named '<m> (this run)',
-    with classification scores on the multi-batch categories, as a run has."""
+    with classification scores on the multi-batch categories, as a run has (the
+    stored ones where the stored table has them)."""
     picked = sorted(stored["method"].unique())[:3]
     run = stored[stored["method"].isin(picked)].assign(
         method=lambda d: d["method"] + " (this run)", source="user")
-    if category != "vertical":
+    if category != "vertical" and not run["metric"].isin(CLASSIFICATION).any():
         rng = np.random.default_rng(0)
         first = run.drop_duplicates("method")
         cls = pd.concat([first.assign(metric=c) for c in CLASSIFICATION], ignore_index=True)
@@ -66,8 +68,8 @@ def _cases():
 CASES = list(_cases())
 
 
-def test_the_proof_has_36_cases():
-    assert len(CASES) == 36
+def test_the_proof_has_42_cases():
+    assert len(CASES) == 42
 
 
 @pytest.mark.parametrize("category", CATEGORIES)
@@ -139,8 +141,11 @@ def test_your_rows_on_another_dataset_are_refused(dataset):
 
 # --------------------------------------------------------------- D02
 def _with_classification():
-    st, tables = _tables("diagonal")
-    return tables["+run"]
+    """D28 without its stored classification rows, next to your run that has
+    them: a family only your rows have."""
+    st = _stored("diagonal")
+    st = st[~st["metric"].isin(CLASSIFICATION)]
+    return pd.concat([st, _run_rows(st, "diagonal")], ignore_index=True)
 
 
 @pytest.mark.parametrize("metrics", ["all", ["ARI", "OCA"]])

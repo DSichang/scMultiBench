@@ -55,7 +55,9 @@ def test_metrics_filters_by_family(result_dir):
     assert set(b.metric) <= fam["batch"] and len(b)
     c = results.load_results("diagonal", dataset="D28", metrics="clustering")
     assert set(c.metric) <= fam["clustering"] and len(c)
-    assert len(b) + len(c) == len(full)      # the two families partition the frame
+    k = results.load_results("diagonal", dataset="D28", metrics="classification")
+    assert set(k.metric) <= fam["classification"] and len(k)
+    assert len(b) + len(c) + len(k) == len(full)     # the families partition the frame
     with pytest.raises(ValueError, match=r"Unknown metrics= token bogus\. Pass 'all', "
                                          r"'clustering', 'batch' or 'classification'"):
         results.load_results("diagonal", dataset="D28", metrics="bogus")

@@ -507,8 +507,8 @@ def recommend(
             from ..plot.bar import CLASSIFICATION_METRICS
             if long_df_was_none and set(sel.codes) <= set(CLASSIFICATION_METRICS):
                 raise ValueError(
-                    "The stored results have no classification scores. Score your runs "
-                    "with mtb.evaluate and pass them as long_df=.")
+                    f"The stored results of {category} have no classification scores. "
+                    f"Score your runs with mtb.evaluate and pass them as long_df=.")
             if long_df_was_none and not sel.explicit and sel.family == "batch":
                 one = ", ".join(sorted(map(str, long_df["dataset"].unique())))
                 raise ValueError(

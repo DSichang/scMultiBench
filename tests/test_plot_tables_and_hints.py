@@ -102,6 +102,8 @@ def test_a_family_two_rows_have_counts_in_no_overall():
     import warnings
     import pandas as pd
     stored = mtb.load_results("diagonal", dataset="D28")
+    # a family only two rows have: the stored classification rows left out
+    stored = stored[~stored["metric"].isin(["OCA", "ACA", "Spec", "Sens", "F1"])]
     mine = stored[stored["method"].isin(["scJoint", "iNMF"])].assign(
         method=lambda d: d["method"] + "_rerun", source="user",
         scored_with="leidenalg/search/0.4.0")
