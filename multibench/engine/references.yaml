@@ -7,20 +7,9 @@
 #                         was resolved against the Crossref registry
 #                         (api.crossref.org/works/<doi>) and the returned title
 #                         checked against the method. Never add a DOI from memory.
-#   _benchmark          - the benchmark's own citation (scMultiBench CITATION.cff)
 #
 # A method without `reference:` has no verified DOI yet (listed in
 # tests/test_references.py::UNREFERENCED); add one only with its Crossref check.
-
-_benchmark:
-  doi: 10.1038/s41592-025-02856-3
-  title: Multitask benchmarking of single-cell multimodal omics integration methods
-  authors: Liu C, Ding S, Kim HJ, Long S, Xiao D, Ghazanfar S, Yang P
-  journal: Nature Methods
-  year: 2025
-  volume: "22"
-  pages: 2449-2460
-  repo_url: https://github.com/PYangLab/scMultiBench
 
 SCALEX:
   repo_url: https://github.com/jsxlei/SCALEX

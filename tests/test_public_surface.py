@@ -1,6 +1,6 @@
 """The public surface (the 0.3.0 cut and the 0.4.0 core API), pinned.
 
-``__all__`` of ``mtb`` (18 names), ``mtb.plot``, ``mtb.io``, ``mtb.env``,
+``__all__`` of ``mtb`` (17 names), ``mtb.plot``, ``mtb.io``, ``mtb.env``,
 ``mtb.config``, ``mtb.catalog`` and ``mtb.data`` are EXACTLY the contract's sets; ``dir()`` of those namespaces
 leaks no import; every deprecated alias warns and forwards; every removed
 name / keyword fails loudly with the contract's message; every ``--help``
@@ -20,7 +20,7 @@ from multibench.engine import envs, ingest
 
 MTB_ALL = {                                       # the 0.4.0 core API (TARGET.txt)
     "config", "plot", "catalog", "io", "env", "data",
-    "find_methods", "method_info", "params_for", "cite",
+    "find_methods", "method_info", "params_for",
     "scan", "run", "load_run", "RunResult",
     "evaluate", "load_results", "recommend",
     "__version__",
@@ -41,7 +41,7 @@ def _leaks(ns) -> set:
 
 # ------------------------------------------------------------------ __all__ sets
 def test_top_level_all_is_exactly_the_contract():
-    assert set(mtb.__all__) == MTB_ALL and len(MTB_ALL) == 18
+    assert set(mtb.__all__) == MTB_ALL and len(MTB_ALL) == 17
     assert len(mtb.__all__) == len(MTB_ALL)                 # no duplicates
     assert all(hasattr(mtb, n) for n in MTB_ALL)
     assert _leaks(mtb) == set()
@@ -126,12 +126,6 @@ def test_method_info_files_dir_is_gone_and_runtime_is_there():
     info = mtb.method_info("Matilda")
     assert set(info["runtime"]) == {"tier", "worst_sec", "observed", "host", "note"}
     assert "deep_learning" not in info and "output" not in info
-
-
-def test_cite_methods_keyword_is_gone():
-    with pytest.raises(TypeError, match="methods"):
-        mtb.cite(methods=["Matilda"])
-    assert inspect.signature(mtb.cite).parameters["format"].default == "text"
 
 
 def test_scan_is_the_plan_with_its_command():

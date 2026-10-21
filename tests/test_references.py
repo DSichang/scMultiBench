@@ -1,14 +1,10 @@
-"""method_info provenance (repo_url / reference / notes / driver / variants) and mtb.cite.
+"""method_info provenance: the reference of each method.
 
 DOIs in engine/references.yaml were each resolved against Crossref when added;
 the tests here pin shape and reachability, not truth - do not add a DOI from
 memory (see the header of references.yaml).
 """
 import re
-from pathlib import Path
-
-import pytest
-import yaml
 
 import multibench as mtb
 from multibench.engine import registry
@@ -21,22 +17,14 @@ UNREFERENCED = {"VIMCCA", "VIPCCA", "scMSI"}
 DOI_RE = re.compile(r"10\.\d{4,9}/\S+")
 
 
-def test_cite_bibtex_and_text():
-    from multibench.discover import cite
-    s = cite(["StabMap", "GLUE"], format="bibtex")
-    assert s.count("@article{") == 3
-    assert "10.1038/s41592-025-02856-3" in s
-    assert "10.1038/s41587-023-01766-z" in s and "10.1038/s41587-022-01284-4" in s
-    t = cite(format="text")
-    assert t.count("\n") == 0 and "https://doi.org/10.1038/s41592-025-02856-3" in t
-    with pytest.raises(ValueError, match="unknown format 'ris'"):
-        cite(format="ris")
-    with pytest.raises(KeyError, match="Unknown method NoSuchMethod"):
-        cite(["NoSuchMethod"])
-    # an unverified method is flagged, not silently dropped
-    u = cite(["VIMCCA"], format="bibtex")
-    assert "% VIMCCA: no verified reference" in u and "scbean" in u
-    assert "VIMCCA: no verified reference" in cite("VIMCCA") and "%" not in cite("VIMCCA")
-    allb = cite("all", format="bibtex")
-    assert allb.count("@article{") == 1 + len(registry.list_methods()) - len(UNREFERENCED)
-    assert cite("StabMap") == cite(["StabMap"])
+def test_every_verified_method_has_a_reference():
+    for m in registry.list_methods():
+        ref = mtb.method_info(m)["reference"]
+        if m in UNREFERENCED:
+            assert ref is None, f"{m} now has a reference - drop it from UNREFERENCED"
+        else:
+            assert ref and DOI_RE.fullmatch(ref["doi"]), (m, ref)
+            for k in ("title", "authors", "journal", "year"):
+                assert ref.get(k), (m, k)
+    assert mtb.method_info("StabMap")["reference"]["doi"] == "10.1038/s41587-023-01766-z"
+    assert mtb.method_info("GLUE")["reference"]["doi"] == "10.1038/s41587-022-01284-4"

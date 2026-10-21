@@ -17,7 +17,7 @@ from .schema import (ArgSpec, MethodSpec, OutputSpec, Variant, base_modality,
 _YAML = Path(__file__).resolve().parent / "methods.yaml"
 # the tunable hyperparams, generated from the upstream argparse
 _PARAMS_YAML = Path(__file__).resolve().parent / "params.yaml"
-# per-method provenance, and the benchmark's own citation under `_benchmark`
+# per-method provenance
 _REFERENCES = Path(__file__).resolve().parent / "references.yaml"
 
 # what `atac:` may say in methods.yaml
@@ -133,10 +133,6 @@ def _references() -> dict:
             f"(engine/references.yaml must ship with multibench)")
     return yaml.safe_load(_REFERENCES.read_text()) or {}
 
-
-def benchmark_reference() -> dict:
-    """The benchmark's own citation: ``{doi, title, authors, journal, year, ...}``."""
-    return dict(_references().get("_benchmark") or {})
 
 
 @functools.lru_cache(maxsize=1)

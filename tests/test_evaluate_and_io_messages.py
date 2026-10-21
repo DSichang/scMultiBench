@@ -92,11 +92,6 @@ def test_x12_a_label_file_without_ids_is_matched_by_position_silently(tmp_path):
     assert not any("matched by position" in m for m in msgs)
 
 
-def test_x47_text_returns_echo_as_text():
-    text = mtb.cite(["Matilda"])
-    assert isinstance(text, str) and repr(text) == str(text) and "\n" in text
-
-
 def test_x49_obsm_none_reads_x_emb_only():
     # c1 (C02): never "the only key"; the message names the keys
     import numpy as np

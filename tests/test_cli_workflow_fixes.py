@@ -145,7 +145,6 @@ _READ_ONLY = [
     ["scan", "D11", "--category", "vertical"],
     ["scan", "D11", "--category", "vertical", "--format", "tsv", "--columns", "all"],
     ["layout", "vertical"],
-    ["cite", "Matilda"],
     ["env", "status"],
     ["env", "groups"],
     ["env", "plan", "--category", "vertical"],

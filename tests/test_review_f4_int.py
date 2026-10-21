@@ -14,8 +14,7 @@
 - --strict: the per-method line reads the row whose files are on disk.
 - run-all's failure line says when the saved folder kept an earlier record.
 - An env with a single build reports flavor 'single'.
-- No user-visible text says 'registry'; the cite example cites only the
-  methods that finished.
+- No user-visible text says 'registry'.
 """
 import inspect
 import re
@@ -239,10 +238,3 @@ def test_a_single_build_env_reports_single(tmp_path, monkeypatch):
     assert envs.installed_flavor("scmb_r") == "single"      # a record saying gpu
     assert envs.installed_flavor("matilda") == "gpu"        # a real GPU build
     assert scripts.run_provenance("scmb_r")["env_flavor"] == "single"
-
-
-def test_cite_example_cites_only_the_methods_that_finished():
-    ex = inspect.getdoc(mtb.cite).split("Examples\n--------\n")[1].split("\n\n")[0]
-    # 0.4: cite takes the RunResult and cites the methods that ran
-    assert 'mtb.cite(mtb.load_run("out/"), format="bibtex")' in ex
-    assert "list(res.summary.method)" not in ex

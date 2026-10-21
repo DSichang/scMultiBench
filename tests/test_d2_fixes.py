@@ -77,7 +77,7 @@ def test_repeated_raw_barcodes_are_still_refused(d28_like):
 
 def test_a_misspelt_method_in_other_letter_case_gets_a_hint():
     with pytest.raises(KeyError, match=r"Unknown method scalexx\. Did you mean SCALEX\?"):
-        mtb.cite("scalexx")
+        mtb.method_info("scalexx")
 
 
 def test_load_run_of_a_missing_folder_says_it_does_not_exist(tmp_path):

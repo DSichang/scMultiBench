@@ -51,7 +51,6 @@ def test_readme_and_pyproject_share_one_paper_title_and_doi():
     assert PAPER_TITLE in readme
     assert PAPER_DOI in readme
     assert "Benchmarking single-cell multimodal data integrations" not in readme
-    assert "mtb.cite(" in readme
     pyproject = (ROOT / "pyproject.toml").read_text()
     urls = pyproject.split("[project.urls]", 1)[1].split("\n[", 1)[0]
     for key in ("Repository", "Upstream", "Paper"):
@@ -183,11 +182,9 @@ def test_tutorials_use_the_public_api_not_raw_csv_reads():
     for key, s in gen.TASKS.items():
         cells = gen.build_tutorial(key)
         src = "\n".join(c.source for c in cells if c.cell_type == "code")
-        md = "\n".join(c.source for c in cells if c.cell_type == "markdown")
         # stored scores are drawn only where the task has a stored dataset
         assert ("mtb.load_results(" in src) == bool(s.get("stored_ds")), key
         assert "source=" not in src, key
-        assert "mtb.cite(" in md
         assert f'mtb.data.write_example("{s["ds"]}")' in src, key
         assert src.count("write_example(") == 1, key
         assert 'ad.read_h5ad("my_' in src, key
@@ -293,7 +290,6 @@ REFERENCE = {
     "mtb.find_methods": ("discover.md", "multibench.discover.find_methods"),
     "mtb.method_info": ("discover.md", "multibench.discover.method_info"),
     "mtb.params_for": ("discover.md", "multibench.discover.params_for"),
-    "mtb.cite": ("discover.md", "multibench.discover.cite"),
     "mtb.scan": ("run.md", "multibench.workflow.scan"),
     "mtb.run": ("run.md", "multibench.workflow.run"),
     "mtb.load_run": ("run.md", "multibench.workflow.load_run"),

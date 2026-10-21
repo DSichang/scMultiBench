@@ -192,10 +192,7 @@ def test_normalize_modalities_aliases_base_and_errors():
 
 # --- P13: provenance attached at load time -----------------------------------
 
-def test_references_attached_and_benchmark_entry():
-    ref = registry.benchmark_reference()
-    assert ref["doi"] == "10.1038/s41592-025-02856-3"
-    assert "Nature Methods" in ref["journal"]
+def test_references_attached():
     for s in registry.load():
         assert s.reference.get("repo_url", "").startswith("http"), s.id
         assert s.reference.get("summary"), s.id

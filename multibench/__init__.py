@@ -21,7 +21,7 @@ from ._settings import config
 from . import plot, catalog, io, env, data
 from ._data.results import load_results, recommend
 from .eval.pipeline import evaluate
-from .discover import find_methods, method_info, params_for, cite
+from .discover import find_methods, method_info, params_for
 from .workflow import scan, run, RunResult, load_run
 
 __version__ = "0.4.0"
@@ -30,7 +30,7 @@ __all__ = [
     # namespaces
     "config", "plot", "catalog", "io", "env", "data",
     # methods
-    "find_methods", "method_info", "params_for", "cite",
+    "find_methods", "method_info", "params_for",
     # run
     "scan", "run", "load_run", "RunResult",
     # metrics

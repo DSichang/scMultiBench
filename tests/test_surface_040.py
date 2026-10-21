@@ -12,7 +12,7 @@ import multibench as mtb
 ROOT = Path(__file__).resolve().parents[1]
 
 TOP = ["config", "plot", "catalog", "io", "env", "data",
-       "find_methods", "method_info", "params_for", "cite",
+       "find_methods", "method_info", "params_for",
        "scan", "run", "load_run", "RunResult",
        "evaluate", "load_results", "recommend",
        "__version__"]
@@ -26,7 +26,6 @@ SIGNATURES = {
     "find_methods": ["category", "modalities", "needs_labels"],
     "method_info": ["method"],
     "params_for": ["method", "category", "modalities"],
-    "cite": ["methods", "format"],
     "scan": ["dataset", "category", "methods", "modalities", "params", "assume_gpu",
              "verbose"],
     "run": ["dataset", "category", "out_dir", "methods", "modalities", "params", "batch",
@@ -127,7 +126,6 @@ def test_public_calls_emit_no_future_warning(tmp_path):
         mtb.find_methods("vertical", modalities=["rna", "adt"])
         mtb.method_info("Matilda")
         mtb.params_for("Matilda", "vertical", ["rna", "adt"])
-        mtb.cite("Matilda", format="bibtex")
         mtb.catalog.datasets()
         mtb.catalog.metrics()
         long = mtb.load_results("vertical", dataset="D11")

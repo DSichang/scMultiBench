@@ -1240,7 +1240,6 @@ To run them all, set `METHODS` to these names in section 2 and run the notebook 
 
     md(f"""## Next steps
 
-- `mtb.cite(METHODS)` returns the citations for the benchmark and the methods you ran.
 - The other tutorials: {", ".join(f"[{TASKS[k]['cat']} {TASKS[k]['label']}]({SITE}tutorials/{k}/)" for k in TASKS if k != key)}.
 - The guides: [run]({SITE}tutorials/run/), [evaluate]({SITE}tutorials/evaluate/), [plot]({SITE}tutorials/plot/) and [discover methods]({SITE}tutorials/discover/).
 - The [interactive explorer](https://shiny.maths.usyd.edu.au/scMultiBench/) has the full benchmark's rankings, with no install needed.""")
@@ -1344,7 +1343,7 @@ print(len(mtb.find_methods()), "methods in the package")
 mtb.find_methods(category="vertical")""")
     md("""## Inspect a method
 
-`method_info` returns what the package knows about a method. `find_methods` filters methods by what your data has, and `cite` returns the citations.
+`method_info` returns what the package knows about a method. `find_methods` filters methods by what your data has.
 
 """ + details(
         "A method matches when one of its variants meets every filter: category, "
@@ -1358,7 +1357,6 @@ keys = ("id", "language", "env", "needs_labels", "notes", "repo_url", "reference
         "supports")
 {k: info[k] for k in keys}""")
     code("""mtb.find_methods(category="vertical", modalities=["rna", "adt"], needs_labels=False)""")
-    code("""print(mtb.cite(["Matilda"]))   # format="bibtex" for BibTeX entries""")
     md("""## Draw the stored results
 
 The package ships stored results, so these figures draw without running anything.

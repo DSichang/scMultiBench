@@ -1,5 +1,5 @@
-"""Small helpers every module uses: :class:`Text` for printable text,
-:func:`warn`, a warning attributed to the user's line, and :func:`_and_list`."""
+"""Small helpers every module uses: :func:`warn`, a warning attributed to the
+user's line, and :func:`_and_list`."""
 from __future__ import annotations
 
 import os
@@ -7,14 +7,6 @@ import sys
 import warnings
 
 _PACKAGE = os.path.dirname(os.path.abspath(__file__)) + os.sep
-
-
-class Text(str):
-    """A ``str`` whose notebook / REPL echo is the text itself, line breaks and
-    all (``cite``); it is a ``str`` in every other way."""
-
-    def __repr__(self) -> str:
-        return str(self)
 
 
 def caller_stacklevel() -> int:

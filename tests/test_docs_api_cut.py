@@ -43,7 +43,6 @@ STALE = {
     r"create_commands|group_create_commands|install_packed|packed_sizes|"
     r"host_platform_problem|DIFFICULTY|VERIFIED_STAR)\b": "left env.__all__ in 0.3.0 (status/plan/install/doctor/recipe)",
     r"list_methods\([^)]*\b(task|runnable)=": "find_methods(category, task=/runnable=)",
-    r"cite\([^)]*\bmethods=": "cite(*ids) or cite([ids])",
     r"needs_labels=True": "to_long() lost needs_labels; add the column to the frame",
     # 0.4.0: evaluate(method=) names the rows again, so only the other calls refuse it
     r"\b(evaluate|load_results|recommend|rescore)\([^)]*\b(task|family|only|metric)=": "metrics= / methods=",
@@ -55,7 +54,7 @@ STALE = {
     r"(?i)\bcondacolab\b": "no condacolab: mtb.env.install(..., packed=True, dry_run=False) needs no conda binary",
     # 0.4.0: the removed names, and run_all, which is run now
     r"\bmtb\.(run_all|inputs_for|labels_for|to_long|sweep|classify|classification_metrics|"
-    r"results_coverage|available_datasets)\(": "run(methods=[m]) / evaluate(dataset=, method=) / catalog.datasets()",
+    r"results_coverage|available_datasets|cite)\(": "run(methods=[m]) / evaluate(dataset=, method=) / catalog.datasets() / method_info(m)['reference']",
     r"\bmtb\.(env\.(doctor|status)|io\.to_canonical|plot\.(build_table|BubbleTable)|"
     r"config\.Config|catalog\.methods|data\.fetchable)\b": "env.install(dry_run=True) / io.export_dataset / recommend(long_df=) / config",
     r"\bmultibench (convert|export|run-all|scan|env|fetch|plot|evaluate)\b": "the Python call (0.4.0: no command line)",
@@ -119,7 +118,8 @@ def test_every_mtb_name_mentioned_is_public(path):
     # check does not scan; api.md has no deprecation section and is checked whole
     text = _text(path)
     tokens = _mtb_tokens(text)
-    assert tokens, f"{path.name} mentions no mtb.<name>?"
+    # the README names no mtb call since 0.4.0; it is still scanned
+    assert tokens or path.name == "README.md", f"{path.name} mentions no mtb.<name>?"
     for tok in tokens:
         parts = tok.split(".")
         if any(part.startswith("__") for part in parts):
@@ -248,4 +248,4 @@ def test_every_documented_call_binds_to_the_live_signature(path):
             except TypeError as e:
                 raise AssertionError(f"{path.name}: {ast.unparse(node)[:100]} -> {e}") from None
             seen += 1
-    assert seen, f"{path.name}: no mtb.<fn>(...) call parsed"
+    assert seen or path.name == "README.md", f"{path.name}: no mtb.<fn>(...) call parsed"

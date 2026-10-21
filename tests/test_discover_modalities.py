@@ -1,5 +1,5 @@
 """find_methods keeps directory-fed methods (P03); supports[i]['labels'];
-params_for ambiguity (Rin/Noor/Sam); cite is variadic (Sam)."""
+params_for ambiguity (Rin/Noor/Sam)."""
 import warnings
 
 import pytest
@@ -66,24 +66,3 @@ def test_params_for_ambiguity_is_valueerror_with_the_exact_call():
     with pytest.raises(KeyError, match="totalVI does not run on mosaic data"):
         mtb.params_for("totalVI", "mosaic")
 
-
-def test_cite_is_variadic_and_keeps_the_list_form():
-    both = mtb.cite("Matilda", "MOFA2", format="bibtex")
-    assert both == mtb.cite(["Matilda", "MOFA2"], format="bibtex")
-    assert both == mtb.cite(("Matilda", "MOFA2"), format="bibtex")
-    assert "Matilda" in both and "MOFA2" in both and both.startswith("@article{scMultiBench")
-    assert mtb.cite() == mtb.cite(None)
-    assert "https://doi.org/" in mtb.cite() and "@article" not in mtb.cite()   # text is the default
-    assert mtb.cite("Matilda") == mtb.cite(["Matilda"], format="text")
-    assert mtb.cite("all") == mtb.cite(["all"][0]) and mtb.cite("all", format="bibtex").count("@") > 30
-    with pytest.raises(ValueError, match="unknown format 'nope'"):
-        mtb.cite("Matilda", format="nope")
-    with pytest.raises(KeyError, match="Did you mean Matilda"):
-        mtb.cite("Matlida")
-    with pytest.raises(TypeError, match="pass one list"):
-        mtb.cite(["Matilda"], ["MOFA2"])
-    # the 0.2 methods= keyword and the positional fmt are gone: loud
-    with pytest.raises(TypeError, match="methods"):
-        mtb.cite(methods=["MOFA2"])
-    with pytest.raises(TypeError, match="method ids must be strings"):
-        mtb.cite(["Matilda"], "text")

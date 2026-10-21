@@ -1,11 +1,10 @@
-"""Discovery: filter methods by need; enrich method_info with catalog metadata; cite."""
+"""Discovery: filter methods by need; enrich method_info with catalog metadata."""
 from __future__ import annotations
 
 import functools
 from pathlib import Path
 from urllib.parse import quote as _quote
 
-from . import _text
 from ._text import _and_list
 from .engine import registry, upstream, envs
 from .engine.schema import AmbiguousVariantError, is_label_role
@@ -208,7 +207,6 @@ def method_info(method: str) -> dict:
     --------
     mtb.params_for : the hyperparameters of one variant, with upstream defaults.
     mtb.find_methods : filter methods by category, modalities, labels, ATAC representation.
-    mtb.cite : the paper to cite for a method.
     """
     s = registry.get(method)
     method = s.id
@@ -433,122 +431,3 @@ def _same_types(variants, modalities) -> list:
     want = {_base_modality(m) for m in modalities}
     exact = [v for v in variants if v.modality_types == want]
     return exact or [v for v in variants if want <= v.modality_types]
-
-
-# ------------------------------------------------------------------ citations
-_CITE_FORMATS = ("bibtex", "text")
-
-
-def _bibtex_key(tag: str, year) -> str:
-    return f"{tag.replace(' ', '_')}_{year}" if year else tag.replace(" ", "_")
-
-
-def _format_entry(tag: str, ref: dict, fmt: str) -> str:
-    doi = ref.get("doi")
-    authors = ref.get("authors") or ""
-    title = ref.get("title") or ""
-    journal = ref.get("journal") or ""
-    year = ref.get("year") or ""
-    if fmt == "bibtex":
-        fields = [("author", authors.replace(", ", " and ") if authors else ""),
-                  ("title", title), ("journal", journal), ("year", year)]
-        if ref.get("volume"):
-            fields.append(("volume", ref["volume"]))
-        if ref.get("pages"):
-            fields.append(("pages", ref["pages"]))
-        fields.append(("doi", doi))
-        body = ",\n".join(f"  {k} = {{{v}}}" for k, v in fields if v not in (None, ""))
-        return f"@article{{{_bibtex_key(tag, year)},\n{body}\n}}"
-    line = f"{authors}. {title}. {journal} ({year})."
-    if doi:
-        line += f" https://doi.org/{doi}"
-    return line
-
-
-def cite(*methods, format: str = "text") -> str:
-    """Return citation text for the benchmark and, optionally, the methods you ran.
-
-    Parameters
-    ----------
-    *methods : str | list[str] | RunResult
-        Method ids, one per argument or as one list; a ``RunResult`` = the
-        methods that ran; ``"all"`` = every method; none = the benchmark only.
-    format : str
-        ``"text"`` (one line per entry) or ``"bibtex"`` (one ``@article`` per
-        entry).
-
-    Returns
-    -------
-    str
-        The benchmark entry first, then one entry per method in the order
-        given.
-
-    Raises
-    ------
-    ValueError
-        ``format`` is neither ``"text"`` nor ``"bibtex"``; the message lists both.
-    KeyError
-        Unknown method id; the message suggests a close match, if any.
-    TypeError
-        Several ids are given and one is not a string.
-
-    Examples
-    --------
-    >>> import multibench as mtb
-    >>> print(mtb.cite())                                  # the benchmark only
-    >>> print(mtb.cite("Matilda", "MOFA2"))
-    >>> print(mtb.cite(mtb.load_run("out/"), format="bibtex"))   # what ran
-
-    Notes
-    -----
-    **Two spellings.** Both forms return the same text, and ``cite(None)`` is
-    ``cite()``:
-
-    - ``cite('Matilda', 'MOFA2')`` - one id per argument.
-    - ``cite(['Matilda', 'MOFA2'])`` - one list or tuple.
-
-    **Formats.**
-
-    - ``"text"`` - one ``Authors. Title. Journal (year). https://doi.org/...``
-      line per entry.
-    - ``"bibtex"`` - one ``@article{<id>_<year>, ...}`` per entry, separated
-      by a blank line; the benchmark's key is ``scMultiBench_<year>``.
-
-    **Methods without a reference.** A method without a verified reference
-    is emitted as a ``% <id>: no verified reference; see <repo_url>``
-    comment (bibtex) or the same line without ``%`` (text).
-
-    See Also
-    --------
-    mtb.method_info : carries the same ``reference``, ``repo_url`` and ``version`` per method.
-    """
-    args = list(methods)
-    if format not in _CITE_FORMATS:
-        raise ValueError(f"unknown format {format!r}; valid: {list(_CITE_FORMATS)}")
-    if len(args) == 1 and hasattr(args[0], "records") and hasattr(args[0], "summary"):
-        # a RunResult: the methods that ran, in its order
-        args = [[r["method"] for r in args[0].records if r.get("status") in ("scored", "ran")]]
-    if not args:
-        ids: list[str] = []
-    elif len(args) == 1 and not isinstance(args[0], str):
-        ids = [] if args[0] is None else [registry.check_method(m) for m in args[0]]
-    elif len(args) == 1 and args[0] == "all":
-        ids = registry.list_methods()
-    else:
-        bad = [a for a in args if not isinstance(a, str)]
-        if bad:
-            raise TypeError(
-                f"cite(): method ids must be strings, got {type(bad[0]).__name__}; "
-                f"pass one list (cite(['Matilda', 'MOFA2'])) or one id per argument")
-        ids = [registry.check_method(m) for m in args]
-    parts = [_format_entry("scMultiBench", registry.benchmark_reference(), format)]
-    for m in ids:
-        s = registry.get(m)
-        ref = s.reference.get("reference")
-        if ref:
-            parts.append(_format_entry(m, ref, format))
-        else:
-            url = s.reference.get("repo_url") or "(no repo_url)"
-            note = f"{m}: no verified reference; see {url}"
-            parts.append(("% " + note) if format == "bibtex" else note)
-    return _text.Text("\n\n".join(parts) if format == "bibtex" else "\n".join(parts))

@@ -1,7 +1,7 @@
 """A method can be named by its id in any letter case or by its display name.
 
 ``load_results`` and ``recommend`` took ``"totalvi"`` and ``"MOFA+"``; ``run``,
-``scan``, ``method_info``, ``cite``, ``params_for``, ``inputs_for``, ``labels_for``,
+``scan``, ``method_info``, ``params_for``, ``inputs_for``, ``labels_for``,
 ``run`` and the env functions raised "Unknown method". They all resolve the
 name through ``registry.check_method`` now; an unknown name still raises with
 the did-you-mean.
@@ -34,8 +34,8 @@ def test_unknown_names_still_raise_with_the_hint():
 def test_discovery_functions():
     assert mtb.method_info("totalvi")["id"] == "totalVI"
     assert mtb.params_for("matilda", "vertical", ["rna", "adt"])["method"] == "Matilda"
-    assert mtb.cite("MOFA+") == mtb.cite("MOFA2")
-    assert mtb.cite(["seurat(wnn)"]) == mtb.cite("Seurat_WNN")
+    assert mtb.method_info("MOFA+")["id"] == "MOFA2"
+    assert mtb.method_info("seurat(wnn)")["id"] == "Seurat_WNN"
 
 
 def test_inputs_and_labels(tmp_path):
