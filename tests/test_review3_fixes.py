@@ -492,3 +492,83 @@ def _changes(heading):
     """One section of the 0.3.5 part of the Changes page, on one line."""
     part = _read("changes.md").split("## New in 0.3.4", 1)[0]
     return " ".join(part.split(f"### {heading}\n", 1)[1].split("\n### ", 1)[0].split())
+
+
+# ---- restored from before the 0.4 cut: kept behaviour
+def _check(capsys, dataset, *a, data_path=None, **kw):
+    capsys.readouterr()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        pm = mtb.scan(os.path.join(data_path, dataset) if data_path else dataset, *a, **kw)
+    return pm, capsys.readouterr().out.splitlines()
+
+
+def test_a_cross_folder_of_gene_activity_holds_atac(linux, tmp_path, capsys):
+    """``export_dataset(category="cross", atac_kind="gene_activity")`` writes
+    ``atac_gas<N>.h5``, which no cross method reads. The folder holds ATAC
+    all the same, and the reason is about its form, not about ADT files."""
+    _cross(tmp_path, "GA", "atac_gas")
+    pm, lines = _check(capsys, "GA", "cross", methods=["StabMap", "scMM"], data_path=tmp_path)
+    assert lines == [
+        "[scan] 0 of 2 methods have their input files in GA. 0 of 2 can run on this "
+        "computer. GA holds RNA and ATAC, in batches 1-3.",
+        "[scan] Cells per file: rna1.h5 40, atac_gas1.h5 40, rna2.h5 40, atac_gas2.h5 40, "
+        "rna3.h5 40, atac_gas3.h5 40.",
+        "[scan] StabMap: " + GAS_REASON.format(m="StabMap"),
+        "[scan] scMM: " + GAS_REASON.format(m="scMM")]
+    assert list(pm["reason"]) == [GAS_REASON.format(m="StabMap"), GAS_REASON.format(m="scMM")]
+    assert pm.attrs["held"] == ["rna", "atac"] and not pm["runnable"].any()
+
+
+def test_every_combination_still_gives_the_atac_reason(linux, tmp_path, capsys):
+    """With ``modalities="all"`` the ADT rows are listed too, and lack as
+    many files as the ATAC rows: the row of the families that the folder
+    holds speaks for the method. A method that reads ADT alone keeps its
+    own reason."""
+    _cross(tmp_path, "GA", "atac_gas")
+    pm, lines = _check(capsys, "GA", "cross", methods=["StabMap", "totalVI"],
+                       data_path=tmp_path, modalities="all")
+    assert lines[2:] == ["[scan] StabMap: " + GAS_REASON.format(m="StabMap"),
+                         "[scan] totalVI: adt1.h5, adt2.h5, adt3.h5 are missing."]
+
+
+def test_gene_activity_under_the_peak_name_keeps_its_reason(linux, tmp_path, capsys):
+    _cross(tmp_path, "PK", "atac_peak")
+    _, lines = _check(capsys, "PK", "cross", methods=["StabMap"], data_path=tmp_path)
+    assert lines[0] == ("[scan] 1 of 1 method has its input files in PK. 0 of 1 can run on "
+                        "this computer. PK holds RNA and ATAC, in batches 1-3.")
+    assert lines[2] == ("[scan] StabMap: StabMap needs peak ATAC, and atac_peak1.h5 holds "
+                        "gene activity. Export the ATAC as peaks.")
+
+
+@needs_docs
+def test_the_changes_page_names_the_new_refusals_and_texts(linux, tmp_path, capsys):
+    exports, checks = _changes("Dataset folders and exports"), _changes("scan and dry runs")
+    messages, open_ = _changes("Messages"), _changes("Not solved in 0.3.5")
+    # the refusal, with the two calls that the page names
+    assert ("`mtb.io.export_dataset` and `multibench convert` raise `ValueError` when two "
+            "modalities name the same matrix of the same object, such as `rna=\"X\", "
+            "adt=\"X\"` or `rna=\"layer:counts\", atac=\"layer:counts\"`, or one object "
+            "passed for two modalities. The call writes nothing.") in exports
+    rna = _rna()
+    for kw in (dict(rna="X", adt="X"),
+               dict(rna="layer:counts", atac="layer:counts", atac_kind="peak")):
+        assert "name the same matrix" in _refused(tmp_path, rna, **kw)
+    assert ("`export_dataset` raises `ValueError` when `adt_names=` is a string.") in exports
+    assert "adt_names=list(adata.uns[\"protein_names\"])" in exports
+    # the reason that the page quotes is the one the check prints
+    _cross(tmp_path, "GA", "atac_gas")
+    pm, _ = _check(capsys, "GA", "cross", methods=["StabMap"], data_path=tmp_path)
+    # the 0.3.5 text; c2 (C22) names the files export writes, atac_peak<i>.h5
+    assert ("`StabMap needs peak ATAC (atac1.h5, atac2.h5, atac3.h5), and the folder has "
+            "gene activity (atac_gas1.h5, atac_gas2.h5, atac_gas3.h5).` 0.3.4 wrote one "
+            "sentence per file.") in messages
+    assert pm["reason"][0].startswith("StabMap needs peak ATAC (atac_peak1.h5, atac_peak2.h5,")
+    assert ("A cross folder written with `atac_kind=\"gene_activity\"` holds `atac_gas1.h5`, "
+            "`atac_gas2.h5` and so on") in checks
+    assert ("It gives the line `adt.X = adt.layers[\"counts\"]` when the object has a "
+            "layer called `counts`.") in messages
+    assert "On the command line, convert each side with its own command and its own " \
+           "`--labels`, into the same folder." in messages
+    assert open_.startswith("- The check does not compare the feature names of two batches.")
+

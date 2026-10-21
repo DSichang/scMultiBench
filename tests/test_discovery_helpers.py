@@ -99,3 +99,51 @@ def test_recommend_task_error_names_real_metrics(result_dir):
         recommend("vertical", metrics=["GC", "iLISI"])
 
 
+def test_namespace_all_hygiene():
+    # env/config/io expose a curated __all__ (no leaked stdlib imports)
+    # recipe left __all__ in 0.4.0 (X34); it stays importable
+    assert "recipe" not in mtb.env.__all__ and "subprocess" not in mtb.env.__all__
+    assert callable(mtb.env.recipe)
+    # config.Config and io.to_canonical are deprecated in 0.4.0: out of __all__
+    assert mtb.config.__all__ == ["DEFAULT"]
+    assert "category_folder" not in mtb.config.__all__      # internal token map
+    assert sorted(mtb.io.__all__) == ["export_dataset", "read_canonical"]
+
+
+def _rec(*a, **k):
+    import warnings
+    from multibench.data.results import recommend
+    with warnings.catch_warnings(record=True) as rec:
+        warnings.simplefilter("always")
+        r = recommend(*a, **k)
+    msgs = [str(w.message) for w in rec if "recommend(" in str(w.message)
+            and not issubclass(w.category, FutureWarning)]
+    return r, (msgs[0] if msgs else "")
+
+
+def test_recommend_rerun_missing_only_seurat_wnn(result_dir):
+    r, msg = _rec("vertical", modalities=["rna", "adt"])
+    assert set(r[r.grand_score.isna()].method) == {"Seurat_WNN"}
+    assert r.attrs["source"] == "rerun" and r.attrs["missing"] == ["Seurat_WNN"]
+    assert "Seurat_WNN has no stored results" not in msg            # c1 (C17)
+    assert 'Try source="rerun"' not in msg
+
+
+def test_recommend_long_df_records_source_and_family(result_dir):
+    long = mtb.load_results("vertical", dataset="D11")
+    r, _ = _rec("vertical", long_df=long, metrics="clustering")
+    assert r.attrs["source"] == "long_df" and r.attrs["metrics"] == "clustering"
+    r2, _ = _rec("vertical", long_df=long, metrics=["ARI", "NMI"])
+    assert r2.attrs["metrics"] == ["ARI", "NMI"]
+
+
+def test_recommend_metrics_batch_on_diagonal_rerun(result_dir):
+    r, _ = _rec("diagonal", metrics="batch")
+    assert r.attrs["metrics"] == "batch" and r.grand_score.notna().any()
+    # the explicit list of the same family scores the same
+    m = mtb.catalog.metrics()
+    batch = m.loc[m.family == "batch", "metric"].tolist()
+    r2, _ = _rec("diagonal", metrics=batch)
+    assert r2.attrs["metrics"] == batch
+    pd.testing.assert_frame_equal(r, r2)
+

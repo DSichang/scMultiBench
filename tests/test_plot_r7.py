@@ -71,3 +71,5 @@ def test_wide_figure_is_not_widened():
     fig = _quiet(B.render, tbl)
     total_w = sum(1.5 + 1.1 * b.raw.shape[1] + 0.5 for b in tbl.blocks) - 0.5
     assert fig.get_size_inches()[0] == pytest.approx(0.6 * total_w + 2.8)
+
+

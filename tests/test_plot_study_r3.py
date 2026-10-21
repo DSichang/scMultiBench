@@ -66,3 +66,75 @@ def test_na_warning_stops_after_three_rows():
     assert msg.endswith("Pass metrics= without NMI to compare on the same metrics.")
 
 
+# ---- restored from before the 0.4 cut: kept behaviour
+def _stored(dataset, source="rerun", category="vertical"):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return mtb.load_results(category, dataset=dataset)
+
+
+def _mycite():
+    # S1: two baselines of her own CITE-seq dataset, scored with the default backend
+    return pd.concat([_mine("RNA PCA", "MYCITE"), _mine("ADT PCA", "MYCITE", base=0.6)],
+                     ignore_index=True)
+
+
+@pytest.mark.parametrize("fn", [_build_table, mtb.plot.bubble, mtb.plot.bar])
+def test_own_dataset_rows_next_to_stored_rows_are_refused(fn):
+    # c2 (C18): refused, where 0.4.0 rc warned that the datasets share no method
+    df = pd.concat([_stored("D11"), _mycite()], ignore_index=True)
+    with pytest.raises(ValueError) as e:
+        _messages(fn, df)
+    assert str(e.value) == REFUSAL
+
+
+@pytest.mark.parametrize("fn", [_build_table, mtb.plot.bubble, mtb.plot.bar])
+def test_same_dataset_igraph_row_still_warns(fn):
+    df = pd.concat([_stored("D11"), _mine("PriyaNet", "D11")], ignore_index=True)
+    _, msgs = _messages(fn, df)
+    hit = [m for m in msgs if "igraph Leiden backend" in m]
+    assert len(hit) == 1 and hit[0].startswith("The rows for PriyaNet were clustered"), msgs
+
+
+def test_backend_rule_without_a_dataset_column_is_unchanged():
+    stored = _stored("D11").drop(columns="dataset")
+    own = _mine("PriyaNet", "D11").drop(columns="dataset")
+    msg = mtb.plot.style.backend_warning(pd.concat([stored, own], ignore_index=True))
+    assert msg and msg.startswith("The rows for PriyaNet were clustered")
+
+
+def test_recommend_long_df_warns_about_igraph_rows_of_a_stored_dataset():
+    # S4: her method, scored with the default backend, ranked against the re-run tables
+    long_df = pd.concat([_stored(None), _mine("PriyaNet_ig", "D11", base=0.9)],
+                        ignore_index=True)
+    r, msgs = _messages(mtb.recommend, "vertical", long_df=long_df)
+    assert "PriyaNet_ig" in set(r["method"])
+    (msg,) = [m for m in msgs if m.startswith("recommend('vertical'):")]
+    assert ("\n  - The rows for PriyaNet_ig were clustered with the igraph Leiden backend. "
+            "The stored results used leidenalg") in msg
+    assert "mtb.config.DEFAULT.leiden_flavor = 'leidenalg'" in msg
+
+
+def test_recommend_backend_line_needs_igraph_rows_a_stored_dataset_and_a_sweep_metric():
+    stored = _stored(None)
+    cases = {
+        "leidenalg": pd.concat([stored, _mine("P", "D11", scored_with="leidenalg/search/0.4.0")]),
+        "stored only": stored,
+    }
+    for what, df in cases.items():
+        _, msgs = _messages(mtb.recommend, "vertical", long_df=df.reset_index(drop=True))
+        assert not any("igraph Leiden backend" in m for m in msgs), (what, msgs)
+    # cLISI does not depend on the Leiden backend (ASW does under the 0.4.0 search)
+    df = pd.concat([stored, _mine("P", "D11")], ignore_index=True)
+    _, msgs = _messages(mtb.recommend, "vertical", long_df=df, metrics=["cLISI"])
+    assert not any("igraph Leiden backend" in m for m in msgs), msgs
+
+
+def _d28_with_mine():
+    # S3: her own method on D28, added to the published D28 table, all metrics
+    pub = _stored("D28", source="published", category="diagonal")
+    metrics = sorted(pub["metric"].unique())
+    mine = _mine("LiNet", "D28", scored_with="leidenalg/search/0.4.0", metrics=metrics)
+    return pd.concat([pub, mine.assign(category="diagonal")], ignore_index=True)
+
+

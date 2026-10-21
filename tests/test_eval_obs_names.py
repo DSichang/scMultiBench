@@ -161,3 +161,5 @@ def test_a_label_column_spelled_another_way_gets_a_did_you_mean():
             mtb.evaluate(a, labels=wrong, metrics=["ARI"])
         with pytest.raises(ValueError, match=r"Did you mean 'celltype'\?$"):
             mtb.io.export_dataset(a, "unused", labels=wrong)
+
+

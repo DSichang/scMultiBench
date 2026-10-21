@@ -422,3 +422,68 @@ def test_setup_note_is_dropped_once_the_helper_file_is_in_place(tmp_path, monkey
     assert runner.script_notes(spec, v, tmp_path)[0].startswith("MIRA imports a logger.py")
     (script.parent / "logger.py").write_text("")
     assert runner.script_notes(spec, v, tmp_path) == [v.size_hint]
+
+
+# ----------------------------------------------------------------- L53: obs_names
+def _barcodes(path):
+    with h5py.File(path, "r") as f:
+        return [b.decode() for b in f["matrix/barcodes"][:]]
+
+
+def _fake_run(monkeypatch, tmp_path, method, category, dataset, n):
+    """Run ``method`` on a demo dataset with a fake process that writes an
+    ``n`` x 4 embedding into out_dir."""
+    inp = mtb.engine.resolve.inputs_for(dataset, category, method)
+    repo = tmp_path / "repo"
+    (repo / "tools_scripts").mkdir(parents=True, exist_ok=True)
+    calls = {}
+    monkeypatch.setattr(runner.subprocess, "Popen", _fake_popen(n, calls))
+    monkeypatch.setattr(config.DEFAULT, "repo_path", repo)
+    return inp, mtb.engine.runner.run(method, category, inputs=inp, out_dir=str(tmp_path / method),
+                                      cmd_template="{cmd}")
+
+
+def test_obs_names_vertical_are_the_paired_barcodes(tmp_path, monkeypatch):
+    inp = mtb.engine.resolve.inputs_for("D11", "vertical", "totalVI")
+    bars = _barcodes(inp["rna"])
+    _, res = _fake_run(monkeypatch, tmp_path, "totalVI", "vertical", "D11", n=len(bars))
+    assert res.obs_names == bars and res.output.shape[0] == len(res.obs_names)
+
+
+@pytest.mark.parametrize("method,first", [("SCALEX", "rna"), ("uniPort", "atac_gas")])
+def test_obs_names_diagonal_follow_the_stacking_order(tmp_path, monkeypatch, method, first):
+    inp = mtb.engine.resolve.inputs_for("D28", "diagonal", method)
+    rna, atac = _barcodes(inp["rna"]), _barcodes(inp["atac_gas"])
+    want = rna + atac if first == "rna" else atac + rna
+    _, res = _fake_run(monkeypatch, tmp_path, method, "diagonal", "D28", n=len(want))
+    assert res.obs_names == want
+    # the same order labels_for gives the label files
+    order = list(mtb.engine.resolve.labels_for("D28", "diagonal", method))
+    assert order[0].startswith(first.split("_")[0])
+
+
+def test_obs_names_mosaic_one_block_per_batch(tmp_path, monkeypatch):
+    inp = mtb.engine.resolve.inputs_for("D46", "mosaic", "StabMap")
+    want = sum((_barcodes(inp[r]) for r in ("rna1", "rna2", "rna3")), [])
+    _, res = _fake_run(monkeypatch, tmp_path, "StabMap", "mosaic", "D46", n=len(want))
+    assert res.obs_names == want
+
+
+def test_obs_names_none_with_a_warning_when_counts_differ(tmp_path, monkeypatch):
+    with pytest.warns(UserWarning, match="obs_names is None"):
+        _, res = _fake_run(monkeypatch, tmp_path, "totalVI", "vertical", "D11", n=7)
+    assert res.obs_names is None
+
+
+@pytest.mark.parametrize("obj", [mtb.scan, mtb.run, mtb.engine.runner.run, mtb.load_batch,
+                                 mtb.describe_layout, mtb.BatchResult, runner.RunResult,
+                                 mtb.BatchResult.save, mtb.data.fetch])
+def test_docstrings_use_plain_wording(obj):
+    doc = inspect.getdoc(obj)
+    assert _caps(doc) == [], _caps(doc)
+    flat = " ".join(doc.split())
+    for banned in (" iff ", " trap", " gate", "tidy frame", "SCAN_COLUMNS",
+                   "OUT_DIR_PLACEHOLDER", "plausible", "Replaces a hand-written",
+                   "never silently", "stand-in"):
+        assert banned not in flat, banned
+

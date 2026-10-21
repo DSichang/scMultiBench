@@ -204,3 +204,18 @@ def test_module_help_is_written_for_users():
         for internal in (".yaml", "install_packed", "create_env", "files/", "space-named",
                          "scib_metric", "env_spec"):
             assert internal not in doc, (mod.__name__, internal)
+
+
+# ---- restored from before the 0.4 cut: kept behaviour
+# ------------------------------------------------------------------ L61 method_info text
+@pytest.mark.parametrize("method", mtb.find_methods())
+def test_method_info_notes_and_setup_hint_hold_no_internal_names(method):
+    info = mtb.method_info(method)
+    for key in ("notes", "setup_hint"):
+        text = str(info.get(key) or "")
+        for bad in ("engine/", "source()d", ".yaml"):
+            assert bad not in text, (method, key, bad)
+    if method == "StabMap":
+        assert info["notes"].endswith("using shared and unshared features; R.")
+
+

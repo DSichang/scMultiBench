@@ -89,21 +89,6 @@ def test_input_matrix_passed_as_output_is_explained(tmp_path):
         eio.read_clustering(g2)
 
 
-def test_docstrings_match_the_code():
-    doc = " ".join(evaluate.__doc__.split())
-    assert "v1" not in doc
-    assert "verbose" in doc and "2,000 cells" in doc
-    import multibench.plot as mplot
-    assert "BatchResult.long()" not in mplot.bubble.__doc__
-    assert ":meth:`BatchResult.long`" not in mplot.bar.__doc__
-    # 0.4.0 docstring: "as mtb.load_results, mtb.evaluate and BatchResult.long return"
-    assert "``mtb.evaluate`` and ``BatchResult.long`` return" in \
-        " ".join(mplot.bubble.__doc__.split())
-    from multibench.data import results
-    assert "v1" not in results.__doc__ and "v1" not in results.load_results.__doc__
-    assert not hasattr(pipeline, "to_long")      # evaluate returns the long table
-
-
 def test_a_wrong_batch_column_gets_its_error_without_the_unused_batch_warning(tmp_path):
     # Z23 (r3): the batch is read before the "changes nothing" warning
     import warnings
@@ -120,3 +105,19 @@ def test_a_wrong_batch_column_gets_its_error_without_the_unused_batch_warning(tm
         with pytest.raises(ValueError, match="batch='Donor' is neither an obs column"):
             mtb.evaluate(a, labels="celltype", batch="Donor", metrics=["ARI"])
     assert not [w for w in rec if "changes nothing" in str(w.message)]
+
+
+def test_docstrings_match_the_code():
+    doc = " ".join(evaluate.__doc__.split())
+    assert "v1" not in doc
+    assert "verbose" in doc and "2,000 cells" in doc
+    import multibench.plot as mplot
+    assert "BatchResult.long()" not in mplot.bubble.__doc__
+    assert ":meth:`BatchResult.long`" not in mplot.bar.__doc__
+    # 0.4.0 docstring: "as mtb.load_results, mtb.evaluate and BatchResult.long return"
+    assert "``mtb.evaluate`` and ``BatchResult.long`` return" in \
+        " ".join(mplot.bubble.__doc__.split())
+    from multibench.data import results
+    assert "v1" not in results.__doc__ and "v1" not in results.load_results.__doc__
+    assert not hasattr(pipeline, "to_long")      # evaluate returns the long table
+

@@ -111,3 +111,20 @@ def _plain(msg, *code, lead=None):
     return msg
 
 
+# ---- restored from before the 0.4 cut: kept behaviour
+def _warned(fn, *args, **kw):
+    with warnings.catch_warnings(record=True) as rec:
+        warnings.simplefilter("always")
+        out = fn(*args, **kw)
+    return out, [str(w.message) for w in rec]
+
+
+def _two(values):
+    """Two methods on one dataset with the given (cLISI, iLISI) per method."""
+    rows = []
+    for m, (cl, il, ari) in zip(("A", "B"), values):
+        rows += [{"method": m, "dataset": "D1", "metric": k, "value": v}
+                 for k, v in (("cLISI", cl), ("iLISI", il), ("ARI", ari))]
+    return pd.DataFrame(rows)
+
+

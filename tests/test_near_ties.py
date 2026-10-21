@@ -47,3 +47,64 @@ def test_compute_records_lisi_residue_as_zero(monkeypatch):
     bat = np.tile(["x", "y"], 30)
     out = escib.compute(emb, lab, None, bat, group="batch", only={"iLISI"})
     assert out.loc["iLISI", "Value"] == 0.0
+
+
+# ---- restored from before the 0.4 cut: kept behaviour
+def _noise_frame():
+    rows = []
+    for m, il in (("A", 2.2e-16), ("B", 0.0), ("C", 0.0)):
+        rows += [{"method": m, "metric": "iLISI", "value": il},
+                 {"method": m, "metric": "GC", "value": 0.5},
+                 {"method": m, "metric": "ASW_batch", "value": 0.5}]
+    return pd.DataFrame(rows)
+
+
+def test_build_table_near_tie_ranks_are_equal():
+    from multibench.plot.bubble import _build_table
+    tbl = _build_table(_noise_frame())
+    assert tbl.ranks["iLISI"].nunique() == 1
+    assert tbl.norm["iLISI"].tolist() == [1.0, 1.0, 1.0]
+    assert tbl.overall.nunique() == 1
+
+
+def _old_rank_max(x):
+    return pd.Series(np.asarray(x, dtype=float)).rank(method="max").to_numpy()
+
+
+def _old_minmax(x):
+    x = np.asarray(x, dtype=float)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        lo, hi = np.nanmin(x), np.nanmax(x)
+    if not np.isfinite(lo) or lo == hi:
+        return np.ones_like(x)
+    return (x - lo) / (hi - lo)
+
+
+def _stored_frames():
+    """Every stored table: each (source, dataset) alone, and each category's
+    datasets together."""
+    out = []
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for cat in ("vertical", "diagonal", "mosaic", "cross"):
+            for source in ("rerun",):
+                try:
+                    df = mtb.load_results(cat)
+                except (FileNotFoundError, ValueError):
+                    continue
+                if df.empty:
+                    continue
+                for ds in sorted(df["dataset"].unique()):
+                    out.append((f"{source}/{ds}", "dataset", df[df["dataset"] == ds]))
+                if df["dataset"].nunique() > 1:
+                    out.append((f"{source}/{cat}", "summary", df))
+    return out
+
+
+def _tables(df, aggregate):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return mtb.plot.build_table(df, aggregate=aggregate)
+
+

@@ -125,3 +125,63 @@ def test_lisi_formula_matches_scib():
     assert "np.nanmedian" in src
     assert "(ilisi - 1) / (nbatches - 1)" in src
     assert "(nlabs - clisi) / (nlabs - 1)" in src
+
+
+# ---- restored from before the 0.4 cut: kept behaviour
+def _stored(dataset, source="published", category="diagonal"):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return mtb.load_results(category, dataset=dataset)
+
+
+def _bubble(df, **kw):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return mtb.plot.bubble(df, **kw)
+
+
+def _legend_outside(fig):
+    """Legend artists whose drawn extent leaves the axes or the figure."""
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    FigureCanvasAgg(fig).draw()
+    renderer = fig.canvas.get_renderer()
+    ax = fig.axes[0]
+    ax_box, fig_box = ax.get_window_extent(renderer), fig.bbox
+    legend = [a for a in list(ax.patches) + list(ax.texts) if a.get_gid() == "legend"]
+    assert legend, "no artist carries gid='legend'"
+    bad = []
+    for a in legend:
+        bb = a.get_window_extent(renderer)
+        for box, where in ((ax_box, "axes"), (fig_box, "figure")):
+            if (bb.x0 < box.x0 - 0.5 or bb.x1 > box.x1 + 0.5
+                    or bb.y0 < box.y0 - 0.5 or bb.y1 > box.y1 + 0.5):
+                bad.append((type(a).__name__, getattr(a, "get_text", lambda: "")(), where))
+    return bad
+
+
+def test_quickstart_figure_keeps_its_rank_legend_whole():
+    df = _stored("D28")
+    fig = _bubble(df, metrics=QUICKSTART)
+    assert _legend_outside(fig) == []
+    # all five Rank circles are drawn, the largest (rank 1) last
+    circles = [p for p in fig.axes[0].patches if p.get_gid() == "legend"
+               and type(p).__name__ == "Circle"]
+    assert len(circles) == 5
+
+
+def _old_width(tbl):
+    """The figure width before R5-08: 0.6 * table width + 2.8 inches."""
+    total_w = sum(1.5 + 1.1 * b.raw.shape[1] + 0.5 for b in tbl.blocks) - 0.5
+    return 0.6 * total_w + 2.8
+
+
+def test_several_datasets_warning_is_plain():
+    d11 = _stored("D11", "rerun", "vertical")     # a second dataset of the same methods
+    df = pd.concat([d11, d11.assign(dataset="D11b")], ignore_index=True).assign(source="user")
+    _, msgs = _messages(_build_table, df)
+    assert msgs == [
+        "This figure averages each method over 2 datasets, D11 and D11b. Its rows "
+        "mix datasets. mtb.plot.bar ranks the methods within each dataset; or filter "
+        "to one dataset."]
+
+

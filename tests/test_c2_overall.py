@@ -168,3 +168,52 @@ def test_bar_of_a_family_only_your_rows_have():
     assert names and all(n.endswith(" (this run)") for n in names)
 
 
+# ---- restored from before the 0.4 cut: kept behaviour
+def _article(st, metrics):
+    """The article's score of a stored-only table, from the per-dataset max-ranks:
+    mean over the datasets of minmax(mean rank), best first, ties by name."""
+    parts = style.per_dataset_ranks(st, metrics)
+    def per_ds(mat):            # minmax of the mean per-column max-rank
+        mean_rank = mat.apply(lambda col: style.rank_max(col.to_numpy()), axis=0).mean(axis=1)
+        return pd.Series(style.minmax(mean_rank.to_numpy()), index=mat.index)
+    s = pd.DataFrame({ds: per_ds(p) for ds, p in parts.items()}).mean(axis=1)
+    s = s.dropna()
+    return s.iloc[np.lexsort([s.index.to_numpy(dtype=str), -s.to_numpy()])]
+
+
+@pytest.mark.parametrize("category, family, name", CASES)
+def test_overall(category, family, name):
+    metrics = FAMILIES[family]
+    st, tables = _tables(category)
+    df = tables[name]
+    s = style.overall(df, metrics)
+    # sorted best first, ties by method name
+    assert list(s.index) == sorted(s.index, key=lambda m: (-s[m], m))
+    # identical rows score the same
+    suffix = " (this run)" if name == "+run" else " copy"
+    pairs = [(m[:-len(suffix)], m) for m in s.index
+             if m.endswith(suffix) and m[:-len(suffix)] in s.index]
+    for a, b in pairs:
+        assert s[a] == s[b], (a, b)
+        # and the stored row sits right above its copy
+        assert list(s.index).index(b) == list(s.index).index(a) + 1
+    if st["metric"].isin(metrics or st["metric"]).any():
+        alone = style.overall(st, metrics)
+        # stored-only tables reproduce today's numbers: the article's rule
+        pd.testing.assert_series_equal(alone, _article(st, metrics), check_names=False)
+        if name != "+copy stored":
+            # stored scores and order are unchanged by what is added
+            kept = s[s.index.isin(alone.index)]
+            assert list(kept.index) == list(alone.index)
+            assert np.allclose(kept.to_numpy(), alone.to_numpy(), rtol=0, atol=0)
+    else:
+        # a family only your rows have is ranked among your rows
+        assert set(s.index) == {m for m in df["method"].unique() if m.endswith(suffix)}
+
+
+def test_your_rows_alone_rank_among_themselves():
+    st = _stored("vertical").assign(source="user")
+    assert np.allclose(style.overall(st), _article(st, None))
+    one = st[st["method"] == "Matilda"]
+    assert style.overall(one).to_dict() == {"Matilda": 1.0}
+

@@ -142,3 +142,5 @@ def test_error_tail_is_clipped_at_a_word_boundary():
     tail = W._error_tail(long, width=60)
     assert tail.startswith("...") and len(tail) <= 60
     assert tail[3:].split(" ", 1)[0] in {"could", "not", "reach", "github.com"}
+
+

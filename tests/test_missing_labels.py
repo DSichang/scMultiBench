@@ -532,3 +532,4 @@ def test_docstring_names_the_argument_and_its_errors():
     assert "missing_labels" not in doc
     assert "missing_labels" not in inspect.signature(mtb.evaluate).parameters
     assert "Missing or misaligned labels or batches" in flat              # Raises
+

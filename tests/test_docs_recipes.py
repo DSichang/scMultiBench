@@ -772,62 +772,6 @@ def test_a_diagonal_folder_with_labels_for_one_side_is_not_scored(host, tmp_path
     assert [r["status"] for r in res.records] == ["RUN_OK"]
 
 
-def _labelled_call():
-    """The page's call for an embedding with labels for some of the cells
-    (0.4.0: a subset of the AnnData, not the deprecated missing_labels=)."""
-    call = 'mtb.evaluate(emb[emb.obs["label"].notna()], labels="label")'
-    assert f"`{call}`" in _said("recipe-no-labels")
-    return call
-
-
-def _emb(matrix, labels):
-    """An embedding as res.embedding(m) returns it: obsm["X_emb"], obs["label"]."""
-    emb = ad.AnnData(np.zeros((len(labels), 1)))
-    emb.obsm["X_emb"] = matrix
-    emb.obs["label"] = np.asarray(labels, dtype=object)
-    return emb
-
-
-def test_the_evaluate_call_of_the_page_scores_the_labelled_cells():
-    """The call for an embedding with labels for some of the cells."""
-    call = _labelled_call()
-    _says("recipe-no-labels", "`evaluate` raises when a label is missing")
-    labels = _cite().obs["celltype"].astype(object).to_numpy()
-    labels[:12] = None
-    emb = _emb(np.random.default_rng(0).normal(size=(len(labels), 4)), labels)
-    scores = eval(call, {"mtb": mtb, "emb": emb})
-    assert scores["value"].notna().all()
-    assert scores.equals(mtb.evaluate(emb[12:].copy(), labels="label"))
-    # "evaluate raises when a label is missing."
-    with pytest.raises(ValueError, match=r"^labels: 12 of the 120 cells have no label\. "):
-        mtb.evaluate(emb, labels="label")
-
-
-def test_scores_of_one_labelled_side_do_not_see_the_other_side():
-    """Cell types for the RNA cells only. The scores of the labelled cells
-    are those of the RNA cells alone: embeddings that put the ATAC cells in
-    different places get the same scores, so the recipe says that no score
-    compares methods on such data."""
-    _says("recipe-no-labels", "No score compares methods on such data: scores of the RNA "
-                              "cells alone do not change with where a method puts the ATAC "
-                              "cells.")
-    call = _labelled_call()
-    rng = np.random.default_rng(0)
-    n = 120
-    types = rng.choice(["T", "B", "NK"], n)
-    centre = {"T": 0.0, "B": 6.0, "NK": 12.0}
-    rna = np.array([[centre[t]] * 4 for t in types]) + rng.normal(size=(n, 4))
-    # the ATAC cells on the RNA cells, far from all of them, and at one point
-    scores = []
-    for atac in (rna, rna + 100.0, np.zeros((n, 4))):
-        emb = _emb(np.vstack([rna, atac]), [*types, *[None] * n])   # RNA, then ATAC
-        scores.append(eval(call, {"mtb": mtb, "emb": emb}))
-    assert scores[0]["value"].notna().all()
-    assert scores[1].equals(scores[0]) and scores[2].equals(scores[0])
-    # they are the scores of the RNA cells alone
-    assert mtb.evaluate(_emb(rna, types), labels="label").equals(scores[0])
-
-
 # ------------------------------------------------ cell types later, per layout
 def _without_labels(export):
     """The export cell of a tutorial without its ``labels=`` argument."""
@@ -1143,3 +1087,60 @@ def test_details_name_the_filter_error_and_the_files_of_other_data(tmp_path):
         assert str(left.value) == (f"{out} holds atac.h5 and 1 more file with other cells. "
                                    f"Export to a new folder.")
     assert _bytes(out) == before
+
+
+def _labelled_call():
+    """The page's call for an embedding with labels for some of the cells
+    (0.4.0: a subset of the AnnData, not the deprecated missing_labels=)."""
+    call = 'mtb.evaluate(emb[emb.obs["label"].notna()], labels="label")'
+    assert f"`{call}`" in _said("recipe-no-labels")
+    return call
+
+
+def _emb(matrix, labels):
+    """An embedding as res.embedding(m) returns it: obsm["X_emb"], obs["label"]."""
+    emb = ad.AnnData(np.zeros((len(labels), 1)))
+    emb.obsm["X_emb"] = matrix
+    emb.obs["label"] = np.asarray(labels, dtype=object)
+    return emb
+
+
+def test_the_evaluate_call_of_the_page_scores_the_labelled_cells():
+    """The call for an embedding with labels for some of the cells."""
+    call = _labelled_call()
+    _says("recipe-no-labels", "`evaluate` raises when a label is missing")
+    labels = _cite().obs["celltype"].astype(object).to_numpy()
+    labels[:12] = None
+    emb = _emb(np.random.default_rng(0).normal(size=(len(labels), 4)), labels)
+    scores = eval(call, {"mtb": mtb, "emb": emb})
+    assert scores["value"].notna().all()
+    assert scores.equals(mtb.evaluate(emb[12:].copy(), labels="label"))
+    # "evaluate raises when a label is missing."
+    with pytest.raises(ValueError, match=r"^labels: 12 of the 120 cells have no label\. "):
+        mtb.evaluate(emb, labels="label")
+
+
+def test_scores_of_one_labelled_side_do_not_see_the_other_side():
+    """Cell types for the RNA cells only. The scores of the labelled cells
+    are those of the RNA cells alone: embeddings that put the ATAC cells in
+    different places get the same scores, so the recipe says that no score
+    compares methods on such data."""
+    _says("recipe-no-labels", "No score compares methods on such data: scores of the RNA "
+                              "cells alone do not change with where a method puts the ATAC "
+                              "cells.")
+    call = _labelled_call()
+    rng = np.random.default_rng(0)
+    n = 120
+    types = rng.choice(["T", "B", "NK"], n)
+    centre = {"T": 0.0, "B": 6.0, "NK": 12.0}
+    rna = np.array([[centre[t]] * 4 for t in types]) + rng.normal(size=(n, 4))
+    # the ATAC cells on the RNA cells, far from all of them, and at one point
+    scores = []
+    for atac in (rna, rna + 100.0, np.zeros((n, 4))):
+        emb = _emb(np.vstack([rna, atac]), [*types, *[None] * n])   # RNA, then ATAC
+        scores.append(eval(call, {"mtb": mtb, "emb": emb}))
+    assert scores[0]["value"].notna().all()
+    assert scores[1].equals(scores[0]) and scores[2].equals(scores[0])
+    # they are the scores of the RNA cells alone
+    assert mtb.evaluate(_emb(rna, types), labels="label").equals(scores[0])
+

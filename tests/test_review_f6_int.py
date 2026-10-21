@@ -257,12 +257,13 @@ def test_the_scbridge_error_names_the_method_once(tmp_path):
 # =========================================================== docstrings
 def test_docstrings_quote_the_current_texts():
     flat = {k: " ".join(inspect.getdoc(o).split()) for k, o in {
-        "run": mtb.run, "save": W.BatchResult.save, "run": mtb.engine.runner.run,
+        "run": mtb.run, "save": W.BatchResult.save, "runner": mtb.engine.runner.run,
         "rescore": W.BatchResult.rescore, "load_batch": mtb.load_batch}.items()}
     assert "nothing is runnable" not in flat["run"]
-    # 0.4: the Notes of run, run and rescore that quoted these texts are cut
-    assert "no 'cross' variant matches" not in flat["run"]
-    assert "and the ``batch`` vector" not in flat["run"]
+    # 0.4: the Notes of run, the runner and rescore that quoted these texts are cut
+    for key in ("run", "runner"):
+        assert "no 'cross' variant matches" not in flat[key]
+        assert "and the ``batch`` vector" not in flat[key]
     assert "all four files" not in flat["save"]
     assert "every file in the list above is rewritten from the merged set" in flat["save"]
     assert "see its Notes" not in flat["rescore"]

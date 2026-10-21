@@ -102,3 +102,59 @@ BACKEND = ("The rows for {m} were clustered with the igraph Leiden backend. The 
            "them.")
 
 
+# ---- restored from before the 0.4 cut: kept behaviour
+def _stored(dataset, source="rerun", category="vertical"):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return mtb.load_results(category, dataset=dataset)
+
+
+def _pair():
+    """D11 and a second dataset of the same methods (the subsample tables left
+    in 0.4.0, X04): D11's rows under another dataset name."""
+    d11 = _stored("D11")
+    return pd.concat([d11, d11.assign(dataset="D11b")], ignore_index=True).assign(source="user")
+
+
+def test_dataset_mode_rerun_pair_suggests_plot_bar():
+    _, msgs = _messages(_build_table, _pair())
+    assert msgs == [
+        "This figure averages each method over 2 datasets, D11 and D11b. Its rows "
+        "mix datasets. mtb.plot.bar ranks the methods within each dataset; or filter "
+        "to one dataset."]
+
+
+@pytest.mark.parametrize("fn", [_build_table, mtb.plot.bubble, mtb.plot.bar])
+def test_igraph_rows_next_to_stored_rows_warn(fn):
+    df = pd.concat([_stored("D11"), _mine(method="MyMethod", dataset="D11")],
+                   ignore_index=True)
+    _, msgs = _messages(fn, df)
+    assert msgs.count(BACKEND.format(m="MyMethod")) == 1, msgs
+
+
+@pytest.mark.parametrize("fn", [_build_table, mtb.plot.bar])
+def test_no_backend_warning_for_leidenalg_or_own_rows(fn):
+    lalg = _mine(method="MyMethod", dataset="D11", scored_with="leidenalg/search/0.4.0")
+    _, msgs = _messages(fn, pd.concat([_stored("D11"), lalg], ignore_index=True))
+    assert not any("igraph Leiden backend" in m for m in msgs), msgs
+    own = pd.concat([_mine(method="M1"), _mine(method="M2", values=(0.4, 0.6, 0.5, 0.8))],
+                    ignore_index=True)
+    _, msgs = _messages(fn, own)
+    assert not any("igraph Leiden backend" in m for m in msgs), msgs
+    # rows without scored_with (stored rows only) never trigger it
+    _, msgs = _messages(fn, _stored("D11"))
+    assert not any("igraph Leiden backend" in m for m in msgs), msgs
+
+
+def test_backend_warning_needs_a_sweep_metric_on_show():
+    df = pd.concat([_stored("D11"), _mine(method="MyMethod", dataset="D11")],
+                   ignore_index=True)
+    # under the 0.4.0 search ASW reads the Leiden clusters too: cLISI does not
+    _, msgs = _messages(_build_table, df, metrics=["cLISI"])
+    assert not any("igraph Leiden backend" in m for m in msgs), msgs
+    # clusters from the user: only iF1 depends on the backend
+    user = _mine(method="MyMethod", dataset="D11", scored_with="igraph/user/0.4.0")
+    _, msgs = _messages(_build_table,
+                        pd.concat([_stored("D11"), user], ignore_index=True))
+    assert not any("igraph Leiden backend" in m for m in msgs), msgs
+

@@ -68,3 +68,5 @@ def test_run_all_scoring_labels_its_internal_search_as_search():
     assert names == ["good.csv"]
     assert val.attrs["clustering"] == "search"
     assert val.attrs["leiden_flavor"] == _flavor()
+
+

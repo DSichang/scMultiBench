@@ -441,3 +441,5 @@ def test_method_runs_are_scored_in_file_order_as_before(cite, tmp_path, monkeypa
         turned = mtb.run("MYCITE", "vertical", out_dir=tmp_path / "turned", **kw)
     assert turned.summary.loc[0, ["ARI", "NMI"]].tolist() == scores    # A|B halves swap
     assert "evaluate:" not in capsys.readouterr().err
+
+
