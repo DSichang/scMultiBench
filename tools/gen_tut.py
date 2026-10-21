@@ -449,8 +449,9 @@ def multi_numbering():
             f"and ATAC batch 1 need not come from the same sample. "
             f"{and_list(_several_batch_diagonal_methods())} read exactly {n} RNA and {n} "
             f"ATAC batches. For another number, such as two donors, write one `rna.h5` "
-            f"and one ATAC file with every cell, as in the diagonal RNA + ATAC tutorial, "
-            f"and pass the batches to `run` as `batch=`, one per RNA and ATAC cell.")
+            f"and one ATAC file with every cell, and pass the batches to `run` as `batch=`, "
+            f"one per RNA and ATAC cell, as in "
+            f"[Another number of donors]({SITE}tutorials/run/#recipe-donors).")
 MULTI_PEAK = ("For ATAC as a peak matrix, pass `atac_kind=\"peak\"`. {multi_peak} "
               "the peak matrix.")
 MOSAIC_LAYOUT = ("[The folder layout](" + LAYOUT + ") lists the batch patterns and the methods "

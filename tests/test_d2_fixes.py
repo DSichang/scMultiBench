@@ -1,6 +1,7 @@
 """Round d2 of the 0.4.0 review: the cell names RunResult.embedding gives are
 accepted back as batch= / labels= ids; a misspelt method in another letter
-case gets a did-you-mean hint."""
+case gets a did-you-mean hint; messages name the embedding, a missing folder and
+an empty table."""
 import shutil
 import warnings
 
@@ -76,3 +77,14 @@ def test_repeated_raw_barcodes_are_still_refused(d28_like):
 def test_a_misspelt_method_in_other_letter_case_gets_a_hint():
     with pytest.raises(KeyError, match=r"Unknown method scalexx\. Did you mean SCALEX\?"):
         mtb.cite("scalexx")
+
+
+def test_load_run_of_a_missing_folder_says_it_does_not_exist(tmp_path):
+    with pytest.raises(FileNotFoundError, match=r"nothing does not exist\. Pass the out_dir"):
+        mtb.load_run(tmp_path / "nothing")
+
+
+def test_an_empty_table_is_not_blamed_on_filters():
+    empty = pd.DataFrame(columns=["method", "metric", "value"])
+    with pytest.raises(ValueError, match=r"^The table has no rows\.$"):
+        mtb.plot.bubble(empty)

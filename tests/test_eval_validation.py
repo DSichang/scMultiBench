@@ -143,7 +143,7 @@ def test_labels_series_missing_or_extra_ids_raise_naming_them():
     with pytest.raises(ValueError) as exc:
         evaluate(df, labels=ser.iloc[:-2], metrics=["ARI"])
     msg = str(exc.value)
-    assert "cannot align by cell id" in msg and "2 of the output's 90 cells are missing" in msg
+    assert "cannot align by cell id" in msg and "2 of the embedding's 90 cells are missing" in msg
     # c4: to_numpy() only fits labels with one entry per cell
     assert "cell88" in msg and "cell89" in msg and "labels.to_numpy()" not in msg
     # c3 (E08): ids the output lacks are left out when every cell has its label

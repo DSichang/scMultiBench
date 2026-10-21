@@ -91,6 +91,8 @@ def load_run(out_dir, *, methods=None) -> "RunResult":
     ``mtb.config.data_path``.
     """
     folder = Path(out_dir).expanduser()
+    if not folder.is_dir():
+        raise FileNotFoundError(f"{folder} does not exist. Pass the out_dir that mtb.run wrote.")
     if not (folder / "batch_result.json").is_file():
         raise FileNotFoundError(
             f"{folder} holds no batch_result.json, so it is not an out_dir of mtb.run. "

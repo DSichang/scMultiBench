@@ -243,7 +243,9 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None) -> Bubble
                            catalog._canonical_metric)
         df = df[df["metric"].isin(metrics)]
     if df.empty:
-        raise ValueError("no rows left after applying methods=/metrics= filters")
+        raise ValueError("no rows left after applying methods=/metrics= filters"
+                         if methods is not None or metrics is not None
+                         else "The table has no rows.")
 
     keys = ["method", "metric"] + (["dataset"] if "dataset" in df.columns else [])
     repeated = df.duplicated(keys, keep=False)
