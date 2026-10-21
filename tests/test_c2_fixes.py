@@ -256,7 +256,6 @@ def test_cross_messages_name_the_files_export_writes(tmp_path):
         pd.DataFrame({"x": ["T", "B"] * 20}).to_csv(d / f"cty{b}.csv", index=False)
     reason = mtb.scan(d, "cross", verbose=False, methods=["StabMap"])["reason"].iloc[0]
     assert "needs peak ATAC (atac_peak3.h5)" in reason
-    assert "atac_peak<i>.h5 holds peaks: every cross method" in mtb.describe_layout("cross")
 
 
 def test_one_raw_counts_sentence_for_the_files_of_several_batches(tmp_path):

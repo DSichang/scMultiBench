@@ -1,6 +1,6 @@
 """The public surface (the 0.3.0 cut and the 0.4.0 core API), pinned.
 
-``__all__`` of ``mtb`` (19 names), ``mtb.plot``, ``mtb.io``, ``mtb.env``,
+``__all__`` of ``mtb`` (18 names), ``mtb.plot``, ``mtb.io``, ``mtb.env``,
 ``mtb.config``, ``mtb.catalog`` and ``mtb.data`` are EXACTLY the contract's sets; ``dir()`` of those namespaces
 leaks no import; every deprecated alias warns and forwards; every removed
 name / keyword fails loudly with the contract's message; every ``--help``
@@ -20,7 +20,7 @@ MTB_ALL = {                                       # the 0.4.0 core API (TARGET.t
     "find_methods", "method_info", "params_for", "cite",
     "scan", "run", "load_batch", "BatchResult",
     "evaluate", "load_results", "recommend",
-    "describe_layout", "__version__",
+    "__version__",
 }
 PLOT_ALL = {"bubble", "bar"}
 IO_ALL = {"export_dataset", "read_canonical"}
@@ -38,7 +38,7 @@ def _leaks(ns) -> set:
 
 # ------------------------------------------------------------------ __all__ sets
 def test_top_level_all_is_exactly_the_contract():
-    assert set(mtb.__all__) == MTB_ALL and len(MTB_ALL) == 19
+    assert set(mtb.__all__) == MTB_ALL and len(MTB_ALL) == 18
     assert len(mtb.__all__) == len(MTB_ALL)                 # no duplicates
     assert all(hasattr(mtb, n) for n in MTB_ALL)
     assert _leaks(mtb) == set()

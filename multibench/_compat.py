@@ -11,7 +11,7 @@ _PACKAGE = os.path.dirname(os.path.abspath(__file__)) + os.sep
 
 class Text(str):
     """A ``str`` whose notebook / REPL echo is the text itself, line breaks and
-    all (``describe_layout``, ``cite``); it is a ``str`` in every other way."""
+    all (``cite``); it is a ``str`` in every other way."""
 
     def __repr__(self) -> str:
         return str(self)

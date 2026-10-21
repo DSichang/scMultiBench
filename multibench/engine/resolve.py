@@ -14,6 +14,9 @@ from . import registry
 from .schema import (_NON_MODALITY_ROLES, AmbiguousVariantError, _batch_of,
                      base_modality, is_label_role)
 
+#: The docs section that lists the files of a dataset folder, per category.
+LAYOUT_URL = "https://dsichang.github.io/scMultiBench/tutorials/run/#folder-layout"
+
 # file stems tried in order for a role; the first existing file wins
 _ROLE_FILE_CANDIDATES = {
     "atac_gas": ("atac_gas", "atac"),
@@ -284,9 +287,8 @@ def missing_dataset_message(base, dataset: str) -> str:
              f"{base} holds no folders." if base.is_dir() else
              f"{base} does not exist either.")
     return (f"The folder {base / dataset} does not exist. {holds} "
-            + ("dataset= is the folder's path, or its name under "
-                          "mtb.config.DEFAULT.data_path. mtb.describe_layout() shows the "
-                          "layout."))
+            + "dataset= is the folder's path, or its name under "
+            + f"mtb.config.DEFAULT.data_path. The folder layout is at {LAYOUT_URL}.")
 
 
 def _note_local_folder(base: Path, name: str) -> None:
@@ -679,7 +681,7 @@ def _batch_label_file(role: str, path, category: str | None = None) -> tuple[str
     return m.group(1), p.parent / f"cty{m.group(1)}.csv"
 
 
-def _check_label_count(labels: Path, data: Path, category, *, batch=None) -> None:
+def _check_label_count(labels: Path, data: Path, *, batch=None) -> None:
     """``ValueError`` when the label file ``labels`` has another number of rows
     than ``data`` has cells; unreadable files and square matrices pass."""
     if not labels.is_file() or data.suffix != ".h5" or not data.is_file():
@@ -691,7 +693,7 @@ def _check_label_count(labels: Path, data: Path, category, *, batch=None) -> Non
     _, n_feat, n_cell = sniff
     if n_feat != n_cell and n_lab != n_cell:
         raise ValueError(_label_count_text(labels.name, n_lab, data.name, n_cell,
-                                           category, batch=batch))
+                                           batch=batch))
 
 
 def _check_label_lengths(category, resolved):
@@ -702,13 +704,13 @@ def _check_label_lengths(category, resolved):
     for role, path in resolved.items():
         pair = _batch_label_file(role, path, category)
         if pair is not None and pair[1].stem not in resolved:   # else a role, below
-            _check_label_count(pair[1], Path(path), category, batch=pair[0])
+            _check_label_count(pair[1], Path(path), batch=pair[0])
     if category == "diagonal":
         _check_diagonal_label_files(resolved)
     for role, path in resolved.items():
         if is_label_role(role) and Path(path).suffix == ".csv":
             for partner in _label_partners(role, resolved):
-                _check_label_count(Path(path), Path(resolved[partner]), category)
+                _check_label_count(Path(path), Path(resolved[partner]))
 
 
 def _check_diagonal_label_files(resolved):
@@ -721,17 +723,15 @@ def _check_diagonal_label_files(resolved):
         base = base_modality(role)
         label_role = f"{base}_cty"
         if base in ("rna", "atac") and label_role not in resolved:
-            _check_label_count(Path(path).parent / f"{label_role}.csv", Path(path),
-                               "diagonal")
+            _check_label_count(Path(path).parent / f"{label_role}.csv", Path(path))
 
 
-def _label_count_text(labels: str, n_lab: int, data: str, n_cell: int, category: str,
-                      *, batch=None) -> str:
+def _label_count_text(labels: str, n_lab: int, data: str, n_cell: int, *,
+                      batch=None) -> str:
     """The error of a label file whose length is not its data file's cell count."""
     each = f"each cell of batch {batch}" if batch is not None else "each cell"
     return (f"{labels} has {n_lab} labels, but {data} has {n_cell} cells. Give {each} "
-            f"one label, in the order of the cells. "
-            + f"mtb.describe_layout({category!r}) shows the files.")
+            f"one label, in the order of the cells. The folder layout is at {LAYOUT_URL}.")
 
 
 def _data_dir_files(variant, data_dir) -> dict:

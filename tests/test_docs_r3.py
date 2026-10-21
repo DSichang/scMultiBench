@@ -58,7 +58,7 @@ def test_dry_run_line_is_on_the_quickstart_only():
     repeats it (tutorials/run carries the dry-run step)."""
     quick, install = _read("quickstart.md"), _read("installation.md")
     for text in (quick, install):
-        assert "mtb.describe_layout(" in text
+        assert "(tutorials/run.md#folder-layout)" in text
     assert 'mtb.run("D28", "diagonal", methods=["SCALEX"]' in quick
     assert "dry_run=True" in quick
     assert "**Preview a run.**" not in install and "**Custom launch.**" not in install

@@ -8,7 +8,6 @@
   files are in the folder, as for SKIPPED records; one line counts the rest.
   A variant that reads a folder is listed as ``scBridge``, not
   ``scBridge ((data_dir))``.
-- describe_layout and list_categories join no two facts with ';'.
 - labels_for names a missing dataset folder as scan does; load_results
   names missing tables in plain sentences without the package path.
 - Old-style messages: an unknown modality, an unknown metrics= token, no

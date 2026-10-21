@@ -255,13 +255,6 @@ def test_a_gene_activity_batch_in_another_cell_order_is_refused(tmp_path):
     mtb.engine.resolve.inputs_for("MB", "diagonal", "GLUE", data_path=tmp_path, check=True)
 
 
-# ------------------------------------------------------------------------ layout
-def test_the_file_table_lists_the_per_batch_label_files():
-    text = mtb.describe_layout()
-    assert "rna_cty1.csv, atac_cty1.csv ... - the same per batch (diagonal" in text
-    assert "rna_cty1.csv" not in mtb.describe_layout("cross")
-
-
 # ---------------------------------------------------------------------- export
 def _adata(n, feats, prefix, seed=0):
     import anndata as ad

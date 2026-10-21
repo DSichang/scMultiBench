@@ -4,23 +4,6 @@ import pytest
 import multibench as mtb
 
 
-def test_describe_layout_names_files_and_flags_the_atac_trap():
-    txt = mtb.describe_layout("vertical")
-    assert "rna.h5" in txt and "adt.h5" in txt and "cty.csv" in txt
-    # vertical reads atac.h5, and the method decides what it must hold (L34);
-    # 0.4.0: scan and run skip a method whose file holds the other one
-    assert "atac.h5" in txt and "mtb.scan and mtb.run skip such a method." in txt
-    # assert the SUBSTANCE of the warning, not one word of its phrasing: the
-    # text must say which representation each method needs, and that feeding
-    # the wrong one does not raise.
-    low = txt.lower()
-    assert "peaks" in low and ("gene activity" in low or "gene-activity" in low)
-    assert "wrong" in low, "must warn that the wrong representation is silently wrong"
-    # the diagonal text names both representation files and the older name
-    diag = mtb.describe_layout("diagonal")
-    assert "atac_peak.h5" in diag and "atac_gas.h5" in diag and "peak.h5" in diag
-
-
 def test_package_docstring_has_import_and_categories():
     doc = mtb.__doc__ or ""
     assert "import multibench as mtb" in doc
@@ -96,28 +79,6 @@ def test_run_all_missing_dataset_folder_is_filenotfound():
     assert str(e.value).startswith("The folder ") and "NO_SUCH_DATASET_XYZ does not exist. " \
         in str(e.value)
     assert "D11" in str(e.value)
-
-
-def test_describe_layout_is_category_specific():
-    """It used to print the CITE-seq layout whatever category you asked for, so an
-    unpaired user was told to write a single cty.csv - which silently mis-scores."""
-    diag = mtb.describe_layout("diagonal")
-    assert "rna_cty.csv" in diag and "atac_cty.csv" in diag
-    assert "\ndiagonal: " in diag
-    vert = mtb.describe_layout("vertical")
-    assert "\nvertical: " in vert
-    # per-category output prints only that category (L33): no role table of
-    # the others, so the whole text is checked, not a block of it
-    assert "atac_cty.csv" not in vert and "rna_cty.csv" not in vert
-    assert "\ndiagonal: " not in vert and "\nvertical: " not in diag
-
-
-# --- handover: registry-generated describe_layout lists, validated tokens -------
-
-def test_describe_layout_rejects_typo():
-    with pytest.raises(ValueError, match="unknown category 'crosss'"):
-        mtb.describe_layout("crosss")
-    assert mtb.describe_layout(None)            # None still prints everything
 
 
 def test_read_labels_reads_cty_and_obs_exports(tmp_path):

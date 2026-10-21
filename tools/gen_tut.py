@@ -63,6 +63,7 @@ os.makedirs(OUT, exist_ok=True)
 
 COLAB = "https://colab.research.google.com/github/DSichang/scMultiBench/blob/main/notebooks/"
 SITE = "https://dsichang.github.io/scMultiBench/"
+LAYOUT = SITE + "tutorials/run/#folder-layout"
 
 
 def details(*paras, label="Details"):
@@ -139,24 +140,20 @@ def atac_forms(cat):
 def diagonal_atac_sentence():
     """The visible ATAC-form sentence of the diagonal tutorial's first cell.
 
-    It points to ``describe_layout``, which lists each method under the ATAC
-    files it needs. ``method_info(m)["atac"]`` names one form, and lists the
+    It points to the run guide's folder layout, which lists each diagonal
+    method under the ATAC files it needs (a package test pins that table to
+    the registry). ``method_info(m)["atac"]`` names one form, and lists the
     methods that read both files under peak."""
     gas, peak_only, both = atac_forms("diagonal")
     if not (peak_only and both and len(gas) > len(peak_only) + len(both)):
         raise SystemExit("diagonal ATAC forms changed: reword the diagonal title cell")
     if "same cells" not in mtb.method_info("Seurat_v5")["setup_hint"]:
         raise SystemExit("Seurat_v5's setup hint changed: reword the diagonal title cell")
-    layout = [ln.strip() for ln in mtb.describe_layout("diagonal").splitlines()]
-    if not any(ln.startswith("need both files:") and all(m in ln for m in both)
-               for ln in layout):
-        raise SystemExit("describe_layout no longer lists the methods that read both "
-                         "ATAC files: reword the diagonal title cell")
     return (f"Most diagonal methods read ATAC as gene-activity scores, made beforehand "
             f"with a tool such as Signac or ArchR. {and_list(peak_only)} read the peak "
             f"matrix, and {and_list(both)} need both. Seurat_v5 also needs RNA and ATAC "
-            f"from the same cells. `mtb.describe_layout(\"diagonal\")` lists each "
-            f"method's ATAC files.")
+            f"from the same cells. [The folder layout]({LAYOUT}) lists each method's "
+            f"ATAC files.")
 
 
 # The install cell of every notebook (the module docstring says why it pins numpy
@@ -440,13 +437,13 @@ MUDATA_NOTE = ("A 10x Multiome MuData goes in with one call. Here the labels are
 DIAG_ONE_SIDE = ("`labels=` needs the column in both files. With cell types for the RNA "
                  "cells only, leave `labels=` out and follow the recipe for no labels.")
 DIAG_PEAK = ("For ATAC as a peak matrix, pass `atac_kind=\"peak\"`. {peak_only} read "
-             "peaks. `mtb.describe_layout(\"diagonal\")` lists the files each method needs.")
+             "peaks. [The folder layout](" + LAYOUT + ") lists the files each method needs.")
 MULTI_NUMBERING = ("The RNA batches and the ATAC batches are numbered separately. RNA batch 1 "
                    "and ATAC batch 1 need not come from the same sample. The loop takes as "
                    "many batches as the list `rna` holds.")
 MULTI_PEAK = ("For ATAC as a peak matrix, pass `atac_kind=\"peak\"`. {multi_peak} "
               "the peak matrix.")
-MOSAIC_LAYOUT = ("`mtb.describe_layout(\"mosaic\")` lists the batch patterns and the methods "
+MOSAIC_LAYOUT = ("[The folder layout](" + LAYOUT + ") lists the batch patterns and the methods "
                  "that accept each one.")
 MOSAIC_ONE_FILE = ("A batch with RNA and ADT in one file goes in with a selector, for "
                    "example `adt=\"obsm:protein\"`.")

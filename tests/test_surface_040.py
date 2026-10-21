@@ -16,7 +16,7 @@ TOP = ["config", "plot", "catalog", "io", "env", "data",
        "find_methods", "method_info", "params_for", "cite",
        "scan", "run", "load_batch", "BatchResult",
        "evaluate", "load_results", "recommend",
-       "describe_layout", "__version__"]
+       "__version__"]
 
 NAMESPACES = {"config": ["DEFAULT"], "plot": ["bubble", "bar"],
               "catalog": ["datasets", "metrics"], "io": ["export_dataset", "read_canonical"],
@@ -36,7 +36,6 @@ SIGNATURES = {
                  "metrics", "obsm", "verbose"],
     "load_results": ["category", "dataset", "methods", "metrics"],
     "recommend": ["category", "modalities", "methods", "metrics", "long_df"],
-    "describe_layout": ["category"],
     "plot.bubble": ["long_df", "metrics", "methods", "title", "save"],
     "plot.bar": ["long_df", "metrics", "methods", "title", "save"],
     "catalog.datasets": ["category"],
@@ -123,7 +122,6 @@ def test_public_calls_emit_no_future_warning(tmp_path):
         mtb.method_info("Matilda")
         mtb.params_for("Matilda", "vertical", ["rna", "adt"])
         mtb.cite("Matilda", format="bibtex")
-        mtb.describe_layout("mosaic")
         mtb.catalog.datasets()
         mtb.catalog.metrics()
         long = mtb.load_results("vertical", dataset="D11")

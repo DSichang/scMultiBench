@@ -1,6 +1,5 @@
-"""Student study round 2, package items M17, M19, M23, M28 and M29.
+"""Student study round 2, package items M19, M23, M28 and M29.
 
-M17: the diagonal ATAC lines of ``describe_layout`` name each method once.
 M19: messages printed by the command line name ``multibench ...`` commands,
 not Python calls; JSON output keeps ``/`` unescaped.
 M23: a vertical folder holding ``atac_peak.h5`` gets a reason that says how

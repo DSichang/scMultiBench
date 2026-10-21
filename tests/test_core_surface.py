@@ -9,7 +9,7 @@ import multibench as mtb
 
 TOP = {"config", "plot", "catalog", "io", "env", "data", "find_methods", "method_info",
        "params_for", "cite", "scan", "run", "load_batch", "BatchResult", "evaluate",
-       "load_results", "recommend", "describe_layout", "__version__"}
+       "load_results", "recommend", "__version__"}
 MEMBERS = {"io": ["export_dataset", "read_canonical"], "env": ["install"],
            "plot": ["bubble", "bar"], "data": ["fetch", "write_example"],
            "catalog": ["datasets", "metrics"], "config": ["DEFAULT"]}
@@ -17,8 +17,8 @@ COMMANDS = ["find", "params", "info", "fetch", "config", "scan", "layout", "expo
             "plot", "run-all", "evaluate", "env", "env install"]
 
 
-def test_top_level_is_the_nineteen_names():
-    assert set(mtb.__all__) == TOP and len(mtb.__all__) == 19
+def test_top_level_is_the_eighteen_names():
+    assert set(mtb.__all__) == TOP and len(mtb.__all__) == 18
     assert set(dir(mtb)) - {n for n in dir(mtb) if n.startswith("__")} == TOP - {"__version__"}
 
 

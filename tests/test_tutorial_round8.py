@@ -87,6 +87,6 @@ def test_split_sentences_keep_their_facts():
             continue
         md = "\n".join(src for kind, src in _cells(f"tutorial_{key}") if kind == "markdown")
         assert "writes one batch per call. Number the batches as below: " in md, key
-        assert "`mtb.describe_layout(\"mosaic\")` lists the batch patterns" in md, key
+        assert f"[The folder layout]({GEN.LAYOUT}) lists the batch patterns" in md, key
 
 

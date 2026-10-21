@@ -94,8 +94,8 @@ def test_x12_a_label_file_without_ids_is_matched_by_position_silently(tmp_path):
 
 
 def test_x47_text_returns_echo_as_text():
-    for text in (mtb.describe_layout("vertical"), mtb.cite(["Matilda"])):
-        assert isinstance(text, str) and repr(text) == str(text) and "\n" in text
+    text = mtb.cite(["Matilda"])
+    assert isinstance(text, str) and repr(text) == str(text) and "\n" in text
 
 
 def test_x49_obsm_none_reads_x_emb_only():

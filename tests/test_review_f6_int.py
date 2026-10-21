@@ -229,7 +229,7 @@ def test_the_no_variant_and_missing_folder_errors_are_sentences(tmp_path):
     assert str(e.value) == (f"The folder {tmp_path / 'MYCITE'} does not exist. {tmp_path} "
                             f"holds D11 and D28. dataset= is the folder's path, or its "
                             f"name under mtb.config.DEFAULT.data_path. "
-                            f"mtb.describe_layout() shows the layout.")
+                            f"The folder layout is at {mtb.engine.resolve.LAYOUT_URL}.")
 
 
 def test_the_label_count_error_is_sentences(tmp_path):
@@ -243,7 +243,7 @@ def test_the_label_count_error_is_sentences(tmp_path):
                        data_path=tmp_path, check=True)
     assert str(e.value) == ("cty.csv has 15 labels, but rna.h5 has 20 cells. Give each "
                             "cell one label, in the order of the cells. "
-                            "mtb.describe_layout('vertical') shows the files.")
+                            f"The folder layout is at {mtb.engine.resolve.LAYOUT_URL}.")
 
 
 def test_the_scbridge_error_names_the_method_once(tmp_path):

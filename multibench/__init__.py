@@ -6,8 +6,6 @@ Quickstart
 
     import multibench as mtb
 
-    print(mtb.describe_layout())     # the four categories and how to lay out your dataset
-
     mtb.scan("MYDATA")               # which methods can run on it (and why not the rest)
 
     res = mtb.run("MYDATA", "vertical", out_dir="out/")
@@ -15,8 +13,8 @@ Quickstart
     res.plot().savefig("compare.png")
 
 The four ``category`` values are ``vertical``, ``diagonal``, ``mosaic`` and
-``cross`` - see :func:`describe_layout` for what each one means and the
-filenames each expects.
+``cross``. The files each one expects in a dataset folder are listed at
+https://dsichang.github.io/scMultiBench/tutorials/run/#folder-layout.
 """
 
 from . import config
@@ -29,7 +27,7 @@ from .eval.pipeline import evaluate
 from .engine import ingest as io
 from .engine import envs as env
 from .discover import find_methods, method_info, params_for, cite
-from .workflow import scan, run, BatchResult, describe_layout, load_batch
+from .workflow import scan, run, BatchResult, load_batch
 
 # `import multibench.io` / `from multibench.env import install` work as for a
 # real submodule: the three namespaces live elsewhere in the package
@@ -49,8 +47,8 @@ __all__ = [
     "scan", "run", "load_batch", "BatchResult",
     # metrics
     "evaluate", "load_results", "recommend",
-    # setup
-    "describe_layout", "__version__",
+    # version
+    "__version__",
 ]
 
 

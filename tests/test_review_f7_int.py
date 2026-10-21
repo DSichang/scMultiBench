@@ -5,7 +5,6 @@
   with 'Use'.
 - R7-11: the reason column drops '<method> reads <file> of <dataset>, which'.
 - A missing batch file is called a batch file, in sentences.
-- describe_layout('diagonal') points to its own list, not method_info.
 - The several-datasets warning of the plots lists its datasets in words.
 - The no-conda install error, the modalities warning of scan, the missing
   feature-names warning and the several-variants errors are sentences.
@@ -179,18 +178,3 @@ def test_plot_page_says_how_to_keep_the_methods_scored_everywhere():
     # the subsample tables left in 0.4.0 (X04): the page says a summary needs datasets
     # of your own
     assert "The stored results hold one dataset per category" in text
-
-
-# ---- the Python part of tests that also ran the command line
-def test_diagonal_layout_points_to_its_own_list(monkeypatch):
-    text = mtb.describe_layout('diagonal')
-    assert "method_info(m)['atac']" not in text
-    assert 'need both files:       MultiMAP, Seurat_v3' in text
-    assert 'mtb.scan and mtb.run skip such a method.' in text
-    assert 'only warns' not in text
-    cli_text = mtb.describe_layout('diagonal')
-    assert 'only warns' not in cli_text
-    assert 'multibench info METHOD' not in cli_text
-    assert 'only warns' not in mtb.describe_layout('vertical')
-
-

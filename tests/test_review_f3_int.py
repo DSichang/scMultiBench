@@ -16,7 +16,7 @@
   included (R3-02).
 - Smaller: the empty summary's columns, the evaluate count messages per
   flag, the scan error's list of methods, the unpacked-size check, the
-  describe_layout and export_dataset wording, load_results on a missing file.
+  export_dataset wording, load_results on a missing file.
 
 The env probe is pinned (every env installed, a GPU present) where a verdict
 depends on it.
@@ -270,13 +270,7 @@ def test_an_unpacked_size_below_the_archive_reads_unknown(tmp_path, monkeypatch)
     assert bad <= {"scmb_scmm2-cpu"}
 
 
-def test_layout_and_export_notes_say_scan_skips_the_other_representation():
-    txt = mtb.describe_layout("vertical")
-    assert "still runs" not in txt
-    assert "A method whose ATAC file holds the other representation gives a wrong " \
-           "embedding." in txt
-    assert "mtb.scan and mtb.run skip such a method." in txt
-    assert "allow_atac_mismatch" not in txt          # deprecated in 0.4.0
+def test_export_notes_say_scan_skips_the_other_representation():
     notes = " ".join(inspect.getdoc(ingest.export_dataset).split())
     assert "reports the mismatch in its ``caveat`` column" not in notes
 
@@ -298,16 +292,17 @@ def _flat(page):
 
 @needs_docs
 def test_pages_state_the_donor_count_cross_reads():
-    """The Quickstart and the run guide say what describe_layout('cross') lists."""
-    layout = [l for l in mtb.describe_layout("cross").splitlines() if "batch 1 =" in l]
+    """The Quickstart and the run guide say how many batches the cross
+    patterns of the registry read."""
+    from multibench import workflow as W
+    from multibench.engine.schema import _batch_of
     reads = {}
-    for line in layout:
-        pattern, methods = line.split(":", 1)
-        if "atac" in pattern:                 # the page is about RNA + ADT donors
+    for roles, methods in W.batch_patterns("cross"):
+        if any("atac" in r for r in roles):   # the page is about RNA + ADT donors
             continue
-        top = max(int(n) for n in re.findall(r"(?:batch )?(\d+) =", pattern))
-        for m in re.sub(r"\(demo \w+\)", "", methods).split(","):
-            reads.setdefault(m.strip(), set()).add(top)
+        top = max(_batch_of(r) for r in roles)
+        for m in methods:
+            reads.setdefault(m, set()).add(top)
     # UINMF has a variant for two batches and one for three
     assert reads.pop("UINMF") == {2, 3} and set(map(frozenset, reads.values())) == {
         frozenset({3})}
@@ -323,7 +318,7 @@ def test_pages_state_the_donor_count_cross_reads():
             "[Another number of donors](tutorials/run.md#recipe-donors).") in step1
     run = _flat("tutorials/run.md")
     assert ('category="cross") ``` The cross methods for RNA + ADT read batches 1-3. '
-            '`describe_layout("cross")` lists every batch pattern.') in run
+            '[Dataset folder layout](#folder-layout) lists every batch pattern.') in run
 
 
 @needs_docs

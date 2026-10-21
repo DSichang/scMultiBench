@@ -126,7 +126,8 @@ def test_label_length_mismatch_reported(tmp_path):
         resolve.inputs_for("D11", "vertical", "Matilda", modalities=["rna", "adt"],
                            data_path=tmp_path, check=True)
     msg = str(e.value)
-    assert "cty.csv has 59 labels" in msg and "60 cells" in msg and "describe_layout" in msg
+    assert "cty.csv has 59 labels" in msg and "60 cells" in msg
+    assert msg.endswith(f"The folder layout is at {resolve.LAYOUT_URL}.")
     # check=None / False do not raise (best-effort paths)
     resolve.inputs_for("D11", "vertical", "Matilda", modalities=["rna", "adt"],
                        data_path=tmp_path, check=False)

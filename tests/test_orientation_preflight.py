@@ -1,7 +1,7 @@
 """A transposed modality matrix must be rejected at preflight.
 
 Storing matrix/data as cells x features is the easy mistake - it is the
-scanpy/AnnData convention, and describe_layout only says "the matrix under
+scanpy/AnnData convention, and the layout once only said "the matrix under
 matrix/data" without stating an orientation. It does NOT silently produce a
 wrong number (measured: the methods fail), but without this check it fails late,
 after conda-env startup and potentially hours of compute, with a third-party

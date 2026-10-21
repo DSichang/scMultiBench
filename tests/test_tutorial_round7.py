@@ -11,8 +11,9 @@ Round 7 reworded package messages that the notebooks quote or point to:
   the file check no longer points to ``method_info(m)["atac"]``, which lists
   them under peak. The diagonal tutorial's first cell names these two as
   needing both files and then pointed to the same ``method_info`` field for
-  "which form a method reads". It now points to ``describe_layout``, which
-  lists each method under the ATAC files it needs.
+  "which form a method reads". It now points to the run guide's folder
+  layout, which lists each method under the ATAC files it needs
+  (tests/test_docs_folder_layout.py pins that list to the registry).
 
 The other round-7 changes (R7-09 export texts, R7-10 environment texts) keep
 the notebooks' sentences true; the guards below check those sentences on the
@@ -120,7 +121,7 @@ def test_troubleshooting_quotes_the_live_orientation_error(name, tmp_path):
 
 
 # ---------------------------------- R7-03: which ATAC files a method needs
-def test_diagonal_title_points_to_the_call_that_lists_the_files_each_method_needs():
+def test_diagonal_title_points_to_the_page_that_lists_the_files_each_method_needs():
     import multibench as mtb
     title = _visible(_cells("tutorial_diagonal_rna_atac")[0][1])
     _, _, both = GEN.atac_forms("diagonal")
@@ -129,10 +130,7 @@ def test_diagonal_title_points_to_the_call_that_lists_the_files_each_method_need
     # so it cannot be the pointer next to "need both"
     assert {mtb.method_info(m)["atac"] for m in both} == {"peak"}
     assert 'method_info(m)["atac"]' not in title
-    assert "`mtb.describe_layout(\"diagonal\")` lists each method's ATAC files." in title
-    lines = [ln.strip() for ln in mtb.describe_layout("diagonal").splitlines()]
-    need_both = next(ln for ln in lines if ln.startswith("need both files:"))
-    assert set(need_both.split(":", 1)[1].strip().split(", ")) == set(both)
+    assert f"[The folder layout]({GEN.LAYOUT}) lists each method's ATAC files." in title
 
 
 # ---------------------- R7-09: export texts the tutorials describe (guards)

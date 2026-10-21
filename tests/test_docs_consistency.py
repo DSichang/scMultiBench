@@ -293,7 +293,6 @@ REFERENCE = {
     "mtb.find_methods": ("discover.md", "multibench.discover.find_methods"),
     "mtb.method_info": ("discover.md", "multibench.discover.method_info"),
     "mtb.params_for": ("discover.md", "multibench.discover.params_for"),
-    "mtb.describe_layout": ("discover.md", "multibench.workflow.describe_layout"),
     "mtb.cite": ("discover.md", "multibench.discover.cite"),
     "mtb.scan": ("run.md", "multibench.workflow.scan"),
     "mtb.run": ("run.md", "multibench.workflow.run"),

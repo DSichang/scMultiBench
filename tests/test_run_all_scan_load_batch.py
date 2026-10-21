@@ -205,7 +205,6 @@ def test_scan_names_data_folder_here(tmp_path, monkeypatch):
     monkeypatch.setattr(mtb.config.DEFAULT, "data_path", tmp_path / "cache")
     with pytest.raises(FileNotFoundError, match=r"data/CITE exists here: pass 'data/CITE'\."):
         mtb.scan("CITE", "vertical")
-    assert "mtb.scan('data/MYDATA', 'vertical')" in mtb.describe_layout("vertical")
 
 
 # Y50: scan without a category names the one category whose rows have their files

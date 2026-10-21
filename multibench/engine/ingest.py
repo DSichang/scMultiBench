@@ -1233,9 +1233,10 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                    overwrite: bool = False) -> Path:
     """Write an AnnData / MuData (or loose objects) as a canonical dataset folder.
 
-    Produces the layout ``mtb.describe_layout`` documents (``rna.h5``,
-    ``adt.h5``, ATAC files, ``cty.csv``), so ``mtb.scan`` and
-    ``mtb.run`` work on your own data. Give raw counts.
+    Produces the dataset folder layout (``rna.h5``, ``adt.h5``, ATAC files,
+    ``cty.csv``), so ``mtb.scan`` and ``mtb.run`` work on your own data. Give
+    raw counts. The files of each category are listed at
+    https://dsichang.github.io/scMultiBench/tutorials/run/#folder-layout.
 
     Parameters
     ----------
@@ -1312,7 +1313,6 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
 
     See Also
     --------
-    mtb.describe_layout : the layout being produced and the role -> filename mapping.
     mtb.scan : confirm the folder is found and which methods can run on it.
     """
     if isinstance(data, (str, os.PathLike)):

@@ -401,13 +401,6 @@ def _caps(text):
                    and not w.startswith(("CHAIN_OK", "RUN_OK"))})
 
 
-@pytest.mark.parametrize("cat", [None, "vertical", "diagonal", "mosaic", "cross"])
-def test_describe_layout_output_is_plain(cat):
-    txt = mtb.describe_layout(cat)
-    assert "!!" not in txt and "trap" not in txt and "gate" not in txt
-    assert _caps(txt.replace("<DATASET>", "").replace("MYDATA", "")) == []
-
-
 def test_setup_note_is_dropped_once_the_helper_file_is_in_place(tmp_path, monkeypatch):
     """MIRA's hint is about its logger.py; with the file there, or shipped by
     the package, it is moot."""
@@ -476,7 +469,7 @@ def test_obs_names_none_with_a_warning_when_counts_differ(tmp_path, monkeypatch)
 
 
 @pytest.mark.parametrize("obj", [mtb.scan, mtb.run, mtb.engine.runner.run, mtb.load_batch,
-                                 mtb.describe_layout, mtb.BatchResult, runner.RunResult,
+                                 mtb.BatchResult, runner.RunResult,
                                  mtb.BatchResult.save, mtb.data.fetch])
 def test_docstrings_use_plain_wording(obj):
     doc = inspect.getdoc(obj)
