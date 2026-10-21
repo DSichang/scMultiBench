@@ -204,11 +204,9 @@ def unknown_method_message(method_id, hint: str | None = None) -> str:
 
 def closest_method(method_id: str) -> str | None:
     """The registry id closest to ``method_id``, or ``None`` when none is close."""
-    ids = [s.id for s in load()]
-    hint = difflib.get_close_matches(str(method_id), ids, n=1, cutoff=0.6)
-    if hint:
-        return hint[0]
-    return {i.lower(): i for i in ids}.get(str(method_id).lower())
+    ids = {s.id.lower(): s.id for s in load()}
+    hint = difflib.get_close_matches(str(method_id).lower(), list(ids), n=1, cutoff=0.6)
+    return ids[hint[0]] if hint else None
 
 
 def check_id_list(value, name: str):

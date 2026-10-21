@@ -2729,6 +2729,33 @@ def _dataset_cell_ids(dataset, data_path) -> list | None:
     return ids if ids and len(set(ids)) == len(ids) else None
 
 
+def _embedding_cell_ids(dataset, data_path) -> list:
+    """The other names :meth:`RunResult.embedding` can give the same cells, in
+    the same order: with each ATAC file's barcodes (D28's ``atac_gas.h5`` and
+    ``atac_peak.h5`` differ in suffix), prefixed by label file when they repeat."""
+    folder = _dataset_folder(dataset, data_path)
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            files = list(map(Path, _resolve.labels_for(dataset, data_path=data_path,
+                                                       check=False).values()))
+        sizes = [len(_eio.read_labels(p)) for p in files]
+    except Exception:  # noqa: BLE001 - no readable files: no ids
+        return []
+    out = []
+    for read in [()] + [(f.name,) for f in sorted(folder.glob("*.h5"))]:
+        bars = [next((b for b in map(_resolve._barcodes_of, _label_data_files(p, read))
+                      if b is not None and len(b) == n), None) for p, n in zip(files, sizes)]
+        if any(b is None for b in bars):
+            continue
+        ids = [str(i) for b in bars for i in b]
+        if len(set(ids)) != len(ids):
+            ids = [f"{p.stem}:{i}" for p, b in zip(files, bars) for i in b]
+        if ids not in out:
+            out.append(ids)
+    return out
+
+
 #: the order an argument of run / rescore follows when it is matched by position
 _ROWS = "the embedding rows"
 
@@ -2766,11 +2793,17 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
             _text.warn(_eio._by_position(what), UserWarning)
         return vals, False
     ids = _dataset_cell_ids(dataset, data_path)
+    index = pd.Index([str(i) for i in x.index])
+    if index.is_unique and (ids is None or set(index) != set(ids)):
+        # the cell names res.embedding(m) gave
+        named = next((c for c in _embedding_cell_ids(dataset, data_path)
+                      if set(c) == set(index)), None)
+        if named is not None:
+            return np.asarray(pd.Series(vals, index=index).reindex(named).to_numpy()), True
     if ids is None:
         _text.warn(f"The {what} {type(x).__name__} is matched by position, because "
                      f"{why}. {fix}", UserWarning)
         return vals, False
-    index = pd.Index([str(i) for i in x.index])
     if list(index) == ids:
         return vals, True
     # to_numpy() is right only for a vector already in that order

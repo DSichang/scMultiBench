@@ -1,0 +1,78 @@
+"""Round d2 of the 0.4.0 review: the cell names RunResult.embedding gives are
+accepted back as batch= / labels= ids; a misspelt method in another letter
+case gets a did-you-mean hint."""
+import shutil
+import warnings
+
+import anndata as ad
+import h5py
+import numpy as np
+import pandas as pd
+import pytest
+
+import multibench as mtb
+from multibench import workflow as W
+
+
+def _set_barcodes(path, bars):
+    with h5py.File(path, "a") as f:
+        del f["matrix/barcodes"]
+        f.create_dataset("matrix/barcodes", data=np.asarray(bars, dtype=object),
+                         dtype=h5py.string_dtype())
+
+
+@pytest.fixture
+def d28_like(tmp_path):
+    """Diagonal folder as D28: atac_peak.h5 and atac_gas.h5 hold the same cells,
+    with -2 and -1 suffixes; the -1 barcodes repeat three RNA barcodes."""
+    rng = np.random.default_rng(0)
+    n_r, n_a = 30, 20
+    rna = ad.AnnData(rng.poisson(1, (n_r, 15)).astype(np.float32),
+                     obs=pd.DataFrame({"celltype": list("ab") * (n_r // 2)},
+                                      index=[f"R{i}-1" for i in range(n_r)]))
+    atac = ad.AnnData(rng.poisson(1, (n_a, 15)).astype(np.float32),
+                      obs=pd.DataFrame({"celltype": list("ab") * (n_a // 2)},
+                                       index=[f"A{i}-1" for i in range(n_a)]))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        mtb.io.export_dataset(rna, tmp_path / "DD", rna="X", atac=atac,
+                              atac_kind="gene_activity", labels="obs:celltype",
+                              category="diagonal")
+    folder = tmp_path / "DD"
+    gas = list(atac.obs_names)
+    gas[:3] = list(rna.obs_names[:3])
+    _set_barcodes(folder / "atac_gas.h5", gas)
+    shutil.copy(folder / "atac_gas.h5", folder / "atac_peak.h5")
+    _set_barcodes(folder / "atac_peak.h5", [b[:-2] + "-2" for b in gas])
+    return folder, list(rna.obs_names), gas
+
+
+def test_embedding_names_are_accepted_as_batch_ids(d28_like):
+    folder, rna_bars, gas = d28_like
+    names = ([f"rna_cty:{b}" for b in rna_bars] + [f"atac_cty:{b}" for b in gas])
+    assert names in W._embedding_cell_ids("DD", folder.parent)
+    v = np.where(np.arange(len(names)) % 3, "x", "y")
+    shuffled = pd.Series(v, index=names).sample(frac=1, random_state=0)
+    vec, by_cell = W._cell_vector(shuffled, "DD", folder.parent)
+    assert by_cell and list(vec) == list(v)
+
+
+def test_dataset_barcodes_still_match(d28_like):
+    folder, rna_bars, gas = d28_like
+    ids = rna_bars + [b[:-2] + "-2" for b in gas]
+    assert W._dataset_cell_ids("DD", folder.parent) == ids
+    v = np.arange(len(ids)).astype(str)
+    vec, by_cell = W._cell_vector(pd.Series(v, index=ids)[::-1], "DD", folder.parent)
+    assert by_cell and list(vec) == list(v)
+
+
+def test_repeated_raw_barcodes_are_still_refused(d28_like):
+    folder, rna_bars, gas = d28_like
+    s = pd.Series("x", index=rna_bars + gas)
+    with pytest.raises(ValueError, match=r"the index repeats 3 ids"):
+        W._cell_vector(s, "DD", folder.parent)
+
+
+def test_a_misspelt_method_in_other_letter_case_gets_a_hint():
+    with pytest.raises(KeyError, match=r"Unknown method scalexx\. Did you mean SCALEX\?"):
+        mtb.cite("scalexx")
