@@ -29,10 +29,6 @@ _CATEGORY_FOLDERS = {
     "cross": "cross integration",
 }
 
-_METRIC_SET_DIRS = {
-    "scib": "scib_metric",
-}
-
 _ROOT = Path(__file__).resolve().parent.parent
 # datasets and the scripts clone sit next to the package in a checkout; a wheel
 # install keeps them out of site-packages, in a per-user cache
@@ -145,17 +141,6 @@ def category_folder(token: str) -> str:
 #: assay names a category= gets by mistake (lower case, no dash or space)
 _ASSAY_TOKENS = ("citeseq", "multiome", "10xmultiome", "sharesesq", "shareseq",
                  "teaseq", "asapseq", "dogmaseq", "snareseq")
-
-
-def metric_set_dir(token: str) -> str:
-    """``"scib"`` -> ``"scib_metric"``, the dir under the result root (internal);
-    ``ValueError`` listing the valid tokens for an unknown one."""
-    try:
-        return _METRIC_SET_DIRS[token]
-    except KeyError:
-        raise ValueError(
-            f"unknown metric_set {token!r}; valid: {sorted(_METRIC_SET_DIRS)}"
-        ) from None
 
 
 @dataclass

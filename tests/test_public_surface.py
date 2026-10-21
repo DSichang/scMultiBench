@@ -54,7 +54,6 @@ def test_config_all_is_exactly_the_contract():
     assert _leaks(mtb.config) == set()
     # kept as functions for internal imports, hidden from dir()
     assert mtb.config.category_folder("vertical") == "vertical integration"
-    assert mtb.config.metric_set_dir("scib") == "scib_metric"
     assert "category_folder" not in dir(mtb.config) and "metric_set_dir" not in dir(mtb.config)
 
 

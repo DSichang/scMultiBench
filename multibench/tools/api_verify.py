@@ -75,7 +75,7 @@ def _(): return f"{mtb.catalog.metrics().shape}"
 def _():
     assert mtb.config.__all__ == ["DEFAULT"], mtb.config.__all__
     assert "category_folder" not in dir(mtb.config)
-    return "category_folder / metric_set_dir hidden (internal-only since 0.3.0)"
+    return "category_folder hidden (internal-only since 0.3.0)"
 @check("config.DEFAULT")
 def _(): return str(mtb.config.DEFAULT.data_path)
 
