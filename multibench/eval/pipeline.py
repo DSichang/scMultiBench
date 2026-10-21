@@ -884,8 +884,11 @@ def evaluate(embedding, labels=None, *, dataset: str | None = None,
         modality). ``None`` = the label files of ``dataset``.
     dataset : str | None
         The dataset folder, a name or a path; its name fills the ``dataset``
-        column. With ``labels=None`` its label files are read, in the cell
-        order of ``method`` when that is a package method.
+        column. With ``labels=None`` its label files are read and matched to
+        the cells by the names ``run`` writes into ``embedding.h5``; for a
+        file of a ``run`` folder without them, in the cell order of the
+        method its run record names; else in the order of ``method`` when
+        that is a package method.
     method : str
         Fills the ``method`` column: a package method id or your own name.
     category : str | None

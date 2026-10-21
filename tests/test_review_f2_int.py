@@ -226,9 +226,11 @@ def test_public_docstrings_say_cell_order():
         doc = inspect.getdoc(obj)
         for old in ("stacking order", "cell-stacking", "stacks its cells", "stacks the cells"):
             assert old not in doc, (obj, old)
-    # 0.4: labels_for is deprecated; evaluate(dataset=, method=) reads the label files
-    assert ("its label files are read, in the cell order of ``method``"
-            in " ".join(inspect.getdoc(evaluate).split()))
+    # 0.4: labels_for is gone; evaluate(dataset=) reads the label files, matched to
+    # the cells by the names run writes (d1), else in the cell order of method=
+    doc = " ".join(inspect.getdoc(evaluate).split())
+    assert "its label files are read and matched to the cells by the names ``run`` writes" in doc
+    assert "in the order of ``method`` when that is a package method" in doc
 
 
 # ====================================================================== M10

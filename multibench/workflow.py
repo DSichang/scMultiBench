@@ -2113,9 +2113,9 @@ class RunResult:
         -------
         anndata.AnnData
             ``obsm["X_emb"]`` in the method's cell order; ``obs_names`` are
-            the cells' barcodes (``cty2:AAAC...`` where batches share one) and
-            ``obs`` holds each cell's ``label``, and its ``batch`` when the
-            cells have several.
+            the cells' barcodes (``cty2:AAAC...`` where two files share one)
+            and ``obs`` holds each cell's ``label``, and its ``batch`` when
+            the run had more than one batch.
 
         Raises
         ------
@@ -3151,7 +3151,8 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
     category : str
         Integration category: ``vertical``, ``diagonal``, ``mosaic`` or ``cross``.
     out_dir : path
-        Output root, one ``<out_dir>/<method>_<dataset>/`` per method.
+        Output root, one ``<out_dir>/<method>_<dataset>/`` per method. An
+        ``embedding.h5`` there also holds its cells' names (``barcodes``).
     methods : list[str] | None
         Method ids to run, as a list; ``None`` = every runnable method.
     modalities : list[str] | str | None
