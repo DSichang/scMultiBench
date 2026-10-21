@@ -4,7 +4,7 @@
   or call trace instead of the error, because R prints both after the error.
 - ``BatchResult.rescore`` scored FAIL and TIMEOUT records again, so a method
   that failed to run came back as ``RUN_OK_EVAL_FAILED``, ``CHAIN_OK`` or
-  ``RUN_OK_NO_EMBEDDING`` and left ``failures``.
+  ``RUN_OK_NO_EMBEDDING`` and was no longer ``failed``.
 
 The run tests use the stand-in env prefixes of ``tests/test_f4_cli.py``.
 """
@@ -81,7 +81,7 @@ def _run_py(data, out):
 def test_run_all_fail_line_ends_with_the_r_error(r_failing, tmp_path, capsys):
     res = _run_py(r_failing, tmp_path / "out")
     out = capsys.readouterr().out
-    assert res.failures["method"].tolist() == ["Matilda"], out
+    assert res.summary[res.summary.status != "scored"]["method"].tolist() == ["Matilda"], out
     assert _status_line(out).endswith(") " + _R_CAUSE), out
 
 
@@ -107,23 +107,24 @@ def _rescored(out):
 
 def test_rescore_keeps_a_fail_record_without_output(fail_early, tmp_path):
     out = tmp_path / "out"
-    assert not _run_py(fail_early, out).failures.empty
+    assert _run_py(fail_early, out).summary.status.tolist() == ["failed"]
     res, new = _rescored(out)
     rec = new.records[0]
     assert rec["status"] == "FAIL"
     assert rec["error"] == res.records[0]["error"]
-    assert new.failures["status"].tolist() == ["failed"]
+    assert new.summary["status"].tolist() == ["failed"]
 
 
 def test_rescore_keeps_a_fail_record_whose_output_exists(fail_after_writing, tmp_path):
     """The method wrote embedding.h5 and then exited 1: still a failed run."""
     out = tmp_path / "out"
-    assert not _run_py(fail_after_writing, out).failures.empty
+    assert _run_py(fail_after_writing, out).summary.status.tolist() == ["failed"]
     assert list(out.rglob("embedding.h5"))
     res, new = _rescored(out)
     assert new.records[0]["status"] == "FAIL"
     assert not new.records[0].get("metrics")
-    assert new.failures["method"].tolist() == ["Matilda"]
+    assert new.summary["status"].tolist() == ["failed"]
     new.save(tmp_path / "rescored")
-    assert pd.read_csv(tmp_path / "rescored" / "failures.csv")["status"].tolist() == ["failed"]
+    assert pd.read_csv(tmp_path / "rescored" / "summary.csv")["status"].tolist() == ["failed"]
+    assert not (tmp_path / "rescored" / "failures.csv").exists()
 

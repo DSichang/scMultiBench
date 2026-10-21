@@ -313,8 +313,8 @@ def test_named_blocked_methods_are_logged_and_recorded(tmp_path, monkeypatch, ca
     assert "[run] skipping UnitedNet: " in log and "[run] skipping MIRA: " in log
     sm = res.summary.set_index("method")
     assert sm.loc["UnitedNet", "status"] == "skipped" == sm.loc["MIRA", "status"]
-    fails = res.failures.set_index("method")
-    assert set(fails.index) == {"UnitedNet", "MIRA"}
+    fails = res.summary[res.summary.status != "scored"].set_index("method")
+    assert set(fails.index) == {"scMVP", "UnitedNet", "MIRA"}
     assert "logger.py" in fails.loc["MIRA", "reason"]
     assert "needs an NVIDIA GPU" in fails.loc["UnitedNet", "reason"]
     # the export fix ends the reason, after the GPU sentence; no override (0.4.0)
@@ -326,7 +326,7 @@ def test_named_blocked_methods_are_logged_and_recorded(tmp_path, monkeypatch, ca
     rec = next(r for r in blob["records"] if r["method"] == "MIRA")
     assert rec["status"] == "SKIPPED" and rec["requested"] is True
     back = mtb.load_batch(tmp_path / "out")
-    assert set(back.failures["method"]) == {"UnitedNet", "MIRA"}
+    assert set(back.summary.query("status == 'skipped'")["method"]) == {"UnitedNet", "MIRA"}
     assert "2 skipped" in repr(back)
     # rescore keeps a SKIPPED record as it is (scMVP's fake run left no output,
     # and a tree with no output to score raises: MIRA alone)
@@ -337,7 +337,7 @@ def test_named_blocked_methods_are_logged_and_recorded(tmp_path, monkeypatch, ca
         _quiet(back.rescore, metrics=["ARI"])
 
 
-def test_unnamed_gpu_rows_are_skipped_but_not_failures(tmp_path, monkeypatch, capsys):
+def test_unnamed_gpu_rows_are_skipped(tmp_path, monkeypatch, capsys):
     _skip_setup(monkeypatch, tmp_path)
     root = _vertical(tmp_path, "MU_PEAK", PEAKS)
     mtb.config.DEFAULT.data_path = root
@@ -348,7 +348,6 @@ def test_unnamed_gpu_rows_are_skipped_but_not_failures(tmp_path, monkeypatch, ca
         assert sm.loc[m, "status"] == "skipped", m
         assert f"[run] skipping {m}: " in log
     assert sm.loc["MIRA", "status"] == "skipped"
-    assert res.failures.empty, res.failures
 
 
 def test_rows_without_files_are_counted_not_recorded(tmp_path, monkeypatch, capsys):
@@ -362,7 +361,6 @@ def test_rows_without_files_are_counted_not_recorded(tmp_path, monkeypatch, caps
     assert m, log
     statuses = {r["method"]: r["status"] for r in res.records}
     assert "totalVI" not in statuses          # rna+adt only: adt.h5 is not there
-    assert res.failures.empty
 
 
 def test_a_named_method_with_a_runnable_mosaic_variant_is_not_a_failure(
@@ -372,7 +370,6 @@ def test_a_named_method_with_a_runnable_mosaic_variant_is_not_a_failure(
                  evaluate=False, modalities="all")
     log = capsys.readouterr().out
     assert [r["status"] for r in res.records] == ["RUN_OK"]
-    assert res.failures.empty
     # Multigrate's three other mosaic rows are for patterns D45 does not hold
     assert ("[run] 3 more rows need files this folder does not have. mtb.scan shows "
             "them.") in log
@@ -400,8 +397,6 @@ def test_a_skipped_record_never_replaces_an_earlier_run(tmp_path):
 def test_summary_notes_list_skipped():
     doc = " ".join(inspect.getdoc(W.BatchResult.summary).split())
     assert "skipped or timeout" in doc and "why the method has no scores" in doc
-    doc = " ".join(inspect.getdoc(W.BatchResult.failures).split())
-    assert "``skipped`` for a method that ``methods=`` named" in doc
 
 
 # ======================================================================= R4-11

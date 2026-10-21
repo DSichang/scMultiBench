@@ -33,7 +33,7 @@ def test_kept_docstrings_name_no_cut_name():
         m = getattr(mtb, ns)
         objs[ns] = m
         objs.update({f"{ns}.{a}": getattr(m, a) for a in dir(m) if not a.startswith("_")})
-    for a in ("summary", "long", "failures", "plot", "rescore", "save", "embedding"):
+    for a in ("summary", "long", "plot", "rescore", "save", "embedding"):
         objs[f"BatchResult.{a}"] = getattr(mtb.BatchResult, a)
     hits = {n: [w for w in _CUT if w in (inspect.getdoc(o) or "")] for n, o in objs.items()}
     assert {n: h for n, h in hits.items() if h} == {}

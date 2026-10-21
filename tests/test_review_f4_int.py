@@ -165,7 +165,7 @@ def test_repr_counts_a_named_skipped_method_once():
         _rec(m, "SKIPPED", error="blocked", requested=True)
         for m in ("scMDC", "UnitedNet", "scMVP", "MIRA")]
     res = W.BatchResult(recs, "MYMULTIOME", "vertical")
-    assert len(res.failures) == 5
+    assert (res.summary.status != "scored").sum() == 5
     # c1 (C38): one count per status
     assert repr(res) == "<BatchResult vertical/MYMULTIOME: 1 failed, 4 skipped>"
     unnamed = W.BatchResult([_rec("Matilda", "FAIL", error="x"),

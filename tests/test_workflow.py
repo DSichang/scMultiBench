@@ -65,7 +65,7 @@ def test_batch_result_shape():
                     "D11", "vertical")
     assert len(r) == 1
     assert r.summary.loc[0, "ARI"] == 0.5
-    assert r.failures.empty
+    assert r.summary.status.tolist() == ["scored"]
     # .long is DERIVED from the record's metrics when no tidy frame was attached
     lng = r.long
     assert list(lng.columns) == ["metric", "value", "method", "dataset", "category",

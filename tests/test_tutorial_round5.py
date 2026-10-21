@@ -5,9 +5,8 @@
   dict "is read in the default order", which reads as if it were re-sorted;
   no tutorial says so.
 
-R5-03 added a ``reason`` column to ``res.summary``; the Troubleshooting
-sentence on ``res.failures`` stays true, and the guard below checks both on
-the live package. (R5-05, the download error of ``fetch_outputs``, is pinned
+R5-03 added a ``reason`` column to ``res.summary``; the guard below checks
+the Troubleshooting sentence on the live package. (R5-05, the download error of ``fetch_outputs``, is pinned
 in tests/test_study_r5_cfg.py.)
 """
 import importlib.util
@@ -87,11 +86,10 @@ def test_evaluate_refuses_a_dict_out_of_the_default_order(tmp_path):
 
 
 # --------------------------------------- R5-03: guard for Troubleshooting
-def test_a_named_skipped_method_has_its_reason_in_summary_and_failures(tmp_path, monkeypatch):
+def test_a_named_skipped_method_has_its_reason_in_summary(tmp_path, monkeypatch):
     """The vertical run cell's call with one environment missing: the method
-    is SKIPPED, ``res.failures`` holds the reason (the Troubleshooting
-    sentence), and the summary's last column, ``reason``, holds the same
-    text."""
+    is SKIPPED, and the summary's last column, ``reason``, holds why (the
+    Troubleshooting sentence)."""
     import multibench as mtb
     from multibench import config
     from multibench import workflow as W
@@ -117,5 +115,3 @@ def test_a_named_skipped_method_has_its_reason_in_summary_and_failures(tmp_path,
     assert sm.loc[trio[-1], "status"] == "skipped"
     assert f"mtb.env.install([{trio[-1]!r}])" in sm.loc[trio[-1], "reason"]
     assert (sm.drop(index=trio[-1])["reason"] == "").all()
-    fails = res.failures.set_index("method")
-    assert fails.loc[trio[-1], "reason"] == sm.loc[trio[-1], "reason"]

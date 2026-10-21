@@ -5,9 +5,8 @@ Round 4 changed what the notebooks tell a reader in five places:
 - R4-01: naming a method in ``methods=`` no longer runs it on the other ATAC
   representation, so the ATAC form section 5 names holds for the
   named-method calls the run cells make.
-- R4-04: ``run`` records a blocked method as ``SKIPPED``; the reason is in
-  ``res.failures`` for a method that ``methods=`` named, which every tutorial
-  run does.
+- R4-04: ``run`` records a blocked method that ``methods=`` named, as every
+  tutorial run does, as ``SKIPPED``; the reason is in ``res.summary``.
 - R4-08: an environment without a CPU archive has a single build, so a CPU
   runtime does not get a smaller build of every environment.
 - R4-13: a dry run's printed command alone fails in a job script when the
@@ -68,26 +67,26 @@ def _quiet(fn, *a, **kw):
 
 
 # ----------------------------------------------------------- R4-04: SKIPPED
-SKIP_SENTENCE = "`res.failures` lists each method that failed or was skipped."
+SKIP_SENTENCE = ('`res.summary[res.summary.status != "scored"]` lists each method that '
+                 'failed or was skipped.')
 
 
 @pytest.mark.parametrize("name", TUTORIALS)
 def test_troubleshooting_says_where_the_reason_of_a_skipped_method_is(name):
     """Visible under the Troubleshooting heading: a method the run cell names
     and ``run`` skips shows ``SKIPPED`` in ``res.summary``, and
-    ``res.failures`` holds the reason (since round 5 the summary's ``reason``
-    column holds it too, tests/test_tutorial_round5.py)."""
+    its ``reason`` column holds the reason (tests/test_tutorial_round5.py)."""
     md = next(src for kind, src in _cells(name)
               if kind == "markdown" and src.startswith("## Troubleshooting"))
     assert SKIP_SENTENCE in _visible(md), md
     assert "When a run fails, `res.failures` holds the error." not in md
 
 
-def test_a_named_method_without_its_environment_is_in_failures_with_the_reason(
+def test_a_named_method_without_its_environment_is_skipped_with_the_reason(
         tmp_path, monkeypatch):
     """The sentence on the live package: the vertical tutorial's run of its
     methods on D11, with one environment missing, lists that method as
-    SKIPPED in ``res.failures`` and gives the install command as the reason."""
+    SKIPPED in ``res.summary`` and gives the install command as the reason."""
     import multibench as mtb
     from multibench import config
     from multibench import workflow as W
@@ -109,8 +108,8 @@ def test_a_named_method_without_its_environment_is_in_failures_with_the_reason(
                  evaluate=False, verbose=False)
     status = res.summary.set_index("method")["status"]
     assert status[trio[-1]] == "skipped"
-    fails = res.failures.set_index("method")
-    assert list(fails.index) == [trio[-1]]
+    fails = res.summary[res.summary.status != "scored"].set_index("method")
+    assert trio[-1] in fails.index          # the others ran: evaluate=False
     assert fails.loc[trio[-1], "status"] == "skipped"
     assert f"mtb.env.install([{trio[-1]!r}])" in fails.loc[trio[-1], "reason"]
 

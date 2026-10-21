@@ -50,21 +50,6 @@ def test_the_summary_has_no_label_order_confidence_and_the_records_keep_the_orde
     assert not hasattr(workflow, "_order_confidence")
 
 
-def test_failures_name_their_text_reason_as_the_summary_does():
-    recs = [{"method": "A", "status": "FAIL", "error": "boom"},
-            {"method": "B", "status": "RUN_OK_EVAL_FAILED", "error": "no labels"},
-            {"method": "C", "status": "RUN_OK_NO_EMBEDDING"},
-            {"method": "D", "status": "SKIPPED", "error": "env", "requested": True},
-            {"method": "E", "status": "SKIPPED", "error": "env"},
-            {"method": "F", "status": "TIMEOUT_600", "error": "slow"}]
-    res = mtb.BatchResult(recs, "D11", "vertical")
-    f = res.failures
-    assert list(f.columns) == ["method", "status", "reason"]
-    assert f["method"].tolist() == ["A", "B", "D", "F"]
-    s = res.summary.set_index("method")
-    assert (f.set_index("method")["reason"] == s.loc[f["method"], "reason"]).all()
-
-
 def test_every_record_code_the_package_writes_has_a_status():
     src = Path(workflow.__file__).read_text()
     written = set(re.findall(r'rec\["status"\](?:, rec\["error"\])? = "([A-Z_]+)"', src))

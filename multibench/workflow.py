@@ -1858,9 +1858,6 @@ _STATUS = {"CHAIN_OK": "scored", "CHAIN_OK_GRAPH_METHOD": "scored", "RUN_OK": "r
            "RUN_OK_NO_LABEL_MATCH": "ran", "FAIL": "failed", "SKIPPED": "skipped",
            "TIMEOUT": "timeout"}
 
-#: the record codes of a run whose scoring failed: listed in BatchResult.failures
-_RAN_FAILED = ("RUN_OK_EVAL_FAILED", "RUN_OK_NO_LABEL_MATCH")
-
 #: the reason of a record that ran and holds no error of its own
 _RAN_REASON = {"RUN_OK_NO_EMBEDDING": "It writes a graph, not an embedding.",
                "RUN_OK_NO_LABEL_MATCH": "No label file has as many cells as the output."}
@@ -2004,7 +2001,7 @@ class BatchResult:
     >>> import multibench as mtb
     >>> res = mtb.run("D11", "vertical", out_dir="out/", timeout=3600)
     >>> res.summary[["method", "status", "ARI", "NMI"]]
-    >>> res.failures                              # empty frame when all went well
+    >>> res.summary[res.summary.status != "scored"]   # what did not finish, and why
     >>> fig = res.plot(metrics=["ARI", "NMI", "ASW"])
     >>> res.rescore().save()                      # nothing re-run
 
@@ -2061,7 +2058,6 @@ class BatchResult:
 
         See Also
         --------
-        BatchResult.failures : the rows whose status means something went wrong.
         mtb.load_batch : reads a saved folder; its ``batch_result.json`` holds every
             record, with the label orders tried.
         """
@@ -2131,42 +2127,6 @@ class BatchResult:
         return pd.concat(frames, ignore_index=True).drop(columns="clustering",
                                                          errors="ignore")
 
-    @property
-    def failures(self) -> pd.DataFrame:
-        """Methods that failed, timed out or could not be scored.
-
-        ``run`` records failures instead of raising. Check this frame.
-
-        Returns
-        -------
-        pandas.DataFrame
-            Columns ``method, status, reason``; empty when nothing failed.
-
-        Examples
-        --------
-        >>> res = mtb.load_batch("out/")
-        >>> res.failures
-        >>> assert res.failures.empty, res.failures.to_string()
-
-        Notes
-        -----
-        **Statuses listed.** ``failed``, ``timeout``, ``skipped`` for a method
-        that ``methods=`` named, and ``ran`` for a method whose scoring failed
-        or whose cells match no label file. A method that writes a graph only
-        is not listed.
-
-        See Also
-        --------
-        BatchResult.summary : every method, including the ones that ran but could not be scored.
-        """
-        rows = [{"method": r.get("method"), "status": _status(r.get("status")),
-                 "reason": _reason(r)} for r in self.records]
-        bad = [row for row, r in zip(rows, self.records)
-               if row["status"] in ("failed", "timeout")
-               or (row["status"] == "skipped" and r.get("requested"))
-               or (row["status"] == "ran" and r.get("status") in _RAN_FAILED)]
-        return pd.DataFrame(bad, columns=["method", "status", "reason"])
-
     def plot(self, **kw):
         """Bubble figure of every method that produced metrics.
 
@@ -2188,7 +2148,7 @@ class BatchResult:
         Raises
         ------
         ValueError
-            Nothing was scored (see ``failures``), or an unknown name in ``methods=``.
+            Nothing was scored (``summary`` says why), or an unknown name in ``methods=``.
 
         Examples
         --------
@@ -2215,7 +2175,7 @@ class BatchResult:
         from . import plot as _plot
         lng = self.long
         if lng.empty:
-            raise ValueError("no method produced metrics; see .failures / .summary")
+            raise ValueError("No method produced metrics. res.summary says why.")
         return _plot.bubble(lng, **kw)
 
     def rescore(self, *, batch=None, labels=None, metrics=None,
@@ -2452,7 +2412,7 @@ class BatchResult:
             raise KeyError(f"No record for {method!r}; this result has {_and_list(have)}.")
         if not _scorable(rec) or not rec.get("out_dir"):
             raise ValueError(f"{name} has no output: its status is {rec.get('status')}. "
-                             f"res.failures says why.")
+                             f"res.summary says why.")
         variant = registry.get(name).select(self.category, set(rec.get("modalities") or ()))
         emb = _load_embedding(Path(rec["out_dir"]), variant)
         if emb is None:
@@ -2494,7 +2454,6 @@ class BatchResult:
         - ``summary.csv`` - the ``summary`` frame.
         - ``long.csv`` - the ``long`` frame, only when some method produced
           metrics.
-        - ``failures.csv`` - the ``failures`` frame.
         - ``batch_result.json`` - dataset, category and the per-method records.
         - ``batch_<hash>.csv`` - a batch vector the records were scored with.
 
@@ -2532,7 +2491,8 @@ class BatchResult:
         elif (folder / "long.csv").exists():
             # an earlier long.csv would attach stale metrics on load_batch
             (folder / "long.csv").unlink()
-        merged.failures.to_csv(folder / "failures.csv", index=False)
+        # failures.csv, written before 0.4.0, would disagree with summary.csv
+        (folder / "failures.csv").unlink(missing_ok=True)
         for name in dict.fromkeys(r["batch_file"] for r in merged.records
                                   if r.get("batch_file")):
             text = None if (folder / name).exists() else self._batch_text(name)
@@ -3444,7 +3404,7 @@ def run(dataset: str, category: str, out_dir=None, *, methods=None, modalities=N
     Returns
     -------
     BatchResult or pandas.DataFrame
-        A ``BatchResult``: read ``summary`` and ``failures`` first,
+        A ``BatchResult``: read ``summary`` first,
         ``embedding(method)`` for an embedding. With ``dry_run=True``, the plan.
 
     Raises

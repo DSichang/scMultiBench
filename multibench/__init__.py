@@ -11,8 +11,7 @@ Quickstart
     mtb.scan("MYDATA")               # which methods can run on it (and why not the rest)
 
     res = mtb.run("MYDATA", "vertical", out_dir="out/")
-    print(res.summary)               # per-method status + metrics
-    print(res.failures)              # what did not finish, and why
+    print(res.summary)               # per method: status, metrics, and why one failed
     res.plot().savefig("compare.png")
 
 The four ``category`` values are ``vertical``, ``diagonal``, ``mosaic`` and

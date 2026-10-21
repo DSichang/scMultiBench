@@ -41,7 +41,7 @@ def test_skip_existing_with_params_is_refused():
 
 def test_batch_result_attributes_are_documented():
     import inspect
-    for attr in ("summary", "long", "failures", "plot"):
+    for attr in ("summary", "long", "plot"):
         a = getattr(mtb.BatchResult, attr)
         doc = inspect.getdoc(a.fget if isinstance(a, property) else a)
         assert doc and len(doc) > 40, f"BatchResult.{attr} needs a real docstring"
@@ -49,13 +49,9 @@ def test_batch_result_attributes_are_documented():
     assert "records : list[dict]" in inspect.getdoc(mtb.BatchResult)
 
 
-def test_failures_excludes_successful_but_unscorable_runs():
-    """A method that ran fine but emits only a graph is NOT a failure.
-
-    Seurat_WNN and MIRA write a neighbour graph and no embedding, so there is
-    nothing to score - listing them under .failures sends users hunting for a
-    bug that does not exist.
-    """
+def test_a_graph_only_run_counts_as_ran_not_failed():
+    """Seurat_WNN and MIRA write a neighbour graph and no embedding: they ran,
+    and there is nothing to score."""
     from multibench.workflow import BatchResult
     recs = [{"method": "Seurat_WNN", "status": "RUN_OK_NO_EMBEDDING", "_long": None},
             {"method": "MIRA", "status": "RUN_OK_NO_EMBEDDING", "_long": None},
@@ -63,7 +59,6 @@ def test_failures_excludes_successful_but_unscorable_runs():
             {"method": "Slow", "status": "TIMEOUT", "error": "too long", "_long": None},
             {"method": "Good", "status": "CHAIN_OK", "_long": None}]
     r = BatchResult(recs, "D11", "vertical")
-    assert set(r.failures["method"]) == {"Broken", "Slow"}
     assert repr(r) == "<BatchResult vertical/D11: 1 scored, 2 ran, 1 failed, 1 timeout>"
 import multibench as mtb
 from multibench.workflow import BatchResult

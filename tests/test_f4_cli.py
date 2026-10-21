@@ -1,7 +1,6 @@
 """Fix round 4, work package 'cli'.
 
-R4-03: ``run-all`` exits 3 when a finished run lists a method in failures,
-and the ``-> FAIL`` / ``-> TIMEOUT`` progress line ends with the error.
+R4-03: the ``-> FAIL`` / ``-> TIMEOUT`` progress line ends with the error.
 R4-05: ``evaluate`` refuses ``--labels`` files typed in an order that
 contradicts the method named by ``--method``; the count error speaks of the
 row order of ``--embedding``, not batches.
@@ -95,7 +94,7 @@ def test_python_run_all_status_line_ends_with_the_error(failing, tmp_path, capsy
     res = mtb.run(str(failing / "MYCITE"), "vertical", out_dir=tmp_path / "py",
                       methods=["Matilda"], modalities=["rna", "adt"])
     out = capsys.readouterr().out
-    assert len(res.failures) == 1                       # the Python call does not raise
+    assert res.summary.status.tolist() == ["failed"]    # the Python call does not raise
     assert _status_line(out).endswith(") ValueError: stand-in method failed on purpose")
 
 

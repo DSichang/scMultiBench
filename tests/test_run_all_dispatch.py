@@ -64,7 +64,7 @@ def test_timeout_path_dispatches_exactly_once(monkeypatch, tmp_path):
                       out_dir=str(tmp_path), timeout=600,
                       evaluate=False, verbose=False)
     assert len(calls) == 1, f"dispatched {len(calls)}x with timeout set, expected 1"
-    assert not len(res.failures), res.failures.to_string()
+    assert res.summary.status.tolist() == ["ran"], res.summary.to_string()
 
 
 def test_no_timeout_path_dispatches_exactly_once(monkeypatch, tmp_path):
@@ -73,7 +73,7 @@ def test_no_timeout_path_dispatches_exactly_once(monkeypatch, tmp_path):
     res = mtb.run("D11", "vertical", methods=["Matilda"],
                       out_dir=str(tmp_path), evaluate=False, verbose=False)
     assert len(calls) == 1, f"dispatched {len(calls)}x, expected 1"
-    assert not len(res.failures), res.failures.to_string()
+    assert res.summary.status.tolist() == ["ran"], res.summary.to_string()
 
 
 def test_unknown_override_rejected_on_the_timeout_path(monkeypatch, tmp_path):
@@ -84,8 +84,8 @@ def test_unknown_override_rejected_on_the_timeout_path(monkeypatch, tmp_path):
                       params={"Matilda": {"not_a_real_parameter": 1}},
                       out_dir=str(tmp_path), timeout=600,
                       evaluate=False, verbose=False)
-    assert len(res.failures) == 1
-    assert "does not accept" in str(res.failures.iloc[0]["reason"])
+    assert res.summary.status.tolist() == ["failed"]
+    assert "does not accept" in str(res.summary.iloc[0]["reason"])
     assert calls == [], "method was dispatched despite an invalid override"
 
 

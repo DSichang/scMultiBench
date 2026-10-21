@@ -125,8 +125,6 @@ def test_the_summary_columns_and_reasons():
     assert s.status.tolist() == ["scored", "ran", "ran", "skipped"]
     assert s.reason.tolist() == ["", "ValueError: x", "It writes a graph, not an embedding.",
                                  "needs labels"]
-    f = mtb.BatchResult(recs, "D11", "vertical").failures
-    assert f.status.tolist() == ["ran", "skipped"]
     assert repr(mtb.BatchResult(recs, "D11", "vertical")) == \
         "<BatchResult vertical/D11: 1 scored, 2 ran, 1 skipped>"
 

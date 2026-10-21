@@ -1159,7 +1159,8 @@ envs[["env", "methods", "state"]]''')
         run_notes.append("scMoMaT writes a graph instead of an embedding. `run` scores "
                          "its UMAP.")
     run_notes += [
-        "`res.failures` says why a method failed. `params={\"Method\": {\"key\": value}}` "
+        "The `reason` column of `res.summary` says why a method failed. "
+        "`params={\"Method\": {\"key\": value}}` "
         "sets a method's parameters, and `mtb.params_for` lists them. Many methods "
         "take none.",
         f"`mtb.load_batch(\"out/{ds}\")` reloads these results later without running "
@@ -1218,7 +1219,7 @@ To run them all, set `METHODS` to these names in section 2 and run the notebook 
 
     md("""## Troubleshooting
 
-`res.failures` lists each method that failed or was skipped. Its `reason` column ends with the method's error output.
+`res.summary[res.summary.status != "scored"]` lists each method that failed or was skipped. Its `reason` column ends with the method's error output.
 
 """ + details(
         """| symptom | fix |
