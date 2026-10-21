@@ -299,7 +299,9 @@ def test_the_anchors_exist_once(tmp_path):
     page = _read("tutorials/run.md")
     for anchor in ANCHORS:
         assert page.count(f"{{ #{anchor} }}") == 1, anchor
-    assert re.findall(r"^#{3,4} .*? \{ #([a-z0-9-]+) \}$", page, flags=re.M) == ANCHORS
+    # the other anchored heading, Dataset folder layout: tests/test_docs_folder_layout.py
+    assert re.findall(r"^#{3,4} .*? \{ #([a-z0-9-]+) \}$", page, flags=re.M) == \
+        ["folder-layout"] + ANCHORS
     assert set(re.findall(r"\(#(recipe-[a-z0-9-]+)\)", page)) <= set(ANCHORS)
     # the section sits in "Inputs", after the ATAC details and before the rule
     before, after = page.split("### Recipes for your own data { #own-data-recipes }")
