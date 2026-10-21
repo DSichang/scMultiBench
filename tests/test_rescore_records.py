@@ -2,6 +2,7 @@
 the current scoring, one ordering for identical label files, the plan's caveat
 as this version words it, the version that ran next to the scorer, and an
 ``out_dir`` relative to the saved folder."""
+import os
 import json
 import shutil
 from pathlib import Path
@@ -46,8 +47,8 @@ def _tree(tmp_path, monkeypatch, same_labels=False):
         return _Res(emb)
     monkeypatch.setattr(W, "_run", fake_run)
     out = tmp_path / "out"
-    res = _quiet(mtb.run_all, "MYCROSS", "cross", out, data_path=tmp_path / "data",
-                 methods=["totalVI"], verbose=False)
+    mtb.config.DEFAULT.data_path = tmp_path / "data"
+    res = _quiet(mtb.run_all, 'MYCROSS', 'cross', out, methods=['totalVI'], verbose=False)
     return res, out
 
 
@@ -67,8 +68,7 @@ def test_rescore_words_the_caveat_as_this_version_does(tmp_path, monkeypatch):
     blob["records"][0]["caveat"] = "totalVI needs about 5,000 cells in total."
     p.write_text(json.dumps(blob))
     new = _quiet(mtb.load_batch(out).rescore, metrics=["ARI"], verbose=False)
-    plan = mtb.run_all("MYCROSS", "cross", methods=["totalVI"], dry_run=True,
-                       data_path=tmp_path / "data", verbose=False)
+    plan = mtb.run_all(os.path.join(tmp_path / 'data', 'MYCROSS'), 'cross', methods=['totalVI'], dry_run=True, verbose=False)
     assert new.records[0]["caveat"] == W._run_caveat(plan["caveat"].iloc[0])
     assert "5,000" not in new.records[0]["caveat"]
 

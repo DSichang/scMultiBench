@@ -9,6 +9,7 @@ too.
 A synthetic CITE-seq folder and a fake ``_run`` that writes ``embedding.h5``
 keep these independent of any conda env.
 """
+import os
 import warnings
 from pathlib import Path
 
@@ -101,7 +102,8 @@ FORMS = [(np.nan, NAN), (None, NAN), (pd.NA, NAN), ("", ""), (" ", ""),
 def test_run_all_stops_on_a_missing_batch(cite, tmp_path, gap, seen):
     data, calls = cite
     series = _donor(gap)
-    kw = dict(methods=["totalVI"], data_path=data, verbose=False)
+    mtb.config.DEFAULT.data_path = data
+    kw = dict(methods=['totalVI'], verbose=False)
     for batch in (series, series.sample(frac=1, random_state=0), series.to_numpy(),
                   list(series), series.to_frame()):
         with pytest.raises(ValueError) as e:
@@ -118,15 +120,15 @@ def test_a_float_batch_with_a_gap(cite, tmp_path):
     batch = np.tile([1.0, 2.0], N // 2)
     batch[[3, 4, 50]] = np.nan
     with pytest.raises(ValueError) as e:
-        mtb.run_all("MYCITE", "vertical", tmp_path / "out", methods=["totalVI"],
-                    data_path=data, verbose=False, batch=batch)
+        mtb.run_all(os.path.join(data, 'MYCITE'), 'vertical', tmp_path / 'out', methods=['totalVI'], verbose=False, batch=batch)
     assert str(e.value) == _bv2(3, NAN)
     assert calls == []
 
 
 def test_a_batch_file_names_the_word_it_holds(cite, tmp_path):
     data, calls = cite
-    kw = dict(methods=["totalVI"], data_path=data, verbose=False, dry_run=True)
+    mtb.config.DEFAULT.data_path = data
+    kw = dict(methods=['totalVI'], verbose=False, dry_run=True)
     sheet = tmp_path / "donor.csv"
     _donor("NA").to_frame().to_csv(sheet)                 # barcodes, then the donor
     for batch in (sheet, str(sheet)):
@@ -146,8 +148,8 @@ def test_a_batch_file_names_the_word_it_holds(cite, tmp_path):
 
 def test_rescore_stops_on_a_missing_batch(cite, tmp_path):
     data, calls = cite
-    res = _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "out", methods=["totalVI"],
-                 data_path=data, verbose=False)
+    mtb.config.DEFAULT.data_path = data
+    res = _quiet(mtb.run_all, 'MYCITE', 'vertical', tmp_path / 'out', methods=['totalVI'], verbose=False)
     assert [r["status"] for r in res.records] == ["CHAIN_OK"]
     for gap, seen in ((np.nan, NAN), ("nan", ", for example 'nan'")):
         series = _donor(gap)
@@ -169,7 +171,8 @@ def test_rescore_stops_on_a_missing_batch(cite, tmp_path):
 def test_a_complete_batch_runs(cite, tmp_path):
     data, calls = cite
     series = _donor(n_gaps=0)
-    kw = dict(methods=["totalVI"], data_path=data, verbose=False)
+    mtb.config.DEFAULT.data_path = data
+    kw = dict(methods=['totalVI'], verbose=False)
     plan = mtb.run_all("MYCITE", "vertical", dry_run=True, batch=series, **kw)
     assert len(plan) == 1 and plan["runnable"].all()
     res = _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "out", batch=series, **kw)

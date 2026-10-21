@@ -41,7 +41,7 @@ def _added(stored):
 
 def _bar_order(df, metrics):
     import matplotlib.pyplot as plt
-    fig = bar_module._bar(df, metrics=metrics)
+    fig = bar_module.bar(df, metrics=metrics)
     names = [t.get_text() for t in fig.axes[0].get_yticklabels()][::-1]
     plt.close(fig)
     return names
@@ -114,15 +114,6 @@ def test_recommend_with_long_df_ranks_its_methods_only():
 SUMMARY = ["method", "status", "ARI", "NMI", "run_sec", "caveat", "reason"]
 
 
-@pytest.mark.parametrize("code, status", [
-    ("CHAIN_OK", "scored"), ("CHAIN_OK_GRAPH_METHOD", "scored"), ("RUN_OK", "ran"),
-    ("RUN_OK_EVAL_FAILED", "ran"), ("RUN_OK_NO_EMBEDDING", "ran"),
-    ("RUN_OK_NO_LABEL_MATCH", "ran"), ("FAIL", "failed"), ("SKIPPED", "skipped"),
-    ("TIMEOUT", "timeout"), ("scored", "scored")])
-def test_the_nine_record_codes_map_onto_five_statuses(code, status):
-    assert workflow._status(code) == status
-
-
 def test_the_summary_columns_and_reasons():
     recs = [{"method": "A", "status": "CHAIN_OK", "run_sec": 1.0,
              "metrics": {"ARI": 0.5, "NMI": 0.6}},
@@ -182,9 +173,3 @@ def test_rescore_merges_the_named_metrics_and_save_writes_them(tmp_path):
     assert sorted(pd.read_csv(out / "long.csv")["metric"]) == ["ARI", "NMI", "cLISI"]
 
 
-# --------------------------------------------------------------- C39 own clusters
-def test_the_clustering_warning_names_sklearn():
-    with pytest.warns(FutureWarning, match=r"sklearn\.metrics\.adjusted_rand_score"
-                                           r"\(labels, clusters\)"):
-        mtb.evaluate(np.eye(4), ["a", "b", "a", "b"], clustering=[0, 1, 0, 1],
-                     metrics=["ARI"], verbose=False)

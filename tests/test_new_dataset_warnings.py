@@ -53,61 +53,12 @@ def test_bar_warns_about_a_lone_method_and_the_incomplete_matrix():
     assert inc[0].endswith("Pass methods= with the methods scored on every dataset.")
 
 
-def test_build_table_summary_warns_about_the_lone_method_too():
-    tbl, msgs = _messages(mtb.plot.build_table, _stored_plus_lone_baseline(),
-                          aggregate="summary", overall="mean_overall")
-    assert tbl.methods[0] == "PCA_standin"            # the reason for the warning
-    assert any(m.startswith("Dataset LABMOS has only one method, PCA_standin. "
-                            "Its Overall there is always 1.0") for m in msgs)
-    _, msgs = _messages(mtb.plot.build_table, _stored_plus_lone_baseline(),
-                        aggregate="summary")          # overall="rank"
-    assert any(m.startswith("Dataset LABMOS has only one method, PCA_standin. "
-                            "Its rank there is always the lowest")
-               for m in msgs)
-
-
-def test_datasets_sharing_no_method_get_the_stronger_warning():
-    df = pd.DataFrame(_rows("A", "D1") + _rows("B", "D1", 0.6)
-                      + _rows("X", "MINE") + _rows("Y", "MINE", 0.4))
-    for fn, kw in ((mtb.plot.bar, {}),
-                   (mtb.plot.build_table, {"aggregate": "summary"}),
-                   (mtb.plot.bubble, {"aggregate": "summary"})):
-        _, msgs = _messages(fn, df, **kw)
-        strong = [m for m in msgs if m.startswith("The rows come from")]
-        assert strong == ["The rows come from 2 datasets, D1 and MINE, that share no "
-                          "method. The figure ranks unrelated rows against each other. Plot "
-                          "each dataset on its own."], fn
-        # it replaces the incomplete-matrix message, which says less
-        assert not any(m.startswith("The summary ranks ") for m in msgs), fn
-
-
-def test_a_complete_frame_plots_without_these_warnings():
-    # B leads on both datasets: with A ahead on D2, every mean rank would tie
-    # and the summary would warn that the columns compare nothing
-    df = pd.DataFrame(_rows("A", "D1") + _rows("B", "D1", 0.6)
-                      + _rows("A", "D2", 0.3) + _rows("B", "D2", 0.4))
-    # no warning: the two-method warning went in r3 (Z15)
-    for fn, kw, want in ((mtb.plot.bar, {}, []),
-                         (mtb.plot.build_table, {"aggregate": "summary"}, [])):
-        _, msgs = _messages(fn, df, **kw)
-        assert msgs == want, (fn, msgs)
-
-
 def test_one_dataset_frame_needs_no_cross_dataset_warning():
     # a single method on a single dataset: nothing is ranked against anything
     _, msgs = _messages(mtb.plot.bar, pd.DataFrame(_rows("A", "D1")))
     assert msgs == []
     _, msgs = _messages(mtb.plot.bar, pd.DataFrame(_rows("A", "D1") + _rows("B", "D1", 0.6)))
     assert msgs == []                              # no two-method warning (Z15, r3)
-
-
-def test_require_complete_drops_the_incomplete_method_without_a_coverage_warning():
-    df = pd.DataFrame(_rows("A", "D1") + _rows("B", "D1", 0.6) + _rows("C", "D1", 0.7)
-                      + _rows("A", "D2", 0.3) + _rows("B", "D2", 0.4))
-    tbl, msgs = _messages(mtb.plot.build_table, df, aggregate="summary",
-                          require_complete=True)
-    assert set(tbl.methods) == {"A", "B"}
-    assert [m for m in msgs if not m.startswith("require_complete=True dropped")] == []
 
 
 # plot.build_table is deprecated in 0.4.0: its docstring names mtb.recommend only

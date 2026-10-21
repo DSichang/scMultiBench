@@ -27,72 +27,12 @@ def _quiet(fn, *args, **kw):
 
 
 def _d28():
-    return _quiet(mtb.load_results, "diagonal", dataset="D28", source="published")
-
-
-def _rerun(name, **extra):
-    """A re-run scored in Python and renamed, as in Quickstart Step 5."""
-    wide = pd.DataFrame({"Value": [0.31, 0.42, 0.88]}, index=["ARI", "NMI", "cLISI"])
-    long = _quiet(mtb.to_long, wide, method=name, dataset="D28", category="diagonal")
-    for k, v in extra.items():
-        long[k] = v
-    return long
-
-
-def _texts(fig):
-    return [t.get_text() for t in fig.axes[0].texts]
-
-
-def _chips(fig):
-    """Row label -> the chip letters drawn on that row."""
-    ax = fig.axes[0]
-    rows = {round(float(y), 3): lab.get_text()
-            for y, lab in zip(ax.get_yticks(), ax.get_yticklabels())}
-    out = {}
-    for t in ax.texts:
-        x, y = t.get_position()
-        if t.get_text() in ("Py", "R", "?", "L") and round(y, 3) in rows:
-            out.setdefault(rows[round(y, 3)], []).append(t.get_text())
-    return out
+    return _quiet(mtb.load_results, "diagonal", dataset="D28")
 
 
 # --- R7-04: the chip of a renamed re-run --------------------------------------
 
 KEY = "Py / R: the method's language; ?: not a package method"
-
-
-def test_renamed_rerun_keeps_its_question_mark():
-    df = pd.concat([_d28(), _rerun("SCALEX_rerun")], ignore_index=True)
-    fig = _quiet(mtb.plot.bubble, df, metrics=["ARI", "NMI", "cLISI"])
-    # the chip still follows the row name: the renamed row keeps its '?', and
-    # the key says what '?' means (0.4.0)
-    assert _chips(fig)["SCALEX_rerun"] == ["?"]
-    assert _chips(fig)["SCALEX"] == ["Py"]
-    assert KEY in _texts(fig)
-
-
-def test_this_run_suffix_keeps_the_methods_chip():
-    # 0.4.0: "<method> (this run)" is the method's own row, with its language chip
-    df = pd.concat([_d28(), _rerun("SCALEX (this run)")], ignore_index=True)
-    fig = _quiet(mtb.plot.bubble, df, metrics=["ARI", "NMI", "cLISI"])
-    assert _chips(fig)["SCALEX (this run)"] == ["Py"]
-    assert KEY not in _texts(fig)
-
-
-def test_renamed_supervised_rerun_shows_question_mark_and_no_badge():
-    df = pd.concat([_d28(), _rerun("Seurat_v3_rerun", needs_labels=True)],
-                   ignore_index=True)
-    fig = _quiet(mtb.plot.bubble, df, metrics=["ARI", "NMI", "cLISI"])
-    assert _chips(fig)["Seurat_v3_rerun"] == ["?"]
-    assert "L" not in sum(_chips(fig).values(), [])
-
-
-def test_docstrings_use_the_key_wording():
-    for fn in (mtb.plot.bubble, mtb.to_long):
-        doc = " ".join(inspect.getdoc(fn).split())
-        assert "not a package method" not in doc, fn.__name__
-    assert "sweep variant" not in inspect.getdoc(mtb.plot.bubble)
-    assert "needs_labels" not in inspect.getdoc(mtb.to_long)   # the figure reads no such column
 
 
 # --- R7-04: the legends and row labels fit the narrow figures -----------------
@@ -125,30 +65,6 @@ def _outside(fig, pad=0.5):
 def test_narrow_figures_keep_legends_and_row_labels_inside(kw):
     fig = _quiet(mtb.plot.bubble, _d28(), **kw)
     assert _outside(fig) == [], kw
-
-
-def test_renamed_rerun_alone_keeps_its_texts_inside():
-    fig = _quiet(mtb.plot.bubble, _rerun("SCALEX_rerun"))
-    assert _outside(fig) == []
-
-
-def test_narrow_summary_figure_keeps_its_texts_inside():
-    df = pd.concat([_quiet(mtb.load_results, "diagonal", dataset=d, source="published")
-                    for d in ("D24", "D25", "D28")], ignore_index=True)
-    fig = _quiet(mtb.plot.bubble, df, metrics=["ARI"], aggregate="summary")
-    assert _outside(fig) == []
-
-
-def test_fit_widens_only_and_keeps_the_height():
-    # a row label wider than the left margin: only the fit can make room for it
-    long_name = "A_renamed_rerun_with_a_name_much_longer_than_any_package_method"
-    tbl = _quiet(B._build_table, _rerun(long_name), metrics=["ARI"])
-    fig = _quiet(B.render, tbl)
-    w, h = fig.get_size_inches()
-    assert h == pytest.approx(0.42 * 1 + 2.9)
-    # 0.6 inch per x-unit past the table, plus 2.8: the width before the fit
-    assert w > 0.6 * (4.82 - 0.45) + 2.8
-    assert _outside(fig) == []
 
 
 def test_wide_figure_is_not_widened():

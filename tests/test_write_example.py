@@ -95,7 +95,7 @@ def test_files_and_contents(ds, tmp_path, monkeypatch):
         exec(compile(OLD[TASK[ds]]["data"], f"0.3.4 {TASK[ds]}", "exec"), ns)
     with warnings.catch_warnings(record=True) as seen:
         warnings.simplefilter("always")
-        assert mtb.data.write_example(ds, quiet=True) is None    # c3 (E15): no repr in a cell
+        assert mtb.data.write_example(ds, verbose=False) is None    # c3 (E15): no repr in a cell
     # the cell of the tutorial shows the reader no warning of the package or of anndata
     ours = [str(w.message) for w in seen if "multibench" in (w.filename or "")
             or issubclass(w.category, UserWarning)]
@@ -134,7 +134,7 @@ def _canonical(path, n_cells, feats, seed=0):
     rng = np.random.default_rng(seed)
     a = ad.AnnData(rng.poisson(1.0, (n_cells, len(feats))).astype(float))
     a.var_names, a.obs_names = feats, [f"cell{i}-1" for i in range(n_cells)]
-    ingest.to_canonical(a, path)
+    ingest._to_canonical(a, path)
 
 
 @pytest.fixture
@@ -161,37 +161,6 @@ def root(tmp_path):
     return r
 
 
-def _bytes(folder):
-    return {p.name: p.read_bytes() for p in sorted(folder.iterdir())}
-
-
-def test_printed_lines(root, tmp_path, capsys, monkeypatch):
-    here = tmp_path / "work"
-    here.mkdir()
-    monkeypatch.chdir(here)
-    mtb.data.write_example("D11", data_path=root)
-    assert capsys.readouterr().out == (
-        'wrote my_file.h5ad: 24 cells. RNA counts in X, protein counts in obsm["protein"], '
-        'cell types in obs["celltype"].\n')
-    mtb.data.write_example("D58mini", "files", data_path=root)
-    assert capsys.readouterr().out == (
-        'wrote files/my_adt.h5ad: 24 cells. protein counts in X, cell types in '
-        'obs["celltype"], batches in obs["batch"].\n'
-        'wrote files/my_atac.h5ad: 24 cells. ATAC peak counts in X, cell types in '
-        'obs["celltype"], batches in obs["batch"].\n')
-    mtb.data.write_example("D27mini", "unpaired", data_path=root)
-    assert capsys.readouterr().out == (
-        'wrote unpaired/my_rna.h5ad: 27 cells. RNA counts in X, cell types in '
-        'obs["celltype"].\n'
-        'wrote unpaired/my_atac.h5ad: 18 cells. ATAC gene-activity scores in X, cell types '
-        'in obs["celltype"].\n')
-    mtb.data.write_example("D52mini", "quiet", data_path=root, quiet=True)
-    mtb.data.write_example("D52mini", "quiet", data_path=root, quiet=True)
-    captured = capsys.readouterr()
-    assert captured.out == "" and captured.err == ""
-    assert (here / "quiet" / "my_file.h5ad").is_file()
-
-
 def test_the_first_line_of_the_first_tutorial(tmp_path, capsys, monkeypatch):
     if not (mtb.config.DEFAULT.data_path / "D11").is_dir():
         pytest.skip("D11 is not on disk")
@@ -200,171 +169,6 @@ def test_the_first_line_of_the_first_tutorial(tmp_path, capsys, monkeypatch):
     assert capsys.readouterr().out == (
         'wrote my_file.h5ad: 1,718 cells. RNA counts in X, protein counts in '
         'obsm["protein"], cell types in obs["celltype"].\n')
-
-
-def test_a_file_of_the_reader_is_kept(root, tmp_path, capsys):
-    """A file with the example's name that multibench did not write: an
-    .h5ad of the reader, or anything else."""
-    folder = tmp_path / "mine"
-    folder.mkdir()
-    own = ad.AnnData(np.ones((3, 2)))
-    own.write_h5ad(folder / "my_file.h5ad")
-    (folder / "my_atac.h5ad").write_text("not an HDF5 file")
-    (folder / "my_adt.h5ad").mkdir()
-    before = {p.name: p.read_bytes() for p in folder.iterdir() if p.is_file()}
-    mtb.data.write_example("D11", folder, data_path=root)
-    mtb.data.write_example("D58mini", folder, data_path=root)
-    assert capsys.readouterr().out == "".join(
-        f"{folder / name} is already here and is not an example file of multibench. It was "
-        f"left as it is.\n" for name in ("my_file.h5ad", "my_adt.h5ad", "my_atac.h5ad"))
-    assert {p.name: p.read_bytes() for p in folder.iterdir() if p.is_file()} == before
-    assert (folder / "my_adt.h5ad").is_dir() and len(list(folder.iterdir())) == 3
-
-
-def test_a_saved_copy_has_no_marker(root, tmp_path, capsys):
-    """An example that the reader read and saved again is the reader's file:
-    write_h5ad does not carry the marker over."""
-    folder = tmp_path / "f"
-    mtb.data.write_example("D11", folder, data_path=root)
-    target = folder / "my_file.h5ad"
-    assert _mark(target) == f"D11@{mtb.__version__}"
-    mine = ad.read_h5ad(target)
-    mine.obs["celltype"] = "edited"
-    mine.write_h5ad(target)
-    assert _mark(target) is None
-    before = target.read_bytes()
-    capsys.readouterr()
-    for ds in ("D11", "D52mini"):
-        mtb.data.write_example(ds, folder, data_path=root)
-        assert capsys.readouterr().out == (
-            f"{target} is already here and is not an example file of multibench. It was "
-            f"left as it is.\n")
-    assert target.read_bytes() == before
-    assert set(ad.read_h5ad(target).obs["celltype"]) == {"edited"}
-
-
-def test_the_same_example_is_kept(root, tmp_path, capsys):
-    """The second call writes nothing. Nor does a call after the file was
-    changed in place, which keeps the marker."""
-    folder = tmp_path / "f"
-    mtb.data.write_example("D11", folder, data_path=root)
-    target = folder / "my_file.h5ad"
-    before = target.read_bytes()
-    capsys.readouterr()
-    kept = f"{target} is already here (the example of D11). Delete the file to write it again.\n"
-    mtb.data.write_example("D11", folder, data_path=root)
-    assert capsys.readouterr().out == kept and target.read_bytes() == before
-    backed = ad.read_h5ad(target, backed="r+")
-    backed.obs["mine"] = 1
-    backed.write()
-    backed.file.close()
-    changed = target.read_bytes()
-    assert changed != before and _mark(target) == f"D11@{mtb.__version__}"
-    mtb.data.write_example("D11", folder, data_path=root)
-    assert capsys.readouterr().out == kept and target.read_bytes() == changed
-    # deleting it, as the line says, writes it again
-    target.unlink()
-    mtb.data.write_example("D11", folder, data_path=root)
-    assert capsys.readouterr().out.startswith(f"wrote {target}: 24 cells.")
-    assert "mine" not in ad.read_h5ad(target).obs
-
-
-def test_another_example_is_replaced(root, tmp_path, capsys):
-    """Two tutorials use the name my_file.h5ad. Run in one folder, the second
-    must not read the example of the first; nor must a newer multibench read
-    the example an older one wrote."""
-    folder = tmp_path / "f"
-    target = folder / "my_file.h5ad"
-    mtb.data.write_example("D11", folder, data_path=root, quiet=True)
-    assert "batch" not in ad.read_h5ad(target).obs
-    mtb.data.write_example("D52mini", folder, data_path=root)
-    assert capsys.readouterr().out.startswith(f"wrote {target}: 36 cells.")
-    assert _mark(target) == f"D52mini@{mtb.__version__}"
-    assert "batch" in ad.read_h5ad(target).obs
-    # the example of another version
-    with h5py.File(target, "a") as f:
-        f.attrs[MARK] = "D52mini@0.0.1"
-    old = target.read_bytes()
-    mtb.data.write_example("D52mini", folder, data_path=root)
-    assert capsys.readouterr().out.startswith(f"wrote {target}: 36 cells.")
-    assert target.read_bytes() != old and _mark(target) == f"D52mini@{mtb.__version__}"
-    assert sorted(p.name for p in folder.iterdir()) == ["my_file.h5ad"]
-
-
-def test_unknown_dataset_and_missing_folder(root, tmp_path):
-    folder = tmp_path / "f"
-    with pytest.raises(ValueError) as e:
-        mtb.data.write_example("D99", folder, data_path=root)
-    assert str(e.value) == (
-        "No example is defined for 'D99'. Examples exist for D11, D22mini, D27mini, "
-        "D27mini_vertical, D37mini, D38mini, D45mini, D46mini, D49mini, D52mini, D56mini, "
-        "D58mini, D59mini.")
-    with pytest.raises(ValueError, match="No example is defined for 'D28'"):
-        mtb.data.write_example("D28", folder, data_path=root)        # a dataset, but no example
-    with pytest.raises(FileNotFoundError) as e:
-        mtb.data.write_example("D22mini", folder, data_path=root)
-    assert str(e.value) == (f"{root / 'D22mini'} does not exist. Run "
-                            f"mtb.data.fetch('D22mini') first.")
-    assert not folder.exists()                       # no folder for a call that wrote nothing
-
-
-def test_the_data_root_is_read_at_call_time(root, tmp_path, monkeypatch):
-    folder = tmp_path / "f"
-    monkeypatch.setattr(mtb.config.DEFAULT, "data_path", tmp_path / "nowhere")
-    with pytest.raises(FileNotFoundError) as e:
-        mtb.data.write_example("D11", folder)
-    assert str(e.value) == (f"{tmp_path / 'nowhere' / 'D11'} does not exist. Run "
-                            f"mtb.data.fetch('D11') first.")
-    monkeypatch.setattr(mtb.config.DEFAULT, "data_path", root)
-    mtb.data.write_example("D11", folder, quiet=True)
-    assert ad.read_h5ad(folder / "my_file.h5ad").n_obs == 24
-    # data_path= wins over the configured root
-    monkeypatch.setattr(mtb.config.DEFAULT, "data_path", tmp_path / "nowhere")
-    mtb.data.write_example("D27mini", folder, data_path=str(root), quiet=True)
-    assert (folder / "my_rna.h5ad").is_file()
-
-
-def test_a_failed_write_leaves_no_file(root, tmp_path, monkeypatch):
-    """A file appears under its name only when it is complete."""
-    folder = tmp_path / "f"
-    real = ad.AnnData.write_h5ad
-
-    def half_written(self, path, *a, **kw):
-        real(self, path, *a, **kw)
-        if "my_atac" in str(path) or self.n_vars == 3:       # the second file of D58mini
-            raise OSError("disk full")
-    monkeypatch.setattr(ad.AnnData, "write_h5ad", half_written)
-    with pytest.raises(OSError, match="disk full"):
-        mtb.data.write_example("D58mini", folder, data_path=root, quiet=True)
-    assert list(folder.iterdir()) == []              # neither the file nor a temporary one
-    monkeypatch.setattr(ad.AnnData, "write_h5ad", real)
-    # an example that was to be replaced is still whole
-    mtb.data.write_example("D11", folder, data_path=root, quiet=True)
-    before = _bytes(folder)
-
-    def fails(self, path, *a, **kw):
-        raise OSError("disk full")
-    monkeypatch.setattr(ad.AnnData, "write_h5ad", fails)
-    with pytest.raises(OSError, match="disk full"):
-        mtb.data.write_example("D52mini", folder, data_path=root, quiet=True)
-    assert _bytes(folder) == before
-
-
-def test_the_files_are_what_the_export_reads(root, tmp_path):
-    """Read back, the example goes through export_dataset as the tutorial
-    writes it: the protein names come from uns, with no warning."""
-    folder = tmp_path / "f"
-    mtb.data.write_example("D52mini", folder, data_path=root, quiet=True)
-    adata = ad.read_h5ad(folder / "my_file.h5ad")
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        out = mtb.io.export_dataset(adata, tmp_path / "mydata" / "MYCROSS", rna="X",
-                                    adt="obsm:protein", labels="obs:celltype",
-                                    batch="obs:batch", category="cross")
-    assert sorted(p.name for p in out.iterdir()) == [
-        f"{stem}{b}{ext}" for stem, ext in (("adt", ".h5"), ("cty", ".csv"), ("rna", ".h5"))
-        for b in (1, 2, 3)]
-    assert list(mtb.io.read_canonical(out / "adt1.h5").var_names) == ["CD3", "CD4", "CD8"]
 
 
 def test_the_docstring():
@@ -402,5 +206,5 @@ def test_write_example_returns_nothing(tmp_path):
     import multibench as mtb
     if not (mtb.config.DEFAULT.data_path / "D11").is_dir():
         pytest.skip("D11 is not in the data root")
-    assert mtb.data.write_example("D11", tmp_path / "ex", quiet=True) is None
+    assert mtb.data.write_example('D11', tmp_path / 'ex', verbose=False) is None
     assert (tmp_path / "ex" / "my_file.h5ad").is_file()

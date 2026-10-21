@@ -85,23 +85,6 @@ def test_labels_for_accepts_method_and_category_positionally(tmp_path):
     assert a == b and set(a) == {"rna_cty", "peak_cty"}
 
 
-def test_labels_for_positional_data_path_is_refused(tmp_path):
-    """The 0.2 positional data_path (2nd slot) is category since 0.3.0: loud."""
-    import warnings
-    data = _make_labels_ds(tmp_path)
-    with pytest.raises(TypeError, match="pass data_path= by keyword"):
-        resolve.labels_for("D27", data)
-    with pytest.raises(TypeError, match="is category since 0.3.0"):
-        resolve.labels_for("D27", str(data))
-    # a bare method id in the category slot is the old order: loud too
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        with pytest.raises(TypeError, match=r"labels_for argument order is \(dataset, category, method\)"):
-            resolve.labels_for("D27", "Seurat_v5", data_path=tmp_path / "nowhere")
-        with pytest.raises(FileNotFoundError):
-            resolve.labels_for("D27", method="Seurat_v5", data_path=tmp_path / "nowhere")
-
-
 # --- P09: inputs_for validates tokens and accepts aliases ---------------------
 
 def test_inputs_for_protein_alias_and_bad_category(tmp_path):

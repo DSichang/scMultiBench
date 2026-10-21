@@ -77,7 +77,6 @@ import pandas as pd  # noqa: E402
 import pytest  # noqa: E402
 
 import multibench as mtb  # noqa: E402
-from multibench import cli  # noqa: E402
 from multibench import workflow as W  # noqa: E402
 from tests.test_study_r4_wf import N, _batch_metrics, _h5, _quiet, cite  # noqa: E402,F401
 
@@ -109,7 +108,8 @@ def _meta(batch):
 def swept(cite, tmp_path):
     """A saved one-method vertical sweep of the ``cite`` folder."""
     data, batch, shuffled = cite
-    _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "a", data_path=data, **KW)
+    mtb.config.DEFAULT.data_path = data
+    _quiet(mtb.run_all, 'MYCITE', 'vertical', tmp_path / 'a', **KW)
     return mtb.load_batch(tmp_path / "a"), data, batch
 
 
@@ -342,7 +342,8 @@ def test_r_row_numbers_and_one_column_files_score_as_before(tmp_path, cite):
     for path in (rnum, one):
         with pytest.raises(ValueError, match="has no cell ids, and the embedding has"):
             mtb.evaluate(a, batch=str(path), **kw)
-    kw = dict(data_path=data, **KW)
+    mtb.config.DEFAULT.data_path = data
+    kw = dict(**KW)
     by_one = _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "a",
                     batch=_one_column(tmp_path / "b1.csv", batch), **kw)
     by_r = _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "b",

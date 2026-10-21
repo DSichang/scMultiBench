@@ -16,12 +16,6 @@ def _messages(fn, *args, **kw):
     return out, [str(w.message) for w in rec]
 
 
-def _d11():
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        return mtb.load_results("vertical", dataset="D11")
-
-
 def _mine(base, name="Mine", scored_with="leidenalg/search/0.4.0"):
     rows = base[base.method == "Matilda"].assign(method=name, source="user")
     if scored_with is not None:
@@ -47,28 +41,6 @@ def test_x04_one_stored_table_per_category():
     assert not stored.dataset.str.endswith("s").any()
     # recommend's n_datasets column left in 0.4.0: the stored results hold one dataset
     assert set(mtb.load_results("diagonal").dataset) == {"D28"}
-
-
-def test_x04_bar_of_one_dataset_has_no_whiskers():
-    fig = mtb.plot.bar(mtb.load_results("diagonal"), overall="mean_overall")
-    ax = fig.axes[0]
-    assert ax.get_title(loc="left") == "overall — D28"
-    assert ax.get_xlabel() == "overall score (D28)"
-    from matplotlib.collections import LineCollection
-    assert not [c for c in ax.collections if isinstance(c, LineCollection)
-                and len(c.get_segments())]
-
-
-def test_x42_results_coverage_has_three_columns():
-    cov = mtb.results_coverage("cross")
-    assert list(cov.columns) == ["category", "dataset", "method"]
-    assert cov.attrs["rerun_version"] == "0.4.0"
-
-
-def test_x59_available_datasets_lists_the_stored_datasets():
-    with pytest.warns(FutureWarning, match="available_datasets is deprecated"):
-        got = mtb.available_datasets()
-    assert got == sorted(mtb.results_coverage().dataset.unique())
 
 
 def test_x69_uinmf_two_batch_rows_left_the_d52_table():
@@ -99,21 +71,6 @@ def test_x14_rows_repeating_stored_rows_are_refused(fn):
                                          r"rows\.assign\(method=rows\.method \+ "
                                          r"' \(this run\)'\)\."):
         call()
-
-
-def test_x16_the_rename_advice_works_on_a_long_frame():
-    d11 = _d11()
-    rows = d11[d11.method == "scMM"].assign(source="user")
-    # Y23 (r3): the advice keeps each method its own name
-    # 0.4.0: the suffix is " (this run)"; recommend(long_df=) replaces build_table
-    with pytest.raises(ValueError, match=r"rows\.assign\(method=rows\.method \+ "
-                                         r"' \(this run\)'\)") as e:
-        mtb.recommend("vertical", long_df=pd.concat([d11, rows]))
-    assert "to_long(method" not in str(e.value)
-    # the advice runs as written
-    fixed = rows.assign(method=rows.method + " (this run)")
-    r, _ = _messages(mtb.recommend, "vertical", long_df=pd.concat([d11, fixed]))
-    assert "scMM (this run)" in set(r.method)
 
 
 def test_x89_batch_family_on_vertical_says_why():

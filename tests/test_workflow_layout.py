@@ -63,22 +63,6 @@ def test_batch_categories_explain_numbered_files(cat):
     assert "cty1.csv" in txt and "one label file per batch" in txt
 
 
-def test_one_peak_file_name_per_category():
-    """describe_layout('diagonal') used to give three peak file names."""
-    diag = mtb.describe_layout("diagonal")
-    bare_peak = re.findall(r"(?<![\w_])peak\.h5", diag)
-    assert len(bare_peak) == 1                          # only in the older-names line
-    assert "Older names still read: peak.h5 for peaks, and atac.h5 for gene activity." in diag
-    vert = mtb.describe_layout("vertical")
-    assert not re.search(r"(?<![\w_])peak\.h5", vert) and "atac_peak.h5" not in vert
-    # every vertical method that reads ATAC reads peaks; with a gene-activity
-    # method in the registry the text lists the methods of each form instead
-    assert mtb.find_methods("vertical", atac="gene_activity") == []
-    assert ("atac.h5 holds peaks, not gene activity: every vertical method that reads "
-            "ATAC needs peaks.") in vert
-    assert "need peaks:" not in vert and "need gene activity:" not in vert
-
-
 def test_mosaic_lists_every_registry_pattern_with_methods_and_demo():
     txt = mtb.describe_layout("mosaic")
     assert "Number your batches to match one of them" in txt

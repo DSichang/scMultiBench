@@ -18,11 +18,8 @@ from ..data.results import COLUMNS as _RESULT_COLUMNS
 #: the long table's columns; the stored tables' constant ``clustering`` is not written
 LONG_COLUMNS = [c for c in _RESULT_COLUMNS if c != "clustering"]
 
-#: the ``attrs`` keys evaluate() sets and to_long() joins into ``scored_with``
+#: the ``attrs`` keys evaluate() sets and the long table joins into ``scored_with``
 PROVENANCE_ATTRS = ("leiden_flavor", "clustering", "multibench_version")
-
-#: ``attrs`` keys of a frame scored with ``missing_labels="drop"``: cells scored, cells given
-DROP_ATTRS = ("cells_scored", "cells_total")
 
 #: ``scored_with`` of rows whose frame carries no record of how it was scored
 UNKNOWN_SCORING = "unknown"
@@ -41,69 +38,26 @@ def _scib_version() -> str | None:
 
 
 def _scored_with(attrs) -> str | None:
-    """``"leidenalg/search/0.4.0"`` (plus ``"/270 of 300 cells"`` after a drop)
-    from evaluate()'s ``attrs``; ``None`` when the frame carries none."""
+    """``"leidenalg/search/0.4.0"`` from evaluate()'s ``attrs``; ``None`` when
+    the frame carries none."""
     if not attrs or attrs.get("multibench_version") is None:
         return None
-    parts = [str(attrs.get(k) or "none") for k in PROVENANCE_ATTRS]
-    if all(attrs.get(k) is not None for k in DROP_ATTRS):
-        # no thousands separators: a CSV column
-        parts.append("{} of {} cells".format(*(attrs[k] for k in DROP_ATTRS)))
-    return "/".join(parts)
+    return "/".join(str(attrs.get(k) or "none") for k in PROVENANCE_ATTRS)
 
 
 def _long_table(value_df, *, method: str, dataset: str | None = None,
                 category: str | None = None) -> pd.DataFrame:
     """The long table of a wide score frame (metrics as the index, one column
-    ``Value``), its CSV, or a Series indexed by metric: one row per metric with
-    the columns of ``mtb.load_results`` plus ``scored_with``. ``dataset=None``
-    writes ``"all"``, ``category=None`` leaves the column empty."""
+    ``Value``): one row per metric with the columns of ``mtb.load_results``
+    plus ``scored_with``. ``dataset=None`` writes ``"all"``, ``category=None``
+    leaves the column empty."""
     if category is not None:
         config.category_folder(category)        # "verticall" is refused here
-    if isinstance(value_df, (str, Path)):
-        # evaluate()'s frame saved with to_csv: the metrics are its first column
-        value_df = pd.read_csv(io._require_file(value_df, "metric CSV"), index_col=0)
-    if isinstance(value_df, pd.Series):
-        value_df = value_df.to_frame("Value")
-    cols = [str(c) for c in getattr(value_df, "columns", [])]
-    if {"metric", "value", "method"} <= set(cols):
-        raise ValueError(
-            "to_long() got an already long frame (columns metric, value, method"
-            f"{', ...' if len(cols) > 3 else ''}); pass it to mtb.plot.bubble / "
-            "pd.concat / load_results consumers directly - to_long reshapes "
-            "evaluate()'s wide frame (metrics as the index, one column 'Value')")
-    if "Value" not in cols:
-        idx = list(map(str, list(value_df.index)[:5]))
-        raise ValueError(
-            f"to_long expects evaluate()'s frame: metrics as index, one column "
-            f"'Value'; got columns {cols} (index {idx}) - for a wide one-row "
-            f"frame use df.T.set_axis(['Value'], axis=1)")
-    if "metric" in cols:
-        # saved with index_label="metric": reset_index would add a second 'metric' column
-        value_df = value_df.set_index("metric")
-    elif (cols == ["Unnamed: 0", "Value"]
-          and all(map(_name_or_blank, value_df["Unnamed: 0"]))
-          and any(isinstance(n, str) for n in value_df["Unnamed: 0"])
-          and not any(isinstance(n, str) for n in value_df.index)):
-        # a plain pd.read_csv of wide.to_csv(path): the names are column 'Unnamed: 0'
-        value_df = value_df.set_index("Unnamed: 0")
     out = value_df.rename(columns={"Value": "value"}).copy()
     out = out.reset_index()
     out = out.rename(columns={out.columns[0]: "metric"})   # the index, whatever its name
-    if not all(map(_name_or_blank, out["metric"])):
-        # row numbers would pass canonical_metric as metrics '0', '1', ...
-        raise ValueError(
-            f"to_long needs the metric names as strings (evaluate()'s index or a "
-            f"'metric' column); got {out['metric'].head(5).tolist()} with columns {cols} "
-            f"- read a CSV saved with wide.to_csv(path) back with "
-            f"pd.read_csv(path, index_col=0)")
     out["metric"] = out["metric"].map(catalog._canonical_metric)
     out = out.dropna(subset=["metric"])
-    if out.empty and len(value_df):
-        raise ValueError(
-            f"no metric name in the index canonicalises to a known code: "
-            f"{list(map(str, value_df.index))[:10]} - to_long expects "
-            f"evaluate()'s frame (metrics as index, one column 'Value')")
     dup = out["metric"].duplicated(keep=False)
     if dup.any():
         raise ValueError(
@@ -119,36 +73,10 @@ def _long_table(value_df, *, method: str, dataset: str | None = None,
     out = out[LONG_COLUMNS + ["scored_with"]].reset_index(drop=True)
     if stamp is not None:
         out.attrs = {k: value_df.attrs.get(k) for k in PROVENANCE_ATTRS}
-        for k in ("scib_version",) + DROP_ATTRS:
+        for k in ("scib_version",):
             if k in value_df.attrs:
                 out.attrs[k] = value_df.attrs[k]
     return out
-
-
-@_compat.keywords("to_long", dropped=("clustering", "source"))
-def to_long(value_df, *, method: str, dataset: str | None = None,
-            category: str | None = None) -> pd.DataFrame:
-    """Deprecated: ``mtb.evaluate(..., method=, dataset=)`` returns the long table."""
-    _compat.deprecated("to_long", _compat.use("mtb.evaluate(..., method=, dataset=)"))
-    cols = {str(c) for c in getattr(value_df, "columns", [])}
-    if not {"metric", "value", "method"} <= cols:
-        out = _long_table(value_df, method=method, dataset=dataset, category=category)
-        # as in 0.3, until to_long goes in 0.5
-        return out if category is not None else out.assign(category="user")
-    # what evaluate returns in 0.4: only the named columns change
-    out = value_df.copy()
-    out["method"] = method
-    if dataset is not None:
-        out["dataset"] = dataset
-    if category is not None:
-        config.category_folder(category)
-        out["category"] = category
-    return out
-
-
-def _name_or_blank(v) -> bool:
-    """A metric name (``str``) or a blank cell (``None``/NaN, which to_long drops)."""
-    return isinstance(v, str) or (pd.api.types.is_scalar(v) and pd.isna(v))
 
 
 def _metric_families() -> tuple[list, list, list]:
@@ -291,7 +219,7 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
         if not Path(x).is_file():
             from ..engine.ingest import _case_hint
             raise ValueError(
-                f"{what}={x!r}" + " is neither an obs "
+                f"{what}={x!r} is neither an obs "
                 f"column of the {type(adata).__name__} (obs columns: {_obs_choices(adata)}) "
                 f"nor an existing file." + _case_hint(x.removeprefix("obs:"),
                                                       _obs_choices(adata)))
@@ -310,13 +238,13 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
             # no ids: the dataset folder's matrix names the cells
             first = _folder_ids([x], [len(vals)], ids, read, others)
         if _has_cell_ids(ids) and not _file_carries_ids(first, ids):
-            by_position = "" if len(vals) != len(ids) else ", or " + f"pass {what}=pd.read_csv(...).iloc[:, 0].to_numpy()" + " to match by position"
+            by_position = "" if len(vals) != len(ids) else f", or pass {what}=pd.read_csv(...).iloc[:, 0].to_numpy() to match by position"
             raise ValueError(f"{name} has no cell ids, and the embedding has: put the barcodes "
                              f"in its first column{by_position}.")
         return io.by_id_column(
             vals, first, ids if unique else None, what=what, name=name,
             target="the embedding", order="the rows of the embedding",
-            no_ids=_no_ids(ids), drop=what == "labels")[0]
+            no_ids=_no_ids(ids))[0]
     if _carries_ids(x):
         if ids is not None:
             name = f"the {what} {type(x).__name__}"
@@ -485,7 +413,7 @@ def _stack_label_files(files, ids, as_written=False, table=None, read=(), others
         pos, _ = io.by_id_column(np.arange(len(vals)), pd.concat(
             [first for _, first in rows], ignore_index=True), ids if unique else None,
             what="labels", name=name, target="the embedding", order=order,
-            no_ids=_no_ids(ids), n_files=len(names), drop=True)
+            no_ids=_no_ids(ids), n_files=len(names))
         return vals[pos], origin[pos]
     if all(first is None for _, first in rows) and _has_cell_ids(ids):
         # no ids: the dataset folder's matrices name the cells; without them, by position
@@ -494,7 +422,7 @@ def _stack_label_files(files, ids, as_written=False, table=None, read=(), others
             pos, _ = io.by_id_column(np.arange(len(vals)), keys, ids, what="labels",
                                      name=_and_list(names), target="the embedding",
                                      order=order, no_ids=_no_ids(ids),
-                                     n_files=len(names), drop=True)
+                                     n_files=len(names))
             return vals[pos], origin[pos]
     for (v, first), name in zip(rows, names):
         io.by_id_column(v, first, None, what="labels", name=name, target="the embedding",
@@ -504,55 +432,33 @@ def _stack_label_files(files, ids, as_written=False, table=None, read=(), others
     return vals, origin
 
 
-def _labels_from_dict(d: dict, label_order) -> list:
+def _labels_from_dict(d: dict) -> list:
     """The paths of a ``{name: path}`` label dict in cell order.
 
     A guess at any other order would score misordered labels without an error,
-    so several entries need ``label_order``, an unchanged ``labels_for`` dict,
-    or the default order (``_label_sort_key``).
+    so several entries need an unchanged ``labels_for`` dict or the default
+    order (``_label_sort_key``).
     """
-    if label_order is None:
-        if len(d) == 1:
-            return [next(iter(d.values()))]
-        from ..engine.resolve import LabelFiles, _label_sort_key
-        keys = list(d)
-        if isinstance(d, LabelFiles) and d.in_stacking_order():
-            return [d[k] for k in keys]
-        if keys == sorted(keys, key=_label_sort_key):
-            return [d[k] for k in keys]
-        # name the method's cell order only for a reordered labels_for dict that had one
-        if isinstance(d, LabelFiles) and \
-                list(d.stacking_order) != sorted(d.stacking_order, key=_label_sort_key):
-            where = "are in neither the method's cell order nor the default order"
-        else:
-            where = "are not in the default order"
-        raise ValueError(
-            f"The label keys {_and_list(keys)} {where}. Pass a list of paths in "
-            f"cell order, or dataset=, category= and method=. The default order is "
-            f"cty1, cty2, ... by number, with rna before adt before atac. It is "
-            f"not alphabetical.")
-    if isinstance(label_order, str) or not isinstance(label_order, (list, tuple)):
-        raise TypeError(
-            f"label_order= takes a list of keys of the labels dict, such as "
-            f"label_order={list(map(str, d))!r}. It got a "
-            f"{type(label_order).__name__}.")
-    order = list(label_order)
-    if not order:
-        raise ValueError(
-            f"label_order= is empty. List the keys of the labels dict in the "
-            f"method's cell order, such as {list(map(str, d))!r}.")
-    unknown = list(dict.fromkeys(k for k in order if k not in d))
-    if unknown:
-        what = ("which is not a key" if len(unknown) == 1
-                else "which are not keys")
-        raise ValueError(
-            f"label_order names {_and_list(unknown)}, {what} of the labels dict. "
-            f"Its keys are {_and_list(d)}.")
-    if len(set(order)) != len(order):
-        times = {k: order.count(k) for k in dict.fromkeys(order) if order.count(k) > 1}
-        raise ValueError("label_order names " + _and_list(
-            f"{k} {'twice' if n == 2 else f'{n} times'}" for k, n in times.items()) + ".")
-    return [d[k] for k in order]
+    if len(d) == 1:
+        return [next(iter(d.values()))]
+    from ..engine.resolve import LabelFiles, _label_sort_key
+    keys = list(d)
+    if isinstance(d, LabelFiles) and d.in_stacking_order():
+        return [d[k] for k in keys]
+    if keys == sorted(keys, key=_label_sort_key):
+        return [d[k] for k in keys]
+    # name the method's cell order only for a reordered labels_for dict that had one
+    if isinstance(d, LabelFiles) and \
+            list(d.stacking_order) != sorted(d.stacking_order, key=_label_sort_key):
+        where = "are in neither the method's cell order nor the default order"
+    else:
+        where = "are not in the default order"
+    raise ValueError(
+        f"The label keys {_and_list(keys)} {where}. Pass a list of paths in "
+        f"cell order, or dataset=, category= and method=. The default order is "
+        f"cty1, cty2, ... by number, with rna before adt before atac. It is "
+        f"not alphabetical.")
+
 
 
 #: the keys of a labels dict, in the order of its files (label_order's spelling)
@@ -672,18 +578,6 @@ def _n_batches(ba) -> int:
     return len(set(ba[~io.missing_mask(ba)].astype(str).tolist()))
 
 
-def _dropped_warning(n_scored: int, n_cells: int, batches=None) -> str:
-    """evaluate()'s warning after ``missing_labels="drop"``. ``batches`` is
-    ``(batches with a labelled cell, batches given)`` when a batch vector is known."""
-    msg = f"Scored the {n_scored:,} labelled cells of {n_cells:,}"
-    b, n_batches = batches or (0, 0)
-    if b == 1 < n_batches:
-        msg += f", all in one batch of {n_batches}"
-    elif b < n_batches:
-        msg += f", from {b} of the {n_batches} batches"
-    return msg + "."
-
-
 def _batch_files(path: Path, n_cells: int) -> list:
     """``cty1.csv, cty2.csv, ...`` next to ``path``, in number order, when their
     labels add up to ``n_cells``; else ``[]``."""
@@ -780,7 +674,6 @@ def _count_error(what: str, n: int, n_cells: int, given, category=None,
     if side and not batches:
         return (f'{fact}. {files[0].name} labels the {side[0]} cells only, see the recipe '
                 f'"No labels" in the docs.')
-    order = f" ({', '.join(f.name for f in batches)})" if batches else ""
     return (f"{fact}. For a folder with one label file per batch, pass dataset=, category= "
         f"and method=." if files else
         f"labels has {_n(n, 'entry', 'entries')} for {_n(n_cells, 'embedding row')}: "
@@ -868,7 +761,7 @@ def _classification_error(metrics, why: str, what: str = "output") -> str:
     head = _metrics_spelling(metrics)
     if why == "graph":
         from .classify import _graph_text
-        return _graph_text(what) + " " + "Pass metrics='clustering'."
+        return _graph_text(what) + " Pass metrics='clustering'."
     if why == "not embedding":
         return f"{head} needs an embedding; {what} is not one. Pass the method's embedding file."
     if why == "none scored":
@@ -893,7 +786,7 @@ def _classification_warning(why: str, what: str = "output") -> str:
     if why == "none scored":
         return (f"{head}: no batch has two cell types that another batch has. "
                 f"Check labels and batch.")
-    return f"{head}: every cell is in one batch. " + "Pass batch= with two or more batches."
+    return f"{head}: every cell is in one batch. Pass batch= with two or more batches."
 
 
 def _classification_scores(request, emb, ct, cb, *, category, not_embedding, graph,
@@ -945,7 +838,7 @@ def _classification_scores(request, emb, ct, cb, *, category, not_embedding, gra
 
 def _origin_names(labels, origin):
     """The batch of each cell when several label files give it: the file's stem,
-    as ``mtb.classify`` names it, else its number."""
+    as ``classify`` names it, else its number."""
     stems = [Path(p).stem for p in labels]
     names = stems if len(set(stems)) == len(stems) else \
         [str(i + 1) for i in range(len(labels))]
@@ -960,24 +853,6 @@ def _metrics_spelling(metrics) -> str:
     return f"metrics={metrics!r}"
 
 
-_METRICS_KEYWORD = ("0.4", _compat.use("metrics="))
-
-
-@_compat.keywords("evaluate", private="_evaluate", renamed={"output": "embedding"},
-                  kept={"clustering": _compat.note(
-                            "for your own clusters use "
-                            "sklearn.metrics.adjusted_rand_score(labels, clusters)"),
-                        "label_order": _compat.use("evaluate(..., dataset=, method=)"),
-                        "missing_labels": _compat.note(
-                            "keep the cells that have a label, as adata[adata.obs[col].notna()]")},
-                  removed={"task": _METRICS_KEYWORD, "family": _METRICS_KEYWORD,
-                           "only": _METRICS_KEYWORD,
-                           "slow_metrics": ("0.3.0", _compat.note(
-                               "pass metrics=[...] without cLISI and iLISI")),
-                           "column": ("0.3.0", _compat.note(
-                               "pass the column itself as labels= or batch=")),
-                           "metric_set": ("0.3.0", _compat.note(
-                               "only the scIB metric set exists, so drop it"))})
 def evaluate(embedding, labels=None, *, dataset: str | None = None,
              method: str = "embedding", category: str | None = None, batch=None,
              metrics=None, obsm: str | None = None, verbose: bool = True) -> pd.DataFrame:
@@ -1044,32 +919,16 @@ def evaluate(embedding, labels=None, *, dataset: str | None = None,
     >>> mtb.evaluate(adata, labels="celltype", batch="sample", obsm="X_pca",
     ...              method="PCA")
     """
-    return _evaluate(embedding, labels, dataset=dataset, method=method,
-                     category=category, batch=batch, metrics=metrics, obsm=obsm,
-                     verbose=verbose)
-
-
-def _evaluate(embedding, labels=None, *, dataset=None, method="embedding", category=None,
-              batch=None, metrics=None, obsm=None, verbose=True, clustering=None,
-              label_order=None, missing_labels="error", data_path=None,
-              from_dataset=False) -> pd.DataFrame:
-    """:func:`evaluate` with the deprecated ``clustering=``, ``label_order=`` and
-    ``missing_labels=``; ``data_path`` is the folder that holds ``dataset``;
-    ``from_dataset``: ``labels`` are copies of the dataset's label files (the
-    command line's ``--column``)."""
-    if not isinstance(missing_labels, str) or missing_labels not in ("error", "drop"):
-        raise ValueError(
-            f'missing_labels must be "error" or "drop", got {missing_labels!r}.')
     if not isinstance(method, str) or not method.strip():
         raise TypeError(f"method= takes a name, such as method='Matilda'; got {method!r}.")
     name = cells = None
     if dataset is not None:
         from ..engine import resolve
         from ..workflow import known_category
-        name, data_path = resolve.split_dataset(dataset, data_path)
+        name, data_path = resolve.split_dataset(dataset, None)
         bench = known_category(name)             # a benchmark dataset has one
         category = bench if category is None else category
-        from_files = labels is None or from_dataset
+        from_files = labels is None
         if labels is None:
             labels = _dataset_labels(name, category, method, data_path)
         cells = _expected_cells(name, category, method, data_path,
@@ -1078,8 +937,7 @@ def _evaluate(embedding, labels=None, *, dataset=None, method="embedding", categ
         raise ValueError("evaluate needs labels=, one cell type per cell, or dataset= "
                          "to read the label files of a dataset folder.")
     wide = _scores(embedding, labels=labels, category=category, batch=batch,
-                   metrics=metrics, clusters=clustering, obsm=obsm, label_order=label_order,
-                   verbose=verbose, missing_labels=missing_labels, cells=cells)
+                   metrics=metrics, obsm=obsm, verbose=verbose, cells=cells)
     return _long_table(wide, method=method, dataset="user" if name is None else name,
                        category=category)
 
@@ -1234,18 +1092,13 @@ def _scores(
     metrics=None,
     clusters=None,
     obsm: str | None = None,
-    label_order=None,
     verbose: bool = True,
-    missing_labels: str = "error",
     cells: _Cells | None = None,
 ) -> pd.DataFrame:
     """The scores of :func:`evaluate` as a wide frame: one row per metric, one
     column ``Value``; ``attrs`` records how they were scored. ``clusters``
     replaces the Leiden clusters of ARI, NMI, ASW, iASW and iF1; ``cells`` are
     the cells of ``evaluate(dataset=)``."""
-    if not isinstance(missing_labels, str) or missing_labels not in ("error", "drop"):
-        raise ValueError(
-            f'missing_labels must be "error" or "drop", got {missing_labels!r}.')
     _validate_category(category)
     if labels is None:
         raise ValueError("metrics require `labels` (cty / ground-truth cell types).")
@@ -1256,14 +1109,8 @@ def _scores(
     # a dict becomes a list of paths first, for the file-of-origin batch rule
     _LABEL_KEYS.set(None)
     if isinstance(labels, dict):
-        _LABEL_KEYS.set([str(k) for k in (labels if label_order is None else label_order)])
-        labels = _labels_from_dict(labels, label_order)
-    elif label_order is not None:
-        raise TypeError(
-            f"label_order= applies only when labels is a dict ({{name: path}}, "
-            f"as returned by mtb.labels_for); labels is a "
-            f"{type(labels).__name__} - pass the files as a list in that order "
-            f"instead")
+        _LABEL_KEYS.set([str(k) for k in labels])
+        labels = _labels_from_dict(labels)
     batch_from_files = batch is None and _is_label_path_list(labels) and len(labels) > 1
     group, only, slow, want_cls = _plan_metrics(
         metrics, has_batch=batch is not None or batch_from_files)
@@ -1291,9 +1138,9 @@ def _scores(
     if cells is not None and cells.moved and not _follows_cells(labels, adata, cells):
         stems = ", ".join(cells.moved)
         raise ValueError(
-            "labels= is matched to the cells by position, and "
-            + f"{cells.method} puts the cells of {cells.dataset} in the order {stems}. "
-            + f"Leave labels= out to read the label files in that order.")
+            f"labels= is matched to the cells by position, and {cells.method} puts "
+            f"the cells of {cells.dataset} in the order {stems}. Leave labels= out to "
+            f"read the label files in that order.")
     lab_ids, ba_ids = ids, ids
     # the files whose barcodes name the cells: the method's, else the folder's default
     read = cells.read if cells is not None else ()
@@ -1371,31 +1218,20 @@ def _scores(
             raise ValueError(_count_error(what, len(values), n_cells, given, category,
                                           from_files))
     # checked here: compute() casts labels to str, and "nan" would become a cell type
-    miss, dropped = io.missing_mask(ct), None
-    keep = ~miss
+    miss = io.missing_mask(ct)
     if miss.any():
-        if missing_labels == "error" or miss.all():
-            shown = _as_written(labels, adata, lab_ids, what="labels", read=read,
-                                others=others)
-            raise ValueError(_no_label_error(
-                ct if shown is None else shown, miss, labels,
-                from_files and from_files.dataset))
-        # ba is zeros when no batch metric is scored: count the file of origin then
-        known = ba if batch is not None else origin if batch_from_files else None
-        batches = None if known is None else (
-            _n_batches(np.asarray(known)[keep]), _n_batches(known))
-        emb, ct, ba = emb[keep], np.asarray(ct)[keep], np.asarray(ba)[keep]
-        cl = None if cl is None else np.asarray(cl)[keep]
-        cb = None if cb is None else np.asarray(cb)[keep]
-        dropped = (int(keep.sum()), n_cells, batches)
+        shown = _as_written(labels, adata, lab_ids, what="labels", read=read,
+                            others=others)
+        raise ValueError(_no_label_error(
+            ct if shown is None else shown, miss, labels,
+            from_files and from_files.dataset))
     if batch is not None:
-        # after the drop: only the cells that are scored need a batch
         no_batch = io.missing_mask(ba)
         if no_batch.any():
             shown = _as_written(batch, adata, ba_ids, what="batch", read=read,
                                 others=others)
             raise ValueError(_no_batch_error(
-                ba if shown is None else np.asarray(shown)[keep], no_batch, batch))
+                ba if shown is None else np.asarray(shown), no_batch, batch))
     if group in ("batch", "all") and len(set(np.asarray(ba).astype(str).tolist())) < 2:
         # batch metrics on one batch: NaN, or a GC of 1.0
         if metrics is not None:
@@ -1428,8 +1264,4 @@ def _scores(
         # unreachable while every family code is one compute() scores; loud if not
         raise ValueError(
             f"evaluate(metrics={metrics!r}) selected no metric - nothing to return")
-    if dropped:
-        out.attrs.update(zip(DROP_ATTRS, dropped[:2]))
-        # evaluate <- its keyword wrapper <- the caller
-        _compat.warn(_dropped_warning(*dropped), UserWarning)
     return out

@@ -157,72 +157,6 @@ def test_fewer_donors_after_more_are_refused(tmp_path):
         f"{g} holds rna3.h5 and 2 more files of batch 3. {ADVICE}")
 
 
-def test_batch_index_checks_other_batch_numbers_only_with_n_batches(tmp_path):
-    """Three example batches, then the reader's batch 1 of two. A call with
-    batch_index= cannot know how many batches the data has: n_batches= says
-    it."""
-    f = tmp_path / "INDEX"
-    kw = dict(rna="X", labels="obs:celltype", category="cross")
-    for b in (1, 2, 3):
-        _write(_cells(100, f"EX{b}", seed=b)[0], f, batch_index=b, **kw)
-    mine, _ = _cells(90, "MINE", seed=9)
-    assert _refused(mine, f, batch_index=1, n_batches=2, **kw) == (
-        f"{f} holds rna3.h5 and 1 more file of batch 3, above n_batches=2. {ADVICE}")
-    # n_batches=3: batch 3 is part of the data
-    third = {n: (f / n).read_bytes() for n in ("rna3.h5", "cty3.csv")}
-    _write(mine, f, batch_index=1, n_batches=3, **kw)
-    # without n_batches, as in 0.3.4: the call passes and batch 3 stays
-    _write(mine, f, batch_index=1, **kw)
-    assert {n: (f / n).read_bytes() for n in third} == third
-    assert resolve._barcodes_of(f / "rna1.h5")[0] == "MINE0000-1"
-
-
-def test_n_batches_of_one(tmp_path):
-    f = tmp_path / "ONE"
-    kw = dict(rna="X", labels="obs:celltype", category="cross")
-    for b in (1, 2):
-        _write(_cells(60, f"EX{b}", seed=b)[0], f, batch_index=b, **kw)
-    assert _refused(_cells(60, "EX1", seed=1)[0], f, batch_index=1, n_batches=1, **kw) == (
-        f"{f} holds rna2.h5 and 1 more file of batch 2, above n_batches=1. {ADVICE}")
-
-
-def test_the_diagonal_loop_with_fewer_batches_is_refused(tmp_path):
-    """The tutorial's loop over two lists: with one batch taken out of both,
-    n_batches is 2 and the third batch of the example is named."""
-    f = tmp_path / "LOOP"
-    kw = dict(rna="X", atac_kind="gene_activity", labels="obs:celltype", category="diagonal")
-    rna = [_cells(80, f"R{b}", seed=b)[0] for b in (1, 2, 3)]
-    atac = [_genes(_cells(70, f"A{b}", seed=10 + b)[1]) for b in (1, 2, 3)]
-    for b in range(3):
-        _write(rna[b], f, atac=atac[b], batch_index=b + 1, n_batches=3, **kw)
-    assert len(_names(f)) == 12
-    assert _refused(rna[0], f, atac=atac[0], batch_index=1, n_batches=2, **kw) == (
-        f"{f} holds rna3.h5 and 3 more files of batch 3, above n_batches=2. {ADVICE}")
-
-
-def test_n_batches_counts_the_batches_of_both_sides(tmp_path):
-    """A diagonal call that writes one side. n_batches is the number of
-    batches of the data, not of the side: a higher batch number on the side
-    the call does not write is named too. Up to n_batches that side is not
-    judged."""
-    f = tmp_path / "SIDE"
-    kw = dict(labels="obs:celltype", category="diagonal")
-    for b in (1, 2, 3):
-        _write(None, f, atac=_genes(_cells(70, f"A{b}", seed=10 + b)[1]),
-               atac_kind="gene_activity", batch_index=b, **kw)
-    assert len(_names(f)) == 6
-    rna, _ = _cells(80, "R1", seed=1)
-    assert _refused(rna, f, rna="X", batch_index=1, n_batches=2, **kw) == (
-        f"{f} holds atac_gas3.h5 and 1 more file of batch 3, above n_batches=2. {ADVICE}")
-    assert _refused(rna, f, rna="X", batch_index=1, n_batches=1, **kw) == (
-        f"{f} holds atac_gas2.h5 and 3 more files of batches 2-3, above n_batches=1. {ADVICE}")
-    atac_side = {n: (f / n).read_bytes() for n in _names(f)}
-    _write(rna, f, rna="X", batch_index=1, n_batches=3, **kw)
-    _write(rna, f, rna="X", batch_index=1, **kw)
-    assert _names(f) == sorted([*atac_side, "rna1.h5", "rna_cty1.csv"])
-    assert {n: (f / n).read_bytes() for n in atac_side} == atac_side
-
-
 # ----------------------------------------------------------- (b) other cells
 def test_another_dataset_into_the_same_mosaic_folder(tmp_path):
     """Batch 1 has the same file names, so it is replaced. Batch 2 leaves the
@@ -580,29 +514,6 @@ def test_an_empty_list_leaves_the_old_check_and_text(tmp_path):
                             f"overwrite=True to replace them.")
 
 
-# ------------------------------------------------------------------ n_batches
-def test_n_batches_arguments(tmp_path):
-    me, _ = _cells(60, "ME")
-    f = tmp_path / "ARGS"
-    kw = dict(rna="X", category="cross")
-    for extra in ({}, {"batch": "obs:donor"}):
-        with pytest.raises(ValueError) as e:
-            ingest.export_dataset(me, f, n_batches=3, **kw, **extra)
-        assert str(e.value) == (
-            "n_batches= goes with batch_index= only. Leave n_batches= out.")
-    with pytest.raises(ValueError) as e:
-        ingest.export_dataset(me, f, batch_index=3, n_batches=2, **kw)
-    assert str(e.value) == "batch_index=3 is larger than n_batches=2."
-    for bad in (0, -1, 2.0, "3", True):
-        with pytest.raises(ValueError) as e:
-            ingest.export_dataset(me, f, batch_index=1, n_batches=bad, **kw)
-        assert str(e.value) == f"n_batches= must be a positive integer, got {bad!r}"
-    assert not f.exists()
-    ingest.export_dataset(me, f, batch_index=2, n_batches=2, **kw)
-    ingest.export_dataset(me, f, batch_index=1, n_batches=np.int64(2), **kw)
-    assert _names(f) == ["rna1.h5", "rna2.h5"]
-
-
 # ------------------------------------------------------------------ the names
 def test_the_rule_uses_the_resolver_names():
     """Every name export_dataset writes is a layout name, and for a name with
@@ -637,7 +548,7 @@ def test_files_outside_the_layout_are_never_judged(tmp_path):
     (f / "notes.txt").write_text("cells of another experiment\n")
     (f / "scMM_data").mkdir()
     (f / "scMM_data" / "rna.h5").write_bytes(b"not a file of this folder")
-    ingest.to_canonical(ex_atac, f / "peak.h5")
+    ingest._to_canonical(ex_atac, f / 'peak.h5')
     (f / "rna7.h5").mkdir()
     (f / "adt.h5").write_bytes(b"not an HDF5 file")
     (f / "atac_cty.csv").write_bytes(b"\x00\xff not a table")

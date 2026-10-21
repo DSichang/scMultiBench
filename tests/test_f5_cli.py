@@ -31,44 +31,6 @@ pytest.importorskip("scib")
 _PKG = Path(mtb.__file__).resolve().parent
 
 
-# ====================================================================== R5-06
-def _published(*args, **kwargs):
-    """``load_results`` on the published tables (the deprecated ``source=``)."""
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", FutureWarning)
-        return mtb.load_results(*args, source="published", **kwargs)
-
-
-def test_mosaic_error_starts_with_the_category_and_the_fix():
-    with pytest.raises(FileNotFoundError) as e:
-        _published("mosaic")
-    msg = str(e.value)
-    assert msg == ("mosaic has no published tables. Leave out source= to load the "
-                   "stored results.")
-    assert " - " not in msg and "package sweeps" not in msg
-    assert "multibench/result/scib_metric" not in msg          # not an install problem
-
-
-def test_wrong_result_path_keeps_the_path_advice_without_mosaic(tmp_path):
-    with pytest.raises(FileNotFoundError) as e:
-        _published("vertical", result_path=tmp_path)
-    msg = str(e.value)
-    assert msg.startswith(f"no published scIB metric tables under {tmp_path}")
-    assert "mtb.config.DEFAULT.result_path" in msg
-    assert "mosaic" not in msg and " - " not in msg
-
-
-def test_the_condition_is_read_from_the_shipped_tree(tmp_path, monkeypatch):
-    # a package without a vertical tree: vertical then reads as unpublished
-    tree = tmp_path / "result" / config.metric_set_dir("scib")
-    (tree / config.category_folder("mosaic")).mkdir(parents=True)
-    monkeypatch.setattr(R, "_SHIPPED_BASE", tmp_path / "result")
-    assert R._category_unpublished("vertical")
-    assert not R._category_unpublished("mosaic")
-    with pytest.raises(FileNotFoundError, match=r"^vertical has no published tables\."):
-        _published("vertical", result_path=tmp_path / "result")
-
-
 # ====================================================================== R5-10
 from multibench import workflow as W                                  # noqa: E402
 from multibench.engine import envs, registry, runner                  # noqa: E402
@@ -94,11 +56,11 @@ def test_peak_name_note_and_warning_end_with_the_fix(tmp_path, pinned, capsys):
     inputs = {"rna": str(d / "rna.h5"), "atac_peak": str(d / "atac_peak.h5")}
     note = ("GLUE reads peak names such as chr1:100-200. atac_peak.h5 holds other names, "
             "for example peak_0. Rename them to chr:start-end.")
-    _quiet(mtb.run, "GLUE", "diagonal", inputs=inputs, out_dir=tmp_path / "o", dry_run=True)
+    _quiet(mtb.engine.runner.run, "GLUE", "diagonal", inputs=inputs, out_dir=tmp_path / "o", dry_run=True)
     assert f"# {note}\n" in capsys.readouterr().err
     with pytest.warns(UserWarning) as rec:
         with pytest.raises(Exception):
-            mtb.run("GLUE", "diagonal", inputs=inputs, out_dir=tmp_path / "o2")
+            mtb.engine.runner.run("GLUE", "diagonal", inputs=inputs, out_dir=tmp_path / "o2")
     assert note in [str(w.message) for w in rec]
 
 

@@ -11,13 +11,6 @@ def test_top_level_exposes_data_api():
     assert hasattr(mtb, "config")
 
 
-def test_top_level_exposes_spec_symbols():
-    import multibench as mtb
-    assert hasattr(mtb, "inputs_for")
-    assert hasattr(mtb.io, "to_canonical")
-    assert "clustering" in mtb.list_tasks()
-
-
 def test_end_to_end_load_results(result_dir, monkeypatch):
     import multibench as mtb
     df = mtb.load_results(category="diagonal", dataset="D28")

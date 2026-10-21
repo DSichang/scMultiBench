@@ -41,15 +41,6 @@ def test_evaluate_records_a_search():
                           "scib_version": version("scib")}
 
 
-def test_evaluate_records_user_clusters_and_no_sweep():
-    # clustering= is deprecated since 0.4: its implementation, without the warning
-    emb, lab = _blobs()
-    long = pipeline._evaluate(emb, labels=lab, clustering=lab, metrics=["ARI", "NMI"])
-    assert long.attrs["clustering"] == "user"
-    assert long.attrs["leiden_flavor"] is None          # nothing needed a sweep
-    assert set(long["scored_with"]) == {f"none/user/{mtb.__version__}"}
-
-
 def test_evaluate_without_clustering_metrics_records_none():
     emb, lab = _blobs()
     wide = mtb.evaluate(emb, labels=lab, metrics=["cLISI"])
@@ -64,71 +55,6 @@ def test_evaluate_records_the_configured_backend(monkeypatch):
     emb, lab = _blobs()
     wide = mtb.evaluate(emb, labels=lab, metrics=["ARI"])
     assert wide.attrs["leiden_flavor"] == "leidenalg"
-
-
-def test_to_long_writes_scored_with_and_keeps_the_attrs():
-    emb, lab = _blobs()
-    wide = mtb.evaluate(emb, labels=lab, metrics=["ARI", "ASW"])
-    long = mtb.to_long(wide, method="Mine", dataset="D11", category="vertical")
-    assert long.columns.tolist() == pipeline.LONG_COLUMNS + ["scored_with"]
-    assert set(long["scored_with"]) == {f"{_flavor()}/search/{mtb.__version__}"}
-    assert long.attrs == wide.attrs
-    # a clustering-free score fills the parts that did not apply with 'none'
-    asw = mtb.to_long(mtb.evaluate(emb, labels=lab, metrics=["cLISI"]), method="M")
-    assert set(asw["scored_with"]) == {f"none/none/{mtb.__version__}"}
-
-
-def test_to_long_of_a_frame_without_provenance_says_unknown(tmp_path):
-    w = pd.DataFrame({"Value": [0.5, 0.6]}, index=["ARI", "NMI"])
-    with warnings.catch_warnings():          # Z31 (r3): the column says it, silently
-        warnings.simplefilter("error", UserWarning)
-        long = mtb.to_long(w, method="M")
-    assert long.columns.tolist() == pipeline.LONG_COLUMNS + ["scored_with"]
-    assert set(long["scored_with"]) == {"unknown"}
-    # 0.4.0: evaluate's CSV is the long table, so its scored_with column comes
-    # back with it, and to_long keeps it
-    emb, lab = _blobs()
-    scores = mtb.evaluate(emb, labels=lab, metrics=["ASW"])
-    scores.to_csv(tmp_path / "w.csv", index=False)
-    back = pd.read_csv(tmp_path / "w.csv")
-    long = mtb.to_long(back, method="M")
-    assert long.columns.tolist() == pipeline.LONG_COLUMNS + ["scored_with"]
-    assert long["scored_with"].tolist() == scores["scored_with"].tolist()
-
-
-def _mine():
-    emb, lab = _blobs()
-    wide = mtb.evaluate(emb, labels=lab, metrics=["ARI", "NMI", "ASW"])
-    return mtb.to_long(wide, method="Mine", dataset="D11", category="vertical")
-
-
-def test_scored_with_column_passes_through_the_consumers(tmp_path):
-    import matplotlib
-    matplotlib.use("Agg")
-    mine = _mine()
-    stored = mtb.load_results("vertical", dataset="D11")
-    both = pd.concat([stored, mine], ignore_index=True)
-    # c2 (C15): the stored rows carry it too
-    assert both["scored_with"].notna().all()
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        tbl = mtb.plot.build_table(both)
-        assert "Mine" in tbl.methods
-        mtb.plot.bubble(both)
-        mtb.plot.bar(both)
-        rec = mtb.recommend("vertical", long_df=both, metrics=["ARI", "NMI", "ASW"])
-    assert "Mine" in set(rec["method"])
-    path = tmp_path / "all.csv"
-    both.to_csv(path, index=False)
-    back = mtb.load_results(result_path=path, source="user")
-    assert set(back["method"]) == {"Mine"} and len(back) == len(mine)
-    # the provenance survives the documented CSV round trip
-    assert back.columns.tolist() == pipeline.LONG_COLUMNS + ["scored_with"]
-    assert back["scored_with"].tolist() == mine["scored_with"].tolist()
-    # a file without the column still loads with the seven columns
-    stored.drop(columns="scored_with").to_csv(tmp_path / "stored.csv", index=False)
-    assert mtb.load_results(result_path=tmp_path / "stored.csv").columns.tolist() == \
-        pipeline.LONG_COLUMNS
 
 
 def test_run_all_scoring_labels_its_internal_search_as_search():

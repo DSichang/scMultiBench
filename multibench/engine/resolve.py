@@ -81,7 +81,7 @@ def _one_file_advice(category: str, *, stem: str = "rna", has_adt: bool = False)
         n = f"exactly {counts.pop()}" if len(counts) == 1 else "several"
         also = (f" {_and_list(several)} also read {n} numbered RNA and ATAC batches, "
                 "written one batch per call with "
-                + "batch_index=" + "." if several else "")
+                + "batch_index=." if several else "")
         return "Diagonal methods read one rna.h5 and one ATAC file. " + advice + also
     cross = 'category="cross"'
     return (f"{category.capitalize()} methods read one {stem}.h5. " + advice
@@ -312,7 +312,7 @@ def _note_local_folder(base: Path, name: str) -> None:
     _NOTED[:] = [outer, key]
     path = f"./{name}"
     _compat.warn(f"Using {base / name}; {path} also exists: pass "
-                 + f"{path!r}" + " for it.", UserWarning)
+                 + f"{path!r} for it.", UserWarning)
 
 
 #: the call that last got the note of :func:`_note_local_folder`
@@ -344,22 +344,6 @@ def canonical_dataset(base, dataset: str) -> str:
     return same[0]
 
 
-def _is_category_token(token) -> bool:
-    try:
-        registry.check_category(str(token))
-    except ValueError:
-        return False
-    return True
-
-
-def _is_method_id(token) -> bool:
-    try:
-        registry.check_method(str(token))
-    except KeyError:
-        return False
-    return True
-
-
 def split_dataset(dataset, data_path) -> tuple[str, Path | str | None]:
     """``(name, data_path)`` for ``dataset``: a folder name under ``data_path``, or
     a folder path (a ``Path``, or a str with a ``/``), relative to ``data_path``
@@ -371,22 +355,13 @@ def split_dataset(dataset, data_path) -> tuple[str, Path | str | None]:
     return folder.name, folder.parent
 
 
-def _old_order_error(fn: str, dataset, category, method) -> None:
-    """``TypeError`` when the category slot holds a method id and the method
-    slot a category (or nothing): the order before 0.3.0."""
-    if _is_method_id(category) and (method is None or _is_category_token(method)):
-        raise TypeError(
-            f"{fn} argument order is (dataset, category, method) since 0.3.0; "
-            f"you passed (dataset, method, category)")
-
-
 def inputs_for(dataset: str, category: str, method: str, *,
                modalities: list[str] | set[str] | None = None,
                data_path: Path | str | None = None,
                check: bool | None = True) -> dict:
     """Return the input files a method reads from a dataset folder, by role.
 
-    Paths are absolute, ready for ``mtb.run(inputs=...)``. The files are
+    Paths are absolute, ready for ``runner.run(inputs=...)``. The files are
     checked before they are returned, so a long run does not start on a
     missing or malformed file; ``check=False`` only builds the paths (for
     another host).
@@ -425,7 +400,7 @@ def inputs_for(dataset: str, category: str, method: str, *,
         variant matches ``category`` and ``modalities``.
     ValueError
         Unknown category or modality token, or several variants fit
-        (``mtb.AmbiguousVariantError``).
+        (``AmbiguousVariantError``).
     ValueError
         ``check=True``: a transposed matrix, or label rows differ from the cell count.
     ValueError
@@ -442,20 +417,10 @@ def inputs_for(dataset: str, category: str, method: str, *,
 
     Examples
     --------
-    >>> import multibench as mtb
-    >>> mtb.inputs_for("D11", "vertical", "Matilda")
+    >>> inputs_for("D11", "vertical", "Matilda")
     {'rna': '/abs/data/D11/rna.h5', 'adt': '/abs/data/D11/adt.h5',
      'cty': '/abs/data/D11/cty.csv'}
-    >>> inp = mtb.inputs_for("D11", "vertical", "Matilda",
-    ...                      modalities=["rna", "adt"])
-
-    See Also
-    --------
-    mtb.labels_for : the cell-type label CSVs of the same dataset, in the method's cell order.
-    mtb.run : consumes the returned dict as ``inputs=``.
-    mtb.scan : which methods can run on the folder, with reasons.
     """
-    _old_order_error("inputs_for", dataset, category, method)
     dataset, data_path = split_dataset(dataset, data_path)
     root = data_path if data_path is not None else config.DEFAULT.data_path
     base = Path(os.path.abspath(os.fspath(root)))
@@ -562,7 +527,8 @@ def _near_miss_hints(ds_dir: Path, missing: dict, category: str,
         elif reads_both:
             why = f"{who[:1].upper()}{who[1:]} reads both atac_peak.h5 and atac_gas.h5."
         else:
-            why = f'method_info("{method}")["atac"]' if method else 'method_info(m)["atac"]' + f" says which ATAC {who} needs."
+            why = ((f'method_info("{method}")["atac"]' if method else 'method_info(m)["atac"]')
+                   + f" says which ATAC {who} needs.")
         rule = f"{category.capitalize()} methods read {' or '.join(accepted)}."
         if category == "vertical" and not m:
             rule = "Vertical methods read atac.h5."
@@ -765,7 +731,7 @@ def _label_count_text(labels: str, n_lab: int, data: str, n_cell: int, category:
     each = f"each cell of batch {batch}" if batch is not None else "each cell"
     return (f"{labels} has {n_lab} labels, but {data} has {n_cell} cells. Give {each} "
             f"one label, in the order of the cells. "
-            + f"mtb.describe_layout({category!r})" + " shows the files.")
+            + f"mtb.describe_layout({category!r}) shows the files.")
 
 
 def _data_dir_files(variant, data_dir) -> dict:
@@ -1410,28 +1376,19 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
 
     Examples
     --------
-    >>> import multibench as mtb
     >>> # diagonal: RNA cells first, then ATAC
-    >>> mtb.labels_for("D28")
+    >>> labels_for("D28")
     {'rna_cty': '/abs/data/D28/rna_cty.csv',
      'atac_cty': '/abs/data/D28/atac_cty.csv'}
     >>> # StabMap: its reference batch first
-    >>> mtb.labels_for("D52", "cross", "StabMap")
+    >>> labels_for("D52", "cross", "StabMap")
     {'cty3': '/abs/data/D52/cty3.csv', 'cty1': '/abs/data/D52/cty1.csv',
      'cty2': '/abs/data/D52/cty2.csv'}
 
     See Also
     --------
-    mtb.inputs_for : the modality files of the same dataset.
-    mtb.evaluate : scores an embedding against these labels.
+    mtb.evaluate : reads these files with ``dataset=``.
     """
-    if category is not None and (
-            isinstance(category, Path)
-            or (isinstance(category, str) and (os.sep in category or Path(category).is_dir()))):
-        raise TypeError(
-            "labels_for: pass data_path= by keyword; the 2nd positional argument "
-            "is category since 0.3.0 (order: (dataset, category, method))")
-    _old_order_error("labels_for", dataset, category, method)
     dataset, data_path = split_dataset(dataset, data_path)
     if category is not None:
         registry.check_category(category)

@@ -110,11 +110,11 @@ def test_no_scan_caveat_has_a_semicolon_or_starts_in_lower_case(tmp_path, pinned
                                                                 monkeypatch):
     frames = [
         _quiet(full_scan, "LUNG_ids", "diagonal", data_path=_lung_ids(tmp_path / "a"),
-               verbose=False, allow_atac_mismatch=True),
+               verbose=False),
         _quiet(full_scan, "LOGCITE", "vertical", data_path=_log_cite(tmp_path / "b"),
                verbose=False),
         _quiet(full_scan, "MU_PEAK", "vertical", data_path=_mu_peak(tmp_path / "c"),
-               verbose=False, allow_atac_mismatch=True),
+               verbose=False),
         _quiet(full_scan, "D52", "cross", data_path=root / "data", verbose=False),
         _quiet(full_scan, "D28", "diagonal", data_path=root / "data", verbose=False),
     ]
@@ -165,7 +165,7 @@ def test_the_glue_uinmf_and_raw_count_caveats_read_as_sentences(tmp_path, pinned
 def test_the_atac_caveats_start_with_the_method(tmp_path, pinned, gas_matilda):
     sc = _quiet(full_scan, "MU_PEAK", "vertical", methods=["Matilda", "scMVP"],
                 modalities=["rna", "atac"], data_path=_mu_peak(tmp_path),
-                verbose=False, allow_atac_mismatch=True).set_index("method")
+                verbose=False).set_index("method")
     assert sc.loc["Matilda", "caveat"].startswith(f"Matilda {GAS_CAV} ")
     # the reason the row carries without the override is unchanged
     blocked = _quiet(full_scan, "MU_PEAK", "vertical", methods=["Matilda"],
@@ -218,28 +218,6 @@ def wrong_ref(tmp_path, monkeypatch):
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
     monkeypatch.setenv(config.SCRIPTS_REF_VAR, "deadbeef")
     return repo, head[:7]
-
-
-@needs_git
-def test_the_scripts_ref_reason_is_sentences(wrong_ref):
-    repo, head = wrong_ref
-    assert config.scripts_ref_problem() == (
-        f"The method scripts are at {head}, not deadbeef (MULTIBENCH_SCRIPTS_REF). Unset "
-        f"the variable, or fetch that ref into a new repo_path.")
-    reason = _quiet(full_scan, "D11", "vertical", methods=["Matilda"],
-                    modalities=["rna", "adt"], verbose=False)["reason"].iloc[0]
-    assert reason.startswith("The method scripts are at "), reason
-    # the error of a real run names the folder; the --ref form reads the same way
-    with pytest.raises(RuntimeError) as e:
-        config.ensure_repo()
-    assert str(e.value).startswith(f"The method scripts in {repo} are at {head}, not "
-                                   f"deadbeef (MULTIBENCH_SCRIPTS_REF). Unset the variable")
-    with pytest.raises(RuntimeError) as e:
-        config.ensure_repo(repo, ref="deadbeef")
-    assert str(e.value) == (
-        f"The method scripts in {repo} are at {head}, not deadbeef (--ref). Set "
-        f"MULTIBENCH_REPO_PATH to a new folder and run multibench fetch --scripts --ref "
-        f"deadbeef.")
 
 
 # ======================================================================= R6-12
@@ -301,7 +279,7 @@ def test_per_batch_hint_is_sentences(tmp_path):
         _h5(d / f"adt{i}.h5", [f"p{k}" for k in range(6)], bars)
         _labels(d / f"cty{i}.csv", 20)
     with pytest.raises(FileNotFoundError) as e:
-        mtb.inputs_for("MB", "vertical", "totalVI", data_path=tmp_path, check=True)
+        mtb.engine.resolve.inputs_for("MB", "vertical", "totalVI", data_path=tmp_path, check=True)
     msg = str(e.value)
     assert msg == (
         f"totalVI (vertical) needs rna.h5 and adt.h5 in {d}. The folder holds adt1.h5, "
@@ -347,7 +325,7 @@ def test_positional_warning_is_plural_for_several_files(tmp_path):
 # ======================================================================= R6-14
 def test_notes_passages_have_no_dash_insertions():
     flat = {fn: " ".join(inspect.getdoc(fn).split()) for fn in (
-        mtb.BatchResult, mtb.run, mtb.io.export_dataset,
+        mtb.BatchResult, mtb.engine.runner.run, mtb.io.export_dataset,
         mtb.BatchResult.rescore, mtb.recommend)}
     assert "the label orderings tried (``label_order_candidates``)" in flat[mtb.BatchResult]
     assert "Batch ids in the order of the dataset's label files" in \

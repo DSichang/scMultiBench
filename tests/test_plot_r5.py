@@ -34,110 +34,9 @@ def _messages(fn, *args, **kw):
     return out, [str(w.message) for w in rec if issubclass(w.category, UserWarning)]
 
 
-def _stored(dataset, source="published", category="diagonal"):
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        return mtb.load_results(category, dataset=dataset, source=source)
-
-
-def _bubble(df, **kw):
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        return mtb.plot.bubble(df, **kw)
-
-
 # --- R5-08: the legends stay inside the axes and the figure ------------------
 
-def _legend_outside(fig):
-    """Legend artists whose drawn extent leaves the axes or the figure."""
-    from matplotlib.backends.backend_agg import FigureCanvasAgg
-    FigureCanvasAgg(fig).draw()
-    renderer = fig.canvas.get_renderer()
-    ax = fig.axes[0]
-    ax_box, fig_box = ax.get_window_extent(renderer), fig.bbox
-    legend = [a for a in list(ax.patches) + list(ax.texts) if a.get_gid() == "legend"]
-    assert legend, "no artist carries gid='legend'"
-    bad = []
-    for a in legend:
-        bb = a.get_window_extent(renderer)
-        for box, where in ((ax_box, "axes"), (fig_box, "figure")):
-            if (bb.x0 < box.x0 - 0.5 or bb.x1 > box.x1 + 0.5
-                    or bb.y0 < box.y0 - 0.5 or bb.y1 > box.y1 + 0.5):
-                bad.append((type(a).__name__, getattr(a, "get_text", lambda: "")(), where))
-    return bad
-
-
-def test_quickstart_figure_keeps_its_rank_legend_whole():
-    df = _stored("D28")
-    fig = _bubble(df, metrics=QUICKSTART)
-    assert _legend_outside(fig) == []
-    # all five Rank circles are drawn, the largest (rank 1) last
-    circles = [p for p in fig.axes[0].patches if p.get_gid() == "legend"
-               and type(p).__name__ == "Circle"]
-    assert len(circles) == 5
-
-
-@pytest.mark.parametrize("kw", [
-    {"metrics": ["ARI"]},                                   # one metric
-    {"metrics": QUICKSTART, "methods": ["Conos", "GLUE"]},  # two rows
-    {"metrics": ["ARI"], "methods": ["Conos"]},               # one row, one metric
-    {"metrics": ["ARI", "iLISI"]},                           # two families, one metric each
-    {"metrics": QUICKSTART, "show_language": False},
-])
-def test_narrow_figures_keep_their_legends_inside(kw):
-    fig = _bubble(_stored("D28"), **kw)
-    assert _legend_outside(fig) == [], kw
-
-
-def test_narrow_summary_figure_keeps_its_score_legend_inside():
-    df = _stored(["D24", "D25", "D28"])
-    fig = _bubble(df, metrics=["ARI"], aggregate="summary")
-    assert _legend_outside(fig) == []
-
-
-def _old_width(tbl):
-    """The figure width before R5-08: 0.6 * table width + 2.8 inches."""
-    total_w = sum(1.5 + 1.1 * b.raw.shape[1] + 0.5 for b in tbl.blocks) - 0.5
-    return 0.6 * total_w + 2.8
-
-
-@pytest.mark.parametrize("metrics", [
-    ["cLISI", "ARI", "ASW", "iASW", "NMI"],            # five, one family
-    ["ARI", "NMI", "cLISI", "ASW", "iLISI"],           # five, two families
-    None,                                              # every metric
-])
-def test_figures_of_five_or_more_metrics_keep_their_size(metrics):
-    df = _stored("D28")
-    tbl = B.build_table(df, metrics=metrics, na="skip")
-    fig = B.render(tbl)
-    w, h = fig.get_size_inches()
-    assert w == pytest.approx(_old_width(tbl))
-    assert h == pytest.approx(0.42 * len(tbl.methods) + 2.9)
-    assert _legend_outside(fig) == []
-
-
 # --- R5-11 (a): the several-datasets warning -----------------------------------
-
-def test_several_datasets_warning_is_plain():
-    d11 = _stored("D11", "rerun", "vertical")     # a second dataset of the same methods
-    df = pd.concat([d11, d11.assign(dataset="D11b")], ignore_index=True).assign(source="user")
-    _, msgs = _messages(_build_table, df)
-    assert msgs == [
-        "This figure averages each method over 2 datasets, D11 and D11b. Its rows "
-        "mix datasets. mtb.plot.bar ranks the methods within each dataset; or filter "
-        "to one dataset."]
-
-
-def test_several_datasets_warning_with_a_lone_dataset():
-    diag = _stored(["D24", "D25", "D28"]).assign(source="user")   # c2: stored rows refuse LUNG
-    own = pd.DataFrame([{"metric": m, "value": v, "method": "PCA_standin",
-                         "dataset": "LUNG", "category": "diagonal", "source": "user"}
-                        for m, v in (("ARI", 0.3), ("NMI", 0.4), ("cLISI", 0.9))])
-    _, msgs = _messages(_build_table, pd.concat([diag, own], ignore_index=True))
-    assert ("This figure averages each method over 4 datasets, D24, D25, D28 and LUNG. "
-            "Its rows mix datasets. Plot each dataset on its own.") in msgs
-    assert not any("paper's" in m for m in msgs), msgs
-
 
 # --- R5-11 (b): one method, equal columns ------------------------------------
 
@@ -167,36 +66,9 @@ def test_equal_column_warning_is_plain():
                     "columns are grey. Leave them out with metrics=."]
 
 
-def test_equal_mean_rank_warning_is_plain():
-    rows = []
-    for ds, (a, b) in (("D1", (0.9, 0.1)), ("D2", (0.1, 0.9))):
-        for m, v in (("A", a), ("B", b)):
-            rows += [{"method": m, "dataset": ds, "metric": k, "value": v}
-                     for k in ("ARI", "NMI")]
-    _, msgs = _messages(_build_table, pd.DataFrame(rows), aggregate="summary")
-    grey = [m for m in msgs if m.startswith("Every method has mean rank")]
-    assert grey == ["Every method has mean rank 1.5 in ARI and NMI. Those columns "
-                    "are grey. Leave them out with metrics=."], msgs
-
-
 # --- R5-11 (c): the CLI overlay line -----------------------------------------
 
 # --- R5-11 (d): na='raise' does not describe the figure it does not draw -------
-
-def _with_gap():
-    df = pd.DataFrame(_rows("A", (0.3, 0.4, 0.9)) + _rows("B", (0.5, 0.2, 0.8))
-                      + _rows("C", (0.1, 0.6, 0.7)))
-    return df[~((df.method == "B") & (df.metric == "NMI"))]
-
-
-def test_na_raise_leaves_out_the_overall_sentence():
-    with pytest.raises(ValueError) as e:
-        _build_table(_with_gap(), na="raise")
-    assert str(e.value) == ("Row B has no NMI. Pass na='warn' to draw the figure "
-                            "with these gaps.")
-    _, msgs = _messages(_build_table, _with_gap())
-    assert "Row B has no NMI. Pass metrics= without NMI to compare on the same metrics." in msgs
-
 
 # --- R5-11 (e): the label-order error names a method only when one was used ---
 
@@ -210,7 +82,7 @@ def _cty(tmp_path):
 def test_reordered_plain_dict_error_names_only_the_default_order(tmp_path):
     p1, p2 = _cty(tmp_path)
     with pytest.raises(ValueError) as e:
-        P._labels_from_dict({"cty2": p2, "cty1": p1}, None)
+        P._labels_from_dict({"cty2": p2, "cty1": p1})
     assert str(e.value) == (
         "The label keys cty2 and cty1 are not in the default order. Pass a list of "
         "paths in cell order, or dataset=, category= and method=. The default order is cty1, "
@@ -223,13 +95,13 @@ def test_reordered_labels_for_dict_names_the_method_order(tmp_path):
     p1, p2 = _cty(tmp_path)
     # labels_for with a method whose cell order puts cty2 first
     d = LabelFiles({"cty2": p2, "cty1": p1})
-    assert P._labels_from_dict(d, None) == [p2, p1]
+    assert P._labels_from_dict(d) == [p2, p1]
     d["cty2"] = d.pop("cty2")                     # now cty1, cty2: the default order
-    assert P._labels_from_dict(d, None) == [p1, p2]
+    assert P._labels_from_dict(d) == [p1, p2]
     three = LabelFiles({"cty2": p2, "cty1": p1, "cty3": p1})
     three["cty2"] = three.pop("cty2")             # cty1, cty3, cty2: neither order
     with pytest.raises(ValueError) as e:
-        P._labels_from_dict(three, None)
+        P._labels_from_dict(three)
     assert str(e.value).startswith(
         "The label keys cty1, cty3 and cty2 are in neither the method's cell "
         "order nor the default order. Pass a list of paths in cell order, or dataset=, "
@@ -238,7 +110,7 @@ def test_reordered_labels_for_dict_names_the_method_order(tmp_path):
     plain = LabelFiles({"cty1": p1, "cty2": p2})
     plain["cty1"] = plain.pop("cty1")
     with pytest.raises(ValueError) as e:
-        P._labels_from_dict(plain, None)
+        P._labels_from_dict(plain)
     assert "method's cell order" not in str(e.value)
     assert "are not in the default order" in str(e.value)
 

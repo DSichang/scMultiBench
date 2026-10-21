@@ -37,15 +37,3 @@ def test_no_checkout_yet_reports_nothing(tmp_path, monkeypatch):
     assert workflow._missing_script(_variant("tools_scripts/Any/main_Any.py")) == ""
 
 
-def test_every_entrypoint_is_a_tools_scripts_path():
-    """run() fetches tools_scripts/ from the scMultiBench repository and
-    method_info builds scripts_url from the first entrypoint; both rely on
-    every entrypoint being a tools_scripts/<folder>/ path."""
-    from multibench.engine import registry
-    for m in mtb.list_methods():
-        eps = [v.entrypoint for v in registry.get(m).variants]
-        assert eps and all(e.startswith("tools_scripts/") for e in eps), (m, eps)
-        folder = "/".join(eps[0].split("/")[:2])
-        assert mtb.method_info(m, verbose=True)["scripts_url"] == (
-            "https://github.com/PYangLab/scMultiBench/tree/main/"
-            + urllib.parse.quote(folder, safe="/"))

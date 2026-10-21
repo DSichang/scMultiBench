@@ -8,6 +8,7 @@ R4-13: recommend's warning lines, DegenerateRerunWarning, evaluate's
 reordered-dict error, the prepared-file note, the batch= advice and the
 run_all messages are short plain sentences.
 """
+import os
 import importlib
 import inspect
 import warnings
@@ -17,7 +18,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-# the table behind a bubble figure: mtb.plot.build_table is deprecated in 0.4.0
+# the table behind a bubble figure
 from multibench.plot.bubble import _build_table  # noqa: E402
 from multibench import config
 from tests.conftest import full_scan
@@ -60,9 +61,7 @@ def _two_own_folders():
                      ignore_index=True)
 
 
-@pytest.mark.parametrize("fn,kw", [(_build_table, {}),
-                                   (_build_table, {"aggregate": "summary"}),
-                                   (mtb.plot.bar, {})])
+@pytest.mark.parametrize("fn,kw", [(_build_table, {}), (mtb.plot.bar, {})])
 def test_two_own_datasets_sharing_no_method_get_one_action(fn, kw):
     # c4 (u3): one action, no same-cells sentence
     _, msgs = _messages(fn, _two_own_folders(), **kw)
@@ -77,20 +76,6 @@ def _incomplete():
                       _mine("A", "D2", 0.3), _mine("B", "D2", 0.45)], ignore_index=True)
 
 
-def test_incomplete_matrix_warning_is_short_sentences():
-    _, msgs = _messages(_build_table, _incomplete(), aggregate="summary")
-    (msg,) = [m for m in msgs if m.startswith("The summary ranks")]
-    # c1 (C21): one sentence, without the cut overall=
-    assert msg == ("The summary ranks 2 datasets. C has scores on 1 of them. A missing "
-                   "dataset counts as rank 0, the lowest. "
-                   "Pass methods= with the methods scored on every dataset.")
-    assert ";" not in msg and "under" not in msg
-    _, msgs = _messages(mtb.plot.bar, _incomplete())
-    (msg,) = [m for m in msgs if m.startswith("The summary ranks")]
-    assert ";" not in msg
-    assert msg.endswith("Pass methods= with the methods scored on every dataset.")
-
-
 def test_incomplete_matrix_groups_methods_by_count():
     parts = {"D1": pd.DataFrame(index=["A", "B", "C", "E"]),
              "D2": pd.DataFrame(index=["A", "B"]),
@@ -102,42 +87,7 @@ def test_incomplete_matrix_groups_methods_by_count():
 
 # --- R4-12 (d): the n/a error -------------------------------------------------
 
-def _with_gap():
-    df = pd.concat([_mine("A", "X"), _mine("B", "X", 0.6), _mine("C", "X", 0.4)],
-                   ignore_index=True)
-    return df[~((df["method"] == "B") & (df["metric"] == "NMI"))]
-
-
-def test_na_raise_does_not_offer_to_hide_the_error():
-    with pytest.raises(ValueError) as e:
-        _build_table(_with_gap(), na="raise")
-    msg = str(e.value)
-    assert "hide this message" not in msg
-    assert msg.endswith("Pass na='warn' to draw the figure with these gaps.")
-    # the warning keeps its own last sentence
-    _, msgs = _messages(_build_table, _with_gap())
-    (warn,) = [m for m in msgs if "has no" in m]
-    assert warn.endswith("Pass metrics= without NMI to compare on the same metrics.")
-    assert "hide this message" not in warn
-    # R5-11: the error leaves out the Overall sentence (no figure is drawn)
-    assert "to compare on the same metrics" not in msg
-    body = warn.replace(" Pass metrics= without NMI to compare on the same metrics.", "")
-    assert msg.startswith(body + " ")
-
-
 # --- R4-12 (e): extended summaries --------------------------------------------
-
-def test_plot_extended_summaries_are_plain():
-    # 0.4.0: one paragraph says the bars follow recommend's order
-    bar = inspect.getdoc(mtb.plot.bar).split("\n\n")
-    assert bar[1].startswith("Within each dataset the methods are ranked on each metric")
-    assert bar[2].startswith("Parameters")
-    assert "summary view" not in inspect.getdoc(mtb.plot.bar)
-    # build_table is deprecated in 0.4.0; its docstring names the replacement
-    assert inspect.getdoc(mtb.plot.build_table) == (
-        "Deprecated: ``mtb.recommend(category, long_df=...)`` gives the numbers\n"
-        "behind a figure.")
-
 
 # --- R4-13 (a): recommend's warning lines -------------------------------------
 
@@ -169,39 +119,7 @@ def test_recommend_unscored_methods_line_is_plain(result_dir):
     assert "listed last" not in msg
 
 
-def test_recommend_coverage_and_dropped_lines_are_plain(result_dir, layout_tree_foreign):
-    layout_tree = layout_tree_foreign
-    d28 = mtb.load_results("diagonal")
-    part = pd.concat([d28, d28[~d28.method.isin(["iNMF", "SCALEX"])].assign(dataset="D28b")]).assign(source="user")
-    _, msg = _recommend("diagonal", long_df=part)
-    # 0.4.0: recommend has no coverage column, so the line ends with the counts
-    assert ("Some methods have scores on only part of the datasets: SCALEX 1 of 2, "
-            "iNMF 1 of 2.") in msg
-    _no_log_joins(msg)
-    _, msg = _recommend("cross", source="published", result_path=layout_tree)
-    assert ("scMoMaT has scores only on datasets left out of the ranking, "
-            "so it is listed last.") in msg
-    assert ("scMSI and Seurat_WNN have scores in the published table, but this package "
-            "does not run them for cross, so they are left out of the ranking. "
-            "mtb.find_methods(category='cross') does not list them.") in msg
-    assert "A min-max score over one method is always 1.0." in msg
-    _no_log_joins(msg)
-
-
 # --- R4-13 (c): DegenerateRerunWarning ----------------------------------------
-
-def test_degenerate_rerun_warning_head_is_a_sentence(result_dir):
-    from multibench.data import results
-    d28 = mtb.load_results("diagonal", dataset="D28")
-    bad = d28.iloc[:1].assign(metric="ARI", value=0.0013, method="Conos")
-    with pytest.warns(mtb.DegenerateRerunWarning) as rec:
-        results._warn_degenerate(bad, result_dir, "0.4.0")
-    msg = str(rec[0].message)
-    assert msg.startswith(
-        "This stored row has ARI below 0.01 where the article's run scored above 0.2: "
-        "Conos/D28 (stored 0.4.0, ARI 0.0013). It most likely comes from a failed run.")
-    _no_log_joins(msg)
-
 
 # --- R4-13 (d): evaluate's reordered-dict error -------------------------------
 
@@ -237,8 +155,7 @@ def test_nothing_runnable_tail_is_plain(no_envs, root):
             ({"methods": ["Matilda"]},
              "mtb.run_all('D11', 'vertical', methods=['Matilda'], dry_run=True) shows these rows.")):
         with pytest.raises(ValueError) as e:
-            mtb.run_all("D11", "vertical", out_dir="/tmp/unused", verbose=False,
-                        data_path=root / "data", **kw)
+            mtb.run_all(os.path.join(root / 'data', 'D11'), 'vertical', out_dir='/tmp/unused', verbose=False, **kw)
         lines = str(e.value).splitlines()
         assert lines[-1] == (f"{where} Its reason column says which check "
                              f"failed. mtb.env.install(dry_run=True) checks the environments.")
@@ -246,8 +163,7 @@ def test_nothing_runnable_tail_is_plain(no_envs, root):
 
 
 def test_dry_run_count_line_is_plain(no_envs, root, capsys, tmp_path):
-    mtb.run_all("D11", "vertical", out_dir=tmp_path, dry_run=True, verbose=True,
-                data_path=root / "data")
+    mtb.run_all(os.path.join(root / 'data', 'D11'), 'vertical', out_dir=tmp_path, dry_run=True, verbose=True)
     (line,) = [ln for ln in capsys.readouterr().out.splitlines()
                if ln.startswith("[run_all] Dry run:")]
     assert line.endswith(" (vertical); the reason column says why.")    # Z19 (r3)

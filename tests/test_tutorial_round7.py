@@ -105,7 +105,7 @@ def test_troubleshooting_quotes_the_live_orientation_error(name, tmp_path):
     words = quoted.group(1)
     _transposed_folder(tmp_path)
     with pytest.raises(ValueError) as e:
-        mtb.inputs_for("MYCITE", "vertical", "Matilda", modalities=["rna", "adt"],
+        mtb.engine.resolve.inputs_for("MYCITE", "vertical", "Matilda", modalities=["rna", "adt"],
                        data_path=tmp_path, check=True)
     assert words in str(e.value), (words, str(e.value))
     row = _quiet(full_scan, "MYCITE", "vertical", methods=["Matilda"], data_path=tmp_path,
@@ -115,7 +115,7 @@ def test_troubleshooting_quotes_the_live_orientation_error(name, tmp_path):
     assert "`mtb.io.export_dataset`" in fix
     mtb.io.export_dataset(_demo(n=120), tmp_path / "FIXED", rna="X", adt="obsm:protein",
                           labels="obs:celltype")
-    mtb.inputs_for("FIXED", "vertical", "Matilda", modalities=["rna", "adt"],
+    mtb.engine.resolve.inputs_for("FIXED", "vertical", "Matilda", modalities=["rna", "adt"],
                    data_path=tmp_path, check=True)
 
 

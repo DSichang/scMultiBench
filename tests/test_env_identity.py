@@ -146,13 +146,6 @@ def test_scan_reports_the_users_env_and_does_not_run_it(fake_root):
         f"install --methods Matilda.")
 
 
-def test_doctor_names_the_users_env(fake_root):
-    rows = {r["env"]: r for r in mtb.env.doctor(methods=["Matilda", "sciPENN"]).to_dict("records")}
-    assert rows["matilda"]["exists"] is False
-    assert rows["matilda"]["other_env"] == str(fake_root / "envs" / "matilda")
-    assert rows["env_sciPENN"]["exists"] is True and rows["env_sciPENN"]["other_env"] is None
-
-
 def test_install_does_not_take_the_users_env_as_installed(fake_root, monkeypatch):
     row = mtb.env.install(["Matilda"], dry_run=True).to_dict("records")[0]
     assert row["state"] == "name taken" and row["exists"] is False
@@ -172,9 +165,9 @@ def test_install_packed_refuses_a_users_env_at_its_target(fake_root):
 
 
 def test_run_refuses_the_users_env_on_linux(fake_root, tmp_path):
-    inputs = mtb.inputs_for("D11", "vertical", "Matilda")
+    inputs = mtb.engine.resolve.inputs_for("D11", "vertical", "Matilda")
     with pytest.raises(OSError) as e:
-        mtb.run("Matilda", "vertical", inputs=inputs, out_dir=str(tmp_path / "out"))
+        mtb.engine.runner.run("Matilda", "vertical", inputs=inputs, out_dir=str(tmp_path / "out"))
     assert str(e.value) == (
         f"Environment matilda was not installed by this version of multibench, so it is "
         f"not used. Rename or remove {fake_root / 'envs' / 'matilda'}, then call "
@@ -188,10 +181,10 @@ def test_run_refuses_off_linux_also_when_the_env_is_installed(fake_root, tmp_pat
                         lambda: "method environments are linux-64 conda envs (packed "
                                 "archives + lockfiles); this host is darwin/arm64")
     assert envs.env_prefix("env_sciPENN") is not None
-    inputs = mtb.inputs_for("D11", "vertical", "sciPENN")
+    inputs = mtb.engine.resolve.inputs_for("D11", "vertical", "sciPENN")
     with pytest.raises(OSError, match=r"^Methods run only on Linux, and this computer "
                                       r"runs macOS\. Run this call on a Linux machine\."):
-        mtb.run("sciPENN", "vertical", inputs=inputs, out_dir=str(tmp_path / "out"))
+        mtb.engine.runner.run("sciPENN", "vertical", inputs=inputs, out_dir=str(tmp_path / "out"))
     assert not (tmp_path / "out").exists()
 
 
@@ -205,9 +198,3 @@ def test_a_lockfile_build_marks_its_env_and_refuses_a_users_env(fake_root):
         envs.create_env("matilda", conda=conda, dry_run=False, force=True)
 
 
-def test_a_recipe_build_marks_its_env(fake_root):
-    conda = str(Path(config.DEFAULT.envs_dir).parent.parent / "bin" / "conda")
-    method = next(m for m in mtb.list_methods() if envs.recipe(m))
-    envs.create(method, env_name="own_build", conda=conda, dry_run=False, force=True)
-    assert (fake_root / "envs" / "own_build" / envs.FLAVOR_FILE).read_text() == "recipe\n"
-    assert envs.env_prefix("own_build") == fake_root / "envs" / "own_build"

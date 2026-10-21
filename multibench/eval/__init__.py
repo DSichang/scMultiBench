@@ -1,5 +1,5 @@
 """evaluate(): the benchmark's metrics of an embedding, as the long results table."""
-from .pipeline import evaluate, to_long  # noqa: F401  (to_long: deprecated)
+from .pipeline import evaluate
 
 __all__ = ["evaluate"]
 

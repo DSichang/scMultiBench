@@ -46,19 +46,6 @@ def test_bar_methods_selects_the_bars():
     assert [t.get_text() for t in fig.axes[0].get_yticklabels()] == ["B", "C"]
 
 
-def test_bar_xlabel_names_dataset_or_formula():
-    one = mtb.plot.bar(_long(datasets=("D1",)))
-    assert one.axes[0].get_xlabel() == "overall score (D1)"
-    two = mtb.plot.bar(_long())
-    assert "mean of per-dataset overall" in two.axes[0].get_xlabel()
-    # the deprecated overall= (0.4.0) keeps its effect
-    with pytest.warns(FutureWarning, match=r"plot\.bar\(overall=\) is deprecated"):
-        rk = mtb.plot.bar(_long(), overall="rank")
-    assert "rank of mean ranks" in rk.axes[0].get_xlabel()
-    with pytest.warns(FutureWarning), pytest.raises(ValueError, match="overall must be one of"):
-        mtb.plot.bar(_long(), overall="median")
-
-
 def test_bar_doc_names_the_recommend_order():
     # 0.4.0: the overall= text left the docstring with the keyword; the bars
     # are in recommend's order

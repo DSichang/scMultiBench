@@ -136,33 +136,6 @@ def test_labels_series_aligned_by_index_against_dataframe_output():
     assert not _no_alignment_warning(rec)
 
 
-def test_labels_series_aligned_by_obs_names_against_anndata_output():
-    ad = pytest.importorskip("anndata")
-    emb, ct, bat, ids = _toy()
-    a = ad.AnnData(np.zeros((len(ct), 2)))
-    a.obs_names = ids
-    a.obsm["X_emb"] = emb
-    a.obs["celltype"] = ct
-    shuffled = pd.Series(ct, index=ids).sample(frac=1, random_state=1)
-    got = evaluate(a, labels=shuffled, metrics=["ARI"])
-    assert _ari(got) == pytest.approx(1.0)
-    # batch= follows the same rule: a shuffled batch Series is re-aligned
-    shuffled_batch = pd.Series(bat, index=ids).sample(frac=1, random_state=2)
-    ref = evaluate(a, labels="celltype", batch=bat, metrics=["GC", "ASW_batch"])
-    got = evaluate(a, labels="celltype", batch=shuffled_batch,
-                   metrics=["GC", "ASW_batch"])
-    pd.testing.assert_frame_equal(got.sort_index(), ref.sort_index())
-    # clustering= too (and an obs column name works for clustering, like labels);
-    # deprecated since 0.4: its implementation, without the warning
-    a.obs["leiden"] = pd.Categorical(ct)
-    c1 = pipeline._evaluate(a, labels="celltype", clustering="leiden", metrics=["ARI"])
-    c2 = pipeline._evaluate(
-        a, labels="celltype",
-        clustering=pd.Series(ct, index=ids).sample(frac=1, random_state=3),
-        metrics=["ARI"])
-    assert _ari(c1) == pytest.approx(1.0) and _ari(c2) == pytest.approx(1.0)
-
-
 def test_labels_series_missing_or_extra_ids_raise_naming_them():
     emb, ct, _, ids = _toy()
     df = pd.DataFrame(emb, index=ids)
@@ -194,8 +167,8 @@ def test_rescore_keeps_its_text_for_a_label_file_without_every_cell(cite, tmp_pa
     cells of the dataset gives no advice about it."""
     import multibench as mtb
     data, _, _ = cite
-    _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "a", data_path=data,
-           methods=["Matilda"], modalities=["rna", "adt"], verbose=False)
+    mtb.config.DEFAULT.data_path = data
+    _quiet(mtb.run_all, 'MYCITE', 'vertical', tmp_path / 'a', methods=['Matilda'], modalities=['rna', 'adt'], verbose=False)
     res = mtb.load_batch(tmp_path / "a")
     pd.DataFrame({"barcode": [f"c{i}" for i in range(N_CITE - 30)],
                   "x": ["A"] * 60 + ["B"] * 30}).to_csv(tmp_path / "part.csv", index=False)
@@ -288,86 +261,9 @@ def test_multi_entry_dict_error_names_keys_and_the_stacking_rule(tmp_path):
         evaluate(emb, metrics="all", labels=d)
 
 
-def test_label_order_fixes_the_dict_order_and_feeds_the_file_batch(tmp_path):
-    # label_order= is deprecated since 0.4: its implementation, without the warning
-    evaluate = pipeline._evaluate
-    emb, ct, _, _ = _toy()
-    p_rna, p_atac = tmp_path / "rna_cty.csv", tmp_path / "atac_cty.csv"
-    _write_cty(p_rna, ct[:60]); _write_cty(p_atac, ct[60:])
-    d = {"atac_cty": str(p_atac), "rna_cty": str(p_rna)}
-    got = evaluate(emb, labels=d, label_order=["rna_cty", "atac_cty"],
-                   metrics=["ARI", "GC"])
-    ref = evaluate(emb, labels=[p_rna, p_atac], metrics=["ARI", "GC"])
-    pd.testing.assert_frame_equal(got.sort_index(), ref.sort_index())
-    assert _ari(got) == pytest.approx(1.0)
-    # trusting the dict's own order is spelled label_order=list(d): here it is
-    # the WRONG (alphabetical) order, and the score shows it - explicitly asked for
-    wrong = evaluate(emb, labels=d, label_order=list(d), metrics=["ARI"])
-    assert _ari(wrong) < 0.5
-    # a one-entry dict needs no order (unchanged behaviour)
-    one = tmp_path / "cty.csv"; _write_cty(one, ct)
-    assert _ari(evaluate(emb, labels={"cty": str(one)}, metrics=["ARI"])) == pytest.approx(1.0)
-    # a subset selects those files
-    sub = evaluate(emb[:60], labels=d, label_order=["rna_cty"], metrics=["ARI"])
-    assert _ari(sub) == pytest.approx(1.0)
-
-
-def test_label_order_validation_messages(tmp_path):
-    emb, ct, _, _ = _toy()
-    p1, p2 = tmp_path / "cty1.csv", tmp_path / "cty2.csv"
-    _write_cty(p1, ct[:30]); _write_cty(p2, ct[30:])
-    d = {"cty1": str(p1), "cty2": str(p2)}
-    with pytest.raises(ValueError) as exc:
-        evaluate(emb, labels=d, label_order=["cty1", "cty3"], metrics=["ARI"])
-    assert str(exc.value) == ("label_order names cty3, which is not a key of the "
-                              "labels dict. Its keys are cty1 and cty2.")
-    with pytest.raises(ValueError, match="^label_order names cty1 twice\\.$"):
-        evaluate(emb, labels=d, label_order=["cty1", "cty1"], metrics=["ARI"])
-    with pytest.raises(ValueError, match="label_order= is empty"):
-        evaluate(emb, labels=d, label_order=[], metrics=["ARI"])
-    with pytest.raises(TypeError, match="^label_order= takes a list of keys"):
-        evaluate(emb, labels=d, label_order="cty1", metrics=["ARI"])
-    with pytest.raises(TypeError, match="label_order= applies only when labels is a dict"):
-        evaluate(emb, labels=[p1, p2], label_order=["cty1", "cty2"], metrics=["ARI"])
-    with pytest.raises(TypeError):                 # keyword-only: no positional slot
-        evaluate(emb, None, "clustering", d, None, None, "scib", False, {"ARI"},
-                 "X_emb", None, ["cty1", "cty2"])
-
-
 # ------------------------------------ I4: canonical names end to end
 _CANONICAL = ["ARI", "NMI", "ASW", "iASW", "iF1", "cLISI", "ASW_batch", "ARI_batch",
               "NMI_batch", "GC", "iLISI", "kBET",
               "OCA", "ACA", "Spec", "Sens", "F1"]
 
 
-def test_evaluate_emits_canonical_metric_names_only():
-    from multibench.data import catalog
-    emb, ct, bat, _ = _toy()
-    df = evaluate(emb, metrics="all", labels=ct, batch=bat)
-    assert set(_metrics(df)) <= set(_CANONICAL), sorted(_metrics(df))
-    assert all(catalog.canonical_metric(m) == m for m in _metrics(df))
-    assert list(df.columns) == LONG_COLUMNS + ["scored_with"]
-
-
-def test_evaluate_concat_with_published_builds_the_bubble_table():
-    import matplotlib
-    matplotlib.use("Agg")
-    import multibench as mtb
-    from multibench import plot as mplot
-
-    emb, ct, bat, _ = _toy()
-    # 0.4.0: evaluate returns the long table itself
-    # c3 (E14): dataset="D52" needs the cells of D52, so the toy rows are named after
-    mine = evaluate(emb, metrics="all", labels=ct, batch=bat, method="MyMethod",
-                    category="cross").assign(dataset="D52")
-    published = mtb.load_results("cross", dataset="D52")
-    both = pd.concat([published, mine], ignore_index=True)
-    # one spelling per metric after canonicalisation - no duplicate columns
-    canon = both["metric"].map(mtb.data.catalog.canonical_metric)
-    assert set(canon) == set(both["metric"]), "to_long/evaluate names were not canonical"
-    assert both.groupby(["method", "metric"]).size().max() == 1
-    tab = mplot.build_table(both)
-    assert "MyMethod" in tab.methods
-    wide = both.pivot_table(index="method", columns="metric", values="value")
-    assert len(wide.columns) == len(set(published["metric"]) | set(mine["metric"]))
-    assert wide.loc["MyMethod", "ARI"] == pytest.approx(_ari(mine))

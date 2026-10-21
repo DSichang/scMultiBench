@@ -17,7 +17,7 @@ def gpu(monkeypatch):
 
 
 def _dry(method, category, inputs, params, tmp_path):
-    return mtb.run(method, category, inputs=inputs, out_dir=str(tmp_path / "o"),
+    return mtb.engine.runner.run(method, category, inputs=inputs, out_dir=str(tmp_path / "o"),
                    params=params, dry_run=True, cmd_template="conda run -n x {cmd}")
 
 
@@ -85,14 +85,6 @@ def test_tunable_default_is_what_a_run_uses():
     assert "no_cuda" not in t and set(t["epochs"]) == {"type", "default"}
 
 
-# Y14 / Y15 / Y16: params and argument-order mistakes get one plain sentence
-def test_run_nested_params_says_flat():
-    with pytest.raises(KeyError, match=r"run takes params=\{'epochs': 3\}; the nested form "
-                                       r"is for run_all\."):
-        mtb.run("Matilda", "vertical", inputs=MATILDA, out_dir="/o",
-                params={"Matilda": {"epochs": 3}}, dry_run=True)
-
-
 def test_run_all_params_for_a_method_not_run():
     with pytest.raises(ValueError, match=r"^params names scMM, which is not in methods=\.$"):
         mtb.run_all("D52mini", "cross", methods=["Multigrate"],
@@ -100,7 +92,3 @@ def test_run_all_params_for_a_method_not_run():
                     verbose=False)
 
 
-def test_sweep_in_run_order():
-    with pytest.raises(TypeError, match=r"sweep takes \(dataset, category, method, param, "
-                                        r"values\)\."):
-        mtb.sweep("Matilda", "D11", "vertical", "epochs", [5, 10], out_dir="/o")

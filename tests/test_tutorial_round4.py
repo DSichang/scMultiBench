@@ -254,8 +254,8 @@ def test_runnable_sentence_holds_for_the_named_method_calls_of_the_run_cells(
     trio, mods = task["methods"], "+".join(task["variants"][0])
     sc = _quiet(full_scan, "MYMOSAIC", "mosaic", methods=trio, data_path=tmp_path,
                 verbose=False)
-    plan = _quiet(mtb.run_all, "MYMOSAIC", "mosaic", tmp_path / "out", methods=trio,
-                  data_path=tmp_path, dry_run=True, verbose=False)
+    mtb.config.DEFAULT.data_path = tmp_path
+    plan = _quiet(mtb.run_all, 'MYMOSAIC', 'mosaic', tmp_path / 'out', methods=trio, dry_run=True, verbose=False)
     for df in (sc, plan):
         # a method has one row per mosaic pattern: the row of this pattern
         df = df[df.modalities == mods].set_index("method")

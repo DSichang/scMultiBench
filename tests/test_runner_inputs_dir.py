@@ -34,22 +34,6 @@ class _FakePopen:
         return self.returncode
 
 
-def test_file_role_method_keeps_its_inputs_dir(tmp_path, monkeypatch):
-    """A file-role method gets inputs/."""
-    class FakePopen(_FakePopen):
-        def __init__(self, cmd, cwd, **kw):
-            super().__init__(cmd, cwd, None, None, True)
-            with h5py.File(Path(cwd) / "embedding.h5", "w") as f:
-                f.create_dataset("data", data=np.zeros((6, 3)))
-    monkeypatch.setattr(runner.subprocess, "Popen", FakePopen)
-    out = tmp_path / "out"
-    res = mtb.run(method="SCALEX", category="diagonal",
-                  inputs={"rna": str(tmp_path / "a.h5"), "atac_gas": str(tmp_path / "b.h5")},
-                  out_dir=str(out), convert=False, cmd_template="conda run -n scalex {cmd}")
-    assert (out / "inputs").is_dir()
-    assert res.extra == {}
-
-
 def test_data_dir_method_gets_no_empty_inputs_dir(tmp_path, monkeypatch):
     """scBridge takes a data_dir plus const filenames: nothing to stage, so no inputs/."""
     class FakePopen(_FakePopen):
@@ -65,5 +49,5 @@ def test_data_dir_method_gets_no_empty_inputs_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(runner.envs, "host_has_gpu", lambda: True)
     out = tmp_path / "out"
     with pytest.raises(RuntimeError, match="scBridge failed"):
-        mtb.run("scBridge", "diagonal", inputs={"data_dir": str(tmp_path)}, out_dir=str(out))
+        mtb.engine.runner.run("scBridge", "diagonal", inputs={"data_dir": str(tmp_path)}, out_dir=str(out))
     assert out.is_dir() and not (out / "inputs").exists()

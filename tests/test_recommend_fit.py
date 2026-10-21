@@ -20,20 +20,6 @@ def _quiet(fn, *a, **kw):
     return out, [str(x.message) for x in w]
 
 
-def test_raises_when_no_ranked_dataset_measured_the_modality():
-    # a warning until 0.3.9; the ranking was returned all the same
-    with pytest.raises(ValueError) as e:
-        mtb.recommend("vertical", modalities=["rna", "atac"])
-    assert str(e.value) == (
-        "The stored results of vertical come from D11 (rna+adt). None of these datasets "
-        "measured atac, so they cannot rank methods for RNA+ATAC data. Pass scores on "
-        "such data as long_df=.")
-    # atac= names the modality as well
-    with pytest.raises(ValueError, match=r"come from D11 \(rna\+adt\)\. None of these "
-                                         r"datasets measured atac"):
-        mtb.recommend("vertical", atac="peak")
-
-
 def test_no_modality_warning_when_the_data_measured_it():
     for call in (lambda: mtb.recommend("vertical", modalities=["rna", "adt"]),
                  lambda: mtb.recommend("diagonal", modalities=["rna", "atac"]),
@@ -49,11 +35,6 @@ def test_recommend_has_the_six_columns():
     assert list(r.columns) == ["method", "grand_score", "needs_labels", "runtime_tier",
                                "worst_sec", "env"]
     assert r.grand_score.notna().any()
-
-
-def test_every_stored_dataset_has_its_measured_modalities():
-    stored = set(mtb.available_datasets(source="both"))
-    assert stored == set(results._STORED_DATASET_MODALITIES)
 
 
 def test_a_dataset_of_unknown_modalities_is_not_judged():

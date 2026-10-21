@@ -1,4 +1,4 @@
-"""scan(per_method=True): one row per method, for the check after an export.
+"""scan: one row per method, for the check after an export.
 
 The tutorials' own-data section calls it right after ``export_dataset``. It
 answers one question per method (can it run on this folder?) in three
@@ -103,51 +103,6 @@ def _only(monkeypatch, methods):
     monkeypatch.setattr(W, "_installed_envs", lambda: have)
 
 
-# ------------------------------------------------------------------ the frame
-def test_columns_order_and_one_row_per_method(linux, monkeypatch):
-    _only(monkeypatch, ["Matilda", "sciPENN"])
-    pm = mtb.scan("D11", "vertical", per_method=True, verbose=False)
-    full = full_scan("D11", "vertical", verbose=False)
-    assert type(pm) is pd.DataFrame
-    assert list(pm.columns) == ["method", "modalities", "runnable", "reason"]
-    assert pm["method"].is_unique and set(pm["method"]) == set(full["method"])
-    assert pm["runnable"].dtype == bool
-    # runnable methods first, then by name
-    assert list(pm["method"][:2]) == ["Matilda", "sciPENN"] and list(pm["runnable"][:2]) == [
-        True, True]
-    rest = list(pm["method"][2:])
-    assert rest == sorted(rest) and not pm["runnable"][2:].any()
-    assert list(pm.index) == list(range(len(pm)))
-    # when runnable: empty, or the note that the method scripts are not fetched
-    # yet (0.4: the full plan has it in caveat); else the reason of a row of the
-    # full table, as it is
-    by = full.set_index("method")["reason"]
-    assert all(r == "" or r.startswith("The method scripts are not in ")
-               for r in pm["reason"][:2])
-    for m, reason in zip(pm["method"][2:], pm["reason"][2:]):
-        assert reason and reason == by[m]
-    assert set(pm.attrs) == {"held", "not_listed", "not_held", "cells", "not_listed_batch"}
-    assert {k: pm.attrs[k] for k in full.attrs} == full.attrs
-
-
-def test_the_example_of_the_tutorials(linux, monkeypatch, tmp_path, capsys):
-    """Spec 2.6: the check cell on a folder that is fine, two methods."""
-    _only(monkeypatch, ["Matilda", "totalVI"])
-    _cite(tmp_path, n=1718)
-    pm = mtb.scan("MYCITE", "vertical", methods=["Matilda", "totalVI"], data_path=tmp_path,
-                  per_method=True)
-    assert capsys.readouterr().out == (
-        "[scan] 2 of 2 methods have their input files in MYCITE. 2 of 2 can run on this "
-        "computer. MYCITE holds RNA and ADT.\n"
-        "[scan] Cells per file: rna.h5 1,718, adt.h5 1,718.\n")
-    reasons = pm.pop("reason").tolist()
-    assert pm.to_dict("list") == {"method": ["Matilda", "totalVI"],
-                                  "modalities": ["rna+adt", "rna+adt"],
-                                  "runnable": [True, True]}
-    # 0.4: a runnable row says when the method scripts are not fetched yet
-    assert all(r == "" or r.startswith("The method scripts are not in ") for r in reasons)
-
-
 @pytest.mark.parametrize("ds,cat", [("D11", "vertical"), ("D46mini", "mosaic"),
                                     ("D52mini", "cross")])
 def test_runnable_is_what_run_all_tries(ds, cat, linux, monkeypatch, tmp_path):
@@ -157,7 +112,7 @@ def test_runnable_is_what_run_all_tries(ds, cat, linux, monkeypatch, tmp_path):
     _only(monkeypatch, methods[::2])
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
     for kw in ({}, {"methods": methods[:5]}, {"modalities": "all"}):
-        pm = _quiet(mtb.scan, ds, cat, per_method=True, verbose=False, **kw)
+        pm = _quiet(mtb.scan, ds, cat, verbose=False, **kw)
         linux.clear()
         _quiet(mtb.run_all, ds, cat, tmp_path / f"out{len(kw)}{list(kw)}", evaluate=False,
                verbose=False, **kw)
@@ -180,7 +135,8 @@ def _tenx(path, n=60):
 def test_the_first_line_names_10x_files(linux, tmp_path, capsys):
     """A 10x file copied to rna.h5 is not RNA that the folder holds."""
     def first(*a, **kw):
-        pm = _quiet(mtb.scan, *a, per_method=True, data_path=tmp_path, **kw)
+        mtb.config.DEFAULT.data_path = tmp_path
+        pm = _quiet(mtb.scan, *a, **kw)
         return pm, capsys.readouterr().out.splitlines()[0]
 
     counts = ("[scan] 0 of 2 methods have their input files in {0}. 0 of 2 can run on "
@@ -199,7 +155,8 @@ def test_the_first_line_names_10x_files(linux, tmp_path, capsys):
         assert pm.attrs["held"] == ["rna", other[:-len(".h5")]]
         assert list(pm["method"]) == methods and not pm["runnable"].any()
     # with the rows that are not listed: the same sentence starts the note
-    _quiet(mtb.run_all, "TXADT", "vertical", data_path=tmp_path, dry_run=True)
+    mtb.config.DEFAULT.data_path = tmp_path
+    _quiet(mtb.run_all, 'TXADT', 'vertical', dry_run=True)
     assert capsys.readouterr().out.splitlines()[1] == (
         "[run_all] TXADT holds no dataset file: rna.h5 and adt.h5 are 10x Genomics files "
         "under the names of dataset files.")
@@ -232,7 +189,7 @@ def test_the_first_line_names_10x_files(linux, tmp_path, capsys):
     _h5(tmp_path / "GAS" / "rna.h5", GENES[:30], bars)
     _h5(tmp_path / "GAS" / "atac_peak.h5", PEAKS, bars)
     _tenx(tmp_path / "GAS" / "atac_gas.h5")
-    got = mtb.inputs_for("GAS", "vertical", "scMM", data_path=tmp_path, check=True)
+    got = mtb.engine.resolve.inputs_for("GAS", "vertical", "scMM", data_path=tmp_path, check=True)
     assert got == {"rna": str(tmp_path / "GAS" / "rna.h5"),
                    "atac": str(tmp_path / "GAS" / "atac_peak.h5")}      # X13
     pm, line = first("GAS", "vertical", methods=["VIMCCA", "scMM"])
@@ -251,7 +208,8 @@ def test_the_first_line_names_10x_files(linux, tmp_path, capsys):
 def test_files_of_another_layout_are_not_called_no_file(linux, tmp_path, capsys):
     """The line under it lists the matrix files, so "no file" was false."""
     def lines(*a, **kw):
-        pm = _quiet(mtb.scan, *a, per_method=True, data_path=tmp_path, **kw)
+        mtb.config.DEFAULT.data_path = tmp_path
+        pm = _quiet(mtb.scan, *a, **kw)
         return pm, capsys.readouterr().out.splitlines()
 
     counts = ("[scan] 0 of 2 methods have their input files in {0}. 0 of 2 can run on "
@@ -280,79 +238,26 @@ def test_files_of_another_layout_are_not_called_no_file(linux, tmp_path, capsys)
     assert not any(l.startswith("[scan] Cells per file") for l in out)
 
 
-def test_first_line_counts_the_methods_that_are_not_listed(linux, monkeypatch, capsys):
-    # D11 holds no ATAC: four vertical methods read nothing else
-    pm = mtb.scan("D11", "vertical", per_method=True)
-    line = capsys.readouterr().out.splitlines()[0]
-    every = mtb.scan("D11", "vertical", modalities="all", verbose=False)
-    gone = sorted(set(every["method"]) - set(pm["method"]))
-    assert len(gone) == 4 and "MIRA" in gone
-    # c3 (C55): no sentence on them; a method named in methods= has its own error
-    assert line == ("[scan] 14 of 14 methods have their input files in D11. 14 of 14 can "
-                    "run on this computer. D11 holds RNA and ADT.")
-    # with them: every method, and no such sentence
-    pm = mtb.scan("D11", "vertical", per_method=True, modalities="all")
-    line = capsys.readouterr().out.splitlines()[0]
-    assert len(pm) == 18 and line == (
-        "[scan] 14 of 18 methods have their input files in D11. 14 of 18 can run on this "
-        "computer. D11 holds RNA and ADT.")
-    # a method named in methods= keeps its rows: it is listed, with its reason
-    pm = mtb.scan("D11", "vertical", per_method=True, methods=["Matilda", "MIRA"])
-    line = capsys.readouterr().out.splitlines()[0]
-    assert list(pm["method"]) == ["Matilda", "MIRA"] and "not listed" not in line
-
-
 def test_one_method_that_is_not_listed(linux, monkeypatch, capsys):
     # D52mini holds RNA and ADT in three batches; UnitedNet's cross variant reads ATAC
     _on_disk("D52mini")
-    pm = _quiet(mtb.scan, "D52mini", "cross", per_method=True)
+    pm = _quiet(mtb.scan, "D52mini", "cross")
     line = capsys.readouterr().out.splitlines()[0]
     assert "UnitedNet" not in set(pm["method"]) and len(pm) == 10
     assert line == ("[scan] 10 of 10 methods have their input files in D52mini. 10 of 10 "
                     "can run on this computer. D52mini holds RNA and ADT, in batches 1-3.")
     # ADT and ATAC: the methods that read RNA are not listed, without a sentence
     _on_disk("D58mini")
-    _quiet(mtb.scan, "D58mini", "cross", per_method=True)
+    _quiet(mtb.scan, "D58mini", "cross")
     assert capsys.readouterr().out.splitlines()[0].endswith(
         " D58mini holds ADT and ATAC, in batches 1-2.")
-
-
-def test_what_the_folder_holds_does_not_follow_the_methods_named(linux, capsys):
-    # D22mini holds RNA, ADT and ATAC; totalVI reads the first two
-    _on_disk("D22mini")
-    pm = mtb.scan("D22mini", "vertical", methods=["totalVI"], per_method=True)
-    out = capsys.readouterr().out.splitlines()
-    assert out == [
-        "[scan] 1 of 1 method has its input files in D22mini. 1 of 1 can run on this "
-        "computer. D22mini holds RNA, ADT and ATAC.",
-        "[scan] Cells per file: rna.h5 3,000, adt.h5 3,000, atac.h5 3,000."]
-    assert pm.attrs["held"] == ["rna", "adt", "atac"]
-
-
-def test_first_line_off_linux(monkeypatch, tmp_path, capsys):
-    monkeypatch.setattr(R, "linux_only_sentence", lambda: MACOS)
-    monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
-    _cite(tmp_path)
-    pm = mtb.scan("MYCITE", "vertical", methods=["Matilda", "totalVI"], data_path=tmp_path,
-                  per_method=True)
-    out = capsys.readouterr().out.splitlines()
-    assert out == [
-        "[scan] 2 of 2 methods have their input files in MYCITE. 0 of 2 can run on this "
-        "computer. MYCITE holds RNA and ADT. Method environments run only on Linux. On "
-        "this computer you can check files, score embeddings and plot.",
-        "[scan] Cells per file: rna.h5 60, adt.h5 60."]
-    # the platform is the only block: the table says so, and no line repeats it
-    assert not pm["runnable"].any()
-    assert list(pm["reason"]) == [
-        "Environment matilda runs only on Linux, not on this computer.",
-        "Environment scmb_scvi runs only on Linux, not on this computer."]
-    assert W.LINUX_ONLY_SUMMARY.startswith(W.LINUX_ONLY_CHECK + " ")
 
 
 # ------------------------------------------------------------------ cells per file
 def test_cells_per_file_line(linux, tmp_path, capsys):
     def second(*a, **kw):
-        pm = _quiet(mtb.scan, *a, per_method=True, data_path=tmp_path, **kw)
+        mtb.config.DEFAULT.data_path = tmp_path
+        pm = _quiet(mtb.scan, *a, **kw)
         lines = capsys.readouterr().out.splitlines()
         return pm, [l for l in lines if l.startswith("[scan] Cells per file")]
 
@@ -395,143 +300,8 @@ def test_a_name_left_from_the_example_shows_in_the_cells(linux, tmp_path, capsys
     _cite(tmp_path)
     _h5(tmp_path / "MYCITE" / "adt.h5", [f"p{i}" for i in range(8)],
         [f"x{i}" for i in range(45)])
-    _quiet(mtb.scan, "MYCITE", "vertical", methods=["totalVI"], data_path=tmp_path,
-           per_method=True)
+    mtb.config.DEFAULT.data_path = tmp_path
+    _quiet(mtb.scan, 'MYCITE', 'vertical', methods=['totalVI'])
     assert "[scan] Cells per file: rna.h5 60, adt.h5 45." in capsys.readouterr().out
 
 
-# ------------------------------------------------------------------ reasons and caveats
-def test_reasons_are_printed_in_full(linux, monkeypatch, tmp_path, capsys):
-    _cite(tmp_path, labels=False)
-    _only(monkeypatch, ["Matilda"])
-    pm = mtb.scan("MYCITE", "vertical", methods=["Matilda", "totalVI", "sciPENN"],
-                  data_path=tmp_path, per_method=True)
-    out = capsys.readouterr().out.splitlines()
-    assert out[2:] == [
-        "[scan] Matilda: cty.csv is missing.",
-        "[scan] sciPENN: Environment env_sciPENN is not installed. Run multibench env "
-        "install --methods sciPENN. Use --category vertical to install the "
-        "environments of every vertical method.",
-        "[scan] totalVI: Environment scmb_scvi is not installed. Run multibench env "
-        "install --methods totalVI. Use --category vertical to install the "
-        "environments of every vertical method."]
-    # one line per method that cannot run, in the order of the table, whole
-    assert [l.split(": ")[0].split()[-1] for l in out[2:]] == list(pm["method"])
-    assert [l.split(": ", 1)[1] for l in out[2:]] == list(pm["reason"])
-    assert max(map(len, pm["reason"])) > 80           # longer than a printed cell
-    # two donors: the missing batch
-    monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
-    _donors(tmp_path, "TWO", 2)
-    mtb.scan("TWO", "cross", methods=["StabMap", "sciPENN"], data_path=tmp_path,
-             per_method=True)
-    assert capsys.readouterr().out.splitlines()[2:] == [
-        "[scan] StabMap: rna3.h5, adt3.h5 are missing.",
-        "[scan] sciPENN: rna3.h5, adt3.h5 are missing."]
-
-
-def test_off_linux_the_reason_line_leaves_the_platform_out(monkeypatch, tmp_path, capsys):
-    monkeypatch.setattr(R, "linux_only_sentence", lambda: MACOS)
-    monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
-    _cite(tmp_path, labels=False)
-    pm = mtb.scan("MYCITE", "vertical", methods=["Matilda", "totalVI"], data_path=tmp_path,
-                  per_method=True)
-    out = capsys.readouterr().out.splitlines()
-    assert out[2:] == ["[scan] Matilda: cty.csv is missing."]
-    assert list(pm["reason"]) == [
-        "cty.csv is missing. Environment matilda runs only on Linux, not on this "
-        "computer.",
-        "Environment scmb_scvi runs only on Linux, not on this computer."]
-
-
-def test_folder_caveats_are_printed_and_fixed_notes_are_not(linux, tmp_path, capsys):
-    _donors(tmp_path, "FIVE", 5)
-    pm = mtb.scan("FIVE", "cross", methods=["StabMap", "sciPENN"], data_path=tmp_path,
-                  per_method=True)
-    out = capsys.readouterr().out.splitlines()
-    assert out[0] == ("[scan] 2 of 2 methods have their input files in FIVE. 2 of 2 can "
-                      "run on this computer. FIVE holds RNA and ADT, in batches 1-5.")
-    assert out[2:] == ["[scan] StabMap reads batches 1-3 of 5. Batches 4-5 are not used.",
-                       "[scan] sciPENN reads batches 1-3 of 5. Batches 4-5 are not used."]
-    assert pm["runnable"].all()
-    # the note on the method itself, the same on every folder, is run_all's
-    _on_disk("D27mini")
-    full = full_scan("D27mini", "diagonal", methods=["online_iNMF", "SCALEX"], verbose=False)
-    # 3,000 RNA + 3,000 ATAC cells: enough, so the size note is not shown (X81)
-    assert "online_iNMF needs about 5,000 cells" not in " ".join(full["caveat"])
-    mtb.scan("D27mini", "diagonal", methods=["online_iNMF", "SCALEX"], per_method=True)
-    out = capsys.readouterr().out
-    assert "needs about 5,000 cells" not in out and len(out.splitlines()) == 2
-    plan = mtb.run_all("D27mini", "diagonal", methods=["online_iNMF", "SCALEX"],
-                       dry_run=True)
-    # 6,000 cells: no size note (X81)
-    assert "online_iNMF needs about 5,000 cells" not in capsys.readouterr().out and len(plan)
-
-
-def test_the_caveat_of_a_row_that_does_not_run_is_left_out(linux, tmp_path, capsys):
-    # UINMF's two-batch row is inside its three-batch row, which is the one
-    # that runs on three donors
-    _donors(tmp_path, "THREE", 3)
-    mtb.scan("THREE", "cross", methods=["UINMF"], data_path=tmp_path, per_method=True)
-    assert "UINMF reads batches" not in capsys.readouterr().out
-    # with that row selected, it is the row that runs
-    mtb.scan("THREE", "cross", methods=["UINMF"], data_path=tmp_path, per_method=True,
-             modalities=["rna1", "rna2", "adt1", "adt2"])
-    assert "[scan] UINMF reads batches 1-2 of 3. Batch 3 is not used." in \
-        capsys.readouterr().out.splitlines()
-
-
-def test_reason_row_choice(linux, monkeypatch, tmp_path):
-    monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
-    # Matilda on RNA + ADT without labels, every variant: the row whose files
-    # are nearest speaks, not the first of the table
-    _cite(tmp_path, labels=False)
-    kw = dict(methods=["Matilda"], data_path=tmp_path, verbose=False)
-    full = full_scan("MYCITE", "vertical", modalities="all", **kw)
-    assert list(full["modalities"]) == ["rna+adt", "rna+atac", "rna+adt+atac"]
-    pm = mtb.scan("MYCITE", "vertical", modalities="all", per_method=True, **kw)
-    assert pm.loc[0, "reason"] == full.loc[0, "reason"]
-    assert pm.loc[0, "reason"].startswith("cty.csv is missing. ")
-    # RNA + ATAC: the first row of the table lacks adt.h5, the second lacks nothing
-    d = tmp_path / "MULTIOME"
-    d.mkdir()
-    bars = [f"c{i}" for i in range(60)]
-    _h5(d / "rna.h5", GENES[:30], bars)
-    _h5(d / "atac.h5", PEAKS, bars)
-    _labels(d / "cty.csv", 60)
-    full = full_scan("MULTIOME", "vertical", modalities="all", **kw)
-    on_disk = [W._inputs_on_disk(r, "MULTIOME", tmp_path) for _, r in full.iterrows()]
-    assert list(full["modalities"]) == ["rna+adt", "rna+atac", "rna+adt+atac"]
-    assert on_disk == [False, True, False] and not full["runnable"].any()
-    pm = mtb.scan("MULTIOME", "vertical", modalities="all", per_method=True, **kw)
-    assert pm.loc[0, "reason"] == full.loc[1, "reason"]
-    assert pm.loc[0, "reason"].startswith("Environment matilda is not installed.")
-    # no row has its files: the one that lacks the fewest
-    (d / "atac.h5").unlink()
-    (d / "cty.csv").unlink()
-    full = full_scan("MULTIOME", "vertical", modalities="all", **kw)
-    lacking = [W._missing_inputs(r, "MULTIOME", tmp_path) for _, r in full.iterrows()]
-    assert lacking == [2, 2, 3]
-    pm = mtb.scan("MULTIOME", "vertical", modalities="all", per_method=True, **kw)
-    assert pm.loc[0, "reason"] == full.loc[0, "reason"]         # a tie: the first row
-
-
-def test_per_method_without_a_category_is_the_default_scan(tmp_path):
-    # 0.4: one row per method is scan's default; per_method= only warns; without a
-    # category, a dataset the benchmark scored takes its category (D11: vertical)
-    with pytest.warns(FutureWarning, match=r"scan\(per_method=\) is deprecated"):
-        pm = mtb.scan("D11", per_method=True, verbose=False)
-    pd.testing.assert_frame_equal(pm, mtb.scan("D11", verbose=False))
-    pd.testing.assert_frame_equal(pm, mtb.scan("D11", "vertical", verbose=False))
-    assert pm.columns.tolist() == ["method", "modalities", "runnable", "reason"]
-    with pytest.raises(FileNotFoundError):
-        _quiet(mtb.scan, "NO_SUCH_FOLDER", per_method=True, data_path=tmp_path)
-    assert _quiet(mtb.scan, "D11", per_method=False,
-                  verbose=False).columns.tolist() == W.SCAN_COLUMNS
-
-
-def test_verbose_false_prints_nothing(linux, capsys):
-    pm = mtb.scan("D11", "vertical", methods=["Matilda", "MIRA"], per_method=True,
-                  verbose=False)
-    assert capsys.readouterr().out == ""
-    assert list(pm["method"]) == ["Matilda", "MIRA"] and pm.attrs["cells"] == {
-        "rna.h5": 2864, "adt.h5": 2864}

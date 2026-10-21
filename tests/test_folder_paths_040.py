@@ -22,5 +22,5 @@ def here(tmp_path, monkeypatch):
 def test_a_registered_data_path_folder_wins_over_one_here(here, monkeypatch):
     """D11 under the data path and ./D11: the documented rule, data_path first."""
     shutil.copytree("data/MYCITE", "D11")
-    got = mtb.inputs_for("D11", "vertical", "Matilda")
+    got = mtb.engine.resolve.inputs_for("D11", "vertical", "Matilda")
     assert got["rna"] == str(mtb.config.DEFAULT.data_path / "D11" / "rna.h5")

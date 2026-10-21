@@ -23,13 +23,13 @@ def _genes(n_cell=6, n_feat=5):
 
 def test_to_canonical_vertical_writes_atac_h5_for_any_representation(tmp_path):
     d = tmp_path / "V"; d.mkdir()
-    assert ingest.to_canonical(_peaks(), d, modality="peak", category="vertical").name == "atac.h5"
+    assert ingest._to_canonical(_peaks(), d, modality='peak', category='vertical').name == "atac.h5"
     d2 = tmp_path / "V2"; d2.mkdir()
-    assert ingest.to_canonical(_genes(), d2, modality="gas", category="vertical").name == "atac.h5"
+    assert ingest._to_canonical(_genes(), d2, modality='gas', category='vertical').name == "atac.h5"
     d3 = tmp_path / "V3"; d3.mkdir()
-    assert ingest.to_canonical(_peaks(), d3, modality="atac", category="vertical").name == "atac.h5"
+    assert ingest._to_canonical(_peaks(), d3, modality='atac', category='vertical').name == "atac.h5"
     # non-ATAC modalities are untouched by the hint
-    assert ingest.to_canonical(_genes(), d3, modality="rna", category="vertical").name == "rna.h5"
+    assert ingest._to_canonical(_genes(), d3, modality='rna', category='vertical').name == "rna.h5"
     # the vertical `atac` role now resolves
     assert resolve._resolve_role(d, "atac").name == "atac.h5" and (d / "atac.h5").is_file()
 
@@ -37,21 +37,21 @@ def test_to_canonical_vertical_writes_atac_h5_for_any_representation(tmp_path):
 def test_to_canonical_other_categories_and_none_keep_todays_names(tmp_path):
     for cat in ("diagonal", "mosaic", "cross", None):
         d = tmp_path / str(cat); d.mkdir()
-        assert ingest.to_canonical(_peaks(), d, modality="peak", category=cat).name == "atac_peak.h5"
-        assert ingest.to_canonical(_genes(), d, modality="gas", category=cat).name == "atac_gas.h5"
-        assert ingest.to_canonical(_peaks(), d, modality="atac", category=cat).name == "atac.h5"
+        assert ingest._to_canonical(_peaks(), d, modality='peak', category=cat).name == "atac_peak.h5"
+        assert ingest._to_canonical(_genes(), d, modality='gas', category=cat).name == "atac_gas.h5"
+        assert ingest._to_canonical(_peaks(), d, modality='atac', category=cat).name == "atac.h5"
     with pytest.raises(ValueError, match="unknown category"):
-        ingest.to_canonical(_peaks(), tmp_path, modality="peak", category="vertcal")
+        ingest._to_canonical(_peaks(), tmp_path, modality='peak', category='vertcal')
     # an explicit file path is used verbatim whatever the category
-    out = ingest.to_canonical(_peaks(), tmp_path / "mine.h5", modality="peak", category="vertical")
+    out = ingest._to_canonical(_peaks(), tmp_path / 'mine.h5', modality='peak', category='vertical')
     assert out.name == "mine.h5"
 
 
 def test_to_canonical_peak_vertical_makes_scan_find_a_runnable_layout(tmp_path):
     d = tmp_path / "TWOADATA"; d.mkdir()
     rna = _genes(); rna.obs["ct"] = ["a", "b"] * 3
-    ingest.to_canonical(rna, d, modality="rna")
-    ingest.to_canonical(_peaks(), d, modality="peak", category="vertical")
+    ingest._to_canonical(rna, d, modality='rna')
+    ingest._to_canonical(_peaks(), d, modality='peak', category='vertical')
     ingest._write_labels(rna.obs["ct"], d / "cty.csv")
     got = resolve.inputs_for("TWOADATA", "vertical", "Matilda", modalities=["rna", "atac"],
                              data_path=tmp_path, check=True)
@@ -88,8 +88,7 @@ def test_export_dataset_explicit_other_category_keeps_representation_names(tmp_p
     assert sorted(p.name for p in out.iterdir()) == ["atac_gas1.h5"]
     # mosaic: the atac<i>.h5 every mosaic variant reads, whatever the kind (L06)
     with pytest.warns(UserWarning, match=r"^Every mosaic method reads peak ATAC\. Export "
-                                         r"the ATAC as peaks \(atac_kind='peak'\), or pass "
-                                         r"allow_atac_mismatch=True to scan and run_all\.$"):
+                                         r"the ATAC as peaks \(atac_kind='peak'\)\.$"):
         out = ingest.export_dataset(g, tmp_path / "MG", rna=None, atac="X",
                                     atac_kind="gene_activity", category="mosaic",
                                     batch_index=2)

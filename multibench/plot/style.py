@@ -50,18 +50,7 @@ def rank_max(x: np.ndarray) -> np.ndarray:
     return s.rank(method="max").to_numpy()
 
 
-def compute_overall(mat: pd.DataFrame) -> pd.Series:
-    """overall = minmax(mean over columns of per-column max-rank)."""
-    ranks = mat.apply(lambda col: rank_max(col.to_numpy()), axis=0)
-    mean_rank = ranks.mean(axis=1)
-    return pd.Series(minmax(mean_rank.to_numpy()), index=mat.index)
-
-
 # cross-dataset summary math, shared by bubble and bar
-
-#: the deprecated ``overall=`` of the figures: the 0.3 across-dataset formulas
-OVERALL_BASES = ("rank", "mean_overall")
-
 
 def per_dataset_ranks(long_df: pd.DataFrame, metrics=None) -> dict:
     """Within-dataset max-ranks: ``{dataset: DataFrame(method x metric)}``.
@@ -120,23 +109,6 @@ def lone_message(lone: dict) -> str | None:
             f"so {'it does' if one else 'they do'} not count in the Overall.")
 
 
-def mean_rank_matrix(parts: dict) -> pd.DataFrame:
-    """Average the per-dataset rank matrices from :func:`per_dataset_ranks`.
-
-    Rows are the union of methods; a method absent from a dataset, or lacking
-    a metric there, scores rank 0 (as in the paper's summary), but only for
-    the metrics that dataset computed - each metric is averaged over the
-    datasets that have it.
-    """
-    mats = list(parts.values())
-    idx = mats[0].index
-    for q in mats[1:]:
-        idx = idx.union(q.index)
-    aligned = [q.reindex(idx).fillna(0) for q in mats]
-    stacked = pd.concat(aligned, keys=range(len(aligned)))
-    return stacked.groupby(level=1).mean()
-
-
 def coverage(parts: dict) -> pd.Series:
     """Number of datasets (keys of ``parts``) each method appears in."""
     counts: dict = {}
@@ -154,11 +126,11 @@ STORED_SOURCES = ("published", "stored", "rerun")
 SNAP = 1e-6
 
 
-def stored_pairs(result_path=None) -> frozenset:
+def stored_pairs() -> frozenset:
     """``{(dataset, method)}`` of the stored results ``mtb.load_results`` reads
-    under ``mtb.config.DEFAULT.result_path`` (or ``result_path``)."""
+    under ``mtb.config.DEFAULT.result_path``."""
     from ..data.results import _base_path
-    base = _base_path(result_path)
+    base = _base_path()
     # the folders' times: tables written after a first call are read again
     stamp = tuple(p.stat().st_mtime_ns if p.exists() else 0 for p in (base, base / "rerun"))
     return _pairs_under(str(base), stamp)
@@ -170,7 +142,7 @@ def _pairs_under(base: str, stamp: tuple) -> frozenset:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")     # load_results says them when it is called
         try:
-            rows = _load_results(None, source="both", result_path=base)
+            rows = _load_results(None)
         except FileNotFoundError:
             return frozenset()
     return frozenset(zip(rows["dataset"].astype(str), rows["method"].astype(str)))
@@ -193,7 +165,6 @@ def overall(df: pd.DataFrame, metrics=None, *, stored=None) -> pd.Series:
     value of its method (``"Cobolt (this run)"`` is Cobolt's) on the same
     dataset and metric counts as that value.
     """
-    from .. import config
     from ..engine.registry import method_of
     if metrics is not None:
         df = df[df["metric"].isin(metrics)]
@@ -292,13 +263,10 @@ def coverage_warnings(parts: dict, *, basis: str, incomplete_fix: str) -> list:
 def dataset_mode_warnings(parts: dict) -> list:
     """The warnings a figure of raw values from several datasets needs.
 
-    ``aggregate="dataset"`` of ``plot.build_table``: rows from different
-    datasets are ranked against each other. ``aggregate="summary"`` is
-    suggested only when every method has rows in at least two datasets and
-    no dataset holds a single method; otherwise the summary would warn in
-    turn.
+    The bubble figure ranks rows from different datasets against each other.
+    ``mtb.plot.bar`` is suggested only when every method has rows in at least
+    two datasets and no dataset holds a single method.
     """
-    from .. import config
     n = len(parts)
     if n <= 1:
         return []
@@ -406,7 +374,6 @@ def backend_warning(df: pd.DataFrame) -> str | None:
     the clusters part is ``search`` (ARI and NMI also ``sweep``, before 0.4).
     Rows without ``scored_with`` (NaN) never trigger the igraph check.
     """
-    from .. import config
     old = old_scoring_warning(df)
     if old:
         return old

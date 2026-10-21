@@ -30,16 +30,16 @@ def _h5(path, n_feat, n_cell, feats=None):
 
 # ----------------------------------------------------------------- H2 labels_for
 def test_labels_for_d28_is_rna_then_atac(root):
-    lab = mtb.labels_for("D28", data_path=root / "data")
+    lab = mtb.engine.resolve.labels_for("D28", data_path=root / "data")
     assert list(lab) == ["rna_cty", "atac_cty"]          # not alphabetical
-    assert list(mtb.labels_for("D28", "diagonal", "Portal", data_path=root / "data")) == ["rna_cty", "atac_cty"]
-    assert list(mtb.labels_for("D28", "diagonal", "Seurat_v3", data_path=root / "data")) == ["rna_cty", "atac_cty"]
+    assert list(mtb.engine.resolve.labels_for("D28", "diagonal", "Portal", data_path=root / "data")) == ["rna_cty", "atac_cty"]
+    assert list(mtb.engine.resolve.labels_for("D28", "diagonal", "Seurat_v3", data_path=root / "data")) == ["rna_cty", "atac_cty"]
 
 
 def test_labels_for_d52_numbered_batches(root):
-    assert list(mtb.labels_for("D52", data_path=root / "data")) == ["cty1", "cty2", "cty3"]
-    assert list(mtb.labels_for("D52", "cross", "scMoMaT", data_path=root / "data")) == ["cty1", "cty2", "cty3"]
-    assert list(mtb.labels_for("D11", data_path=root / "data")) == ["cty"]
+    assert list(mtb.engine.resolve.labels_for("D52", data_path=root / "data")) == ["cty1", "cty2", "cty3"]
+    assert list(mtb.engine.resolve.labels_for("D52", "cross", "scMoMaT", data_path=root / "data")) == ["cty1", "cty2", "cty3"]
+    assert list(mtb.engine.resolve.labels_for("D11", data_path=root / "data")) == ["cty"]
 
 
 def test_labels_for_synthetic_folder_orders_numerically_and_by_modality(tmp_path):
@@ -47,7 +47,7 @@ def test_labels_for_synthetic_folder_orders_numerically_and_by_modality(tmp_path
     for n in ["atac_cty.csv", "cty10.csv", "cty2.csv", "cty1.csv", "rna_cty.csv",
               "peak_cty.csv", "adt_cty.csv", "cty.csv", "source_cty.csv", "zz_cty_scjoint.csv"]:
         (d / n).write_text("x\na\n")
-    got = list(mtb.labels_for("SYN", data_path=tmp_path))
+    got = list(mtb.engine.resolve.labels_for("SYN", data_path=tmp_path))
     assert got == ["cty", "cty1", "cty2", "cty10", "rna_cty", "adt_cty", "atac_cty", "peak_cty",
                    "source_cty"]
     # plain cty first, numbered numerically (cty10 after cty2), rna < adt < atac (peak = atac)
@@ -73,10 +73,10 @@ def test_labels_for_follows_the_variants_modality_order_when_method_and_category
     spec = MethodSpec(id="AtacFirst", language="python", categories=["diagonal"],
                       tasks=["clustering"], atac="gene_activity", variants=[v])
     monkeypatch.setattr(registry, "load", lambda: [spec])
-    assert list(mtb.labels_for("SYN", data_path=tmp_path)) == ["rna_cty", "atac_cty"]
-    assert list(mtb.labels_for("SYN", "diagonal", "AtacFirst", data_path=tmp_path)) == ["atac_cty", "rna_cty"]
+    assert list(mtb.engine.resolve.labels_for("SYN", data_path=tmp_path)) == ["rna_cty", "atac_cty"]
+    assert list(mtb.engine.resolve.labels_for("SYN", "diagonal", "AtacFirst", data_path=tmp_path)) == ["atac_cty", "rna_cty"]
     # method alone (no category) does not change the order; the SET never changes
-    assert list(mtb.labels_for("SYN", method="AtacFirst", data_path=tmp_path)) == ["rna_cty", "atac_cty"]
+    assert list(mtb.engine.resolve.labels_for("SYN", method="AtacFirst", data_path=tmp_path)) == ["rna_cty", "atac_cty"]
 
 
 def test_labels_for_docstring_documents_the_order():

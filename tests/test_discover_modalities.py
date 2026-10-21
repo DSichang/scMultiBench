@@ -67,29 +67,6 @@ def test_params_for_ambiguity_is_valueerror_with_the_exact_call():
         mtb.params_for("totalVI", "mosaic")
 
 
-def test_params_for_dataset_disambiguates_by_folder(tmp_path):
-    d = tmp_path / "D11"; d.mkdir()
-    for n in ("rna.h5", "adt.h5", "cty.csv"):
-        (d / n).write_text("")
-    r = mtb.params_for("Matilda", dataset="D11", data_path=tmp_path)
-    assert r["variant"] == "vertical:rna+adt"
-    assert mtb.params_for("Matilda", "vertical", dataset="D11", data_path=tmp_path)["variant"] == "vertical:rna+adt"
-    # every variant satisfiable, and rna+adt and rna+atac are inside
-    # rna+adt+atac: the largest one
-    (d / "atac.h5").write_text("")
-    assert mtb.params_for("Matilda", dataset="D11",
-                          data_path=tmp_path)["variant"] == "vertical:rna+adt+atac"
-    # two satisfiable variants that are not nested, with the same parameters: both
-    assert mtb.params_for("VIMCCA", dataset="D11", data_path=tmp_path)["variant"] == \
-        "vertical:rna+adt and vertical:rna+atac"
-    # missing folder settles nothing
-    with pytest.raises(ValueError):
-        mtb.params_for("Multigrate", dataset="D99", data_path=tmp_path)
-    # dataset= is deprecated in 0.4.0: it keeps its effect and is out of the docs
-    doc = mtb.params_for.__doc__
-    assert "dataset" not in doc and "Returns" in doc and "Raises" in doc
-
-
 def test_cite_is_variadic_and_keeps_the_list_form():
     both = mtb.cite("Matilda", "MOFA2", format="bibtex")
     assert both == mtb.cite(["Matilda", "MOFA2"], format="bibtex")

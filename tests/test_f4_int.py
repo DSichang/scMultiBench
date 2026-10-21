@@ -7,6 +7,8 @@
 """
 from __future__ import annotations
 
+import os
+
 import warnings
 
 from multibench import config
@@ -28,8 +30,7 @@ def test_run_all_dry_run_names_a_scripts_folder_without_scripts(tmp_path, monkey
     root = _gasmos(tmp_path)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        df = W.run_all("GASMOS", "mosaic", data_path=root, dry_run=True,
-                       methods=["StabMap"], verbose=False)
+        df = W.run_all(os.path.join(root, 'GASMOS'), 'mosaic', dry_run=True, methods=['StabMap'], verbose=False)
     sentence = (f"{repo} holds other files and no method scripts. Set MULTIBENCH_REPO_PATH "
                 f"or mtb.config.DEFAULT.repo_path to an empty or new folder, then run "
                 f"multibench fetch --scripts. If the folder is left over from an earlier "
@@ -39,7 +40,6 @@ def test_run_all_dry_run_names_a_scripts_folder_without_scripts(tmp_path, monkey
     assert sentence not in capsys.readouterr().err
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        W.run_all("GASMOS", "mosaic", data_path=root, dry_run=True, methods=["StabMap"],
-                  verbose=True)
+        W.run_all(os.path.join(root, 'GASMOS'), 'mosaic', dry_run=True, methods=['StabMap'], verbose=True)
     out = capsys.readouterr().out
     assert out.count(f"[run_all] {sentence}.\n") == 1, out

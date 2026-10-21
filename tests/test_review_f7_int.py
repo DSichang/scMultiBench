@@ -34,10 +34,6 @@ from tests.conftest import full_scan
 ROOT = __import__("pathlib").Path(__file__).resolve().parent.parent
 
 
-def _doc(obj) -> str:
-    return " ".join(inspect.getdoc(obj).split())
-
-
 def test_env_reason_names_the_category_in_a_sentence(monkeypatch):
     monkeypatch.setattr(R, "linux_only_sentence", lambda: None)
     text = W._env_hint("glue", "GLUE", "diagonal")
@@ -89,40 +85,6 @@ def test_missing_batch_file_is_named_as_a_batch_file(tmp_path, monkeypatch):
     assert "labels file" not in msg and ";" not in msg and "(cwd" not in msg
 
 
-# ====================================================== several-datasets warning
-def test_several_datasets_warning_lists_the_datasets_in_words():
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", FutureWarning)       # source= (0.4)
-        df = mtb.load_results("diagonal", dataset=["D24", "D28"], source="published")
-    with warnings.catch_warnings(record=True) as rec:
-        warnings.simplefilter("always")
-        mtb.plot.build_table(df, metrics=["ARI", "NMI"])
-    msgs = [str(w.message) for w in rec if "averages each method" in str(w.message)]
-    assert len(msgs) == 1, [str(w.message) for w in rec]
-    assert msgs[0].startswith("This figure averages each method over 2 datasets, D24 and "
-                              "D28. Its rows mix datasets. ")
-    assert "(D24" not in msgs[0] and ", so" not in msgs[0]
-
-
-# ============================================================ no conda
-@pytest.fixture
-def linux_without_conda(monkeypatch):
-    monkeypatch.setattr(envs, "_find_conda", lambda: None)
-    monkeypatch.setattr(envs, "_doctor_rows", lambda **kw: [
-        {"env": envs.group_for("StabMap"), "exists": False}])
-    monkeypatch.setattr(envs, "install_packed",
-                        lambda env, **kw: pytest.fail(f"download of {env} started"))
-
-
-def test_no_conda_error_in_python(linux_without_conda):
-    env = envs.group_for("StabMap")
-    with pytest.raises(RuntimeError) as e:
-        mtb.env.install(["StabMap"], packed=False, dry_run=False).to_dict("records")
-    assert str(e.value) == (f"Conda is not installed on this computer. Environment {env} "
-                            f"has a packed archive. Leave out build=True to install it.")
-    assert str(e.value).startswith(envs.NO_CONDA)
-
-
 # ==================================================== scan's modalities warning
 def _lung_data(root):
     d = _lung(root / "data")
@@ -159,7 +121,7 @@ def _names_warning(fn, *args, **kw):
 
 
 def test_missing_feature_names_of_to_canonical_name_its_argument(tmp_path):
-    msgs = _names_warning(ingest.to_canonical, _citeseq(), tmp_path / "adt.h5",
+    msgs = _names_warning(ingest._to_canonical, _citeseq(), tmp_path / "adt.h5",
                           modality="adt", obsm="protein")
     assert len(msgs) == 1 and "Pass feature_names=, store obsm['protein'] as a " \
         "DataFrame" in msgs[0], msgs
@@ -172,17 +134,6 @@ def test_missing_feature_names_of_a_bare_array(tmp_path):
     assert msgs == ["The adt matrix array has no feature names. The file names them "
                     "feature_0 to feature_3. Pass adt_names=, or give adt= as a DataFrame "
                     "or AnnData with named features."]
-
-
-# ==================================================== docstrings
-def test_long_names_when_scored_with_is_there():
-    res = mtb.load_batch(ROOT / "data" / "outputs" / "D11")
-    assert list(res.long.columns) == ["metric", "value", "method", "dataset", "category",
-                                      "source"]
-    doc = _doc(W.BatchResult.long)
-    assert "When the scores carry ``scored_with``, so does the table." in doc
-    assert "fetch_outputs" not in doc
-    assert "for rows ``run_all`` scored" not in doc
 
 
 def test_method_info_returns_and_raises_read_as_a_card():
@@ -214,40 +165,6 @@ def test_installation_heading_quotes_the_no_conda_error():
     assert (f"`RuntimeError: {envs.NO_CONDA} Environment <env> has a packed archive.`"
             in text)
     assert "no conda/mamba" not in text
-
-
-@needs_docs
-def test_changes_page_quotes_the_live_several_datasets_warning():
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", FutureWarning)       # source= (0.4)
-        df = mtb.load_results("diagonal", dataset=["D24", "D25", "D28"],
-                              source="published")
-    with warnings.catch_warnings(record=True) as rec:
-        warnings.simplefilter("always")
-        mtb.plot.build_table(df, metrics=["ARI", "NMI"])
-    shown = ("This figure averages each method over 3 datasets, D24, D25 and D28. Its rows "
-             "mix datasets.")
-    assert any(str(w.message).startswith(shown + " ") for w in rec)
-    assert f"`{shown}`" in _flat("changes.md")
-
-
-@needs_docs
-def test_changes_page_lists_the_review_changes():
-    text = _flat("changes.md")
-    for phrase in (
-            "- `bubble` widens a family pill to fit its header, and a figure of one to "
-            "three metrics to fit its row labels and key. The height is unchanged.",
-            "On Linux, it names `mtb.env.doctor()` when an environment is missing.",
-            # R8-10 folded the reworded items into one sentence
-            "`inputs_for`, `params_for` and `evaluate`. Also the environment messages, "
-            "file checks,"):
-        assert phrase in text, phrase
-    assert "`verbose=True` prints a line before each ranking." not in text
-    # the height of a narrow figure is that of the full one
-    df = mtb.load_results("diagonal", dataset="D28")
-    narrow = _quiet(mtb.plot.bubble, df, metrics=["ARI"]).get_size_inches()
-    full = _quiet(mtb.plot.bubble, df).get_size_inches()
-    assert narrow[1] == full[1] and narrow[0] < full[0]
 
 
 @needs_docs

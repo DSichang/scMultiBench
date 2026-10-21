@@ -1,7 +1,7 @@
 """Maintainer tool: refresh ``multibench/engine/packed_sizes.json``.
 
-``multibench env plan`` / ``env install --packed`` print how large each packed
-archive is (download) and how much disk it needs unpacked. Those numbers are
+``mtb.env.install(dry_run=True)`` reports how large each packed archive is
+(download) and how much disk it needs unpacked. Those numbers are
 a SHIPPED SNAPSHOT, never fetched at runtime (offline nodes, Zenodo rate
 limits) - so they rot whenever an archive is republished. Rerun this after
 publishing::

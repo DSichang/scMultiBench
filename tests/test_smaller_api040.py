@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parent.parent
 def test_io_catalog_env_import_as_submodules():
     code = ("import multibench.io, multibench.catalog, multibench.env\n"
             "from multibench.io import export_dataset\n"
-            "from multibench.env import plan\n"
+            "from multibench.env import install\n"
             "import multibench as mtb\n"
             "assert multibench.io is mtb.io and multibench.env is mtb.env\n"
             "assert multibench.catalog is mtb.catalog and export_dataset is mtb.io.export_dataset\n")
@@ -41,7 +41,3 @@ def test_data_has_a_module_docstring():
     assert mtb.data.__doc__.startswith("Demo data: ``fetch`` downloads demo datasets")
 
 
-def test_fetchable_example_is_the_call():
-    shown = inspect.getdoc(mtb.data.fetchable).split(">>> mtb.data.fetchable()\n", 1)[1]
-    shown = shown.split("\n\n", 1)[0]
-    assert eval(shown) == mtb.data.fetchable()

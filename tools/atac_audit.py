@@ -37,10 +37,10 @@ def atac_kind(path):
 
 
 CATS = ["vertical", "diagonal", "mosaic", "cross"]
-datasets = sorted(mtb.available_datasets())
+datasets = sorted(mtb.catalog.datasets().query("has_results").dataset)
 
 seen = {}
-for m in sorted(mtb.list_methods()):
+for m in sorted(mtb.find_methods()):
     want = ("gene_activity" if m in NEEDS_GENE_ACTIVITY
             else "peaks" if m in NEEDS_PEAKS
             else "mode" if m in MODE_DEPENDENT else "?")

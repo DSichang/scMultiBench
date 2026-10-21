@@ -40,7 +40,7 @@ def gpu(monkeypatch):
 
 
 def _dry(method, category, inputs, params, tmp_path):
-    return mtb.run(method, category, inputs=inputs, out_dir=str(tmp_path / "o"),
+    return mtb.engine.runner.run(method, category, inputs=inputs, out_dir=str(tmp_path / "o"),
                    params=params, dry_run=True, cmd_template="conda run -n x {cmd}")
 
 
@@ -93,35 +93,6 @@ def test_x12_a_label_file_without_ids_is_matched_by_position_silently(tmp_path):
     assert not any("matched by position" in m for m in msgs)
 
 
-def test_x36_to_long_clustering_and_source_are_deprecated():
-    wide = pd.DataFrame({"Value": [0.5]}, index=["ARI"])
-    with pytest.warns(FutureWarning, match=r"^to_long\(source=\) is deprecated and will "
-                                           r"be removed in 0\.5; it has no effect\.$"):
-        out = mtb.to_long(wide, method="M", source="rerun", clustering="mine")
-    assert "clustering" not in out and out["source"].iloc[0] == "user"     # Y39 (r3)
-
-
-def test_x37_to_canonical_keywords_are_deprecated(tmp_path):
-    import inspect
-    sig = inspect.signature(mtb.io.to_canonical).parameters
-    assert not {"convert", "compression", "block"} & set(sig)
-    a = _adata()
-    with pytest.warns(FutureWarning, match=r"^io\.to_canonical\(compression=\) is "
-                                           r"deprecated"):
-        p = mtb.io.to_canonical(a, tmp_path / "rna.h5", compression=None)
-    assert mtb.io.read_canonical(p).shape == (60, 20)
-    with pytest.warns(FutureWarning, match=r"^io\.to_canonical\(convert=\) is deprecated"):
-        assert mtb.io.to_canonical(p, tmp_path / "x.h5", "rna", False) == p
-
-
-def test_x38_scan_params_is_deprecated():
-    with pytest.warns(FutureWarning, match=r"^scan\(params=\) is deprecated and will be "
-                                           r"removed in 0\.5\. Use run_all\(\.\.\., "
-                                           r"params=\.\.\., dry_run=True\)\.$"):
-        mtb.scan("D11", "vertical", methods=["Matilda"], params={"Matilda": {"epochs": 3}},
-                 verbose=False)
-
-
 def test_x47_text_returns_echo_as_text():
     for text in (mtb.describe_layout("vertical"), mtb.cite(["Matilda"])):
         assert isinstance(text, str) and repr(text) == str(text) and "\n" in text
@@ -157,29 +128,11 @@ def test_x50_x71_classification_docs_and_left_out_cells():
     assert "lacks is left out" in " ".join(C.classify.__doc__.split())
 
 
-def test_x58_find_methods_task_names_no_replacement():
-    with pytest.warns(FutureWarning, match=r"find_methods\(task=\) is deprecated and will "
-                                           r"be removed in 0\.5; it has no replacement\."):
-        mtb.find_methods(task="clustering")
-
-
-def test_x61_x62_to_long_reads_a_path_and_checks_the_category(tmp_path):
-    wide = pd.DataFrame({"Value": [0.5, 0.6]}, index=["ARI", "NMI"])
-    wide.to_csv(tmp_path / "metric.csv")
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        out = mtb.to_long(tmp_path / "metric.csv", method="Old", dataset="D11",
-                          category="vertical")
-    assert out.metric.tolist() == ["ARI", "NMI"] and out.value.tolist() == [0.5, 0.6]
-    with pytest.raises(ValueError, match=r"^unknown category 'verticall'"):
-        mtb.to_long(wide, method="M", category="verticall")
-
-
 def test_x67_labels_for_names_the_dataset_category_once():
-    _, msgs = _messages(mtb.labels_for, "D52mini")
+    _, msgs = _messages(mtb.engine.resolve.labels_for, "D52mini")
     hits = [m for m in msgs if "default order" in m]
     assert len(hits) == 1 and "In cross, StabMap" in hits[0] and "mosaic" not in hits[0]
-    _, msgs = _messages(mtb.labels_for, "D52mini")
+    _, msgs = _messages(mtb.engine.resolve.labels_for, "D52mini")
     assert not [m for m in msgs if "default order" in m]          # once a session
 
 
@@ -240,8 +193,8 @@ def test_default_order_warning_once():
     resolve._ORDER_NOTED.clear()
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
-        mtb.labels_for("D52mini", "cross")
-        mtb.labels_for("D52mini", "cross")
+        mtb.engine.resolve.labels_for("D52mini", "cross")
+        mtb.engine.resolve.labels_for("D52mini", "cross")
     assert len([x for x in w if "default order" in str(x.message)]) == 1
 
 

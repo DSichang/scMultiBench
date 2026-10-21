@@ -121,8 +121,7 @@ def test_no_batch_is_an_error(three):
     with pytest.raises(ValueError) as e2:
         classify(emb[:30], labels=paths["cty1"])
     assert str(e.value) == str(e2.value) == (
-        "classify needs the batch of each cell. Pass batch=, or "
-        "labels=mtb.labels_for(dataset, category, method).")
+        "classify needs the batch of each cell. Pass batch=.")
 
 
 def test_a_graph_or_label_output_is_an_error(three, tmp_path):
@@ -199,32 +198,6 @@ def test_same_seed_same_predictions(tmp_path):
     pd.testing.assert_frame_equal(a, b)
 
 
-def test_labels_for_dict_in_a_method_order(tmp_path):
-    """A labels_for dict whose order is not the default one (StabMap: its
-    reference batch first) names the batches and lines up the cells."""
-    ds = tmp_path / "DS"
-    ds.mkdir()
-    emb, labels, paths = _write(ds, {"cty3": ("ABC", 30), "cty1": ("AB", 20),
-                                     "cty2": ("ABC", 25)})
-    d = mtb.labels_for("DS", "cross", "StabMap", data_path=tmp_path)
-    assert list(d) == ["cty3", "cty1", "cty2"]
-    out = classify(emb, labels=d, reference="cty3")
-    assert out["batch"].tolist() == ["cty1"] * 20 + ["cty2"] * 25
-    assert out["label"].tolist() == labels[30:]
-    assert (out["label"] == out["predicted"]).all()
-    # the same files in another order need label_order=, as for evaluate
-    plain = {k: d[k] for k in ("cty1", "cty3", "cty2")}
-    with pytest.raises(ValueError) as e:
-        classify(emb, labels=plain)
-    with pytest.raises(ValueError) as e2, warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        mtb.evaluate(emb, labels=plain)
-    assert str(e.value) == str(e2.value)
-    out2 = classify(emb, labels=plain, label_order=["cty3", "cty1", "cty2"],
-                        reference="cty3")
-    pd.testing.assert_frame_equal(out, out2)
-
-
 # --- classification_metrics -------------------------------------------------
 
 METRICS = ["OCA", "ACA", "Spec", "Sens", "F1"]
@@ -298,24 +271,10 @@ def test_missing_column_is_an_error():
     with pytest.raises(ValueError) as e:
         classification_metrics(pd.DataFrame({"label": ["A"]}))
     assert str(e.value) == ("predictions has no predicted column. "
-                            "Pass the frame mtb.classify returns.")
+                            "Pass the frame classify returns.")
     with pytest.raises(ValueError) as e:
         classification_metrics(pd.DataFrame({"cell": [0]}))
     assert str(e.value) == ("predictions has no label and no predicted column. "
-                            "Pass the frame mtb.classify returns.")
+                            "Pass the frame classify returns.")
 
 
-def test_the_deprecated_names_warn_once_and_still_work(three):
-    emb, labels, paths = three
-    tail = ("is deprecated and will be removed in 0.5. "
-            "Use mtb.evaluate(..., metrics='classification').")
-    for name, call in (
-            ("classify", lambda: mtb.classify(emb, labels=list(paths.values()))),
-            ("classification_metrics",
-             lambda: mtb.classification_metrics(_pred(["r1", "r2"])))):
-        with warnings.catch_warnings(record=True) as rec:
-            warnings.simplefilter("always")
-            out = call()
-        future = [str(w.message) for w in rec if issubclass(w.category, FutureWarning)]
-        assert future == [f"{name} {tail}"]
-        assert not out.empty

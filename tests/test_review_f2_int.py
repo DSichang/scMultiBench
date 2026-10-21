@@ -70,35 +70,14 @@ def _old_unitednet_folder(root):
     return d
 
 
-def _old_inputs(d):
-    return {"rna": str(d / "rna.h5"), "atac_gas": str(d / "atac.h5"),
-            "rna_cty": str(d / "rna_cty.csv")}
-
-
-def test_unitednet_refuses_the_removed_rna_cty_key_naming_cty(tmp_path):
-    d = _old_unitednet_folder(tmp_path)
-    with pytest.raises(ValueError) as e:
-        mtb.run("UnitedNet", "vertical", inputs=_old_inputs(d),
-                out_dir=str(tmp_path / "o"), dry_run=True)
-    assert str(e.value) == ("The inputs key 'rna_cty' of UnitedNet was removed in 0.4. "
-                            "Use 'cty'.")
-    # the new key: the same file
-    argv = mtb.run("UnitedNet", "vertical",
-                   inputs={**{k: v for k, v in _old_inputs(d).items() if k != "rna_cty"},
-                           "cty": str(d / "rna_cty.csv")},
-                   out_dir=str(tmp_path / "o"), dry_run=True)
-    i = argv.index("--train_cty_path")
-    assert argv[i + 1] == str(d / "rna_cty.csv")
-
-
 def test_labels_for_gives_an_older_folder_the_cty_key(tmp_path):
     d = _old_unitednet_folder(tmp_path)
-    got = mtb.labels_for("OLD", "vertical", "UnitedNet", data_path=tmp_path)
+    got = mtb.engine.resolve.labels_for("OLD", "vertical", "UnitedNet", data_path=tmp_path)
     assert dict(got) == {"cty": str(d / "rna_cty.csv")}
-    inp = mtb.inputs_for("OLD", "vertical", "UnitedNet", data_path=tmp_path)
+    inp = mtb.engine.resolve.inputs_for("OLD", "vertical", "UnitedNet", data_path=tmp_path)
     assert inp["cty"] == got["cty"]
     # without a method the stem is kept, as before
-    assert list(mtb.labels_for("OLD", data_path=tmp_path)) == ["rna_cty"]
+    assert list(mtb.engine.resolve.labels_for("OLD", data_path=tmp_path)) == ["rna_cty"]
 
 
 # ====================================================================== M02
@@ -108,29 +87,9 @@ def _rows(method, dataset, base=0.5):
             for k, m in enumerate(("ARI", "NMI", "ASW", "cLISI"))]
 
 
-def _trade_places():
-    """B leads on D1, A on D2: every mean rank ties at 1.5."""
-    return pd.DataFrame(_rows("A", "D1") + _rows("B", "D1", 0.6)
-                        + _rows("A", "D2", 0.3) + _rows("B", "D2", 0.2))
-
-
 def _figure_texts(fig):
     return [t.get_text() for ax in fig.axes for t in ax.texts] + [t.get_text()
                                                                   for t in fig.texts]
-
-
-def test_summary_mode_names_the_tied_mean_rank_not_a_metric_value():
-    import matplotlib.pyplot as plt
-    tbl, msgs = _messages(mtb.plot.build_table, _trade_places(), aggregate="summary")
-    grey = [m for m in msgs if "are grey." in m]
-    assert grey == ["Every method has mean rank 1.5 in ARI, NMI, ASW and cLISI. "
-                    "Those columns are grey. Leave them out with metrics=."], msgs
-    assert not any("same value" in m or "1.500" in m for m in msgs)
-    for overall in ("rank", "mean_overall"):
-        fig, msgs = _messages(mtb.plot.bubble, _trade_places(), aggregate="summary",
-                              overall=overall)
-        assert [m for m in msgs if "are grey." in m] == grey
-        plt.close(fig)
 
 
 def test_dataset_mode_keeps_the_metric_value():
@@ -160,11 +119,11 @@ def test_run_refuses_a_gene_activity_file_in_another_cell_order(tmp_path):
     with pytest.raises(ValueError, match=r"^MultiMAP reads atac_gas\.h5 of SHUF, which "
                                          r"lists the ATAC cells in another order than "
                                          r"atac_peak\.h5\."):
-        mtb.run("MultiMAP", "diagonal", inputs=inp, out_dir=str(tmp_path / "o"),
+        mtb.engine.runner.run("MultiMAP", "diagonal", inputs=inp, out_dir=str(tmp_path / "o"),
                 dry_run=True)
     # SCALEX reads rna + atac_gas: the peak file next to it sets the order
     with pytest.raises(ValueError, match="another order"):
-        mtb.run("SCALEX", "diagonal", inputs={"rna": inp["rna"], "atac_gas": inp["atac_gas"]},
+        mtb.engine.runner.run("SCALEX", "diagonal", inputs={"rna": inp["rna"], "atac_gas": inp["atac_gas"]},
                 out_dir=str(tmp_path / "o"), dry_run=True)
     # other cells
     d2 = tmp_path / "OTHER"
@@ -173,7 +132,7 @@ def test_run_refuses_a_gene_activity_file_in_another_cell_order(tmp_path):
         shutil.copy(d / f, d2 / f)
     _h5(d2 / "atac_gas.h5", [f"g{i}" for i in range(20)], [f"x{i}" for i in range(24)])
     with pytest.raises(ValueError, match="which holds other cells than atac_peak.h5"):
-        mtb.run("MultiMAP", "diagonal",
+        mtb.engine.runner.run("MultiMAP", "diagonal",
                 inputs={r: str(d2 / f"{r}.h5") for r in ("rna", "atac_peak", "atac_gas")},
                 out_dir=str(tmp_path / "o"), dry_run=True)
 
@@ -181,7 +140,7 @@ def test_run_refuses_a_gene_activity_file_in_another_cell_order(tmp_path):
 def test_run_passes_files_that_agree(tmp_path):
     d = _diagonal(tmp_path, "OK", list(range(24)))
     inp = {r: str(d / f"{r}.h5") for r in ("rna", "atac_peak", "atac_gas")}
-    argv = mtb.run("MultiMAP", "diagonal", inputs=inp, out_dir=str(tmp_path / "o"),
+    argv = mtb.engine.runner.run("MultiMAP", "diagonal", inputs=inp, out_dir=str(tmp_path / "o"),
                    dry_run=True)
     assert isinstance(argv, list) and argv
     # Seurat_v5 on RNA and ATAC of the same cells
@@ -191,7 +150,7 @@ def test_run_passes_files_that_agree(tmp_path):
     _h5(p / "rna.h5", [f"g{i}" for i in range(20)], cells)
     _h5(p / "atac_peak.h5", [f"chr1:{i * 100}-{i * 100 + 50}" for i in range(30)],
         cells[::-1])
-    argv = mtb.run("Seurat_v5", "diagonal",
+    argv = mtb.engine.runner.run("Seurat_v5", "diagonal",
                    inputs={"rna": str(p / "rna.h5"), "atac_peak": str(p / "atac_peak.h5")},
                    out_dir=str(tmp_path / "o5"), dry_run=True)
     assert isinstance(argv, list) and argv
@@ -258,58 +217,10 @@ def _git_repo(path):
                           capture_output=True, text=True).stdout.strip()
 
 
-def test_config_says_when_the_scripts_are_not_fetched(tmp_path, monkeypatch):
-    monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
-    monkeypatch.setattr(config.DEFAULT, "repo_path", tmp_path / "none")
-    row = next(r for r in config._sources() if r["name"] == "scripts_commit")
-    assert row["value"] == "not fetched"
-    assert "multibench fetch --scripts" in row["source"]
-    (tmp_path / "plain" / "tools_scripts").mkdir(parents=True)
-    monkeypatch.setattr(config.DEFAULT, "repo_path", tmp_path / "plain")
-    row = next(r for r in config._sources() if r["name"] == "scripts_commit")
-    assert row["value"] == "unknown" and "is not a git checkout" in row["source"]
-
-
-# ====================================================================== M22
-def test_glue_d28_caveat_names_the_rename_call(tmp_path):
-    # R3-04: mtb.run rewrites D28's chr_start_end names for GLUE, so the
-    # caveat has no peak-name clause and does not name the dataset
-    r = full_scan("D28", "diagonal", methods=["GLUE"], verbose=False).iloc[0]
-    assert r["caveat"].startswith("GLUE reads the GENCODE v43 human annotation")
-    assert "peak names" not in r["caveat"] and "D28" not in r["caveat"]
-    assert ";" not in r["caveat"] and "D27" not in r["caveat"]
-    # the named call writes the spelling GLUE needs
-    src = Path(mtb.inputs_for("D28", "diagonal", "GLUE")["atac_peak"])
-    out = mtb.io.normalize_peak_names(src, tmp_path / "atac_peak.h5")
-    with h5py.File(out, "r") as f:
-        first = f["matrix/features"][0].decode()
-    assert re.fullmatch(r"chr\w+:\d+-\d+", first), first
-
-
 def test_caveat_clauses_join_as_sentences():
     # R6-10: the caveat parts are sentences, joined with a space
     assert W._join_sentences(["A sentence.", "", "GLUE needs b"]) == "A sentence. GLUE needs b."
     assert W._join_sentences(["Only one."]) == "Only one."
-
-
-# ====================================================================== M25
-def test_docstrings_drop_the_justification_tails():
-    # 0.4: to_long is deprecated; evaluate returns the long table and says so
-    texts = {
-        "evaluate": mtb.evaluate.__doc__,
-        "summary": W.BatchResult.summary.__doc__,
-        "plan": mtb.env.plan.__doc__,
-        "load_results": mtb.load_results.__doc__,
-    }
-    flat = {k: " ".join(v.split()) for k, v in texts.items()}
-    assert "keep their provenance through a CSV round trip" not in flat["evaluate"]
-    assert "next to ``mtb.load_results`` rows or alone." in flat["evaluate"]
-    assert "the placeholder the plotting layer uses" not in flat["evaluate"]
-    assert "bounded above by the ARI itself" not in flat["summary"]
-    # R4-14 deleted the ratio sentence; 0.4 cut the formula with the long notes
-    assert "not a difference, because" not in flat["summary"]
-    assert "so a whole category needs only a few envs" not in flat["plan"]
-    assert "go straight to" not in flat["load_results"]
 
 
 # ====================================================================== M06
@@ -406,23 +317,6 @@ def test_quickstart_laptop_tab_runs_on_a_panel_of_14_adts(tmp_path, monkeypatch,
             and "multibench" in str(w.filename)]
     assert not any("only one method" in m.lower() for m in msgs), msgs
     plt.close("all")
-
-
-@needs_docs
-def test_discover_explains_a_filtered_grand_score():
-    text = " ".join((_docs_root() / "tutorials" / "discover.md").read_text().split())
-    assert "On each dataset the best method gets 1 and the lowest 0." not in text
-    # c2 (D01): the stored methods set the scale
-    assert ("On each dataset, the stored methods set the 0-1 scale: the best gets 1 and "
-            "the lowest 0") in text
-    assert "a filtered list can start below 1 and end above 0" in text
-    # the facts behind it
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        peak = mtb.recommend("diagonal", atac="peak")["grand_score"]
-        full = mtb.recommend("vertical")["grand_score"]
-    assert peak.max() < 1 and peak.min() > 0
-    assert full.max() == 1 and full.min() == 0
 
 
 @needs_docs

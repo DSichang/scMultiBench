@@ -54,7 +54,7 @@ def test_evaluate_rejects_non_scib():
     with pytest.raises(ValueError) as exc:
         pipeline.evaluate(embedding="x.h5", category="mosaic", metrics="dimension_reduction",
                           labels="c.csv")
-    assert "dimension_reduction" in str(exc.value) and "metric family" in str(exc.value)
+    assert "Unknown metrics= token dimension_reduction" in str(exc.value)
 
 
 def test_evaluate_requires_labels_and_clustering(tmp_path):
@@ -384,35 +384,6 @@ def test_evaluate_warns_on_transpose():
         warnings.simplefilter("always")
         evaluate(emb, labels=ct, metrics=["ASW"])
     assert not [x for x in w if "transposed" in str(x.message)]
-
-
-def test_evaluate_clustering_accepts_csv_and_arraylike(tmp_path):
-    # clustering= is deprecated since 0.4: its implementation, without the warning
-    pytest.importorskip("scib")
-    from multibench.eval.pipeline import _evaluate
-    emb, ct, _ = _toy()
-    p = tmp_path / "cluster.csv"; _write_cty(p, ct)
-    ref = _evaluate(emb, labels=ct, clustering=ct, metrics=["ARI"])
-    assert _value(ref, "ARI") == pytest.approx(1.0)
-    for cl in (p, pd.Series(ct), list(ct)):
-        got = _evaluate(emb, labels=ct, clustering=cl, metrics=["ARI"])
-        assert _value(got, "ARI") == _value(ref, "ARI")
-
-
-def test_evaluate_clustering_h5_path_reads_like_the_str(tmp_path):
-    # the suffix decides how a clustering= path is read, not its type: a
-    # pathlib.Path to an .h5 goes to read_clustering, exactly as the str does
-    pytest.importorskip("scib")
-    from multibench.eval.pipeline import _evaluate
-    emb, ct, _ = _toy()
-    p = tmp_path / "x.h5"
-    with h5py.File(p, "w") as f:
-        f.create_group("obs").create_dataset(
-            "cluster_leiden", data=np.repeat([0, 1], len(ct) // 2))
-    as_str = _evaluate(emb, labels=ct, clustering=str(p), metrics=["ARI"])
-    as_path = _evaluate(emb, labels=ct, clustering=p, metrics=["ARI"])
-    assert _value(as_str, "ARI") == pytest.approx(1.0)
-    assert _value(as_path, "ARI") == _value(as_str, "ARI")
 
 
 def test_read_labels_reads_benchmark_style_files(tmp_path):

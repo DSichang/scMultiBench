@@ -68,24 +68,6 @@ def _flat(text):
     return " ".join(text.split())
 
 
-def _would_run(key, methods, **where):
-    """The rows ``run_all`` runs for ``methods`` with the notebook's
-    arguments, on a computer that has every environment: the rows with their
-    input files that nothing but the environment blocks, less the rows inside
-    a larger one of the same method (no notebook names the modalities)."""
-    import warnings
-    import multibench as mtb
-    from multibench import workflow as W
-    t = GEN.TASKS[key]
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        plan = mtb.run_all(where.pop("dataset", t["ds"]), t["cat"], methods=methods,
-                           dry_run=True, verbose=False, assume_gpu=True, **where)
-    other = [str(r).replace(str(e), "").strip() for r, e in zip(plan.reason, plan.env_reason)]
-    rows = plan[[bool(f) and o == "" for f, o in zip(plan.files_ok, other)]]
-    return rows.drop(index=W._nested_rows(rows)[0])
-
-
 def _cells(name):
     nb = json.loads((ROOT / "notebooks" / f"{name}.ipynb").read_text())
     return [(c["cell_type"], "".join(c["source"])) for c in nb["cells"]]
@@ -119,19 +101,6 @@ def test_install_cell_keeps_numpy_and_pandas():
     plain install upgrades both, and the session must restart)."""
     assert "numpy=={numpy.__version__}" in GEN.INSTALL_CELL
     assert "pandas=={pandas.__version__}" in GEN.INSTALL_CELL
-
-
-@pytest.mark.parametrize("name", ALL)
-def test_no_flags_fallbacks_or_helpers(name):
-    """No function definitions, no try/except, no if/else in any code cell."""
-    for src in _code(name):
-        for node in ast.walk(_tree(src)):
-            assert not isinstance(node, (ast.FunctionDef, ast.Lambda, ast.Try, ast.If)), (
-                name, type(node).__name__, src[:80])
-    text = "\n".join(_code(name))
-    for gone in ("INSTALL_ENVS", "stored_sweep", "replacement", "subsample_dataset",
-                 "fetch_outputs", "env_ok"):
-        assert gone not in text, (name, gone)
 
 
 @pytest.mark.parametrize("name", ALL)
@@ -204,52 +173,6 @@ def test_no_notebook_names_the_modalities_or_overrides_the_atac_check():
                             and ast.unparse(n.func) == "mtb.run_all")
                 assert {k.arg for k in tree.keywords} <= {"methods", "out_dir", "data_path"}, \
                     (name, call)
-
-
-def test_the_atac_check_stops_no_method_of_a_task():
-    """Matilda (vertical RNA + ADT + ATAC), UnitedNet and scMDC (cross RNA +
-    ATAC) are registered as reading peaks, the form the task's datasets hold,
-    as in the benchmark."""
-    import multibench as mtb
-    for m in ("Matilda", "scMDC", "UnitedNet"):
-        assert mtb.method_info(m)["atac"] == "peak", m
-    for key in ("vertical_rna_adt_atac", "cross_rna_atac", "vertical_rna_atac"):
-        if not (mtb.config.DEFAULT.data_path / GEN.TASKS[key]["ds"]).is_dir():
-            pytest.skip(f"{GEN.TASKS[key]['ds']} is not on disk")
-        everyone = GEN.task_methods(key)
-        assert sorted(_would_run(key, everyone).method) == everyone, key
-
-
-def test_the_generator_refuses_a_task_whose_call_leaves_a_method_out(monkeypatch):
-    """``check_task`` stops the generation when the notebooks' ``run_all``
-    call would not run every method of the task once."""
-    key = "vertical_rna_adt_atac"
-    GEN.check_task(key)
-    rows = GEN.would_run(key, GEN.task_methods(key))
-    monkeypatch.setattr(GEN, "would_run", lambda *a, **k: rows[rows.method != "Matilda"])
-    with pytest.raises(SystemExit, match="not one row per method of the task"):
-        GEN.check_task(key)
-
-
-def test_the_generator_refuses_a_method_that_reads_only_some_batches(monkeypatch):
-    """Every method of a task reads every batch of its dataset. UINMF has a
-    three-batch variant for the cross datasets with three batches, so it can
-    be a default there; a method that read two of three would stop the
-    generation."""
-    import multibench as mtb
-    for key in ("cross_rna_adt", "cross_rna_atac"):
-        ds = GEN.TASKS[key]["ds"]
-        if not (mtb.config.DEFAULT.data_path / ds).is_dir():
-            pytest.skip(f"{ds} is not on disk")
-        monkeypatch.setitem(GEN.TASKS[key], "methods", ["StabMap", "UINMF"])
-        GEN.check_task(key)
-        # 0.4.0: the generator checks with the internal labels_for (mtb.labels_for is deprecated)
-        real = GEN.labels_for
-        monkeypatch.setattr(GEN, "labels_for", lambda *a, **k: (
-            list(real(*a, **k))[:2] if a[2:] == ("UINMF",) else real(*a, **k)))
-        with pytest.raises(SystemExit, match=f"UINMF reads only some batches of {ds}"):
-            GEN.check_task(key)
-        monkeypatch.setattr(GEN, "labels_for", real)
 
 
 # ------------------------------------------------- the article's 13 tasks
@@ -354,9 +277,9 @@ def test_every_method_reads_every_batch(key):
     t = GEN.TASKS[key]
     if not (mtb.config.DEFAULT.data_path / t["ds"]).is_dir():
         pytest.skip(f"{t['ds']} is not on disk")
-    n = len(mtb.labels_for(t["ds"]))
+    n = len(mtb.engine.resolve.labels_for(t["ds"]))
     short = [m for m in GEN.task_methods(key)
-             if len(mtb.labels_for(t["ds"], t["cat"], m)) < n]
+             if len(mtb.engine.resolve.labels_for(t["ds"], t["cat"], m)) < n]
     assert short == [], key
     for name in [f"tutorial_{key}"] + [f"tutorial_{key}_all"] * GEN.has_all(key):
         assert "takes two batches" not in _markdown(name), name
@@ -409,55 +332,13 @@ def test_every_method_of_a_task_has_its_input_files_on_the_dataset(key):
         (key, sorted(set(everyone) - set(sc[sc.files_ok].method)))
 
 
-@pytest.mark.parametrize("key", KEYS)
-def test_the_notebook_arguments_give_every_method_one_row_with_its_files(key):
-    """With the exact arguments a notebook passes to ``run_all``, each of its
-    methods runs once, on the variant of the task, with its input files on
-    the task's dataset: the default methods in the tutorial, every method of
-    the task in the every-method notebook."""
-    import multibench as mtb
-    t = GEN.TASKS[key]
-    if not (mtb.config.DEFAULT.data_path / t["ds"]).is_dir():
-        pytest.skip(f"{t['ds']} is not on disk")
-    of_task = GEN.run_variants(key)
-    runs = [(False, t["methods"])] + [(True, GEN.task_methods(key))] * GEN.has_all(key)
-    for every, methods in runs:
-        rows = _would_run(key, methods)
-        assert bool(rows.files_ok.all())
-        assert dict(zip(rows.method, rows.modalities)) == {m: of_task[m] for m in methods}, \
-            (key, every)
-        assert len(rows) == len(methods), (key, every, list(rows.method))
-
-
-def test_uinmf_runs_its_three_batch_variant_on_the_three_batch_cross_datasets():
-    """The folder holds the files of UINMF's two-batch variant too. The run
-    takes the three-batch one, whose files hold the other's."""
-    import multibench as mtb
-    for key, second in (("cross_rna_adt", "adt"), ("cross_rna_atac", "atac")):
-        if not (mtb.config.DEFAULT.data_path / GEN.TASKS[key]["ds"]).is_dir():
-            pytest.skip(f"{GEN.TASKS[key]['ds']} is not on disk")
-        rows = _would_run(key, ["UINMF"])
-        assert list(rows.modalities) == [
-            "+".join(f"{r}{i}" for r in ("rna", second) for i in (1, 2, 3))], key
-
-
-def test_the_tasks_cover_every_method_of_the_four_categories():
-    import multibench as mtb
-    assert {t["cat"] for t in GEN.TASKS.values()} == set(CATEGORIES)
-    for cat in CATEGORIES:
-        covered = {m for k, t in GEN.TASKS.items() if t["cat"] == cat
-                   for m in GEN.task_methods(k)}
-        assert covered == set(mtb.list_methods(category=cat)), cat
-    assert set(GEN.OWN) == set(GEN.TASKS)
-
-
 def test_end_to_end_installs_and_runs_matilda():
     code = "\n".join(_code("tutorial_end_to_end"))
     assert 'mtb.env.install(["Matilda"])' in code        # installs by default (X27)
     # 0.4.0: one method is run_all(methods=[m]); res.embedding(m) is its embedding
     assert 'mtb.run_all("D11", "vertical", methods=["Matilda"]' in code
     assert 'emb = res.embedding("Matilda")' in code
-    assert "mtb.evaluate(emb" in code and "mtb.run(" not in code
+    assert "mtb.evaluate(emb" in code and "mtb.engine.runner.run(" not in code
 
 
 @pytest.mark.parametrize("name", RUNNING)
@@ -496,7 +377,7 @@ def test_quickstart_and_next_steps_link_every_task_tutorial():
 
 def test_colab_quickstart_runs_nothing():
     code = "\n".join(_code("colab_quickstart"))
-    for call in ("env.install", "run_all", "mtb.run(", "data.fetch"):
+    for call in ("env.install", "run_all", "mtb.engine.runner.run(", "data.fetch"):
         assert call not in code
 
 

@@ -89,8 +89,8 @@ def test_an_empty_labels_dict_has_nothing_to_score(tmp_path):
     _folder(data, "NOLAB", {"rna.h5": 50, "atac_gas.h5": 40}, {})
     _folder(data, "X_NOLAB", {f"{m}{i}.h5": 45 for m in ("rna", "adt") for i in (1, 2)},
             {})
-    for labels in ({}, mtb.labels_for("NOLAB", "diagonal", "SCALEX", data_path=data),
-                   mtb.labels_for("X_NOLAB", "cross", data_path=data)):
+    for labels in ({}, mtb.engine.resolve.labels_for("NOLAB", "diagonal", "SCALEX", data_path=data),
+                   mtb.engine.resolve.labels_for("X_NOLAB", "cross", data_path=data)):
         assert labels == {}
         with pytest.raises(ValueError) as e:
             mtb.evaluate(emb, labels=labels, metrics=["ASW"])
@@ -141,7 +141,7 @@ def test_run_off_linux_is_the_linux_sentence_alone(tmp_path, monkeypatch):
     monkeypatch.setattr(envs, "host_platform_problem", lambda: DARWIN)
     monkeypatch.setattr(runner.envs, "installed_envs", lambda conda=None: ["base"])
     with pytest.raises(OSError) as e:
-        mtb.run("totalVI", "vertical", inputs=mtb.inputs_for("D11", "vertical", "totalVI"),
+        mtb.engine.runner.run("totalVI", "vertical", inputs=mtb.engine.resolve.inputs_for("D11", "vertical", "totalVI"),
                 out_dir=str(tmp_path / "out"))
     msg = str(e.value)
     assert msg == ("Methods run only on Linux, and this computer runs macOS. Run this "
@@ -154,7 +154,7 @@ def test_run_on_linux_keeps_the_install_line(tmp_path, monkeypatch):
     from multibench.engine import runner
     monkeypatch.setattr(runner.envs, "installed_envs", lambda conda=None: ["base"])
     with pytest.raises(OSError) as e:
-        mtb.run("totalVI", "vertical", inputs=mtb.inputs_for("D11", "vertical", "totalVI"),
+        mtb.engine.runner.run("totalVI", "vertical", inputs=mtb.engine.resolve.inputs_for("D11", "vertical", "totalVI"),
                 out_dir=str(tmp_path / "out"))
     msg = str(e.value)
     assert "is not installed" in msg and "multibench env install --methods totalVI" in msg

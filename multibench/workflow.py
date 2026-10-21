@@ -37,7 +37,7 @@ from .engine.runner import run as _run
 from .eval import io as _eio, scib as _escib
 from .eval.pipeline import LONG_COLUMNS as _LONG_COLUMNS, _long_table as _to_long, _scores
 
-__all__ = ["scan", "run_all", "BatchResult", "describe_layout", "load_batch", "sweep"]
+__all__ = ["scan", "run_all", "BatchResult", "describe_layout", "load_batch"]
 
 
 def _registry_id_or(name):
@@ -48,8 +48,6 @@ def _registry_id_or(name):
         return name
 
 
-@_compat.keywords("load_batch", private="_load_batch", kept={"data_path": _compat.use(
-    "mtb.config.DEFAULT.data_path")})
 def load_batch(out_dir, *, methods=None) -> "BatchResult":
     """Reload a saved ``run_all`` result.
 
@@ -92,12 +90,6 @@ def load_batch(out_dir, *, methods=None) -> "BatchResult":
     gone, and the dataset folder under the recorded data root, then
     ``mtb.config.DEFAULT.data_path``.
     """
-    return _load_batch(out_dir, methods=methods)
-
-
-def _load_batch(out_dir, *, methods=None, data_path=None) -> "BatchResult":
-    """:func:`load_batch`, with the deprecated ``data_path=``: the folder that
-    holds the dataset folder, looked up first."""
     folder = Path(out_dir)
     if not (folder / "batch_result.json").is_file():
         raise FileNotFoundError(
@@ -116,7 +108,6 @@ def _load_batch(out_dir, *, methods=None, data_path=None) -> "BatchResult":
             raise KeyError(f"no record for {unknown} in {folder}; methods in the "
                            f"tree: {have}")
         records = [r for r in records if r.get("method") in set(methods)]
-    _check_data_path(data_path, blob["dataset"])
     for r in records:
         # a tree copied from another host: the output folder sits next to the JSON;
         # an older record without out_dir: the folder run_all names
@@ -128,7 +119,7 @@ def _load_batch(out_dir, *, methods=None, data_path=None) -> "BatchResult":
         if saved.exists() and str(saved) != str(r.get("out_dir")):
             r["out_dir"] = str(saved.resolve())
         # left as recorded when no root holds the dataset; rescore then names the roots
-        root, found = _dataset_root(r, blob["dataset"], data_path)
+        root, found = _dataset_root(r, blob["dataset"])
         if found and root is not None:
             r["data_path"] = r["data_root"] = root
     long_path = folder / "long.csv"
@@ -198,14 +189,6 @@ ROLES = {
 #: Older file names the loader still reads, in one line.
 OLDER_NAMES = ("Older names still read: peak.h5 for peaks, and atac.h5 for gene "
                "activity.")
-
-
-def _categories() -> dict:
-    """``{category: description}`` (the deprecated ``list_categories``)."""
-    return dict(CATEGORIES)
-
-
-list_categories = _compat.renamed("list_categories", "describe_layout", _categories)
 
 
 def describe_layout(category: str | None = None) -> str:
@@ -870,7 +853,7 @@ def _modality_matcher(modalities, named=None):
     rules are those of the scan docstring. ``named`` are the ``methods=`` ids."""
     from .discover import _modality_filter
     from .engine.schema import modality_family
-    _modality_filter(modalities, None)      # ValueError / TypeError as in find_methods
+    _modality_filter(modalities)      # ValueError / TypeError as in find_methods
     exact = set(registry.normalize_modalities(modalities))
     spelled = {str(t).lower() for t in modalities}
     named = set(named or ())
@@ -1212,15 +1195,6 @@ def _category_hint(df: "pd.DataFrame", category: str | None) -> str:
             + f'category="{cat}"' + ".")
 
 
-#: the tails of the deprecated keywords of scan and run_all
-_DATA_PATH = _compat.use("the dataset folder path or mtb.config.DEFAULT.data_path")
-_ATAC_MISMATCH = _compat.use("an ATAC file in the form the method reads")
-
-
-@_compat.keywords("scan", private="_scan_methods", dropped=("out_dir",),
-                  kept={"per_method": _compat.use("run_all(..., dry_run=True)"),
-                        "params": _compat.use("run_all(..., params=..., dry_run=True)"),
-                        "data_path": _DATA_PATH, "allow_atac_mismatch": _ATAC_MISMATCH})
 def scan(dataset: str, category: str | None = None, *,
          methods: list[str] | None = None,
          modalities: list[str] | str | None = None,
@@ -1284,8 +1258,12 @@ def scan(dataset: str, category: str | None = None, *,
     mtb.run_all : runs the runnable methods; ``dry_run=True`` returns the full plan.
     mtb.describe_layout : how to lay out a dataset folder.
     """
-    return _scan_methods(dataset, category, methods=methods, modalities=modalities,
-                         verbose=verbose, assume_gpu=assume_gpu)
+    if category is None:
+        category = known_category(dataset)
+    df, private = _scan(dataset, category, methods=methods, modalities=modalities,
+                        verbose=False, assume_gpu=assume_gpu)
+    return _per_method(df, private, verbose=verbose,
+                       nested=not isinstance(modalities, (list, tuple)))
 
 
 def known_category(dataset) -> str | None:
@@ -1300,27 +1278,9 @@ def known_category(dataset) -> str | None:
     return cats.iloc[0] if len(cats) == 1 and ";" not in cats.iloc[0] else None
 
 
-def _scan_methods(dataset, category=None, *, methods=None, modalities=None, data_path=None,
-                  params=None, verbose=True, assume_gpu=False, allow_atac_mismatch=False,
-                  per_method=True) -> pd.DataFrame:
-    """:func:`scan`, with the deprecated ``per_method``: ``False`` returns the full
-    plan behind ``run_all(dry_run=True)``."""
-    if category is None:
-        category = known_category(dataset)
-    df, private = _scan(dataset, category, methods=methods, modalities=modalities,
-                        data_path=data_path, params=params,
-                        verbose=verbose and per_method is False, assume_gpu=assume_gpu,
-                        allow_atac_mismatch=allow_atac_mismatch)
-    if per_method is False:
-        return df
-    return _per_method(df, private, data_path=data_path, verbose=verbose,
-                       nested=not isinstance(modalities, (list, tuple)))
-
-
 def _scan(dataset: str, category: str | None = None, *, methods=None, modalities=None,
           data_path=None, out_dir="<out_dir>", params: dict | None = None,
-          verbose: bool = True, assume_gpu: bool = False,
-          allow_atac_mismatch: bool = False) -> "tuple[pd.DataFrame, pd.DataFrame]":
+          verbose: bool = True, assume_gpu: bool = False) -> "tuple[pd.DataFrame, pd.DataFrame]":
     """The full plan (every column of :data:`SCAN_COLUMNS`), and a second frame
     aligned with it: ``_other`` (the
     reason without the off-Linux sentence), ``_label_inputs`` and ``_folder_caveat``."""
@@ -1390,8 +1350,7 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
             if extra:
                 rec["caveat"] = _join_sentences([rec["caveat"], *extra])
                 rec["_folder_caveat"] = _join_sentences(extra)
-            if not allow_atac_mismatch:
-                wrong_atac = _wrong_atac_reason(spec.id, extra)
+            wrong_atac = _wrong_atac_reason(spec.id, extra)
         except Exception as e:  # missing files, no variant, bad layout
             full = f"{type(e).__name__}: {e}"
             file_problems.append(full)
@@ -2172,13 +2131,6 @@ class BatchResult:
         return pd.concat(frames, ignore_index=True).drop(columns="clustering",
                                                          errors="ignore")
 
-    def __getattr__(self, name):
-        # the deprecated ``results`` (not a property: dir() leaves it out)
-        if name == "results":
-            _compat.deprecated("BatchResult.results", _compat.use("BatchResult.records"))
-            return self.records
-        raise AttributeError(f"{type(self).__name__!r} object has no attribute {name!r}")
-
     @property
     def failures(self) -> pd.DataFrame:
         """Methods that failed, timed out or could not be scored.
@@ -2708,10 +2660,9 @@ def _error_tail(error, width: int = 200) -> str:
 
 
 def _scan_hint(dataset: str, category: str, *, data_path=None, methods=None,
-               modalities=None, allow_atac_mismatch: bool = False,
-               assume_gpu: bool = False, every: bool = False) -> str:
-    """The ``mtb.run_all(..., dry_run=True)`` call that shows the rows of a ``run_all`` call, with every non-default argument as
-    the caller gave it. A folder outside the default data path is named by its
+               modalities=None, every: bool = False) -> str:
+    """The ``mtb.run_all(..., dry_run=True)`` call that shows the rows of a
+    ``run_all`` call, with every non-default argument as the caller gave it. A folder outside the default data path is named by its
     path, as the docs teach (relative to the working directory when inside it)."""
     if data_path is not None and (os.path.realpath(data_path)
                                   != os.path.realpath(config.DEFAULT.data_path)):
@@ -2725,17 +2676,11 @@ def _scan_hint(dataset: str, category: str, *, data_path=None, methods=None,
         py.append(f"modalities={list(modalities)}")
     elif every:
         py.append('modalities="all"')
-    if allow_atac_mismatch:
-        py.append("allow_atac_mismatch=True")
-    if assume_gpu:
-        py.append("assume_gpu=True")
     return f"mtb.run_all({', '.join(py + ['dry_run=True'])})"
 
 
 def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame,
-                              methods, *, data_path=None, modalities=None,
-                              allow_atac_mismatch: bool = False,
-                              assume_gpu: bool = False, others=None,
+                              methods, *, data_path=None, modalities=None, others=None,
                               every: bool = False, note: str = "",
                               hidden: bool = False) -> str:
     """The ``ValueError`` text when no requested row can start (run_all's Notes);
@@ -2749,8 +2694,7 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
     platform = _platform_line(blocked)
     doctor = "mtb.env.install(dry_run=True)"
     where = _scan_hint(dataset, category, data_path=data_path, methods=methods,
-                       modalities=modalities, allow_atac_mismatch=allow_atac_mismatch,
-                       assume_gpu=assume_gpu, every=every)
+                       modalities=modalities, every=every)
     lacking = ""
     if platform and others is not None:
         # as for SKIPPED records: the rest are only counted
@@ -2775,8 +2719,7 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
                 if methods else "No method can run on ") + f"{dataset} ({category})."
         what = "the plan" if methods else "the listed rows" if hidden else "every row"
         where = _scan_hint(dataset, category, data_path=data_path, methods=methods,
-                           modalities=modalities, allow_atac_mismatch=allow_atac_mismatch,
-                           assume_gpu=assume_gpu, every=every)
+                           modalities=modalities, every=every)
         return f"{head}\n{platform}" + (f"{note}\n" if note else "") + f"{where} shows {what}."
     if methods:
         head = (f"None of the requested methods ({', '.join(methods)}) can run on "
@@ -2970,33 +2913,22 @@ def _dataset_folder(dataset, data_path) -> Path:
     return Path(base) / dataset
 
 
-def _root_tries(rec: dict, override=None) -> list:
-    """The data roots a saved record's dataset is looked up under: ``override``,
-    the recorded ``data_path`` (``None`` = config's), then ``data_root``."""
-    tries = [override] if override is not None else []
-    tries.append(rec.get("data_path"))
+def _root_tries(rec: dict) -> list:
+    """The data roots a saved record's dataset is looked up under: the recorded
+    ``data_path`` (``None`` = config's), then ``data_root``."""
+    tries = [rec.get("data_path")]
     if rec.get("data_root"):
         tries.append(rec["data_root"])
     return tries
 
 
-def _dataset_root(rec: dict, dataset: str, override=None) -> tuple:
+def _dataset_root(rec: dict, dataset: str) -> tuple:
     """``(root, found)``: the first root of :func:`_root_tries` that holds the
     dataset, absolute (``None`` = config's); else the recorded ``data_path``, ``False``."""
-    for root in _root_tries(rec, override):
+    for root in _root_tries(rec):
         if _dataset_folder(dataset, root).is_dir():
             return (None if root is None else str(Path(root).resolve())), True
     return rec.get("data_path"), False
-
-
-def _check_data_path(data_path, dataset: str) -> None:
-    """``ValueError`` when ``load_batch(data_path=)`` does not hold ``dataset``."""
-    if data_path is None or _dataset_folder(dataset, data_path).is_dir():
-        return
-    root = Path(data_path)
-    here = f", here {root.parent}" if root.name == dataset else ""
-    raise ValueError(f"{root / dataset} is not a folder. data_path= is the folder "
-                     f"that holds {dataset}{here}.")
 
 
 #: what to do when a saved result's dataset folder is not found
@@ -3155,7 +3087,7 @@ def _check_batch(vec, dataset: str) -> None:
         return
     miss = _eio.missing_mask(vec)
     raise ValueError(
-        "batch" + f": {int(miss.sum()):,} of the "
+        f"batch: {int(miss.sum()):,} of the "
         f"{len(miss):,} cells of {dataset} have no batch{_eio._missing_example(vec)}. "
         f"Give every cell a batch.")
 
@@ -3464,9 +3396,6 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
     return rec
 
 
-@_compat.keywords("run_all", private="_run_all", kept={
-    "data_path": _DATA_PATH, "allow_atac_mismatch": _ATAC_MISMATCH,
-    "assume_gpu": _compat.use("mtb.scan(..., assume_gpu=True)")})
 def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalities=None,
             params: dict | None = None, batch=None, evaluate: bool = True,
             dry_run: bool = False, timeout: float | None = None,
@@ -3544,18 +3473,14 @@ def run_all(dataset: str, category: str, out_dir=None, *, methods=None, modaliti
 
 
 def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalities=None,
-             params: dict | None = None, data_path=None, evaluate: bool = True,
+             params: dict | None = None, evaluate: bool = True,
              dry_run: bool = False, verbose: bool = True,
              timeout: float | None = None,
              skip_existing: bool = False,
-             batch=None,
-             assume_gpu: bool = False,
-             allow_atac_mismatch: bool = False) -> "BatchResult | pd.DataFrame":
-    """:func:`run_all`, with the deprecated ``data_path=`` (the folder that holds
-    the dataset folder), ``assume_gpu=`` (a dry run skips this host's GPU test)
-    and ``allow_atac_mismatch=`` (also run a method whose ATAC file holds the
-    other representation)."""
-    dataset, data_path = _resolve.split_dataset(dataset, data_path)
+             batch=None) -> "BatchResult | pd.DataFrame":
+    """:func:`run_all` before the plan's columns are picked: a dry run returns
+    every column of the scan frame."""
+    dataset, data_path = _resolve.split_dataset(dataset, None)
     # the arguments first, so a bad combination is not reported as an I/O error
     registry.check_category(category)
     registry.check_id_list(methods, "methods")
@@ -3570,11 +3495,6 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
         if stray:
             raise ValueError(f"params names {_and_list(stray)}, which "
                              f"{'is' if len(stray) == 1 else 'are'} not in methods=.")
-    if assume_gpu and not dry_run:
-        raise ValueError(
-            "assume_gpu=True applies to a dry run only; a real run checks this "
-            "host's GPU. Pass dry_run=True, or run it on the GPU node "
-            "without assume_gpu.")
     if skip_existing and params:
         raise ValueError("skip_existing=True with params=... would return results computed with the "
             "earlier parameters (reuse is keyed on the output file, not on params). "
@@ -3588,8 +3508,6 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
     # a real run checks params per method and records a bad key as FAIL
     plan_df, private = _scan(dataset, category, data_path=data_path, methods=methods,
                              modalities="all" if every else modalities, verbose=False,
-                             assume_gpu=assume_gpu,
-                             allow_atac_mismatch=allow_atac_mismatch,
                              params=params if dry_run else None,
                              out_dir=OUT_DIR_PLACEHOLDER if out_dir is None else out_dir)
     not_listed = (_not_listed_note(plan_df, dataset, private.attrs["folder"], category)
@@ -3654,14 +3572,13 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
         raise ValueError(
             f"No saved output of {_and_list(dict.fromkeys(blocked['method']))} in {out_dir} "
             f"(it would be {Path(out_dir) / f'{first}_{dataset}'}). Pass the "
-            + "out_dir" + " of the earlier run.")
+            + "out_dir of the earlier run.")
     if plan_df.empty:
         # not one method could start: the request is wrong, and an empty result
         # would read "0 failed", as success
         raise ValueError(_nothing_runnable_message(
             dataset, category, blocked, methods, data_path=data_path,
-            modalities=modalities, allow_atac_mismatch=allow_atac_mismatch,
-            assume_gpu=assume_gpu, others=private["_other"], every=every,
+            modalities=modalities, others=private["_other"], every=every,
             note="" if methods else not_listed,
             hidden=bool(plan_df.attrs.get("not_listed")
                         or plan_df.attrs.get("not_listed_batch"))))
@@ -3820,53 +3737,3 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
         result._batches[batch_file[0]] = batch_file[1]
     result.save()
     return result
-
-
-def sweep(dataset: str, category: str, method: str, param: str, values, *,
-          out_dir, modalities=None, data_path=None, timeout=None,
-          verbose: bool = True) -> pd.DataFrame:
-    """Run one method once per value of one hyperparameter (deprecated: a loop
-    over ``mtb.run_all(params=...)``). Returns the ``summary`` rows of each
-    value, the value first; ``attrs["long"]`` holds the long table."""
-    def _is_method(name) -> bool:
-        try:
-            registry.check_method(name)
-            return True
-        except (KeyError, TypeError):
-            return False
-    if method in config._CATEGORY_FOLDERS or (_is_method(dataset) and not _is_method(method)):
-        raise TypeError("sweep takes (dataset, category, method, param, values).")
-    if isinstance(values, (str, bytes)) or not hasattr(values, "__iter__"):
-        raise TypeError("values takes a list, e.g. [5].")
-    dataset, data_path = _resolve.split_dataset(dataset, data_path)
-    method = registry.check_method(method)
-    values = list(values)
-    if values:
-        # the key check of run_all's dry run, before any setting runs
-        _run_all(dataset, category, out_dir=OUT_DIR_PLACEHOLDER, methods=[method],
-                 modalities=modalities, data_path=data_path,
-                 params={method: {param: values[0]}}, dry_run=True, verbose=False)
-    frames, longs = [], []
-    for v in values:
-        tag = str(v).replace(".", "p").replace("-", "m")
-        res = _run_all(dataset, category, out_dir=Path(out_dir) / f"{param}_{tag}",
-                      methods=[method], modalities=modalities, data_path=data_path,
-                      params={method: {param: v}}, timeout=timeout, verbose=verbose)
-        df = res.summary
-        df.insert(0, param, v)
-        frames.append(df)
-        setting = res.long
-        if not setting.empty:                  # each setting its own series
-            setting = setting.copy()
-            setting[param] = v
-            setting["method"] = setting["method"].astype(str) + f" ({param}={v})"
-            longs.append(setting)
-    out = pd.concat(frames, ignore_index=True)
-    long_table = pd.concat(longs, ignore_index=True) if longs else pd.DataFrame()
-    out.attrs["long"] = long_table
-    if not long_table.empty:
-        long_path = Path(out_dir) / "sweep_long.csv"
-        long_path.parent.mkdir(parents=True, exist_ok=True)
-        long_table.to_csv(long_path, index=False)
-        out.attrs["long_path"] = str(long_path)
-    return out

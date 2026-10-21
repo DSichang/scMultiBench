@@ -106,17 +106,3 @@ def test_first_choice_of_every_choice_set_is_the_signature_default():
     assert _mismatches() == []
 
 
-def test_the_scan_sees_the_known_choice_sets():
-    # guard against a scan that silently checks nothing
-    seen = {}
-    for path, obj in _callables():
-        doc = obj.__doc__ or ""
-        for line in _parameter_lines(doc) if "Parameters" in doc else ():
-            m = _CHOICE_LINE.match(line)
-            if m:
-                seen.setdefault(path, set()).update(m.group("names").split(", "))
-    # 0.4.0: bar(overall=), bubble(aggregate=, overall=) and build_table are
-    # deprecated and left the docstrings, so the plot module documents no choice set
-    assert not [p for p in seen if p.startswith("multibench.plot")]
-    assert "flavor" in seen["multibench.eval.scib.compute"]
-    assert "flavor" in seen["multibench.eval.scib.leiden_sweep"]

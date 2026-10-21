@@ -131,35 +131,6 @@ def test_changes_list_the_new_messages():
             "that the barcodes of a `.csv` output are kept.") in said
 
 
-def test_changes_say_what_the_new_warnings_leave_open(tmp_path):
-    said = _changes("Not solved in 0.3.5")
-    assert ("`mtb.io.to_canonical`, `multibench convert --modality` and the conversion of "
-            "an `.h5ad` input that `mtb.run` does write a feature name that occurs more "
-            "than once without a message of their own.") in said
-    assert ("A `labels=` Series whose index is the row numbers `0` to `n-1` is matched by "
-            "position without a message. Only `batch=` warns.") in said
-    ad = pytest.importorskip("anndata")
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        a = ad.AnnData(np.ones((20, 3)))
-        a.var_names = ["G1", "G2", "G2"]
-    a.obs_names = [f"cell{i}-1" for i in range(20)]
-    a.obs["donor"] = ["a", "b"] * 10
-    with warnings.catch_warnings(record=True) as rec:
-        warnings.simplefilter("always")
-        ingest.to_canonical(a, tmp_path / "rna.h5", modality="rna")
-        a.var_names_make_unique()
-        ingest.export_dataset(a, tmp_path / "OUT", rna="X", category="cross",
-                              labels=pd.Series(["T", "B"] * 10), batch="obs:donor")
-    assert [str(w.message) for w in rec if "feature name" in str(w.message)] == []
-    # 0.4.0 closes the second gap: export_dataset warns on a labels Series without barcodes
-    assert [str(w.message) for w in rec if "Series" in str(w.message)] == [
-        "labels is a Series without barcodes and is matched to the cells by position. "
-        "To match by barcode, pass a Series indexed by barcode."]
-    assert ("warns when a `labels` Series without barcodes is matched by position."
-            in _flat("changes.md"))
-
-
 def test_the_quickstart_tab_names_batch_for_donors():
     page = _flat("quickstart.md")
     tab = page.split('=== "Linux, environments installed"', 1)[1].split("10x Multiome,", 1)[0]

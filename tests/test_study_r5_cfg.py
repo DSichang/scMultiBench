@@ -34,62 +34,6 @@ MATILDA = ["scan", "D11", "--category", "vertical", "--methods", "Matilda",
 REASON = "The method scripts are not fetched. Run multibench fetch --scripts."
 
 
-# ================================================= R5-05: download errors
-def _http_404(url):
-    raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)
-
-
-def _refused(url):
-    raise urllib.error.URLError(ConnectionRefusedError(61, "Connection refused"))
-
-
-@pytest.mark.parametrize("dead, why", [(_http_404, "(HTTP 404)"),
-                                       (_refused, "Connection refused")],
-                         ids=["http-404", "url-error"])
-def test_fetch_names_the_url_and_the_manual_route(tmp_path, monkeypatch, capsys,
-                                                  dead, why):
-    monkeypatch.setattr(F, "_download", dead)
-    root = tmp_path / "data"
-    url = f"{F.RELEASE_URL}/D46.tar.gz"
-    with pytest.raises(OSError) as e:
-        mtb.data.fetch("D46", data_path=root)
-    msg = str(e.value)
-    assert msg.startswith(f"Could not download D46 from {url} ")
-    assert why in msg and "Get the data" in msg and str(root) in msg
-    assert isinstance(e.value.__cause__, urllib.error.URLError)
-    assert not root.exists()                            # nothing left under data_path
-    assert capsys.readouterr().out == f"downloading D46 (97 MB) from {url} ...\n"
-
-
-def test_fetch_leaves_an_existing_data_path_empty(tmp_path, monkeypatch):
-    monkeypatch.setattr(F, "_download", _http_404)
-    root = tmp_path / "data"
-    root.mkdir()
-    with pytest.raises(OSError, match="Get the data"):
-        mtb.data.fetch("D11", data_path=root, quiet=True)
-    assert list(root.iterdir()) == []
-
-
-@pytest.mark.parametrize("dead, why", [(_http_404, "(HTTP 404)"),
-                                       (_refused, "Connection refused")],
-                         ids=["http-404", "url-error"])
-def test_fetch_outputs_names_the_url(tmp_path, monkeypatch, dead, why):
-    monkeypatch.setattr(F, "_download", dead)
-    root = tmp_path / "data"
-    url = F._output_urls()["D11"]
-    with pytest.raises(OSError) as e:
-        F.fetch_outputs("D11", data_path=root, quiet=True)
-    msg = str(e.value)
-    assert msg.startswith(f"Could not download the stored outputs of D11 from {url} ")
-    # the archive's own layout decides where it lands: the message names the
-    # file that must exist, not the dataset recipe of 'Get the data'
-    dest = root / "outputs" / "D11"
-    assert why in msg and "Get the data" not in msg
-    assert msg.endswith(f"unpack it into {dest}, so that {dest / 'batch_result.json'} "
-                        f"exists.")
-    assert not root.exists()
-
-
 def test_raises_tables_list_the_download_error():
     import inspect
     for fn in (mtb.data.fetch,):
@@ -155,8 +99,7 @@ def test_diagonal_export_compares_with_the_rna_side(tmp_path):
 
 def test_without_rna_names_both_options_rename_first(tmp_path):
     atac = _adata(PEAK_IDS)
-    one = _messages(lambda: ingest.to_canonical(atac, tmp_path / "a.h5",
-                                                modality="atac_peak"))
+    one = _messages(lambda: ingest._to_canonical(atac, tmp_path / 'a.h5', modality='atac_peak'))
     assert one == ["Only 0% of the ATAC feature names look like peaks such as "
                    "chr1:100-200. If they are peaks, rename them to chr:start-end. "
                    "Some methods read the peak positions from the names, and "
@@ -171,8 +114,7 @@ def test_without_rna_names_both_options_rename_first(tmp_path):
 
 def test_gene_activity_with_peak_names_is_plain(tmp_path):
     peaks = _adata(["chr1_100_200", "chr1-300-400", "chr2:10-20", "chrX_5_9"])
-    one = _messages(lambda: ingest.to_canonical(peaks, tmp_path / "a.h5",
-                                                modality="atac_gas"))
+    one = _messages(lambda: ingest._to_canonical(peaks, tmp_path / 'a.h5', modality='atac_gas'))
     assert one == ["100% of the ATAC feature names look like peaks such as "
                    "chr1:100-200, not genes. If the matrix holds peaks, pass "
                    "modality='atac_peak'."]

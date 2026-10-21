@@ -34,7 +34,7 @@ def gpu(monkeypatch):
 
 
 def _dry(method, category, inputs, params, tmp_path):
-    return mtb.run(method, category, inputs=inputs, out_dir=str(tmp_path / "o"),
+    return mtb.engine.runner.run(method, category, inputs=inputs, out_dir=str(tmp_path / "o"),
                    params=params, dry_run=True, cmd_template="conda run -n x {cmd}")
 
 
@@ -56,12 +56,12 @@ def test_cmd_template_bare_quoted_and_mid_string():
 def test_cmd_template_needs_one_placeholder(tmp_path):
     for bad in ("srun", "{env_cmd} {env_cmd}"):
         with pytest.raises(ValueError, match=r"must hold \{env_cmd\} \(or \{cmd\}\) once"):
-            mtb.run("Matilda", "vertical", inputs=MATILDA, out_dir=str(tmp_path),
+            mtb.engine.runner.run("Matilda", "vertical", inputs=MATILDA, out_dir=str(tmp_path),
                     dry_run=True, cmd_template=bad)
 
 
 def test_cmd_template_env_cmd_in_quotes(tmp_path):
-    argv = mtb.run("Matilda", "vertical", inputs=MATILDA, out_dir=str(tmp_path),
+    argv = mtb.engine.runner.run("Matilda", "vertical", inputs=MATILDA, out_dir=str(tmp_path),
                    dry_run=True, cmd_template="sbatch --wrap '{env_cmd}'")
     assert argv[:2] == ["sbatch", "--wrap"] and len(argv) == 3
     assert argv[2].startswith("conda run -n ") or " run_matilda.py " in argv[2]

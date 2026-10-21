@@ -7,13 +7,10 @@ score 0.7814 on the cells below). Now:
 - one definition of "missing" (``eval.io.missing_mask``): NaN, ``None``,
   ``pd.NA``, blank text, and any text that the label reader itself reads back
   as missing (``NA``, ``None``, ``nan``, ...), with or without blanks around it;
-- ``missing_labels="error"`` (the default) raises and says how many cells and
-  one text that reads as missing, if any; ``"drop"`` scores the labelled
-  cells only, warns with the two counts, and records them;
+- evaluate raises and says how many cells and one text that reads as missing,
+  if any, and to score the labelled cells instead;
 - complete labels score exactly as before.
 
-0.4.0: ``missing_labels=`` is deprecated (one FutureWarning, same effect), and
-the error says to score the labelled cells instead of suggesting it.
 evaluate returns the long table (``metric, value, ...``).
 """
 import inspect
@@ -82,11 +79,6 @@ def _e1(src="", example="", n=30, total=N):
     return f"labels{src}: {n} of the {total} cells have no label{example}." + KEEP_FIX
 
 
-def _scored(rec):
-    """The messages of the warnings about cells left out."""
-    return [str(w.message) for w in rec if str(w.message).startswith("Scored the")]
-
-
 def _value(out, code):
     """The value of ``code`` in evaluate's long table."""
     return out.set_index("metric")["value"][code]
@@ -96,17 +88,6 @@ def _same(got, want):
     """The same metrics with the same values, NaN included."""
     assert got["metric"].tolist() == want["metric"].tolist()
     np.testing.assert_array_equal(got["value"].to_numpy(), want["value"].to_numpy())
-
-
-def _drop(*args, **kw):
-    """evaluate(missing_labels="drop"), with its warnings about the cells left out.
-    The keyword is deprecated in 0.4.0 and says so once."""
-    with warnings.catch_warnings(record=True) as rec:
-        warnings.simplefilter("always")
-        out = mtb.evaluate(*args, missing_labels="drop", verbose=False, **kw)
-    assert len([w for w in rec if issubclass(w.category, FutureWarning) and
-                "evaluate(missing_labels=) is deprecated" in str(w.message)]) == 1
-    return out, _scored(rec)
 
 
 def _silent(*args, **kw):
@@ -347,7 +328,7 @@ def test_evaluate_raises_on_missing_labels(form, tmp_path):
     output, labels, src, *said = _label_forms(tmp_path)[form]
     # NaN, and an empty field of a file, are no word: no example
     (example,) = said or ("",)
-    for kw in ({}, {"missing_labels": "error"}):
+    for kw in ({},):
         with pytest.raises(ValueError) as e:
             mtb.evaluate(output, labels=labels, metrics=["ASW"], **kw)
         assert str(e.value) == _e1(src, example), form
@@ -480,37 +461,21 @@ def test_a_file_whose_missing_word_has_a_blank_is_named(tmp_path):
     assert str(e.value) == _e1(" (cty.csv)", example=EX_NA)
 
 
-def test_counts_carry_thousands_separators():
-    rng = np.random.default_rng(1)
-    emb = rng.normal(size=(1200, 4))
-    lab = np.repeat(["A", "B"], 600).astype(object)
-    emb[:600] += 4
-    lab[np.arange(0, 1200, 12)] = None              # 100 cells
-    with pytest.raises(ValueError) as e:
-        mtb.evaluate(emb, labels=lab, metrics=["cLISI"])
-    assert str(e.value) == "labels: 100 of the 1,200 cells have no label." + KEEP_FIX
-    out, said = _drop(emb, labels=lab, metrics=["cLISI"])
-    assert said == ["Scored the 1,100 labelled cells of 1,200."]
-    assert (out.attrs["cells_scored"], out.attrs["cells_total"]) == (1100, 1200)
-    assert set(out["scored_with"]) == {f"none/none/{mtb.__version__}/1100 of 1200 cells"}
-
-
 def test_blank_lines_in_a_one_column_file_keep_the_count_error(tmp_path):
     """A truly empty line is no row for the reader: the file is short, as before."""
     emb, lab = _cells()
     path = tmp_path / "cty.csv"
     path.write_text("x\n" + "".join(f"{v}\n" for v in _gaps(lab, "")))
     assert len(eio.read_labels(path)) == 270
-    for kw in ({}, {"missing_labels": "drop"}):
+    for kw in ({},):
         with pytest.raises(ValueError, match=r"^labels has 270 entries for 300 cells "
                                              r"in the embedding\."):
             mtb.evaluate(emb, labels=str(path), metrics=["ASW"], **kw)
 
 
-@pytest.mark.parametrize("missing_labels", ["error", "drop"])
-def test_evaluate_raises_when_every_label_is_missing(missing_labels, tmp_path):
+def test_evaluate_raises_when_every_label_is_missing(tmp_path):
     emb, _ = _cells()
-    kw = dict(metrics=["ASW"], missing_labels=missing_labels)
+    kw = dict(metrics=["ASW"])
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=np.full(N, np.nan, dtype=object), **kw)
     assert str(e.value) == "labels: none of the 300 cells has a label." + NONE_FIX
@@ -531,117 +496,16 @@ def test_evaluate_raises_when_every_label_is_missing(missing_labels, tmp_path):
                             + NONE_FIX)
 
 
-@pytest.mark.parametrize("value", ["skip", "Drop", "", None, True, 0, ["drop"]], ids=repr)
-def test_missing_labels_value_is_checked(value):
-    emb, lab = _cells()
-    with pytest.raises(ValueError) as e:
-        mtb.evaluate(emb, labels=lab, metrics=["ASW"], missing_labels=value)
-    assert str(e.value) == f'missing_labels must be "error" or "drop", got {value!r}.'
-
-
-def test_missing_labels_value_is_checked_before_anything_else():
-    # no labels, an unknown category, an output that does not exist: the
-    # value of missing_labels is still the first thing said
-    with pytest.raises(ValueError) as e:
-        mtb.evaluate("nothere.h5", category="nope", missing_labels="keep")
-    assert str(e.value) == 'missing_labels must be "error" or "drop", got \'keep\'.'
-
-
-# ============================================================ "drop"
-def test_drop_equals_scoring_the_labelled_cells(tmp_path):
+def test_complete_labels_score_as_before():
     emb, lab = _cells()
     bat = _donors()
-    nan = _gaps(lab)
-    # the plain call, and the value the released 0.3.4 gives for those cells
-    got, said = _drop(emb, labels=nan, metrics=["ASW"])
-    _same(got, mtb.evaluate(emb[KEEP], labels=lab[KEEP], metrics=["ASW"]))
-    assert _value(got, "ASW") == pytest.approx(ASW_034_LABELLED, abs=1e-9)
-    assert len(said) == 1
-    # batch= and clustering= (deprecated, kept) lose the same cells
-    kw = dict(metrics=["ARI", "NMI", "ASW", "ASW_batch", "GC"])
-    got, _ = _drop(emb, labels=nan, batch=bat, clustering=lab, **kw)
-    with pytest.warns(FutureWarning, match=r"evaluate\(clustering=\) is deprecated"):
-        want = mtb.evaluate(emb[KEEP], labels=lab[KEEP], batch=bat[KEEP],
-                            clustering=lab[KEEP], **kw)
-    _same(got, want)
-    # an AnnData with obs columns, every argument by name
-    a = _adata(emb, celltype=nan, donor=bat, leiden=lab)
-    got, _ = _drop(a, labels="celltype", batch="donor", clustering="leiden", **kw)
-    _same(got, want)
-    # a list of label files: the file of origin is the batch, cut alike
-    files = [tmp_path / "cty1.csv", tmp_path / "cty2.csv"]
-    for path, part in zip(files, (nan[:150], nan[150:])):
-        pd.DataFrame({"x": part}).to_csv(path, index=False)
-    origin = np.repeat([1, 2], 150)
-    got, _ = _drop(emb, labels=[str(p) for p in files])
-    assert {"ARI", "ASW_batch", "iLISI"} <= set(got["metric"])
-    _same(got, mtb.evaluate(emb[KEEP], labels=lab[KEEP], batch=origin[KEEP],
-                            verbose=False))
-    # a dims x cells output is turned by the count of all the labels
-    with pytest.warns(UserWarning) as rec:
-        got = mtb.evaluate(emb.T, labels=nan, metrics=["ASW"], missing_labels="drop")
-    assert [str(w.message) for w in rec if issubclass(w.category, UserWarning)][0] == \
-        "embedding was (dims x cells) (8, 300); transposed to (cells x dims)"
-    assert len(_scored(rec)) == 1
-    _same(got, mtb.evaluate(emb[KEEP], labels=lab[KEEP], metrics=["ASW"]))
-
-
-def test_drop_scores_the_sweep_on_the_labelled_cells():
-    """ARI without clustering=: the Leiden search runs on the cells that are
-    scored, as it does for a call with those cells only."""
-    emb, lab = _cells()
-    got, _ = _drop(emb, labels=_gaps(lab, "NA"), metrics=["ARI", "NMI"])
-    _same(got, mtb.evaluate(emb[KEEP], labels=lab[KEEP], metrics=["ARI", "NMI"],
-                            verbose=False))
-    assert got.attrs["clustering"] == "search"
-
-
-def test_drop_warns_and_records_the_cell_counts():
-    emb, lab = _cells()
-    with pytest.warns(UserWarning) as rec:
-        long = mtb.evaluate(emb, labels=_gaps(lab), metrics=["cLISI"], missing_labels="drop")
-    assert _scored(rec) == ["Scored the 270 labelled cells of 300."]
-    # the warning points at the line that called evaluate
-    assert [Path(w.filename).name for w in rec
-            if str(w.message).startswith("Scored the")] == [Path(__file__).name]
-    assert long.attrs["cells_scored"] == 270 and long.attrs["cells_total"] == 300
-    assert type(long.attrs["cells_scored"]) is int and type(long.attrs["cells_total"]) is int
-    assert list(long.attrs) == ["leiden_flavor", "clustering", "multibench_version",
-                                "scib_version", "cells_scored", "cells_total"]
-    assert pipeline._scored_with(long.attrs) == \
-        f"none/none/{mtb.__version__}/270 of 300 cells"
-    # evaluate's long table carries the count in scored_with
-    assert set(long["scored_with"]) == {f"none/none/{mtb.__version__}/270 of 300 cells"}
-    # the consumer of scored_with reads its first two parts, which did not move
-    assert long["scored_with"].str.split("/").str[:2].tolist() == [["none", "none"]]
-
-
-def test_drop_of_one_cell_reads_in_the_singular():
-    """The warning no longer has the sentence about the cells left out, so
-    one cell left out reads like any other count."""
-    emb, lab = _cells()
-    lab[7] = None
-    out, said = _drop(emb, labels=lab, metrics=["ASW"])
-    assert said == ["Scored the 299 labelled cells of 300."]
-    assert pipeline._scored_with(out.attrs).endswith("/299 of 300 cells")
-
-
-def test_drop_without_gaps_changes_nothing():
-    emb, lab = _cells()
-    bat = _donors()
-    kw = dict(labels=lab, batch=bat, metrics=["ASW", "ASW_batch"])
-    plain = _silent(emb, **kw)
-    drop = _silent(emb, missing_labels="drop", **kw)
-    error = _silent(emb, missing_labels="error", **kw)
-    _same(drop, plain)
-    _same(error, plain)
-    for out in (plain, drop, error):
-        assert list(out.attrs) == ["leiden_flavor", "clustering", "multibench_version",
-                                   "scib_version"]
+    plain = _silent(emb, labels=lab, batch=bat, metrics=["ASW", "ASW_batch"])
+    assert list(plain.attrs) == ["leiden_flavor", "clustering", "multibench_version",
+                                 "scib_version"]
     # the value of the released 0.3.4 for these cells
     assert _value(plain, "ASW") == pytest.approx(ASW_034, abs=1e-9)
-    assert set(drop["scored_with"]) == {
-        f"{drop.attrs['leiden_flavor']}/search/{mtb.__version__}"}
+    assert set(plain["scored_with"]) == {
+        f"{plain.attrs['leiden_flavor']}/search/{mtb.__version__}"}
 
 
 @pytest.mark.parametrize("name", ["C\rcell", "C\r\ncell", "C\ncell", "C\x00cell"], ids=repr)
@@ -651,89 +515,13 @@ def test_a_line_break_or_a_nul_in_a_name_changes_nothing(name):
     name."""
     emb, lab = _cells()
     named = np.where(lab == "C", name, lab).astype(object)
-    for kw in ({}, {"missing_labels": "drop"}):
+    for kw in ({},):
         got = _silent(emb, labels=named, metrics=["ASW"], **kw)
         assert _value(got, "ASW") == pytest.approx(ASW_034, abs=1e-9)
     bat = _donors()
     kw = dict(labels=lab, metrics=["ASW_batch"])
     _same(_silent(emb, batch=np.where(bat == "d3", name, bat).astype(object), **kw),
           _silent(emb, batch=bat, **kw))
-
-
-def test_drop_names_a_lost_batch(tmp_path):
-    emb, lab = _cells()
-    bat = _donors()
-    kw = dict(metrics=["ASW", "ASW_batch"])
-    # donor d3 has no labelled cell: two of the three batches are left
-    _, said = _drop(emb, labels=_gaps(lab, at=bat == "d3"), batch=bat, **kw)
-    assert said == ["Scored the 200 labelled cells of 300, from 2 of the 3 batches."]
-    # only donor d1 is labelled: one batch is left, and ASW_batch is refused (c1, C11)
-    with pytest.raises(ValueError, match="needs two or more batches; every cell is in one "
-                                         "batch"):
-        _drop(emb, labels=_gaps(lab, at=bat != "d1"), batch=bat, **kw)
-    _, said = _drop(emb, labels=_gaps(lab, at=bat != "d1"), batch=bat, metrics=["ASW"])
-    assert said == ["Scored the 100 labelled cells of 300, all in one batch of 3."]
-    # every batch keeps a labelled cell: nothing to add
-    _, said = _drop(emb, labels=_gaps(lab), batch=bat, **kw)
-    assert said == ["Scored the 270 labelled cells of 300."]
-    # no batch vector is given: there are no batches to count
-    _, said = _drop(emb, labels=_gaps(lab, at=bat == "d3"), metrics=["ASW"])
-    assert said == ["Scored the 200 labelled cells of 300."]
-
-
-def test_drop_with_one_of_two_label_files_all_missing(tmp_path):
-    emb, lab = _cells()
-    files = [tmp_path / "cty1.csv", tmp_path / "cty2.csv"]
-    pd.DataFrame({"x": lab[:150]}).to_csv(files[0], index=False)
-    pd.DataFrame({"x": ["NA"] * 150}).to_csv(files[1], index=False)
-    out, said = _drop(emb, labels=[str(p) for p in files])
-    assert said == ["Scored the 150 labelled cells of 300, all in one batch of 2."]
-    assert (out.attrs["cells_scored"], out.attrs["cells_total"]) == (150, 300)
-    # the default set: "all" would add the classification family, NaN for one batch
-    _same(out, mtb.evaluate(emb[:150], labels=lab[:150], batch=np.ones(150, dtype=int),
-                            verbose=False))
-    # without the flag, the same files stop the call
-    with pytest.raises(ValueError) as e:
-        mtb.evaluate(emb, labels=[str(p) for p in files])
-    assert str(e.value) == _e1(" (cty1.csv, cty2.csv)", EX_NA, n=150)
-
-
-def test_one_labelled_batch_hides_the_other_batches_from_every_score(tmp_path):
-    """With labels in one batch only, every cell of the other batches is left
-    out: two embeddings that differ only in those cells get the same scores.
-    The warning says so whenever a batch vector is known."""
-    emb, lab = _cells()
-    bat = _donors()
-    one = _gaps(lab, at=bat != "d1")
-    moved = emb.copy()
-    moved[bat != "d1"] = np.random.default_rng(1).normal(size=(200, 8)) * 9
-    base = "Scored the 100 labelled cells of 300"
-    hidden = ", all in one batch of 3."
-    # the default set: one batch with labels leaves the batch metrics out (c1, C11)
-    kw = dict(labels=one, batch=bat)
-    got, said = _drop(emb, **kw)
-    other, said_other = _drop(moved, **kw)
-    _same(got, other)
-    assert got["metric"].tolist() == ["ARI", "NMI", "ASW", "iASW", "iF1", "cLISI"]
-    assert said == said_other == [base + hidden]
-    # no batch metric is scored: the warning reads the same
-    kw = dict(labels=one, batch=bat, metrics=["ASW"])
-    got, said = _drop(emb, **kw)
-    _same(got, _drop(moved, **kw)[0])
-    assert said == [base + hidden]
-    # labels in two of the three batches are counted without a batch metric too
-    _, said = _drop(emb, labels=_gaps(lab, at=bat == "d3"), batch=bat, metrics=["ASW"])
-    assert said == ["Scored the 200 labelled cells of 300, from 2 of the 3 batches."]
-    # no batch vector: evaluate cannot tell which cells were left out
-    got, said = _drop(emb, labels=one, metrics=["ASW"])
-    _same(got, _drop(moved, labels=one, metrics=["ASW"])[0])
-    assert said == [base + "."]
-    # the file of origin is a batch vector, also when no batch metric is scored
-    files = [tmp_path / "cty1.csv", tmp_path / "cty2.csv"]
-    pd.DataFrame({"x": lab[:150]}).to_csv(files[0], index=False)
-    pd.DataFrame({"x": ["NA"] * 150}).to_csv(files[1], index=False)
-    _, said = _drop(emb, labels=[str(p) for p in files], metrics=["ASW"])
-    assert said == ["Scored the 150 labelled cells of 300, all in one batch of 2."]
 
 
 # ============================================================ the reference

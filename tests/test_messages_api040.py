@@ -8,6 +8,7 @@
 - bubble(methods=[...]) with package methods absent from the table said "Did
   you mean Matilda and totalVI?" for Matilda and totalVI.
 """
+import os
 from pathlib import Path
 
 import numpy as np
@@ -24,8 +25,7 @@ def test_requested_rows_the_folder_cannot_feed_are_counted(tmp_path):
     for f in ("rna.h5", "atac_gas.h5", "rna_cty.csv", "atac_cty.csv"):
         (d / f).write_text("")
     with pytest.raises(ValueError) as e:
-        mtb.run_all("DG", "diagonal", methods=["iNMF"], out_dir=tmp_path / "o",
-                    data_path=tmp_path, verbose=False)
+        mtb.run_all(os.path.join(tmp_path, 'DG'), 'diagonal', methods=['iNMF'], out_dir=tmp_path / 'o', verbose=False)
     text = str(e.value)
     assert "rna1+rna2+rna3" not in text
     # the row for numbered batches of this one-batch folder is not listed (X80)

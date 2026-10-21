@@ -15,6 +15,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+import multibench.eval.classify  # noqa: F401  (mtb.eval.classify)
 from multibench import workflow as W
 from multibench.data import catalog
 B = importlib.import_module("multibench.plot.bubble")   # the module
@@ -65,23 +66,12 @@ def _caught(fn, *a, **kw):
 
 
 def _reference(emb, paths):
-    return _quiet(mtb.classification_metrics, _quiet(mtb.classify, emb, labels=paths)).loc["mean"]
+    return _quiet(mtb.eval.classify.classification_metrics, _quiet(mtb.eval.classify.classify, emb, labels=paths)).loc["mean"]
 
 
 def _values(df):
     """evaluate's long table as a Series of values indexed by metric."""
     return df.set_index("metric")["value"]
-
-
-# ---------------------------------------------------------------- vocabulary
-def test_the_family_and_its_codes():
-    m = mtb.catalog.metrics()
-    assert m.loc[m.family == "classification", "metric"].tolist() == CODES
-    assert m["metric"].tolist() == [
-        "ARI", "NMI", "ASW", "iASW", "iF1", "cLISI", "ASW_batch", "ARI_batch",
-        "NMI_batch", "GC", "iLISI", "kBET", "OCA", "ACA", "Spec", "Sens", "F1"]
-    assert [_quiet(catalog.canonical_metric, c)
-            for c in ("oca", "Aca", "SPEC", "sens", "f1", "if1")] == CODES + ["iF1"]
 
 
 def test_metrics_selects_the_family():
@@ -249,19 +239,6 @@ def test_batch_with_classification_only_is_used_not_warned(three):
     assert not [m for m in said if "changes nothing" in m]
 
 
-# ---------------------------------------------------------------- to_long
-def test_to_long_keeps_the_codes_and_their_family(three):
-    emb, paths = three
-    wide = mtb.evaluate(emb, labels=paths, metrics="classification")
-    lg = mtb.to_long(wide, method="Mine", dataset="MB", category="mosaic")
-    assert lg["metric"].tolist() == CODES
-    families = importlib.import_module("multibench.plot.bar").FAMILY_METRICS
-    fam = {c: f for f, codes in families.items() for c in codes}
-    assert {fam[c] for c in lg["metric"]} == {"classification"}
-    hand = pd.DataFrame({"Value": [0.9, 0.8]}, index=["oca", "f1"])
-    assert _quiet(mtb.to_long, hand, method="Mine")["metric"].tolist() == ["OCA", "F1"]
-
-
 # ---------------------------------------------------------------- run_all / rescore
 def _record(tmp_path, emb, method="StabMap"):
     out = tmp_path / "out" / f"{method}_MB"
@@ -311,62 +288,6 @@ def test_rescore_carries_the_codes(three, tmp_path):
     ref = _reference(emb, paths)
     assert new.records[0]["metrics"]["OCA"] == round(float(ref["OCA"]), 4)
     assert new.long["metric"].tolist() == CODES
-
-
-# ---------------------------------------------------------------- plots
-def _long(codes, methods=("M1", "M2", "M3")):
-    rng = np.random.default_rng(0)
-    return pd.DataFrame([{"method": m, "metric": c, "value": float(rng.uniform()),
-                          "dataset": "MB"} for m in methods for c in codes])
-
-
-def test_bubble_has_a_third_block_in_pink():
-    tbl = _quiet(mtb.plot.build_table, _long(SCIB + CODES))
-    assert [b.label for b in tbl.blocks] == ["Clustering", "Batch correction",
-                                             "Classification"]
-    assert tbl.blocks[2].cmap == "Pinks" and list(tbl.blocks[2].raw.columns) == CODES
-    fig = B.render(tbl)
-    ax = fig.axes[0]
-    assert [t.get_text() for t in ax.texts if t.get_gid() == "family"] == [
-        "Clustering", "Batch correction", "Classification"]
-    ramps = [p for p in ax.patches if p.get_gid() == "legend" and p.get_width() == 0.07]
-    assert len(ramps) == 3 * 40
-    assert sum(t.get_text() == "High" for t in ax.texts) == 3
-    pink = mtb.plot.style.colormap("Pinks")
-    r, g, b, _ = pink(1.0)
-    assert r > b > g                      # deep magenta, not purple or red
-    assert pink(0.0)[:3] == pytest.approx((0.97, 0.97, 0.97), abs=0.01)
-
-
-def test_bubble_without_the_family_keeps_two_blocks():
-    tbl = _quiet(mtb.plot.build_table, _long(SCIB))
-    assert [b.label for b in tbl.blocks] == ["Clustering", "Batch correction"]
-    ax = B.render(tbl).axes[0]
-    assert sum(t.get_text() == "High" for t in ax.texts) == 2
-
-
-def test_bar_scores_the_family_in_pink():
-    fig = _quiet(mtb.plot.bar, _long(SCIB + CODES), group="classification")
-    assert len(fig.axes[0].patches) == 3
-    with pytest.raises(ValueError) as e:
-        mtb.plot.bar(_long(SCIB), group="classification")
-    assert str(e.value) == (
-        "no 'classification' metrics present. Found ['ARI', 'ARI_batch', 'ASW', "
-        "'ASW_batch', 'GC', 'NMI', 'NMI_batch', 'cLISI', 'iASW', 'iF1', 'iLISI']. "
-        "The stored results have none. "
-        "mtb.evaluate computes them on multi-batch data.")
-
-
-def test_bubble_grey_columns_with_a_method_without_values():
-    lg = pd.concat([_long(SCIB + CODES, methods=("M1",)), _long(SCIB, methods=("M2",))])
-    lg.loc[lg.method == "M2", "value"] += 0.01
-    _, said = _caught(mtb.plot.build_table, lg)
-    grey = [m for m in said if "grey" in m]
-    # the family only M1 has counts in no Overall (0.4.0, X07); its n/a cells show it
-    assert len(grey) == 1 and grey[0].endswith(
-        "for every method with a value. Those columns are grey. "
-        "Leave them out with metrics=.")
-    assert "for every method." not in grey[0]
 
 
 def test_recommend_without_classification_scores():

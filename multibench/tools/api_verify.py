@@ -141,18 +141,6 @@ def _():
     assert list(v.metric) == ["cLISI"], list(v.metric)
     return f"cLISI={float(v.value.iloc[0]):.3f}"
 
-@check("evaluate(task=) - the one deliberate deprecated-alias check")
-def _():
-    # The 0.2 spelling must still work for one release and warn; every other
-    # call in this script uses metrics=.
-    e, lab = _emb_and_labels()
-    with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
-        mtb.evaluate(e, category="vertical", task="clustering", labels=lab)
-    msgs = [str(x.message) for x in w if issubclass(x.category, DeprecationWarning)]
-    assert any("metrics='clustering'" in m for m in msgs), msgs
-    return f"warned: {msgs[0][:60]}"
-
 @check("evaluate(dataset=, method=) - the long table")
 def _():
     e, _ = _emb_and_labels()

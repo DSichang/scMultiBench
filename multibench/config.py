@@ -222,7 +222,7 @@ _Config = Config
 del Config
 
 
-def _scripts_checkout(cfg: Config | None = None) -> Path | None:
+def _scripts_checkout(cfg: _Config | None = None) -> Path | None:
     """The folder holding ``tools_scripts/`` that :func:`ensure_repo` would use, or ``None``."""
     cfg = DEFAULT if cfg is None else cfg
     for p in (Path(cfg.repo_path), _ROOT):
@@ -440,9 +440,3 @@ def ensure_repo(path=None):
     else:
         part.rename(p)
     return p
-
-
-from . import _compat  # noqa: E402  (stdlib only: no import cycle)
-__getattr__ = _compat.module_getattr(__name__, "config", old={
-    "Config": (_Config, _compat.use("mtb.config.DEFAULT")),
-})

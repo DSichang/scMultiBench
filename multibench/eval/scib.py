@@ -364,55 +364,6 @@ def leiden_n_clusters(emb, n: int, *, flavor=None) -> np.ndarray:
     return _n_clusters(_clustering_graph(emb), int(n), flavor)
 
 
-def leiden_sweep(emb, *, flavor=None):
-    """Run the scIB optimal-resolution Leiden sweep once (deprecated).
-
-    Deprecated: use :func:`leiden_n_clusters`, the article's clustering.
-    The clustering at each of the 10 resolutions depends only on the
-    embedding.
-
-    Parameters
-    ----------
-    emb : array-like
-        Embedding, cells x dims.
-    flavor : {None, "igraph", "leidenalg"}
-        Leiden backend. ``None`` (default) reads ``config.DEFAULT.leiden_flavor``
-        (``"igraph"``: scanpy's igraph backend with ``n_iterations=2``,
-        ``directed=False``; ``"leidenalg"``: the classic backend scib itself
-        runs).
-
-    Returns
-    -------
-    tuple
-        ``(adata, keys)``. The caller assigns ``adata.obs["celltype"]`` and
-        scores with scib's own ``nmi``/``ari`` against each key, so the
-        selection protocol stays identical to ``cluster_optimal_resolution``'s
-        rather than being reimplemented. ``adata.uns["leiden_flavor"]`` is
-        the backend that ran.
-
-    Raises
-    ------
-    ValueError
-        ``flavor`` is neither ``"igraph"`` nor ``"leidenalg"``.
-    """
-    from scib.metrics.clustering import get_resolutions
-
-    _compat.warn("leiden_sweep is deprecated and will be removed in 0.5. "
-                 "Use leiden_n_clusters.", FutureWarning)
-    flavor = _resolve_flavor(flavor)
-    import anndata as ad
-    adata = ad.AnnData(np.asarray(emb, dtype=float))
-    adata.obsm["X_emb"] = adata.X
-    _neighbors(adata, "X_emb")
-    adata.uns["leiden_flavor"] = flavor
-    keys = []
-    for res in get_resolutions(n=10, max=2):
-        key = f"_mb_res_{res}"
-        _leiden(adata, res, key, flavor)
-        keys.append(key)
-    return adata, keys
-
-
 def _isolated_labels_f1(adata, label_key, batch_key, cluster_key, iso_threshold):
     """Isolated-label F1 of the clustering ``adata.obs[cluster_key]``: for each
     isolated label, the best F1 of one cluster, averaged over labels. scib's

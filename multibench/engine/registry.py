@@ -198,7 +198,7 @@ def unknown_method_message(method_id, hint: str | None = None) -> str:
                 else closest_method(method_id))
     return (f"Unknown method {method_id}."
             + (f" Did you mean {hint}?" if hint else "")
-            + " " + "mtb.find_methods()"
+            + " mtb.find_methods()"
             + " shows all methods.")
 
 
@@ -228,29 +228,6 @@ def check_category(category: str | None) -> str | None:
         return None
     config.category_folder(category)
     return category
-
-
-def check_task(task: str | None) -> str | None:
-    """Validate a task token against :func:`list_tasks`; ``None`` passes through."""
-    if task is None:
-        return None
-    valid = list_tasks()
-    if task not in valid:
-        raise ValueError(f"unknown task {task!r}; valid: {valid}")
-    return task
-
-
-def check_atac(atac: str | None) -> str | None:
-    """The canonical ``atac=`` token (``peak`` / ``gene_activity``) for a value
-    or its aliases ``peaks`` / ``gas`` / ``gene-activity``; ``None`` passes through."""
-    if atac is None:
-        return None
-    canon = {"peak": "peak", "peaks": "peak",
-             "gene_activity": "gene_activity", "gene-activity": "gene_activity",
-             "gas": "gene_activity"}.get(str(atac).lower())
-    if canon is None:
-        raise ValueError(f"unknown atac representation {atac!r}; valid: {list(ATAC_VALUES)}")
-    return canon
 
 
 @functools.lru_cache(maxsize=1)
@@ -293,25 +270,7 @@ def get(method_id: str) -> MethodSpec:
     return next(s for s in load() if s.id == method_id)
 
 
-def list_tasks() -> list[str]:
-    """The task names that methods declare, sorted (the deprecated ``mtb.list_tasks``)."""
-    return sorted({t for s in load() for t in s.tasks})
-
-
-def list_methods(category: str | None = None, task: str | None = None,
-                 runnable: bool | None = None) -> list[str]:
-    """Registry method ids in registry order, filtered by a validated
-    ``category`` and ``task``; ``runnable=True`` keeps the methods with a
-    variant, ``False`` those without."""
+def list_methods(category: str | None = None) -> list[str]:
+    """Registry method ids in registry order, filtered by a validated ``category``."""
     check_category(category)
-    check_task(task)
-    out = []
-    for s in load():
-        if category and category not in s.categories:
-            continue
-        if task and task not in s.tasks:
-            continue
-        if runnable is not None and bool(s.variants) != runnable:
-            continue
-        out.append(s.id)
-    return out
+    return [s.id for s in load() if not category or category in s.categories]

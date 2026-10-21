@@ -42,7 +42,7 @@ def test_changes_page_quotes_the_live_both_files_sentence(tmp_path, method):
     for f in ("rna_cty.csv", "atac_cty.csv"):
         (d / f).write_bytes((_DATA / "D28" / f).read_bytes())
     with pytest.raises(FileNotFoundError) as exc:
-        mtb.inputs_for("LUNG", "diagonal", method, data_path=str(tmp_path / "data"),
+        mtb.engine.resolve.inputs_for("LUNG", "diagonal", method, data_path=str(tmp_path / "data"),
                        check=True)
     assert str(exc.value).endswith(f"{method} reads both atac_peak.h5 and atac_gas.h5.")
     assert ("For MultiMAP and Seurat_v3, the text ends "

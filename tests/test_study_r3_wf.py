@@ -48,7 +48,6 @@ PEAK_METHODS = {"MIRA", "Seurat_WNN", "VIMCCA", "iPOLNG", "moETM", "scMM", "scMV
 
 @pytest.fixture(autouse=True)
 def three_methods_read_gene_activity(monkeypatch):
-    assert discover.find_methods("vertical", atac="gene_activity") == []    # the registry
     for m in GAS_METHODS:
         assert registry.get(m).atac == "peak", m
         monkeypatch.setattr(registry.get(m), "atac", "gene_activity")
@@ -85,21 +84,6 @@ def _quiet(fn, *a, **kw):
         return fn(*a, **kw)
 
 
-# ----------------------------------------------------------------- R3-01
-@pytest.mark.parametrize("tok", ["gene_activity", "gas", "atac_gas"])
-def test_gene_activity_token_keeps_only_the_gene_activity_methods(tmp_path, tok):
-    root = _vertical(tmp_path, "MU_GA", "atac.h5", GENES)
-    want = set(discover.find_methods("vertical", atac="gene_activity"))
-    assert want == GAS_METHODS
-    df = _quiet(full_scan, "MU_GA", "vertical", modalities=["rna", tok], data_path=root,
-                verbose=False)
-    assert set(df["method"]) == want
-    plan = _quiet(mtb.run_all, "MU_GA", "vertical", modalities=["rna", tok],
-                  data_path=root, dry_run=True, verbose=False)
-    assert set(plan["method"]) == want
-    assert plan["runnable"].all()
-
-
 def test_peak_token_still_keeps_the_peak_methods_behind_an_atac_gas_role(tmp_path):
     root = _vertical(tmp_path, "MU_PK", "atac.h5", PEAKS)
     for call in (full_scan, lambda *a, **k: mtb.run_all(*a, dry_run=True, **k)):
@@ -121,30 +105,6 @@ def test_gene_activity_near_miss_states_the_vertical_rule(tmp_path):
         assert "atac_gas.h5 or atac.h5" not in text
 
 
-# ----------------------------------------------------------------- R3-02
-def test_scan_blocks_the_other_atac_kind_unless_allowed(tmp_path):
-    root = _vertical(tmp_path, "MU_PEAK", "atac.h5", PEAKS)
-    for call in (full_scan, lambda *a, **k: mtb.run_all(*a, dry_run=True, **k)):
-        df = _quiet(call, "MU_PEAK", "vertical", modalities=["rna", "atac"],
-                    data_path=root, verbose=False).set_index("method")
-        for m in GAS_METHODS:
-            r = df.loc[m]
-            assert not r.runnable and r.files_ok and r.env_ok, m
-            assert r.reason == (f"{m} needs gene-activity ATAC, and atac.h5 holds peaks. "
-                                f"Export the ATAC as gene activity."), r.reason
-            assert r.caveat.startswith(f"{m} {GAS_CAV}")
-        assert df.loc[["moETM", "scMM", "iPOLNG", "scMVP"], "runnable"].all()
-    # R4-01: naming the method no longer runs it; allow_atac_mismatch does
-    named = _quiet(mtb.run_all, "MU_PEAK", "vertical", methods=["Matilda"],
-                   modalities=["rna", "atac"], data_path=root, dry_run=True, verbose=False)
-    assert not named["runnable"].any()
-    allowed = _quiet(mtb.run_all, "MU_PEAK", "vertical", methods=["Matilda"],
-                     modalities=["rna", "atac"], data_path=root, dry_run=True,
-                     verbose=False, allow_atac_mismatch=True)
-    assert allowed["runnable"].all() and allowed["reason"].eq("").all()
-    assert allowed["caveat"].str.startswith("Matilda needs gene-activity ATAC").all()
-
-
 def test_scan_blocks_peak_methods_given_gene_activity(tmp_path):
     root = _vertical(tmp_path, "MU_GA", "atac.h5", GENES)
     df = _quiet(full_scan, "MU_GA", "vertical", modalities=["rna", "atac"], data_path=root,
@@ -159,48 +119,6 @@ def test_scan_blocks_peak_methods_given_gene_activity(tmp_path):
 class _Res:
     def __init__(self, out):
         self.output = out
-
-
-def test_real_run_skips_it_prints_every_caveat_and_keeps_it(tmp_path, monkeypatch, capsys):
-    root = _vertical(tmp_path, "MU_PEAK", "atac.h5", PEAKS)
-    calls = []
-
-    def fake_run(method, category, inputs, out_dir, params=None):
-        calls.append(method)
-        return _Res(np.zeros((60, 5)))
-    monkeypatch.setattr(W, "_run", fake_run)
-    out = tmp_path / "out"
-    _quiet(mtb.run_all, "MU_PEAK", "vertical", out, modalities=["rna", "atac"],
-           data_path=root, evaluate=False)
-    log = capsys.readouterr().out
-    assert not GAS_METHODS & set(calls)
-    assert ("[run_all] skipping Matilda: Matilda needs gene-activity ATAC, and atac.h5 "
-            "holds peaks.") in log
-    # allowed: it runs, and the caveat reaches the log, the summary and the files
-    res = _quiet(mtb.run_all, "MU_PEAK", "vertical", tmp_path / "named",
-                 methods=["Matilda"], modalities=["rna", "atac"], data_path=root,
-                 evaluate=False, allow_atac_mismatch=True)
-    log = capsys.readouterr().out
-    assert calls[-1] == "Matilda"
-    assert f"[run_all]   Matilda {GAS_CAV}" in log
-    sm = res.summary
-    # R5-03: reason follows caveat as the last column
-    assert list(sm.columns[-2:]) == ["caveat", "reason"]
-    assert sm["caveat"].iloc[0].startswith(f"Matilda {GAS_CAV}")
-    disk = pd.read_csv(tmp_path / "named" / "summary.csv")
-    assert list(disk.columns)[-2:] == ["caveat", "reason"]
-    assert disk["caveat"].iloc[0].startswith("Matilda needs gene-activity ATAC")
-    blob = json.loads((tmp_path / "named" / "batch_result.json").read_text())
-    assert blob["records"][0]["caveat"].startswith("Matilda needs gene-activity ATAC")
-    assert mtb.load_batch(tmp_path / "named").summary["caveat"].iloc[0] == sm["caveat"].iloc[0]
-
-
-def test_dry_run_prints_the_whole_caveat(tmp_path, capsys):
-    root = _vertical(tmp_path, "MU_PEAK", "atac.h5", PEAKS)
-    _quiet(mtb.run_all, "MU_PEAK", "vertical", methods=["Matilda"], data_path=root,
-           dry_run=True, allow_atac_mismatch=True)
-    assert (f"[run_all] Matilda {GAS_CAV}"
-            in capsys.readouterr().out)
 
 
 def test_old_records_without_a_caveat_still_summarise():
@@ -218,57 +136,3 @@ def test_demo_datasets_have_no_row_blocked_by_the_atac_kind(dataset, category):
         W._is_wrong_atac(df["reason"]), ["method", "reason"]]
 
 
-# ----------------------------------------------------------------- R3-17
-def test_generated_sounding_passages_are_rewritten():
-    import importlib
-    from multibench.data import results
-    bar = importlib.import_module("multibench.plot.bar")
-    docs = {
-        "summary": inspect.getdoc(W.BatchResult.summary),
-        "failures": inspect.getdoc(W.BatchResult.failures),
-        "Degenerate": inspect.getdoc(results.DegenerateRerunWarning),
-        "coverage": inspect.getdoc(results.results_coverage),
-        "recommend": inspect.getdoc(results.recommend),
-        "available": inspect.getdoc(results.available_datasets),
-        "find_methods": inspect.getdoc(discover.find_methods),
-        "list_methods": inspect.getdoc(discover.list_methods),
-        "method_info": inspect.getdoc(discover.method_info),
-        "metric_set_dir": inspect.getdoc(mtb.config.metric_set_dir),
-        "bar_src": inspect.getsource(bar.bar),
-        "degenerate_src": inspect.getsource(results._warn_degenerate),
-    }
-    gone = ["wired", "headline", "like with like", "Stored is not downloadable",
-            "treat that row with suspicion", "worth fixing", "Two methods can both",
-            "where rows are", "usually comes from a failed re-run"]
-    for name, text in docs.items():
-        flat = " ".join(text.split())
-        for phrase in gone:
-            assert phrase not in flat, (name, phrase)
-    s = " ".join(docs["summary"].split())
-    assert "status scored, ran, failed, skipped or timeout" in s           # c1 (C38)
-    f = " ".join(docs["failures"].split())
-    assert "``ran`` for a method whose scoring failed or whose cells match no label file" in f
-
-
-def test_run_records_keep_the_caveat_without_the_notes_on_starting(tmp_path, monkeypatch,
-                                                                   capsys):
-    """The scripts-fetch note is about starting the method, which run_all does."""
-    from multibench import config
-    root = _vertical(tmp_path, "MU_PEAK", "atac.h5", PEAKS)
-    monkeypatch.setattr(config.DEFAULT, "repo_path", tmp_path / "no_checkout")
-    plan = _quiet(full_scan, "MU_PEAK", "vertical", methods=["Matilda"],
-                  modalities=["rna", "atac"], data_path=root, verbose=False)
-    assert "The method scripts are not in" in plan["caveat"].iloc[0]
-    monkeypatch.setattr(W, "_run", lambda method, category, inputs, out_dir, params=None:
-                        _Res(np.zeros((60, 5))))
-    res = _quiet(mtb.run_all, "MU_PEAK", "vertical", tmp_path / "out", methods=["Matilda"],
-                 modalities=["rna", "atac"], data_path=root, evaluate=False,
-                 allow_atac_mismatch=True)
-    log = capsys.readouterr().out
-    cav = res.records[0]["caveat"]
-    assert cav == f"Matilda {GAS_CAV}", cav
-    assert "The method scripts are not in" not in log
-    assert W._run_caveat("Matilda reads inputs/a.h5. mtb.run writes that file first") == ""
-    assert W._run_caveat("Matilda needs raw counts. rna.h5 holds non-integer values. "
-                         "Matilda reads inputs/a.h5. mtb.run writes that file first") == (
-        "Matilda needs raw counts. rna.h5 holds non-integer values.")

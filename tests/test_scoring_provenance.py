@@ -12,16 +12,6 @@ import multibench as mtb
 from multibench import config
 
 
-def _doc(obj):
-    return " ".join(inspect.getdoc(obj).split())
-
-
-def test_leiden_flavor_names_the_backend_of_the_stored_sources():
-    doc = _doc(config.Config)
-    assert "up to about 0.1" not in doc                   # Z32 (r3)
-    assert "backend of both stored sources" not in doc
-
-
 def test_the_shipped_rerun_tables_are_the_version_the_docs_name():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")

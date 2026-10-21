@@ -28,17 +28,3 @@ def test_metric_set_dir_rejects_unwired():
         config.metric_set_dir("classification")
 
 
-def test_defaults_point_at_local_data(tmp_path, monkeypatch):
-    cfg = config.Config()
-    # default result/files paths resolve under the repo's multibench/ dir
-    assert cfg.result_path.name == "result"
-    assert cfg.files_path.name == "files"
-
-
-def test_config_signature_and_repr_leave_out_the_package_tables():
-    # Z32 (r3): result_path and files_path are the package's, still readable
-    import inspect
-    params = inspect.signature(config.Config).parameters
-    assert "result_path" not in params and "files_path" not in params
-    cfg = config.Config()
-    assert "result_path" not in repr(cfg) and cfg.result_path.name == "result"

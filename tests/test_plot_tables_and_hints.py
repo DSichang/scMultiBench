@@ -44,7 +44,7 @@ def gpu(monkeypatch):
 
 
 def _dry(method, category, inputs, params, tmp_path):
-    return mtb.run(method, category, inputs=inputs, out_dir=str(tmp_path / "o"),
+    return mtb.engine.runner.run(method, category, inputs=inputs, out_dir=str(tmp_path / "o"),
                    params=params, dry_run=True, cmd_template="conda run -n x {cmd}")
 
 
@@ -67,29 +67,10 @@ def test_x07_a_family_only_your_row_has_does_not_lift_it():
            "the Overall." in msgs
 
 
-def test_x86_language_chips_and_summary_scale_have_a_legend():
-    d11 = _d11()
-    fig, _ = _messages(mtb.plot.bubble, pd.concat([d11, _mine(d11)]))
-    texts = [t.get_text() for t in fig.axes[0].texts]
-    assert "Py / R: the method's language; ?: not a package method" in texts      # 0.4.0
-    fig, _ = _messages(mtb.plot.bubble, d11)
-    assert "Py / R: the method's language" in [t.get_text() for t in fig.axes[0].texts]
-    two = pd.concat([d11, d11.assign(dataset="D11b")]).assign(source="user")
-    fig, _ = _messages(mtb.plot.bubble, two, aggregate="summary")
-    assert "(mean rank over datasets, scaled per column)" in \
-        [t.get_text() for t in fig.axes[0].texts]
-
-
 def test_x87_clustering_columns_follow_catalog_metrics():
     tbl = _build_table(_d11())
     order = mtb.catalog.metrics().query("family == 'clustering'").metric.tolist()
     assert tbl.blocks[0].raw.columns.tolist() == order
-
-
-def test_x88_bubble_table_repr_is_short():
-    text = repr(_build_table(_d11()))
-    assert len(text.splitlines()) == 1 and text.startswith("BubbleTable: 13 methods (")
-    assert "families Clustering (6)" in text and "datasets D11" in text
 
 
 @pytest.mark.parametrize("scored_with,expect", [

@@ -71,7 +71,7 @@ def pinned(monkeypatch, tmp_path):
 def test_single_file_variant_keeps_the_method_info_pointer(tmp_path, pinned):
     _lung(tmp_path)
     with pytest.raises(FileNotFoundError) as e:
-        mtb.inputs_for("LUNG", "diagonal", "SCALEX", data_path=tmp_path, check=True)
+        mtb.engine.resolve.inputs_for("LUNG", "diagonal", "SCALEX", data_path=tmp_path, check=True)
     assert str(e.value).endswith(
         'method_info("SCALEX")["atac"] says which ATAC SCALEX needs.')
 
@@ -100,71 +100,12 @@ def test_python_run_all_dry_run_prints_the_ref_note_only_when_verbose(wrong_ref,
     assert lines.index(f"[run_all] {WRONG_REF}") > count
 
 
-# ======================================================================= R7-08
-def _stored(dataset):
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        return mtb.load_results("vertical", dataset=dataset)
-
-
-def _mine(method="PriyaNet", dataset="MYCITE"):
-    return pd.DataFrame([
-        {"metric": m, "value": v, "method": method, "dataset": dataset,
-         "category": "vertical", "clustering": "default", "source": "user",
-         "scored_with": "leidenalg/search/0.4.0"}
-        for m, v in zip(("ARI", "NMI", "ASW", "cLISI"), (0.351, 0.5, 0.55, 0.9))])
-
-
-def _warned(fn, *a, **kw):
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    with warnings.catch_warnings(record=True) as rec:
-        warnings.simplefilter("always")
-        out = fn(*a, **kw)
-    plt.close("all")
-    return [str(w.message) for w in rec if issubclass(w.category, UserWarning)]
-
-
-def test_plot_warnings_on_mixed_datasets_are_capitalized_sentences():
-    # your rows on two datasets (next to stored rows, c2 refuses them: C18)
-    df = pd.concat([_stored("D11").assign(source="user"), _mine()], ignore_index=True)
-    seen = []
-    for fn, kw in [(mtb.plot.bubble, {}), (mtb.plot.build_table, {}),
-                   (mtb.plot.build_table, {"aggregate": "summary"}),
-                   (mtb.plot.build_table, {"aggregate": "summary",
-                                           "overall": "mean_overall"}),
-                   (mtb.plot.bar, {})]:
-        msgs = _warned(fn, df, **kw)
-        seen += msgs
-        for m in msgs:
-            assert m[:1].isupper(), (fn, kw, m)
-            assert "(D11, MYCITE)" not in m, m
-            assert ", so " not in m.split(".")[0], m
-    assert ("The rows come from 2 datasets, D11 and MYCITE, that share no method. The "
-            "figure ranks unrelated rows against each other. Plot each dataset on its "
-            "own.") in seen
-    assert ("Dataset MYCITE has only one method, PriyaNet. Its row is ranked against rows "
-            "from other datasets. Plot it with methods scored on the same dataset.") in seen
-    assert ("Dataset MYCITE has only one method, PriyaNet. Its rank there is always the "
-            "lowest. Plot it with methods scored on the same dataset.") in seen
-    assert ("Dataset MYCITE has only one method, PriyaNet. Its Overall there is always "
-            "1.0. Plot it with methods scored on the same dataset.") in seen
-
-
 def test_no_overlap_of_own_datasets_gives_one_action():
     from multibench.plot import style
     parts = {"MINE_A": pd.DataFrame(index=["X"]), "MINE_B": pd.DataFrame(index=["Y"])}
     assert style._no_overlap_message(parts) == (
         "The rows come from 2 datasets, MINE_A and MINE_B, that share no method. The "
         "figure ranks unrelated rows against each other. Plot each dataset on its own.")
-
-
-def test_to_long_warning_for_scores_with_no_record_is_sentences():
-    wide = pd.DataFrame({"Value": [0.5, 0.6]}, index=["ARI", "NMI"])
-    msgs = _warned(mtb.to_long, wide, method="Mine", dataset="MYCITE",
-                   category="vertical")
-    assert msgs == []              # Z31 (r3): every row's scored_with is "unknown"
 
 
 # ======================================================================= R7-09
@@ -221,7 +162,7 @@ def test_raw_counts_warning_of_an_anndata_export(tmp_path):
                    "The methods normalise raw counts themselves. Export raw counts, for "
                    "example with rna='layer:counts'.")
     assert "(log-normalised?)" not in msg and "e.g." not in msg and "MuData" not in msg
-    (msg,) = _count_warnings(ingest.to_canonical, a, tmp_path / "x.h5", modality="rna")
+    (msg,) = _count_warnings(ingest._to_canonical, a, tmp_path / "x.h5", modality="rna")
     assert msg.endswith("Export raw counts, for example with layer='counts'.")
 
 
@@ -295,7 +236,7 @@ def test_scan_env_reason_on_linux(monkeypatch):
 def test_same_cells_error_starts_with_the_method(tmp_path, pinned):
     _lung(tmp_path, n_rna=20, n_atac=16)
     with pytest.raises(ValueError) as e:
-        mtb.inputs_for("LUNG", "diagonal", "Seurat_v5", data_path=tmp_path, check=True)
+        mtb.engine.resolve.inputs_for("LUNG", "diagonal", "Seurat_v5", data_path=tmp_path, check=True)
     msg = str(e.value)
     assert msg == ("Seurat_v5 needs RNA and ATAC from the same cells as its bridge. In "
                    "LUNG, rna.h5 and atac_peak.h5 share 0 of 20 and 16 cells.")
@@ -313,7 +254,7 @@ def test_gas_order_error_is_sentences(tmp_path, pinned):
     d = _lung(tmp_path)
     _gas(d, [f"a{i}" for i in reversed(range(20))])
     with pytest.raises(ValueError) as e:
-        mtb.inputs_for("LUNG", "diagonal", "SCALEX", data_path=tmp_path, check=True)
+        mtb.engine.resolve.inputs_for("LUNG", "diagonal", "SCALEX", data_path=tmp_path, check=True)
     msg = str(e.value)
     assert msg == ("SCALEX reads atac_gas.h5 of LUNG, which lists the ATAC cells in another "
                    "order than atac_peak.h5. atac_cty.csv follows atac_peak.h5. Write "
@@ -326,7 +267,7 @@ def test_gas_other_cells_error_is_sentences(tmp_path, pinned):
     d = _lung(tmp_path)
     _gas(d, [f"x{i}" for i in range(18)])
     with pytest.raises(ValueError) as e:
-        mtb.inputs_for("LUNG", "diagonal", "SCALEX", data_path=tmp_path, check=True)
+        mtb.engine.resolve.inputs_for("LUNG", "diagonal", "SCALEX", data_path=tmp_path, check=True)
     msg = str(e.value)
     assert msg.startswith("SCALEX reads atac_gas.h5 of LUNG, which holds other cells than "
                           "atac_peak.h5.")
@@ -345,7 +286,7 @@ def test_orientation_error_starts_with_the_method(tmp_path, pinned):
     _h5(d / "adt.h5", [f"p{i}" for i in range(6)], bars)
     _labels(d / "cty.csv", 20)
     with pytest.raises(ValueError) as e:
-        mtb.inputs_for("TRANS", "vertical", "totalVI", data_path=tmp_path, check=True)
+        mtb.engine.resolve.inputs_for("TRANS", "vertical", "totalVI", data_path=tmp_path, check=True)
     msg = str(e.value)
     assert msg == ("totalVI reads rna.h5 of TRANS, which stores matrix/data as cells x "
                    "features, shape (20, 60). The file lists 60 features and 20 cells. Its "

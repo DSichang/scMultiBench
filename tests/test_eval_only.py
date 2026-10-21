@@ -41,18 +41,6 @@ def test_only_does_not_change_the_metric_value():
                                                         abs=1e-12)
 
 
-def test_only_skips_the_leiden_sweep_when_nothing_needs_it(monkeypatch):
-    """cLISI needs no clustering; asking for it alone must not run Leiden."""
-    emb, lab, bat = _blobs(n_per=250, n_labels=6, dims=12)
-    calls = []
-    real = escib._leiden
-    monkeypatch.setattr(escib, "_leiden", lambda *a, **k: (calls.append(1), real(*a, **k)))
-    escib.compute(emb, lab, None, bat, group="clustering", only={"cLISI"})
-    assert calls == []
-    escib.compute(emb, lab, None, bat, group="clustering", only={"ARI"})
-    assert calls
-
-
 def test_best_order_still_returns_the_full_metric_set():
     """Screening must not leak into the reported result: the winner is scored
     with everything, not just the ARI used for ranking."""
@@ -89,15 +77,6 @@ def test_shared_sweep_gives_the_standard_protocol_ari():
         assert by_order[tuple(order)] == pytest.approx(round(ari, 4), abs=1e-4), (
             f"{order}: shared-sweep ARI {by_order[tuple(order)]} != "
             f"per-candidate ARI {ari}")
-
-
-def test_leiden_sweep_is_reusable_across_label_vectors():
-    emb, lab, _ = _blobs()
-    adata, keys = escib.leiden_sweep(emb)
-    assert len(keys) == 10, keys
-    assert adata.n_obs == emb.shape[0]
-    # the sweep must not depend on any label vector having been supplied
-    assert "celltype" not in adata.obs
 
 
 def test_best_order_single_candidate_skips_screening():

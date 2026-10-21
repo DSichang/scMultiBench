@@ -288,7 +288,6 @@ def read_labels_ids(path: Path | str, column: str | None = None, *,
     ``as_written=True`` returns each value read as missing (``NA``, ``None``,
     ...) as the word the file holds, for messages only.
     """
-    from .. import config
     path = _require_file(path, f"{what} file"
                          if what else "labels file")
     d = _read_table(path, _sep_for(path))
@@ -402,8 +401,7 @@ def _looks_like_ids(col: pd.Series) -> bool:
 
 
 def by_id_column(values, first, ids, *, what: str, name: str, target: str,
-                 order: str, no_ids: str, n_files: int = 1,
-                 drop: bool = False):
+                 order: str, no_ids: str, n_files: int = 1):
     """Put a per-cell file in the order of ``ids`` by its first column.
 
     ``values`` and ``first`` come from :func:`read_labels_ids`; ``ids`` are
@@ -429,9 +427,6 @@ def by_id_column(values, first, ids, *, what: str, name: str, target: str,
     ``n_files`` > 1 when ``name`` names several stacked files: the warnings
     then speak of them in the plural.
 
-    ``drop`` is true for the labels of a caller that can leave out the cells
-    without a label (``evaluate(missing_labels="drop")``): the error for a
-    cell without a row then says how to mark such a cell.
     """
     vals = np.asarray(values)
     if first is None:
@@ -599,7 +594,6 @@ def as_vector(x, *, what: str = "labels", column: str | None = None,
 def _multi_dict_message(what: str, d: dict, *, label_order_hint: bool) -> str:
     """The error for a ``{name: path}`` dict with several entries: a dict fixes
     no cell order, and a wrong order invalidates every score without an error."""
-    from .. import config
     keys = [str(k) for k in d]
     return (
         f"{what}: got a dict with {len(d)} label files {keys}; a dict does not "
@@ -607,8 +601,7 @@ def _multi_dict_message(what: str, d: dict, *, label_order_hint: bool) -> str:
         f"(the order in which the method concatenated its input cells, which "
         f"is not alphabetical; for most methods numbered files ascending, cty1, "
         f"cty2, ..., and rna before atac). Pass the paths as a list in that order, "
-        f"or "
-        + "dataset=, category= and method=, which read them in that order.")
+        f"or dataset=, category= and method=, which read them in that order.")
 
 
 def _first(ix, n: int = 5) -> list:
@@ -649,10 +642,7 @@ def align_vector(x, ids, *, what: str = "labels", column: str | None = None) -> 
         ``x`` (or ``ids``) has duplicate ids so the mapping is ambiguous; some
         of the output's ids are missing from ``x``; ``x`` has ids the output
         lacks. The message names the first few offenders and the positional
-        escape hatch (``{what}.to_numpy()``). For labels that only lack some
-        of the output's cells, it also says how to pass the cells without a
-        label: with ``missing_labels="drop"``, as
-        ``labels.reindex(adata.obs_names)``.
+        escape hatch (``{what}.to_numpy()``).
     """
     return _align_vector(x, ids, what=what, column=column, cells="adata.obs_names")
 
@@ -760,7 +750,6 @@ def _own_dtype(x) -> np.ndarray:
 
 
 def _anndata_matrix(adata, obsm: str | None) -> np.ndarray:
-    from .. import config
     key = "X_emb" if obsm is None else obsm
     has_x = getattr(adata, "X", None) is not None
     if (obsm == "X" and has_x) or (obsm != "X" and key in adata.obsm):

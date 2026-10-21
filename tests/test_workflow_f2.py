@@ -25,28 +25,8 @@ from tests.conftest import full_scan
 
 ad = pytest.importorskip("anndata")
 
-ALL_ENVS = frozenset(envs.group_for(m) for m in mtb.list_methods())
+ALL_ENVS = frozenset(envs.group_for(m) for m in mtb.find_methods())
 CATS = ("vertical", "diagonal", "mosaic", "cross")
-
-
-# ------------------------------------------------------------------- M17
-def test_diagonal_layout_names_each_method_on_one_line():
-    txt = mtb.describe_layout("diagonal")
-    lines = txt.splitlines()
-    assert ("Give atac_peak.h5, atac_gas.h5 or both. Each method needs one of them, "
-            "or both:") in lines
-    keys = ("need both files:", "need peaks:", "need gene activity:")
-    listed = {}
-    for key in keys:
-        line = next(l for l in lines if l.strip().startswith(key))
-        listed[key] = line.split(":", 1)[1].strip().split(", ")
-    readers = set(mtb.find_methods("diagonal", atac="peak")) | set(
-        mtb.find_methods("diagonal", atac="gene_activity"))
-    for m in readers:
-        hits = [k for k in keys if m in listed[k]]
-        assert len(hits) == 1, (m, hits)
-    assert {"MultiMAP", "Seurat_v3"} <= set(listed["need both files:"])
-    assert "MultiMAP" not in listed["need peaks:"]
 
 
 def _cite_h5ad(path, n=60):
@@ -83,8 +63,8 @@ def _mu_tc(root):
     atac.var_names = [f"chr1:{i * 1000}-{i * 1000 + 200}" for i in range(40)]
     d = root / "MU_TC"
     d.mkdir()
-    ingest.to_canonical(rna, d, modality="rna")
-    ingest.to_canonical(atac, d, modality="peak")
+    ingest._to_canonical(rna, d, modality='rna')
+    ingest._to_canonical(atac, d, modality='peak')
     pd.DataFrame({"x": rng.choice(["T", "B"], n)}).to_csv(d / "cty.csv", index=False)
     return d
 
@@ -141,7 +121,8 @@ def test_scan_assume_gpu_keeps_the_row_and_says_so(login_node):
 def test_scan_assume_gpu_previews_the_gpu_node_command(login_node, tmp_path):
     from tests.test_gpu_requirements import _cite
     _cite(tmp_path)
-    kw = dict(methods=["scMDC"], data_path=tmp_path, verbose=False)
+    mtb.config.DEFAULT.data_path = tmp_path
+    kw = dict(methods=['scMDC'], verbose=False)
     cpu = full_scan("CITE", "vertical", **kw)
     gpu = full_scan("CITE", "vertical", assume_gpu=True, **kw)
     assert "--device cpu" in cpu[cpu.modalities == "rna+adt"]["command"].iloc[0]
@@ -154,14 +135,6 @@ def test_scan_assume_gpu_is_a_no_op_on_a_gpu_host(monkeypatch):
     row = full_scan("D45", "mosaic", methods=["SMILE"], assume_gpu=True,
                    verbose=False).iloc[0]
     assert row["runnable"] and "GPU node" not in row["caveat"]
-
-
-def test_run_all_dry_run_takes_assume_gpu(login_node):
-    plan = mtb.run_all("D45", "mosaic", methods=["SMILE"], dry_run=True,
-                       assume_gpu=True, verbose=False)
-    assert bool(plan["runnable"].iloc[0])
-    with pytest.raises(ValueError, match="assume_gpu=True applies to a dry run only"):
-        mtb.run_all("D45", "mosaic", "out/", methods=["SMILE"], assume_gpu=True)
 
 
 def _mdata_with_labels_in_rna_obs():

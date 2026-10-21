@@ -100,40 +100,9 @@ os.listdir = _descending
 '''
 
 
-def test_concerto_rows_follow_labels_for_on_any_listing_order(root, tmp_path, monkeypatch):
-    data = root / "data"
-    repo = tmp_path / "repo"
-    script_dir = repo / "tools_scripts" / "Concerto"
-    script_dir.mkdir(parents=True)
-    (script_dir / "main_Concerto.py").write_text(_FAKE_MAIN)
-    (script_dir / "concerto_function5_3.py").write_text(_FAKE_HELPER)
-    site = tmp_path / "site"
-    site.mkdir()
-    (site / "sitecustomize.py").write_text(_DESCENDING_FS)
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    (bin_dir / "python").write_text(f'#!/bin/sh\nexec "{sys.executable}" "$@"\n')
-    (bin_dir / "python").chmod(0o755)
-    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
-    monkeypatch.setenv("PYTHONPATH", str(site))
-
-    out = tmp_path / "out"
-    mtb.run("Concerto", "cross", inputs=mtb.inputs_for("D52", "cross", "Concerto", data_path=data),
-            out_dir=str(out), convert=False, cmd_template="{cmd}", repo_path=repo)
-    with h5py.File(out / "embedding.h5", "r") as f:
-        rows = f["data"][:, 0].astype(int)
-
-    labels = mtb.labels_for("D52", "cross", "Concerto", data_path=data)
-    expected = np.concatenate([np.full(len(pd.read_csv(path)), int(stem[3:]) - 1)
-                               for stem, path in labels.items()])
-    blocks = [int(k) for i, k in enumerate(rows) if i == 0 or rows[i - 1] != k]
-    assert blocks == [0, 1, 2]
-    np.testing.assert_array_equal(rows, expected)
-
-
 def test_concerto_cross_command_runs_the_driver(root):
-    inputs = mtb.inputs_for("D52", "cross", "Concerto", data_path=root / "data")
-    cmd = mtb.run("Concerto", "cross", inputs=inputs, out_dir="out/Concerto_D52", dry_run=True)
+    inputs = mtb.engine.resolve.inputs_for("D52", "cross", "Concerto", data_path=root / "data")
+    cmd = mtb.engine.runner.run("Concerto", "cross", inputs=inputs, out_dir="out/Concerto_D52", dry_run=True)
     i = cmd.index(str(PKG / DRIVER))
     assert cmd[i - 1] == "python"
     assert cmd[i + 1] == "--script_dir"

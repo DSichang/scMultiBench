@@ -22,7 +22,7 @@ from multibench import workflow
 def _notes(*args, **kw):
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
-        mtb.labels_for(*args, **kw)
+        mtb.engine.resolve.labels_for(*args, **kw)
     return [str(x.message) for x in w if "default order" in str(x.message)]
 
 
@@ -52,7 +52,7 @@ def test_only_methods_whose_files_pass_the_check_are_named():
 
 def test_silent_calls():
     assert _notes("D52", "cross", "StabMap") == []
-    assert list(mtb.labels_for("D52", "cross", "StabMap")) == ["cty3", "cty1", "cty2"]
+    assert list(mtb.engine.resolve.labels_for("D52", "cross", "StabMap")) == ["cty3", "cty1", "cty2"]
     assert _notes("D11") == []                 # one label file
     assert _notes("D46") == []                 # StabMap keeps the default order there
 

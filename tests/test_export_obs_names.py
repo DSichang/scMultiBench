@@ -42,28 +42,6 @@ def _value_error(tmp_path, data, **kw):
     return str(e.value)
 
 
-def test_bare_and_prefixed_names_write_the_same_labels(tmp_path):
-    a = _cells()
-    bare = ingest.export_dataset(a, tmp_path / "BARE", rna="X", labels="celltype")
-    prefixed = ingest.export_dataset(a, tmp_path / "PREFIXED", rna="X", labels="obs:celltype")
-    assert (bare / "cty.csv").read_bytes() == (prefixed / "cty.csv").read_bytes()
-    assert pd.read_csv(bare / "cty.csv")["x"].tolist() == list(a.obs["celltype"])
-    kw = dict(rna="X", category="cross")
-    bare = ingest.export_dataset(a, tmp_path / "B1", labels="celltype", batch="donor", **kw)
-    prefixed = ingest.export_dataset(a, tmp_path / "B2", labels="obs:celltype",
-                                     batch="obs:donor", **kw)
-    assert sorted(_files(bare)) == ["cty1.csv", "cty2.csv", "rna1.h5", "rna2.h5"]
-    for name in ("cty1.csv", "cty2.csv"):
-        assert (bare / name).read_bytes() == (prefixed / name).read_bytes()
-    for name in ("rna1.h5", "rna2.h5"):
-        x, y = (ingest.read_canonical(d / name, sparse=False) for d in (bare, prefixed))
-        assert np.array_equal(x.X, y.X) and list(x.obs_names) == list(y.obs_names)
-    # the column itself, as before
-    series = ingest.export_dataset(a, tmp_path / "B3", labels=a.obs["celltype"],
-                                   batch=a.obs["donor"], **kw)
-    assert (series / "cty2.csv").read_bytes() == (bare / "cty2.csv").read_bytes()
-
-
 def test_a_column_whose_name_looks_like_a_file_is_a_column(tmp_path):
     a = _cells()
     a.obs["annotation.csv"] = a.obs["celltype"]

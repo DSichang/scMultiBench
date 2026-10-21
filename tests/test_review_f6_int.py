@@ -34,7 +34,6 @@ import multibench as mtb
 from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs
-from multibench.plot import build_table
 from tests.test_docs_r4 import _flat, needs_docs
 from tests.test_study_r4_wf import ALL_ENVS, _h5, _quiet, _Res, cite  # noqa: F401
 from tests.test_study_r6_msg import _lung_ids, needs_git, pinned, wrong_ref
@@ -94,8 +93,8 @@ def stacked(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     donor = np.concatenate([_donor(b, n) for b, n in SIZES.items()])
     batch = pd.Series(donor, index=bars).sample(frac=1.0, random_state=2)
-    res = _quiet(mtb.run_all, "MYCROSS", "cross", "out", data_path="data",
-                 methods=["StabMap"], batch=batch, verbose=False)
+    mtb.config.DEFAULT.data_path = "data"
+    res = _quiet(mtb.run_all, 'MYCROSS', 'cross', 'out', methods=['StabMap'], batch=batch, verbose=False)
     emb_labels = np.concatenate([labs[b] for b in EMB_ORDER])
     return res, emb_labels, tmp_path
 
@@ -148,44 +147,13 @@ def test_a_saved_batch_is_dropped_when_the_dataset_folder_is_not_found(stacked):
     assert _batch_cols(_quiet(back.rescore)) == _batch_cols(res)
 
 
-# ========================================================== data folders
-def test_a_data_path_that_does_not_hold_the_dataset_raises(rel):
-    _, root = rel
-    with pytest.raises(ValueError) as e:
-        mtb.load_batch("out", data_path=root / "data" / "MYCITE")
-    assert str(e.value) == (
-        f"{root / 'data' / 'MYCITE' / 'MYCITE'} is not a folder. data_path= is the "
-        f"folder that holds MYCITE, here {root / 'data'}.")
-    with pytest.raises(ValueError, match=r"^\S+nowhere/MYCITE is not a folder\. "
-                                         r"data_path= is the folder that holds MYCITE\.$"):
-        mtb.load_batch("out", data_path=root / "nowhere")
     # 0.4: data_path= is deprecated, so the docstring no longer lists this error
-
-
-def test_the_folder_found_is_recorded_as_an_absolute_path(rel, monkeypatch):
-    res, root = rel
-    shutil.move(str(root / "data"), str(root / "gone"))
-    shutil.move(str(root / "out"), str(root / "moved_out"))
-    monkeypatch.chdir(root / "nb")
-    back = mtb.load_batch("../moved_out", data_path="../gone")
-    rec = back.records[0]
-    gone = str((root / "gone").resolve())
-    assert rec["data_path"] == rec["data_root"] == gone
-    assert rec["out_dir"] == str((root / "moved_out" / "Matilda_MYCITE").resolve())
-    _quiet(back.rescore, metrics=["ARI"]).save("../ct2")
-    saved = json.loads((root / "ct2" / "batch_result.json").read_text())["records"][0]
-    assert saved["data_path"] == saved["data_root"] == gone
-    assert Path(saved["out_dir"]).is_absolute()
-    # read from yet another directory, the saved result still finds its data
-    monkeypatch.chdir(root)
-    again = _quiet(mtb.load_batch("ct2").rescore, labels=_shuffled_labels())
-    assert "+".join(again.records[0]["labels_used"]) == "cty.csv"
 
 
 def test_no_unsaved_batch_warning_without_a_batch_metric(cite, tmp_path):
     data, batch, shuffled = cite
-    _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "out", data_path=data,
-           batch=shuffled, **KW)
+    mtb.config.DEFAULT.data_path = data
+    _quiet(mtb.run_all, 'MYCITE', 'vertical', tmp_path / 'out', batch=shuffled, **KW)
     p = tmp_path / "out" / "batch_result.json"
     blob = json.loads(p.read_text())
     for r in blob["records"]:                      # a folder from before 0.3.2
@@ -270,7 +238,7 @@ def test_the_label_count_error_is_sentences(tmp_path):
     _h5(d / "adt.h5", [f"p{i}" for i in range(6)], [f"c{i}" for i in range(20)])
     pd.DataFrame({"x": ["A"] * 15}).to_csv(d / "cty.csv", index=False)
     with pytest.raises(ValueError) as e:
-        mtb.inputs_for("LAB", "vertical", "Matilda", modalities=["rna", "adt"],
+        mtb.engine.resolve.inputs_for("LAB", "vertical", "Matilda", modalities=["rna", "adt"],
                        data_path=tmp_path, check=True)
     assert str(e.value) == ("cty.csv has 15 labels, but rna.h5 has 20 cells. Give each "
                             "cell one label, in the order of the cells. "
@@ -279,7 +247,7 @@ def test_the_label_count_error_is_sentences(tmp_path):
 
 def test_the_scbridge_error_names_the_method_once(tmp_path):
     with pytest.raises(FileNotFoundError) as e:
-        mtb.inputs_for("LUNG_ids", "diagonal", "scBridge", data_path=_lung_ids(tmp_path),
+        mtb.engine.resolve.inputs_for("LUNG_ids", "diagonal", "scBridge", data_path=_lung_ids(tmp_path),
                        check=True)
     assert str(e.value) == (f"scBridge needs atac_gas.h5, and {tmp_path / 'LUNG_ids'} has "
                             f"no such file.")
@@ -289,7 +257,7 @@ def test_the_scbridge_error_names_the_method_once(tmp_path):
 # =========================================================== docstrings
 def test_docstrings_quote_the_current_texts():
     flat = {k: " ".join(inspect.getdoc(o).split()) for k, o in {
-        "run_all": mtb.run_all, "save": W.BatchResult.save, "run": mtb.run,
+        "run_all": mtb.run_all, "save": W.BatchResult.save, "run": mtb.engine.runner.run,
         "rescore": W.BatchResult.rescore, "load_batch": mtb.load_batch}.items()}
     assert "nothing is runnable" not in flat["run_all"]
     # 0.4: the Notes of run_all, run and rescore that quoted these texts are cut

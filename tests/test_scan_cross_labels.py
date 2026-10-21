@@ -110,10 +110,10 @@ def test_inputs_for_check_true_raises_with_the_same_message(tmp_path):
     _numbered(tmp_path, "BADLAB", short=(1, 5))
     with pytest.raises(ValueError, match=r"^cty1\.csv has 35 labels, but rna1\.h5 has 40 cells\. Give each cell of "
                                          r"batch 1 one label, in the order of the cells\. "):
-        mtb.inputs_for("BADLAB", "cross", "Concerto", data_path=tmp_path, check=True)
+        mtb.engine.resolve.inputs_for("BADLAB", "cross", "Concerto", data_path=tmp_path, check=True)
     # check=None and check=False stay silent about content
-    mtb.inputs_for("BADLAB", "cross", "Concerto", data_path=tmp_path, check=None)
-    mtb.inputs_for("BADLAB", "cross", "Concerto", data_path=tmp_path, check=False)
+    mtb.engine.resolve.inputs_for("BADLAB", "cross", "Concerto", data_path=tmp_path, check=None)
+    mtb.engine.resolve.inputs_for("BADLAB", "cross", "Concerto", data_path=tmp_path, check=False)
 
 
 def test_batch_label_file_pairing_rule():

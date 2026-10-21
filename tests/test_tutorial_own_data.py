@@ -211,7 +211,7 @@ def linux(monkeypatch, tmp_path):
         files = {role: Path(str(f)) for role, f in inputs.items()}
         calls.append((method, files))
         folder = next(iter(files.values())).parent
-        labels = mtb.labels_for(folder.name, category, method, data_path=folder.parent)
+        labels = mtb.engine.resolve.labels_for(folder.name, category, method, data_path=folder.parent)
         n = sum(len(pd.read_csv(f)) for f in labels.values())
         return _Res(np.random.default_rng(0).normal(size=(n, 4)))
     monkeypatch.setattr(W, "_run", fake_run)
@@ -404,7 +404,7 @@ def test_the_section_runs_twice_and_keeps_a_file_of_the_reader(key, tmp_path, mo
     the second, and the three cells run both times."""
     ds = _on_disk(key)
     mine, *others = EXAMPLES[ds]
-    mtb.data.write_example(ds, tmp_path / "side", quiet=True)
+    mtb.data.write_example(ds, tmp_path / 'side', verbose=False)
     work = tmp_path / "work"
     work.mkdir()
     # saved again with write_h5ad: the file carries no mark of an example
@@ -903,35 +903,6 @@ def test_the_check_sentence_covers_the_further_lines(linux, tmp_path, monkeypatc
         "method": ["StabMap", "sciPENN"], "runnable": [True] * 2}
 
 
-@pytest.mark.parametrize("key", KEYS)
-def test_the_check_names_the_two_atac_files(key, tmp_path, monkeypatch, capsys):
-    """Without a category, the export writes the ATAC peaks as ``atac.h5``
-    and as ``atac_peak.h5``. The second line of the check lists both, under a
-    sentence that asks the reader to compare the files with their data, so
-    the sentence says that the two are one matrix. It is there exactly where
-    the folder holds both."""
-    _on_disk(key)
-    monkeypatch.chdir(tmp_path)
-    src, ns = _sources(key), _namespace(key)
-    for i in (EXAMPLE, READ, EXPORT):
-        _run_cell(src[i], ns)
-    table = _run_cell(src[CHECK], ns)
-    capsys.readouterr()
-    cells = table.attrs["cells"]
-    both = {"atac.h5", "atac_peak.h5"} <= set(cells)
-    assert both == (key in TWO_ATAC_NAMES) == (CHECK_TWO_NAMES in src[CHECK - 1])
-    assert ("atac_peak.h5" in src[CHECK - 1]) == both
-    if both:
-        content = _content(Path("mydata") / NAMES[key])
-        assert cells["atac.h5"] == cells["atac_peak.h5"] > 0
-        assert content["atac.h5"] == content["atac_peak.h5"]
-        # the diagonal methods read atac_peak.h5; none reads a file named atac.h5
-        roles = {r for m in mtb.list_methods(category="diagonal")
-                 for v in mtb.method_info(m)["supports"] if v["category"] == "diagonal"
-                 for r in v["modalities"] if r.startswith("atac")}
-        assert "atac_peak" in roles and not [r for r in roles if re.fullmatch(r"atac\d*", r)]
-
-
 def test_the_small_dataset_row_names_the_scan_that_has_the_column(tmp_path, monkeypatch,
                                                                   capsys):
     """The Troubleshooting row sends a reader to the ``caveat`` column of the
@@ -1028,13 +999,6 @@ def test_the_cross_sentence_counts_the_batches_from_the_registry(monkeypatch):
         (m, v) for m, v in variants if m != "UINMF" or len(v.when["modalities"]) == 4])
     with pytest.raises(SystemExit, match="reword cross_batches_sentence"):
         GEN.cross_batches_sentence("cross_rna_adt")
-
-
-def test_check_task_checks_section_5(monkeypatch):
-    seen = []
-    monkeypatch.setattr(GEN, "check_own", seen.append)
-    GEN.check_task("vertical_rna_adt")
-    assert seen == ["vertical_rna_adt"]
 
 
 def test_the_generator_refuses_a_section_whose_texts_do_not_fit(monkeypatch):

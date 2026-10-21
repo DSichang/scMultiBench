@@ -1,5 +1,5 @@
 # Per-method environment recipes, written by hand. multibench.engine.registry.load()
-# attaches each entry to its method as env_spec; read one with mtb.env.recipe(method).
+# attaches each entry to its method as env_spec; read one with multibench.engine.envs.recipe(method).
 SCALEX:
   python_version: '3.9'
   conda_channels: []

@@ -41,7 +41,7 @@ def _launch_env(monkeypatch, tmp_path, method, category, cmd_template=None):
                         lambda conda=None: [envs.group_for(method)])
     monkeypatch.setattr(runner.envs, "other_env_prefix", lambda name: None)
     import multibench as mtb
-    inp = mtb.inputs_for("D11", category, method, modalities=["rna", "adt"])
+    inp = mtb.engine.resolve.inputs_for("D11", category, method, modalities=["rna", "adt"])
     with pytest.raises(RuntimeError, match="stop after env capture"):
         runner.run(method=method, category=category, inputs=inp,
                    out_dir=str(tmp_path / "out"),

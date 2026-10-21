@@ -2,14 +2,12 @@
 from __future__ import annotations
 
 
-import numpy as np
 import pandas as pd
 
 from . import style
 from .. import _compat
-from .. import config as _config
 from ..data.catalog import FAMILY_METRICS
-from .style import compute_overall, minmax
+from .style import minmax
 
 CLUSTERING_METRICS = FAMILY_METRICS["clustering"]
 BATCH_METRICS = FAMILY_METRICS["batch"]
@@ -18,12 +16,6 @@ CLASSIFICATION_METRICS = FAMILY_METRICS["classification"]
 FAMILY_CMAPS = {"clustering": "Blues", "batch": "Greens", "classification": "Pinks"}
 
 
-@_compat.keywords("plot.bar", renamed={"group": "metrics"}, private="_bar", kept={
-    "cmap": _compat.note("leave it out for the metric family's colours"),
-    "show_datasets": _compat.note(
-        'leave it out to draw the dataset dots of overall="mean_overall"'),
-    "top": _compat.use("methods="),
-    "overall": _compat.use("the default")})
 def bar(long_df: pd.DataFrame, *, metrics=None, methods=None, title: str | None = None,
         save: str | None = None):
     """Draw each method's overall score as a horizontal bar, best on top.
@@ -75,15 +67,6 @@ def bar(long_df: pd.DataFrame, *, metrics=None, methods=None, title: str | None 
     >>> df = mtb.load_results("diagonal")
     >>> fig = mtb.plot.bar(df, metrics="clustering", save="clustering.png")
     """
-    return _bar(long_df, metrics=metrics, methods=methods, title=title, save=save)
-
-
-def _bar(long_df: pd.DataFrame, *, metrics=None, methods=None, top: int | None = None,
-         title: str | None = None, save: str | None = None, overall: str | None = None,
-         cmap: str = "Blues", show_datasets: bool = True):
-    """:func:`bar`, with the deprecated ``top``, ``overall`` (the 0.3 formulas
-    ``"rank"`` and ``"mean_overall"``), ``cmap`` (the colours when no metric
-    family is drawn) and ``show_datasets``."""
     import matplotlib.pyplot as plt
     from .bubble import _resolve
     from ..data import catalog
@@ -109,9 +92,8 @@ def _bar(long_df: pd.DataFrame, *, metrics=None, methods=None, top: int | None =
         metrics = FAMILY_METRICS[family]
         present = set(long_df["metric"].unique())
         if not (set(metrics) & present):
-            why = ("The stored results have none. "
-                   + "mtb.evaluate"
-                   + " computes them on multi-batch data." if family == "classification" else
+            why = ("The stored results have none. mtb.evaluate computes them on "
+                   "multi-batch data." if family == "classification" else
                    "Batch metrics need a multi-batch dataset - a single-batch design "
                    "has none to compute.")
             raise ValueError(f"no {family!r} metrics present. Found {sorted(present)}. {why}")
@@ -120,9 +102,6 @@ def _bar(long_df: pd.DataFrame, *, metrics=None, methods=None, top: int | None =
         metrics = _expand_families(metrics, long_df["metric"].dropna().unique().tolist())
         metrics = _resolve(metrics, long_df["metric"].dropna().unique().tolist(),
                            "metric", catalog._canonical_metric)
-    if overall is not None and overall not in style.OVERALL_BASES:
-        raise ValueError(
-            f"overall must be one of {list(style.OVERALL_BASES)}, got {overall!r}")
 
     from .bubble import _duplicate_rows_message, _user_repeats
     keys = ["method", "metric"] + (["dataset"] if "dataset" in long_df.columns else [])
@@ -140,63 +119,34 @@ def _bar(long_df: pd.DataFrame, *, metrics=None, methods=None, top: int | None =
     if lone:
         _compat.warn(lone, UserWarning)
     for msg in style.coverage_warnings(
-            parts, basis=overall or "mean_overall",
+            parts, basis="mean_overall",
             incomplete_fix="Pass methods= with the methods scored on every dataset."):
         _compat.warn(msg, UserWarning)
     backend = style.backend_warning(picked)
     if backend:
         _compat.warn(backend, UserWarning)
     datasets = list(parts)
-    if overall is not None:                 # the 0.3 formulas, until 0.5
-        ranks = style.per_dataset_ranks(long_df, metrics)
-        per_ds = pd.DataFrame({ds: compute_overall(mat) for ds, mat in ranks.items()})
-        mean = (per_ds.mean(axis=1) if overall == "mean_overall"
-                else compute_overall(style.mean_rank_matrix(ranks)))
-        mean = mean.sort_values(ascending=False, kind="mergesort")
     mean = mean[::-1]                       # the best method is drawn on top
-    if top:
-        mean = mean.tail(top)
 
     n = len(mean)
     # matplotlib's own defaults, whatever the session's rcParams are:
     # importing scib (mtb.evaluate) switches them to seaborn's "talk" sizes
     with plt.style.context("default"):
         fig, ax = plt.subplots(figsize=(7.2, max(2.2, 0.34 * n + 1.1)))
-        colors = style.colormap(FAMILY_CMAPS.get(family, cmap))(
+        colors = style.colormap(FAMILY_CMAPS.get(family, "Blues"))(
             0.35 + 0.55 * minmax(mean.to_numpy()))
-        # whisker = SD across datasets; none for a method in one dataset, and none
-        # under overall="rank", whose bar is not a mean of per-dataset scores
-        if overall == "mean_overall":
-            per_ds = per_ds.reindex(mean.index)
-            sd = per_ds.std(axis=1, ddof=0)
-            n_scored = per_ds.notna().sum(axis=1)
-            xerr = np.where(n_scored.to_numpy() > 1, sd.to_numpy(), np.nan)
-        else:
-            xerr = np.full(n, np.nan)
-        # no whisker artist at all when no method has a spread (one dataset)
         ax.barh(range(n), mean.to_numpy(), color=colors, edgecolor="#333",
-                linewidth=0.6, zorder=2,
-                xerr=xerr if np.isfinite(xerr).any() else None,
-                error_kw=dict(ecolor="#333", elinewidth=1.0, capsize=3, capthick=1.0))
-
-        if show_datasets and overall == "mean_overall" and per_ds.shape[1] > 1:
-            for i, m in enumerate(mean.index):
-                vals = per_ds.loc[m].dropna().to_numpy()
-                ax.scatter(vals, np.full(len(vals), i), s=16, facecolor="white",
-                           edgecolor="#444", linewidth=0.7, zorder=3)
+                linewidth=0.6, zorder=2)
 
         ax.set_yticks(range(n)); ax.set_yticklabels(mean.index, fontsize=9)
         n_datasets = len(datasets)
         if n_datasets == 1:
             xlabel = f"overall score ({datasets[0]})"
         else:
-            how = {"rank": "rank of mean ranks"}.get(overall, "mean of per-dataset overall")
-            xlabel = f"overall score ({how}, {n_datasets} datasets)"
+            xlabel = f"overall score (mean of per-dataset overall, {n_datasets} datasets)"
         ax.set_xlabel(xlabel, fontsize=9)
-        # the stored scores lie in [0, 1]; your rows and a whisker (mean +/- SD) can reach past either end
-        reach = np.nan_to_num(xerr)
-        ax.set_xlim(min(0, (mean.to_numpy() - reach).min() - 0.02),
-                    max(1, (mean.to_numpy() + reach).max()) + 0.02)
+        # the stored scores lie in [0, 1]; your rows can reach past either end
+        ax.set_xlim(min(0, mean.to_numpy().min() - 0.02), max(1, mean.to_numpy().max()) + 0.02)
         ax.grid(axis="x", color="#e8e8e8", zorder=0)
         for side in ("top", "right", "left"):
             ax.spines[side].set_visible(False)

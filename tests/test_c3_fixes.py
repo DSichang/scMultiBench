@@ -248,20 +248,6 @@ def test_e13_e14_a_benchmark_dataset_gives_its_category_and_its_cells():
                metrics=["cLISI"])
 
 
-# --------------------------------------------------------------- E18 / C20
-def test_e18_default_calls_rank_once(monkeypatch):
-    from multibench.plot import style
-    pb = importlib.import_module("multibench.plot.bar")
-    calls = []
-    for mod, name in ((style, "compute_overall"), (pb, "compute_overall"),
-                      (style, "mean_rank_matrix")):
-        monkeypatch.setattr(mod, name, lambda *a, _n=name, **k: calls.append(_n))
-    df = pd.concat([mtb.load_results("vertical"), _this_run("vertical")])
-    _quiet(mtb.plot.bar, df)
-    _quiet(mtb.recommend, "vertical", long_df=df)
-    assert calls == []
-
-
 def test_c20_your_rows_have_no_runtime_of_the_package():
     df = pd.concat([mtb.load_results("vertical"), _this_run("vertical")])
     r = _quiet(mtb.recommend, "vertical", long_df=df).set_index("method")

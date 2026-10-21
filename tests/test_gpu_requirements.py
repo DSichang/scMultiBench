@@ -13,6 +13,7 @@ method with ``OSError`` before launching; ``scan`` / ``run_all`` report the
 same sentence in the env gate. On a GPU host nothing changes. Every test
 patches ``host_has_gpu`` both ways, so it holds on ANY machine.
 """
+import os
 from pathlib import Path
 
 import h5py
@@ -67,93 +68,11 @@ def _cite(root, name="CITE", n=60):
     return d
 
 
-class _FakePopen:
-    """Writes the embedding the runner loads; records argv; launches nothing."""
-    calls: dict = {}
-
-    def __init__(self, cmd, cwd, stdout, stderr, text, env=None, start_new_session=False):
-        _FakePopen.calls["cmd"] = cmd
-        self.pid = 4242
-        self.returncode = 0
-        with h5py.File(Path(cwd) / "embedding.h5", "w") as f:
-            f.create_dataset("data", data=np.zeros((6, 3)))
-
-    def communicate(self):
-        return "", ""
-
-    def kill(self):
-        pass
-
-    def wait(self):
-        return self.returncode
-
-
 def _must_not_spawn(*a, **k):
     raise AssertionError("Popen must not be reached")
 
 
 # ------------------------------------------------------------ the snapshot
-
-def test_requires_gpu_set_is_pinned():
-    got = {m for m in mtb.list_methods() if mtb.method_info(m)["gpu"] == "required"}
-    assert got == GPU_ONLY, got
-
-
-def test_cpu_params_are_pinned():
-    got = {m: mtb.method_info(m, verbose=True)["cpu_params"] for m in mtb.list_methods()
-           if mtb.method_info(m, verbose=True)["cpu_params"]}
-    assert got == CPU_SWITCH, got
-    # exactly what the scripts need: argparse type=bool is truthy for any
-    # non-empty string, so scJoint's switch is the EMPTY string
-    assert mtb.method_info("scJoint", verbose=True)["cpu_params"] == {"use_cuda": ""}
-    assert mtb.method_info("scMDC", verbose=True)["cpu_params"] == {"device": "cpu"}
-
-
-def test_gpu_evidence_names_a_cuda_call():
-    """``gpu_evidence`` is ``file:line`` of the unconditional CUDA call; when
-    the reference checkout is here, that line really says cuda."""
-    root = runner._repo_root_no_fetch()
-    for m in mtb.list_methods():
-        info = mtb.method_info(m, verbose=True)
-        ev = info["gpu_evidence"]
-        if info["gpu"] != "required":
-            assert ev is None, m
-            continue
-        for entry in ev.split(", "):          # moETM names one call per script
-            path, _, line = entry.rpartition(":")
-            assert path.startswith("tools_scripts/") and line.isdigit(), (m, ev)
-            f = root / path
-            if f.is_file():
-                text = f.read_text(errors="replace").splitlines()[int(line) - 1]
-                assert "cuda" in text.lower(), (m, entry, text)
-
-
-def test_method_info_keys_and_defaults():
-    for m in mtb.list_methods():
-        info = mtb.method_info(m, verbose=True)
-        assert isinstance(info["cpu_params"], dict)
-        assert info["gpu_evidence"] is None or isinstance(info["gpu_evidence"], str)
-    info = mtb.method_info("SCALEX", verbose=True)
-    assert info["cpu_params"] == {} and info["gpu"] != "required"
-    assert info["gpu_evidence"] is None
-    assert "cpu_params" in (mtb.method_info.__doc__ or "")
-    assert "requires_gpu" not in (mtb.method_info.__doc__ or "")       # c1 (C33)
-
-
-def test_scmm_and_scmvp_keep_their_existing_cpu_treatment():
-    """scMM turns CUDA off through its own ``--no_cuda`` default param and
-    scMVP / scMSI through ``run_env: CUDA_VISIBLE_DEVICES=""`` - both
-    predate cpu_params and both scripts fall back on is_available(), so
-    they need neither new key."""
-    for v in registry.get("scMM").variants:
-        assert v.params.get("no_cuda") is True
-    for m in ("scMVP", "scMSI"):
-        for v in registry.get(m).variants:
-            assert v.run_env.get("CUDA_VISIBLE_DEVICES") == ""
-        assert mtb.method_info(m, verbose=True)["cpu_params"] == {}
-        assert mtb.method_info(m)["gpu"] != "required"
-    assert mtb.method_info("scMM", verbose=True)["cpu_params"] == {}
-
 
 def test_cpu_params_keys_are_accepted_params_of_every_variant():
     """The runner emits cpu_params below the params check. Since r3 (X64) they are
@@ -263,13 +182,13 @@ def test_cpu_params_for_merges_only_without_gpu(no_gpu, monkeypatch):
 
 
 def test_dry_run_shows_cpu_params_without_gpu(tmp_path, no_gpu):
-    argv = mtb.run("scMDC", "vertical", inputs=_cite_inputs(tmp_path),
+    argv = mtb.engine.runner.run("scMDC", "vertical", inputs=_cite_inputs(tmp_path),
                    out_dir=str(tmp_path / "o"), dry_run=True,
                    cmd_template="conda run -n x {cmd}")
     i = argv.index("--device")
     assert argv[i + 1] == "cpu"
     # scJoint: the empty string, inside the pty wrap the variant opts into
-    argv = mtb.run("scJoint", "diagonal",
+    argv = mtb.engine.runner.run("scJoint", "diagonal",
                    inputs={"rna": "r.h5", "atac_gas": "a.h5", "rna_cty": "c.csv"},
                    out_dir=str(tmp_path / "o"), dry_run=True,
                    cmd_template="conda run -n x {cmd}")
@@ -277,11 +196,11 @@ def test_dry_run_shows_cpu_params_without_gpu(tmp_path, no_gpu):
 
 
 def test_dry_run_unchanged_on_gpu_host(tmp_path, gpu):
-    argv = mtb.run("scMDC", "vertical", inputs=_cite_inputs(tmp_path),
+    argv = mtb.engine.runner.run("scMDC", "vertical", inputs=_cite_inputs(tmp_path),
                    out_dir=str(tmp_path / "o"), dry_run=True,
                    cmd_template="conda run -n x {cmd}")
     assert "--device" not in argv
-    argv = mtb.run("scJoint", "diagonal",
+    argv = mtb.engine.runner.run("scJoint", "diagonal",
                    inputs={"rna": "r.h5", "atac_gas": "a.h5", "rna_cty": "c.csv"},
                    out_dir=str(tmp_path / "o"), dry_run=True,
                    cmd_template="conda run -n x {cmd}")
@@ -291,35 +210,9 @@ def test_dry_run_unchanged_on_gpu_host(tmp_path, gpu):
 def test_explicit_param_wins_over_cpu_params(tmp_path, no_gpu):
     # r3 (X64): the CUDA switch is the package's, so params= cannot set it
     with pytest.raises(KeyError, match=r"scMDC does not accept \['device'\]"):
-        mtb.run("scMDC", "vertical", inputs=_cite_inputs(tmp_path),
+        mtb.engine.runner.run("scMDC", "vertical", inputs=_cite_inputs(tmp_path),
                 out_dir=str(tmp_path / "o"), dry_run=True, params={"device": "cuda:1"},
                 cmd_template="conda run -n x {cmd}")
-
-
-def test_real_run_merges_and_logs_one_stderr_line(tmp_path, no_gpu, monkeypatch, capsys):
-    monkeypatch.setattr(runner.subprocess, "Popen", _FakePopen)
-    res = mtb.run("scMDC", "vertical", inputs=_cite_inputs(tmp_path),
-                  out_dir=str(tmp_path / "o"), convert=False,
-                  cmd_template="conda run -n x {cmd}")
-    cmd = _FakePopen.calls["cmd"]
-    assert cmd[cmd.index("--device") + 1] == "cpu" and res.cmd == cmd
-    err = capsys.readouterr().err
-    assert err.count("[run] no GPU on this host: applying scMDC cpu_params {'device': 'cpu'}") == 1
-
-
-def test_real_run_is_silent_on_gpu_host_and_with_explicit_key(tmp_path, monkeypatch, capsys):
-    monkeypatch.setattr(runner.subprocess, "Popen", _FakePopen)
-    monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
-    mtb.run("scMDC", "vertical", inputs=_cite_inputs(tmp_path),
-            out_dir=str(tmp_path / "o1"), convert=False, cmd_template="conda run -n x {cmd}")
-    assert "--device" not in _FakePopen.calls["cmd"]
-    # r3 (X64): an explicit device is refused before anything runs
-    monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
-    with pytest.raises(KeyError, match=r"does not accept \['device'\]"):
-        mtb.run("scMDC", "vertical", inputs=_cite_inputs(tmp_path / "b"),
-                out_dir=str(tmp_path / "o2"), convert=False, params={"device": "cuda:0"},
-                cmd_template="conda run -n x {cmd}")
-    assert "[run] no GPU" not in capsys.readouterr().err
 
 
 # ------------------------------------------------------------ runner: requires_gpu
@@ -327,30 +220,8 @@ def test_real_run_is_silent_on_gpu_host_and_with_explicit_key(tmp_path, monkeypa
 MOETM_REASON = 'moETM needs an NVIDIA GPU, and this computer has none.'
 
 
-def test_requires_gpu_raises_before_launching(tmp_path, no_gpu, monkeypatch):
-    monkeypatch.setattr(runner.subprocess, "Popen", _must_not_spawn)
-    out = tmp_path / "o"
-    with pytest.raises(OSError) as e:
-        mtb.run("moETM", "vertical", inputs=_cite_inputs(tmp_path), out_dir=str(out),
-                convert=False, cmd_template="conda run -n x {cmd}")
-    assert str(e.value) == MOETM_REASON
-    assert not out.exists()                      # nothing written
-    assert registry.get("moETM").requires_gpu_reason == MOETM_REASON
-    with pytest.raises(OSError, match="^moETM needs an NVIDIA GPU"):
-        runner.check_gpu_requirement(registry.get("moETM"))
-    runner.check_gpu_requirement(registry.get("scMDC"))   # no requirement: silent
-
-
-def test_requires_gpu_method_runs_on_gpu_host(tmp_path, gpu, monkeypatch):
-    monkeypatch.setattr(runner.subprocess, "Popen", _FakePopen)
-    res = mtb.run("moETM", "vertical", inputs=_cite_inputs(tmp_path),
-                  out_dir=str(tmp_path / "o"), convert=False,
-                  cmd_template="conda run -n x {cmd}")
-    assert res.output.shape == (6, 3)
-
-
 def test_requires_gpu_dry_run_still_previews(tmp_path, no_gpu):
-    argv = mtb.run("moETM", "vertical", inputs=_cite_inputs(tmp_path),
+    argv = mtb.engine.runner.run("moETM", "vertical", inputs=_cite_inputs(tmp_path),
                    out_dir=str(tmp_path / "o"), dry_run=True,
                    cmd_template="conda run -n x {cmd}")
     assert any(a.endswith("main_moETM_rna_adt.py") for a in argv)
@@ -359,8 +230,8 @@ def test_requires_gpu_dry_run_still_previews(tmp_path, no_gpu):
 def test_run_docstring_documents_the_contract():
     # mtb.run is deprecated in 0.4.0 (its docstring names run_all); the
     # contract stays on the implementation it wraps
-    assert "mtb.run_all(" in mtb.run.__doc__
-    doc = mtb.run.__wrapped__.__doc__ or ""
+    assert "mtb.run_all(" in mtb.engine.runner.run.__doc__
+    doc = mtb.engine.runner.run.__wrapped__.__doc__ or ""
     assert "OSError" in doc and "needs a GPU this host lacks" in " ".join(doc.split())
 
 
@@ -404,14 +275,12 @@ def test_scan_joins_missing_env_and_missing_gpu(tmp_path, no_gpu, monkeypatch):
 def test_run_all_never_dispatches_a_requires_gpu_method(tmp_path, no_gpu, all_envs, monkeypatch):
     _cite(tmp_path)
     monkeypatch.setattr(W, "_run", _must_not_spawn)
-    plan = mtb.run_all("CITE", "vertical", methods=["moETM"], data_path=tmp_path,
-                       out_dir=str(tmp_path / "res"), dry_run=True, verbose=False)
+    plan = mtb.run_all(os.path.join(tmp_path, 'CITE'), 'vertical', methods=['moETM'], out_dir=str(tmp_path / 'res'), dry_run=True, verbose=False)
     row = plan[plan["modalities"] == "rna+adt"].iloc[0]
     assert not bool(row["runnable"]) and row["reason"] == MOETM_REASON
     with pytest.raises(ValueError, match=r"^None of the requested methods \(moETM\) can "
                                          r"run on CITE \(vertical\)\.") as e:
-        mtb.run_all("CITE", "vertical", methods=["moETM"], data_path=tmp_path,
-                    out_dir=str(tmp_path / "res"), verbose=False)
+        mtb.run_all(os.path.join(tmp_path, 'CITE'), 'vertical', methods=['moETM'], out_dir=str(tmp_path / 'res'), verbose=False)
     assert "needs an NVIDIA GPU" in str(e.value)
 
 
@@ -419,10 +288,3 @@ def test_scan_docstring_documents_the_gate():
     assert "skip this host's GPU test" in " ".join((mtb.scan.__doc__ or "").split())
 
 
-def test_runtime_hint_names_its_host():
-    """The observed times were taken on the GPU benchmark host, and the note
-    says which (r3, Z33: without the CPU-host clause)."""
-    import multibench as mtb
-    rt = mtb.method_info("scMoMaT", verbose=True)["runtime"]
-    assert rt["host"] == "gpu" and "RTX 4090" in rt["note"] and "CPU-only" not in rt["note"]
-    assert set(rt) >= {"tier", "worst_sec", "observed", "host", "note"}

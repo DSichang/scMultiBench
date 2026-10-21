@@ -15,22 +15,9 @@ def no_category_message(method: str, categories, category) -> str:
 class AmbiguousVariantError(ValueError, KeyError):
     """Raised when several variants of a method fit and the call must pick one.
 
-    Raised by ``mtb.params_for`` and ``mtb.inputs_for``; the message spells
-    out the call that selects one variant.
-
-    Examples
-    --------
-    >>> from multibench import params_for, AmbiguousVariantError
-    >>> params_for("Matilda")  # raises: rna+adt or rna+atac
-    >>> params_for("Matilda", "vertical", ["rna", "adt"])  # selects one
-
-    Notes
-    -----
-    ``mtb.inputs_for`` (without ``modalities=``) and
-    ``mtb.params_for(dataset=)`` (without ``category=`` or ``modalities=``)
-    first let the dataset folder decide, and raise only when it settles
-    nothing. ``mtb.labels_for`` never raises it; it falls back to the default
-    label order.
+    Raised by ``mtb.params_for`` and the folder lookup of ``mtb.scan`` /
+    ``mtb.run_all``; the message spells out the call that selects one variant.
+    ``except ValueError`` catches it.
 
     It is a ``ValueError`` and also a ``KeyError``, so ``except KeyError``
     catches it too. ``str(exc)`` is the plain message, without ``KeyError``

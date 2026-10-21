@@ -61,60 +61,6 @@ def _asked(seen):
     return {kw.get("flavor", "leidenalg") for kw in seen}
 
 @pytest.mark.parametrize("flavor", ["igraph", "leidenalg"])
-
-def test_both_flavors_give_one_clustering_per_resolution(flavor, monkeypatch):
-    from scib.metrics.clustering import get_resolutions
-    seen = _spy_leiden(monkeypatch)
-    emb, _ = _blobs()
-    adata, keys = S.leiden_sweep(emb, flavor=flavor)
-    assert keys == [f"_mb_res_{r}" for r in get_resolutions(n=10, max=2)]
-    for k in keys:
-        assert k in adata.obs and adata.obs[k].nunique() >= 1
-    assert adata.obs[keys[-1]].nunique() >= 3            # three well-separated blobs
-    assert len(seen) == 10 and _asked(seen) == {_eff(flavor)}
-    if _eff(flavor) == "igraph":
-        assert all(kw["n_iterations"] == 2 and kw["directed"] is False for kw in seen)
-    else:
-        assert all("n_iterations" not in kw for kw in seen)
-
-
-def test_default_reads_the_config_field(monkeypatch):
-    seen = _spy_leiden(monkeypatch)
-    emb, _ = _blobs(n_per=30)
-    monkeypatch.setattr(config.DEFAULT, "leiden_flavor", "leidenalg", raising=False)
-    S.leiden_sweep(emb)
-    assert _asked(seen) == {"leidenalg"}
-    seen.clear()
-    monkeypatch.setattr(config.DEFAULT, "leiden_flavor", "igraph", raising=False)
-    S.leiden_sweep(emb)
-    assert _asked(seen) == {_eff("igraph")}
-
-
-def test_shipped_default_is_leidenalg():
-    """0.4: ``config.DEFAULT.leiden_flavor`` defaults to ``"leidenalg"``, the
-    article's backend and the stored tables'; igraph stays selectable."""
-    assert config.DEFAULT.leiden_flavor == "leidenalg"
-    assert config._Config().leiden_flavor == "leidenalg"   # config.Config is deprecated
-    assert S._resolve_flavor(None) == "leidenalg"
-    assert S._resolve_flavor("igraph") == _eff("igraph")
-
-
-def test_unknown_flavor_raises():
-    emb, _ = _blobs(n_per=10)
-    with pytest.raises(ValueError) as e:
-        S.leiden_sweep(emb, flavor="Igraph")
-    assert str(e.value) == "unknown leiden flavor 'Igraph'; valid: igraph|leidenalg"
-    with pytest.raises(ValueError, match="unknown leiden flavor 'louvain'"):
-        S.compute(emb, np.zeros(len(emb)), None, np.zeros(len(emb)), flavor="louvain")
-
-
-def test_leiden_sweep_flavor_is_keyword_only():
-    import inspect
-    p = inspect.signature(S.leiden_sweep).parameters["flavor"]
-    assert p.kind is inspect.Parameter.KEYWORD_ONLY and p.default is None
-
-
-@pytest.mark.parametrize("flavor", ["igraph", "leidenalg"])
 def test_evaluate_recovers_the_blobs_on_either_flavor(flavor, monkeypatch):
     monkeypatch.setattr(config.DEFAULT, "leiden_flavor", flavor, raising=False)
     seen = _spy_leiden(monkeypatch)
@@ -137,17 +83,6 @@ def test_sweep_notice_names_the_flavor(monkeypatch, capsys):
         err = capsys.readouterr().err
         assert re.search(rf"cells for ARI with the {_eff(flavor)} Leiden "
                          rf"backend\.", err)
-
-
-def test_leidenalg_path_does_not_nag_about_igraph(recwarn):
-    """scanpy warns on every leidenalg call that igraph is faster; with the
-    backend an explicit choice that is noise, and only that message is muted."""
-    import warnings
-    emb, _ = _blobs(n_per=15)
-    with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
-        S.leiden_sweep(emb, flavor="leidenalg")
-    assert not [x for x in w if "igraph" in str(x.message)]
 
 
 def test_igraph_falls_back_to_leidenalg_on_old_scanpy(monkeypatch):

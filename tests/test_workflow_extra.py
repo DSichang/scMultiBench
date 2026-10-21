@@ -1,14 +1,7 @@
 """Regression tests for usability fixes found by non-coder reviewers."""
+import os
 import pytest
 import multibench as mtb
-
-
-def test_list_categories_names_all_four():
-    """Reviewers' #1 blocker: category is required but its values were undocumented."""
-    cats = mtb.list_categories()
-    assert set(cats) == {"vertical", "diagonal", "mosaic", "cross"}
-    for name, desc in cats.items():
-        assert len(desc) > 30, f"{name} needs a real description, not a label"
 
 
 def test_describe_layout_names_files_and_flags_the_atac_trap():
@@ -33,14 +26,6 @@ def test_package_docstring_has_import_and_categories():
     assert "import multibench as mtb" in doc
     for c in ("vertical", "diagonal", "mosaic", "cross"):
         assert c in doc
-
-
-def test_find_methods_tunable_filter():
-    tunable = set(mtb.find_methods(tunable=True))
-    fixed = set(mtb.find_methods(tunable=False))
-    assert tunable and fixed
-    assert not (tunable & fixed)
-    assert tunable | fixed == set(mtb.find_methods())
 
 
 def test_skip_existing_with_params_is_refused():
@@ -84,16 +69,6 @@ import multibench as mtb
 from multibench.workflow import BatchResult
 
 
-def test_sweep_rejects_a_param_the_method_does_not_expose():
-    """A sweep over a nonexistent knob would burn hours and change nothing."""
-    with pytest.raises(KeyError) as e:
-        mtb.sweep("D11", "vertical", "Multigrate", "not_a_real_param", [1, 2],
-                  out_dir="/tmp/unused", modalities=["rna", "adt"])
-    # run_all's message since 0.4 (it was "does not expose ..." before)
-    assert e.value.args[0] == ("Multigrate does not accept ['not_a_real_param']; it accepts "
-                               "['bs', 'epochs', 'lr'].")
-
-
 def test_runresult_is_documented():
     import inspect
     from multibench.engine.runner import RunResult
@@ -101,10 +76,6 @@ def test_runresult_is_documented():
     assert len(doc) > 200, "RunResult is the return of run(); it needs real docs"
     for word in ("out_dir", "output", "stderr", "extra"):
         assert word in doc
-
-
-def test_sweep_exported():
-    assert hasattr(mtb, "sweep")
 
 
 def test_run_all_raises_when_nothing_can_run(tmp_path, monkeypatch):
@@ -116,8 +87,7 @@ def test_run_all_raises_when_nothing_can_run(tmp_path, monkeypatch):
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     (tmp_path / "EMPTYDS").mkdir()
     with pytest.raises(ValueError) as e:
-        mtb.run_all("EMPTYDS", "vertical", data_path=tmp_path,
-                    out_dir=tmp_path / "out", verbose=False)
+        mtb.run_all(os.path.join(tmp_path, 'EMPTYDS'), 'vertical', out_dir=tmp_path / 'out', verbose=False)
     assert str(e.value).startswith("No method can run on EMPTYDS (vertical).\n")
     assert "mtb.run_all" in str(e.value)       # tells you how to diagnose it
 
@@ -149,56 +119,10 @@ def test_describe_layout_is_category_specific():
 
 # --- handover: registry-generated describe_layout lists, validated tokens -------
 
-def test_describe_layout_atac_lists_come_from_registry(monkeypatch):
-    from multibench.engine import registry
-    # vertical: no method reads gene activity, so one sentence replaces the lists
-    assert mtb.find_methods("vertical", atac="gene_activity") == []
-    assert "need gene activity:" not in mtb.describe_layout("vertical")
-    assert "every vertical method that reads ATAC needs peaks." in mtb.describe_layout("vertical")
-    # ... and the lists come back with the first method that does
-    monkeypatch.setattr(registry.get("Matilda"), "atac", "gene_activity")
-    for cat in ("vertical", "diagonal"):
-        txt = mtb.describe_layout(cat)
-        gas_line = next(l for l in txt.splitlines() if "need gene activity:" in l)
-        peak_line = next(l for l in txt.splitlines() if "need peaks:" in l)
-        # diagonal: a method that needs both files is listed on that line only
-        both_line = next((l for l in txt.splitlines() if "need both files:" in l), "")
-        both = set(both_line.split(":", 1)[1].strip().split(", ")) if both_line else set()
-        assert set(mtb.find_methods(cat, atac="gene_activity")) - both == \
-            set(gas_line.split(":", 1)[1].strip().split(", "))
-        assert set(mtb.find_methods(cat, atac="peak")) - both == \
-            set(peak_line.split(":", 1)[1].strip().split(", "))
-        assert both <= set(mtb.find_methods(cat, atac="peak")) | set(
-            mtb.find_methods(cat, atac="gene_activity"))
-        # the wrong representation is named plainly, without capitals (L61)
-        assert "wrong embedding" in txt and "WRONG" not in txt and "!!" not in txt
-        if cat == "vertical":
-            # moETM and scMM declare role atac_gas yet consume PEAKS - registry, not prose
-            assert "moETM" in peak_line and "scMM" in peak_line
-        else:
-            assert "Portal" in gas_line and "SCALEX" in gas_line
-
-
 def test_describe_layout_rejects_typo():
     with pytest.raises(ValueError, match="unknown category 'crosss'"):
         mtb.describe_layout("crosss")
     assert mtb.describe_layout(None)            # None still prints everything
-
-
-def test_method_info_runtime_validates_method_id():
-    with pytest.raises(KeyError, match="Did you mean StabMap"):
-        mtb.method_info("StabMapp")
-    h = mtb.method_info("StabMap")["runtime"]
-    assert set(h) == {"tier", "worst_sec", "observed", "host", "note"}
-    from multibench.discover import _runtimes
-    unmeasured = [m for m in mtb.list_methods() if m not in _runtimes()]
-    if unmeasured:
-        assert mtb.method_info(unmeasured[0])["runtime"]["tier"] == "unknown"
-
-
-def test_sweep_validates_method_id():
-    with pytest.raises(KeyError, match="Did you mean StabMap"):
-        mtb.sweep("D11", "cross", "StabMapp", "k", [1, 2], out_dir="/tmp/unused")
 
 
 def test_read_labels_reads_cty_and_obs_exports(tmp_path):

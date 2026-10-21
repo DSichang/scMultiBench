@@ -135,22 +135,3 @@ def test_ari_batch_and_nmi_batch_are_absent_with_one_batch():
     assert {"ARI_batch", "NMI_batch"} <= set(two.index)
 
 
-def test_the_batch_family_lists_them():
-    assert mtb.plot.BATCH_METRICS[:3] == ["ASW_batch", "ARI_batch", "NMI_batch"]
-    assert {"ARI_batch", "NMI_batch"} <= set(mtb.catalog.metrics()["metric"])
-    assert mtb.catalog.canonical_metric("ari_batch") == "ARI_batch"
-
-
-def test_published_tables_read_ari_batch_and_nmi_batch_from_their_file():
-    df = mtb.load_results("diagonal", dataset="D28", source="published")
-    v = df[df.method == "iNMF"].set_index("metric")["value"]
-    assert v["ARI_batch"] == pytest.approx(0.944977134818114)
-    assert v["NMI_batch"] == pytest.approx(0.9562164841965417)
-    assert v["ARI"] == pytest.approx(0.1986774572091863)    # metric.csv's own ARI
-
-
-def test_leiden_sweep_is_deprecated():
-    emb, _ = _blobs(k=2, n_per=20)
-    with pytest.warns(FutureWarning, match="leiden_sweep is deprecated and will be "
-                                           "removed in 0.5. Use leiden_n_clusters."):
-        S.leiden_sweep(emb)

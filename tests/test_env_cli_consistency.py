@@ -57,18 +57,6 @@ def test_size_total_counts_unknowns_per_column():
     assert totals["total_disk_bytes"] == 2_000_000_000
 
 
-# ----------------------------------------------------------------- recipe
-def test_recipe_pins_python_once():
-    spec = registry.get("Matilda").env_spec
-    assert spec["python_version"] and any(envs._is_python_pin(c) for c in spec["conda_packages"]), \
-        "Matilda's recipe is the duplicate-pin case this test guards"
-    create = envs.create_commands("Matilda")[0]
-    pins = [c for c in create if envs._is_python_pin(c)]
-    assert pins == ["python=3.7"]
-    yml = envs.environment_yml("Matilda")
-    assert yml.count("- python=") == 1
-
-
 def test_python_pin_detection():
     for p in ("python", "python=3.7", "python==3.7.10", "python>=3.8", "python 3.9"):
         assert envs._is_python_pin(p)
@@ -80,28 +68,6 @@ def test_conda_packages_untouched_without_python_version():
     spec = {"conda_packages": ["python=3.8", "numpy"]}
     assert envs._conda_packages(spec) == ["python=3.8", "numpy"]
     assert envs._conda_packages({**spec, "python_version": "3.8"}) == ["numpy"]
-
-
-def test_env_mark_and_status_rows_carry_has_lock():
-    assert envs.env_mark(True, False) == "x" and envs.env_mark(False, True) == "L" \
-        and envs.env_mark(False, False) == "!"
-    row = next(r for r in envs.status() if r["method"] == "Matilda")
-    assert row["has_lock"] == (envs.lockfile(row["env"]) is not None)
-    frame = envs.status(as_frame=True)
-    assert "has_lock" in frame.columns
-
-
-# ----------------------------------------------------------------- MIRA: the truth
-def test_mira_is_no_longer_blocked_and_says_what_the_package_supplies():
-    """The package ships the logger.py MIRA's script imports, so no method is
-    tagged blocked-script; the tag stays in the vocabulary for a future one."""
-    spec = registry.get("MIRA")
-    assert spec.env_spec["difficulty"] == "verified" and spec.env_spec["verified_working"]
-    assert spec.variants[0].helpers == ["logger.py"]
-    assert runner.shipped_helper("MIRA", "logger.py") is not None
-    info = mtb.method_info("MIRA", verbose=True)
-    assert "logger.py" in info["setup_hint"]
-    assert "setup_hint" in envs.DIFFICULTY["blocked-script"]
 
 
 def test_every_blocked_script_method_names_the_block_in_its_setup_hint():

@@ -547,7 +547,7 @@ def _duplicate_names_warning(feats, *, arg, spec, role, obsm=None,
     if not isinstance(spec, str):
         return f"{head} Run {arg}.var_names_make_unique() {when}."
     if var_filter is None:
-        return f"{head} Run var_names_make_unique() on {obj} " + "you export."
+        return f"{head} Run var_names_make_unique() on {obj} you export."
     # on the whole object the call also renames a feature of another type
     return f'{head} Split the object first, as in the recipe "A 10x .h5 file" in the docs.'
 
@@ -677,111 +677,21 @@ def _write_canonical(out: Path, X, feats, bars, *, dtype, compression, block):
     return out
 
 
-@_compat.keywords("io.to_canonical", private="_to_canonical", positional=("convert",), kept={
-    "convert": _compat.note("leave it out: a canonical .h5 is passed through as it is"),
-    "compression": _compat.note("leave it out for gzip"),
-    "block": _compat.note("leave it out"),
-    "mod": _compat.use('the modality itself, to_canonical(mdata["<name>"])')})
-def to_canonical(src, out: Path | str | None = None, modality: str | None = None, *,
-                 layer: str | None = None, obsm: str | None = None,
-                 dtype: str = "float64",
-                 category: str | None = None,
-                 feature_names: list | None = None) -> Path:
-    """Convert one matrix to a canonical scMultiBench ``.h5`` and return its path.
-
-    The canonical layout is ``matrix/data`` (features x cells),
-    ``matrix/features`` and ``matrix/barcodes``. A path that is already a
-    canonical ``.h5`` is returned untouched, whatever the other arguments.
-
-    Parameters
-    ----------
-    src : AnnData, Path or str
-        Matrix to convert: an AnnData (for a MuData, ``mdata["<name>"]``), or a
-        path to ``.h5ad`` / ``.csv`` / ``.tsv`` (cells x features) / ``.loom``
-        / canonical ``.h5``.
-    out : Path | str | None
-        Output file, or a directory (existing or ending in ``/``) that gets
-        the ``modality`` filename; ``None`` = that filename in the current
-        directory (needs ``modality``).
-    modality : str | None
-        ``'rna'``, ``'adt'``, ``'atac'``, ``'atac_peak'`` or ``'atac_gas'``;
-        names the file when ``out`` is a directory or ``None``, and enables
-        the ADT / ATAC checks.
-    layer : str | None
-        Take the matrix from ``adata.layers[layer]`` instead of ``adata.X``.
-    obsm : str | None
-        Take the matrix from ``adata.obsm[obsm]`` (e.g. ``'protein'`` for CITE-seq).
-    dtype : str
-        Stored dtype of ``matrix/data``; ``'float32'`` halves the file.
-    category : str | None
-        Integration category the file is for (``vertical``, ``diagonal``,
-        ``mosaic`` or ``cross``); only changes ATAC filenames.
-    feature_names : list | None
-        Feature names that override ``var_names`` / ``uns`` / DataFrame
-        columns; the way to name a bare ``obsm`` array.
-
-    Returns
-    -------
-    pathlib.Path
-        The canonical ``.h5`` written, or ``src`` itself on passthrough.
-
-    Raises
-    ------
-    FileNotFoundError
-        ``src`` is a path that does not exist.
-    ValueError
-        Invalid or conflicting arguments, a non-canonical ``.h5``, or features
-        of several types.
-    KeyError
-        ``layer`` or ``obsm`` names an entry the object does not have.
-    ImportError
-        ``.h5mu`` without ``mudata``, or ``.loom`` without ``loompy``.
-
-    Warns
-    -----
-    UserWarning
-        Values not whole numbers; feature names missing or contradicting ``modality``; size over 1 GB.
-    UserWarning
-        ``modality='gas'`` for other cells than the ``atac_peak.h5`` next to ``out``.
-
-    Examples
-    --------
-    >>> import multibench as mtb
-    >>> # writes data/MYCITE/rna.h5
-    >>> mtb.io.to_canonical(adata, "data/MYCITE/", modality="rna")
-    >>> mtb.io.to_canonical(adata, "data/MYCITE/", modality="adt", obsm="protein")
-
-    See Also
-    --------
-    mtb.io.export_dataset : a whole dataset folder (all modalities, labels, batches) in one call.
-    mtb.io.read_canonical : the inverse, canonical ``.h5`` -> AnnData.
-    mtb.describe_layout : the folder layout and the role -> filename mapping.
-    """
-    return _to_canonical(src, out, modality, layer=layer, obsm=obsm,
-                         dtype=dtype, category=category, feature_names=feature_names)
-
-
-to_canonical = _compat.renamed("io.to_canonical", "mtb.io.export_dataset", to_canonical)
-
-
-def _to_canonical(src, out: Path | str | None = None, modality: str | None = None,
-                  convert: bool = True, *, layer: str | None = None,
-                  obsm: str | None = None, mod: str | None = None,
-                  dtype: str = "float64", compression: str | None = "gzip",
-                  block: int = 1024, category: str | None = None,
+def _to_canonical(src, out: Path | str | None = None, modality: str | None = None, *,
+                  layer: str | None = None, obsm: str | None = None,
+                  dtype: str = "float64", category: str | None = None,
                   feature_names: list | None = None) -> Path:
-    """:func:`to_canonical`, with the deprecated ``convert`` (``False``: never
-    write), ``compression`` (the h5py filter) and ``block`` (features per
-    streaming step)."""
+    """Convert one matrix to a canonical ``.h5`` (``matrix/data`` features x
+    cells, ``matrix/features``, ``matrix/barcodes``) and return its path; a
+    canonical ``.h5`` is returned untouched. ``out`` is a file, or a directory
+    that gets the ``modality`` filename. The inputs ``mtb.run_all`` converts
+    before a method runs go through here."""
     if isinstance(src, (str, Path)) and _is_canonical_h5(Path(src)):
         return Path(src)
     if isinstance(src, (str, Path)) and Path(src).suffix.lower() == ".h5" \
             and _is_tenx_h5(Path(src)):
         # before the checks of the other arguments, which would ask for an out path
         raise ValueError(_tenx_message(Path(src)))
-    if convert is False:
-        raise ValueError(
-            f"src is not a canonical .h5 and convert=False: {src if isinstance(src, (str, Path)) else type(src).__name__}")
     modality = _norm_modality(modality)
     category = _check_category(category)
     if out is None:
@@ -797,16 +707,10 @@ def _to_canonical(src, out: Path | str | None = None, modality: str | None = Non
 
     adata = _to_anndata(src)
     if _is_mudata(adata):
-        if mod is None:
-            first = next(iter(adata.mod), "rna")
-            raise ValueError(
-                f"A MuData holds the modalities {list(adata.mod)}: pass one, "
-                + f"e.g. mdata[{first!r}].")
-        if mod not in adata.mod:
-            raise KeyError(f"mod {mod!r} not in MuData; found: {list(adata.mod)}")
-        adata = adata.mod[mod]
-    elif mod is not None:
-        raise ValueError("mod= only applies to MuData input")
+        first = next(iter(adata.mod), "rna")
+        raise ValueError(
+            f"A MuData holds the modalities {list(adata.mod)}: pass one, "
+            f"e.g. mdata[{first!r}].")
 
     if modality == "adt" and obsm is None and layer is None and _adt_obsm_keys(adata):
         raise ValueError(
@@ -831,12 +735,10 @@ def _to_canonical(src, out: Path | str | None = None, modality: str | None = Non
         X, bars = _follow_peak_order(out, X, bars)
     if getattr(X, "ndim", 0) == 2:      # X=None: _write_canonical raises
         _warn_dense_size(out, X.shape[1], X.shape[0], dtype)
-    return _write_canonical(out, X, feats, bars, dtype=dtype,
-                            compression=compression, block=block)
+    return _write_canonical(out, X, feats, bars, dtype=dtype, compression="gzip",
+                            block=1024)
 
 
-@_compat.keywords("io.read_canonical", private="_read_canonical",
-                  kept={"sparse": _compat.use("the default")})
 def read_canonical(path: Path | str):
     """Read a canonical ``.h5`` (a dataset file or an ``embedding.h5``) as an AnnData.
 
@@ -866,12 +768,6 @@ def read_canonical(path: Path | str):
     >>> import multibench as mtb
     >>> rna = mtb.io.read_canonical(mtb.config.DEFAULT.data_path / "D11" / "rna.h5")
     """
-    return _read_canonical(path)
-
-
-def _read_canonical(path: Path | str, sparse: bool | None = None):
-    """:func:`read_canonical` with the deprecated ``sparse=``: ``True`` = CSR,
-    ``False`` = dense, ``None`` = CSR when fewer than half of the entries are non-zero."""
     import anndata as ad
     import scipy.sparse as sp
     if not Path(path).exists():
@@ -894,8 +790,7 @@ def _read_canonical(path: Path | str, sparse: bool | None = None):
                              f"canonical .h5. Its keys: {sorted(f.keys())}.")
         data = np.array(f["matrix/data"]).T
         X = np.asarray(data, dtype=float)
-        if sparse is None:
-            sparse = X.size > 0 and np.count_nonzero(X) / X.size < 0.5
+        sparse = X.size > 0 and np.count_nonzero(X) / X.size < 0.5
         a = ad.AnnData(sp.csr_matrix(X) if sparse else X)
         if "matrix/features" in f:
             a.var_names = [x.decode() if isinstance(x, bytes) else str(x)
@@ -1096,8 +991,8 @@ def _select_obs(data, spec, *, what):
         raise ValueError(_file_name_message(spec, what))
     cols = [str(c) for c in data.obs.columns]
     raise ValueError(
-        f"{what}={spec!r}" + " is not a column of "
-        + "mdata.obs" if mu else _ADATA_OBS
+        f"{what}={spec!r} is not a column of "
+        + ("mdata.obs" if mu else _ADATA_OBS)
         + (f". Columns: {', '.join(cols[:5])}"
            f"{f' and {len(cols) - 5:,} more' if len(cols) > 5 else ''}."
            if cols else ", which has no columns.") + _case_hint(spec, cols))
@@ -1258,7 +1153,7 @@ def _align_cells(a, *, master, master_name, role, category=None):
                 if category == "mosaic":
                     raise ValueError(
                         f"{head} Make the names match; for a batch with RNA only, export "
-                        "it without " + "atac=" + ".")
+                        "it without atac=.")
                 raise ValueError(
                     f"{head} Make the names match; for different cells pass "
                     + 'category="diagonal"' + ".")
@@ -1328,10 +1223,6 @@ def _as_obs_vector(data, spec, *, what, master):
     return vals
 
 
-@_compat.keywords("io.export_dataset", private="_export_dataset",
-                  kept={"compression": _compat.note("leave it out for gzip"),
-                        "dtype": _compat.use("the default float64"),
-                        "n_batches": _compat.use("a new dataset folder")})
 def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                    adt=None, atac=None,
                    atac_kind: str | None = None, labels=None,
@@ -1427,24 +1318,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     if isinstance(data, (str, os.PathLike)):
         raise TypeError("export_dataset takes an AnnData or MuData object, not a path: "
                         "read the file first, e.g. anndata.read_h5ad(path).")
-    return _export_dataset(data, dataset_dir, rna=rna, adt=adt, atac=atac,
-                           atac_kind=atac_kind, labels=labels, batch=batch,
-                           category=category, adt_names=adt_names, batch_index=batch_index,
-                           overwrite=overwrite)
-
-
-def _export_dataset(data, dataset_dir: Path | str, *, rna="X",
-                    adt=None, atac=None,
-                    atac_kind: str | None = None, labels=None,
-                    batch=None, dtype: str = "float64",
-                    category: str | None = None,
-                    adt_names: list | None = None,
-                    batch_index: int | None = None,
-                    overwrite: bool = False,
-                    n_batches: int | None = None,
-                    compression="gzip") -> Path:
-    """:func:`export_dataset`, with the deprecated ``compression``, ``dtype`` and
-    ``n_batches`` (with ``batch_index``: files of a higher batch number are refused)."""
+    dtype = "float64"
     out = Path(dataset_dir)
     category = _check_category(category)
     if data is None and isinstance(rna, str) and rna == "X":
@@ -1465,7 +1339,7 @@ def _export_dataset(data, dataset_dir: Path | str, *, rna="X",
         _compat.warn(_VERTICAL_GAS, UserWarning)
     if rna is None and adt is None and atac is None and labels is None:
         raise ValueError("nothing to export: give at least one of rna=, adt=, atac=, labels=")
-    _check_batch_args(batch, batch_index, category, adt=adt, atac=atac, n_batches=n_batches)
+    _check_batch_args(batch, batch_index, category, adt=adt, atac=atac)
     if isinstance(adt_names, str):
         # a string is a sequence of characters: 13 letters would name 13 proteins
         # a key of uns is named only when the string is one
@@ -1598,9 +1472,8 @@ def _export_dataset(data, dataset_dir: Path | str, *, rna="X",
                         _compat.warn(_VERTICAL_GAS, UserWarning)
                 _check_peak_names(role, feats, rna_feats=rna_feats, kind_arg=True)
                 if category == "mosaic" and role == "atac_gas":
-                    _compat.warn("Every mosaic method reads peak ATAC. " + ("Export the ATAC as peaks (atac_kind='peak'), or pass "
-                        "allow_atac_mismatch=True to scan and run_all."),
-                        UserWarning)
+                    _compat.warn("Every mosaic method reads peak ATAC. Export the ATAC as "
+                                 "peaks (atac_kind='peak').", UserWarning)
             if role in _COUNT_ROLES:
                 selector = {"rna": rna, "adt": adt, "atac": atac}[what]
                 hint, how = _raw_count_hint(what, selector)
@@ -1637,15 +1510,14 @@ def _export_dataset(data, dataset_dir: Path | str, *, rna="X",
                                          len(m) if mask is None else len(mask))
     existing = [pth.name for pth, _, _, _ in plan if pth.exists() or pth.is_symlink()]
     found = _leftovers(out, {pth.name for pth, _, _, _ in plan}, units, diagonal=diagonal,
-                       by_column=batch is not None, batch_index=batch_index,
-                       n_batches=n_batches)
+                       by_column=batch is not None, batch_index=batch_index)
     if any(found):
         held = []
         if not prepared and category is None and batch_index is None:
             # labels alone, for a folder that may be written with a category
             held = _matrices_of(out, masters.get("rna"), len(labels_by_side["rna"]),
                                 skip={name for names in found for name in names})
-        raise FileExistsError(_leftover_message(out, found, n_batches=n_batches, held=held))
+        raise FileExistsError(_leftover_message(out, found, held=held))
     if existing and not overwrite:
         raise FileExistsError(
             f"{out} already holds {config._and_list(existing)}. Pass "
@@ -1666,7 +1538,7 @@ def _export_dataset(data, dataset_dir: Path | str, *, rna="X",
         if kind == "matrix":
             sub, feats, sub_bars = payload
             _write_canonical(pth, sub, feats, sub_bars, dtype=dtype,
-                             compression=compression, block=1024)
+                             compression="gzip", block=1024)
         elif kind == "link":
             _link_or_copy(payload, pth)
         else:
@@ -1725,7 +1597,7 @@ def _adt_in_x_message(spec, keys, own: bool = False) -> str:
     """The error for ``adt`` reading ``X`` of an object whose ``obsm`` may hold
     the protein matrix. ``own``: the ADT came as its own object."""
     one = len(keys) == 1
-    head = (f"adt={_shown(spec)}" + " takes X, and the object "
+    head = (f"adt={_shown(spec)} takes X, and the object "
             + (f"also holds obsm[{keys[0]!r}]." if one else
                f"also holds {len(keys)} obsm entries, for example {keys[0]!r}."))
     if own:
@@ -1735,7 +1607,7 @@ def _adt_in_x_message(spec, keys, own: bool = False) -> str:
                 f"adt.obsm[{keys[0]!r}].")
     key = keys[0] if one else "<key>"
     return (f"{head} If {'that' if one else 'one'} is the protein matrix, pass "
-            + f"adt='obsm:{key}'" + ".")
+            + f"adt='obsm:{key}'.")
 
 
 #: file stems of the dataset layout, in the order messages list them
@@ -1793,7 +1665,7 @@ def _folder_readers():
             lambda p: resolve._count_label_rows(str(p), p.stat().st_mtime_ns))
 
 
-def _leftovers(out: Path, planned, units, *, diagonal, by_column, batch_index, n_batches):
+def _leftovers(out: Path, planned, units, *, diagonal, by_column, batch_index):
     """The layout files of ``out`` the call does not write that hold other
     data: ``(other batches, other cells, other label counts)``. A method
     reads every layout file, so such a file would join the dataset.
@@ -1826,9 +1698,8 @@ def _leftovers(out: Path, planned, units, *, diagonal, by_column, batch_index, n
                 other_count.append(p.name)
         elif number and by_column:      # a batch column gives every batch
             other_batch.append(p.name)
-        elif batch_index is not None:   # other batches are the build, up to n_batches
-            if number and n_batches is not None and int(number) > n_batches:
-                other_batch.append(p.name)
+        elif batch_index is not None:   # other batches are the build
+            pass
         elif matrix:                    # another unit with a cell the call does not write
             old = barcodes_of(p)
             if old is not None and side in side_cells \
@@ -1858,7 +1729,7 @@ def _matrices_of(out: Path, cells, n: int, *, skip) -> list:
     return held
 
 
-def _leftover_message(out: Path, found, *, n_batches, held=()) -> str:
+def _leftover_message(out: Path, found, *, held=()) -> str:
     """The error for the leftovers ``found`` by :func:`_leftovers`. With
     ``held`` (:func:`_matrices_of`) the leftovers are likely the rest of the
     same dataset, so the advice is to rerun the export with labels."""
@@ -1876,8 +1747,6 @@ def _leftover_message(out: Path, found, *, n_batches, held=()) -> str:
         theirs = sorted({_layout_order(f)[0] for f in other_batch})
         what = (f"{names(other_batch)} of {'batch' if len(theirs) == 1 else 'batches'} "
                 f"{_span(theirs)}")
-        if n_batches is not None:
-            what += ", above " + f"n_batches={n_batches}"
     elif other_cells:
         what = f"{names(other_cells)} with other cells"
     else:
@@ -1935,9 +1804,8 @@ def _in_order(kind: str, payload, idx):
     return payload                      # a link
 
 
-def _check_batch_args(batch, batch_index, category, *, adt, atac, n_batches=None) -> None:
-    """Refuse the batch / batch_index combinations no method can read, and an
-    ``n_batches`` that does not go with ``batch_index``."""
+def _check_batch_args(batch, batch_index, category, *, adt, atac) -> None:
+    """Refuse the batch / batch_index combinations no method can read."""
     if batch is not None and batch_index is not None:
         raise ValueError("pass batch= or batch_index=, not both: batch= splits the object "
                          "by a column, batch_index= writes the whole object as one batch")
@@ -1952,21 +1820,10 @@ def _check_batch_args(batch, batch_index, category, *, adt, atac, n_batches=None
                 f"mosaic and cross methods read, and the diagonal methods that take "
                 f"several batches: pass category='mosaic', category='cross' or "
                 f"category='diagonal' (got category={category!r})")
-    if n_batches is not None:
-        if batch_index is None:
-            raise ValueError("n_batches= goes with batch_index= only. Leave n_batches= out.")
-        if isinstance(n_batches, bool) or not isinstance(n_batches, (int, np.integer)) \
-                or n_batches < 1:
-            raise ValueError("n_batches="
-                             + f" must be a positive integer, got {n_batches!r}")
-        if batch_index > n_batches:
-            raise ValueError(
-                f"batch_index={batch_index} is larger than "
-                            f"n_batches={n_batches}.")
     if batch is not None and category in ("vertical", "diagonal"):
         from .resolve import _one_file_advice
         raise ValueError(
-            "batch=" + " writes per-batch files (rna1.h5, "
+            "batch= writes per-batch files (rna1.h5, "
             "rna2.h5, ...). "
             + _one_file_advice(category, has_adt=adt is not None and atac is None))
     if batch is not None and category is None and atac is not None:
@@ -2204,8 +2061,3 @@ def _export_filename(role: str, number: str, category: str | None) -> str:
     if role.startswith("atac") and category in ("vertical", "mosaic"):
         return f"atac{number}.h5"
     return f"{role}{number}.h5"
-
-
-__getattr__ = _compat.module_getattr(__name__, "io", old={
-    "normalize_peak_names": (_normalize_peak_names, _compat.note("a run renames the peaks itself")),
-})

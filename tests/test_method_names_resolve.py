@@ -8,6 +8,8 @@ the did-you-mean.
 """
 from __future__ import annotations
 
+import os
+
 import pytest
 
 import multibench as mtb
@@ -43,24 +45,17 @@ def test_inputs_and_labels(tmp_path):
         (d / f).write_text("")
     for i in (1, 2, 3):
         (d / f"cty{i}.csv").write_text("x\nA\n")
-    assert list(mtb.labels_for("C3", "cross", "stabmap", data_path=tmp_path)) == \
+    assert list(mtb.engine.resolve.labels_for("C3", "cross", "stabmap", data_path=tmp_path)) == \
         ["cty3", "cty1", "cty2"]
-    assert mtb.inputs_for("C3", "cross", "STABMAP", data_path=tmp_path) == \
-        mtb.inputs_for("C3", "cross", "StabMap", data_path=tmp_path)
+    assert mtb.engine.resolve.inputs_for("C3", "cross", "STABMAP", data_path=tmp_path) == \
+        mtb.engine.resolve.inputs_for("C3", "cross", "StabMap", data_path=tmp_path)
 
 
 def test_run_dry_run_uses_the_methods_env():
-    argv = mtb.run("totalvi", "vertical", inputs={"rna": "/a.h5", "adt": "/b.h5"},
+    argv = mtb.engine.runner.run("totalvi", "vertical", inputs={"rna": "/a.h5", "adt": "/b.h5"},
                    out_dir="/o", dry_run=True)
-    assert argv == mtb.run("totalVI", "vertical", inputs={"rna": "/a.h5", "adt": "/b.h5"},
+    assert argv == mtb.engine.runner.run("totalVI", "vertical", inputs={"rna": "/a.h5", "adt": "/b.h5"},
                            out_dir="/o", dry_run=True)
-
-
-def test_env_functions():
-    assert mtb.env.plan(methods=["Seurat(WNN)"]) == mtb.env.plan(methods=["Seurat_WNN"])
-    assert [r["methods"] for r in mtb.env.doctor(methods=["matilda"]).to_dict("records")] == [["Matilda"]]
-    assert [r["methods"] for r in mtb.env.install(["scipenn"], dry_run=True).to_dict("records")] == [["sciPENN"]]
-    assert mtb.env.recipe("matilda") == mtb.env.recipe("Matilda")
 
 
 def test_scan_and_run_all_take_any_case(tmp_path):
@@ -68,10 +63,9 @@ def test_scan_and_run_all_take_any_case(tmp_path):
     d.mkdir()
     for f in ("rna.h5", "adt.h5", "cty.csv"):
         (d / f).write_text("")
-    df = mtb.scan("V", "vertical", methods=["totalvi"], data_path=tmp_path, verbose=False)
+    df = mtb.scan(os.path.join(tmp_path, 'V'), 'vertical', methods=['totalvi'], verbose=False)
     assert list(df.method) == ["totalVI"]
     with pytest.raises(KeyError, match="totalVI does not accept"):
-        mtb.run_all("V", "vertical", methods=["TotalVI"], data_path=tmp_path,
-                    params={"TOTALVI": {"nonsense": 1}}, dry_run=True, verbose=False)
+        mtb.run_all(os.path.join(tmp_path, 'V'), 'vertical', methods=['TotalVI'], params={'TOTALVI': {'nonsense': 1}}, dry_run=True, verbose=False)
 
 

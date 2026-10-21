@@ -9,6 +9,7 @@ file keeps the file error.
 A synthetic CITE-seq folder and a fake ``_run`` keep these independent of any
 conda env.
 """
+import os
 import warnings
 from pathlib import Path
 
@@ -85,7 +86,8 @@ def _c1(what, given, col):
 @pytest.mark.parametrize("given", ["donor", "obs:donor"])
 def test_a_column_name_is_explained(cite, tmp_path, given):
     data, calls = cite
-    kw = dict(methods=["totalVI"], data_path=data, verbose=False)
+    mtb.config.DEFAULT.data_path = data
+    kw = dict(methods=['totalVI'], verbose=False)
     with pytest.raises(FileNotFoundError) as e:
         mtb.run_all("MYCITE", "vertical", dry_run=True, batch=given, **kw)
     assert str(e.value) == _c1("batch", given, "donor")
@@ -105,7 +107,8 @@ def test_a_column_name_is_explained(cite, tmp_path, given):
 
 def test_other_names_that_are_no_file(cite, tmp_path):
     data, _ = cite
-    kw = dict(methods=["totalVI"], data_path=data, verbose=False, dry_run=True)
+    mtb.config.DEFAULT.data_path = data
+    kw = dict(methods=['totalVI'], verbose=False, dry_run=True)
     for given, col in (("sample id", "sample id"), ("rna:donor", "rna:donor"),
                        ("donor.h5ad", "donor.h5ad"), ("obs:", "")):
         with pytest.raises(FileNotFoundError) as e:
@@ -115,7 +118,8 @@ def test_other_names_that_are_no_file(cite, tmp_path):
 
 def test_a_missing_csv_keeps_its_text(cite, tmp_path):
     data, calls = cite
-    kw = dict(methods=["totalVI"], data_path=data, verbose=False)
+    mtb.config.DEFAULT.data_path = data
+    kw = dict(methods=['totalVI'], verbose=False)
     cwd = Path.cwd()
 
     def gone(name, what="batch"):
@@ -146,8 +150,7 @@ def test_a_file_named_like_a_column_is_read(cite, tmp_path):
     data, _ = cite
     donor = pd.Series(["d1", "d2"] * (N // 2), index=BARS, name="donor")
     donor.to_frame().to_csv(tmp_path / "donor")        # no suffix: it is there, so a file
-    plan = mtb.run_all("MYCITE", "vertical", methods=["totalVI"], data_path=data,
-                       verbose=False, dry_run=True, batch="donor")
+    plan = mtb.run_all(os.path.join(data, 'MYCITE'), 'vertical', methods=['totalVI'], verbose=False, dry_run=True, batch='donor')
     assert len(plan) == 1
 
 
@@ -155,7 +158,8 @@ def test_the_column_itself_works(cite, tmp_path):
     data, calls = cite
     donor = pd.Series(["d1", "d2"] * (N // 2), index=BARS, name="donor")
     obs = pd.DataFrame({"donor": donor, "celltype": ["A"] * 60 + ["B"] * 60}, index=BARS)
-    kw = dict(methods=["totalVI"], data_path=data, verbose=False)
+    mtb.config.DEFAULT.data_path = data
+    kw = dict(methods=['totalVI'], verbose=False)
     # in another row order: matched to the cells by barcode
     shuffled = obs.sample(frac=1, random_state=3)
     plan = mtb.run_all("MYCITE", "vertical", dry_run=True, batch=shuffled["donor"], **kw)

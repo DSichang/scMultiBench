@@ -104,15 +104,6 @@ def test_builders_dry_run_everywhere(off_linux):
     assert envs.create_env("matilda")
 
 
-# ----------------------------------------------------------------- vocabulary
-def test_difficulty_vocabulary_covers_every_tag_in_env_specs():
-    tags = {r["difficulty"] for r in envs.status()}
-    assert tags <= set(envs.DIFFICULTY), tags - set(envs.DIFFICULTY)
-    for tag in ("easy", "old-scvi", "old-tensorflow", "R", "verified", "blocked-script"):
-        assert tag in envs.DIFFICULTY and len(envs.DIFFICULTY[tag]) > 20
-    assert "verified_working" in envs.VERIFIED_STAR
-
-
 # ----------------------------------------------------------------- sizes
 def test_packed_sizes_cover_every_packed_url():
     urls = json.loads((ROOT / "multibench/engine/packed_urls.json").read_text())
@@ -182,32 +173,3 @@ def test_packed_sizes_tool_builds_from_head_requests(tmp_path):
         {k: v for k, v in shipped.items() if k != "_meta"}
 
 
-# ----------------------------------------------------------------- as_frame
-def test_env_tables_as_frame(monkeypatch):
-    monkeypatch.setattr(envs, "installed_envs", lambda conda=None: [])
-    for fn, kw in ((envs.plan, {"category": "vertical"}),
-                   (envs.status, {})):
-        rows = fn(**kw)
-        assert isinstance(rows, list) and isinstance(rows[0], dict)     # default kept
-        df = fn(**kw, as_frame=True)
-        assert isinstance(df, pd.DataFrame)
-        assert list(df.columns) == list(rows[0]) and len(df) == len(rows)
-    # doctor returns a frame since 0.4.0 (X26); as_frame= is deprecated, no effect
-    rows = envs._doctor_rows(category="vertical")
-    df = envs.doctor(category="vertical")
-    assert isinstance(df, pd.DataFrame) and df.to_dict("records") == rows
-    with pytest.warns(FutureWarning, match=r"env\.doctor\(as_frame=\) is deprecated"):
-        assert envs.doctor(category="vertical", as_frame=True).equals(df)
-
-
-def test_env_docstrings_have_parameters_and_returns():
-    import inspect
-    # env.plan / env.status / env.doctor are deprecated: a one-line docstring
-    # naming the new name
-    assert "mtb.env.install(methods, dry_run=True)" in inspect.getdoc(envs.doctor)
-    for fn in (envs.create_all, envs.create_env,
-               envs.create, envs.create_group, envs.install_packed, envs.packed_sizes,
-               envs.host_platform_problem):
-        doc = inspect.getdoc(fn)
-        assert doc and "Returns" in doc, fn.__name__
-        assert doc.splitlines()[0].strip().endswith((".", "?")), fn.__name__

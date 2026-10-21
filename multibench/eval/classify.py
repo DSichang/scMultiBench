@@ -1,5 +1,6 @@
-"""classify(): predict the cell type of each query cell from a reference batch;
-classification_metrics(): score those predictions."""
+"""The classification metrics of ``mtb.evaluate(metrics="classification")``:
+classify() predicts the cell type of each query cell from a reference batch;
+classification_metrics() scores those predictions."""
 from __future__ import annotations
 
 import warnings
@@ -22,7 +23,7 @@ COLUMNS = ["reference", "batch", "cell", "label", "predicted"]
 
 
 def classify(output, labels=None, *, batch=None, reference=None,
-             obsm: str | None = None, label_order=None, seed: int = 0) -> pd.DataFrame:
+             obsm: str | None = None, seed: int = 0) -> pd.DataFrame:
     """Predict the cell type of each query cell from a reference batch.
 
     One batch is the reference: a small neural network learns the cell
@@ -37,8 +38,8 @@ def classify(output, labels=None, *, batch=None, reference=None,
         DataFrame or an array.
     labels
         Cell types, one per cell, in the forms ``mtb.evaluate`` takes. A
-        ``mtb.labels_for`` dict also gives the batches: each file is one
-        batch, named by its key (``cty1``, ``cty2``, ...).
+        ``{name: path}`` dict of label files also gives the batches: each file
+        is one batch, named by its key (``cty1``, ``cty2``, ...).
     batch
         Batch of each cell, in the forms ``labels`` takes; needed unless
         ``labels`` lists two or more files.
@@ -48,10 +49,6 @@ def classify(output, labels=None, *, batch=None, reference=None,
     obsm : str | None
         ``.obsm`` key of an AnnData or ``.h5ad`` ``output``; ``'X'`` means
         ``.X``; ``None`` = ``X_emb``.
-    label_order : list of str
-        Keys of a ``labels`` dict in the method's cell order, as in
-        ``mtb.evaluate``; ``None`` works for an unchanged ``mtb.labels_for``
-        dict.
     seed : int
         Seed of the network; the same seed and the same input, with the
         cells in the same order, give the same predictions.
@@ -79,30 +76,20 @@ def classify(output, labels=None, *, batch=None, reference=None,
         Cells without a label are left out; a reference batch with fewer
         than two cell types is skipped.
 
-    Examples
-    --------
-    >>> import multibench as mtb
-    >>> labels = mtb.labels_for("D52", "cross", "StabMap")
-    >>> pred = mtb.classify(res.output, labels=labels)    # res = mtb.run(...)
-
     See Also
     --------
-    mtb.labels_for : the label files of a dataset, in the method's cell order.
     mtb.evaluate : scores the same embedding with the scIB metrics.
     """
     if labels is None:
         raise ValueError(
-            "classify needs labels. Pass labels=mtb.labels_for(dataset, category, method).")
+            "classify needs labels, one cell type per cell.")
     if isinstance(labels, dict) and not labels:
         raise ValueError(
-            "labels is an empty dict. Pass labels=mtb.labels_for(dataset, category, method).")
+            "labels is an empty dict. Pass one cell type per cell.")
     names = None
     if isinstance(labels, dict):
-        names = [str(k) for k in (labels if label_order is None else label_order)]
-        labels = _labels_from_dict(labels, label_order)
-    elif label_order is not None:
-        raise TypeError("label_order= applies only when labels is a dict. "
-                        "Pass the files as a list in cell order.")
+        names = [str(k) for k in labels]
+        labels = _labels_from_dict(labels)
     if _is_label_path_list(labels) and names is None:
         stems = [Path(p).stem for p in labels]
         names = stems if len(set(stems)) == len(stems) else \
@@ -146,8 +133,7 @@ def classify(output, labels=None, *, batch=None, reference=None,
         ba = np.asarray(names, dtype=object)[np.asarray(origin) - 1]
     else:
         raise ValueError(
-            "classify needs the batch of each cell. Pass batch=, or "
-            "labels=mtb.labels_for(dataset, category, method).")
+            "classify needs the batch of each cell. Pass batch=.")
 
     miss = io.missing_mask(ct)
     if miss.all():
@@ -311,12 +297,12 @@ METRICS = list(_CLASSIFICATION_METRICS)
 
 
 def classification_metrics(predictions) -> pd.DataFrame:
-    """Score the predicted cell types of ``mtb.classify`` with the benchmark's metrics.
+    """Score the predicted cell types of :func:`classify` with the benchmark's metrics.
 
     Parameters
     ----------
     predictions : pandas.DataFrame
-        The frame ``mtb.classify`` returns, or any frame with the columns
+        The frame :func:`classify` returns, or any frame with the columns
         ``label`` (true cell type) and ``predicted``; with a ``reference``
         column, each reference batch is scored on its own.
 
@@ -348,12 +334,6 @@ def classification_metrics(predictions) -> pd.DataFrame:
     ValueError
         ``predictions`` lacks ``label`` or ``predicted``.
 
-    Examples
-    --------
-    >>> labels = mtb.labels_for("D52", "cross", "StabMap")
-    >>> pred = mtb.classify(res.output, labels=labels)    # res = mtb.run(...)
-    >>> mtb.classification_metrics(pred)
-
     Notes
     -----
     The types are those true or predicted in a reference's query. ``ACA``
@@ -364,12 +344,12 @@ def classification_metrics(predictions) -> pd.DataFrame:
     """
     if not isinstance(predictions, pd.DataFrame):
         raise TypeError("classification_metrics needs a DataFrame. "
-                        "Pass the frame mtb.classify returns.")
+                        "Pass the frame classify returns.")
     missing = [c for c in ("label", "predicted") if c not in predictions.columns]
     if missing:
         raise ValueError(
             f"predictions has no {' and no '.join(missing)} column. "
-            f"Pass the frame mtb.classify returns.")
+            f"Pass the frame classify returns.")
     if "reference" not in predictions.columns:
         return pd.DataFrame([_metrics(predictions)], columns=METRICS)
     codes, refs = pd.factorize(predictions["reference"], use_na_sentinel=False)

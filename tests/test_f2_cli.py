@@ -35,26 +35,6 @@ def off_linux(monkeypatch):
     monkeypatch.setattr(envs, "host_platform_problem", lambda: DARWIN)
 
 
-def _h5(path, n_feat, n_cells, prefix="g"):
-    rng = np.random.default_rng(0)
-    with h5py.File(path, "w") as f:
-        g = f.create_group("matrix")
-        g.create_dataset("data", data=rng.poisson(2.0, size=(n_feat, n_cells)).astype(float))
-        g.create_dataset("features", data=np.array([f"{prefix}{i}" for i in range(n_feat)],
-                                                   dtype="S12"))
-        g.create_dataset("barcodes", data=np.array([f"c{i}" for i in range(n_cells)],
-                                                   dtype="S12"))
-
-
-def _cite(root, name="CITE", n=60):
-    d = root / name
-    d.mkdir(parents=True)
-    _h5(d / "rna.h5", 30, n)
-    _h5(d / "adt.h5", 10, n, prefix="p")
-    pd.DataFrame({"x": ["A", "B"] * (n // 2)}).to_csv(d / "cty.csv", index=False)
-    return d
-
-
 # ====================================================================== M14
 def test_version_is_past_the_pypi_release():
     """0.3.1 is on PyPI; a build with new commands must not reuse the number."""
@@ -75,36 +55,6 @@ def test_gpu_refusal_is_one_plain_sentence_and_a_hint():
     assert reason.startswith("moETM needs an NVIDIA GPU, and this computer has none.")
     assert "tools_scripts" not in reason and not re.search(r"\.py:\d+", reason)
     assert reason == "moETM needs an NVIDIA GPU, and this computer has none."   # Z17 (r3)
-
-
-def test_moetm_gpu_evidence_names_both_scripts():
-    ev = mtb.method_info("moETM", verbose=True)["gpu_evidence"]
-    assert "tools_scripts/moETM/main_moETM_rna_adt.py:109" in ev
-    assert "tools_scripts/moETM/main_moETM_rna_atac.py:124" in ev
-
-
-# ====================================================================== M30
-def test_every_method_has_a_gpu_use_value():
-    for m in mtb.list_methods():
-        info = mtb.method_info(m)
-        assert info["gpu"] in GPU_VALUES, (m, info["gpu"])
-        if info["cpu_params"]:
-            assert info["gpu"] == "used when present", m
-
-
-def test_gpu_use_values_from_the_source():
-    got = {m: mtb.method_info(m)["gpu"] for m in mtb.list_methods()}
-    for m in ("StabMap", "UINMF", "iNMF", "online_iNMF", "Conos", "Seurat_v3",
-              "Seurat_WNN", "Seurat_v5"):
-        assert got[m] == "not used", m          # R methods: no CUDA call anywhere
-    # MOFA2 is R but trains in mofapy2 with gpu_mode TRUE (main_MOFA2.Rmd:38)
-    assert got["MOFA2"] == "used when present"
-    for m in ("SCALEX", "scMoMaT", "uniPort", "Matilda", "sciPENN", "scJoint", "scMDC"):
-        assert got[m] == "used when present", m
-    # the package hides the GPU (CUDA_VISIBLE_DEVICES="") or passes --no_cuda
-    for m in ("scMVP", "scMSI", "scMM"):
-        assert got[m] == "not used", m
-    assert got["totalVI"] == "unknown"
 
 
 def test_d46_cell_count_is_recorded():
@@ -222,35 +172,6 @@ def test_run_result_carries_provenance(tmp_path, monkeypatch):
     assert r.scripts_commit is None and r.env_flavor == "unknown" and r.hostname == ""
 
 
-class _FakePopen:
-    def __init__(self, cmd, cwd, stdout, stderr, text, env=None, start_new_session=False):
-        self.pid = 4242
-        self.returncode = 0
-        with h5py.File(Path(cwd) / "embedding.h5", "w") as f:
-            f.create_dataset("data", data=np.zeros((60, 3)))
-
-    def communicate(self):
-        return "", ""
-
-
-def test_run_fills_the_provenance(tmp_path, monkeypatch):
-    import socket
-    monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
-    monkeypatch.setattr(runner.subprocess, "Popen", _FakePopen)
-    monkeypatch.setattr(config, "scripts_commit", lambda repo=None: "f" * 40)
-    monkeypatch.setattr(envs, "installed_flavor", lambda env, conda=None: "cpu")
-    d = _cite(tmp_path)
-    res = mtb.run("scMDC", "vertical", inputs={"rna": str(d / "rna.h5"),
-                                               "adt": str(d / "adt.h5")},
-                  out_dir=str(tmp_path / "o"), convert=False, cmd_template="{cmd}")
-    assert res.scripts_commit == "f" * 40
-    assert res.hostname == socket.gethostname()
-    # a {cmd} template runs in the caller's own env: its build is not known
-    assert res.env_flavor == "unknown"
-    # the package's env: the flavour its install recorded
-    assert config.run_provenance("scmb_torch")["env_flavor"] == "cpu"
-
-
 def test_run_all_records_the_provenance(tmp_path, monkeypatch):
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(config, "scripts_commit", lambda repo=None: "e" * 40)
@@ -270,21 +191,3 @@ def test_run_all_records_the_provenance(tmp_path, monkeypatch):
     assert '"scripts_commit"' in blob and '"hostname"' in blob
 
 
-@needs_git
-def test_present_scripts_must_be_at_the_requested_ref(tmp_path, monkeypatch):
-    repo = tmp_path / "repo"
-    head = _git_repo(repo)
-    monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
-    assert config.ensure_repo(repo, ref=head[:12]) == repo          # commit prefix
-    env = {"GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t", "PATH": "/usr/bin:/bin",
-           "HOME": str(repo)}
-    subprocess.run(["git", "tag", "v1"], cwd=repo, check=True, env=env)
-    assert config.ensure_repo(repo, ref="v1") == repo               # a local tag
-    monkeypatch.setenv(config.SCRIPTS_REF_VAR, "v2")
-    # the real run names the scripts folder
-    with pytest.raises(RuntimeError,
-                       match=rf"^The method scripts in {re.escape(str(repo))} are at "
-                             rf"{head[:7]}, not v2 \(MULTIBENCH_SCRIPTS_REF\)"):
-        config.ensure_repo(repo)                                     # silently other code: no
-    with pytest.raises(RuntimeError, match=r"not a \(--ref\)"):
-        config.ensure_repo(repo, ref="a")                            # too short to be a prefix

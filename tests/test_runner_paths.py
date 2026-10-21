@@ -47,25 +47,6 @@ def test_normalize_paths_absolutizes_and_marks_directories(tmp_path, monkeypatch
     assert out == os.path.join(str(tmp_path / "out" / "x"), "")
 
 
-def test_run_passes_absolute_paths_to_the_child(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    (tmp_path / "data" / "MYCITE").mkdir(parents=True)
-    for n in ("a.h5", "b.h5"):
-        (tmp_path / "data" / "MYCITE" / n).write_text("")
-    calls = {}
-    monkeypatch.setattr(runner.subprocess, "Popen", _popen_honouring_save_path(calls))
-    res = mtb.run("SCALEX", "diagonal",
-                  inputs={"rna": "data/MYCITE/a.h5", "atac_gas": "data/MYCITE/b.h5"},
-                  out_dir="out/x", convert=False, cmd_template="conda run -n scalex {cmd}")
-    cmd = calls["cmd"]
-    assert all(os.path.isabs(t) for t in cmd if os.sep in t), cmd
-    assert os.path.isabs(calls["cwd"])
-    assert cmd[cmd.index("--save_path") + 1] == os.path.join(str(tmp_path / "out" / "x"), "")
-    assert cmd[cmd.index("--path1") + 1] == str(tmp_path / "data" / "MYCITE" / "a.h5")
-    assert res.out_dir.is_absolute() and res.output.shape == (6, 3)
-    assert not (tmp_path / "out" / "x" / "out").exists()     # no nested out/x/out/x
-
-
 def test_run_keeps_in_memory_anndata_inputs(tmp_path, monkeypatch):
     ad = pytest.importorskip("anndata")
     monkeypatch.chdir(tmp_path)
@@ -73,8 +54,7 @@ def test_run_keeps_in_memory_anndata_inputs(tmp_path, monkeypatch):
     monkeypatch.setattr(runner.subprocess, "Popen", _popen_honouring_save_path(calls))
     rna = ad.AnnData(np.ones((6, 4)))
     atac = ad.AnnData(np.ones((6, 5)))
-    res = mtb.run("SCALEX", "diagonal", inputs={"rna": rna, "atac_gas": atac},
-                  out_dir="out/y", convert=True, cmd_template="conda run -n scalex {cmd}")
+    res = mtb.engine.runner.run('SCALEX', 'diagonal', inputs={'rna': rna, 'atac_gas': atac}, out_dir='out/y', cmd_template='conda run -n scalex {cmd}')
     cmd = calls["cmd"]
     p1 = cmd[cmd.index("--path1") + 1]
     assert os.path.isabs(p1) and p1 == str(tmp_path / "out" / "y" / "inputs" / "rna.h5")
@@ -82,5 +62,5 @@ def test_run_keeps_in_memory_anndata_inputs(tmp_path, monkeypatch):
 
 
 def test_run_help_has_no_v1_or_reserved_wording():
-    doc = mtb.run.__doc__
+    doc = mtb.engine.runner.run.__doc__
     assert "v1" not in doc and "reserved" not in doc

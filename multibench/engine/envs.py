@@ -136,14 +136,6 @@ def _gb(n) -> str:
         return "?"
 
 
-def _as_frame(rows: list[dict], as_frame: bool):
-    """``rows`` as given, or as a ``pandas.DataFrame`` when ``as_frame``."""
-    if not as_frame:
-        return rows
-    import pandas as pd
-    return pd.DataFrame(rows)
-
-
 # --- archive flavours (CPU-only vs CUDA builds) ----------------------------
 #: The accepted ``flavor=`` values of :func:`install_packed` / :func:`install`.
 FLAVORS = ("auto", "cpu", "gpu")
@@ -344,8 +336,8 @@ def recipe(method: str) -> dict:
     Examples
     --------
     >>> import multibench as mtb
-    >>> mtb.env.recipe("Matilda")["conda_packages"]
-    >>> mtb.env.recipe("Matilda").get("caveats")
+    >>> recipe("Matilda")["conda_packages"]
+    >>> recipe("Matilda").get("caveats")
 
     See Also
     --------
@@ -486,37 +478,6 @@ def _check_methods(methods):
     ``scmb_<typo>`` env) and ``TypeError`` for a bare string."""
     registry.check_id_list(methods, "methods")
     return None if methods is None else [registry.check_method(m) for m in methods]
-
-
-def _category_or_methods(category, methods, fn: str):
-    """``(category, methods)``, with a list or tuple of method ids passed as the
-    first argument (``plan(["Matilda"])``) moved to ``methods``."""
-    if isinstance(category, (list, tuple)):
-        if methods is not None:
-            raise TypeError(f"{fn}() got methods twice: pass the list once, as "
-                            f"methods=[...]")
-        return None, list(category)
-    return category, methods
-
-
-def _plan(category: str | list[str] | None = None, methods: list[str] | None = None, *,
-          as_frame: bool = False):
-    """The envs a set of methods needs, one row per env: ``env``, ``shared``,
-    ``methods`` and ``flavor`` (the deprecated ``plan``)."""
-    category, methods = _category_or_methods(category, methods, "plan")
-    methods = _check_methods(methods)
-    if methods is None:
-        methods = registry.list_methods(category=category)
-    shared = _merged_groups()
-    buckets: dict[str, list[str]] = {}
-    for m in methods:
-        buckets.setdefault(group_for(m), []).append(m)
-    rows = [
-        {"env": env, "shared": env in shared, "methods": sorted(ms),
-         "flavor": installed_flavor(env)}
-        for env, ms in sorted(buckets.items(), key=lambda kv: (-len(kv[1]), kv[0]))
-    ]
-    return _as_frame(rows, as_frame)
 
 
 # --- env existence / status -----------------------------------------------
@@ -1049,58 +1010,6 @@ def installed_envs(conda: str | None = None) -> list[str]:
                               if made_by_multibench(p, name)))
 
 
-def _check_conda(conda) -> None:
-    """Raise unless ``conda`` is ``None`` or names an executable; a method id
-    or a list (``status("Matilda")``) gets the call that takes methods."""
-    if conda is None:
-        return
-    if isinstance(conda, (list, tuple, set, frozenset)):
-        raise TypeError(
-            f"conda is the conda/mamba executable, not a list of methods "
-            f"(got {list(conda)!r}); for their envs call "
-            f"mtb.env.install({list(conda)!r}, dry_run=True)")
-    if not isinstance(conda, (str, os.PathLike)):
-        raise TypeError(
-            f"conda must be the conda/mamba executable (a path or a name on "
-            f"PATH), got {type(conda).__name__} {conda!r}")
-    name = os.fspath(conda)
-    ids = {s.id.lower(): s.id for s in registry.load()}
-    if str(name).lower() in ids:
-        m = ids[str(name).lower()]
-        raise ValueError(
-            f"{name!r} is a method id, but status() takes no methods: its "
-            f"only positional argument is conda, the conda/mamba executable. "
-            f"For this method call mtb.env.install([{m!r}], dry_run=True), or keep "
-            f"the status() row whose method is {m!r}")
-    if shutil.which(name) is None:
-        raise ValueError(
-            f"conda={name!r} is not an executable path or a name on PATH")
-
-
-def _status(conda: str | None = None, *, as_frame: bool = False):
-    """Per method: ``env``, ``exists``, ``has_lock``, ``difficulty``,
-    ``verified_working``, ``has_recipe`` and ``flavor`` (the deprecated ``status``)."""
-    _check_conda(conda)
-    have = set(installed_envs(conda))
-    out = []
-    for s in registry.load():
-        env_spec = s.env_spec
-        env_name = group_for(s.id)
-        own = own_env_name(s.id)
-        exists = env_name in have or own in have
-        out.append({
-            "method": s.id, "env": env_name, "group": env_name, "own_env": own,
-            "exists": exists,
-            "has_lock": lockfile(env_name) is not None,
-            "difficulty": env_spec.get("difficulty", "unknown"),
-            "verified_working": bool(env_spec.get("verified_working", False)),
-            "has_recipe": bool(env_spec),
-            "flavor": (installed_flavor(env_name, conda) or installed_flavor(own, conda)
-                       if exists else None),
-        })
-    return _as_frame(out, as_frame)
-
-
 # --- lockfile-based provisioning (the reproducible install path) -----------
 def lockfile(env_name: str) -> Path | None:
     """Path of the shipped lockfile ``env_locks/<env_name>.yml``, or ``None``."""
@@ -1274,9 +1183,6 @@ def packed_manifest() -> dict:
 
 #: the first columns of install's and doctor's frames
 _INSTALL_FIRST = ("env", "methods", "state")
-_DOCTOR_FIRST = ("env", "methods", "exists")
-
-
 def _frame(rows: list[dict], first: tuple):
     """``rows`` as a DataFrame, ``first`` columns first."""
     import pandas as pd
@@ -1287,11 +1193,6 @@ def _frame(rows: list[dict], first: tuple):
               + [c for c in df.columns if c not in first]]
 
 
-@_compat.keywords("env.install", private="_install",
-                  kept={"packed": _compat.note(
-                      "packed=True has no effect, and packed=False is build=True"),
-                        "conda": _compat.use("conda on PATH")},
-                  hidden=("force",))
 def install(methods: list[str] | None = None, *, category: str | None = None,
             dry_run: bool = False, flavor: str = "auto", build: bool = False):
     """Install the conda envs a set of methods needs; Linux only.
@@ -1341,19 +1242,8 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
     >>> mtb.env.install(["Matilda", "totalVI"], dry_run=True)
     >>> mtb.env.install(category="vertical")
     """
-    return _install(methods, category=category, build=build, dry_run=dry_run,
-                    flavor=flavor)
-
-
-def _install(methods=None, *, category=None, build: bool = False, packed=None,
-             dry_run: bool = False, conda=None, force: bool = False,
-             flavor: str = "auto"):
-    """:func:`install`, with the deprecated ``packed=`` (``False`` = ``build=True``)
-    and the hidden ``force=`` (try a real install off Linux)."""
-    if packed is not None:
-        build = not packed
     rows = _install_rows(methods, category=category, packed=not build, dry_run=dry_run,
-                         conda=conda, force=force, flavor=flavor)
+                         flavor=flavor)
     plan = _frame(rows, _INSTALL_FIRST)
     if dry_run and not build:
         todo = to_download(rows)
@@ -1460,24 +1350,11 @@ def _install_rows(methods: list[str] | None = None, *, category: str | None = No
     return out
 
 
-def doctor(category=None, methods=None, conda=None, *, as_frame=None):
-    """Deprecated: ``mtb.env.install(methods, dry_run=True)`` shows the same."""
-    _compat.deprecated("env.doctor", _compat.use("mtb.env.install(methods, dry_run=True)"))
-    if as_frame is not None:
-        _compat.deprecated("env.doctor(as_frame=)")
-    return _doctor(category, methods, conda)
-
-
-def _doctor(category=None, methods=None, conda=None):
-    """The rows of the deprecated :func:`doctor` as a frame, ``env`` first."""
-    return _frame(_doctor_rows(category, methods, conda), _DOCTOR_FIRST)
-
-
-def _doctor_rows(category: str | list[str] | None = None,
+def _doctor_rows(category: str | None = None,
                  methods: list[str] | None = None,
                  conda: str | None = None) -> list[dict]:
-    """The rows of :func:`doctor`, as dicts."""
-    category, methods = _category_or_methods(category, methods, "doctor")
+    """One row per env the methods need: ``env``, ``methods``, ``exists``,
+    ``has_lock``, ``flavor`` and ``other_env``."""
     methods = _check_methods(methods)
     have = set(installed_envs(conda))
     if methods is None:
@@ -1734,17 +1611,3 @@ def _run_all(cmds: list[list[str]]) -> None:
     _conda_prefixes.cache_clear()
 
 
-status = _compat.renamed("env.status", "env.install(methods, dry_run=True)", _status)
-
-
-def plan(category=None, methods=None, **kwargs):
-    """Deprecated: use ``env.install``, whose dry run shows the same plan."""
-    category, methods = _category_or_methods(category, methods, "plan")
-    args = []
-    if methods is not None:
-        args.append(repr(list(methods)))
-    if category is not None:
-        args.append(f"category={category!r}")
-    args.append("dry_run=True")
-    _compat.deprecated("env.plan", _compat.use(f"env.install({', '.join(args)})"))
-    return _plan(category, methods, **kwargs)

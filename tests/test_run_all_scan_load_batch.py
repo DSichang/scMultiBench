@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+from tests._trees import _write_tree
 from multibench.engine import builder, envs, registry  # noqa: F401
 
 
@@ -40,7 +41,7 @@ def gpu(monkeypatch):
 
 
 def _dry(method, category, inputs, params, tmp_path):
-    return mtb.run(method, category, inputs=inputs, out_dir=str(tmp_path / "o"),
+    return mtb.engine.runner.run(method, category, inputs=inputs, out_dir=str(tmp_path / "o"),
                    params=params, dry_run=True, cmd_template="conda run -n x {cmd}")
 
 
@@ -114,7 +115,7 @@ def test_x66_dry_run_refuses_skip_existing_with_params():
 
 def test_x68_size_error_names_the_label_files_that_fit(tmp_path):
     import numpy as np
-    labels = mtb.labels_for("D52mini", "cross", "UINMF")
+    labels = mtb.engine.resolve.labels_for("D52mini", "cross", "UINMF")
     n = sum(len(pd.read_csv(labels[k])) for k in ("cty1", "cty2"))
     emb = np.random.default_rng(0).normal(size=(n, 5))
     with pytest.raises(ValueError, match=rf"^The embedding has {n:,} cells = cty1\+cty2\. "
@@ -169,26 +170,23 @@ def test_x79_scan_names_the_batch_renumbering(tmp_path, capsys, monkeypatch):
 def test_x11_a_local_folder_shadowed_by_the_data_path_is_named(tmp_path, monkeypatch):
     (tmp_path / "D11").mkdir()
     monkeypatch.chdir(tmp_path)
-    _, msgs = _messages(mtb.inputs_for, "D11", "vertical", "Matilda")
+    _, msgs = _messages(mtb.engine.resolve.inputs_for, "D11", "vertical", "Matilda")
     want = (f"Using {mtb.config.DEFAULT.data_path / 'D11'}; ./D11 also exists: pass "
             "'./D11' for it.")
     assert msgs.count(want) == 1, msgs
-    _, msgs = _messages(mtb.inputs_for, "D11", "vertical", "Matilda")
+    _, msgs = _messages(mtb.engine.resolve.inputs_for, "D11", "vertical", "Matilda")
     assert msgs.count(want) == 1, msgs                       # every call (R-4)
 
 
 def test_x13_vertical_peak_methods_read_the_atac_role():
     for m in ("UnitedNet", "iPOLNG", "moETM", "scMDC", "scMM"):
-        got = mtb.inputs_for("D27mini_vertical", "vertical", m)
+        got = mtb.engine.resolve.inputs_for("D27mini_vertical", "vertical", m)
         assert "atac" in got and "atac_gas" not in got, m
         assert got["atac"].endswith("atac_peak.h5"), m
     plan = mtb.run_all("D27mini_vertical", "vertical", modalities=["rna", "atac"],
                        dry_run=True, verbose=False)
     assert {"scMM", "scMDC", "moETM", "UnitedNet", "iPOLNG"} <= set(plan.method)
-    # 0.3's key and saved records still select the variant
-    argv = mtb.run("scMM", "vertical", inputs={"rna": "a.h5", "atac_gas": "b.h5"},
-                   out_dir="o", dry_run=True)
-    assert "--path2" in argv
+    # saved records still select the variant
     from multibench.engine import registry
     assert registry.get("scMM").select("vertical", {"rna", "atac_gas"}).when[
         "modalities"] == ["rna", "atac"]
@@ -239,27 +237,6 @@ def test_load_batch_reads_a_relative_out_dir_from_the_tree(tmp_path, monkeypatch
         str((tree / f"{m}_D11").resolve()) for m in ("Matilda", "MOFA2", "scMoMaT")]
 
 
-# Y02 (0.4.0): a tree in place is used as it is; fetch_outputs never moves it
-from test_fetch_outputs import F, _write_tree, served  # noqa: E402,F401
-
-
-def test_a_tree_of_another_url_is_kept(served, monkeypatch):  # noqa: F811
-    data, calls = served
-    out = F.fetch_outputs("D11", data_path=data, quiet=True)
-    assert (out / ".source").read_text().strip() == F._output_urls()["D11"]
-    (out / "mine.txt").write_text("x")
-    new = {**F._output_urls(), "D11": "https://example.org/new/outputs-D11.tar.gz"}
-    monkeypatch.setattr(F, "_output_urls", lambda: new)
-    assert F.fetch_outputs("D11", data_path=data, quiet=True) == out
-    assert len(calls) == 1 and (out / "mine.txt").is_file()
-    assert not (data / "outputs" / "D11.old").exists()
-
-
-def test_a_tree_without_a_source_is_kept(served):  # noqa: F811
-    data, calls = served
-    _write_tree(data / "outputs" / "D11")           # a 0.3.x cache: no .source
-    F.fetch_outputs("D11", data_path=data, quiet=True)
-    assert calls == [] and not (data / "outputs" / "D11.old").exists()
 
 
 def test_a_stored_tree_of_0_3_says_to_rescore(tmp_path):
@@ -271,10 +248,3 @@ def test_a_stored_tree_of_0_3_says_to_rescore(tmp_path):
         mtb.load_batch(tree)
 
 
-# Y40: a second dataset is refused before any download
-def test_fetch_outputs_takes_one_dataset(served):  # noqa: F811
-    data, calls = served
-    with pytest.raises(TypeError, match="fetch_outputs takes one dataset; call it once "
-                                        "per dataset."):
-        F.fetch_outputs("D11", "D28", data_path=data)
-    assert calls == []

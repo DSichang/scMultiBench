@@ -176,29 +176,6 @@ def test_get_unknown_method_has_did_you_mean():
     assert registry.check_method("StabMap") == "StabMap"
 
 
-def test_list_methods_validates_category_and_task():
-    import pytest
-    with pytest.raises(ValueError) as e:
-        registry.list_methods(category="crosss")
-    assert "unknown category 'crosss'" in str(e.value)
-    assert "['cross', 'diagonal', 'mosaic', 'vertical']" in str(e.value)
-    with pytest.raises(ValueError) as e:
-        registry.list_methods(task="xx")
-    assert "unknown task 'xx'" in str(e.value)
-    assert str(registry.list_tasks()) in str(e.value)
-    assert registry.check_category(None) is None and registry.check_task(None) is None
-
-
-def test_check_atac_values_and_aliases():
-    import pytest
-    assert registry.check_atac("peak") == "peak"
-    assert registry.check_atac("gas") == "gene_activity"
-    assert registry.check_atac("peaks") == "peak"
-    assert registry.check_atac(None) is None
-    with pytest.raises(ValueError, match="unknown atac representation 'binary'"):
-        registry.check_atac("binary")
-
-
 def test_normalize_modalities_aliases_base_and_errors():
     import pytest
     assert registry.normalize_modalities(["rna", "protein"]) == ["rna", "adt"]

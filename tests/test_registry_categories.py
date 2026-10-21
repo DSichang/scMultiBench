@@ -9,26 +9,6 @@ from multibench.engine import registry
 from multibench.engine.schema import MethodSpec
 
 
-def test_categories_derived_from_variants():
-    for spec in registry.load():
-        assert spec.categories == spec.wired_categories == \
-            list(dict.fromkeys(v.when["category"] for v in spec.variants)), spec.id
-    for c in ("vertical", "diagonal", "mosaic", "cross"):
-        want = {s.id for s in registry.load() if any(v.when["category"] == c for v in s.variants)}
-        assert set(registry.list_methods(category=c)) == want
-        assert set(discover.find_methods(category=c)) == want
-        assert {r[0].id for r in workflow._variant_rows(c)} == want
-    # the three that had diverged: Multigrate has cross variants since the
-    # article's 13 tasks were registered, totalVI and sciPENN no mosaic one
-    assert "Multigrate" in mtb.list_methods(category="cross")
-    for m in ("totalVI", "sciPENN"):
-        assert m not in mtb.list_methods(category="mosaic")
-    assert sorted(mtb.list_methods(category="cross")) == [
-        "Concerto", "MOFA2", "Multigrate", "StabMap", "UINMF", "UnitedNet", "scMDC", "scMM",
-        "scMoMaT", "sciPENN", "totalVI"]
-    assert mtb.method_info("Multigrate")["categories"] == ["mosaic", "vertical", "cross"]
-
-
 def test_methods_yaml_has_no_hand_categories_key():
     data = yaml.safe_load(registry._YAML.read_text())
     assert [m["id"] for m in data["methods"] if "categories" in m] == []

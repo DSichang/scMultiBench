@@ -9,6 +9,7 @@ one (the flag on the command line, a Series in Python), without pandas'
 an index and its other column.
 R6-15: the catalog's cLISI and iLISI rows name the median over cells.
 """
+import os
 import json
 
 import numpy as np
@@ -19,7 +20,7 @@ import multibench as mtb
 from multibench.eval import io as eio
 from tests.test_study_r4_wf import _quiet, cite  # noqa: F401
 from tests.test_study_r5_wf import (BARS, CELLTYPE, KW, SAMPLES, _adata,  # noqa: F401
-                                    _barcode_csv, _one_column, batchy)
+                                    _barcode_csv, _one_column)
 
 pytest.importorskip("scib")
 
@@ -77,8 +78,7 @@ def test_python_errors_suggest_a_series_that_works(cite, tmp_path):
                                          r"Pass "
                                          r"one column, for example "
                                          r"pd\.read_csv\("):
-        mtb.run_all("MYCITE", "vertical", dry_run=True, batch=dsheet, data_path=data,
-                    **KW)
+        mtb.run_all(os.path.join(data, 'MYCITE'), 'vertical', dry_run=True, batch=dsheet, **KW)
 
 
 def test_files_without_an_id_column_and_tsv_files(tmp_path):

@@ -95,12 +95,3 @@ def test_the_leiden_line_gives_no_skip_advice(tmp_path, capsys):
     assert "To skip it" not in err
 
 
-def test_to_long_is_deprecated_and_takes_the_long_table(tmp_path):
-    ds, emb = _folder(tmp_path)
-    out = mtb.evaluate(emb, [str(ds / "cty1.csv"), str(ds / "cty2.csv")], metrics="ARI",
-                       verbose=False)
-    with pytest.warns(FutureWarning, match=r"^to_long is deprecated and will be removed in "
-                                           r"0\.5\. Use mtb\.evaluate"):
-        again = mtb.to_long(out, method="X", dataset="D11")
-    assert again[["method", "dataset", "category"]].iloc[0].tolist() == ["X", "D11", None]
-    assert again["value"].tolist() == out["value"].tolist()

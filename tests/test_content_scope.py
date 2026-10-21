@@ -84,53 +84,6 @@ def _walk_parsers(parser):
                 yield from _walk_parsers(sub)
 
 
-# ---- tasks ------------------------------------------------------------------
-def test_list_tasks_names_only_the_benchmarked_tasks():
-    assert mtb.list_tasks() == TASKS
-
-
-def test_find_methods_by_task_still_works():
-    everything = set(mtb.list_methods())
-    for task in TASKS:
-        found = mtb.find_methods(task=task)
-        assert found, f"find_methods(task={task!r}) found nothing"
-        for m in found:
-            # method_info has no tasks key since 0.4.0 (X39): the registry keeps them
-            assert task in registry.get(m).tasks, (task, m)
-    # every method keeps clustering, so dropping the other tags lost no method
-    assert set(mtb.find_methods(task="clustering")) == everything
-    with pytest.raises(ValueError, match="valid: \\['batch', 'clustering', 'dimension_reduction'\\]"):
-        mtb.find_methods(task="no_such_task")
-
-
-# ---- user-visible return values and help ------------------------------------
-def test_api_return_values_stay_in_scope():
-    found = []
-
-    def check(where, value):
-        hits = _hits(_strip_titles(repr(value) if not isinstance(value, str) else value))
-        if hits:
-            found.append(f"{where}: {hits}")
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        check("list_tasks()", mtb.list_tasks())
-        check("list_categories()", mtb.list_categories())
-        for m in mtb.list_methods():
-            info = mtb.method_info(m, verbose=True)
-            check(f"method_info({m!r}, verbose=True)", info)
-            check(f"env.recipe({m!r})", mtb.env.recipe(m))
-            for v in info["supports"]:
-                check(f"params_for({m!r}, {v['category']!r}, {v['modalities']})",
-                      mtb.params_for(m, v["category"], v["modalities"]))
-        check("cite(<all methods>)", mtb.cite(*mtb.list_methods()))
-        for c in [None, *mtb.list_categories()]:
-            check(f"describe_layout({c!r})", mtb.describe_layout(c))
-        for name in ("methods", "datasets", "metrics"):
-            check(f"catalog.{name}()", getattr(mtb.catalog, name)().to_string())
-    assert not found, "\n".join(found)
-
-
 # ---- shipped text files -----------------------------------------------------
 def _package_text_files():
     """Every text file under multibench/ (skips __pycache__ and hidden build dirs)."""

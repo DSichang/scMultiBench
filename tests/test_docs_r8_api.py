@@ -7,6 +7,7 @@ package prints.
 
 Every test needs the docs source (SCMULTIBENCH_DOCS=<docs dir>) and is skipped without it.
 """
+import os
 import re
 import warnings
 
@@ -66,15 +67,13 @@ def test_changes_page_quotes_the_live_ari_tail():
 @needs_docs
 def test_changes_page_named_method_entry_follows_the_package(no_envs, labmos):
     with pytest.raises(ValueError, match=r"^totalVI does not run on mosaic data\."):
-        mtb.run_all("LABMOS", "mosaic", data_path="data",
-                    methods=["StabMap", "totalVI"], dry_run=True)
+        mtb.run_all(os.path.join('data', 'LABMOS'), 'mosaic', methods=['StabMap', 'totalVI'], dry_run=True)
 
 
 @needs_docs
 def test_changes_page_scbridge_entry_follows_the_package(lung):
     with warnings.catch_warnings(record=True) as seen:
         warnings.simplefilter("always")
-        mtb.scan("LUNG", "diagonal", data_path="data", verbose=False,
-                 modalities=["rna", "atac_peak"])
+        mtb.scan(os.path.join('data', 'LUNG'), 'diagonal', verbose=False, modalities=['rna', 'atac_peak'])
     assert not [w for w in seen if "scBridge" in str(w.message)]
     assert mtb.method_info("scBridge")["atac"] == "gene_activity"

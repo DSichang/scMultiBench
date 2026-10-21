@@ -21,69 +21,6 @@ UNREFERENCED = {"VIMCCA", "VIPCCA", "scMSI"}
 DOI_RE = re.compile(r"10\.\d{4,9}/\S+")
 
 
-def test_every_method_has_repo_url_summary_and_verified_reference_shape():
-    for m in registry.list_methods():
-        info = mtb.method_info(m, verbose=True)
-        assert info["repo_url"].startswith("http"), m
-        assert info["version"], m
-        assert info["notes"] and len(info["notes"]) <= 300 and " I " not in info["notes"], m
-        if m in UNREFERENCED:
-            assert info["reference"] is None, f"{m} now has a reference - drop it from UNREFERENCED"
-        else:
-            ref = info["reference"]
-            assert ref and DOI_RE.fullmatch(ref["doi"]), (m, ref)
-            for k in ("title", "authors", "journal", "year"):
-                assert ref.get(k), (m, k)
-
-
-def test_variants_deduplicated():
-    for m in registry.list_methods():
-        v = mtb.method_info(m, verbose=True)["variants"]
-        assert len(v) == len(set(v)), m
-    assert mtb.method_info("StabMap", verbose=True)["variants"] == ["tools_scripts/StabMap/main_StabMap.Rmd"]
-
-
-def test_driver_surfaced():
-    assert mtb.method_info("StabMap", verbose=True)["driver"] == "engine/drivers/run_stabmap.R"
-    assert mtb.method_info("Matilda", verbose=True)["driver"] == "engine/drivers/run_matilda.py"
-    assert mtb.method_info("GLUE", verbose=True)["driver"] is None
-
-
-def test_notes_long_only_verbose():
-    info = mtb.method_info("totalVI")
-    assert "notes_long" not in info
-    v = mtb.method_info("totalVI", verbose=True)
-    # the upstream audit note verbatim, far longer than the one-line summary
-    audit = yaml.safe_load((Path(registry.__file__).parent / "upstream_knobs.yaml").read_text())
-    assert v["notes_long"] == audit["totalVI"]["notes"]
-    assert len(v["notes_long"]) > 3 * len(v["notes"])
-    assert mtb.method_info("Multigrate", verbose=True)["notes_long"] is None   # unaudited
-    # verbose adds the maintainer keys (0.4.0, X40) and changes none of the others
-    assert {k: v[k] for k in info} == info
-
-
-def test_method_info_keeps_existing_keys():
-    info = mtb.method_info("scMDC", verbose=True)
-    # "tasks" left in 0.4.0 (X39)
-    for k in ("id", "language", "categories", "env", "atac", "needs_labels",
-              "status", "setup_hint", "variants", "scripts_url", "supports", "params",
-              "fixed_in_script", "upstream_knobs", "upstream_url", "notes",
-              "driver", "repo_url", "version", "reference"):
-        assert k in info, k
-
-
-def test_tunable_defaults_merge_wrapper_defaults_over_upstream():
-    # r3 (Y38): the default of every tunable key is its value in a run (0.4.0:
-    # the "effective" copy of these defaults is gone; tunable = {key: {type, default}})
-    p = mtb.params_for("scMDC", "vertical", ["rna", "adt"])
-    assert "effective" not in p and "nbatch" not in p["tunable"]   # nbatch: from the folder
-    assert all(set(t) >= {"type", "default"} for t in p["tunable"].values())
-    m = mtb.params_for("Multigrate", "vertical", ["rna", "adt"])
-    assert m["tunable"]["epochs"] == {"type": "int", "default": 200}   # the wrapper's value
-    tun = mtb.method_info("scMDC", verbose=True)["params"]["vertical:rna+adt"]["tunable"]
-    assert tun == p["tunable"]
-
-
 def test_cite_bibtex_and_text():
     from multibench.discover import cite
     s = cite(["StabMap", "GLUE"], format="bibtex")

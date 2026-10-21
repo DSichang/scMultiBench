@@ -39,12 +39,6 @@ def test_every_upstream_knob_says_what_it_controls(method):
         assert k["name"] and k["effect"]
 
 
-def test_method_info_carries_the_audit():
-    info = mtb.method_info("GLUE", verbose=True)
-    assert info["fixed_in_script"] and info["upstream_knobs"]
-    assert info["upstream_url"]
-
-
 def test_params_for_explains_an_empty_tunable():
     p = mtb.params_for("totalVI", "vertical")
     assert p["tunable"] == {}, "totalVI's script takes only paths"

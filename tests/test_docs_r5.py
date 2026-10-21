@@ -55,25 +55,6 @@ def test_evaluate_page_says_a_barcode_csv_is_aligned_by_id():
 # ---- API overview, Changes, code font (R5-16, R5-18) ---------------------
 
 @needs_docs
-def test_changes_page_lists_round_5_changes():
-    text = _flat("changes.md")
-    assert "failed or was skipped" not in text
-    for phrase in ("`run-all` exits with `3` after saving when a method failed, or a "
-                   "method named in `--methods` was skipped.",
-                   "`# 1 failed (Seurat_WNN), 1 skipped (totalVI).`",
-                   "`# Not run: ...`",
-                   "end with a `caveat` column and a `reason` column.",
-                   "`BatchResult.rescore(labels=...)` aligns a Series",
-                   "A batch or labels CSV whose first column holds cell ids is aligned",
-                   "`mtb.data.fetch` and `fetch_outputs` raise `OSError`",
-                   "`multibench evaluate --name NAME`",
-                   "`<method> needs an NVIDIA GPU, and this computer has none.`",
-                   "`mosaic has no published tables.`"):
-        assert phrase in text, phrase
-    assert "needs an NVIDIA GPU; this computer has none" not in text
-
-
-@needs_docs
 def test_code_font_draws_no_ligatures():
     css = (_docs_root() / "stylesheets" / "extra.css").read_text()
     rule = re.search(r"\.md-typeset code, \.md-typeset pre, \.md-typeset kbd \{([^}]*)\}", css)

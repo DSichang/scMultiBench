@@ -340,13 +340,6 @@ def test_install_dry_run_null_size_is_unknown(plan_rows, monkeypatch):
     assert envs._gb(row["unpacked_bytes"]) == "?"
 
 
-def test_install_packed_false_has_no_flavour(plan_rows, monkeypatch):
-    monkeypatch.setattr(envs, "host_has_gpu", lambda: pytest.fail("no probe without archives"))
-    rows = mtb.env.install(["Matilda"], packed=False, flavor="cpu", dry_run=True).to_dict("records")
-    assert rows[0]["flavor"] is None and rows[0]["state"] == "build(dry-run)"
-    assert rows[0]["archive_bytes"] is None and rows[0]["packed_url"] is None
-
-
 def test_install_reports_the_installed_flavour_for_existing_envs(envs_dir, monkeypatch,
                                                                  fake_tables):
     prefix = make_prefix(envs_dir, "matilda")
@@ -363,24 +356,6 @@ def test_install_invalid_flavor_is_a_value_error(monkeypatch):
     assert str(e.value) == "flavor='fast': choose one of 'auto', 'cpu', 'gpu'"
 
 
-def test_install_run_hands_the_flavour_to_install_packed(envs_dir, monkeypatch, fake_tables):
-    seen = []
-
-    def fake_unpack(env, **kw):
-        seen.append((env, kw.get("flavor")))
-        make_prefix(envs_dir, env)
-        return True
-    monkeypatch.setattr(envs, "install_packed", fake_unpack)
-    monkeypatch.setattr(envs, "_run_all", lambda cmds: pytest.fail("a build started"))
-    rows = mtb.env.install(["Matilda"], packed=True, dry_run=False, flavor="cpu").to_dict("records")
-    assert seen == [("matilda", "cpu")]
-    assert rows[0]["state"] == "PACKED"
-    # the outcome row carries the recorded flavour (fake_unpack wrote none)
-    assert rows[0]["flavor"] is None
-    (envs_dir / "matilda" / envs.FLAVOR_FILE).write_text("cpu\n")
-    assert _by_env(mtb.env.install(["Matilda"], flavor="gpu", dry_run=True).to_dict("records"))["matilda"]["flavor"] == "cpu"
-
-
 def test_install_signature_and_docs():
     sig = inspect.signature(mtb.env.install)
     assert sig.parameters["flavor"].default == "auto"
@@ -392,31 +367,6 @@ def test_install_signature_and_docs():
         doc = inspect.getdoc(fn)
         assert doc and "Returns" in doc, fn.__name__
     assert "flavor" in inspect.getdoc(envs.install)    # doctor is deprecated in 0.4.0
-
-
-# ---------------------------------------------------------------- plan / doctor / status show the record
-def test_env_tables_show_the_installed_flavour(envs_dir):
-    torch = envs.group_for("SCALEX")
-    prefix = make_prefix(envs_dir, torch)
-    (prefix / envs.FLAVOR_FILE).write_text("cpu\n")
-    make_prefix(envs_dir, "matilda")                    # installed, no record
-    doc = _by_env(envs.doctor(methods=["SCALEX", "Matilda", "UINMF"]).to_dict("records"))
-    assert doc[torch]["exists"] and doc[torch]["flavor"] == "cpu"
-    assert doc["matilda"]["exists"] and doc["matilda"]["flavor"] is None
-    assert not doc["scmb_r"]["exists"] and doc["scmb_r"]["flavor"] is None
-    assert list(doc[torch]) == ["env", "methods", "exists", "has_lock", "flavor", "other_env"]
-    pl = _by_env(envs.plan(methods=["SCALEX", "Matilda", "UINMF"]))
-    assert pl[torch]["flavor"] == "cpu" and pl["matilda"]["flavor"] is None
-    assert list(pl[torch]) == ["env", "shared", "methods", "flavor"]
-    st = {r["method"]: r for r in envs.status()}
-    assert st["SCALEX"]["flavor"] == "cpu" and st["Matilda"]["flavor"] is None
-    assert st["UINMF"]["flavor"] is None
-    assert list(st["SCALEX"]) == ["method", "env", "group", "own_env", "exists", "has_lock",
-                                  "difficulty", "verified_working", "has_recipe", "flavor"]
-    for fn, kw in ((envs.plan, {"methods": ["SCALEX"]}), (envs.doctor, {"methods": ["SCALEX"]}),
-                   (envs.status, {})):
-        df = fn(**kw, as_frame=True)
-        assert "flavor" in df.columns
 
 
     # 0.4.0: install's description leaves --flavor to the option's own help

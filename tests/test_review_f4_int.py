@@ -94,28 +94,6 @@ def _vertical(root, name, atac_feats, n=60, adt=False):
     return root
 
 
-# ------------------------------------------- peak_0 names are not gene activity
-def test_peak_ids_leave_multimap_runnable_and_block_glue_and_seurat_v3(tmp_path, pinned):
-    root = _diagonal(tmp_path, "LUNG_ids", [f"peak_{i}" for i in range(60)])
-    sc = _quiet(full_scan, "LUNG_ids", "diagonal", data_path=root, verbose=False,
-                methods=discover.find_methods("diagonal", atac="peak"))
-    # the rows whose files the folder holds: GLUE's row for several batches has none
-    sc = sc[sc["files_ok"]].set_index("method")
-    assert sc.index.is_unique
-    assert sc.loc["MultiMAP", "runnable"], sc.loc["MultiMAP", "reason"]
-    assert sc.loc["MultiMAP", "reason"] == ""
-    assert sc.loc["MultiMAP", "caveat"].startswith(
-        "MultiMAP needs peak ATAC. atac_peak.h5 holds names such as peak_0, not "
-        "chr:start-end.")
-    assert "gene activity" not in sc.loc["MultiMAP", "caveat"]
-    for m in ("GLUE", "Seurat_v3"):
-        assert not sc.loc[m, "runnable"], m
-        assert sc.loc[m, "reason"].startswith(f"{m} reads peak names such as "
-                                              "chr1:100-200. atac_peak.h5 holds other "
-                                              "names, for example peak_0. Rename them "
-                                              "to chr:start-end"), sc.loc[m, "reason"]
-
-
 def test_peak_ids_in_a_vertical_folder_give_both_kinds_a_caveat(tmp_path, pinned,
                                                                 gas_matilda):
     """atac.h5 names that are neither chr:start-end nor the RNA's genes: the
@@ -174,39 +152,6 @@ def test_a_gpu_blocked_row_ends_with_the_export_fix_and_no_override(
     assert "needs an NVIDIA GPU" in row["reason"]
     assert row["reason"].endswith("Export the ATAC as gene activity.")
     assert "allow_atac_mismatch" not in row["reason"] and "anyway" not in row["reason"]
-
-
-# ------------------------------------------------ one report of an allowed caveat
-class _Stop(RuntimeError):
-    pass
-
-
-def test_run_all_with_the_override_does_not_warn_again(tmp_path, pinned, monkeypatch,
-                                                      capsys, gas_matilda):
-    """The caveat is in the log and the record; the runner's warning is not repeated."""
-    def stop(spec, params):
-        raise _Stop("stand-in env: stop before the method starts")
-    monkeypatch.setattr(R, "cpu_params_for", stop)
-    root = _vertical(tmp_path, "MU_PEAK", PEAKS)
-    with warnings.catch_warnings(record=True) as rec:
-        warnings.simplefilter("always")
-        res = mtb.run_all("MU_PEAK", "vertical", tmp_path / "out", methods=["Matilda"],
-                          modalities=["rna", "atac"], data_path=root,
-                          allow_atac_mismatch=True)
-    assert not [w for w in rec if "needs gene-activity ATAC" in str(w.message)], \
-        [str(w.message) for w in rec]
-    assert f"[run_all]   Matilda {GAS_CAV}" in \
-        capsys.readouterr().out
-    assert res.records[0]["status"] == "FAIL" and "stand-in env" in res.records[0]["error"]
-    # a direct mtb.run still warns, once
-    inp = mtb.inputs_for("MU_PEAK", "vertical", "Matilda", modalities=["rna", "atac"],
-                         data_path=root)
-    with warnings.catch_warnings(record=True) as rec:
-        warnings.simplefilter("always")
-        with pytest.raises(_Stop):
-            mtb.run("Matilda", "vertical", inputs=inp, out_dir=str(tmp_path / "o"))
-    hits = [w for w in rec if "needs gene-activity ATAC" in str(w.message)]
-    assert len(hits) == 1 and issubclass(hits[0].category, UserWarning)
 
 
 # ------------------------------------------------------ BatchResult counts, dtypes

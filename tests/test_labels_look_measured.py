@@ -113,16 +113,6 @@ def test_cell_types_and_cluster_ids_do_not_warn(tmp_path):
     assert _warned(EMB[:19], labels=[f"type{i}" for i in range(19)]) == []
 
 
-def test_the_cells_that_are_scored_count(tmp_path):
-    """After missing_labels="drop": 40 cells without a label do not make the
-    20 others look measured."""
-    labels = np.array(["T", "B"] * 10 + [None] * 40, dtype=object)
-    with warnings.catch_warnings(record=True) as rec:
-        warnings.simplefilter("always")
-        mtb.evaluate(EMB, labels=labels, metrics=["ARI"], missing_labels="drop")
-    assert [str(w.message) for w in rec if "measured" in str(w.message)] == []
-
-
 # ------------------------------------------------------------ shipped datasets
 def test_no_label_file_of_a_local_dataset_looks_measured():
     """Every label file of the datasets under the data path (the demo and

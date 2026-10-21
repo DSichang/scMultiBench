@@ -20,6 +20,7 @@ The runs are faked (``_run`` writes an embedding), as in the R4-02 tests.
 """
 import inspect
 import json
+import os
 import re
 import shutil
 import warnings
@@ -43,7 +44,7 @@ pytest.importorskip("scib")
 KW = dict(methods=["Matilda"], modalities=["rna", "adt"], verbose=False)
 BARS = [f"c{i}" for i in range(N)]
 CELLTYPE = np.array(["A"] * (N // 2) + ["B"] * (N // 2))
-# 0.4.0: load_batch(data_path=) is deprecated; the fix names config.DEFAULT.data_path
+# the fix names config.DEFAULT.data_path
 MOVED = ("Set mtb.config.DEFAULT.data_path to the folder that holds it, or run rescore "
          "from the folder where run_all ran.")
 
@@ -73,7 +74,7 @@ def _rescore(res, **kw):
 def rel(cite, tmp_path, monkeypatch):
     """A sweep run from ``tmp_path`` with the relative ``data_path='data'``."""
     monkeypatch.chdir(tmp_path)
-    res = _quiet(mtb.run_all, "MYCITE", "vertical", "out", data_path="data", **KW)
+    res = _quiet(mtb.run_all, os.path.join("data", "MYCITE"), "vertical", "out", **KW)
     (tmp_path / "nb").mkdir()
     return res, tmp_path
 
@@ -104,30 +105,11 @@ def test_rescore_from_another_directory_aligns_the_labels_by_barcode(rel, monkey
 
 def test_rescore_of_an_in_memory_result_after_a_chdir(rel, monkeypatch):
     _, root = rel
-    res = _quiet(mtb.run_all, "MYCITE", "vertical", root / "abs", data_path="data", **KW)
+    res = _quiet(mtb.run_all, os.path.join("data", "MYCITE"), "vertical", root / "abs", **KW)
     monkeypatch.chdir(root / "nb")
     new, caught = _rescore(res, labels=_shuffled_labels())
     assert not _by_position(caught), caught
     assert "+".join(new.records[0]["labels_used"]) == "cty.csv" and _ari(new) == _ari(res)
-
-
-def test_a_copied_result_is_pointed_at_its_data_with_data_path(rel, monkeypatch):
-    res, root = rel
-    copy = root / "elsewhere" / "copy"
-    shutil.copytree(root / "out", copy)
-    monkeypatch.chdir(root / "nb")
-    new = _quiet(mtb.load_batch(copy, data_path=root / "data").rescore,
-                 labels=_shuffled_labels())
-    assert "+".join(new.records[0]["labels_used"]) == "cty.csv" and _ari(new) == _ari(res)
-    # the data moved too: only the argument finds it
-    shutil.move(str(root / "data"), str(root / "moved"))
-    back = mtb.load_batch(copy, data_path=root / "moved")
-    assert back.records[0]["data_path"] == str(root / "moved")
-    assert back.records[0]["out_dir"] == str(copy / "Matilda_MYCITE")
-    new, caught = _rescore(back, labels=_shuffled_labels())
-    assert not _by_position(caught), caught
-    assert "+".join(new.records[0]["labels_used"]) == "cty.csv" and _ari(new) == _ari(res)
-    assert _ari(_quiet(back.rescore)) == _ari(res)
 
 
 def test_a_folder_that_is_not_found_is_named(rel, monkeypatch):
@@ -169,38 +151,13 @@ def test_unusable_barcodes_keep_their_own_message(rel):
         res.rescore(labels=_shuffled_labels(), metrics=["ARI"])
 
 
-def test_rescore_from_the_run_folder_and_of_a_fetched_tree_is_unchanged(rel, monkeypatch):
-    res, root = rel
-    again = _quiet(mtb.load_batch("out").rescore)
-    # the folder found, as an absolute path (review of round 6)
-    assert again.records[0]["data_path"] == again.records[0]["data_root"] == \
-        str((root / "data").resolve())
-    assert "+".join(again.records[0]["labels_used"]) == "cty.csv" and _ari(again) == _ari(res)
-    # a fetch_outputs tree: data_path None (config's), out_dir from another host
-    tree = root / "tree"
-    shutil.copytree(root / "out", tree)
-    blob = json.loads((tree / "batch_result.json").read_text())
-    for r in blob["records"]:
-        r["data_path"] = None
-        r.pop("data_root", None)
-        r["out_dir"] = "/benchmark/host/out/Matilda_MYCITE"
-    (tree / "batch_result.json").write_text(json.dumps(blob))
-    monkeypatch.setattr(config.DEFAULT, "data_path", root / "data")
-    monkeypatch.chdir(root / "nb")
-    back = mtb.load_batch(tree)
-    assert back.records[0]["data_path"] is None
-    new = _quiet(back.rescore)
-    assert new.records[0]["data_path"] is None
-    assert "+".join(new.records[0]["labels_used"]) == "cty.csv" and _ari(new) == _ari(res)
-
-
 # ======================================================================= R6-02
 @pytest.fixture
 def batched(cite, tmp_path):
     """A sweep scored with a shuffled barcode-indexed batch Series."""
     data, batch, shuffled = cite
-    res = _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "out", data_path=data,
-                 batch=shuffled, **KW)
+    mtb.config.DEFAULT.data_path = data
+    res = _quiet(mtb.run_all, 'MYCITE', 'vertical', tmp_path / 'out', batch=shuffled, **KW)
     return res, batch, tmp_path
 
 
@@ -303,8 +260,8 @@ def cross(tmp_path, monkeypatch):
 
 
 def _cross_run(data, tmp, method, **kw):
-    return _quiet(mtb.run_all, "MYCROSS", "cross", tmp / method, data_path=data,
-                  methods=[method], verbose=False, **kw)
+    mtb.config.DEFAULT.data_path = data
+    return _quiet(mtb.run_all, 'MYCROSS', 'cross', tmp / method, methods=[method], verbose=False, **kw)
 
 
 def _count_sweeps(monkeypatch, fail=False):

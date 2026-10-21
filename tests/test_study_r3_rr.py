@@ -52,8 +52,8 @@ def _scan_row(root, name, method):
 def test_underscore_peaks_are_passed_as_a_rewritten_copy(tmp_path, method):
     _diagonal(tmp_path, "LUNG_us", [f"chr4_{171325400 + 10 * i}_{171325903 + 10 * i}"
                                     for i in range(60)])
-    inp = mtb.inputs_for("LUNG_us", "diagonal", method, data_path=tmp_path)
-    argv = mtb.run(method, "diagonal", inputs=inp, out_dir=str(tmp_path / "o"),
+    inp = mtb.engine.resolve.inputs_for("LUNG_us", "diagonal", method, data_path=tmp_path)
+    argv = mtb.engine.runner.run(method, "diagonal", inputs=inp, out_dir=str(tmp_path / "o"),
                    dry_run=True)
     assert str(tmp_path / "o" / "inputs" / "atac_peak_normpeaks.h5") in argv
     assert inp["atac_peak"] not in argv
@@ -85,15 +85,6 @@ def test_peak_ids_without_coordinates_get_the_peak_names_caveat(tmp_path):
 def test_d28_glue_caveat_does_not_name_the_dataset():
     r = full_scan("D28", "diagonal", methods=["GLUE"], verbose=False).iloc[0]
     assert "D28" not in r["caveat"] and "peak names" not in r["caveat"]
-
-
-def test_normalize_peak_names_notes_name_the_methods_run_renames_for():
-    """The Notes list exactly the methods with a renamed peak role."""
-    renamed = sorted(m for m in registry.list_methods()
-                     if any(v.normalize_peaks for v in registry.get(m).variants))
-    assert renamed == ["GLUE", "Seurat_v3"]
-    doc = " ".join(inspect.getdoc(ingest.normalize_peak_names).split())
-    assert "``run`` applies it for GLUE and Seurat_v3." in doc
 
 
 # ============================================================ R3-10 scripts ref
@@ -160,7 +151,7 @@ def test_scripts_ref_problem_is_none_without_scripts_or_variable(tmp_path, monke
 
 # ============================================================ R3-12 Slurm example
 def test_slurm_example_dry_run_works(tmp_path):
-    argv = mtb.run("scMoMaT", "mosaic", inputs=mtb.inputs_for("D46", "mosaic", "scMoMaT"),
+    argv = mtb.engine.runner.run("scMoMaT", "mosaic", inputs=mtb.engine.resolve.inputs_for("D46", "mosaic", "scMoMaT"),
                    out_dir=str(tmp_path / "scMoMaT"),
                    cmd_template="srun --gres=gpu:1 {env_cmd}", dry_run=True)
     assert argv[:2] == ["srun", "--gres=gpu:1"]

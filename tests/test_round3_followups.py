@@ -8,13 +8,6 @@ import pytest
 import multibench as mtb
 
 
-def test_fetchable_is_reexported_under_data():
-    with pytest.warns(FutureWarning, match=r"Use mtb\.catalog\.datasets\(\)"):
-        ids = mtb.data.fetchable()
-    assert ids == mtb.data.results.fetchable()
-    assert "D11" in ids and len(ids) >= 5
-
-
 def test_io_dir_hides_leaked_imports():
     names = dir(mtb.io)
     assert "to_canonical" not in names      # deprecated: hidden from dir()

@@ -6,6 +6,7 @@
 * ``run_all(dry_run=True)`` returns the ``command`` column the CLI csv carries;
 * ``multibench cite A,B`` works like ``multibench cite A B``.
 """
+import os
 import io
 import warnings
 
@@ -21,34 +22,17 @@ from tests.conftest import full_scan
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 
 
-# ----------------------------------------------------------------- the 0.2 order is refused
-def test_inputs_for_old_order_is_a_typeerror():
-    with pytest.raises(TypeError) as e:
-        mtb.inputs_for("D52", "StabMap", "cross")
-    assert str(e.value) == ("inputs_for argument order is (dataset, category, method) "
-                            "since 0.3.0; you passed (dataset, method, category)")
-
-
-def test_labels_for_old_order_is_a_typeerror():
-    with pytest.raises(TypeError) as e:
-        mtb.labels_for("D52", "StabMap", "cross")
-    assert str(e.value) == ("labels_for argument order is (dataset, category, method) "
-                            "since 0.3.0; you passed (dataset, method, category)")
-    with pytest.raises(TypeError, match="labels_for argument order"):
-        mtb.labels_for("D52", "StabMap")                 # method alone in the category slot
-
-
 def test_inputs_for_plain_typos_keep_their_messages():
     with pytest.raises(KeyError, match="Did you mean StabMap"):
-        mtb.inputs_for("D52", "cross", "StabMapp")
+        mtb.engine.resolve.inputs_for("D52", "cross", "StabMapp")
     with pytest.raises(ValueError, match="unknown category 'cros'; valid"):
-        mtb.inputs_for("D52", "cros", "StabMap")
+        mtb.engine.resolve.inputs_for("D52", "cros", "StabMap")
     # a method id in BOTH slots is a bad category, not a swap
     with pytest.raises(ValueError, match="unknown category 'StabMap'"):
-        mtb.inputs_for("D52", "StabMap", "StabMap")
+        mtb.engine.resolve.inputs_for("D52", "StabMap", "StabMap")
     # a category token in the method slot with an unknown method is a bad id, not a swap
     with pytest.raises(KeyError) as e:
-        mtb.inputs_for("D52", "cross", "nonsense")
+        mtb.engine.resolve.inputs_for("D52", "cross", "nonsense")
     assert "argument order" not in str(e.value)
 
 
@@ -84,11 +68,11 @@ def test_scan_and_inputs_for_carry_the_on_disk_name(tmp_path, monkeypatch):
     assert (df["files_reason"].str.contains("/mycite")).sum() == 0
     assert len(df) == len(full_scan("MYCITE", "vertical", data_path=tmp_path))
     with pytest.warns(UserWarning, match="on-disk spelling"):
-        inp = mtb.inputs_for("mycite", "vertical", "Matilda", modalities=["rna", "adt"],
+        inp = mtb.engine.resolve.inputs_for("mycite", "vertical", "Matilda", modalities=["rna", "adt"],
                              data_path=tmp_path)
     assert all("/MYCITE/" in p for p in inp.values())
     with pytest.warns(UserWarning, match="on-disk spelling"):
-        labs = mtb.labels_for("mycite", data_path=tmp_path)
+        labs = mtb.engine.resolve.labels_for("mycite", data_path=tmp_path)
     assert "/MYCITE/" in labs["cty"]
 
 
@@ -106,8 +90,7 @@ def test_run_all_names_out_dir_and_records_after_the_folder(tmp_path, monkeypatc
     _cite(tmp_path, "MYCITE")
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
-        res = mtb.run_all("mycite", "vertical", methods=["Matilda"], data_path=tmp_path,
-                          out_dir=str(tmp_path / "runs"), evaluate=False, verbose=False)
+        res = mtb.run_all(os.path.join(tmp_path, 'mycite'), 'vertical', methods=['Matilda'], out_dir=str(tmp_path / 'runs'), evaluate=False, verbose=False)
     assert sum("on-disk spelling" in str(x.message) for x in w) == 1     # once, not per call
     assert res.dataset == "MYCITE"
     assert calls == [str(tmp_path / "runs" / "Matilda_MYCITE")]

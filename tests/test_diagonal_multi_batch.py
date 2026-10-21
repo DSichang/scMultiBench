@@ -75,18 +75,18 @@ def _variant(method, d):
 @pytest.mark.parametrize("method", METHODS)
 def test_labels_follow_the_rna_batches_then_the_atac_batches(tmp_path, method):
     _folder(tmp_path)
-    got = mtb.labels_for("MB", "diagonal", method, data_path=tmp_path)
+    got = mtb.engine.resolve.labels_for("MB", "diagonal", method, data_path=tmp_path)
     assert list(got) == ORDER
     assert [p.rsplit("/", 1)[-1] for p in got.values()] == [f"{st}.csv" for st in ORDER]
 
 
 def test_the_default_order_is_the_same_and_evaluate_takes_it(tmp_path):
     _folder(tmp_path)
-    got = mtb.labels_for("MB", data_path=tmp_path)
+    got = mtb.engine.resolve.labels_for("MB", data_path=tmp_path)
     assert list(got) == ORDER
     assert sorted(reversed(ORDER), key=resolve._label_sort_key) == ORDER
     # a plain dict in this order needs no label_order=
-    assert pipeline._labels_from_dict(dict(got), None) == list(got.values())
+    assert pipeline._labels_from_dict(dict(got)) == list(got.values())
     # numbers sort as numbers within a modality
     assert sorted(["atac_cty2", "rna_cty10", "rna_cty2", "atac_cty1"],
                   key=resolve._label_sort_key) == ["rna_cty2", "rna_cty10",
@@ -112,7 +112,7 @@ def test_a_variant_gets_only_the_label_files_of_its_batches(tmp_path):
     d = _folder(tmp_path)
     _h5(d / "rna4.h5", ["g0", "g1", "g2"], ["x0", "x1"])
     _labels(d / "rna_cty4.csv", 2)
-    assert list(mtb.labels_for("MB", "diagonal", "iNMF", data_path=tmp_path)) == ORDER
+    assert list(mtb.engine.resolve.labels_for("MB", "diagonal", "iNMF", data_path=tmp_path)) == ORDER
 
 
 # ---------------------------------------------------------- batch = each file
@@ -148,7 +148,7 @@ def test_no_per_batch_hint_on_such_a_folder(tmp_path):
             resolve.inputs_for("MB", "diagonal", method, data_path=tmp_path, check=True)
     # a method that reads one rna.h5 is not told to export again
     with pytest.raises(FileNotFoundError) as e:
-        mtb.inputs_for("MB", "diagonal", "SCALEX", data_path=tmp_path, check=True)
+        mtb.engine.resolve.inputs_for("MB", "diagonal", "SCALEX", data_path=tmp_path, check=True)
     assert "per-batch files" not in str(e.value)
 
 
@@ -160,7 +160,7 @@ def test_the_hint_still_fires_when_no_variant_reads_the_folder(tmp_path):
     _h5(d / "atac_gas.h5", ["g0", "g1", "g2"], [f"a{k}" for k in range(5)])
     assert "per-batch files (rna1.h5, rna2.h5, ...)" in resolve._per_batch_hint(d, "diagonal")
     with pytest.warns(UserWarning, match="This folder holds per-batch files"):
-        mtb.labels_for("SPLIT", "diagonal", data_path=tmp_path)
+        mtb.engine.resolve.labels_for("SPLIT", "diagonal", data_path=tmp_path)
     # vertical is not affected by the diagonal rule
     assert resolve._per_batch_hint(_folder(tmp_path), "vertical") is not None
 
@@ -183,7 +183,7 @@ def test_each_file_is_its_own_cell_group(tmp_path, method):
     kind = "atac_peak" if method == "GLUE" else "atac_gas"
     roles = [f"rna{i}" for i in (1, 2, 3)] + [f"{kind}{i}" for i in (1, 2, 3)]
     assert runner._cell_group_roles(variant) == [[r] for r in roles]
-    inputs = mtb.inputs_for("MB", "diagonal", method, data_path=tmp_path)
+    inputs = mtb.engine.resolve.inputs_for("MB", "diagonal", method, data_path=tmp_path)
     n = sum(RNA_CELLS) + sum(ATAC_CELLS)
     with warnings.catch_warnings():
         warnings.simplefilter("error")
@@ -208,10 +208,10 @@ def test_a_truncated_label_file_fails_the_file_check(tmp_path, no_envs, short):
     data = "rna2.h5" if short == "rna_cty2" else "atac_gas3.h5"
     for method in GAS_METHODS:
         with pytest.raises(ValueError) as e:
-            mtb.inputs_for("MB", "diagonal", method, data_path=tmp_path, check=True)
+            mtb.engine.resolve.inputs_for("MB", "diagonal", method, data_path=tmp_path, check=True)
         assert f"{short}.csv has {full - 2} labels, but {data} has {full} cells" in str(e.value)
     with pytest.raises(ValueError, match=rf"{short}\.csv has {full - 2} labels"):
-        mtb.inputs_for("MB", "diagonal", "GLUE", data_path=tmp_path, check=True)
+        mtb.engine.resolve.inputs_for("MB", "diagonal", "GLUE", data_path=tmp_path, check=True)
     df = full_scan("MB", "diagonal", data_path=tmp_path, verbose=False)
     rows = df[df["method"].isin(METHODS) & df["modalities"].str.startswith("rna1+")]
     assert len(rows) == 4 and not rows["files_ok"].any()
@@ -247,12 +247,12 @@ def test_a_gene_activity_batch_in_another_cell_order_is_refused(tmp_path):
     cells = [f"a2_{k}" for k in range(ATAC_CELLS[1])]
     _h5(d / "atac_gas2.h5", [f"g{i}" for i in range(30)], cells[::-1])
     with pytest.raises(ValueError) as e:
-        mtb.inputs_for("MB", "diagonal", "iNMF", data_path=tmp_path, check=True)
+        mtb.engine.resolve.inputs_for("MB", "diagonal", "iNMF", data_path=tmp_path, check=True)
     msg = str(e.value)
     assert "atac_gas2.h5" in msg and "another order than atac_peak2.h5" in msg
     assert "atac_cty2.csv follows atac_peak2.h5" in msg
     # GLUE reads the peak files, which the labels follow
-    mtb.inputs_for("MB", "diagonal", "GLUE", data_path=tmp_path, check=True)
+    mtb.engine.resolve.inputs_for("MB", "diagonal", "GLUE", data_path=tmp_path, check=True)
 
 
 # ------------------------------------------------------------------------ layout
@@ -303,13 +303,13 @@ def test_export_writes_one_diagonal_batch_per_call(tmp_path, no_envs, kind, role
         assert len(pd.read_csv(out / f"atac_cty{i}.csv")) == n_atac
         with h5py.File(out / f"{role}{i}.h5") as f:
             assert f["matrix/barcodes"].shape == (n_atac,)
-    assert list(mtb.labels_for("MINE", data_path=tmp_path)) == ORDER
+    assert list(mtb.engine.resolve.labels_for("MINE", data_path=tmp_path)) == ORDER
     sc = full_scan("MINE", "diagonal", data_path=tmp_path, verbose=False)
     assert set(sc[sc.files_ok].method) == set(readers)
     several = sc[sc.files_ok].modalities.str.contains(f"{role}3")
     assert bool(several.all())
     for m in readers:
-        assert list(mtb.labels_for("MINE", "diagonal", m, data_path=tmp_path)) == ORDER
+        assert list(mtb.engine.resolve.labels_for("MINE", "diagonal", m, data_path=tmp_path)) == ORDER
 
 
 def test_export_of_a_diagonal_batch_keeps_the_other_batches_and_refuses_to_replace(tmp_path):

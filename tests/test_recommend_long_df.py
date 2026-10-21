@@ -27,7 +27,3 @@ def test_the_order_is_the_bubble_order_for_the_same_metrics(category, metrics):
     assert list(ranked.dropna(subset=["grand_score"])["method"]) == drawn
 
 
-def test_min_methods_is_deprecated_and_changes_nothing():
-    with pytest.warns(FutureWarning, match=r"recommend\(min_methods=\) is deprecated"):
-        old = mtb.recommend("vertical", min_methods=5)
-    pd.testing.assert_frame_equal(old, mtb.recommend("vertical"))

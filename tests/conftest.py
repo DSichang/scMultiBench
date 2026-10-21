@@ -211,3 +211,15 @@ def _no_archive_download(monkeypatch):
 def _fresh_session_notes(monkeypatch):
     from multibench.engine import resolve
     monkeypatch.setattr(resolve, "_ORDER_NOTED", set())
+
+
+# ---- the settings a test changes are put back --------------------------------
+# A dataset folder outside the data root is given by its path, or by setting
+# mtb.config.DEFAULT.data_path in the test; the settings are restored after it.
+@_pytest.fixture(autouse=True)
+def _restore_config():
+    from multibench import config
+    saved = dict(vars(config.DEFAULT))
+    yield
+    vars(config.DEFAULT).clear()
+    vars(config.DEFAULT).update(saved)

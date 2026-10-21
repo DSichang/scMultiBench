@@ -152,26 +152,6 @@ def test_the_scores_no_longer_follow_the_row_order_of_the_label_file(tmp_path, c
     assert same["value"].tolist() == moved["value"].tolist() == [1.0, 1.0]
 
 
-def test_batch_and_clustering_files_and_a_series_are_matched_too(tmp_path, capsys, seen):
-    emb = _emb(tmp_path)
-    donors = np.array(["d1", "d2"] * (CELLS // 2))
-    clusters = pd.Categorical(TYPES).codes
-    other = PERM[::-1]
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        # clustering= is deprecated since 0.4: its implementation, without the warning
-        pipeline._evaluate(emb, labels=pd.Series(TYPES, index=BARS).iloc[PERM],
-                           batch=_labels(tmp_path, "batch.csv", other, donors,
-                                         column="donor"),
-                           clustering=_labels(tmp_path, "clusters.csv", PERM, clusters,
-                                              column="leiden"), metrics="all")
-    assert capsys.readouterr().err == (
-        "evaluate: matched the labels Series and 2 more to the rows of emb.csv by "
-        "barcode.\n")
-    assert seen["labels"] == list(TYPES) and seen["batch"] == list(donors)
-    assert seen["clustering"] == list(clusters)
-
-
 def test_several_label_files_are_matched_by_their_barcodes(tmp_path, capsys, seen):
     emb = _emb(tmp_path)
     half = CELLS // 2
@@ -437,7 +417,8 @@ def test_method_runs_are_scored_in_file_order_as_before(cite, tmp_path, monkeypa
                         lambda *a, **k: pytest.fail("a CSV embedding was read"))
     monkeypatch.setattr(pipeline, "_Table",
                         lambda *a, **k: pytest.fail("cell ids from a CSV embedding"))
-    kw = dict(methods=["Matilda"], modalities=["rna", "adt"], data_path=data, verbose=False)
+    mtb.config.DEFAULT.data_path = data
+    kw = dict(methods=['Matilda'], modalities=['rna', 'adt'], verbose=False)
     plain = mtb.run_all("MYCITE", "vertical", out_dir=tmp_path / "plain", **kw)
     scores = plain.summary.loc[0, ["ARI", "NMI"]].tolist()
     assert plain.summary.loc[0, "status"] == "scored" and scores == [1.0, 1.0]

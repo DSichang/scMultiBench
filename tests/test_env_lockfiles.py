@@ -1,30 +1,33 @@
 """Every environment a method needs must be buildable from a committed lockfile.
 
-`multibench env install --run` is the whole story for someone setting this up on
-a new machine. An env with no lockfile is silently unbuildable there: env doctor
-shows it as "[!] missing, no lockfile" and the reviewer has no route forward.
+``mtb.env.install(build=True)`` builds from them on a new machine. An env with
+no lockfile is silently unbuildable there.
 
 One env was in exactly that state - it had no lockfile - and nothing in the
 suite would have caught it.
 """
 
-from multibench.engine import envs
+from multibench.engine import envs, registry
+
+
+def _required():
+    return {envs.group_for(m) for m in registry.list_methods()}
 
 
 def test_every_required_env_has_a_lockfile():
-    required = set(envs.required_envs())
+    required = _required()
     assert required, "no envs reported as required - the registry looks empty"
     missing = sorted(e for e in required if envs.lockfile(e) is None)
     assert not missing, (
         f"{len(missing)} of {len(required)} required envs have no committed "
-        f"lockfile, so `multibench env install --run` cannot build them: {missing}. "
-        f"Capture each with `multibench env freeze <env>`.")
+        f"lockfile, so mtb.env.install(build=True) cannot build them: {missing}. "
+        f"Capture each with envs.freeze(<env>).")
 
 
 def test_lockfiles_are_substantive():
     """A truncated or empty lockfile fails at install time, not at freeze time."""
     thin = []
-    for env in sorted(set(envs.required_envs())):
+    for env in sorted(_required()):
         lock = envs.lockfile(env)
         if lock is None:
             continue

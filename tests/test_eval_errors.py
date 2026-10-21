@@ -28,11 +28,9 @@ def test_metrics_token_typo_is_a_value_error_listing_valid_values():
     with pytest.raises(ValueError, match=r"Unknown metrics= token clusterin\. Pass 'all', "
                                          r"'clustering', 'batch' or 'classification'"):
         evaluate(emb, labels=lab, metrics="clusterin")
-    # a declared benchmark task is not a metric family: the error says which
-    # slot this is, without the word "v1"
-    with pytest.raises(ValueError, match=r"selects a metric family, not a task\.") as e:
+    with pytest.raises(ValueError, match=r"Unknown metrics= token dimension_reduction\.") as e:
         evaluate(emb, labels=lab, metrics="dimension_reduction")
-    assert "dimension_reduction" in str(e.value) and "v1" not in str(e.value)
+    assert "v1" not in str(e.value)
 
 
 def test_metrics_family_token_and_code_list_agree():
@@ -89,33 +87,6 @@ def test_input_matrix_passed_as_output_is_explained(tmp_path):
     assert "input matrix" not in str(e2.value)
     with pytest.raises(ValueError, match="/obs/cluster_leiden"):
         eio.read_clustering(g2)
-
-
-def test_verbose_sweep_notice(capsys, monkeypatch):
-    from multibench.eval import scib as mscib
-    assert mscib._SWEEP_NOTICE_CELLS == 2000
-    emb, lab = _blobs()
-    evaluate(emb, labels=lab, metrics=["ARI"])            # 120 cells: below the threshold, quiet
-    assert "Leiden" not in capsys.readouterr().err
-    monkeypatch.setattr(mscib, "_SWEEP_NOTICE_CELLS", 0)  # every sweep now counts as long
-    evaluate(emb, labels=lab, metrics=["ARI"])            # default verbose=True announces it
-    err = capsys.readouterr().err
-    # 0.4.0: the line has no "To skip it" sentence
-    assert re.fullmatch(r"Clustering 120 cells for ARI with the "
-                        r"(igraph|leidenalg) Leiden backend\.\n", err)
-    # with batches, the batch clusters are named; clustering= (deprecated since
-    # 0.4) through its implementation
-    pipeline._evaluate(emb, labels=lab, clustering=lab, batch=np.arange(len(lab)) % 2,
-                       metrics=["NMI_batch"])
-    err = capsys.readouterr().err
-    assert "Clustering 120 cells for NMI_batch with the " in err
-    assert err.rstrip().endswith("Leiden backend.")
-    pipeline._evaluate(emb, labels=lab, clustering=lab)   # nothing left to cluster
-    assert "Leiden" not in capsys.readouterr().err
-    evaluate(emb, labels=lab, metrics=["ARI"], verbose=False)
-    assert "Leiden" not in capsys.readouterr().err
-    evaluate(emb, labels=lab, metrics=["cLISI"])          # no clustering needed
-    assert "Leiden" not in capsys.readouterr().err
 
 
 def test_docstrings_match_the_code():

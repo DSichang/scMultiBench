@@ -437,11 +437,6 @@ MUDATA_NOTE = ("A 10x Multiome MuData goes in with one call. Here the labels are
                "                      atac_kind=\"peak\", labels=\"obs:celltype\",\n"
                "                      category=\"vertical\")\n"
                "```")
-DIAG_CLI = ("The command line writes the same folder from the two files:\n\n"
-            "```\n"
-            "multibench export my_rna.h5ad mydata/{name} --atac-from my_atac.h5ad \\\n"
-            "    --atac-kind gene_activity --labels obs:celltype --category diagonal\n"
-            "```")
 DIAG_ONE_SIDE = ("`labels=` needs the column in both files. With cell types for the RNA "
                  "cells only, leave `labels=` out and follow the recipe for no labels.")
 DIAG_PEAK = ("For ATAC as a peak matrix, pass `atac_kind=\"peak\"`. {peak_only} read "
@@ -452,8 +447,7 @@ MULTI_NUMBERING = ("The RNA batches and the ATAC batches are numbered separately
 MULTI_PEAK = ("For ATAC as a peak matrix, pass `atac_kind=\"peak\"`. {multi_peak} "
               "the peak matrix.")
 MOSAIC_LAYOUT = ("`mtb.describe_layout(\"mosaic\")` lists the batch patterns and the methods "
-                 "that accept each one. The command line writes one batch per call with "
-                 "`multibench export ... --category mosaic --batch-index N`.")
+                 "that accept each one.")
 MOSAIC_ONE_FILE = ("A batch with RNA and ADT in one file goes in with a selector, for "
                    "example `adt=\"obsm:protein\"`.")
 CROSS_ORDER = ("The batches are numbered in the sorted order of their names, read as text: "
@@ -615,7 +609,7 @@ mtb.io.export_dataset(rna, "mydata/" + NAME,
                       atac_kind="gene_activity",  # <- or "peak"
                       labels="obs:celltype",      # <- the column in both files
                       category="diagonal", overwrite=True)''',
-   notes=[DIAG_CLI, DIAG_ONE_SIDE, DIAG_PEAK],
+   notes=[DIAG_ONE_SIDE, DIAG_PEAK],
  ),
  "diagonal_multi": dict(
    name="MYDIAG_BATCHES",
@@ -1143,9 +1137,7 @@ def build_tutorial(key):
         "was already there. With `dry_run=True`, `mtb.env.install` downloads "
         "nothing and returns the plan with its sizes.",
         "Environments go to `mtb.config.DEFAULT.envs_dir`. To use another disk, set it "
-        "before this cell.",
-        f"From a terminal, `multibench env install --methods {','.join(methods)}` "
-        f"does the same."))
+        "before this cell."))
     code(f'''import pandas as pd
 import multibench as mtb
 

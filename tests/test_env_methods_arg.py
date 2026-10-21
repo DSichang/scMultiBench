@@ -1,4 +1,4 @@
-"""``mtb.env.plan`` / ``install`` / ``doctor`` take ``methods`` as a list.
+"""``mtb.env.install`` takes ``methods`` as a list.
 
 A bare string was iterated character by character: ``methods='Matilda'``
 failed with ``unknown method 'M'``. It now raises the ``TypeError``
@@ -10,10 +10,8 @@ import pytest
 import multibench as mtb
 
 CALLS = {
-    "plan": lambda m: mtb.env.plan(methods=m),
     "install": lambda m: mtb.env.install(m, dry_run=True).to_dict("records"),                # the default dry run
     "install(methods=)": lambda m: mtb.env.install(methods=m, dry_run=True).to_dict("records"),
-    "doctor": lambda m: mtb.env.doctor(methods=m).to_dict("records"),
 }
 
 

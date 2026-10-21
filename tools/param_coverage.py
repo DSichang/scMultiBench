@@ -24,7 +24,7 @@ def norm(s):
 
 
 rows = []
-for m in sorted(mtb.list_methods()):
+for m in sorted(mtb.find_methods()):
     spec = registry.get(m)
     ours = set()
     for v in spec.variants:

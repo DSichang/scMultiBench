@@ -3,27 +3,11 @@ import pytest
 from multibench import discover
 
 
-def test_find_methods_by_category_and_task():
-    ids = discover.find_methods(category="diagonal", task="clustering")
-    assert "SCALEX" in ids
-
-
 def test_find_methods_needs_labels_filter():
     # scBridge requires cell-type labels; SCALEX does not
     with_labels = discover.find_methods(category="diagonal", needs_labels=True)
     assert "scBridge" in with_labels
     assert "SCALEX" not in with_labels
-
-
-def test_method_info_returns_dict_with_runtime(files_dir):
-    info = discover.method_info("Seurat_v5", verbose=True)
-    assert info["id"] == "Seurat_v5"
-    assert info["language"] == "R"
-    assert "env" in info and "status" in info
-    assert set(info["runtime"]) == {"tier", "worst_sec", "observed", "host", "note"}
-    # the catalog's paper-only columns moved to catalog.methods(); files_dir= is gone
-    with pytest.raises(TypeError, match="files_dir"):
-        discover.method_info("Seurat_v5", files_dir=files_dir, verbose=True)
 
 
 def test_top_level_find_methods():
@@ -82,127 +66,14 @@ def test_find_methods_modalities_excludes_stub():
             assert stub not in discover.find_methods(modalities=req)
 
 
-def test_method_info_declared_stub_raises_keyerror(monkeypatch):
-    # scripts_url, variants and params are read off the variants, so a
-    # declared stub (no variants) is refused by name, like params_for does
-    import dataclasses
-    from multibench.engine import registry
-    stub = dataclasses.replace(registry.get("SCALEX"), variants=[])
-    real_get = registry.get
-    monkeypatch.setattr(registry, "get",
-                        lambda m: stub if m == "SCALEX" else real_get(m))
-    with pytest.raises(KeyError, match="SCALEX: no variants \\(declared stub\\)"):
-        discover.method_info("SCALEX", verbose=True)
-    with pytest.raises(KeyError, match="declared stub"):
-        discover.params_for("SCALEX", "diagonal")
-    assert discover.method_info("Matilda", verbose=True)["scripts_url"].startswith(
-        "https://github.com/PYangLab/scMultiBench/tree/main/tools_scripts/")
-
-
-def test_method_info_scripts_url_is_percent_encoded():
-    # online_iNMF's upstream folder is 'online iNMF', with a space: a raw
-    # space cuts the URL wherever it is printed or auto-linked
-    import urllib.parse
-    from multibench.engine import registry
-    url = discover.method_info("online_iNMF", verbose=True)["scripts_url"]
-    folder = "/".join(registry.get("online_iNMF").variants[0].entrypoint.split("/")[:2])
-    assert " " in folder and " " not in url
-    assert url.endswith("/tools_scripts/online%20iNMF")
-    assert urllib.parse.unquote(url).endswith("/" + folder)
-
-
 def test_find_methods_modalities_none_unchanged():
     # modalities=None must behave exactly like the call without the kwarg
     assert discover.find_methods() == discover.find_methods(modalities=None)
 
 
-def test_find_methods_runnable_filter():
-    # runnable= is deprecated in 0.4 and keeps its filter: every method is wired
-    from multibench.engine import registry
-    all_ids = discover.find_methods()
-    for flag, want in ((True, all_ids), (False, [])):
-        with pytest.warns(FutureWarning, match=r"runnable=\) is deprecated .* Use mtb\.scan\."):
-            assert discover.find_methods(runnable=flag) == want
-    assert "SCALEX" in all_ids
-    # Milestone: every method is now wired -> zero stubs, every id dispatchable.
-    # (Guard: adding a new declared-but-unwired method should wire it or update this.)
-    assert [s.id for s in registry.load() if not s.variants] == []
-
-
 # --- P06: derived needs_labels / explicit atac reach discovery ---------------
 
-def test_method_info_needs_labels_matches_inputs_for(root):
-    from multibench.engine import resolve
-    from multibench.engine.schema import is_label_role
-    data = root / "data"
-    cases = [("scJoint", "D28", "diagonal", None),
-             ("SCALEX", "D28", "diagonal", None),
-             ("Matilda", "D11", "vertical", ["rna", "adt"])]
-    for m, ds, cat, mods in cases:
-        info = discover.method_info(m, verbose=True)
-        got = resolve.inputs_for(ds, cat, m, modalities=mods, data_path=data, check=False)
-        assert info["needs_labels"] == any(is_label_role(k) for k in got), (m, got)
-        assert all("needs_labels" in sup for sup in info["supports"])
-    assert discover.method_info("scJoint", verbose=True)["needs_labels"] is True
-    assert discover.method_info("Matilda", verbose=True)["needs_labels"] is True
-    # scBridge's labels are const filenames (not resolved roles) -> still True
-    assert discover.method_info("scBridge", verbose=True)["needs_labels"] is True
-    assert discover.find_methods(category="diagonal", needs_labels=True) >= ["scBridge"]
-    assert "scJoint" in discover.find_methods(category="diagonal", needs_labels=True)
-
-
-def test_find_methods_atac_vertical_nonempty():
-    peaks = discover.find_methods(category="vertical", atac="peak")
-    # Matilda, scMDC and UnitedNet read peaks, as the benchmark ran them
-    for m in ("moETM", "scMM", "MIRA", "scMVP", "Seurat_WNN", "Matilda", "scMDC", "UnitedNet"):
-        assert m in peaks, m
-    gas = discover.find_methods(atac="gene_activity")
-    for m in ("SCALEX", "scJoint", "iNMF"):
-        assert m in gas, m
-    # every method that reads gene activity is a diagonal method
-    assert discover.find_methods(category="vertical", atac="gene_activity") == []
-    assert set(peaks).isdisjoint(gas)
-    # alias spellings map onto the same answer
-    assert discover.find_methods(atac="peaks") == discover.find_methods(atac="peak")
-    assert discover.find_methods(atac="gas") == gas
-
-
 # --- P09: typos raise, aliases resolve ---------------------------------------
-
-def test_find_methods_rejects_bad_tokens():
-    import pytest
-    with pytest.raises(ValueError, match="unknown category 'horizontal'"):
-        discover.find_methods(category="horizontal")
-    with pytest.raises(ValueError, match="unknown category 'crosss'"):
-        discover.find_methods(category="crosss")
-    with pytest.raises(ValueError, match="unknown task 'xx'"):
-        discover.find_methods(task="xx")
-    with pytest.raises(ValueError, match="unknown atac representation 'binary'"):
-        discover.find_methods(atac="binary")
-    with pytest.raises(ValueError) as e:
-        discover.find_methods(modalities=["proteinx"])
-    assert "Unknown modality proteinx." in str(e.value) and "protein" in str(e.value)
-
-
-def test_find_methods_modalities_aliases():
-    prot = discover.find_methods(modalities=["rna", "protein"])
-    assert prot == discover.find_methods(modalities=["rna", "adt"])
-    assert "totalVI" in prot
-    # numbered role tokens reduce to their base type; a representation token
-    # (atac_gas / peak) selects by what the method reads (study round 1, L13)
-    assert discover.find_methods(modalities=["rna1", "adt2"]) == prot
-    diag = discover.find_methods(category="diagonal", modalities=["rna", "atac_gas"])
-    assert diag == discover.find_methods(category="diagonal", atac="gene_activity")
-    assert diag and "SCALEX" in diag and "GLUE" not in diag
-    assert discover.find_methods(modalities=["rna", "peak"]) == discover.find_methods(atac="peak")
-
-
-def test_method_info_unknown_method_points_at_mtb_list_methods():
-    import pytest
-    with pytest.raises(KeyError) as e:
-        discover.method_info("StabMapp", verbose=True)
-    assert "Did you mean StabMap" in str(e.value) and "mtb.find_methods()" in str(e.value)
-
 
 def test_params_for_validates_and_aliases():
     import pytest

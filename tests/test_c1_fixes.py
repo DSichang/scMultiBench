@@ -39,16 +39,6 @@ def test_kept_docstrings_name_no_cut_name():
     assert {n: h for n, h in hits.items() if h} == {}
 
 
-def test_the_packed_warning_says_what_it_does():
-    with pytest.warns(FutureWarning, match=r"env\.install\(packed=\) is deprecated and will "
-                      r"be removed in 0\.5; packed=True has no effect, and packed=False is "
-                      r"build=True\."):
-        try:
-            mtb.env.install(["Matilda"], packed=True, dry_run=True)
-        except OSError:
-            pass
-
-
 def test_params_for_returns_the_parameters_the_variants_share():
     p = mtb.params_for("Matilda")
     assert "epochs" in p["tunable"] and p["variant"].count("vertical:") == 3

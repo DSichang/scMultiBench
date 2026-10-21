@@ -22,6 +22,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import os
+
 import multibench as mtb
 from multibench.engine import registry
 from tests.conftest import full_scan
@@ -66,34 +68,8 @@ def test_scan_and_find_methods_read_two_representations_alike(root):
     sc = full_scan("D28", "diagonal", modalities=mods, data_path=root / "data",
                   verbose=False)
     assert set(sc["method"]) == want
-    plan = mtb.run_all("D28", "diagonal", modalities=mods, data_path=root / "data",
-                       dry_run=True)
+    plan = mtb.run_all(os.path.join(root / 'data', 'D28'), 'diagonal', modalities=mods, dry_run=True)
     assert set(plan["method"]) == want
-
-
-def test_scan_and_find_methods_agree_per_representation(root):
-    for mods, atac in ((["rna", "atac_peak"], "peak"), (["rna", "atac_gas"], "gene_activity")):
-        sc = full_scan("D28", "diagonal", modalities=mods, data_path=root / "data",
-                      verbose=False)
-        # scBridge is fed a folder: no modality token selects it in scan
-        want = set(mtb.find_methods("diagonal", atac=atac)) - {"scBridge"}
-        assert set(sc["method"]) == want, mods
-
-
-def test_a_constant_placeholder_is_not_a_modality_the_variant_reads():
-    wnn = registry.get("Seurat_WNN")
-    by_mods = {tuple(v.when["modalities"]): v for v in wnn.variants}
-    assert by_mods[("rna", "adt")].modality_types == {"rna", "adt"}
-    assert by_mods[("rna", "atac")].modality_types == {"rna", "atac"}
-    assert not by_mods[("rna", "adt")].consumes_atac
-    # the rna+adt variant reads no ATAC, so it cannot satisfy atac='peak'
-    assert "Seurat_WNN" not in mtb.find_methods("vertical", modalities=["rna", "adt"],
-                                                atac="peak")
-    assert "Seurat_WNN" in mtb.find_methods("vertical", modalities=["rna", "atac"],
-                                            atac="peak")
-    assert "Seurat_WNN" in mtb.find_methods("vertical", modalities=["rna", "adt"])
-    # scBridge's constant file names still count: it reads rna.h5 and atac_gas.h5
-    assert registry.get("scBridge").modality_types == {"rna", "atac"}
 
 
 def test_scan_has_no_setup_note_for_the_checked_bridge_requirement(root):
@@ -133,7 +109,7 @@ def test_off_linux_messages_say_to_make_the_commands_on_the_linux_machine(
             "Linux machine.") in out
 
     with pytest.raises(OSError) as e:
-        mtb.run("totalVI", "vertical", inputs=mtb.inputs_for("D11", "vertical", "totalVI"),
+        mtb.engine.runner.run("totalVI", "vertical", inputs=mtb.engine.resolve.inputs_for("D11", "vertical", "totalVI"),
                 out_dir=str(tmp_path / "out"))
     msg = str(e.value)
     assert ("Run this call on a Linux machine. dry_run=True previews the method's "

@@ -117,18 +117,6 @@ def test_correctness_facts_are_visible(key):
     assert re.search(r"Your data needs raw [A-Za-z ]*counts", _visible(own)), own
 
 
-def test_diagonal_title_names_the_atac_form_of_each_method():
-    """Which ATAC form a diagonal method reads is visible in the first cell,
-    read from the registry: every peak-reading method is named there."""
-    import multibench as mtb
-    title = _visible(_cells("tutorial_diagonal_rna_atac")[0][1])
-    # the lookup call: describe_layout lists each method under the ATAC files
-    # it needs (round 7; method_info(m)["atac"] lists MultiMAP under peak)
-    assert "gene-activity scores" in title and 'mtb.describe_layout("diagonal")' in title
-    for m in mtb.find_methods("diagonal", atac="peak"):
-        assert m in title, f"diagonal title does not name {m}, which reads peaks"
-
-
 def _holds_atac(key):
     return any(r.startswith("atac") for v in GEN.TASKS[key]["variants"] for r in v)
 
@@ -197,86 +185,6 @@ EXPECTED_FILES = {
     "cross_rna_adt_atac": ["adt1.h5", "adt2.h5", "atac_peak1.h5", "atac_peak2.h5",
                            "cty1.csv", "cty2.csv", "rna1.h5", "rna2.h5"],
 }
-
-
-def _own_data_cells(key):
-    """Section 5's code up to the export: the cell that writes the example
-    files, the cell that reads them and the cell of export calls. The check
-    of the folder and ``run_all`` on it have a cell each, and take the folder
-    from ``NAME``, which the export cell sets."""
-    code = [src for kind, src in _cells(f"tutorial_{key}") if kind == "code"]
-    i = next(i for i, src in enumerate(code) if "mtb.io.export_dataset(" in src)
-    assert "run_all" not in code[i], code[i]
-    assert code[i].startswith(f'NAME = "{GEN.OWN[key]["name"]}"'), code[i]
-    assert code[i + 1].startswith("mtb.scan(\"mydata/\" + NAME, "), code[i + 1]
-    assert code[i + 2].startswith("mine = mtb.run_all(\"mydata/\" + NAME, "), code[i + 2]
-    assert code[i - 2] == f'mtb.data.write_example("{GEN.TASKS[key]["ds"]}")', code[i - 2]
-    return code[i - 2], code[i - 1], code[i]
-
-
-@pytest.mark.parametrize("key", KEYS)
-def test_own_data_demo_writes_the_folder_with_export_dataset(key, tmp_path, monkeypatch):
-    """Each demo writes its folder through export_dataset alone - diagonal
-    with category='diagonal' (several batches: one call per batch with
-    batch_index=), mosaic one call per batch with batch_index= -
-    with no hand-written file, no multibench warning, and a folder on which
-    scan finds the input files of the tutorial's methods."""
-    import multibench as mtb
-    import pandas as pd
-    t = GEN.TASKS[key]
-    cat = t["cat"]
-    if not (mtb.config.DEFAULT.data_path / t["ds"]).is_dir():
-        pytest.skip(f"{t['ds']} is not on disk")
-    example, read, export = _own_data_cells(key)
-    calls = [n for n in ast.walk(ast.parse(export)) if isinstance(n, ast.Call)]
-    names = {ast.unparse(n.func) for n in calls}
-    assert "mtb.io.to_canonical" not in names and not any(n.endswith("to_csv") for n in names), \
-        f"{key}: the demo writes files by hand instead of through export_dataset"
-    exports = [n for n in calls if ast.unparse(n.func) == "mtb.io.export_dataset"]
-    kws = [{k.arg: ast.unparse(k.value) for k in n.keywords} for n in exports]
-    if cat == "diagonal":
-        assert len(exports) == 1 and kws[0]["category"] == "'diagonal'" and "atac" in kws[0]
-        # several batches: the one call sits in a loop over the batch number
-        assert ("batch_index" in kws[0]) == (key == "diagonal_multi")
-    if cat == "mosaic":
-        assert [k.get("batch_index") for k in kws] == ["1", "2", "3"]
-    monkeypatch.chdir(tmp_path)
-    ns = {"mtb": mtb, "pd": pd}
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        exec(compile(example, f"tutorial_{key}", "exec"), ns)
-        exec(compile(read, f"tutorial_{key}", "exec"), ns)
-    with warnings.catch_warnings(record=True) as seen:
-        warnings.simplefilter("always")
-        exec(compile(export, f"tutorial_{key}", "exec"), ns)
-    ours = [str(w.message) for w in seen if "multibench" in (w.filename or "")
-            or issubclass(w.category, UserWarning)]
-    assert not ours, f"{key}: the demo warns: {ours}"
-    own = GEN.OWN[key]["name"]
-    folder = tmp_path / "mydata" / own
-    assert sorted(f.name for f in folder.iterdir()) == EXPECTED_FILES[key]
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        frame = full_scan(own, cat, data_path=tmp_path / "mydata", verbose=False)
-    ok = set(frame[frame.files_ok].method)
-    assert set(t["methods"]) <= ok
-    everyone = set(GEN.task_methods(key))
-    if key == "vertical_rna_adt_atac":
-        # RNA, ADT and ATAC of the same cells also hold the files of the two
-        # smaller vertical tasks
-        assert everyone <= ok
-    elif key == "cross_rna_adt_atac":
-        # two batches with RNA, ADT and ATAC also hold the files of UINMF's
-        # two-batch variants of the smaller cross tasks
-        assert ok == everyone | {"UINMF"}
-    elif key == "diagonal_rna_atac":
-        # the folder holds gene activity only: the peak readers lack a file
-        assert ok == set(mtb.find_methods("diagonal", atac="gene_activity")) < everyone
-    elif key == "diagonal_multi":
-        gas = {m for m, v in GEN.task_variants(key) if "atac_gas1" in v.when["modalities"]}
-        assert ok == gas < everyone
-    else:
-        assert ok == everyone
 
 
 # ------------------------------------------------------------- the generator

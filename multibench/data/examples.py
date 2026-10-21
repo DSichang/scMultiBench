@@ -12,8 +12,6 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from .. import _compat
-from .fetch import DATA_KEYWORDS
 
 __all__ = ["write_example"]
 
@@ -247,7 +245,6 @@ def _write_marked(adata, target: Path, mark: str) -> None:
         raise
 
 
-@_compat.keywords("data.write_example", private="_write_example", kept=DATA_KEYWORDS)
 def write_example(dataset: str, folder: Path | str = ".", *, verbose: bool = True) -> None:
     """Write the example files of a tutorial dataset as .h5ad files.
 
@@ -287,20 +284,13 @@ def write_example(dataset: str, folder: Path | str = ".", *, verbose: bool = Tru
     mtb.data.fetch : download the dataset that the example is made from.
     mtb.io.export_dataset : write the objects read from the files as a dataset folder.
     """
-    return _write_example(dataset, folder, verbose=verbose)
-
-
-def _write_example(dataset: str, folder: Path | str = ".", *, data_path=None,
-                   quiet: bool = False, verbose: bool = True) -> None:
-    """:func:`write_example`, with the deprecated ``data_path=`` and ``quiet=``."""
     from .. import __version__, config
-    quiet = quiet or not verbose
     from ..engine.ingest import read_canonical
 
     if dataset not in EXAMPLES:
         raise ValueError(f"No example is defined for {dataset!r}. Examples exist for "
                          f"{', '.join(EXAMPLES)}.")
-    root = Path(data_path) if data_path is not None else config.DEFAULT.data_path
+    root = Path(config.DEFAULT.data_path)
     if not (root / dataset).is_dir():
         raise FileNotFoundError(f"{root / dataset} does not exist. Run "
                                 f"mtb.data.fetch({dataset!r}) first.")
@@ -346,5 +336,5 @@ def _write_example(dataset: str, folder: Path | str = ".", *, data_path=None,
             parts = [what, 'cell types in obs["celltype"]'] \
                 + (['batches in obs["batch"]'] if "batch" in a.obs else [])
             line = f"wrote {target}: {a.n_obs:,} cells. {', '.join(parts)}."
-        if not quiet:
+        if verbose:
             print(line)

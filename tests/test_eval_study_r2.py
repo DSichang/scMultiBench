@@ -21,33 +21,7 @@ from multibench.eval import pipeline
 pytest.importorskip("scib")
 
 
-def _blobs(n_per=40, n_labels=3, dims=5, seed=0):
-    rng = np.random.default_rng(seed)
-    centres = rng.normal(0, 8, size=(n_labels, dims))
-    emb = np.vstack([centres[i] + rng.normal(0, 1, size=(n_per, dims))
-                     for i in range(n_labels)])
-    lab = np.array([f"t{i}" for i in range(n_labels) for _ in range(n_per)])
-    return emb, lab
-
-
-def _user_warnings(fn, *args, **kw):
-    with warnings.catch_warnings(record=True) as rec:
-        warnings.simplefilter("always")
-        out = fn(*args, **kw)
-    return out, [str(w.message) for w in rec if issubclass(w.category, UserWarning)]
-
-
 # --- M34 ---------------------------------------------------------------------
-
-def test_evaluate_records_the_installed_scib():
-    emb, lab = _blobs()
-    wide = mtb.evaluate(emb, labels=lab, metrics=["cLISI"])
-    assert wide.attrs["scib_version"] == version("scib")
-    long = mtb.to_long(wide, method="M")
-    assert long.attrs["scib_version"] == version("scib")
-    # scored_with keeps its three parts
-    assert long["scored_with"].iloc[0] == f"none/none/{mtb.__version__}"
-
 
 def test_evaluate_notes_name_each_neighbourhood():
     doc = " ".join(inspect.getdoc(pipeline.evaluate).split())
@@ -90,21 +64,3 @@ def test_catalog_describes_clisi_in_plain_direction():
 
 # --- M35 ---------------------------------------------------------------------
 
-def test_wide_csv_read_back_is_marked_unknown(tmp_path):
-    emb, lab = _blobs()
-    # the wide frame evaluate returned before 0.4, as a CSV saved then holds it
-    pipeline._scores(emb, labels=lab, metrics=["ASW"]).to_csv(tmp_path / "metric.csv")
-    back = pd.read_csv(tmp_path / "metric.csv", index_col=0)
-    long, msgs = _user_warnings(mtb.to_long, back, method="X", dataset="D11",
-                                category="vertical")
-    assert long.columns.tolist() == pipeline.LONG_COLUMNS + ["scored_with"]
-    assert set(long["scored_with"]) == {"unknown"}
-    assert msgs == []              # Z31 (r3): the scored_with column says it
-
-
-def test_evaluate_output_converts_without_a_warning():
-    emb, lab = _blobs()
-    wide = mtb.evaluate(emb, labels=lab, metrics=["ASW"])
-    long, msgs = _user_warnings(mtb.to_long, wide, method="X")
-    assert msgs == []
-    assert "unknown" not in set(long["scored_with"])

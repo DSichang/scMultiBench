@@ -19,20 +19,20 @@ ACCEPTS = ("it accepts ['augmentation', 'batch_size', 'epochs', 'hidden_adt', "
 
 def test_run_dry_run_refuses_an_unknown_key():
     with pytest.raises(KeyError) as e:
-        mtb.run("Matilda", "vertical", inputs=INPUTS, out_dir="/o", params={"epoch": 3},
+        mtb.engine.runner.run("Matilda", "vertical", inputs=INPUTS, out_dir="/o", params={"epoch": 3},
                 dry_run=True)
     assert e.value.args[0] == f"Matilda does not accept ['epoch']; {ACCEPTS}"
 
 
 def test_a_real_run_refuses_before_anything_is_written(tmp_path):
     with pytest.raises(KeyError, match=r"does not accept \['epoch'\]"):
-        mtb.run("Matilda", "vertical", inputs=INPUTS, out_dir=str(tmp_path / "o"),
+        mtb.engine.runner.run("Matilda", "vertical", inputs=INPUTS, out_dir=str(tmp_path / "o"),
                 params={"epoch": 3})
     assert not (tmp_path / "o").exists()
 
 
 def test_a_known_key_still_reaches_the_command():
-    argv = mtb.run("Matilda", "vertical", inputs=INPUTS, out_dir="/o", params={"epochs": 3},
+    argv = mtb.engine.runner.run("Matilda", "vertical", inputs=INPUTS, out_dir="/o", params={"epochs": 3},
                    dry_run=True)
     assert argv[-2:] == ["--epochs", "3"] or "--epochs" in argv
 

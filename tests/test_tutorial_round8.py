@@ -62,12 +62,6 @@ def _printed_strings(src):
     return out
 
 
-def _quiet(fn, *a, **kw):
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        return fn(*a, **kw)
-
-
 # ------------------------------------------------ R8-09 style: no ';' joins
 @pytest.mark.parametrize("name", NOTEBOOKS)
 def test_prose_joins_no_two_facts_with_a_semicolon(name):
@@ -96,43 +90,3 @@ def test_split_sentences_keep_their_facts():
         assert "`mtb.describe_layout(\"mosaic\")` lists the batch patterns" in md, key
 
 
-# ------------------------------------------ R8-04 guards: the named methods
-def _method_list(name):
-    """The list a notebook assigns to ``METHODS``."""
-    found = []
-    for kind, src in _cells(name):
-        if kind != "code" or "METHODS = " not in src:
-            continue
-        ipy = pytest.importorskip("IPython.core.inputtransformer2")
-        for node in ast.walk(ast.parse(ipy.TransformerManager().transform_cell(src))):
-            if isinstance(node, ast.Assign) and ast.unparse(node.targets[0]) == "METHODS":
-                found.append(ast.literal_eval(node.value))
-    assert len(found) == 1, name
-    return found[0]
-
-
-@pytest.mark.parametrize("key", KEYS)
-def test_run_cells_name_only_methods_with_a_variant_on_their_dataset(key):
-    """The run cell passes the notebook's method list to run_all on its
-    dataset. Since R8-04 a listed method with no variant there raises
-    ValueError, so every listed method must get a row. The tutorial lists its
-    default methods, and the ``_all`` notebook every method of the task."""
-    import multibench as mtb
-    t = GEN.TASKS[key]
-    cat, ds = t["cat"], t["ds"]
-    lists = {f"tutorial_{key}": t["methods"]}
-    if GEN.has_all(key):
-        lists[f"tutorial_{key}_all"] = GEN.task_methods(key)
-    for name, methods in lists.items():
-        assert _method_list(name) == methods, name
-    assert set(t["methods"]) <= set(GEN.task_methods(key))
-    if not (mtb.config.DEFAULT.data_path / ds).is_dir():
-        pytest.skip(f"{ds} is not on disk")
-    for name, methods in lists.items():
-        sc = _quiet(mtb.scan, ds, cat, methods=methods, verbose=False)
-        assert set(sc.method) == set(methods), (name, ds)
-    # the check the guard protects against: an off-category name raises
-    methods = t["methods"]
-    other = next(m for m in mtb.list_methods() if cat not in mtb.method_info(m)["categories"])
-    with pytest.raises(ValueError, match=rf"{re.escape(other)} does not run on {cat} data"):
-        _quiet(mtb.scan, ds, cat, methods=methods + [other], verbose=False)

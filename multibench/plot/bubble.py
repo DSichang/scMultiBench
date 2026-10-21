@@ -3,10 +3,8 @@
 Layout follows the benchmark paper's figures: each task family (clustering,
 batch correction, classification) is a colour-banded block - blues, greens and
 pinks respectively - preceded by an *Overall* column drawn as a horizontal bar whose length and
-colour both encode the family score. With ``aggregate="summary"`` (several
-datasets, the paper's panel c) every metric marker becomes such a bar too - the
-value is then the metric's rank averaged across datasets; with a single dataset
-the metric markers are circles (panel b). A missing value is drawn as a dash.
+colour both encode the family score. The metric markers are circles (the
+paper's panel b). A missing value is drawn as a dash.
 """
 from __future__ import annotations
 
@@ -18,7 +16,6 @@ import pandas as pd
 
 from . import style
 from .. import _compat
-from .. import config as _config
 from ..config import _and_list
 
 from ..data.catalog import FAMILY_METRICS as _FAMILY_METRICS
@@ -38,9 +35,6 @@ NA_MARK = "\u2013"
 
 #: second line of the Score legend title: the fill is scaled within each column
 SCORE_SCALE_NOTE = "(scaled per column)"
-
-#: the same note under a summary table, whose bars are mean ranks
-SUMMARY_SCALE_NOTE = "(mean rank over datasets, scaled per column)"
 
 #: the legend of the chips left of the rows
 LANGUAGE_NOTE = "Py / R: the method's language"
@@ -69,15 +63,15 @@ class FamilyBlock:
 
 @dataclass
 class BubbleTable:
-    """The numbers behind a bubble figure, as ``mtb.plot.build_table`` returns.
+    """The numbers behind a bubble figure (internal: ``mtb.plot.bubble`` builds
+    and draws it; ``mtb.recommend(category, long_df=...)`` gives its row order).
 
     Rows are ``methods``; the per-family matrices live in ``blocks``.
-    ``mtb.plot.bubble`` draws the same figure from the long table.
 
     Attributes
     ----------
     methods : list of str
-        Row order: best first, or the ``order`` methods first;
+        Row order: best first;
         ``methods.index(name) + 1`` is the row's position (1 = top).
     blocks : list of FamilyBlock
         One block per metric family present, in paper order: clustering
@@ -88,66 +82,33 @@ class BubbleTable:
         Per-column min-max values (method x metric) of all families, in
         figure order.
     raw : pandas.DataFrame
-        Unscaled matrix (method x metric) in figure order: metric means, or
-        mean within-dataset max-ranks under ``"summary"``.
+        Unscaled matrix (method x metric) in figure order: metric means.
     overall : pandas.Series
         The overall score per method, as ``mtb.recommend`` gives it; it sets
-        the row order unless ``order`` is given.
-    aggregate : str
-        ``"dataset"`` (metric markers are circles) or ``"summary"`` (bars,
-        the paper's panel c).
-    overall_basis : str
-        Formula behind the family Overall under ``"summary"``: ``"rank"`` or
-        ``"mean_overall"`` (the ``overall=`` of ``mtb.plot.bubble``).
+        the row order.
     datasets : tuple of str
         Dataset ids in the frame, sorted; ``()`` without a ``dataset`` column.
-    coverage : pandas.Series or None
-        Number of datasets each method has rows in; ``"summary"`` only,
-        else ``None``.
     method_datasets : dict or None
         ``{method: [dataset, ...]}`` from the frame; ``None`` without a
         ``dataset`` column.
     na_cells : list of str or None
-        The ``n/a`` cells: one line per family and method (per dataset and
-        method under ``"summary"``).
-
-    Examples
-    --------
-    >>> import multibench as mtb
-    >>> tbl = mtb.plot.build_table(mtb.load_results("vertical", dataset="D11"))
-    >>> tbl.methods[:3]                  # the best three methods
-
-    See Also
-    --------
-    mtb.plot.build_table : builds a table from a long table.
-    mtb.plot.bubble : builds the table and draws the figure in one call.
+        The ``n/a`` cells: one line per family and method.
     """
     methods: list
     blocks: list
     norm: pd.DataFrame
     raw: pd.DataFrame
     overall: pd.Series
-    aggregate: str = "dataset"
-    overall_basis: str = "rank"
     datasets: tuple = ()
-    coverage: object = None
     method_datasets: object = None
     na_cells: object = None
-
-    @property
-    def matrix(self) -> pd.DataFrame:
-        """Deprecated: ``norm``."""
-        _compat.deprecated("BubbleTable.matrix", _compat.use("BubbleTable.norm"))
-        return self.norm
 
     def __repr__(self) -> str:
         n = len(self.methods)
         head = ", ".join(map(str, self.methods[:5])) + (", ..." if n > 5 else "")
         fams = ", ".join(f"{b.label} ({b.raw.shape[1]})" for b in self.blocks)
         ds = ", ".join(self.datasets) if self.datasets else "one"
-        return (f"BubbleTable: {n} methods ({head}); families {fams}; "
-                f"datasets {ds}; aggregate={self.aggregate!r}, "
-                f"overall={self.overall_basis!r}")
+        return f"BubbleTable: {n} methods ({head}); families {fams}; datasets {ds}"
 
     @property
     def ranks(self) -> pd.DataFrame:
@@ -256,22 +217,8 @@ def _expand_families(metrics, available) -> list:
     return list(dict.fromkeys(out))
 
 
-#: accepted values of ``build_table(na=)`` / ``bubble(na=)``
-NA_POLICIES = ("skip", "warn", "raise")
-
-
-def build_table(long_df: pd.DataFrame, **kwargs) -> BubbleTable:
-    """Deprecated: ``mtb.recommend(category, long_df=...)`` gives the numbers
-    behind a figure."""
-    _compat.deprecated("plot.build_table", _compat.use("mtb.recommend(category, long_df=...)"))
-    return _build_table(long_df, **kwargs)
-
-
-def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=None,
-                 aggregate: str = "dataset", require_complete: bool = False,
-                 overall: str = "rank", na: str = "warn") -> BubbleTable:
-    """:func:`build_table`, with the deprecated ``na=`` of 0.3 (``"warn"``,
-    ``"skip"`` or ``"raise"`` for the ``n/a`` cells)."""
+def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None) -> BubbleTable:
+    """The :class:`BubbleTable` of ``long_df``, as :func:`bubble` draws it."""
     from ..data import catalog
 
     need = {"method", "metric", "value"}
@@ -284,15 +231,6 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=Non
         raise ValueError(
             f"bubble() needs a long table with columns "
             f"['method', 'metric', 'value']; missing {missing}.{hint}")
-    if aggregate not in ("dataset", "summary"):
-        raise ValueError(
-            f"aggregate must be 'dataset' or 'summary', got {aggregate!r}")
-    if overall not in style.OVERALL_BASES:
-        raise ValueError(
-            f"overall must be one of {list(style.OVERALL_BASES)}, got {overall!r}")
-    if na not in NA_POLICIES:
-        raise ValueError(f"na must be one of {list(NA_POLICIES)}, got {na!r}")
-
     df = long_df.copy()
     df = df.dropna(subset=["metric"])
     if methods is not None:
@@ -320,68 +258,19 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=Non
         method_datasets = {m: sorted(map(str, g["dataset"].dropna().unique()))
                            for m, g in df.groupby("method")}
 
-    datasets_per_method = None
-    parts = None
-    if aggregate == "summary":
-        parts = style.per_dataset_ranks(df)
-        n = len(parts)
-        datasets_per_method = style.coverage(parts)
-        if require_complete:
-            keep = datasets_per_method[datasets_per_method == n].index
-            if len(keep) == 0:
-                raise ValueError(
-                    f"No method has results on all {n} datasets "
-                    f"({', '.join(map(str, parts))}). "
-                    + "Pass require_complete=False.")
-            if len(keep) < len(datasets_per_method):
-                dropped = datasets_per_method[datasets_per_method < n].sort_values()
-                groups = {}
-                for m in dropped.index:
-                    lacks = tuple(ds for ds, mat in parts.items() if m not in mat.index)
-                    groups.setdefault(lacks, []).append(str(m))
-                n_dropped = len(dropped)
-                _compat.warn(
-                    "require_complete=True"
-                    + f" dropped {n_dropped} method{'' if n_dropped == 1 else 's'}: "
-                    + " ".join(f"{_and_distinct(ms)} lack{'s' if len(ms) == 1 else ''} "
-                               f"{_and_distinct(ds)}." for ds, ms in groups.items())
-                    + " " + "Pass require_complete=False"
-                    + " to keep them.",
-                    UserWarning)
-                df = df[df["method"].isin(keep)]
-                parts = style.per_dataset_ranks(df)
-                datasets_per_method = style.coverage(parts)
-        for msg in style.coverage_warnings(
-                parts, basis=overall,
-                incomplete_fix="Pass methods= with the methods scored on every dataset."):
+    if len(datasets) > 1:
+        # the per-dataset view, only to see which datasets share methods; the
+        # figure itself shows raw values
+        for msg in style.dataset_mode_warnings(style.per_dataset_ranks(df)):
             _compat.warn(msg, UserWarning)
-        lone = style.lone_message({ds: mat.attrs.get("lone", [])
-                                   for ds, mat in parts.items()})
-        if lone:
-            _compat.warn(lone, UserWarning)
-        raw_all = style.mean_rank_matrix(parts)
-    else:
-        if len(datasets) > 1:
-            # the same per-dataset view as the summary, only to see which
-            # datasets share methods; the figure itself shows raw values
-            for msg in style.dataset_mode_warnings(style.per_dataset_ranks(df)):
-                _compat.warn(msg, UserWarning)
-        raw_all = df.pivot_table(index="method", columns="metric", values="value",
-                                 aggfunc="mean")
+    raw_all = df.pivot_table(index="method", columns="metric", values="value",
+                             aggfunc="mean")
     backend = style.backend_warning(df)
     if backend:
         _compat.warn(backend, UserWarning)
 
     def _block(label, cmap, raw):
-        if aggregate == "dataset":
-            family_overall = style.overall(df, list(raw.columns)).reindex(raw.index)
-        elif overall == "mean_overall":
-            family_overall = pd.DataFrame({
-                ds: style.compute_overall(p[[c for c in raw.columns if c in p.columns]])
-                for ds, p in parts.items() if set(raw.columns) & set(p.columns)
-            }).mean(axis=1).reindex(raw.index)
-        else:
-            family_overall = style.compute_overall(raw)
+        family_overall = style.overall(df, list(raw.columns)).reindex(raw.index)
         return FamilyBlock(
             label=label, cmap=cmap, raw=raw,
             norm=raw.apply(lambda col: style.minmax(col.to_numpy()), axis=0),
@@ -411,19 +300,9 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=Non
     # a family some rows lack (classification of your rows next to stored rows
     # without it) is drawn, but counts in no row's Overall
     counted = [b for b in blocks if b.raw.notna().any(axis=1).all()] or blocks
-    if aggregate == "dataset":
-        combined = score
-    else:
-        combined = pd.concat([b.overall for b in counted], axis=1).mean(axis=1)
-        combined = combined.sort_values(ascending=False, kind="mergesort")
     # rows without a score (no metric the ranking uses) come last
-    ranked = list(combined.index) + sorted(set(raw_all.index) - set(combined.index), key=str)
-    combined = combined.reindex(ranked)
-    if order is not None:
-        order = _resolve(order, raw_all.index.tolist(), "method", catalog._canonical_id)
-        rows = order + [m for m in ranked if m not in order]
-    else:
-        rows = ranked
+    rows = list(score.index) + sorted(set(raw_all.index) - set(score.index), key=str)
+    combined = score.reindex(rows)
 
     for b in blocks:
         b.raw = b.raw.reindex(rows)
@@ -431,17 +310,14 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=Non
         b.ranks = b.ranks.reindex(rows)
         b.overall = b.overall.reindex(rows)
 
-    na_cells = _na_report(blocks, parts, aggregate)
+    na_cells = _na_report(blocks)
     # the n/a cells of a family that counts in no Overall need no words
-    missing = _na_missing(blocks if na == "raise" else counted, parts, aggregate)
-    if na_cells and na != "skip" and missing:
-        msg = _na_message(missing, df, aggregate, na)
-        if na == "raise":
-            raise ValueError(msg)
-        _compat.warn(msg, UserWarning)
+    missing = _na_missing(counted)
+    if na_cells and missing:
+        _compat.warn(_na_message(missing, df), UserWarning)
 
     drawn = pd.concat([b.raw for b in blocks], axis=1)
-    msg = _no_comparison_message(rows, style.constant_columns(drawn), aggregate,
+    msg = _no_comparison_message(rows, style.constant_columns(drawn),
                                  partial=set(drawn.columns[drawn.isna().any()]))
     if msg:
         _compat.warn(msg, UserWarning)
@@ -451,17 +327,13 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None, order=Non
         norm=pd.concat([b.norm for b in blocks], axis=1),
         raw=pd.concat([b.raw for b in blocks], axis=1),
         overall=combined.loc[rows],
-        aggregate=aggregate,
-        overall_basis=overall,
         datasets=datasets,
-        coverage=datasets_per_method,
         method_datasets=method_datasets,
         na_cells=na_cells,
     )
 
 
-def _no_comparison_message(methods, constant: dict, aggregate: str = "dataset",
-                           partial=frozenset()) -> str | None:
+def _no_comparison_message(methods, constant: dict, partial=frozenset()) -> str | None:
     """The warning for grey fills: one method, or the ``constant`` columns
     (``partial`` ones lack some values); ``None`` when there is none."""
     if len(methods) == 1:
@@ -472,15 +344,7 @@ def _no_comparison_message(methods, constant: dict, aggregate: str = "dataset",
         return None
     which = "That column is" if len(constant) == 1 else "Those columns are"
     fix = (" Leave " + ("it" if len(constant) == 1 else "them") + " out with "
-           + "metrics=" + ".")
-    if aggregate == "summary":
-        # columns that share a mean rank are named together
-        groups = {}
-        for c, v in constant.items():
-            groups.setdefault(f"{round(v, 2):g}", []).append(str(c))
-        same = " ".join(f"Every method has mean rank {v} in {_and_list(cs)}."
-                        for v, cs in groups.items())
-        return f"{same} {which} grey.{fix}"
+           + "metrics=.")
     sentences = []
     for cols, who in (([c for c in constant if c not in partial], "every method"),
                       ([c for c in constant if c in partial], "every method with a value")):
@@ -490,17 +354,9 @@ def _no_comparison_message(methods, constant: dict, aggregate: str = "dataset",
     return f"{' '.join(sentences)} {which} grey.{fix}"
 
 
-def _na_report(blocks, parts, aggregate: str) -> list:
-    """The ``na_cells`` lines: one per family and method with n/a cells (per
-    dataset and method under ``"summary"``)."""
+def _na_report(blocks) -> list:
+    """The ``na_cells`` lines: one per family and method with n/a cells."""
     lines = []
-    if aggregate == "summary":
-        for ds, mat in parts.items():
-            for m in mat.index:
-                na = [c for c in mat.columns if pd.isna(mat.loc[m, c])]
-                if na:
-                    lines.append(f"{m}: {', '.join(map(str, na))} n/a in {ds} -> rank 0 there")
-        return lines
     for b in blocks:
         n = b.raw.shape[1]
         whole = []
@@ -519,25 +375,12 @@ def _na_report(blocks, parts, aggregate: str) -> list:
     return lines
 
 
-def _na_missing(blocks, parts, aggregate: str) -> list:
-    """The n/a cells per row, in row order, as ``[(method, [(dataset, codes)],
-    families)]``: dataset ``None`` under ``"dataset"``, where ``families`` are
-    those the method has no value in; codes in column order."""
-    columns = [c for b in blocks for c in b.raw.columns]
-    pos = {c: i for i, c in enumerate(columns)}
-
-    def _sorted(codes):
-        return sorted(codes, key=lambda c: pos.get(c, len(pos)))
-
+def _na_missing(blocks) -> list:
+    """The n/a cells per row, in row order, as ``[(method, codes, families)]``,
+    where ``families`` are those the method has no value in; codes in column
+    order."""
     out = []
     for m in blocks[0].raw.index:
-        if aggregate == "summary":
-            per_ds = [(ds, _sorted(c for c in mat.columns if pd.isna(mat.loc[m, c])))
-                      for ds, mat in parts.items() if m in mat.index]
-            per_ds = [(ds, codes) for ds, codes in per_ds if codes]
-            if per_ds:
-                out.append((m, per_ds, []))
-            continue
         codes, whole = [], []
         for b in blocks:
             na = [c for c in b.raw.columns if pd.isna(b.raw.loc[m, c])]
@@ -545,7 +388,7 @@ def _na_missing(blocks, parts, aggregate: str) -> list:
             if na and len(na) == b.raw.shape[1]:
                 whole.append(b.label)
         if codes:
-            out.append((m, [(None, codes)], whole))
+            out.append((m, codes, whole))
     return out
 
 
@@ -553,14 +396,13 @@ def _na_missing(blocks, parts, aggregate: str) -> list:
 NA_ROWS_SHOWN = 3
 
 
-def _na_message(missing: list, df: pd.DataFrame, aggregate: str,
-                na: str = "warn") -> str:
-    """The ``na="warn"`` / ``na="raise"`` text: one sentence per row (at most
-    ``NA_ROWS_SHOWN``), the rule the figure applies, then the other policy."""
+def _na_message(missing: list, df: pd.DataFrame) -> str:
+    """The n/a warning: one sentence per row (at most ``NA_ROWS_SHOWN``), then
+    what to do about it."""
     stored_sources = set(style.STORED_SOURCES)
     has_ds = "dataset" in df.columns
     sentences = []
-    for m, per_ds, whole in missing[:NA_ROWS_SHOWN]:
+    for m, codes, whole in missing[:NA_ROWS_SHOWN]:
         rows = df[df["method"] == m]
         src = (set(rows["source"].dropna().astype(str)) if "source" in rows.columns
                else set())
@@ -568,20 +410,12 @@ def _na_message(missing: list, df: pd.DataFrame, aggregate: str,
         who = ("The stored row" if stored else
                "Your row" if src and not src & stored_sources else "Row")
         where = []
-        if aggregate != "summary" and has_ds:
+        if has_ds:
             where += sorted(map(str, rows["dataset"].dropna().unique()))
         if stored:
             where += sorted(src)
         name = f"{who} {m}" + (f" ({', '.join(where)})" if where else "")
-        if aggregate == "summary" and has_ds:
-            # datasets that lack the same metrics are named together
-            by_codes: dict = {}
-            for ds, codes in per_ds:
-                by_codes.setdefault(tuple(codes), []).append(str(ds))
-            what = ", and no ".join(f"{_and_list(codes, 'or')} on {_and_list(dss)}"
-                                    for codes, dss in by_codes.items())
-        else:
-            what = _and_list(dict.fromkeys(c for _, codes in per_ds for c in codes), "or")
+        what = _and_list(dict.fromkeys(codes), "or")
         text = f"{name} has no {what}."
         if whole:
             text += f" It has no {' or '.join(whole)} Overall."
@@ -589,23 +423,15 @@ def _na_message(missing: list, df: pd.DataFrame, aggregate: str,
     more = len(missing) - NA_ROWS_SHOWN
     if more > 0:
         sentences.append(f"... and {more} more row{'s' if more > 1 else ''}.")
-    if aggregate == "summary":
-        sentences.append("In the summary, a missing value counts as the lowest rank on "
-                         "that dataset.")
-    elif na != "raise":
-        # what to do about it; na="raise" draws no figure
-        gaps = _and_list(dict.fromkeys(c for _, per_ds, _w in missing
-                                       for _, codes in per_ds for c in codes))
-        sentences.append(f"Pass metrics= without {gaps} to compare on the same metrics.")
-    if na == "raise":
-        sentences.append("Pass na='warn' to draw the figure with these gaps.")
+    gaps = _and_list(dict.fromkeys(c for _, codes, _w in missing for c in codes))
+    sentences.append(f"Pass metrics= without {gaps} to compare on the same metrics.")
     return " ".join(sentences)
 
 
 def _user_repeats(df, keys):
     """Rows that repeat ``keys`` where one of the repeats is not a stored row
-    (your rows next to the stored table, or your rows twice); the published
-    and re-run rows of the deprecated ``source="both"`` are left alone."""
+    (your rows next to the stored table, or your rows twice); repeats among
+    stored rows are left alone."""
     repeated = df.duplicated(keys, keep=False)
     if not repeated.any() or "source" not in df.columns:
         return repeated
@@ -624,11 +450,9 @@ def _duplicate_rows_message(dup, keys) -> str:
     mixed = mixed[mixed].index.to_frame(index=False)
     if len(mixed):
         where = f" on {_and_distinct(mixed['dataset'])}" if "dataset" in keys else ""
-        first = str(mixed["method"].iloc[0])
         return (f"Your rows and the stored results both have "
-                f"{_and_distinct(mixed['method'])}{where}. "
-                + (f"Give your rows another name, e.g. "
-                               f"rows.assign(method=rows.method + {THIS_RUN!r})."))
+                f"{_and_distinct(mixed['method'])}{where}. Give your rows another "
+                f"name, e.g. rows.assign(method=rows.method + {THIS_RUN!r}).")
     what = _and_list(keys)
     example = ", ".join(str(dup[k].iloc[0]) for k in keys)
     return (f"{len(dup)} rows repeat the same {what}, for example {example}. The figure "
@@ -645,20 +469,15 @@ def _method_language(name):
     return None if own is None else registry.get(own).language.lower()
 
 
-def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
-           show_language: bool = True):
+def render(tbl: BubbleTable, title: str | None = None):
     """Draw a :class:`BubbleTable` in the Shiny app's scIB knit-table format.
 
     Parameters
     ----------
     tbl : BubbleTable
-        From :func:`build_table`.
-    cmap : str, optional
-        Matplotlib colormap overriding the first family's palette.
+        From :func:`_build_table`.
     title : str, optional
         Figure title.
-    show_language : bool
-        Draw the Py / R / ? chips left of each row.
 
     Returns
     -------
@@ -675,7 +494,7 @@ def render(tbl: BubbleTable, cmap: str | None = None, title: str | None = None,
     # importing scib (mtb.evaluate) switches them to seaborn's "talk" sizes
     with matplotlib.style.context("default"):
         for _ in range(4):
-            fig = _draw(tbl, cmap, title, show_language, gaps)
+            fig = _draw(tbl, title, gaps)
             short = _fit_pills(fig, fig.axes[0])
             if not any(s > 1e-6 for s in short):
                 break
@@ -701,7 +520,7 @@ def _figure_class():
     return BubbleFigure
 
 
-def _draw(tbl, cmap, title, show_language, gaps):
+def _draw(tbl, title, gaps):
     """The body of :func:`render`; ``gaps`` widens the space between families
     (one data-unit amount per pair of neighbouring families)."""
     Figure = _figure_class()
@@ -732,21 +551,19 @@ def _draw(tbl, cmap, title, show_language, gaps):
     HIGH_W = 0.7
     RANK_X0 = 1.5                    # first Rank circle; the next ones 1.0 apart
     legend_right = RAMP_X0 + (len(tbl.blocks) - 1) * RAMP_STEP + RAMP_W + 0.12 + HIGH_W
-    if tbl.aggregate != "summary":
-        # at most 5 legend circles, sized as the plot's own: 0.85 * sqrt(rank / n)
-        n_legend = min(5, n_rows)
-        legend_radii = np.maximum(
-            0.85 * np.sqrt(np.linspace(1, n_rows, n_legend) / n_rows), 0.12)
-        legend_right = max(legend_right,
-                           RANK_X0 + (n_legend - 1) * 1.0 + R_MAX * legend_radii[-1] * 0.9 + 0.15)
+    # at most 5 legend circles, sized as the plot's own: 0.85 * sqrt(rank / n)
+    n_legend = min(5, n_rows)
+    legend_radii = np.maximum(
+        0.85 * np.sqrt(np.linspace(1, n_rows, n_legend) / n_rows), 0.12)
+    legend_right = max(legend_right,
+                       RANK_X0 + (n_legend - 1) * 1.0 + R_MAX * legend_radii[-1] * 0.9 + 0.15)
     x_right = max(total_w + 0.45, legend_right)
 
     # the width follows the x-range: 0.6 inch per unit past the table's own
     fig = Figure(figsize=(0.6 * (x_right - 0.45) + 2.8, 0.42 * n_rows + 2.9))
     ax = fig.subplots()
     norm01 = colors.Normalize(vmin=0.0, vmax=1.0)
-    mappers = {fi: cm.ScalarMappable(norm=norm01, cmap=style.colormap(
-                   cmap if (fi == 0 and cmap) else b.cmap))
+    mappers = {fi: cm.ScalarMappable(norm=norm01, cmap=style.colormap(b.cmap))
                for fi, b in enumerate(tbl.blocks)}
 
     # alternating row stripes, like the Shiny output
@@ -755,20 +572,19 @@ def _draw(tbl, cmap, title, show_language, gaps):
             ax.add_patch(Rectangle((-1.3, n_rows - i - 1), total_w + 1.8, ROW_H,
                                    facecolor="#DDDDDD", edgecolor="none", zorder=0))
 
-    if show_language:
-        for i, m in enumerate(methods):
-            lang = _method_language(m)
-            if not lang:
-                label, colour = "?", "#aaaaaa"
-            elif lang.startswith("py"):
-                label, colour = "Py", "#3572A5"
-            else:
-                label, colour = "R", "#777777"
-            y = n_rows - i - 0.5
-            ax.add_patch(Circle((-0.85, y), 0.24, facecolor=colour,
-                                edgecolor="none", zorder=3))
-            ax.text(-0.85, y, label, ha="center", va="center", zorder=4,
-                    fontsize=6.4, fontweight="bold", color="white")
+    for i, m in enumerate(methods):
+        lang = _method_language(m)
+        if not lang:
+            label, colour = "?", "#aaaaaa"
+        elif lang.startswith("py"):
+            label, colour = "Py", "#3572A5"
+        else:
+            label, colour = "R", "#777777"
+        y = n_rows - i - 0.5
+        ax.add_patch(Circle((-0.85, y), 0.24, facecolor=colour,
+                            edgecolor="none", zorder=3))
+        ax.text(-0.85, y, label, ha="center", va="center", zorder=4,
+                fontsize=6.4, fontweight="bold", color="white")
 
     def rank_radius(colvals):
         """radius = 0.85 * sqrt(rank / n), n = methods scored in the column."""
@@ -802,17 +618,6 @@ def _draw(tbl, cmap, title, show_language, gaps):
                 ax.add_patch(Rectangle((x + 0.08, y0 + 0.12), bar_len, ROW_H - 0.24,
                                        facecolor=_fill(mapper, float(v), fi in flat_overall),
                                        edgecolor="#333333", linewidth=0.5, zorder=3))
-
-        elif tbl.aggregate == "summary":
-            scaled_values = b.norm[name]
-            # a summary table has no empty cell: a missing score is rank 0
-            for i, m in enumerate(methods):
-                y0 = n_rows - i - 1
-                bar_len = 0.95 * max(floor, float(scaled_values.loc[m]))
-                ax.add_patch(Rectangle((x + 0.06, y0 + 0.16), bar_len, ROW_H - 0.32,
-                                       facecolor=_fill(mapper, float(scaled_values.loc[m]),
-                                                       name in constant),
-                                       edgecolor="#333333", linewidth=0.4, zorder=3))
         else:
             vals, scaled_values = b.raw[name], b.norm[name]
             radii = rank_radius(vals)
@@ -853,8 +658,8 @@ def _draw(tbl, cmap, title, show_language, gaps):
     score_y = -1.1
     ax.text(-0.9, score_y, "Score", fontsize=8, fontweight="bold", va="center",
             gid="legend")
-    ax.text(-0.9, score_y - 0.5, SUMMARY_SCALE_NOTE if tbl.aggregate == "summary"
-            else SCORE_SCALE_NOTE, fontsize=6.4, va="center", gid="legend")
+    ax.text(-0.9, score_y - 0.5, SCORE_SCALE_NOTE, fontsize=6.4, va="center",
+            gid="legend")
     for fi, b in enumerate(tbl.blocks):
         xoff = RAMP_X0 + fi * RAMP_STEP
         for k in range(40):
@@ -865,34 +670,32 @@ def _draw(tbl, cmap, title, show_language, gaps):
                 gid="legend")
         ax.text(xoff + RAMP_W + 0.12, score_y, "High", fontsize=6.6, ha="left",
                 va="center", gid="legend")
-    if tbl.aggregate != "summary":
-        rank_y = score_y - 1.35
-        ax.text(-0.9, rank_y, "Rank", fontsize=8, fontweight="bold", va="center",
-                gid="legend")
-        xoff = RANK_X0
-        for k, r in enumerate(legend_radii):
-            ax.add_patch(Circle((xoff + k * 1.0, rank_y), R_MAX * r * 0.9,
-                                facecolor="#bbbbbb", edgecolor="#333333",
-                                linewidth=0.4, zorder=2, gid="legend"))
-        if n_legend > 1:
-            ax.text(xoff, rank_y - 0.62, "worst", fontsize=6.6,
-                    ha="center", gid="legend")
-        ax.text(xoff + (n_legend - 1) * 1.0, rank_y - 0.62, "best", fontsize=6.6,
+    rank_y = score_y - 1.35
+    ax.text(-0.9, rank_y, "Rank", fontsize=8, fontweight="bold", va="center",
+            gid="legend")
+    xoff = RANK_X0
+    for k, r in enumerate(legend_radii):
+        ax.add_patch(Circle((xoff + k * 1.0, rank_y), R_MAX * r * 0.9,
+                            facecolor="#bbbbbb", edgecolor="#333333",
+                            linewidth=0.4, zorder=2, gid="legend"))
+    if n_legend > 1:
+        ax.text(xoff, rank_y - 0.62, "worst", fontsize=6.6,
                 ha="center", gid="legend")
+    ax.text(xoff + (n_legend - 1) * 1.0, rank_y - 0.62, "best", fontsize=6.6,
+            ha="center", gid="legend")
 
     # room under the legends: the Rank labels, or the Score legend's note
-    y_bottom = -3.4 if tbl.aggregate != "summary" else -2.0
-    if show_language:
-        # what the chips left of the rows mean
-        unknown = any(not _method_language(m) for m in methods)
-        ax.text(-0.9, y_bottom - 0.05, LANGUAGE_NOTE + ("; ?: not a package method"
-                                                        if unknown else ""),
-                fontsize=6.4, va="center", gid="legend")
-        y_bottom -= 0.6
+    y_bottom = -3.4
+    # what the chips left of the rows mean
+    unknown = any(not _method_language(m) for m in methods)
+    ax.text(-0.9, y_bottom - 0.05, LANGUAGE_NOTE + ("; ?: not a package method"
+                                                    if unknown else ""),
+            fontsize=6.4, va="center", gid="legend")
+    y_bottom -= 0.6
 
     # a figure that mixes datasets gets a dataset cue in each row label
     labels = list(methods)
-    if tbl.aggregate == "dataset" and len(tbl.datasets) > 1:
+    if len(tbl.datasets) > 1:
         datasets_of = tbl.method_datasets
         labels = [f"{m} \u00b7 {datasets_of[m][0]}" if len(datasets_of[m]) == 1
                   else f"{m} \u00b7 {len(datasets_of[m])} ds" for m in methods]
@@ -967,21 +770,6 @@ def _fit_width(fig, ax, pad_pt=3.0, rounds=4):
         fig.tight_layout()
 
 
-#: the 0.3 keywords of bubble, which keep their effect until 0.5
-_KEPT = {"cmap": _compat.note("leave it out for the families' colours"),
-         "show_language": _compat.note("leave it out to draw the Py / R chips"),
-         "na": _compat.note("leave it out for a warning that names the n/a cells")}
-
-
-_KEPT.update({
-    "order": _compat.use("methods="),
-    "aggregate": _compat.use("mtb.plot.bar"),
-    "require_complete": _compat.use("methods="),
-    "overall": _compat.use("the default"),
-})
-
-
-@_compat.keywords("plot.bubble", private="_bubble", kept=_KEPT)
 def bubble(long_df, *, metrics=None, methods=None, title=None, save=None):
     """Draw the article's bubble table: methods as rows, metrics as columns.
 
@@ -1032,22 +820,12 @@ def bubble(long_df, *, metrics=None, methods=None, title=None, save=None):
     >>> df = mtb.load_results("vertical", dataset="D11")
     >>> fig = mtb.plot.bubble(df, metrics="clustering", save="d11.pdf")
     """
-    return _bubble(long_df, metrics=metrics, methods=methods, title=title, save=save)
-
-
-def _bubble(long_df, *, metrics=None, methods=None, order=None,
-            aggregate="dataset", title=None, save=None, require_complete=False,
-            overall="rank", cmap=None, show_language=True, na="warn"):
-    """:func:`bubble`, with the deprecated ``cmap``, ``show_language`` and
-    ``na`` of 0.3 (``render``'s and ``build_table``'s)."""
-    tbl = _build_table(long_df, metrics=metrics, methods=methods, order=order,
-                       aggregate=aggregate, require_complete=require_complete,
-                       overall=overall, na=na)
+    tbl = _build_table(long_df, metrics=metrics, methods=methods)
     if title is None and isinstance(long_df, pd.DataFrame):
         one = [str(long_df[c].iloc[0]) for c in ("category", "dataset")
                if c in long_df.columns and long_df[c].nunique() == 1]
         title = " ".join(one) if len(one) == 2 else None
-    fig = render(tbl, cmap=cmap, title=title or None, show_language=show_language)
+    fig = render(tbl, title=title or None)
     if save is not None:
         fig.savefig(save, bbox_inches="tight")
     return fig

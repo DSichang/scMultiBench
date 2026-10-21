@@ -35,9 +35,9 @@ def _matches(heading, exc):
 
 
 def _run_totalvi(tmp_path):
-    inp = mtb.inputs_for("D11", "vertical", "totalVI")
+    inp = mtb.engine.resolve.inputs_for("D11", "vertical", "totalVI")
     with pytest.raises(OSError) as e:
-        mtb.run("totalVI", "vertical", inputs=inp, out_dir=str(tmp_path / "out"))
+        mtb.engine.runner.run("totalVI", "vertical", inputs=inp, out_dir=str(tmp_path / "out"))
     return e.value
 
 

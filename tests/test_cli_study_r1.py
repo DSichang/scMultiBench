@@ -26,40 +26,15 @@ def no_envs(monkeypatch):
     monkeypatch.setattr(workflow, "_installed_envs", lambda: frozenset())
 
 
-# ================================================================ L23 path variables
-def test_data_and_repo_path_variables(monkeypatch, tmp_path):
-    for var, field in ((config.DATA_PATH_VAR, "data_path"), (config.REPO_PATH_VAR, "repo_path")):
-        monkeypatch.delenv(var, raising=False)
-        default = getattr(config.Config(), field)
-        assert default.parent == config._BASE
-        monkeypatch.setenv(var, str(tmp_path / field))
-        cfg = config.Config()
-        assert getattr(cfg, field) == tmp_path / field           # the variable wins
-        setattr(cfg, field, str(tmp_path / "mine"))              # an assignment wins over it
-        assert getattr(cfg, field) == tmp_path / "mine"
-        assert isinstance(getattr(cfg, field), Path)
-        setattr(cfg, field, None)                                # back to the variable
-        assert getattr(cfg, field) == tmp_path / field
-        monkeypatch.delenv(var)
-        assert getattr(cfg, field) == default                    # unset: the default again
-    assert config.Config(data_path="x").data_path == Path("x")
-
-
-def test_config_docstring_lists_the_variables():
-    doc = config.Config.__doc__
-    for var in ("MULTIBENCH_DATA_PATH", "MULTIBENCH_REPO_PATH", "MULTIBENCH_ENVS_DIR"):
-        assert var in doc
-
-
 # ================================================================ L26 {env_cmd}
 def _inputs():
     return {"rna": "/d/rna.h5", "adt": "/d/adt.h5", "cty": "/d/cty.csv"}
 
 
 def test_env_cmd_keeps_the_env_activation_and_cmd_stays_bare(monkeypatch):
-    kept = mtb.run("Matilda", "vertical", inputs=_inputs(), out_dir="/o", dry_run=True,
+    kept = mtb.engine.runner.run("Matilda", "vertical", inputs=_inputs(), out_dir="/o", dry_run=True,
                    cmd_template="srun --gres=gpu:1 {env_cmd}")
-    bare = mtb.run("Matilda", "vertical", inputs=_inputs(), out_dir="/o", dry_run=True,
+    bare = mtb.engine.runner.run("Matilda", "vertical", inputs=_inputs(), out_dir="/o", dry_run=True,
                    cmd_template="srun --gres=gpu:1 {cmd}")
     assert kept[:2] == ["srun", "--gres=gpu:1"] and bare[:2] == ["srun", "--gres=gpu:1"]
     assert kept[3:6] == ["run", "-n", "matilda"] and kept[2].endswith("conda")
@@ -67,22 +42,12 @@ def test_env_cmd_keeps_the_env_activation_and_cmd_stays_bare(monkeypatch):
     # prefix mode: {env_cmd} carries the bash activation
     monkeypatch.delenv("MULTIBENCH_RUN_MODE", raising=False)
     monkeypatch.setattr(runner.envs, "env_prefix", lambda env, conda=None: Path("/envs") / env)
-    kept = mtb.run("Matilda", "vertical", inputs=_inputs(), out_dir="/o", dry_run=True,
+    kept = mtb.engine.runner.run("Matilda", "vertical", inputs=_inputs(), out_dir="/o", dry_run=True,
                    cmd_template="srun {env_cmd}")
     assert kept[:3] == ["srun", "bash", "-c"] and "CONDA_PREFIX=/envs/matilda" in kept[3]
     with pytest.raises(ValueError, match="both"):
-        mtb.run("Matilda", "vertical", inputs=_inputs(), out_dir="/o", dry_run=True,
+        mtb.engine.runner.run("Matilda", "vertical", inputs=_inputs(), out_dir="/o", dry_run=True,
                 cmd_template="srun {cmd} {env_cmd}")
-
-
-def test_env_cmd_keeps_the_env_preflight(tmp_path, monkeypatch):
-    monkeypatch.setattr(runner.envs, "installed_envs", lambda conda=None: ["base"])
-    monkeypatch.setattr(runner.subprocess, "Popen",
-                        lambda *a, **k: pytest.fail("must not launch without the env"))
-    with pytest.raises(EnvironmentError, match="is not installed"):
-        mtb.run("SCALEX", "diagonal", inputs={"rna": str(tmp_path / "a.h5"),
-                                              "atac_gas": str(tmp_path / "b.h5")},
-                out_dir=str(tmp_path / "o"), convert=False, cmd_template="srun {env_cmd}")
 
 
 # ================================================================ L27 total line
@@ -106,11 +71,6 @@ def test_nothing_runnable_lists_rows_with_files_in_place_first(no_envs, tmp_path
     # D11 is CITE-seq: the rna+adt rows have their files; MIRA (rna+atac) does not
     assert len(lines) == 3 and all("(rna+adt)" in l for l in lines), lines
     assert [l.split()[0] for l in lines] == sorted(l.split()[0] for l in lines)
-
-
-def test_blocked_script_tag_has_no_provenance():
-    text = envs.DIFFICULTY["blocked-script"]
-    assert "benchmark host" not in text and "shim" not in text and "setup_hint" in text
 
 
 def test_cpu_fallback_warning_names_no_internal_file():

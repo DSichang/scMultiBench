@@ -41,12 +41,6 @@ def _messages(fn, *args, **kw):
     return out, [str(w.message) for w in rec if issubclass(w.category, UserWarning)]
 
 
-def _stored(dataset, source="rerun", category="vertical"):
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        return mtb.load_results(category, dataset=dataset, source=source)
-
-
 def _mine(method="PCA", dataset="MYCITE", scored_with="igraph/search/0.4.0",
           values=(0.351, 0.5, 0.55, 0.9)):
     return pd.DataFrame([
@@ -57,49 +51,6 @@ def _mine(method="PCA", dataset="MYCITE", scored_with="igraph/search/0.4.0",
 
 
 # --- M01: no summary advice when the datasets share no method ----------------
-
-def test_your_rows_on_their_own_dataset_next_to_stored_rows_are_refused():
-    # c2 (C18): refused, where 0.4.0 rc warned about datasets that share no method
-    for df in (pd.concat([_stored("D11"), _mine()], ignore_index=True),
-               pd.concat([_stored(["D24", "D25", "D28"], source="published",
-                                  category="diagonal"),
-                          _mine(method="PCA_standin", dataset="LUNG")], ignore_index=True)):
-        with pytest.raises(ValueError, match="^Your rows are on (MYCITE|LUNG), the stored"):
-            _messages(_build_table, df)
-
-
-def _pair():
-    """D11 and a second dataset of the same methods (the subsample tables left
-    in 0.4.0, X04): D11's rows under another dataset name."""
-    d11 = _stored("D11")
-    return pd.concat([d11, d11.assign(dataset="D11b")], ignore_index=True).assign(source="user")
-
-
-def test_dataset_mode_rerun_pair_suggests_plot_bar():
-    _, msgs = _messages(_build_table, _pair())
-    assert msgs == [
-        "This figure averages each method over 2 datasets, D11 and D11b. Its rows "
-        "mix datasets. mtb.plot.bar ranks the methods within each dataset; or filter "
-        "to one dataset."]
-
-
-def test_no_plot_warning_says_by_construction():
-    lone = pd.concat([_stored("D11").assign(source="user"),
-                      _mine(scored_with="leidenalg/search/0.4.0")], ignore_index=True)
-    calls = [(_build_table, {}),
-             (_build_table, {"aggregate": "summary"}),
-             (_build_table, {"aggregate": "summary", "overall": "mean_overall"}),
-             (mtb.plot.bar, {}), (mtb.plot.bar, {"overall": "rank"})]
-    seen = []
-    for fn, kw in calls:
-        _, msgs = _messages(fn, lone, **kw)
-        seen += msgs
-        assert not any("by construction" in m for m in msgs), (fn, kw, msgs)
-    assert "Dataset MYCITE has only one method, PCA. Its rank there is always " \
-           "the lowest. Plot it with methods scored on the same dataset." in seen
-    assert "Dataset MYCITE has only one method, PCA. Its Overall there is " \
-           "always 1.0. Plot it with methods scored on the same dataset." in seen
-
 
 # --- M02: constant columns and one-method figures ---------------------------
 
@@ -143,62 +94,11 @@ def test_constant_column_warns_and_uses_the_neutral_fill():
     assert len(ilisi_x) == 1                              # one column, three rows
 
 
-def test_stored_demo_figures_are_unchanged():
-    for source, category, datasets in (
-            ("rerun", "vertical", ["D11"]), ("rerun", "diagonal", ["D28"]),
-            ("rerun", "mosaic", ["D45"]), ("rerun", "cross", ["D52"]),
-            ("published", "vertical", ["D11"]),
-            ("published", "diagonal", ["D24", "D25", "D28"])):
-        for ds in datasets:
-            df = _stored(ds, source=source, category=category)
-            tbl, msgs = _messages(B._build_table, df, na="skip")
-            assert not any("is grey" in m or "are grey" in m for m in msgs), (ds, msgs)
-            fig = B.render(tbl)
-            assert not [p for p in fig.axes[0].patches if p.get_facecolor() == _grey()], ds
-            assert not any(t.get_text().startswith("Grey fill")
-                           for t in fig.axes[0].texts), ds
-
-
 # --- M03: igraph rows next to the stored tables -----------------------------
 
 BACKEND = ("The rows for {m} were clustered with the igraph Leiden backend. The stored "
            "results used leidenalg, which can move ARI by up to about 0.1. Set "
            "mtb.config.DEFAULT.leiden_flavor = 'leidenalg' before evaluate to compare "
            "them.")
-
-
-@pytest.mark.parametrize("fn", [_build_table, mtb.plot.bubble, mtb.plot.bar])
-def test_igraph_rows_next_to_stored_rows_warn(fn):
-    df = pd.concat([_stored("D11"), _mine(method="MyMethod", dataset="D11")],
-                   ignore_index=True)
-    _, msgs = _messages(fn, df)
-    assert msgs.count(BACKEND.format(m="MyMethod")) == 1, msgs
-
-
-@pytest.mark.parametrize("fn", [_build_table, mtb.plot.bar])
-def test_no_backend_warning_for_leidenalg_or_own_rows(fn):
-    lalg = _mine(method="MyMethod", dataset="D11", scored_with="leidenalg/search/0.4.0")
-    _, msgs = _messages(fn, pd.concat([_stored("D11"), lalg], ignore_index=True))
-    assert not any("igraph Leiden backend" in m for m in msgs), msgs
-    own = pd.concat([_mine(method="M1"), _mine(method="M2", values=(0.4, 0.6, 0.5, 0.8))],
-                    ignore_index=True)
-    _, msgs = _messages(fn, own)
-    assert not any("igraph Leiden backend" in m for m in msgs), msgs
-    # rows without scored_with (stored rows only) never trigger it
-    _, msgs = _messages(fn, _stored("D11"))
-    assert not any("igraph Leiden backend" in m for m in msgs), msgs
-
-
-def test_backend_warning_needs_a_sweep_metric_on_show():
-    df = pd.concat([_stored("D11"), _mine(method="MyMethod", dataset="D11")],
-                   ignore_index=True)
-    # under the 0.4.0 search ASW reads the Leiden clusters too: cLISI does not
-    _, msgs = _messages(_build_table, df, metrics=["cLISI"])
-    assert not any("igraph Leiden backend" in m for m in msgs), msgs
-    # clusters from the user: only iF1 depends on the backend
-    user = _mine(method="MyMethod", dataset="D11", scored_with="igraph/user/0.4.0")
-    _, msgs = _messages(_build_table,
-                        pd.concat([_stored("D11"), user], ignore_index=True))
-    assert not any("igraph Leiden backend" in m for m in msgs), msgs
 
 

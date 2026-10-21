@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from .. import _compat, config
+from .. import config
 
 __all__ = ["datasets", "metrics"]
 
@@ -191,13 +191,7 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
         if code in _known_metrics() or code in set(map(str, extra)):
             metrics = [code]               # one code: a list of one
         else:
-            hint = ""
-            from ..engine.registry import list_tasks
-            if metrics in list_tasks():
-                hint = (f" {kw}= selects a metric family, not a task. The tasks "
-                        f"dimension_reduction and clustering both use the clustering "
-                        f"family.")
-            raise ValueError(_unknown_metrics(kw, f"token {metrics}") + hint)
+            raise ValueError(_unknown_metrics(kw, f"token {metrics}"))
     if isinstance(metrics, (bytes, dict)) or not hasattr(metrics, "__iter__"):
         got = type(metrics).__name__
         raise TypeError(
@@ -237,89 +231,6 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
     return MetricSelection(holding[0] if holding else "all", codes, True)
 
 
-def _split_multivalue(cell: object) -> list[str]:
-    if pd.isna(cell):
-        return []
-    parts = re.split(r"[\n;,]+", str(cell))
-    out = []
-    for p in parts:
-        t = p.strip().lower().replace(" integration", "").replace("integration", "").strip()
-        if t:
-            out.append(t)
-    return out
-
-
-_FILES_DIR = {"files_dir": _compat.note("leave it out for the package's tables")}
-
-
-@_compat.keywords("catalog.methods", private="_methods", kept=_FILES_DIR,
-                  positional=("files_dir",))
-def methods() -> pd.DataFrame:
-    """Table of the benchmark's methods, one row per method.
-
-    Returns
-    -------
-    pandas.DataFrame
-        One row per method: ``method`` (the id every function takes),
-        ``name`` (the article's spelling, such as ``MOFA+``), ``language``,
-        ``deep_learning``, ``atac`` (``'peak'`` / ``'gene_activity'`` /
-        ``None``), ``output`` (``'embedding'`` / ``'graph'``),
-        ``needs_labels`` and ``categories``.
-
-    Examples
-    --------
-    >>> import multibench as mtb
-    >>> m = mtb.catalog.methods()
-    >>> m[m.needs_labels][["method", "categories"]]
-    >>> m[m.categories.map(lambda c: "vertical" in c)].method.tolist()
-
-    See Also
-    --------
-    mtb.find_methods : the method ids, filtered by category, modalities and more.
-    mtb.method_info : everything the package knows about one method.
-    """
-    return _methods()
-
-
-methods = _compat.renamed("catalog.methods", "mtb.find_methods() and mtb.method_info(method)",
-                          methods)
-
-
-def _methods(files_dir: Path | str | None = None) -> pd.DataFrame:
-    """:func:`methods`, with the deprecated ``files_dir=`` (the folder holding
-    ``method.csv``)."""
-    if files_dir is None:
-        files_dir = config.DEFAULT.files_path
-    raw = pd.read_csv(Path(files_dir) / "method.csv")
-    cols = {c: c.strip().replace("\n", " ").strip() for c in raw.columns}
-    raw = raw.rename(columns=cols)
-    out = pd.DataFrame()
-    out["name"] = raw["Methods"].astype(str).str.strip()
-    out.insert(0, "method", out["name"].map(_canonical_id))
-    out["language"] = raw["Programming Language"].astype(str).str.strip().str.lower()
-    out["deep_learning"] = raw["Deep Learning"].astype(str).str.strip()
-    out["atac"] = raw["Peak/Gene Activity"].astype(str).str.strip()
-    out["output"] = raw["Output"].astype(str).str.strip()
-    out["needs_labels"] = (
-        raw["CellType Information Required"].astype(str).str.strip().str.lower().isin(["yes", "y", "true"])
-    )
-    out["categories"] = raw["Integration Categories"].map(_split_multivalue)
-    # the registry's values win over the CSV prose
-    from ..engine import registry
-    specs = {s.id: s for s in registry.load()}
-    atac_col = out["atac"].astype(object)
-    for i, cid in enumerate(out["method"]):
-        spec = specs.get(cid)
-        if spec is None:
-            continue
-        out.at[i, "needs_labels"] = bool(spec.needs_labels)
-        atac_col.at[i] = spec.atac
-        out.at[i, "categories"] = list(spec.categories)
-    out["atac"] = atac_col
-    out["needs_labels"] = out["needs_labels"].astype(bool)
-    return out
-
-
 def _dataset_sort_key(ds: str):
     """Natural order for dataset ids: ``D2 < D11 < D11s < SD7``."""
     m = re.match(r"^([A-Za-z]*)(\d+)(.*)$", str(ds))
@@ -333,8 +244,6 @@ def _dataset_sort_key(ds: str):
 _PAPER_COLUMNS = ["assay", "tissue", "n_cells", "n_batches", "source"]
 
 
-@_compat.keywords("catalog.datasets", private="_datasets", kept=_FILES_DIR,
-                  positional=("files_dir",))
 def datasets(*, category: str | None = None) -> pd.DataFrame:
     """The datasets ``mtb.data.fetch`` downloads or ``mtb.load_results`` holds.
 
@@ -359,16 +268,7 @@ def datasets(*, category: str | None = None) -> pd.DataFrame:
     >>> ds.dataset.tolist()
     >>> ds[ds.has_results]
     """
-    return _datasets(category=category)
-
-
-def _datasets(files_dir: Path | str | None = None, *,
-              category: str | None = None) -> pd.DataFrame:
-    """:func:`datasets`, with the deprecated ``files_dir=`` (the folder
-    holding ``dataset.csv``)."""
-    if files_dir is None:
-        files_dir = config.DEFAULT.files_path
-    raw = pd.read_csv(Path(files_dir) / "dataset.csv")
+    raw = pd.read_csv(Path(config.DEFAULT.files_path) / "dataset.csv")
     raw = raw.rename(columns={c: c.strip() for c in raw.columns})
     raw = raw.dropna(how="all", axis=0)
     name_col = "dataset name" if "dataset name" in raw.columns else "dataset"
@@ -381,9 +281,10 @@ def _datasets(files_dir: Path | str | None = None, *,
     served: set[str] = set()
     for cat in results._CATEGORIES:
         try:
-            for ds in results._available_datasets(cat, source="both"):
+            held = results._list_datasets(cat, results._base_path())
+            for ds in held:
                 cat_of.setdefault(ds, []).append(cat)
-            served.update(results._available_datasets(cat, source="rerun"))
+            served.update(held)
         except Exception:       # a broken/absent tree must not break the catalog
             continue
     csv_ids = list(raw[name_col])
@@ -414,8 +315,6 @@ def _datasets(files_dir: Path | str | None = None, *,
     return out.reset_index(drop=True)
 
 
-@_compat.keywords("catalog.metrics", private="_metrics", kept=_FILES_DIR,
-                  positional=("files_dir",))
 def metrics() -> pd.DataFrame:
     """Table describing the metrics: one row per metric code.
 
@@ -436,25 +335,8 @@ def metrics() -> pd.DataFrame:
     --------
     mtb.evaluate : computes these metrics for an embedding.
     """
-    return _metrics()
-
-
-def _metrics(files_dir: Path | str | None = None) -> pd.DataFrame:
-    """:func:`metrics`, with the deprecated ``files_dir=`` (the folder holding
-    ``metric_full.csv``)."""
-    if files_dir is None:
-        files_dir = config.DEFAULT.files_path
-    raw = pd.read_csv(Path(files_dir) / "metric_full.csv")
+    raw = pd.read_csv(Path(config.DEFAULT.files_path) / "metric_full.csv")
     raw = raw.rename(columns={c: c.strip() for c in raw.columns})
     family = {c: f for f, codes in FAMILY_METRICS.items() for c in codes}
     raw.insert(1, "family", raw["metric"].map(family))
     return raw
-
-
-_ANY_SPELLING = _compat.note("every function accepts any spelling of a name")
-__getattr__ = _compat.module_getattr(__name__, "catalog", old={
-    "canonical_id": (_canonical_id, _ANY_SPELLING),
-    "canonical_metric": (_canonical_metric, _ANY_SPELLING),
-    "known_metrics": (_known_metrics, _compat.use("catalog.metrics()")),
-    "PAPER_COLUMNS": (_PAPER_COLUMNS, _compat.NO_EFFECT),
-})

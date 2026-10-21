@@ -94,43 +94,6 @@ SCALEX_INPUTS = {"rna": "a.h5", "atac_gas": "b.h5"}
 SCALEX_ENV = envs.group_for("SCALEX")
 
 
-# ---------------------------------------------------------------- Config.envs_dir
-def test_envs_dir_env_var_wins(monkeypatch, tmp_path):
-    monkeypatch.setenv(config.ENVS_DIR_VAR, str(tmp_path / "mine"))
-    assert config.Config().envs_dir == tmp_path / "mine"
-
-
-def test_envs_dir_uses_conda_envs_dir_when_conda_found(monkeypatch, tmp_path):
-    monkeypatch.delenv(config.ENVS_DIR_VAR, raising=False)
-    monkeypatch.setattr(config._shutil, "which", lambda name: "/fake/bin/" + name)
-    monkeypatch.setattr(envs, "_envs_dir", lambda exe: tmp_path / "conda-envs")
-    config._conda_envs_dir.cache_clear()
-    try:
-        assert config.Config().envs_dir == tmp_path / "conda-envs"
-    finally:
-        config._conda_envs_dir.cache_clear()
-
-
-def test_envs_dir_falls_back_to_the_user_cache(no_conda, monkeypatch):
-    monkeypatch.delenv(config.ENVS_DIR_VAR, raising=False)
-    d = config.Config().envs_dir
-    assert d == config._CACHE / "envs"
-    assert d.parts[-2:] == ("multibench", "envs")
-
-
-def test_envs_dir_is_a_settable_field_and_lazy(monkeypatch, tmp_path):
-    import dataclasses
-    assert "envs_dir" in [f.name for f in dataclasses.fields(config.Config)]
-    cfg = config.Config()
-    assert cfg.__dict__["_envs_dir"] is None, "resolved on first read, not at construction"
-    cfg.envs_dir = str(tmp_path / "x")
-    assert cfg.envs_dir == tmp_path / "x" and isinstance(cfg.envs_dir, Path)
-    assert config.Config(envs_dir=tmp_path / "y").envs_dir == tmp_path / "y"
-    monkeypatch.setattr(config.DEFAULT, "envs_dir", tmp_path / "z")
-    assert config.DEFAULT.envs_dir == tmp_path / "z"
-    assert "envs_dir" in repr(config.DEFAULT)
-
-
 def test_import_does_not_probe_conda():
     """``config.DEFAULT`` is built at import; the probe must not run then."""
     code = ("import multibench.config as c, multibench; "
@@ -169,18 +132,10 @@ def test_env_prefix_asks_conda_when_not_under_envs_dir(envs_dir, monkeypatch, tm
     assert envs.installed_envs() == ["matilda", "scmb_r"]
 
 
-def test_doctor_and_status_count_the_prefix(envs_dir):
-    make_prefix(envs_dir, SCALEX_ENV)
-    row = next(r for r in envs.doctor(methods=["SCALEX"]).to_dict("records") if r["env"] == SCALEX_ENV)
-    assert row["exists"] is True
-    st = next(r for r in envs.status() if r["method"] == "SCALEX")
-    assert st["exists"] is True
-
-
 # ---------------------------------------------------------------- runner: prefix mode
 def test_runner_argv_is_the_bash_wrapper_and_it_runs(envs_dir, tmp_path):
     prefix = make_prefix(envs_dir, SCALEX_ENV)
-    argv = mtb.run("SCALEX", "diagonal", inputs=SCALEX_INPUTS, out_dir=tmp_path / "o",
+    argv = mtb.engine.runner.run("SCALEX", "diagonal", inputs=SCALEX_INPUTS, out_dir=tmp_path / "o",
                    dry_run=True)
     assert argv[:2] == ["bash", "-c"]
     assert argv[3] == "--" and argv[4] == "python"
@@ -216,14 +171,14 @@ def test_run_mode_defaults(envs_dir):
 
 
 def test_conda_mode_when_no_prefix(envs_dir, tmp_path):
-    argv = mtb.run("SCALEX", "diagonal", inputs=SCALEX_INPUTS, out_dir=tmp_path / "o",
+    argv = mtb.engine.runner.run("SCALEX", "diagonal", inputs=SCALEX_INPUTS, out_dir=tmp_path / "o",
                    dry_run=True)
     assert argv[:4] == ["conda", "run", "-n", SCALEX_ENV]
 
 
 def test_cmd_template_overrides_the_prefix(envs_dir, tmp_path):
     make_prefix(envs_dir, SCALEX_ENV)
-    argv = mtb.run("SCALEX", "diagonal", inputs=SCALEX_INPUTS, out_dir=tmp_path / "o",
+    argv = mtb.engine.runner.run("SCALEX", "diagonal", inputs=SCALEX_INPUTS, out_dir=tmp_path / "o",
                    dry_run=True, cmd_template="docker run img {cmd}")
     assert argv[:3] == ["docker", "run", "img"] and "bash" not in argv
 
@@ -233,7 +188,7 @@ def test_pty_wrap_stays_inside_the_prefix_wrapper(envs_dir, tmp_path, monkeypatc
     from multibench.engine import registry
     variant = registry.get("SCALEX").select("diagonal", {"rna", "atac_gas"})
     monkeypatch.setattr(variant, "pty", True)
-    argv = mtb.run("SCALEX", "diagonal", inputs=SCALEX_INPUTS, out_dir=tmp_path / "o",
+    argv = mtb.engine.runner.run("SCALEX", "diagonal", inputs=SCALEX_INPUTS, out_dir=tmp_path / "o",
                    dry_run=True)
     assert argv[:2] == ["bash", "-c"] and argv[4] == "script"
 
@@ -241,7 +196,7 @@ def test_pty_wrap_stays_inside_the_prefix_wrapper(envs_dir, tmp_path, monkeypatc
 def test_forced_prefix_without_prefix_raises(envs_dir, monkeypatch, tmp_path):
     monkeypatch.setenv(runner.RUN_MODE_VAR, "prefix")
     with pytest.raises(OSError) as e:
-        mtb.run("SCALEX", "diagonal", inputs=SCALEX_INPUTS, out_dir=tmp_path / "o",
+        mtb.engine.runner.run("SCALEX", "diagonal", inputs=SCALEX_INPUTS, out_dir=tmp_path / "o",
                 dry_run=True)
     msg = str(e.value)
     assert str(envs_dir) in msg and "mtb.env.install" in msg and SCALEX_ENV in msg
@@ -250,7 +205,7 @@ def test_forced_prefix_without_prefix_raises(envs_dir, monkeypatch, tmp_path):
 def test_forced_conda_ignores_the_prefix(envs_dir, monkeypatch, tmp_path):
     make_prefix(envs_dir, SCALEX_ENV)
     monkeypatch.setenv(runner.RUN_MODE_VAR, "conda")
-    argv = mtb.run("SCALEX", "diagonal", inputs=SCALEX_INPUTS, out_dir=tmp_path / "o",
+    argv = mtb.engine.runner.run("SCALEX", "diagonal", inputs=SCALEX_INPUTS, out_dir=tmp_path / "o",
                    dry_run=True)
     assert argv[:4] == ["conda", "run", "-n", SCALEX_ENV]
 
@@ -262,63 +217,6 @@ def test_forced_prefix_with_prefix_and_bad_value(envs_dir, monkeypatch):
     monkeypatch.setenv(runner.RUN_MODE_VAR, "podman")
     with pytest.raises(ValueError, match="MULTIBENCH_RUN_MODE='podman'"):
         runner.run_mode("matilda")
-
-
-def test_real_run_uses_the_wrapper_and_preflight_passes(envs_dir, tmp_path, monkeypatch):
-    """``run()`` (not dry) spawns the bash wrapper: the preflight sees the
-    prefix as installed without conda and Popen receives the wrapper argv."""
-    import h5py
-    import numpy as np
-    make_prefix(envs_dir, SCALEX_ENV)
-    calls = {}
-
-    class FakePopen:
-        def __init__(self, cmd, cwd, stdout, stderr, text, env=None,
-                     start_new_session=False):
-            calls["cmd"], calls["session"] = cmd, start_new_session
-            self.pid, self.returncode = 4242, 0
-            with h5py.File(Path(cwd) / "embedding.h5", "w") as f:
-                f.create_dataset("data", data=np.zeros((6, 3)))
-
-        def communicate(self):
-            return "", ""
-
-        def kill(self):
-            pass
-
-        def wait(self):
-            return self.returncode
-
-    monkeypatch.setattr(runner.subprocess, "Popen", FakePopen)
-    res = mtb.run("SCALEX", "diagonal",
-                  inputs={"rna": str(tmp_path / "a.h5"), "atac_gas": str(tmp_path / "b.h5")},
-                  out_dir=str(tmp_path / "out"), convert=False)
-    assert calls["cmd"][:2] == ["bash", "-c"] and calls["session"] is True
-    assert res.cmd == calls["cmd"] and res.output.shape == (6, 3)
-
-
-def test_preflight_reprobes_conda_before_refusing(envs_dir, tmp_path, monkeypatch):
-    """An env conda created in another terminal after the first probe must
-    not be refused from the stale per-process cache."""
-    monkeypatch.setattr(envs, "_find_conda", lambda: "/fake/conda")
-    listing = {"envs": ("/opt/conda/envs/base",)}
-    calls = []
-
-    def fake_list(conda):
-        calls.append(conda)
-        return listing["envs"]
-    fake_list.cache_clear = lambda: listing.update(envs=("/opt/conda/envs/base",
-                                                          f"/opt/conda/envs/{SCALEX_ENV}"))
-    monkeypatch.setattr(envs, "_conda_prefixes", fake_list)
-    monkeypatch.setattr(runner.subprocess, "Popen",
-                        lambda *a, **k: pytest.fail("must not spawn in this test") )
-    # first probe: not there -> cache cleared -> second probe sees it -> the
-    # run proceeds to the (failing-on-purpose) spawn
-    with pytest.raises(pytest.fail.Exception):
-        mtb.run("SCALEX", "diagonal",
-                inputs={"rna": str(tmp_path / "a.h5"), "atac_gas": str(tmp_path / "b.h5")},
-                out_dir=str(tmp_path / "out"), convert=False)
-    assert len(calls) >= 2
 
 
 # ---------------------------------------------------------------- install_packed
@@ -413,66 +311,6 @@ def test_install_packed_signature():
     assert list(sig.parameters) == ["env", "envs_dir", "conda", "force", "flavor"]
     assert all(sig.parameters[k].kind is inspect.Parameter.KEYWORD_ONLY
                for k in ("envs_dir", "conda", "force", "flavor"))
-
-
-# ---------------------------------------------------------------- env.install without conda
-@pytest.fixture
-def linux_no_conda(envs_dir, monkeypatch):
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
-    monkeypatch.setattr(envs, "packed_manifest",
-                        lambda: {"scmb_torch": "https://x/scmb_torch.tar.gz"})
-    monkeypatch.setattr(envs, "install_packed",
-                        lambda env, **kw: pytest.fail(f"download of {env} started"))
-    monkeypatch.setattr(envs, "_run_all", lambda cmds: pytest.fail("a build started"))
-    yield
-
-
-def test_install_no_conda_lockfile_build_refused_with_archive(linux_no_conda):
-    # SCALEX -> scmb_torch: archive published, but packed=False asked for a build
-    with pytest.raises(RuntimeError) as e:
-        mtb.env.install(["SCALEX"], packed=False, dry_run=False).to_dict("records")
-    assert str(e.value) == ("Conda is not installed on this computer. Environment "
-                            "scmb_torch has a packed archive. Leave out build=True "
-                            "to install it.")
-
-
-def test_install_no_conda_refused_without_archive(linux_no_conda):
-    # Matilda -> matilda: no archive in the (faked) manifest, so nothing can
-    # provision it here - even with packed=True, and before any download
-    env = envs.group_for("Matilda")
-    assert env not in envs.packed_manifest()
-    with pytest.raises(RuntimeError) as e:
-        mtb.env.install(["Matilda", "SCALEX"], packed=True, dry_run=False).to_dict("records")
-    assert str(e.value) == (f"Conda is not installed on this computer. Environment "
-                            f"{env} has no packed archive. Install conda first.")
-    with pytest.raises(RuntimeError, match=r"has no packed archive\. Install conda first\."):
-        mtb.env.install(["Matilda"], packed=False, dry_run=False).to_dict("records")
-
-
-def test_install_no_conda_packed_path_works(envs_dir, monkeypatch):
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
-    monkeypatch.setattr(envs, "packed_manifest",
-                        lambda: {"scmb_torch": "https://x/scmb_torch.tar.gz"})
-    monkeypatch.setattr(envs, "_run_all", lambda cmds: pytest.fail("a build started"))
-
-    def fake_unpack(env, **kw):
-        make_prefix(envs_dir, env)               # what a real unpack leaves behind
-        return True
-    monkeypatch.setattr(envs, "install_packed", fake_unpack)
-    rows = mtb.env.install(["SCALEX"], packed=True, dry_run=False).to_dict("records")
-    assert [r["state"] for r in rows] == ["PACKED"]
-    assert envs.installed_envs() == ["scmb_torch"]
-    # a second call sees it as installed: no download, no build
-    monkeypatch.setattr(envs, "install_packed",
-                        lambda env, **kw: pytest.fail("downloaded an installed env"))
-    assert [r["state"] for r in mtb.env.install(["SCALEX"], packed=True, dry_run=False).to_dict("records")] == ["have"]
-
-
-def test_install_dry_run_needs_no_conda(linux_no_conda):
-    rows = mtb.env.install(["SCALEX"], packed=True, dry_run=True).to_dict("records")
-    assert rows[0]["state"] == "packed archive published"
-    rows = mtb.env.install(["SCALEX"], packed=False, dry_run=True).to_dict("records")
-    assert rows[0]["state"] == "build(dry-run)"
 
 
 # ---------------------------------------------------------------- scan env gate

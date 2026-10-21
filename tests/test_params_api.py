@@ -59,17 +59,6 @@ def test_params_for_single_variant_needs_no_selector():
     assert ":" in r["variant"]
 
 
-def test_method_info_exposes_params_per_variant():
-    # verbose= is deprecated in 0.4.0 (one FutureWarning) and still adds params
-    assert "params" not in mtb.method_info("Multigrate")
-    with pytest.warns(FutureWarning, match=r"method_info\(verbose=\) is deprecated"):
-        info = mtb.method_info("Multigrate", verbose=True)
-    assert "vertical:rna+adt" in info["params"]
-    # Y38 (r3): no 'defaults' block; the tunable default is the value a run uses
-    assert set(info["params"]["vertical:rna+adt"]) == {"tunable"}
-    assert info["params"]["vertical:rna+adt"]["tunable"]["bs"]["default"] == 256
-
-
 def test_tunable_is_doc_only_and_never_emitted():
     """The safety property: documenting a param must not add it to the command."""
     spec = registry.get("scMDC")

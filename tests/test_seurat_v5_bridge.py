@@ -43,7 +43,7 @@ def _row(tmp_path, name):
 
 
 def test_labels_for_puts_the_atac_cells_first(root):
-    assert list(mtb.labels_for("D28", "diagonal", "Seurat_v5", data_path=root / "data")) == \
+    assert list(mtb.engine.resolve.labels_for("D28", "diagonal", "Seurat_v5", data_path=root / "data")) == \
         ["atac_cty", "rna_cty"]
 
 

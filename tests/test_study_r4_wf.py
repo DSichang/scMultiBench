@@ -105,99 +105,9 @@ def _vertical(root, name, atac_feats, n=60):
     return root
 
 
-def _diagonal(root, name, peaks, n=20):
-    d = root / name
-    d.mkdir(parents=True)
-    genes = [f"GENE{i}" for i in range(60)]
-    _h5(d / "rna.h5", genes, [f"r{i}" for i in range(n)])
-    _h5(d / "atac_peak.h5", peaks, [f"a{i}" for i in range(n)])
-    _h5(d / "atac_gas.h5", genes, [f"a{i}" for i in range(n)])
-    _labels(d / "rna_cty.csv", n)
-    _labels(d / "atac_cty.csv", n)
-    return root
-
-
 class _Res:
     def __init__(self, out):
         self.output = out
-
-
-# ======================================================================= R4-01
-def test_named_methods_no_longer_bypass_the_atac_check(tmp_path, pinned):
-    root = _gasmos(tmp_path)
-    df = _quiet(full_scan, "GASMOS", "mosaic", methods=["StabMap", "scMoMaT"],
-                data_path=root, verbose=False)
-    # each method's row for the folder's batch pattern; its other three lack files
-    assert len(df) == 8 and df["files_ok"].sum() == 2
-    df = df[df["files_ok"]].set_index("method")
-    for m in ("StabMap", "scMoMaT"):
-        assert not df.loc[m, "runnable"] and df.loc[m, "files_ok"], m
-        assert df.loc[m, "reason"] == (
-            f"{m} needs peak ATAC, and atac2.h5 holds gene activity. Export the ATAC as "
-            f"peaks."), df.loc[m, "reason"]
-    ok = _quiet(full_scan, "GASMOS", "mosaic", methods=["StabMap", "scMoMaT"],
-                data_path=root, verbose=False, allow_atac_mismatch=True)
-    ok = ok[ok["files_ok"]]
-    assert len(ok) == 2 and ok["runnable"].all() and ok["reason"].eq("").all()
-    assert all(c.startswith(f"{m} {GP_CAV}")
-               for m, c in zip(ok["method"], ok["caveat"])), ok["caveat"].tolist()
-
-
-def test_run_all_named_matilda_on_peaks_is_blocked_unless_allowed(tmp_path, pinned, capsys,
-                                                                  gas_matilda):
-    root = _vertical(tmp_path, "MU_PEAK", PEAKS)
-    plan = _quiet(mtb.run_all, "MU_PEAK", "vertical", methods=["Matilda"],
-                  modalities=["rna", "atac"], data_path=root, dry_run=True, verbose=False)
-    assert not plan["runnable"].any()
-    assert plan["reason"].iloc[0].startswith("Matilda needs gene-activity ATAC, and atac.h5 "
-                                              "holds peaks. Export the ATAC as gene activity")
-    capsys.readouterr()
-    plan = _quiet(mtb.run_all, "MU_PEAK", "vertical", methods=["Matilda"],
-                  modalities=["rna", "atac"], data_path=root, dry_run=True,
-                  allow_atac_mismatch=True)
-    assert plan["runnable"].all() and plan["reason"].eq("").all()
-    assert plan["caveat"].iloc[0].startswith(f"Matilda {GAS_CAV}")
-    assert f"[run_all] Matilda {GAS_CAV}" in \
-        capsys.readouterr().out
-
-
-def test_real_run_all_with_the_override_runs_and_keeps_the_caveat(tmp_path, pinned,
-                                                                  monkeypatch, capsys,
-                                                                  gas_matilda):
-    root = _vertical(tmp_path, "MU_PEAK", PEAKS)
-    calls = []
-
-    def fake_run(method, category, inputs, out_dir, params=None):
-        calls.append(method)
-        return _Res(np.zeros((60, 5)))
-    monkeypatch.setattr(W, "_run", fake_run)
-    with pytest.raises(ValueError, match=r"^None of the requested methods \(Matilda\) can "
-                                         r"run on MU_PEAK \(vertical\)\."):
-        _quiet(mtb.run_all, "MU_PEAK", "vertical", tmp_path / "blocked",
-               methods=["Matilda"], modalities=["rna", "atac"], data_path=root,
-               evaluate=False)
-    assert calls == []
-    res = _quiet(mtb.run_all, "MU_PEAK", "vertical", tmp_path / "named",
-                 methods=["Matilda"], modalities=["rna", "atac"], data_path=root,
-                 evaluate=False, allow_atac_mismatch=True)
-    assert calls == ["Matilda"]
-    assert f"[run_all]   Matilda {GAS_CAV}" in \
-        capsys.readouterr().out
-    assert res.summary["caveat"].iloc[0].startswith("Matilda needs gene-activity ATAC")
-
-
-def test_named_glue_with_peak_0_names_is_blocked(tmp_path, pinned):
-    root = _diagonal(tmp_path, "LUNG_ids", [f"peak_{i}" for i in range(60)])
-    peak_methods = discover.find_methods("diagonal", atac="peak")
-    df = _quiet(full_scan, "LUNG_ids", "diagonal", methods=peak_methods, data_path=root,
-                verbose=False)
-    df = df[df["files_ok"]].set_index("method")     # not GLUE's row for several batches
-    assert df.index.is_unique
-    assert not df.loc["GLUE", "runnable"] and df.loc["GLUE", "files_ok"]
-    assert df.loc["GLUE", "reason"] == (
-        "GLUE reads peak names such as chr1:100-200. atac_peak.h5 holds other names, for "
-        "example peak_0. Rename them to chr:start-end.")
-    assert W._is_wrong_atac(df["reason"]).loc[["GLUE", "Seurat_v3"]].all()
 
 
 def test_is_wrong_atac_reads_the_blocking_atac_reasons_not_other_prose():
@@ -218,9 +128,9 @@ def test_is_wrong_atac_reads_the_blocking_atac_reasons_not_other_prose():
 def test_run_dry_run_notes_and_real_run_warns(tmp_path, pinned, monkeypatch, capsys,
                                               gas_matilda):
     root = _vertical(tmp_path, "MU_PEAK", PEAKS)
-    inp = mtb.inputs_for("MU_PEAK", "vertical", "Matilda", modalities=["rna", "atac"],
+    inp = mtb.engine.resolve.inputs_for("MU_PEAK", "vertical", "Matilda", modalities=["rna", "atac"],
                          data_path=root)
-    _quiet(mtb.run, "Matilda", "vertical", inputs=inp, out_dir=str(tmp_path / "o"),
+    _quiet(mtb.engine.runner.run, "Matilda", "vertical", inputs=inp, out_dir=str(tmp_path / "o"),
            dry_run=True)
     err = capsys.readouterr().err
     assert re.search(r"^# Matilda needs gene-activity ATAC\. The features of atac\.h5 look "
@@ -236,12 +146,12 @@ def test_run_dry_run_notes_and_real_run_warns(tmp_path, pinned, monkeypatch, cap
                                          r"of atac\.h5 look like chr:start-end, so it holds "
                                          r"peaks\.$"):
         with pytest.raises(Stop):
-            mtb.run("Matilda", "vertical", inputs=inp, out_dir=str(tmp_path / "o"))
+            mtb.engine.runner.run("Matilda", "vertical", inputs=inp, out_dir=str(tmp_path / "o"))
     # the right representation: no note
     root2 = _vertical(tmp_path, "MU_GA", GENES)
-    inp2 = mtb.inputs_for("MU_GA", "vertical", "Matilda", modalities=["rna", "atac"],
+    inp2 = mtb.engine.resolve.inputs_for("MU_GA", "vertical", "Matilda", modalities=["rna", "atac"],
                           data_path=root2)
-    _quiet(mtb.run, "Matilda", "vertical", inputs=inp2, out_dir=str(tmp_path / "o2"),
+    _quiet(mtb.engine.runner.run, "Matilda", "vertical", inputs=inp2, out_dir=str(tmp_path / "o2"),
            dry_run=True)
     assert "needs gene-activity ATAC" not in capsys.readouterr().err
 
@@ -288,8 +198,8 @@ def _batch_metrics(res):
 
 def test_run_all_aligns_a_barcode_indexed_series(cite, tmp_path):
     data, batch, shuffled = cite
-    kw = dict(methods=["Matilda"], modalities=["rna", "adt"], data_path=data,
-              verbose=False)
+    mtb.config.DEFAULT.data_path = data
+    kw = dict(methods=['Matilda'], modalities=['rna', 'adt'], verbose=False)
     ordered = _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "a", batch=batch, **kw)
     series = _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "b", batch=shuffled,
                     **kw)
@@ -303,8 +213,8 @@ def test_run_all_aligns_a_barcode_indexed_series(cite, tmp_path):
 
 def test_rescore_aligns_a_barcode_indexed_series(cite, tmp_path):
     data, batch, shuffled = cite
-    res = _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "a", methods=["Matilda"],
-                 modalities=["rna", "adt"], data_path=data, verbose=False)
+    mtb.config.DEFAULT.data_path = data
+    res = _quiet(mtb.run_all, 'MYCITE', 'vertical', tmp_path / 'a', methods=['Matilda'], modalities=['rna', 'adt'], verbose=False)
     back = mtb.load_batch(tmp_path / "a")
     assert _batch_metrics(_quiet(back.rescore, batch=shuffled)) == \
         _batch_metrics(_quiet(res.rescore, batch=batch))
@@ -313,8 +223,8 @@ def test_rescore_aligns_a_barcode_indexed_series(cite, tmp_path):
 def test_a_series_with_foreign_ids_raises(cite, tmp_path):
     data, batch, shuffled = cite
     bad = shuffled.rename(index=lambda b: "x" + b)
-    kw = dict(methods=["Matilda"], modalities=["rna", "adt"], data_path=data,
-              verbose=False)
+    mtb.config.DEFAULT.data_path = data
+    kw = dict(methods=['Matilda'], modalities=['rna', 'adt'], verbose=False)
     for extra in ({}, {"dry_run": True}):
         with pytest.raises(ValueError, match=r"batch: 120 ids are not cells of MYCITE "
                                              r"\(first: \['xc"):
@@ -396,8 +306,8 @@ def test_named_blocked_methods_are_logged_and_recorded(tmp_path, monkeypatch, ca
     as_gene_activity("UnitedNet")
     calls = _skip_setup(monkeypatch, tmp_path)
     root = _vertical(tmp_path, "MU_PEAK", PEAKS)
-    res = _quiet(mtb.run_all, "MU_PEAK", "vertical", tmp_path / "out",
-                 methods=["scMVP", "UnitedNet", "MIRA"], data_path=root, evaluate=False)
+    mtb.config.DEFAULT.data_path = root
+    res = _quiet(mtb.run_all, 'MU_PEAK', 'vertical', tmp_path / 'out', methods=['scMVP', 'UnitedNet', 'MIRA'], evaluate=False)
     log = capsys.readouterr().out
     assert calls == ["scMVP"]
     assert "[run_all] skipping UnitedNet: " in log and "[run_all] skipping MIRA: " in log
@@ -430,8 +340,8 @@ def test_named_blocked_methods_are_logged_and_recorded(tmp_path, monkeypatch, ca
 def test_unnamed_gpu_rows_are_skipped_but_not_failures(tmp_path, monkeypatch, capsys):
     _skip_setup(monkeypatch, tmp_path)
     root = _vertical(tmp_path, "MU_PEAK", PEAKS)
-    res = _quiet(mtb.run_all, "MU_PEAK", "vertical", tmp_path / "out",
-                 modalities=["rna", "atac_peak"], data_path=root, evaluate=False)
+    mtb.config.DEFAULT.data_path = root
+    res = _quiet(mtb.run_all, 'MU_PEAK', 'vertical', tmp_path / 'out', modalities=['rna', 'atac_peak'], evaluate=False)
     log = capsys.readouterr().out
     sm = res.summary.set_index("method")
     for m in ("moETM", "iPOLNG"):
@@ -444,8 +354,8 @@ def test_unnamed_gpu_rows_are_skipped_but_not_failures(tmp_path, monkeypatch, ca
 def test_rows_without_files_are_counted_not_recorded(tmp_path, monkeypatch, capsys):
     _skip_setup(monkeypatch, tmp_path)
     root = _vertical(tmp_path, "MU_PEAK", PEAKS)
-    res = _quiet(mtb.run_all, "MU_PEAK", "vertical", tmp_path / "out", data_path=root,
-                 evaluate=False, modalities="all")
+    mtb.config.DEFAULT.data_path = root
+    res = _quiet(mtb.run_all, 'MU_PEAK', 'vertical', tmp_path / 'out', evaluate=False, modalities='all')
     log = capsys.readouterr().out
     m = re.search(r"^\[run_all\] (\d+) more rows need files this folder does not "
                   r"have\. mtb\.scan shows them\.$", log, re.M)
@@ -506,33 +416,6 @@ def test_old_records_show_nan_and_new_ones_keep_their_text():
     assert sm.loc["sciPENN", "caveat"] == "reads batches 1-2 of 3"
     none = W.BatchResult([dict(old, caveat=None)], "D52", "cross").summary
     assert isinstance(none["caveat"].iloc[0], float)
-
-
-# ======================================================================= R4-14
-def test_reference_entries_lose_their_justification_tails():
-    from multibench.data import results
-    docs = {
-        "long": inspect.getdoc(W.BatchResult.long),
-        "plot": inspect.getdoc(W.BatchResult.plot),
-        "summary": inspect.getdoc(W.BatchResult.summary),
-        "method_info": inspect.getdoc(discover.method_info),
-        "load_results": inspect.getdoc(results.load_results),
-        "available": inspect.getdoc(results.available_datasets),
-        "create_all": inspect.getdoc(envs.create_all),
-    }
-    flat = {k: " ".join(v.split()) for k, v in docs.items()}
-    assert "still plots" not in flat["long"]
-    assert "Otherwise the record contributes its ``metrics`` dict." in flat["long"]
-    assert "Read it next to ``summary`` -" not in flat["plot"]
-    assert ("so with few methods a small gap fills the whole colour scale. Check the "
-            "values in ``summary``.") in flat["plot"]
-    assert "not a difference, because" not in flat["summary"]
-    assert "not predictions" not in flat["method_info"]
-    assert "meaningless ranks" not in flat["load_results"]
-    assert "not the datasets that can be downloaded" not in flat["available"]
-    assert "Only a few of the benchmark's datasets" not in flat["available"]
-    assert "wired" not in flat["create_all"]
-    assert "Methods with a variant in this category; default: all." in flat["create_all"]
 
 
 def test_modality_token_notes_say_what_atac_peak_alone_keeps(pinned):

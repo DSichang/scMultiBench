@@ -20,14 +20,14 @@ def _touch(d, names):
 def test_inputs_for_returns_absolute_paths_for_relative_data_path(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     _touch(tmp_path / "data" / "MYCITE", ["rna.h5", "adt.h5", "cty.csv"])
-    got = mtb.inputs_for("MYCITE", "vertical", "Matilda", modalities=["rna", "adt"],
+    got = mtb.engine.resolve.inputs_for("MYCITE", "vertical", "Matilda", modalities=["rna", "adt"],
                          data_path="data", check=False)
     assert all(os.path.isabs(p) for p in got.values()), got
     assert got["rna"] == str(tmp_path / "data" / "MYCITE" / "rna.h5")
     # a data_dir method: absolute AND trailing separator
     dd = tmp_path / "data" / "MYDIAG"
     _touch(dd, ["rna.h5", "atac_gas.h5", "rna_cty.csv", "atac_cty.csv"])
-    got = mtb.inputs_for("MYDIAG", "diagonal", "scBridge", data_path="data", check=False)
+    got = mtb.engine.resolve.inputs_for("MYDIAG", "diagonal", "scBridge", data_path="data", check=False)
     assert os.path.isabs(got["data_dir"]) and got["data_dir"].endswith(os.sep)
     assert got["data_dir"] == os.path.join(str(dd), "")
 
@@ -36,28 +36,28 @@ def test_atac_means_any_atac_role(tmp_path):
     _touch(tmp_path / "SYNMULTI", ["rna.h5", "atac.h5", "cty.csv"])
     # scMM's vertical variant is declared [rna, atac] since 0.4.0 (X13); 0.3's
     # atac_gas still reaches it; the file is atac.h5 either way
-    a = mtb.inputs_for("SYNMULTI", "vertical", "scMM", modalities=["rna", "atac"],
+    a = mtb.engine.resolve.inputs_for("SYNMULTI", "vertical", "scMM", modalities=["rna", "atac"],
                        data_path=tmp_path, check=True)
-    b = mtb.inputs_for("SYNMULTI", "vertical", "scMM", modalities=["rna", "atac_gas"],
+    b = mtb.engine.resolve.inputs_for("SYNMULTI", "vertical", "scMM", modalities=["rna", "atac_gas"],
                        data_path=tmp_path, check=True)
     assert a == b and set(a) == {"rna", "atac"} and a["atac"].endswith("/atac.h5")
     # exact tokens still win when they exist; an unrelated set still raises KeyError
     with pytest.raises(KeyError, match="no variant for category='vertical'"):
-        mtb.inputs_for("SYNMULTI", "vertical", "scMM", modalities=["adt", "atac"],
+        mtb.engine.resolve.inputs_for("SYNMULTI", "vertical", "scMM", modalities=["adt", "atac"],
                        data_path=tmp_path, check=False)
     # the aliases the layout text uses reach the same variant
-    c = mtb.inputs_for("SYNMULTI", "vertical", "scMM", modalities=["rna", "gas"],
+    c = mtb.engine.resolve.inputs_for("SYNMULTI", "vertical", "scMM", modalities=["rna", "gas"],
                        data_path=tmp_path, check=False)
     assert c == a
 
 
 def test_folder_disambiguates_multi_variant_method(tmp_path):
     _touch(tmp_path / "D11", ["rna.h5", "adt.h5", "cty.csv"])
-    got = mtb.inputs_for("D11", "vertical", "Matilda", data_path=tmp_path, check=True)
+    got = mtb.engine.resolve.inputs_for("D11", "vertical", "Matilda", data_path=tmp_path, check=True)
     assert set(got) == {"rna", "adt", "cty"}
     # scMM as well: vertical rna+adt vs rna+atac, only atac.h5 present
     _touch(tmp_path / "SYNMULTI", ["rna.h5", "atac.h5", "cty.csv"])
-    got = mtb.inputs_for("SYNMULTI", "vertical", "scMM", data_path=tmp_path, check=True)
+    got = mtb.engine.resolve.inputs_for("SYNMULTI", "vertical", "scMM", data_path=tmp_path, check=True)
     assert set(got) == {"rna", "atac"}
 
 
@@ -66,7 +66,7 @@ def test_ambiguity_is_a_valueerror_listing_the_folder(tmp_path):
     # ValueError (and KeyError for old callers)
     _touch(tmp_path / "D11", ["rna.h5", "adt.h5", "atac.h5", "cty.csv"])
     with pytest.raises(ValueError) as e:
-        mtb.inputs_for("D11", "vertical", "VIMCCA", data_path=tmp_path)
+        mtb.engine.resolve.inputs_for("D11", "vertical", "VIMCCA", data_path=tmp_path)
     msg = str(e.value)
     assert isinstance(e.value, AmbiguousVariantError) and isinstance(e.value, KeyError)
     assert msg.startswith("VIMCCA has 2 vertical variants, rna+adt and rna+atac.")
@@ -74,17 +74,17 @@ def test_ambiguity_is_a_valueerror_listing_the_folder(tmp_path):
     assert msg.endswith("Pass modalities=['rna', 'adt'] or modalities=['rna', 'atac'].")
     assert not msg.startswith('"')          # plain message, no KeyError quoting
     # Matilda's rna+adt and rna+atac are inside its rna+adt+atac: the largest one
-    assert set(mtb.inputs_for("D11", "vertical", "Matilda", data_path=tmp_path)) == {
+    assert set(mtb.engine.resolve.inputs_for("D11", "vertical", "Matilda", data_path=tmp_path)) == {
         "rna", "adt", "atac", "cty"}
     # a folder with the files of neither: what it holds
     _touch(tmp_path / "D12", ["rna.h5", "cty.csv"])
     with pytest.raises(ValueError) as e:
-        mtb.inputs_for("D12", "vertical", "Matilda", data_path=tmp_path)
+        mtb.engine.resolve.inputs_for("D12", "vertical", "Matilda", data_path=tmp_path)
     assert (f"None of them has every input file in {tmp_path / 'D12'}. It holds cty.csv "
             f"and rna.h5.") in str(e.value)
     # nothing on disk -> same error, no folder note
     with pytest.raises(ValueError, match=r"variants, rna\+adt and rna\+atac\. Pass modalities="):
-        mtb.inputs_for("D99", "vertical", "VIMCCA", data_path=tmp_path)
+        mtb.engine.resolve.inputs_for("D99", "vertical", "VIMCCA", data_path=tmp_path)
 
 
 def test_labels_for_validates_method_and_returns_absolute(tmp_path, monkeypatch):

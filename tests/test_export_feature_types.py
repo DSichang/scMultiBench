@@ -203,12 +203,12 @@ def test_calls_that_pass(tmp_path):
     ingest.export_dataset(plain, tmp_path / "ONE", rna="X")
     del plain.var["feature_types"]
     ingest.export_dataset(plain, tmp_path / "NONE", rna="X")
-    ingest.to_canonical(genes, tmp_path / "rna.h5", modality="rna")
+    ingest._to_canonical(genes, tmp_path / 'rna.h5', modality='rna')
     # an obsm matrix has no var axis, so the column says nothing about it
     arc.obsm["protein"] = pd.DataFrame(np.ones((arc.n_obs, 3)), index=arc.obs_names,
                                        columns=["CD3", "CD4", "CD8"])
     ingest.export_dataset(arc, tmp_path / "OBSM", rna=None, adt="obsm:protein")
-    ingest.to_canonical(arc, tmp_path / "adt.h5", modality="adt", obsm="protein")
+    ingest._to_canonical(arc, tmp_path / 'adt.h5', modality='adt', obsm='protein')
 
 
 def test_a_missing_type_is_a_type(tmp_path):
@@ -232,88 +232,21 @@ def test_to_canonical(tmp_path):
     arc = _arc()
     for kw in (dict(modality="rna"), dict(modality="rna", layer="counts")):
         with pytest.raises(ValueError) as e:
-            ingest.to_canonical(arc, f"{tmp_path}/DIR/", **kw)
+            ingest._to_canonical(arc, f'{tmp_path}/DIR/', **kw)
         assert str(e.value) == F3
     assert not (tmp_path / "DIR").exists()
     # the file name says the modality when modality= does not
     with pytest.raises(ValueError) as e:
-        ingest.to_canonical(arc, tmp_path / "DIR" / "rna2.h5")
+        ingest._to_canonical(arc, tmp_path / 'DIR' / 'rna2.h5')
     assert str(e.value) == F3
     with pytest.raises(ValueError) as e:
-        ingest.to_canonical(arc, tmp_path / "DIR" / "atac_peak.h5")
+        ingest._to_canonical(arc, tmp_path / 'DIR' / 'atac_peak.h5')
     assert str(e.value) == _f3("Peaks")
     # neither: no type is offered
     with pytest.raises(ValueError) as e:
-        ingest.to_canonical(arc, tmp_path / "DIR" / "matrix.h5")
+        ingest._to_canonical(arc, tmp_path / 'DIR' / 'matrix.h5')
     assert str(e.value) == _f3("<type>")
     assert not (tmp_path / "DIR").exists()
-
-
-def test_the_conversion_inside_run(tmp_path, monkeypatch):
-    """mtb.run converts an .h5ad input to inputs/<role>.h5: the same check."""
-    src = tmp_path / "arc.h5ad"
-    _arc().write_h5ad(src)
-    adt = ingest.to_canonical(_mixed([("Antibody Capture", 5, "CD")]), tmp_path / "adt.h5")
-    (tmp_path / "repo" / "tools_scripts").mkdir(parents=True)
-    monkeypatch.setattr(runner, "provide_script_files", lambda *a, **k: None)
-    monkeypatch.setattr(runner.subprocess, "Popen",
-                        lambda *a, **k: pytest.fail("the method was started"))
-    with pytest.raises(ValueError) as e:
-        mtb.run("scMDC", "vertical", inputs={"rna": str(src), "adt": str(adt)},
-                out_dir=str(tmp_path / "o"), cmd_template="{cmd}",
-                repo_path=str(tmp_path / "repo"))
-    assert str(e.value) == F3
-    assert not (tmp_path / "o" / "inputs" / "rna.h5").exists()
-
-
-# --------------------------------------------------------- the 10x .h5 file
-def _tenx_h5(path, n_cells=15):
-    """A 10x Genomics feature-barcode matrix as cellranger-arc writes it: a
-    sparse matrix (data, indices, indptr, shape) with its features."""
-    import scipy.sparse as sp
-    arc = _arc()[:n_cells]
-    m = sp.csc_matrix(arc.X.T)                       # features x barcodes
-    with h5py.File(path, "w") as f:
-        g = f.create_group("matrix")
-        g.create_dataset("data", data=m.data.astype("int32"))
-        g.create_dataset("indices", data=m.indices)
-        g.create_dataset("indptr", data=m.indptr)
-        g.create_dataset("shape", data=np.array(m.shape, dtype="int32"))
-        g.create_dataset("barcodes", data=np.array(arc.obs_names, dtype="S"))
-        ft = g.create_group("features")
-        ft.create_dataset("id", data=np.array(arc.var_names, dtype="S"))
-        ft.create_dataset("name", data=np.array(arc.var_names, dtype="S"))
-        ft.create_dataset("feature_type", data=np.array(arc.var["feature_types"], dtype="S"))
-        ft.create_dataset("genome", data=np.array(arc.var["genome"], dtype="S"))
-    return path
-
-
-def test_read_canonical_names_a_10x_file(tmp_path):
-    """The reader of dataset files said "not enough values to unpack" for a
-    10x file. Whatever it read back before, it reads back."""
-    src = _tenx_h5(tmp_path / "filtered_feature_bc_matrix.h5")
-    for path in (src, str(src)):
-        with pytest.raises(ValueError) as e:
-            mtb.io.read_canonical(path)
-        assert str(e.value) == ingest._tenx_message(path) == (
-            f"{src} is a 10x Genomics file. {RECIPE}")
-    # a dataset file, with its shape and names
-    arc = _arc()
-    made = ingest.to_canonical(arc[:, :GENES].copy(), tmp_path / "rna.h5")
-    back = mtb.io.read_canonical(made)
-    assert back.shape == (arc.n_obs, GENES) and list(back.obs_names) == list(arc.obs_names) \
-        and list(back.var_names) == list(arc.var_names[:GENES])
-    # a 2-D matrix/data is read as before, whatever lies next to it
-    odd = tmp_path / "odd.h5"
-    with h5py.File(odd, "w") as f:
-        f.create_dataset("matrix/data", data=np.arange(12.0).reshape(3, 4))
-        f.create_dataset("matrix/indptr", data=np.arange(3))
-    assert ingest._is_tenx_h5(odd) and mtb.io.read_canonical(odd, sparse=False).shape == (4, 3)
-    # a method's embedding file (one dataset data) is read into obsm since 0.4.0 (X83)
-    bare = tmp_path / "bare.h5"
-    with h5py.File(bare, "w") as f:
-        f.create_dataset("data", data=np.zeros((3, 4)))
-    assert mtb.io.read_canonical(bare).obsm["X_emb"].shape == (4, 3)
 
 
 def test_other_h5_files_keep_their_message(tmp_path):
@@ -322,7 +255,7 @@ def test_other_h5_files_keep_their_message(tmp_path):
     with h5py.File(p, "w") as f:
         f.create_dataset("data", data=np.zeros((3, 4)))
     with pytest.raises(ValueError) as e:
-        ingest.to_canonical(p, tmp_path / "x.h5")
+        ingest._to_canonical(p, tmp_path / 'x.h5')
     assert str(e.value) == (
         f"{p} has no dataset 'matrix/data'; found keys ['data'] - a canonical input .h5 "
         f"holds matrix/data (features x cells), matrix/features and matrix/barcodes (a "
@@ -341,7 +274,7 @@ def test_other_h5_files_keep_their_message(tmp_path):
     assert ingest._is_canonical_h5(r) is False
     for path in (q, r):
         with pytest.raises(ValueError) as e:
-            ingest.to_canonical(path, tmp_path / "OUT" / "rna.h5", modality="rna")
+            ingest._to_canonical(path, tmp_path / 'OUT' / 'rna.h5', modality='rna')
         assert str(e.value) == (
             f"{path} has no 2-D dataset 'matrix/data'; found keys ['matrix'] - a canonical "
             f"input .h5 holds matrix/data (features x cells), matrix/features and "
@@ -365,9 +298,9 @@ def test_canonical_files_still_pass(tmp_path):
     not_canonical = [str(p) for p in files if not ingest._is_canonical_h5(p)]
     assert not not_canonical
     for p in files[:3]:
-        assert ingest.to_canonical(p, tmp_path / "copy.h5") == p         # passed through
+        assert ingest._to_canonical(p, tmp_path / 'copy.h5') == p         # passed through
     assert not (tmp_path / "copy.h5").exists()
-    made = ingest.to_canonical(_mixed([("Gene Expression", 5, "G")]), tmp_path / "rna.h5")
-    assert ingest._is_canonical_h5(made) and ingest.to_canonical(made) == made
+    made = ingest._to_canonical(_mixed([('Gene Expression', 5, 'G')]), tmp_path / 'rna.h5')
+    assert ingest._is_canonical_h5(made) and ingest._to_canonical(made) == made
 
 

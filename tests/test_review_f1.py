@@ -10,6 +10,7 @@
 - scan keeps one exact combination; find_methods keeps the variants that read
   at least the named modalities; both docstrings say so (L13).
 """
+import os
 import re
 import warnings
 
@@ -49,14 +50,14 @@ def test_two_representations_select_the_methods_that_read_both_files(data):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         sc = full_scan("D28", "diagonal", modalities=BOTH, data_path=data, verbose=False)
-        plan = mtb.run_all("D28", "diagonal", modalities=BOTH, data_path=data, dry_run=True)
+        plan = mtb.run_all(os.path.join(data, 'D28'), 'diagonal', modalities=BOTH, dry_run=True)
     want = {"MultiMAP", "Seurat_v3"}
     assert set(sc["method"]) == want and set(plan["method"]) == want
     assert set(sc["modalities"]) == {"rna+atac_peak+atac_gas"}
     assert set(mtb.find_methods("diagonal", modalities=BOTH)) == want
     assert set(mtb.find_methods("diagonal", modalities=["peak", "gas"])) == want
     # inputs_for agrees (it did before, and still does)
-    inp = mtb.inputs_for("D28", "diagonal", "MultiMAP", modalities=BOTH, data_path=data)
+    inp = mtb.engine.resolve.inputs_for("D28", "diagonal", "MultiMAP", modalities=BOTH, data_path=data)
     assert {"atac_peak", "atac_gas"} <= set(inp)
 
 
@@ -77,7 +78,7 @@ def test_a_two_file_method_gets_no_representation_caveat(data):
 ])
 def test_inputs_for_applies_the_representation_rule(data, ds, cat, method, mods, msg):
     with pytest.raises(KeyError, match=re.escape(msg)):
-        mtb.inputs_for(ds, cat, method, modalities=mods, data_path=data)
+        mtb.engine.resolve.inputs_for(ds, cat, method, modalities=mods, data_path=data)
     # scan leaves the same method out for the same tokens
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -88,15 +89,15 @@ def test_inputs_for_applies_the_representation_rule(data, ds, cat, method, mods,
 def test_inputs_for_keeps_a_variants_own_roles_and_matching_tokens(data):
     # moETM reads peaks under the role atac since 0.4.0 (X13); 0.3's atac_gas
     # spelling still reaches it
-    assert "atac" in mtb.inputs_for("D11", "vertical", "moETM",
+    assert "atac" in mtb.engine.resolve.inputs_for("D11", "vertical", "moETM",
                                     modalities=["rna", "atac_gas"], data_path=data,
                                     check=False)
-    assert "atac" in mtb.inputs_for("D11", "vertical", "moETM",
+    assert "atac" in mtb.engine.resolve.inputs_for("D11", "vertical", "moETM",
                                     modalities=["rna", "peak"], data_path=data,
                                     check=False)
-    assert "atac" in mtb.inputs_for("D11", "vertical", "Matilda",
+    assert "atac" in mtb.engine.resolve.inputs_for("D11", "vertical", "Matilda",
                                     modalities=["rna", "peak"], data_path=data, check=False)
-    assert "atac_gas" in mtb.inputs_for("D28", "diagonal", "SCALEX",
+    assert "atac_gas" in mtb.engine.resolve.inputs_for("D28", "diagonal", "SCALEX",
                                         modalities=["rna", "atac"], data_path=data,
                                         check=False)
 
@@ -108,7 +109,7 @@ def test_the_vocabulary_message_calls_peak_and_gas_representation_tokens():
     assert "aliases: peak" not in msg
     assert "atac_peak (or peak, peaks) and atac_gas (or gas, gene_activity) name the " \
            "ATAC form a method reads" in msg
-    notes = mtb.inputs_for.__doc__
+    notes = mtb.engine.resolve.inputs_for.__doc__
     assert "``peak`` / ``peaks`` for ``atac_peak``" not in notes
 
 
@@ -126,18 +127,6 @@ def test_scan_keeps_one_combination_and_find_methods_at_least(data):
     scan_doc, fm_doc = mtb.scan.__doc__, mtb.find_methods.__doc__
     assert "the rule is the one ``mtb.find_methods`` uses" not in scan_doc
     assert "a row's modalities must be exactly the named combination" not in fm_doc
-
-
-# ------------------------------------------------------------------ L61 method_info text
-@pytest.mark.parametrize("method", mtb.list_methods())
-def test_method_info_notes_and_setup_hint_hold_no_internal_names(method):
-    info = mtb.method_info(method)
-    for key in ("notes", "setup_hint"):
-        text = str(info.get(key) or "")
-        for bad in ("engine/", "source()d", ".yaml"):
-            assert bad not in text, (method, key, bad)
-    if method == "StabMap":
-        assert info["notes"].endswith("using shared and unshared features; R.")
 
 
 # ------------------------------------------------------------------ L48 BatchResult.plot
@@ -165,7 +154,7 @@ def test_the_loom_hint_names_the_distribution(tmp_path, monkeypatch):
     monkeypatch.setattr(builtins, "__import__", no_loompy)
     (tmp_path / "x.loom").write_bytes(b"")
     with pytest.raises(ImportError) as ei:
-        ingest.to_canonical(tmp_path / "x.loom", tmp_path / "x.h5", modality="rna")
+        ingest._to_canonical(tmp_path / 'x.loom', tmp_path / 'x.h5', modality='rna')
     assert "pip install 'multibench-sc[loom]'" in str(ei.value)
     assert "'multibench[loom]'" not in str(ei.value)
     from multibench.engine import runner
@@ -207,20 +196,6 @@ def test_reference_docstrings_use_plain_words(name, obj):
                    "mtb.env.default_env_name", "host_platform_problem", "failed silently",
                    "OUT_DIR_PLACEHOLDER", "output_urls.json"):
         assert banned not in flat, (name, banned)
-
-
-def test_signatures_render_without_internal_names():
-    import inspect
-    # 0.4: list_methods is the deprecated name of find_methods
-    assert inspect.signature(mtb.list_methods) == inspect.signature(mtb.find_methods)
-    assert "out_dir" not in inspect.signature(mtb.scan).parameters
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", FutureWarning)
-        assert mtb.list_methods(task="clustering") == mtb.find_methods(task="clustering")
-        with pytest.raises(TypeError, match="unexpected keyword argument 'bogus'"):
-            mtb.list_methods(bogus=1)
-    assert mtb.catalog.metrics.__doc__.splitlines()[0] == \
-        "Table describing the metrics: one row per metric code."
 
 
 def test_module_help_is_written_for_users():

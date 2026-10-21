@@ -86,8 +86,8 @@ def test_uinmf_reads_every_batch_of_d52_and_its_two_batch_variant_says_what_it_s
     labels_for and the caveat of that scan row say so."""
     import multibench as mtb
     two = ["rna1", "rna2", "adt1", "adt2"]
-    assert list(mtb.labels_for("D52", "cross", "UINMF")) == ["cty1", "cty2", "cty3"]
-    assert list(mtb.labels_for("D52", "cross", "UINMF", modalities=two)) == ["cty1", "cty2"]
+    assert list(mtb.engine.resolve.labels_for("D52", "cross", "UINMF")) == ["cty1", "cty2", "cty3"]
+    assert list(mtb.engine.resolve.labels_for("D52", "cross", "UINMF", modalities=two)) == ["cty1", "cty2"]
     sc = full_scan("D52", "cross", methods=["UINMF"], verbose=False)
     sc = sc[sc.files_ok].set_index("modalities")
     # the dry run's one line says the three-batch row runs instead (X68, r3)

@@ -105,27 +105,6 @@ def test_evaluate_takes_the_labels_for_dict_as_is(tmp_path, method, category, fi
     assert _value(worse, "ARI") < _value(got, "ARI") - 0.1
 
 
-def test_a_copied_or_reordered_dict_is_checked_like_any_dict(tmp_path):
-    """Only the dict labels_for returned, in the order it returned it, goes in
-    as is; a copy or an edit is held to the default order like any dict."""
-    pytest.importorskip("scib")
-    emb = _stacked_dataset(tmp_path, *_CASES[0][2:])
-    d = resolve.labels_for("SYN", "mosaic", "SMILE", data_path=tmp_path)
-    with pytest.raises(ValueError) as exc:
-        mtb.evaluate(emb, labels=dict(d), metrics=["ASW"], verbose=False)
-    msg = str(exc.value)
-    assert "Pass a list of paths in cell order, or dataset=, category= and method=." in msg
-    moved = resolve.labels_for("SYN", "mosaic", "SMILE", data_path=tmp_path)
-    moved["cty2"] = moved.pop("cty2")          # same keys, cty2 moved to the end
-    with pytest.raises(ValueError, match="nor the default order"):
-        mtb.evaluate(emb, labels=moved, metrics=["ASW"], verbose=False)
-    # label_order= (deprecated) still overrides the recorded order
-    with pytest.warns(FutureWarning, match=r"evaluate\(label_order=\) is deprecated"):
-        got = mtb.evaluate(emb, labels=d, label_order=["cty2", "cty1", "cty3"],
-                           metrics=["ASW"], verbose=False)
-    assert _value(got, "ASW") > 0.9
-
-
 def test_the_error_hint_is_valid_for_every_wired_variant(root):
     """The ValueError for a mis-ordered dict recommends
     labels_for(dataset, method=..., category=...): that dict must never raise
@@ -140,7 +119,7 @@ def test_the_error_hint_is_valid_for_every_wired_variant(root):
             if not any(v.when.get("category") == cat for v in spec.variants):
                 continue
             d = resolve.labels_for(ds, cat, spec.id, data_path=data)
-            assert _labels_from_dict(d, None) == list(d.values()), (ds, spec.id)
+            assert _labels_from_dict(d) == list(d.values()), (ds, spec.id)
             checked += 1
     assert checked > 20
 

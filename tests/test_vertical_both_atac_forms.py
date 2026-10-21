@@ -39,7 +39,7 @@ def both(tmp_path):
     ("iPOLNG", ["rna", "atac_gas"]), ("moETM", ["rna", "atac_gas"]), ("scMM", ["rna", "atac_gas"]),
 ])
 def test_each_method_reads_the_form_it_needs(both, method, mods):
-    got = mtb.inputs_for("BOTH", "vertical", method, modalities=mods, data_path=both)
+    got = mtb.engine.resolve.inputs_for("BOTH", "vertical", method, modalities=mods, data_path=both)
     atac = next(Path(v).name for k, v in got.items() if "atac" in k)
     want = {"peak": "atac_peak.h5", "gene_activity": "atac_gas.h5"}[mtb.method_info(method)["atac"]]
     assert atac == want
@@ -51,7 +51,7 @@ def test_a_folder_with_one_atac_file_is_read_as_before(tmp_path):
     _h5(d / "rna.h5", ["G1", "G2", "G3"])
     _h5(d / "atac.h5", ["chr1:1-100", "chr1:200-300"])
     (d / "cty.csv").write_text("x\n" + "a\n" * 6)
-    got = mtb.inputs_for("ONE", "vertical", "MIRA", modalities=["rna", "atac"], data_path=tmp_path)
+    got = mtb.engine.resolve.inputs_for("ONE", "vertical", "MIRA", modalities=["rna", "atac"], data_path=tmp_path)
     assert Path(got["atac"]).name == "atac.h5"
 
 

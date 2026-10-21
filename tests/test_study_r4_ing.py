@@ -36,20 +36,6 @@ MATILDA = ["scan", "D11", "--category", "vertical", "--methods", "Matilda",
            "--modalities", "rna,adt"]
 
 
-def _upstream(path):
-    """A local git repository standing in for PYangLab/scMultiBench; returns HEAD."""
-    ep = path / registry.get("Matilda").variants[0].entrypoint
-    ep.parent.mkdir(parents=True)
-    ep.write_text("print(1)\n")
-    env = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t",
-           "GIT_COMMITTER_EMAIL": "t@t", "HOME": str(path), "PATH": "/usr/bin:/bin"}
-    for argv in (["git", "init", "-q"], ["git", "add", "."],
-                 ["git", "commit", "-q", "-m", "x"], ["git", "tag", "v1"]):
-        subprocess.run(argv, cwd=path, check=True, env=env)
-    return subprocess.run(["git", "rev-parse", "HEAD"], cwd=path, check=True,
-                          capture_output=True, text=True).stdout.strip()
-
-
 @pytest.fixture
 def host(tmp_path, monkeypatch):
     """No scripts in the package root; every env installed; a GPU; no ref pinned."""
@@ -58,23 +44,6 @@ def host(tmp_path, monkeypatch):
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
     monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
     return tmp_path
-
-
-def _use(monkeypatch, repo):
-    monkeypatch.setattr(config.DEFAULT, "repo_path", repo)
-
-
-@needs_git
-def test_first_run_fills_an_empty_folder_at_a_ref(host, monkeypatch):
-    head = _upstream(host / "upstream")
-    monkeypatch.setattr(config, "SCRIPTS_URL", (host / "upstream").as_uri())
-    target = host / "scripts"
-    (target / config._PARTIAL / "junk").mkdir(parents=True)   # an interrupted fetch
-    assert config.scripts_folder_problem(target) is None
-    assert config.ensure_repo(target, ref="v1") == target
-    assert config.scripts_commit(target) == head
-    assert config.scripts_ref_problem(target) is None
-    assert not (target / config._PARTIAL).exists()
 
 
 def test_a_failed_fetch_leaves_the_empty_folder_as_it_was(host, monkeypatch):
@@ -87,15 +56,6 @@ def test_a_failed_fetch_leaves_the_empty_folder_as_it_was(host, monkeypatch):
     with pytest.raises(RuntimeError, match="^Could not reach github.com"):
         config.ensure_repo(target)
     assert target.is_dir() and not os.listdir(target)
-
-
-def test_config_keeps_the_fetch_hint_for_an_empty_folder(host, monkeypatch):
-    target = host / "scripts"
-    target.mkdir()
-    _use(monkeypatch, target)
-    row = next(r for r in config._sources() if r["name"] == "scripts_commit")
-    assert (row["value"], row["source"]) == (
-        "not fetched", "multibench fetch --scripts fetches the method scripts")
 
 
 # ================================================= (2) --strict: scripts not fetched

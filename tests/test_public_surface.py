@@ -49,17 +49,6 @@ def test_io_all_is_exactly_the_contract():
     assert _leaks(mtb.io) == set()
 
 
-def test_env_all_is_exactly_the_contract():
-    assert set(mtb.env.__all__) == ENV_ALL and mtb.env is envs
-    # dir(mtb.env) is __all__ since 0.4.0 (X34); recipe and the helpers stay importable
-    assert _leaks(mtb.env) == set()
-    assert callable(mtb.env.recipe) and callable(mtb.env.host_has_gpu)
-    # the rest of engine/envs.py stays importable for the CLI and the tests
-    for name in ("group_for", "create_all", "install_packed", "installed_envs",
-                 "default_env_name", "packed_sizes", "packed_manifest"):
-        assert callable(getattr(envs, name)) and name not in dir(mtb.env)
-
-
 def test_config_all_is_exactly_the_contract():
     assert set(mtb.config.__all__) == CONFIG_ALL
     assert _leaks(mtb.config) == set()
@@ -77,63 +66,9 @@ def test_catalog_and_data_all_are_exactly_the_contract():
 def test_plot_all_is_exactly_the_contract():
     assert set(mtb.plot.__all__) == PLOT_ALL
     assert _leaks(mtb.plot) == set()
-    # render / FamilyBlock stay importable but are not advertised
-    assert callable(mtb.plot.render) and mtb.plot.FamilyBlock is not None
-
-
-# ------------------------------------------------------------------ 0.4.0 deprecations
-def _one_future_warning(call):
-    """``(result, message)`` of ``call()``, which must emit exactly one FutureWarning."""
-    with warnings.catch_warnings(record=True) as rec:
-        warnings.simplefilter("always")
-        out = call()
-    future = [str(w.message) for w in rec if issubclass(w.category, FutureWarning)]
-    assert len(future) == 1, future
-    return out, future[0]
-
-
-def test_sweep_warns_once_and_still_loops_over_run_all(monkeypatch, tmp_path):
-    import pandas as pd
-    from types import SimpleNamespace
-    from multibench import workflow
-    seen = []
-
-    def fake_run_all(dataset, category, **kw):
-        seen.append((kw["params"], kw.get("dry_run", False)))
-        return SimpleNamespace(summary=pd.DataFrame({"method": ["Matilda"]}),
-                               long=pd.DataFrame())
-    monkeypatch.setattr(workflow, "_run_all", fake_run_all)
-    out, msg = _one_future_warning(lambda: mtb.sweep("D11", "vertical", "Matilda", "epochs",
-                                                     [1, 2], out_dir=tmp_path, verbose=False))
-    assert msg == ("sweep is deprecated and will be removed in 0.5. Use a loop over "
-                   "mtb.run_all(params=...).")
-    assert list(out["epochs"]) == [1, 2]
-    assert seen == [({"Matilda": {"epochs": 1}}, True), ({"Matilda": {"epochs": 1}}, False),
-                    ({"Matilda": {"epochs": 2}}, False)]
-
-
-def test_to_canonical_warns_once_and_still_writes(tmp_path):
-    import anndata as ad
-    import numpy as np
-    a = ad.AnnData(np.ones((4, 3), dtype=np.float32))
-    a.var_names = ["g1", "g2", "g3"]
-    out, msg = _one_future_warning(lambda: mtb.io.to_canonical(a, tmp_path / "rna.h5"))
-    assert msg.startswith("io.to_canonical is deprecated and will be removed in 0.5. Use ")
-    assert mtb.io.read_canonical(out).shape == (4, 3)
-
-
-# ------------------------------------------------------------------ deprecated aliases
-@pytest.mark.parametrize("name, new", [
-    ("plan", "mtb.run_all(..., dry_run=True)"),
-    ("plan_commands", "mtb.run_all(..., dry_run=True)"),
-    ("runtime_hint", "mtb.method_info(method)['runtime']"),
-])
-def test_the_02_names_are_removed_naming_the_replacement(name, new):
-    """0.4 removes them, as their 0.3 warnings said; the error names what replaces them."""
-    with pytest.raises(AttributeError) as e:
-        getattr(mtb, name)
-    assert str(e.value) == f"mtb.{name} was removed in 0.4. Use {new}."
-    assert name not in mtb.__all__ and name not in dir(mtb)
+    # the drawing internals stay in their module
+    from multibench.plot import bubble as B
+    assert callable(B.render) and B.FamilyBlock is not None
 
 
 # ------------------------------------------------------------------ removed names / kwargs
@@ -141,17 +76,9 @@ def test_command_preview_is_gone_use_run_dry_run():
     assert not hasattr(mtb, "command_preview")
     from multibench import workflow
     assert not hasattr(workflow, "command_preview")
-    inp = mtb.inputs_for("D11", "vertical", "Matilda", modalities=["rna", "adt"])
-    argv = mtb.run("Matilda", "vertical", inputs=inp, out_dir="o", dry_run=True)
+    inp = mtb.engine.resolve.inputs_for("D11", "vertical", "Matilda", modalities=["rna", "adt"])
+    argv = mtb.engine.runner.run("Matilda", "vertical", inputs=inp, out_dir="o", dry_run=True)
     assert isinstance(argv, list) and "--save_path" in argv
-
-
-def test_run_task_is_keyword_only():
-    inp = mtb.inputs_for("D11", "vertical", "Matilda", modalities=["rna", "adt"])
-    with pytest.raises(TypeError):
-        mtb.run("Matilda", "vertical", "clustering", inputs=inp, out_dir="o", dry_run=True)
-    assert mtb.run("Matilda", "vertical", task="clustering", inputs=inp, out_dir="o",
-                   dry_run=True)
 
 
 def test_io_from_mudata_and_write_labels_are_gone():
@@ -190,22 +117,6 @@ def test_cite_methods_keyword_is_gone():
     assert inspect.signature(mtb.cite).parameters["format"].default == "text"
 
 
-def test_inputs_for_old_order_raises_the_contract_message():
-    with pytest.raises(TypeError) as e:
-        mtb.inputs_for("D11", "Matilda", "vertical")
-    assert str(e.value) == ("inputs_for argument order is (dataset, category, method) "
-                            "since 0.3.0; you passed (dataset, method, category)")
-    with pytest.raises(TypeError) as e:
-        mtb.labels_for("D11", "Matilda", "vertical")
-    assert str(e.value) == ("labels_for argument order is (dataset, category, method) "
-                            "since 0.3.0; you passed (dataset, method, category)")
-    # modalities / data_path / check are keyword-only in both
-    with pytest.raises(TypeError):
-        mtb.inputs_for("D11", "vertical", "Matilda", ["rna", "adt"])
-    with pytest.raises(TypeError):
-        mtb.labels_for("D11", "vertical", "Matilda", ["rna", "adt"])
-
-
 def test_scan_data_path_is_keyword_only_and_the_plan_has_command():
     with pytest.raises(TypeError):
         mtb.scan("D11", "vertical", "data")
@@ -231,36 +142,6 @@ def test_rescore_only_is_gone():
     with pytest.raises(TypeError, match="only"):
         res.rescore(only={"ARI"})
     assert "metrics" in inspect.signature(mtb.BatchResult.rescore).parameters
-
-
-# ------------------------------------------------------------------ env.install
-def test_env_install_is_the_cli_code_path(monkeypatch):
-    rows = [{"env": "scmb_torch", "methods": ["SCALEX"], "exists": False, "has_lock": True,
-             "cmds": []},
-            {"env": "have_it", "methods": ["Z"], "exists": True, "has_lock": True, "cmds": []}]
-    seen = {}
-
-    def fake_create_all(**kw):
-        seen.update(kw)
-        return rows
-    monkeypatch.setattr(envs, "create_all", fake_create_all)
-    monkeypatch.setattr(envs, "install_packed", lambda env, **kw: pytest.fail("no download"))
-    monkeypatch.setattr(envs, "packed_manifest", lambda: {"scmb_torch": "https://x/t.tar.gz"})
-    out = mtb.env.install(["SCALEX"], category=None, packed=True, dry_run=True).to_dict("records")
-    assert seen == {"category": None, "methods": ["SCALEX"], "conda": None,
-                    "dry_run": True, "force": False}
-    assert [r["state"] for r in out] == ["packed archive published", "have"]
-    assert out[0]["packed_url"] == "https://x/t.tar.gz"
-    out = mtb.env.install(["SCALEX"], packed=False, dry_run=True).to_dict("records")
-    assert [r["state"] for r in out] == ["build(dry-run)", "have"]
-    with pytest.raises(KeyError, match="Did you mean"):
-        mtb.env.install(["StabMapp"], dry_run=True).to_dict("records")
-    # 0.4.0: build= replaces packed= (X25), installing is the default (X27), force= is
-    # hidden (X33)
-    sig = inspect.signature(mtb.env.install)
-    # 0.4.0: conda= is deprecated (kept, hidden from the signature)
-    assert list(sig.parameters) == ["methods", "category", "dry_run", "flavor", "build"]
-    assert sig.parameters["dry_run"].default is False and sig.parameters["build"].default is False
 
 
 # ------------------------------------------------------------------ CLI help names real functions

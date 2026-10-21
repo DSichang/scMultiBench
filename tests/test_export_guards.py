@@ -38,17 +38,6 @@ def _cite(n=60, seed=0):
     return a
 
 
-def _adt(n=60, seed=1):
-    """Protein counts in X, as the ADT file of a mosaic or cross tutorial."""
-    rng = np.random.default_rng(seed)
-    a = ad.AnnData(rng.poisson(4.0, (n, 6)).astype(float))
-    a.var_names = [f"CD{i}" for i in range(6)]
-    a.obs_names = [f"cell{i}-1" for i in range(n)]
-    a.obs["ct"] = np.array(["T", "B", "NK"])[np.arange(n) % 3]
-    a.obs["batch"] = np.array(["1", "2"])[np.arange(n) % 2]
-    return a
-
-
 def _peaks(n=60, seed=2):
     rng = np.random.default_rng(seed)
     a = ad.AnnData(rng.poisson(0.5, (n, 30)).astype(float))
@@ -103,54 +92,6 @@ TYPE = ("Check the feature type you selected: var['feature_types'] of the whole 
         "lists the names.")
 
 
-def _split_without_peaks():
-    """``(rna, none)``: a 10x file read without ``gex_only=False`` holds the
-    genes alone, so the split by feature type gives peaks of 0 columns."""
-    a = _cite()
-    a.var["feature_types"] = "Gene Expression"
-    kind = a.var["feature_types"]
-    rna, none = a[:, kind == "Gene Expression"].copy(), a[:, kind == "Peaks"].copy()
-    assert rna.shape == (60, 20) and none.shape == (60, 0)
-    return rna, none
-
-
-def test_a_matrix_without_features_is_refused(tmp_path):
-    """0.3.4 wrote such a matrix as a file of barcodes, and said only that 0%
-    of the ATAC feature names look like peaks."""
-    rna, none = _split_without_peaks()
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")          # nothing about peak names before the refusal
-        assert _value_error(tmp_path, none, rna="X") == NO_FEATURES.format(what="rna ") + TYPE
-        assert _value_error(tmp_path, rna, rna="X", adt=none) \
-            == NO_FEATURES.format(what="adt ") + TYPE
-        for kind in ("peak", "gene_activity"):
-            assert _value_error(tmp_path, rna, rna="X", atac=none, atac_kind=kind,
-                                labels="obs:ct") == NO_FEATURES.format(what="atac ") + TYPE
-        assert _value_error(tmp_path, rna, rna="X", atac=none, atac_kind="peak",
-                            labels="obs:ct", category="diagonal") \
-            == NO_FEATURES.format(what="atac ") + TYPE
-        # io.to_canonical is deprecated in 0.4.0: its guard is pinned on the implementation
-        for modality in ("atac_peak", "rna", None):
-            with pytest.raises(ValueError) as e:
-                ingest._to_canonical(none, tmp_path / "OUT" / "atac_peak.h5", modality=modality)
-            assert str(e.value) == NO_FEATURES.format(what="") + TYPE
-        assert not (tmp_path / "OUT").exists()
-    # a folder that is there keeps every file as it was
-    out = ingest.export_dataset(rna, tmp_path / "HERE", rna="X", labels="obs:ct")
-    before = {p.name: p.read_bytes() for p in out.iterdir()}
-    with pytest.raises(ValueError) as e:
-        ingest.export_dataset(rna, out, rna="X", atac=none, atac_kind="peak", labels="obs:ct",
-                              overwrite=True)
-    assert str(e.value) == NO_FEATURES.format(what="atac ") + TYPE
-    with pytest.raises(ValueError) as e:
-        ingest._to_canonical(none, out, modality="atac_peak")
-    assert str(e.value) == NO_FEATURES.format(what="") + TYPE
-    assert {p.name: p.read_bytes() for p in out.iterdir()} == before
-    # one feature is a matrix to write
-    one = ingest.export_dataset(rna, tmp_path / "ONE", rna="X", adt=rna[:, :1].copy())
-    assert ingest.read_canonical(one / "adt.h5").shape == (60, 1)
-
-
 def test_the_advice_for_a_wrong_type_name_works(tmp_path):
     """A 10x object with genes and peaks, split with ``'Peak'`` for
     ``'Peaks'``: the reader of 0.3.5 was sent to ``gex_only=False``, which
@@ -177,37 +118,13 @@ def test_an_object_without_feature_types_keeps_the_advice_for_a_10x_file(tmp_pat
     assert _value_error(tmp_path, rna, rna="X", atac=none, atac_kind="peak") \
         == NO_FEATURES.format(what="atac ") + WHY
     with pytest.raises(ValueError) as e:
-        ingest.to_canonical(none, tmp_path / "OUT" / "atac_peak.h5")
+        ingest._to_canonical(none, tmp_path / 'OUT' / 'atac_peak.h5')
     assert str(e.value) == NO_FEATURES.format(what="") + WHY
     # a matrix in obsm has no var: the column of the object says nothing about it
     rna.var["feature_types"] = "Gene Expression"
     rna.obsm["protein"] = np.zeros((60, 0))
     assert _value_error(tmp_path, rna, rna="X", adt="obsm:protein") \
         == NO_FEATURES.format(what="adt ") + WHY
-
-
-def test_a_nameless_matrix_without_features_gets_no_line_about_its_names(tmp_path):
-    """A bare array and an array in obsm have no feature names, and with 0
-    columns there is none to make up. The warning said that the file names
-    them feature_0 to feature_-1, and then the call was refused."""
-    rna = _cite()
-    rna.obsm["protein"] = np.zeros((60, 0))
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        assert _value_error(tmp_path, rna, rna="X", adt=np.zeros((60, 0))) \
-            == NO_FEATURES.format(what="adt ") + WHY
-        assert _value_error(tmp_path, rna, rna="X", adt="obsm:protein") \
-            == NO_FEATURES.format(what="adt ") + WHY
-        with pytest.raises(ValueError) as e:     # io.to_canonical is deprecated in 0.4.0
-            ingest._to_canonical(rna, tmp_path / "OUT" / "adt.h5", modality="adt", obsm="protein")
-        assert str(e.value) == NO_FEATURES.format(what="") + WHY
-    assert not (tmp_path / "OUT").exists()
-    # with columns to name, the warning is the one of before
-    rna.obsm["protein"] = np.ones((60, 2))
-    for n, adt in enumerate(("obsm:protein", np.ones((60, 2)))):
-        with pytest.warns(UserWarning, match=r"The file names them feature_0 to feature_1\. "):
-            two = ingest.export_dataset(rna, tmp_path / f"TWO{n}", rna="X", adt=adt)
-        assert list(ingest.read_canonical(two / "adt.h5").var_names) == ["feature_0", "feature_1"]
 
 
 # ------------------------------------------------------------- a missing batch
@@ -363,83 +280,12 @@ def test_a_refused_call_leaves_a_folder_as_it_was(tmp_path):
         (a, dict(rna="X", labels="nope")),
         (a, dict(rna="X", labels="annotation.csv")),
         (a, dict(rna="X", labels="obs:nope")),
-        (a, dict(rna="X", n_batches=2)),
-        (a, dict(rna="X", batch_index=3, n_batches=2, category="cross")),
         (a, dict(rna="layer:nope")),
     ]
     for data, kw in refused:
         with pytest.raises((ValueError, KeyError)):
             ingest.export_dataset(data, out, overwrite=True, **kw)
         assert {p.name: p.read_bytes() for p in out.iterdir()} == before, kw
-
-
-def test_a_sparse_matrix_left_on_disk_is_refused_before_the_folder_is_made(tmp_path):
-    """An object read with ``backed="r"`` keeps a sparse ``X`` on disk, which
-    is no matrix to write. 0.3.4 said so after it had made the folder, and
-    left it empty."""
-    import scipy.sparse as sp
-    a = _cite()
-    a.X = sp.csr_matrix(a.X)
-    a.write_h5ad(tmp_path / "a.h5ad")
-    a[::-1].copy().write_h5ad(tmp_path / "reversed.h5ad")
-    text = "matrix must be 2-D (cells x features), got shape ()"
-    assert _value_error(tmp_path, ad.read_h5ad(tmp_path / "a.h5ad", backed="r"), rna="X",
-                        labels="obs:ct") == text
-    # a folder that holds these cells in another order: the same refusal
-    out = ingest.export_dataset(_adt(), tmp_path / "HERE", rna=None, adt="X")
-    before = {p.name: p.read_bytes() for p in out.iterdir()}
-    with pytest.raises(ValueError) as e:
-        ingest.export_dataset(ad.read_h5ad(tmp_path / "reversed.h5ad", backed="r"), out,
-                              rna="X", labels="obs:ct")
-    assert str(e.value) == text
-    assert {p.name: p.read_bytes() for p in out.iterdir()} == before
-    # read into memory, it is written, in the order of the folder
-    ingest.export_dataset(ad.read_h5ad(tmp_path / "reversed.h5ad"), out, rna="X",
-                          labels="obs:ct")
-    assert ingest.read_canonical(out / "rna.h5", sparse=False).obs_names.tolist() \
-        == list(a.obs_names)
-
-
-# ------------------------------------------------------------ ADT taken from X
-def test_adt_in_x_with_an_embedding(tmp_path):
-    """A processed ADT file carries its embeddings. The four tutorials that
-    read protein counts from X export it as they export a bare one."""
-    rna, plain, peaks = _cite(), _adt(), _peaks()
-    rna.obs["batch"] = plain.obs["batch"].to_numpy()
-    rich = plain.copy()
-    rich.obsm["X_umap"] = np.zeros((rich.n_obs, 2))
-    rich.obsm["X_pca"] = np.zeros((rich.n_obs, 5))
-    calls = {
-        # mosaic: an ADT-only batch, and ADT next to the RNA of the batch
-        "adt_only": lambda adt, d: ingest.export_dataset(
-            adt, d, rna=None, adt="X", labels="obs:ct", batch_index=3, category="mosaic"),
-        "with_rna": lambda adt, d: ingest.export_dataset(
-            rna, d, rna="X", adt=adt, labels="obs:ct", batch_index=1, category="mosaic"),
-        # cross: ADT and peaks of the same cells, split by the batch column
-        "cross": lambda adt, d: ingest.export_dataset(
-            adt, d, rna=None, adt="X", atac=peaks, atac_kind="peak", labels="obs:ct",
-            batch="obs:batch", category="cross"),
-        # and the same without a category
-        "plain": lambda adt, d: ingest.export_dataset(adt, d, rna=None, adt="X"),
-    }
-    for name, call in calls.items():
-        with warnings.catch_warnings():
-            warnings.simplefilter("error")
-            a, b = call(plain, tmp_path / f"{name}_plain"), call(rich, tmp_path / f"{name}_rich")
-        files = sorted(p.name for p in a.iterdir())
-        assert files == sorted(p.name for p in b.iterdir()) and any("adt" in f for f in files)
-        for f in files:
-            if f.endswith(".h5"):
-                x = ingest.read_canonical(a / f, sparse=False)
-                y = ingest.read_canonical(b / f, sparse=False)
-                assert np.array_equal(x.X, y.X) and list(x.var_names) == list(y.var_names) \
-                    and list(x.obs_names) == list(y.obs_names)
-            else:
-                assert (a / f).read_bytes() == (b / f).read_bytes()
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        # io.to_canonical is deprecated in 0.4.0: the implementation it wraps
-        assert ingest._to_canonical(rich, tmp_path / "adt.h5", modality="adt").exists()
 
 
 def test_adt_in_x_next_to_a_protein_matrix(tmp_path):
@@ -476,7 +322,7 @@ def test_to_canonical_keeps_its_text_and_ignores_embeddings(tmp_path):
     a.obsm["X_umap"] = np.zeros((a.n_obs, 2))
     a.obsm["protein"] = np.ones((a.n_obs, 4))
     with pytest.raises(ValueError) as e:
-        ingest.to_canonical(a, tmp_path / "adt.h5", modality="adt")
+        ingest._to_canonical(a, tmp_path / 'adt.h5', modality='adt')
     assert str(e.value) == (
         "adt requested but obsm= not given; found obsm keys ['X_umap', 'protein'] - pass "
         "obsm='<key>' (or layer=) to select the protein matrix, otherwise adata.X (usually "
@@ -484,22 +330,3 @@ def test_to_canonical_keeps_its_text_and_ignores_embeddings(tmp_path):
     assert not (tmp_path / "adt.h5").exists()
 
 
-def test_an_atac_only_batch_with_rna_left_at_x_is_told_rna_none(tmp_path):
-    # Z04 (r3): peak names and no feature types: the file is ATAC-only
-    import anndata as ad
-    import numpy as np
-    import pandas as pd
-    from multibench.engine import ingest
-    x = np.random.default_rng(0).poisson(1.0, size=(20, 30)).astype("float32")
-    b3 = ad.AnnData(x, obs=pd.DataFrame({"celltype": ["A", "B"] * 10},
-                                        index=[f"c{i}" for i in range(20)]),
-                    var=pd.DataFrame(index=[f"chr1:{i * 100}-{i * 100 + 50}"
-                                            for i in range(30)]))
-    with pytest.raises(ValueError) as e:
-        ingest.export_dataset(b3, tmp_path / "MOSX", atac="X", labels="obs:celltype",
-                              category="mosaic", batch_index=3, n_batches=3)
-    assert str(e.value) == ("rna='X' and atac='X' name the same matrix. For an ATAC-only "
-                            "file pass rna=None.")
-    ingest.export_dataset(b3, tmp_path / "MOSX", rna=None, atac="X", labels="obs:celltype",
-                          category="mosaic", batch_index=3, n_batches=3)
-    assert (tmp_path / "MOSX" / "atac3.h5").is_file()

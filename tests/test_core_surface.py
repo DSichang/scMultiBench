@@ -29,11 +29,3 @@ def test_each_namespace_lists_its_members():
         assert {n for n in dir(mod) if not n.startswith("__")} == set(names), ns
 
 
-def test_python_names_new_on_the_branch_are_gone():
-    with pytest.raises(TypeError):
-        mtb.evaluate(np.zeros((4, 2)), ["a", "b", "a", "b"], clusters=[0, 1, 0, 1])
-    with pytest.raises(TypeError):
-        mtb.eval.classify.classify(embedding=np.zeros((4, 2)), labels=["a", "b"] * 2)
-    import inspect
-    from multibench import workflow
-    assert "dry_run" not in inspect.signature(workflow.sweep).parameters

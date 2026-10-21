@@ -82,22 +82,6 @@ def test_exact_column_name_wins():
                        metrics=METRICS), got)
 
 
-def test_clustering_takes_the_obs_prefix():
-    # clustering= is deprecated since 0.4: its implementation, without the warning
-    emb, lab = _cells()
-    a = _adata(emb, celltype=lab, leiden=lab, other=_scrambled(lab))
-    kw = dict(labels="celltype", metrics=["ARI", "NMI"])
-    bare = pipeline._evaluate(a, clustering="leiden", **kw)
-    # before, "obs:leiden" was taken for the path of an h5 file
-    prefixed = pipeline._evaluate(a, clustering="obs:leiden", **kw)
-    _same(prefixed, bare)
-    assert bare["value"].tolist() == [1.0, 1.0] and bare.attrs["clustering"] == "user"
-    assert _value(pipeline._evaluate(a, clustering="obs:other", **kw), "ARI") < 0.1
-    # a column called obs:leiden wins over the prefix reading
-    a.obs["obs:leiden"] = a.obs["other"]
-    assert _value(pipeline._evaluate(a, clustering="obs:leiden", **kw), "ARI") < 0.1
-
-
 def test_unknown_column_keeps_its_error():
     emb, lab = _cells()
     a = _adata(emb, celltype=lab, donor=_donors())
@@ -123,52 +107,6 @@ def test_a_file_named_like_a_prefixed_column_is_still_read(tmp_path, monkeypatch
     Path("obs:celltype").write_text("cell,x\n" + "".join(
         f"{c},{v}\n" for c, v in zip(a.obs_names, lab)))
     _same(mtb.evaluate(a, labels="obs:celltype", metrics=["ASW"]),
-          mtb.evaluate(emb, labels=lab, metrics=["ASW"]))
-
-
-def test_array_output_with_a_column_name(tmp_path, monkeypatch):
-    emb, lab = _cells()
-    monkeypatch.chdir(tmp_path)
-    with pytest.raises(FileNotFoundError) as e:
-        mtb.evaluate(emb, labels="celltype", metrics=["ASW"])
-    assert str(e.value) == (
-        "labels='celltype' is not a file, and the embedding has no obs. Pass the values, as "
-        "labels=adata.obs['celltype'].")
-    # the example names the column without its prefix
-    with pytest.raises(FileNotFoundError) as e:
-        mtb.evaluate(emb, labels=lab, batch="obs:donor", metrics=METRICS)
-    assert str(e.value) == (
-        "batch='obs:donor' is not a file, and the embedding has no obs. Pass the values, as "
-        "batch=adata.obs['donor'].")
-    # clustering= is deprecated since 0.4: its implementation, without the warning
-    with pytest.raises(FileNotFoundError) as e:
-        pipeline._evaluate(emb, labels=lab, clustering="obs:leiden", metrics=["ARI"])
-    assert str(e.value) == (
-        "clusters='obs:leiden' is not a file, and the embedding has no obs. Pass the "
-        "values, as clusters=adata.obs['leiden'].")
-    # a name that reads as a file keeps the text of a missing file
-    cwd = Path.cwd()
-    with pytest.raises(FileNotFoundError) as e:
-        mtb.evaluate(emb, labels="missing.csv", metrics=["ASW"])
-    assert str(e.value) == (
-        f"The labels file missing.csv does not exist. From the working directory "
-        f"{cwd}, the path resolves to {Path('missing.csv').resolve()}.")
-    with pytest.raises(FileNotFoundError) as e:
-        mtb.evaluate(emb, labels=lab, batch="sub/donor", metrics=METRICS)
-    assert str(e.value) == (
-        f"The batch file sub/donor does not exist. From the working directory "
-        f"{cwd}, the path resolves to {Path('sub/donor').resolve()}.")
-    with pytest.raises(FileNotFoundError) as e:
-        pipeline._evaluate(emb, labels=lab, clustering="clusters.h5", metrics=["ARI"])
-    assert str(e.value) == (
-        f"The clustering file clusters.h5 does not exist. From the working directory "
-        f"{cwd}, the path resolves to {Path('clusters.h5').resolve()}.")
-    # a Path is a path
-    with pytest.raises(FileNotFoundError, match=r"^The labels file celltype does not exist\."):
-        mtb.evaluate(emb, labels=Path("celltype"), metrics=["ASW"])
-    # an existing file without a suffix is read
-    Path("celltype").write_text("x\n" + "".join(f"{v}\n" for v in lab))
-    _same(mtb.evaluate(emb, labels="celltype", metrics=["ASW"]),
           mtb.evaluate(emb, labels=lab, metrics=["ASW"]))
 
 

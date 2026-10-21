@@ -109,46 +109,12 @@ def test_gene_names_in_the_peak_file_block_glue_seurat_v3_and_multimap(tmp_path,
     assert sc.loc["MultiMAP", "reason"] == (
         "MultiMAP needs peak ATAC, and atac_peak.h5 holds gene activity. Export the ATAC "
         "as peaks.")
-    # R4-01: naming the method keeps it blocked; allow_atac_mismatch runs it
+    # R4-01: naming the method keeps it blocked
     for m in ("GLUE", "Seurat_v3", "MultiMAP"):
         named = _quiet(full_scan, "LUNG_ga", "diagonal", methods=[m], data_path=root,
                        verbose=False)
         assert not named["runnable"].any(), m
         assert named["files_ok"].sum() == 1, m
-        allowed = _quiet(full_scan, "LUNG_ga", "diagonal", methods=[m], data_path=root,
-                         verbose=False, allow_atac_mismatch=True).iloc[0]
-        assert allowed["runnable"] and allowed["reason"] == "", m
-
-
-def test_peak_name_caveat_has_no_subject_and_no_line_names_the_method_twice(
-        tmp_path, pinned, capsys):
-    root = _diagonal(tmp_path, "LUNG_ids", [f"peak_{i}" for i in range(60)])
-    _quiet(mtb.run_all, "LUNG_ids", "diagonal", methods=["GLUE", "Seurat_v3"],
-           data_path=root, dry_run=True, allow_atac_mismatch=True)
-    lines = [l for l in capsys.readouterr().out.splitlines() if l.startswith("[run_all] ")]
-    assert "[run_all] GLUE reads peak names such as chr1:100-200. atac_peak.h5 holds " \
-           "other names, for example peak_0. Rename them to chr:start-end" in "\n".join(lines)
-    for line in lines:
-        for m in ("GLUE", "Seurat_v3"):
-            assert not re.search(rf"\b{m} {m}\b", line), line
-
-
-def test_dry_run_prints_no_caveat_for_a_row_it_would_skip(tmp_path, pinned, capsys,
-                                                          gas_matilda):
-    root = _vertical_peaks(tmp_path)
-    _quiet(mtb.run_all, "MU_PEAK", "vertical", modalities=["rna", "atac"],
-           data_path=root, dry_run=True)
-    out = capsys.readouterr().out
-    assert "[run_all] Matilda" not in out           # blocked: the wrong ATAC kind
-    assert "[run_all] moETM" not in out or "moETM needs" not in out
-    _quiet(mtb.run_all, "MU_PEAK", "vertical", methods=["Matilda"],
-           modalities=["rna", "atac"], data_path=root, dry_run=True)
-    assert "[run_all] Matilda" not in capsys.readouterr().out    # named: still skipped
-    _quiet(mtb.run_all, "MU_PEAK", "vertical", methods=["Matilda"],
-           modalities=["rna", "atac"], data_path=root, dry_run=True,
-           allow_atac_mismatch=True)
-    assert f"[run_all] Matilda {GAS_CAV}" in \
-        capsys.readouterr().out
 
 
 # ---------------------------------------------------------- scripts ref
@@ -313,19 +279,6 @@ def test_layout_and_export_notes_say_scan_skips_the_other_representation():
     assert "allow_atac_mismatch" not in txt          # deprecated in 0.4.0
     notes = " ".join(inspect.getdoc(ingest.export_dataset).split())
     assert "reports the mismatch in its ``caveat`` column" not in notes
-
-
-def test_load_results_on_a_missing_file_names_the_path(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    with pytest.raises(FileNotFoundError, match=r"result_path 'nope\.csv' does not exist "
-                                                r"\(working directory: "):
-        mtb.load_results(result_path="nope.csv", source="user")
-    with pytest.raises(FileNotFoundError, match="does not exist"):
-        mtb.load_results(result_path="nope.csv")
-    mine = tmp_path / "mine.csv"
-    pd.DataFrame({"metric": ["ARI"], "value": [0.5], "method": ["X"], "dataset": ["D1"],
-                  "category": ["vertical"], "source": ["user"]}).to_csv(mine, index=False)
-    assert len(_quiet(mtb.load_results, result_path=str(mine), source="user")) == 1
 
 
 # ---------------------------------------------------------- docs pages

@@ -17,7 +17,7 @@ from .schema import _batch_of, base_modality, is_label_role
 
 @dataclass
 class RunResult:
-    """What ``mtb.run`` returns for one method.
+    """What :func:`run` returns for one method.
 
     Attributes
     ----------
@@ -47,18 +47,10 @@ class RunResult:
     hostname : str
         Name of the computer that ran the method.
 
-    Examples
-    --------
-    >>> import multibench as mtb
-    >>> inp = mtb.inputs_for("D11", "vertical", "totalVI")
-    >>> res = mtb.run("totalVI", "vertical", inputs=inp, out_dir="out/totalVI_D11")
-    >>> adata.obsm["X_totalVI"] = res.output      # rows match res.obs_names
-    >>> assert list(adata.obs_names) == res.obs_names
-
     Notes
     -----
-    **Row order.** Rows follow the order
-    ``mtb.labels_for(dataset, category, method)`` uses. ``obs_names`` is
+    **Row order.** Rows follow the order of the method's label files
+    (``resolve.labels_for``). ``obs_names`` is
     ``None``, with a ``UserWarning``, when the input barcodes do not match
     the output's cells or the inputs are a folder (scBridge).
 
@@ -223,18 +215,6 @@ def _modality_roles(inputs: dict) -> set[str]:
     return {k for k in inputs if _is_modality_role(k)}
 
 
-#: input keys a variant renamed and 0.4 removed, ``{method: {old key: new key}}``
-_REMOVED_ROLES = {"UnitedNet": {"rna_cty": "cty"}}
-
-
-def _check_removed_roles(method: str, inputs: dict) -> None:
-    """``ValueError`` for an input key of :data:`_REMOVED_ROLES`, naming the new key."""
-    for old, new in (_REMOVED_ROLES.get(method) or {}).items():
-        if old in inputs:
-            raise ValueError(_compat.removed_text(f"The inputs key {old!r} of {method}",
-                                                  "0.4", _compat.use(repr(new))))
-
-
 def _check_input_cells(method: str, category: str, inputs: dict) -> None:
     """The cell checks of ``inputs_for(check=True)`` on the input paths;
     raises their ``ValueError``."""
@@ -368,7 +348,7 @@ def script_notes(spec, variant, repo: Path) -> list[str]:
 
 
 def _convert_kw(role: str) -> dict:
-    """The keywords the conversion of ``role`` passes ``ingest.to_canonical``.
+    """The keywords the conversion of ``role`` passes ``ingest._to_canonical``.
 
     Only the ATAC roles pass a modality hint (for the peak-name warning):
     ``modality='adt'`` would refuse an AnnData that has obsm keys.
@@ -550,7 +530,7 @@ def _obs_names(method: str, variant, values: dict, output) -> list[str] | None:
     if why is None:
         return names
     _compat.warn(f"{method}: RunResult.obs_names is None ({why}); the rows follow "
-                 f"the order of mtb.labels_for(dataset, category, {method!r})",
+                 f"the order of {method}'s label files",
                  UserWarning)
     return None
 
@@ -618,8 +598,8 @@ def _argv(variant, method: str, values: dict, out_str: str, repo: Path,
 
 
 def unknown_params_error(method: str, unknown: list, allowed: set) -> KeyError:
-    """The error for ``params`` keys a variant does not accept (``run``,
-    ``run_all`` and ``sweep`` say the same)."""
+    """The error for ``params`` keys a variant does not accept (``run`` and
+    ``mtb.run_all`` say the same)."""
     if not allowed:
         return KeyError(f"{method} does not accept {unknown}; {method} takes no "
                         f"hyperparameters (its script hardcodes them).")
@@ -632,9 +612,6 @@ def check_params(method: str, variant, params: dict | None) -> None:
     type, before anything runs."""
     allowed = set(variant.tunable)
     unknown = [k for k in (params or {}) if k not in allowed]
-    if unknown and all(isinstance(params[k], dict) for k in unknown):
-        raise KeyError(f"run takes params={params[unknown[0]]!r}; the nested form is "
-                       f"for run_all.")
     if unknown:
         raise unknown_params_error(method, unknown, allowed)
     check_param_types(method, variant, params)
@@ -710,17 +687,11 @@ def check_gpu_requirement(spec) -> None:
         raise OSError(spec.requires_gpu_reason)
 
 
-@_compat.keywords("run", private="_run", dropped=("task",), kept={
-    "convert": _compat.note("run converts the inputs it needs itself"),
-    "repo_path": _compat.use("config.DEFAULT.repo_path")})
 def run(method: str, category: str, *, inputs: dict, out_dir: str,
         params: dict | None = None, cmd_template: str | None = None,
         dry_run: bool = False):
-    """Run one method on explicit inputs and load its output.
-
-    For files outside a dataset folder, or a run on a compute node;
-    ``mtb.run_all(methods=[m])`` runs and scores one method on a dataset
-    folder.
+    """Run one method on explicit inputs and load its output (internal:
+    ``mtb.run_all`` calls it for each runnable method of a dataset folder).
 
     Parameters
     ----------
@@ -730,7 +701,7 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
         Integration category of the variant: ``vertical``, ``diagonal``,
         ``mosaic`` or ``cross``.
     inputs : dict
-        ``{role: path or AnnData}``, usually from ``mtb.inputs_for``; its
+        ``{role: path or AnnData}``, from ``resolve.inputs_for``; its
         modality roles select the variant.
     out_dir : str
         Folder the method writes into; created if missing.
@@ -774,35 +745,9 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     UserWarning
         An ATAC input holds the other representation or peak names the method cannot read.
 
-    Examples
-    --------
-    >>> import multibench as mtb
-    >>> inp = mtb.inputs_for("D11", "vertical", "Matilda")
-    >>> mtb.run("Matilda", "vertical", inputs=inp, out_dir="out/Matilda_D11",
-    ...         dry_run=True)
-
-    See Also
-    --------
-    mtb.inputs_for : builds the ``inputs`` dict from a laid-out dataset folder.
-    mtb.run_all : every runnable method on a dataset, scored, with failures recorded.
-    mtb.params_for : the hyperparameters ``params`` takes.
     """
-    return _run(method, category, inputs=inputs, out_dir=out_dir, params=params,
-                cmd_template=cmd_template, dry_run=dry_run)
-
-
-def _run(method: str, category: str, *, inputs: dict, out_dir: str,
-         params: dict | None = None, cmd_template: str | None = None,
-         dry_run: bool = False, convert: bool = True, repo_path=None):
-    """:func:`run`, with the deprecated ``convert`` (``False``: the inputs must
-    be canonical ``.h5`` files) and ``repo_path``."""
-    convert = convert is not False
     _check_template(cmd_template)
     method = registry.check_method(method)
-    _check_removed_roles(method, inputs)
-    if registry.get(method).legacy_modalities(category, _modality_roles(inputs)):
-        # 0.3's key of the vertical peak methods' ATAC file
-        inputs = {("atac" if k == "atac_gas" else k): v for k, v in inputs.items()}
     check_params(method, registry.get(method).select(category, _modality_roles(inputs)),
                  params)
     _check_input_cells(method, category, inputs)
@@ -810,8 +755,7 @@ def _run(method: str, category: str, *, inputs: dict, out_dir: str,
     mismatch = _atac_mismatch_caveats(method, category, inputs)
     if dry_run:
         argv, notes = preview(method, category, inputs=inputs, out_dir=out_dir,
-                              params=params, convert=convert,
-                              cmd_template=cmd_template, repo_path=repo_path)
+                              params=params, cmd_template=cmd_template)
         notes = _missing_input_notes(method, inputs) + notes
         for note in notes + mismatch:
             print(f"# {note}", file=sys.stderr, flush=True)
@@ -858,8 +802,8 @@ def _run(method: str, category: str, *, inputs: dict, out_dir: str,
     out = Path(out_str)
     inputs_dir = out / "inputs"
     # every input-format check before anything is written or fetched
-    plan = _plan_inputs(variant, inputs, inputs_dir, convert=convert, real=True)
-    repo = _fetch_scripts(repo_path)
+    plan = _plan_inputs(variant, inputs, inputs_dir, convert=True, real=True)
+    repo = _fetch_scripts(None)
     provide_script_files(spec, variant, repo)
     out.mkdir(parents=True, exist_ok=True)
     if _modality_roles(inputs):
@@ -868,7 +812,7 @@ def _run(method: str, category: str, *, inputs: dict, out_dir: str,
     values: dict = {}
     for role, step in plan.items():
         if step["convert"]:
-            ingest.to_canonical(step["src"], out=inputs_dir / f"{role}.h5",
+            ingest._to_canonical(step["src"], out=inputs_dir / f"{role}.h5",
                                 **_convert_kw(role))
         if step["normpeaks_from"] is not None:
             ingest._normalize_peak_names(step["normpeaks_from"], step["value"])

@@ -17,7 +17,7 @@ import pytest
 import multibench as mtb
 from tests.test_study_r4_wf import _quiet
 from tests.test_study_r5_wf import (BARS, CELLTYPE, SAMPLES, _adata,  # noqa: F401
-                                    _barcode_csv, batchy)
+                                    _barcode_csv)
 
 pytest.importorskip("scib")
 
@@ -34,8 +34,8 @@ _KW = dict(methods=["Matilda"], modalities=["rna", "adt"], verbose=False)
 
 def test_rescore_with_the_saved_batch_and_no_batch_metric_does_not_warn(cite, tmp_path):
     data, batch, shuffled = cite
-    res = _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "out", data_path=data,
-                 batch=shuffled, **_KW)
+    mtb.config.DEFAULT.data_path = data
+    res = _quiet(mtb.run_all, 'MYCITE', 'vertical', tmp_path / 'out', batch=shuffled, **_KW)
     back = mtb.load_batch(tmp_path / "out")
     with warnings.catch_warnings():
         warnings.simplefilter("error", UserWarning)

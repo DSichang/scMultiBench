@@ -112,10 +112,10 @@ def test_bare_array_needs_master_and_adt_names_warns(tmp_path):
 def test_to_canonical_missing_file_names_path_and_cwd(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     with pytest.raises(FileNotFoundError) as e:
-        ingest.to_canonical("nothere.h5ad", tmp_path / "x.h5")
+        ingest._to_canonical('nothere.h5ad', tmp_path / 'x.h5')
     assert "nothere.h5ad" in str(e.value) and f"cwd {os.getcwd()}" in str(e.value)
     with pytest.raises(FileNotFoundError, match="does not exist"):
-        ingest.to_canonical("nothere.h5", tmp_path / "x.h5")
+        ingest._to_canonical('nothere.h5', tmp_path / 'x.h5')
 
 
 def test_to_canonical_rejects_h5_without_matrix_data(tmp_path):
@@ -123,23 +123,9 @@ def test_to_canonical_rejects_h5_without_matrix_data(tmp_path):
     with h5py.File(p, "w") as f:
         f.create_dataset("data", data=np.zeros((4, 2)))
     with pytest.raises(ValueError) as e:
-        ingest.to_canonical(p, tmp_path / "x.h5")
+        ingest._to_canonical(p, tmp_path / 'x.h5')
     msg = str(e.value)
     assert "no dataset 'matrix/data'" in msg and "found keys ['data']" in msg
     assert "method output" in msg and "evaluate" in msg
 
 
-def test_to_canonical_warns_above_dense_size_threshold(tmp_path, monkeypatch):
-    a = ad.AnnData(np.ones((40, 30)))
-    monkeypatch.setattr(ingest, "DENSE_WARN_BYTES", 40 * 30 * 8 - 1)
-    # io.to_canonical is deprecated in 0.4.0: the implementation it wraps
-    with pytest.warns(UserWarning, match="stored dense") as rec:
-        ingest._to_canonical(a, tmp_path / "big.h5")
-    msg = str(rec[0].message)
-    assert "30 x 40 x 8 B" in msg and "float32" in msg and "highly-variable" in msg
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        ingest._to_canonical(a, tmp_path / "small.h5", dtype="float32")  # 4 B: under the limit
-    assert ingest.DENSE_WARN_BYTES == 40 * 30 * 8 - 1
-    monkeypatch.undo()
-    assert ingest.DENSE_WARN_BYTES == 10 ** 9

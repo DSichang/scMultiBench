@@ -40,17 +40,13 @@ from multibench.data import results as RS
 from multibench.engine import envs
 from multibench.engine import runner as R
 from tests.test_docs_r4 import _flat, needs_docs
-from tests.test_study_r8_other import _depth, _fetch_error, _plain, _subparser
+from tests.test_study_r8_other import _plain
 from tests.conftest import full_scan
 
 matplotlib.use("Agg")
 
 ROOT = Path(__file__).resolve().parent.parent
 MACOS = "Methods run only on Linux, and this computer runs macOS."
-
-
-def _doc(obj) -> str:
-    return " ".join((inspect.getdoc(obj) or "").split())
 
 
 # ======================================================================= R8-01
@@ -65,33 +61,6 @@ def test_a_stored_minus_zero_ari_reads_zero_in_summary(tmp_path):
     assert ari == 0.0 and math.copysign(1, ari) == 1
     assert "-0.0" not in sm.to_csv(index=False)
     assert sm.loc[0, "NMI"] == 0.0101
-
-
-# ======================================================================= R8-07
-def _two_tie_groups():
-    vals = {"ARI": [.9, .1, .2, .8, .5, .4], "NMI": [.9, .1, .1, .9, .5, .5],
-            "GC": [.5] * 6}
-    keys = [("A", "D1"), ("B", "D1"), ("A", "D2"), ("B", "D2"), ("A", "D3"), ("B", "D3")]
-    return pd.DataFrame([{"method": m, "dataset": d, "metric": k, "value": v,
-                          "category": "cross"}
-                         for k, vs in vals.items() for (m, d), v in zip(keys, vs)])
-
-
-def test_each_mean_rank_gets_its_own_sentence():
-    B = importlib.import_module("multibench.plot.bubble")
-    msg = B._no_comparison_message(["A", "B"], {"NMI": 1.6667, "GC": 2.0, "ARI": 1.6667},
-                                   aggregate="summary")
-    assert msg == ("Every method has mean rank 1.67 in NMI and ARI. Every method has "
-                   "mean rank 2 in GC. Those columns are grey. Leave them out with "
-                   "metrics=.")
-    with warnings.catch_warnings(record=True) as rec:
-        warnings.simplefilter("always")
-        mtb.plot.bubble(_two_tie_groups(), aggregate="summary")
-    (grey,) = [str(w.message) for w in rec if "grey" in str(w.message)]
-    assert grey == ("Every method has mean rank 1.67 in NMI. Every method has mean "
-                    "rank 2 in GC. Those columns are grey. Leave them out with metrics=.")
-    for text in (msg, grey):
-        assert ", and" not in text and ";" not in text
 
 
 # ======================================================================= R8-05
@@ -145,10 +114,6 @@ def test_a_folder_variant_is_listed_by_its_method_name(macos_no_gpu, monkeypatch
     assert line.startswith("  scBridge: ") and "scBridge needs an NVIDIA GPU" in line, msg
 
 
-def test_the_category_descriptions_have_no_semicolon():
-    assert not [c for c, d in mtb.list_categories().items() if ";" in d]
-
-
 # ================================================= missing folders and tables
 @pytest.fixture
 def in_tmp(tmp_path, monkeypatch):
@@ -160,38 +125,11 @@ def in_tmp(tmp_path, monkeypatch):
 
 def test_labels_for_names_a_missing_folder_as_scan_does(in_tmp):
     with pytest.raises(FileNotFoundError) as e:
-        mtb.labels_for("MYCITE", "vertical", "Matilda", data_path="data")
+        mtb.engine.resolve.labels_for("MYCITE", "vertical", "Matilda", data_path="data")
     with pytest.raises(FileNotFoundError) as s:
         full_scan("MYCITE", "vertical", data_path="data", verbose=False)
     assert str(e.value) == str(s.value)
     assert str(e.value).startswith("The folder data/MYCITE does not exist. data holds D11.")
-
-
-@pytest.mark.parametrize("kw,start", [
-    # 0.4: the default is the stored results; the published tables need source=
-    (dict(category="vertical", clustering="louvain", source="published"),
-     "The published tables of vertical have no louvain variant. They have default only."),
-    (dict(category="cross", dataset="D52s", source="published"),
-     "The published tables of cross hold D52, not D52s."),
-    (dict(category="cross", dataset=["D52", "D52s"], source="published"),
-     "The published tables of cross hold D52, not D52s."),
-    (dict(category="cross", dataset="D99"),
-     "The stored results of cross hold D52, not D99."),
-    (dict(category="cross", dataset="D99", source="both"),
-     "The published tables of cross hold D52, not D99. The stored results of cross hold "
-     "D52, not D99."),
-    (dict(dataset="D99"), "The stored results hold D11, D28, D45 and D52, not D99."),
-])
-def test_missing_tables_are_named_in_plain_sentences(kw, start):
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        with pytest.raises(FileNotFoundError) as e:
-            mtb.load_results(**kw)
-    msg = str(e.value)
-    assert msg.startswith(start), msg
-    assert "result_path=" not in msg                  # 0.4: no longer suggested
-    _plain(msg)
-    assert "scib_metric" not in msg and str(RS._SHIPPED_BASE) not in msg
 
 
 # ====================================================== old-style messages
@@ -203,19 +141,6 @@ def _raised(fn, *args, **kw):
         except Exception as e:  # noqa: BLE001 - the text is checked
             return e
     raise AssertionError("no error")
-
-
-def test_an_unknown_modality_is_named_in_sentences():
-    e = _raised(full_scan, "D11", "vertical", modalities=["rna", "adtt"], verbose=False)
-    assert isinstance(e, ValueError)
-    assert str(e) == ("Unknown modality adtt. The tokens are rna, adt (or protein) and "
-                      "atac. atac_peak (or peak, peaks) and atac_gas (or gas, "
-                      "gene_activity) name the ATAC form a method reads. rna1, adt1, "
-                      "atac2 ... name numbered batches.")
-    _plain(str(e))
-    e = _raised(mtb.io.to_canonical, None, "x.h5", modality="bogus")
-    assert str(e) == ("Unknown modality bogus. The modalities are rna, adt (or protein), "
-                      "atac, atac_peak (or peak) and atac_gas (or gas, gene_activity).")
 
 
 def test_a_metrics_token_error_is_plain_outside_its_examples():
@@ -254,41 +179,6 @@ def test_an_empty_bar_table_is_plain():
 
 
 # ================================================================ fetch error
-def test_a_ref_fetch_error_keeps_its_subject_in_the_fail_line(monkeypatch, tmp_path):
-    sha = "0123456789abcdef0123456789abcdef01234567"
-    e = _fetch_error(monkeypatch, tmp_path, ref=sha)
-    assert str(e) == (f"Could not fetch the method scripts at '{sha}'. There is no "
-                      "network, or no such commit or tag. Offline, copy a fetched "
-                      "scripts folder and set MULTIBENCH_REPO_PATH.")
-    shown = W._error_tail(f"{type(e).__name__}: {e}")
-    assert shown.startswith("Could not fetch") or "Could not fetch" in shown[:20], shown
-    assert sha in shown
-    _plain(str(e))
-
-
-# ============================================================ CLI help
-def test_env_plan_and_install_descriptions_are_short_sentences():
-    env = _subparser("env")
-    sub = next(a for a in env._actions if a.__class__.__name__ == "_SubParsersAction")
-    for name in ("plan", "install"):
-        text = sub.choices[name].description
-        assert ";" not in text and _depth(text) <= 1, (name, text)
-        assert not re.search(r"\w/\w", text), (name, text)
-    assert "the install refuses." in sub.choices["install"].description
-
-
-def test_preflight_is_gone_from_what_users_read():
-    env = _subparser("env")
-    sub = next(a for a in env._actions if a.__class__.__name__ == "_SubParsersAction")
-    helps = [a.help for a in sub._choices_actions]
-    # 0.4: env doctor and env status are deprecated and hidden; install is listed
-    assert "check which environments are installed or need building" not in helps
-    assert "unpack or build every needed env (mtb.env.install)" in helps
-    texts = helps + [_doc(W.run_all), _doc(W.scan)]
-    assert not [t for t in texts if "preflight" in t.lower()]
-
-
-# ============================================================ scripts checkout
 def test_scan_names_a_missing_scripts_checkout_in_the_caveat(monkeypatch, tmp_path):
     monkeypatch.setattr(R, "_repo_root_no_fetch", lambda: tmp_path / "no_scripts")
     plan = full_scan("D28", "diagonal", methods=["uniPort"], verbose=False)

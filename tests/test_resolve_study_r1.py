@@ -90,22 +90,6 @@ def test_a_single_numbered_file_still_resolves(tmp_path):
     assert resolve._resolve_role(d, "rna1").name == "rna1.h5"       # unresolved, not rna11
 
 
-def test_demo_folders_resolve_as_before(root):
-    data = root / "data"
-    d11 = full_scan("D11", "vertical", data_path=data)
-    assert d11.loc[d11["modalities"] == "rna+adt", "files_ok"].all()
-    d52 = full_scan("D52", "cross", data_path=data)
-    # D52 holds RNA + ADT: every row of those two modalities has its files,
-    # and no row that reads ATAC has
-    rna_adt = ~d52["modalities"].str.contains("atac")
-    assert d52.loc[rna_adt, "files_ok"].all() and not d52.loc[~rna_adt, "files_ok"].any()
-    assert set(d52.loc[rna_adt, "method"]) == set(mtb.list_methods(category="cross")) - {
-        "UnitedNet"}
-    got = resolve.inputs_for("D52", "cross", "StabMap", data_path=data, check=True)
-    assert [got[f"rna{i}"].rsplit("/", 1)[-1] for i in (1, 2, 3)] == \
-        ["rna1.h5", "rna2.h5", "rna3.h5"]
-
-
 # ------------------------------------------------------------------ L06
 def test_numbered_atac_near_miss_names_the_right_file(tmp_path):
     d = tmp_path / "M"

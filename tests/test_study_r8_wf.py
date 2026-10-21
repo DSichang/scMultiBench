@@ -12,6 +12,7 @@ R8-05  off Linux, the "No method can run" error repeated the platform
 R8-06  template-like docstring passages; ``label_order_confidence`` was an
        object column of ``None`` when every row was blank.
 """
+import os
 import inspect
 import math
 import re
@@ -87,8 +88,7 @@ def _result_lines(text, prefix):
 def swept(working, near_zero_ari, tmp_path, capsys):
     """A one-method sweep (Matilda stand-in) whose ARI is -0.00004."""
     out = tmp_path / "py"
-    res = mtb.run_all("MYCITE", "vertical", out_dir=out, methods=["Matilda"],
-                      modalities=["rna", "adt"], data_path=working)
+    res = mtb.run_all(os.path.join(working, 'MYCITE'), 'vertical', out_dir=out, methods=['Matilda'], modalities=['rna', 'adt'])
     return res, out, capsys.readouterr().out
 
 
@@ -196,8 +196,7 @@ def test_scan_raises_for_a_named_method_of_another_category(no_envs, labmos):
 def test_run_all_raises_before_anything_runs(no_envs, labmos, capsys):
     for kw in ({"dry_run": True}, {"out_dir": "out"}):
         with pytest.raises(ValueError) as e:
-            mtb.run_all("LABMOS", "mosaic", data_path="data",
-                        methods=["StabMap", "scMoMaT", "totalVI"], **kw)
+            mtb.run_all(os.path.join('data', 'LABMOS'), 'mosaic', methods=['StabMap', 'scMoMaT', 'totalVI'], **kw)
         assert str(e.value) == _TOTALVI
     assert not (labmos / "out").exists()
     assert capsys.readouterr().out == ""
@@ -257,8 +256,7 @@ def mydata(tmp_path, monkeypatch):
 
 def _nothing_runnable(**kw):
     with pytest.raises(ValueError) as e:
-        mtb.run_all("MYDATA", "vertical", out_dir="out", verbose=False, data_path="data",
-                    **kw)
+        mtb.run_all(os.path.join('data', 'MYDATA'), 'vertical', out_dir='out', verbose=False, **kw)
     return str(e.value)
 
 

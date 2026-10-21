@@ -144,7 +144,8 @@ def test_a_10x_atac_file_is_named_where_a_method_reads_another_atac_file(
     assert "totalVI" in set(ok["method"]) and set(ok["modalities"]) == {"rna+adt"}
     # diagonal: a peak method does not find atac_peak.h5 and is told what is
     # there, a gene-activity method reads atac.h5
-    kw = dict(methods=["SCALEX", "Seurat_v5"], data_path=tmp_path)
+    mtb.config.DEFAULT.data_path = tmp_path
+    kw = dict(methods=['SCALEX', 'Seurat_v5'])
     df = mtb.scan("STRAY", "diagonal", verbose=False, **kw)
     assert list(df["method"]) == ["SCALEX", "Seurat_v5"]
     reasons = [f"atac.h5 {TENX}",
@@ -175,7 +176,7 @@ def test_the_files_a_folder_method_names_are_checked_too(tmp_path):
         pd.DataFrame({"x": ["A"] * 100}).to_csv(d / name, index=False)
 
     def check():
-        return mtb.inputs_for("DIAG", "diagonal", "scBridge", data_path=tmp_path, check=True)
+        return mtb.engine.resolve.inputs_for("DIAG", "diagonal", "scBridge", data_path=tmp_path, check=True)
     with pytest.raises(ValueError) as e:
         check()
     assert str(e.value) == f"scBridge reads rna.h5 of DIAG, which {TENX}"
@@ -201,13 +202,14 @@ def test_dataset_files_keep_passing_the_file_check(ready, tmp_path):
                                      index=a.obs_names, columns=[f"P{i}" for i in range(8)])
     ingest.export_dataset(a, tmp_path / "GOOD", rna="X", adt="obsm:protein",
                           labels="obs:celltype")
-    kw = dict(methods=["Seurat_WNN", "totalVI"], data_path=tmp_path, verbose=False)
+    mtb.config.DEFAULT.data_path = tmp_path
+    kw = dict(methods=['Seurat_WNN', 'totalVI'], verbose=False)
     df = full_scan("GOOD", "vertical", **kw)
     assert df["files_ok"].all() and list(df["reason"]) == ["", ""]
     with h5py.File(tmp_path / "GOOD" / "rna.h5", "a") as f:
         f["matrix/indptr"] = np.arange(3)
     assert ingest._is_tenx_h5(tmp_path / "GOOD" / "rna.h5")
-    assert ingest.to_canonical(tmp_path / "GOOD" / "rna.h5") == tmp_path / "GOOD" / "rna.h5"
+    assert ingest._to_canonical(tmp_path / 'GOOD' / 'rna.h5') == tmp_path / "GOOD" / "rna.h5"
     df = full_scan("GOOD", "vertical", **kw)
     assert df["files_ok"].all() and list(df["reason"]) == ["", ""]
 
@@ -217,7 +219,7 @@ def test_scan_and_inputs_for_describe_the_check_of_matrix_files_alike():
     file (an .h5ad copied to rna.h5) passes it and is refused by mtb.run, so
     neither docstring says that the input files "are dataset files"."""
     scan_doc = " ".join(mtb.scan.__doc__.split())
-    inputs_doc = " ".join(mtb.inputs_for.__doc__.split())
+    inputs_doc = " ".join(mtb.engine.resolve.inputs_for.__doc__.split())
     assert "are dataset files" not in scan_doc + inputs_doc
 
 

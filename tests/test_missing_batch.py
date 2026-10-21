@@ -19,8 +19,7 @@ import multibench as mtb
 from multibench import config
 from multibench.eval import io as eio
 from multibench.eval import pipeline
-from tests.test_missing_labels import (GAPS, KEEP, N, _adata, _cells, _donors, _drop,
-                                       _gaps, _same, _silent, _value)
+from tests.test_missing_labels import GAPS, KEEP, N, _adata, _cells, _donors, _gaps, _same, _silent, _value
 
 pytest.importorskip("scib")
 
@@ -57,7 +56,7 @@ def test_evaluate_raises_on_a_missing_batch(fill, seen, tmp_path):
              "obs column": (a, "donor", "", seen), "obs: column": (a, "obs:donor", "", seen),
              "file": (emb, str(path), " (batch.csv)", in_file)}
     for form, (output, batch, src, said) in forms.items():
-        for kw in ({}, {"missing_labels": "drop"}):
+        for kw in ({},):
             with pytest.raises(ValueError) as e:
                 mtb.evaluate(output, labels=lab, batch=batch, metrics=["ASW_batch"], **kw)
             assert str(e.value) == _bv1(src, said), (form, kw)
@@ -114,7 +113,7 @@ def test_a_complete_batch_changes_nothing(tmp_path):
     want = _silent(emb, labels=lab, batch=bat, metrics=METRICS)
     for output, batch in ((emb, pd.Series(bat)), (emb, pd.Categorical(bat)),
                           (a, "donor"), (a, "obs:donor"), (emb, str(path))):
-        for kw in ({}, {"missing_labels": "drop"}):
+        for kw in ({},):
             _same(_silent(output, labels=lab, batch=batch, metrics=METRICS, **kw), want)
     assert want.set_index("metric")["value"].to_dict() == pytest.approx(SCORES_034, abs=1e-9)
     assert list(want.attrs) == ["leiden_flavor", "clustering", "multibench_version",
@@ -129,49 +128,6 @@ def test_docstring_says_every_cell_needs_a_batch():
     doc = " ".join(mtb.evaluate.__doc__.split())
     assert "needed for the batch metrics unless ``labels`` lists two or more files." in doc
     assert "Missing or misaligned labels or batches" in doc           # Raises
-
-
-def test_drop_checks_the_batch_of_the_cells_it_keeps():
-    emb, lab = _cells()
-    bat = _donors()
-    nan = _gaps(lab)
-    kw = dict(metrics=["ASW", "ASW_batch"])
-    # the cells without a label are the cells without a batch: nothing is left to refuse
-    got, said = _drop(emb, labels=nan, batch=_gaps(bat), **kw)
-    _same(got, mtb.evaluate(emb[KEEP], labels=lab[KEEP], batch=bat[KEEP], **kw))
-    assert said == ["Scored the 270 labelled cells of 300."]
-    # without the flag the labels stop the call first
-    with pytest.raises(ValueError, match=r"^labels: 30 of the 300 cells have no label\."):
-        mtb.evaluate(emb, labels=nan, batch=_gaps(bat), **kw)
-    # four labelled cells have no batch: counted among the 270 that are scored
-    labelled = np.flatnonzero(KEEP)[:4]
-    with warnings.catch_warnings(record=True) as rec:
-        warnings.simplefilter("always")
-        with pytest.raises(ValueError) as e:
-            mtb.evaluate(emb, labels=nan, batch=_gaps(bat, None, at=labelled),
-                         missing_labels="drop", **kw)
-    assert str(e.value) == _bv1(n=4, total=270)
-    # nothing was scored, so nothing says "Scored"; only the deprecated keyword warns
-    assert [str(w.message) for w in rec if not issubclass(w.category, FutureWarning)] == []
-
-
-def test_drop_names_the_words_of_the_cells_it_keeps(tmp_path):
-    """A batch file that writes NA where the label is missing and None for
-    four labelled cells: only the word of the cells that are scored is named."""
-    emb, lab = _cells()
-    bat = _gaps(_donors(), "NA")
-    path = tmp_path / "batch.csv"
-    pd.DataFrame({"x": bat}).to_csv(path, index=False)
-    kw = dict(labels=_gaps(lab), batch=str(path), metrics=["ASW", "ASW_batch"])
-    got, said = _drop(emb, **kw)
-    assert len(said) == 1
-    _same(got, mtb.evaluate(emb[KEEP], labels=lab[KEEP], batch=_donors()[KEEP],
-                            metrics=["ASW", "ASW_batch"]))
-    bat[np.flatnonzero(KEEP)[:4]] = "None"
-    pd.DataFrame({"x": bat}).to_csv(path, index=False)
-    with pytest.raises(ValueError) as e:
-        mtb.evaluate(emb, missing_labels="drop", **kw)
-    assert str(e.value) == _bv1(" (batch.csv)", ", for example 'None'", n=4, total=270)
 
 
 def test_the_file_of_origin_is_not_checked(tmp_path, monkeypatch):

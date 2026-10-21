@@ -38,31 +38,10 @@ def test_every_metric_states_direction_and_the_clustering_used():
         assert "Louvain" not in d[code]
 
 
-def test_the_classification_rows_follow_the_family_order():
-    # the rows are the codes of known_metrics, in its order (PCR left it in 0.4)
-    rows = list(mtb.catalog.metrics()["metric"])
-    assert rows == catalog.known_metrics()
-    d = _desc()
-    assert d["OCA"].startswith("Overall classification accuracy: the fraction of query cells")
-    assert d["ACA"].startswith("Average classification accuracy: the fraction of each cell type")
-    for code in ("Spec", "Sens", "F1"):
-        assert "averaged over cell types" in d[code], code
-
-
-def test_datasets_drops_the_always_empty_columns():
-    df = catalog.datasets()
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", FutureWarning)   # PAPER_COLUMNS is deprecated
-        paper_columns = catalog.PAPER_COLUMNS
-    for col in paper_columns:
-        assert col not in df.columns, col
-    # 0.4.0: the demo subsets join the rows; every row is fetchable, so no such column
-    assert list(df.columns) == ["dataset", "category", "has_results"]
-
-
-def test_datasets_keeps_a_descriptive_column_a_csv_fills(tmp_path):
+def test_datasets_keeps_a_descriptive_column_a_csv_fills(tmp_path, monkeypatch):
     pd.DataFrame({"dataset": ["D11", "D28"], "assay": ["CITE-seq", None],
                   "tissue": [None, None]}).to_csv(tmp_path / "dataset.csv", index=False)
-    df = catalog.datasets(tmp_path).set_index("dataset")
+    monkeypatch.setattr(catalog.config.DEFAULT, "files_path", tmp_path)
+    df = catalog.datasets().set_index("dataset")
     assert "assay" in df.columns and "tissue" not in df.columns
     assert df.loc["D11", "assay"] == "CITE-seq"

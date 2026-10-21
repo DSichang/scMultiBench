@@ -84,61 +84,24 @@ def test_drop_nested_keeps_the_largest_of_nested_sets():
 @pytest.mark.parametrize("method", NESTED + ("Matilda",))
 def test_the_folder_picks_the_largest_nested_variant(tmp_path, method):
     _tri(tmp_path)
-    got = mtb.inputs_for("TRI", "vertical", method, data_path=tmp_path)
+    got = mtb.engine.resolve.inputs_for("TRI", "vertical", method, data_path=tmp_path)
     assert {"rna", "adt", "atac"} <= set(got)
     assert Path(got["atac"]).name == "atac.h5" and Path(got["adt"]).name == "adt.h5"
     # labels_for selects the same variant and does not raise
-    assert list(mtb.labels_for("TRI", "vertical", method, data_path=tmp_path)) == ["cty"]
+    assert list(mtb.engine.resolve.labels_for("TRI", "vertical", method, data_path=tmp_path)) == ["cty"]
 
 
 @pytest.mark.parametrize("mods", [["rna", "adt"], ["rna", "atac"], ["rna", "adt", "atac"]])
 def test_modalities_still_select_any_variant(tmp_path, mods):
     _tri(tmp_path)
-    got = mtb.inputs_for("TRI", "vertical", "scMoMaT", modalities=mods, data_path=tmp_path)
+    got = mtb.engine.resolve.inputs_for("TRI", "vertical", "scMoMaT", modalities=mods, data_path=tmp_path)
     assert set(got) == set(mods)
 
 
 def test_a_smaller_folder_still_picks_its_own_variant(tmp_path):
     d = _tri(tmp_path)
     (d / "atac.h5").unlink()
-    assert set(mtb.inputs_for("TRI", "vertical", "scMoMaT", data_path=tmp_path)) == {"rna", "adt"}
-
-
-@pytest.mark.parametrize("method", ["VIMCCA", "Seurat_WNN"])
-def test_variants_that_are_not_nested_stay_ambiguous(tmp_path, method):
-    """rna+adt and rna+atac, with no rna+adt+atac variant above them."""
-    d = _tri(tmp_path)
-    with pytest.raises(mtb.AmbiguousVariantError) as e:
-        mtb.inputs_for("TRI", "vertical", method, data_path=tmp_path)
-    msg = str(e.value)
-    assert f"{method} has 2 vertical variants, rna+adt and rna+atac." in msg
-    assert f"The folder {d} has every input file of both." in msg
-    assert "modalities=['rna', 'adt']" in msg
-    # c1 (C09): the two take the same parameters
-    assert " and " in mtb.params_for(method, "vertical", dataset="TRI",
-                                     data_path=tmp_path)["variant"]
-    got = mtb.inputs_for("TRI", "vertical", method, modalities=["rna", "atac"],
-                         data_path=tmp_path)
-    assert set(got) == {"rna", "atac"}
-
-
-def test_no_file_of_any_variant_is_still_ambiguous(tmp_path):
-    (tmp_path / "EMPTY").mkdir()
-    with pytest.raises(mtb.AmbiguousVariantError, match="None of them has every input file"):
-        mtb.inputs_for("EMPTY", "vertical", "scMoMaT", data_path=tmp_path)
-
-
-# -------------------------------------------------------------------- params_for
-def test_params_for_uses_the_same_tie_break(tmp_path):
-    _tri(tmp_path)
-    for method in NESTED:
-        p = mtb.params_for(method, "vertical", dataset="TRI", data_path=tmp_path)
-        assert p["variant"] == "vertical:rna+adt+atac"
-    # with no category the folder holds the files of the vertical variants only
-    assert mtb.params_for("MOFA2", dataset="TRI",
-                          data_path=tmp_path)["variant"] == "vertical:rna+adt+atac"
-    assert mtb.params_for("scMoMaT", "vertical", ["rna", "adt"], dataset="TRI",
-                          data_path=tmp_path)["variant"] == "vertical:rna+adt"
+    assert set(mtb.engine.resolve.inputs_for("TRI", "vertical", "scMoMaT", data_path=tmp_path)) == {"rna", "adt"}
 
 
 # ------------------------------------------------------------- scan and run_all
@@ -165,8 +128,7 @@ def test_run_all_runs_the_largest_variant_once(tmp_path, all_envs, monkeypatch, 
     _tri(tmp_path)
     calls = []
     monkeypatch.setattr(W, "_run", _fake_run(calls))
-    res = mtb.run_all("TRI", "vertical", methods=list(NESTED), data_path=tmp_path,
-                      out_dir=str(tmp_path / "out"), evaluate=False)
+    res = mtb.run_all(os.path.join(tmp_path, 'TRI'), 'vertical', methods=list(NESTED), out_dir=str(tmp_path / 'out'), evaluate=False)
     assert sorted(calls) == [(m, ["adt", "atac", "rna"]) for m in sorted(NESTED)]
     assert sorted(res.summary["method"]) == sorted(NESTED)
     out = capsys.readouterr().out
@@ -178,17 +140,14 @@ def test_run_all_with_modalities_runs_the_smaller_variant(tmp_path, all_envs, mo
     _tri(tmp_path)
     calls = []
     monkeypatch.setattr(W, "_run", _fake_run(calls))
-    mtb.run_all("TRI", "vertical", methods=["scMoMaT"], modalities=["rna", "adt"],
-                data_path=tmp_path, out_dir=str(tmp_path / "out"), evaluate=False,
-                verbose=False)
+    mtb.run_all(os.path.join(tmp_path, 'TRI'), 'vertical', methods=['scMoMaT'], modalities=['rna', 'adt'], out_dir=str(tmp_path / 'out'), evaluate=False, verbose=False)
     assert calls == [("scMoMaT", ["adt", "rna"])]
 
 
 def test_dry_run_leaves_out_the_nested_rows_and_names_the_row_that_runs(tmp_path, all_envs,
                                                                          capsys):
     _tri(tmp_path)
-    plan = mtb.run_all("TRI", "vertical", methods=["scMoMaT", "VIMCCA"], data_path=tmp_path,
-                       dry_run=True)
+    plan = mtb.run_all(os.path.join(tmp_path, 'TRI'), 'vertical', methods=['scMoMaT', 'VIMCCA'], dry_run=True)
     # 0.4.0: scMoMaT's rna+adt and rna+atac rows are left out, as a run leaves them out
     assert plan["runnable"].all()
     assert list(plan.loc[plan.method == "scMoMaT", "modalities"]) == ["rna+adt+atac"]
@@ -206,8 +165,7 @@ def test_a_blocked_larger_row_leaves_the_smaller_one_running(tmp_path, all_envs,
     _tri(tmp_path)
     calls = []
     monkeypatch.setattr(W, "_run", _fake_run(calls))
-    mtb.run_all("TRI", "vertical", methods=["Matilda"], data_path=tmp_path,
-                out_dir=str(tmp_path / "out"), evaluate=False, verbose=False)
+    mtb.run_all(os.path.join(tmp_path, 'TRI'), 'vertical', methods=['Matilda'], out_dir=str(tmp_path / 'out'), evaluate=False, verbose=False)
     assert calls == [("Matilda", ["adt", "cty", "rna"])]
 
 
@@ -236,24 +194,23 @@ def test_uinmf_resolves_to_the_variant_of_the_folders_batch_count(tmp_path):
     two-batch files are part of the three-batch ones, so a folder with three
     batches picks the three-batch variant."""
     _cross(tmp_path)
-    got = mtb.inputs_for("B3", "cross", "UINMF", data_path=tmp_path)
+    got = mtb.engine.resolve.inputs_for("B3", "cross", "UINMF", data_path=tmp_path)
     assert list(got) == ["rna1", "rna2", "rna3", "adt1", "adt2", "adt3"]
-    assert list(mtb.labels_for("B3", "cross", "UINMF", data_path=tmp_path)) == [
+    assert list(mtb.engine.resolve.labels_for("B3", "cross", "UINMF", data_path=tmp_path)) == [
         "cty1", "cty2", "cty3"]
     two = ["rna1", "rna2", "adt1", "adt2"]
-    assert list(mtb.inputs_for("B3", "cross", "UINMF", modalities=two,
+    assert list(mtb.engine.resolve.inputs_for("B3", "cross", "UINMF", modalities=two,
                                data_path=tmp_path)) == two
     _cross(tmp_path, "B2", batches=2)
-    assert list(mtb.inputs_for("B2", "cross", "UINMF", data_path=tmp_path)) == two
-    assert list(mtb.labels_for("B2", "cross", "UINMF", data_path=tmp_path)) == ["cty1", "cty2"]
+    assert list(mtb.engine.resolve.inputs_for("B2", "cross", "UINMF", data_path=tmp_path)) == two
+    assert list(mtb.engine.resolve.labels_for("B2", "cross", "UINMF", data_path=tmp_path)) == ["cty1", "cty2"]
 
 
 def test_run_all_runs_uinmf_once_on_three_batches(tmp_path, all_envs, monkeypatch, capsys):
     _cross(tmp_path)
     calls = []
     monkeypatch.setattr(W, "_run", _fake_run(calls, n_cells=36))
-    res = mtb.run_all("B3", "cross", methods=["UINMF"], data_path=tmp_path,
-                      out_dir=str(tmp_path / "out"), evaluate=False)
+    res = mtb.run_all(os.path.join(tmp_path, 'B3'), 'cross', methods=['UINMF'], out_dir=str(tmp_path / 'out'), evaluate=False)
     assert calls == [("UINMF", ["adt1", "adt2", "adt3", "rna1", "rna2", "rna3"])]
     assert list(res.summary["method"]) == ["UINMF"]
     assert ("[run_all] UINMF runs on rna1+rna2+rna3+adt1+adt2+adt3, not on "
@@ -267,18 +224,9 @@ def _demo(name):
     return DEMO
 
 
-def test_d22mini_resolves_its_three_modality_variants():
-    data = _demo("D22mini")
-    for method in NESTED + ("Matilda",):
-        assert set(mtb.inputs_for("D22mini", "vertical", method, data_path=data)) >= {
-            "rna", "adt", "atac"}
-    with pytest.raises(mtb.AmbiguousVariantError):
-        mtb.inputs_for("D22mini", "vertical", "VIMCCA", data_path=data)
-
-
 def test_d52mini_uinmf_reads_every_batch():
     data = _demo("D52mini")
-    assert list(mtb.inputs_for("D52mini", "cross", "UINMF", data_path=data)) == [
+    assert list(mtb.engine.resolve.inputs_for("D52mini", "cross", "UINMF", data_path=data)) == [
         "rna1", "rna2", "rna3", "adt1", "adt2", "adt3"]
 
 

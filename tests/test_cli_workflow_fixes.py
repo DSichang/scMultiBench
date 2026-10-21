@@ -101,19 +101,19 @@ def test_scan_command_column_renders_for_out_dir():
 
 
 def test_run_dry_run_mirrors_run_builder():
-    inp = mtb.inputs_for("D11", "vertical", "Matilda", modalities=["rna", "adt"])
-    argv = mtb.run("Matilda", "vertical", inputs=inp, out_dir="o",
+    inp = mtb.engine.resolve.inputs_for("D11", "vertical", "Matilda", modalities=["rna", "adt"])
+    argv = mtb.engine.runner.run("Matilda", "vertical", inputs=inp, out_dir="o",
                    params={"epochs": 5}, dry_run=True)
     assert argv[:4] == ["conda", "run", "-n", "matilda"] or argv[1:4] == ["run", "-n", "matilda"]
     assert "--epochs" in argv and argv[argv.index("--epochs") + 1] == "5"
     assert argv[argv.index("--save_path") + 1] == os.path.join(os.path.abspath("o"), "")
     assert not os.path.exists("o")                       # nothing created
     # a custom template is honoured verbatim, like the real run
-    argv2 = mtb.run("Matilda", "vertical", inputs=inp, out_dir="o",
+    argv2 = mtb.engine.runner.run("Matilda", "vertical", inputs=inp, out_dir="o",
                     cmd_template="srun {cmd}", dry_run=True)
     assert argv2[0] == "srun" and "conda" not in argv2
     with pytest.raises(KeyError, match="Did you mean"):
-        mtb.run("Matlda", "vertical", inputs=inp, out_dir="o", dry_run=True)
+        mtb.engine.runner.run("Matlda", "vertical", inputs=inp, out_dir="o", dry_run=True)
 
 
 def test_run_all_params_unknown_method_before_io_and_dry_run_key_check():
@@ -144,12 +144,6 @@ def test_default_env_name_is_the_env_every_entry_point_uses():
     assert envs.own_env_name("Matilda") == "scmb_matilda"       # the old answer, renamed
     with pytest.raises(KeyError, match="Did you mean"):
         envs.default_env_name("Matlda")
-
-
-def test_env_status_reports_the_real_env():
-    rows = {r["method"]: r for r in envs.status()}
-    assert rows["Matilda"]["env"] == rows["Matilda"]["group"] == "matilda"
-    assert rows["Matilda"]["own_env"] == "scmb_matilda"
 
 
 # ------------------------------------------------------------------ J7: stdout / stderr discipline

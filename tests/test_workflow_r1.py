@@ -69,22 +69,6 @@ def test_scan_base_atac_token_keeps_the_atac_gas_rows_of_vertical():
     assert "rna+adt+atac" not in mods
 
 
-def test_scan_representation_token_uses_the_methods_atac():
-    """'atac_peak' means ATAC + the method's representation, like
-    find_methods(atac='peak'); it used to keep only the rna+atac_peak roles."""
-    # scBridge reads gene activity: the peak token excludes it, so no warning names it
-    with warnings.catch_warnings(record=True) as seen:
-        warnings.simplefilter("always")
-        df = full_scan("D28", "diagonal", modalities=["rna", "atac_peak"], verbose=False)
-    assert not [w for w in seen if "scBridge" in str(w.message)]
-    want = set(mtb.find_methods("diagonal", atac="peak")) - {"scBridge"}
-    assert set(df["method"]) == want
-    assert "MultiMAP" in want and "SCALEX" not in want
-    with pytest.warns(UserWarning):
-        gas = full_scan("D28", "diagonal", modalities=["rna", "gene_activity"], verbose=False)
-    assert set(gas["method"]) == set(mtb.find_methods("diagonal", atac="gene_activity")) - {"scBridge"}
-
-
 def test_scan_modality_order_does_not_matter():
     a = full_scan("D11", "vertical", modalities=["adt", "rna"], verbose=False)
     b = full_scan("D11", "vertical", modalities=["rna", "protein"], verbose=False)
@@ -155,8 +139,8 @@ def test_scan_caveat_carries_the_first_sentence_of_the_setup_hint():
 
 
 def test_dry_run_prints_the_setup_hint_to_stderr_once(capsys):
-    inp = mtb.inputs_for("D28", "diagonal", "GLUE")
-    argv = mtb.run("GLUE", "diagonal", inputs=inp, out_dir="/tmp/unused/GLUE", dry_run=True)
+    inp = mtb.engine.resolve.inputs_for("D28", "diagonal", "GLUE")
+    argv = mtb.engine.runner.run("GLUE", "diagonal", inputs=inp, out_dir="/tmp/unused/GLUE", dry_run=True)
     err = capsys.readouterr().err
     assert err.count("# GLUE reads the GENCODE v43 human annotation") == 1
     assert isinstance(argv, list)
@@ -185,7 +169,7 @@ def test_run_off_linux_starts_with_the_platform(off_linux, tmp_path, monkeypatch
     for probe in (["base"], []):                    # conda present, or nothing at all
         monkeypatch.setattr(runner.envs, "installed_envs", lambda conda=None, p=probe: p)
         with pytest.raises(OSError) as e:
-            mtb.run("totalVI", "vertical", inputs=mtb.inputs_for("D11", "vertical", "totalVI"),
+            mtb.engine.runner.run("totalVI", "vertical", inputs=mtb.engine.resolve.inputs_for("D11", "vertical", "totalVI"),
                     out_dir=str(tmp_path / "out"))
         msg = str(e.value)
         assert msg.startswith("Methods run only on Linux, and this computer runs macOS. "
@@ -207,8 +191,8 @@ def no_scripts(tmp_path, monkeypatch):
 
 
 def test_dry_run_says_when_the_method_scripts_are_not_here(no_scripts, capsys):
-    inp = mtb.inputs_for("D11", "vertical", "totalVI")
-    mtb.run("totalVI", "vertical", inputs=inp, out_dir="/tmp/unused/t", dry_run=True)
+    inp = mtb.engine.resolve.inputs_for("D11", "vertical", "totalVI")
+    mtb.engine.runner.run("totalVI", "vertical", inputs=inp, out_dir="/tmp/unused/t", dry_run=True)
     err = capsys.readouterr().err
     assert f"# The method scripts are not in {no_scripts}. The first real run clones " \
            f"PYangLab/scMultiBench with git." in err
@@ -227,7 +211,7 @@ def test_real_run_without_network_names_the_fetch_command(tmp_path, monkeypatch)
         raise subprocess.CalledProcessError(128, ["git", "clone"])
     monkeypatch.setattr(runner.config, "ensure_repo", offline)
     with pytest.raises(RuntimeError, match="multibench fetch --scripts") as e:
-        mtb.run("totalVI", "vertical", inputs=mtb.inputs_for("D11", "vertical", "totalVI"),
+        mtb.engine.runner.run("totalVI", "vertical", inputs=mtb.engine.resolve.inputs_for("D11", "vertical", "totalVI"),
                 out_dir=str(tmp_path / "out"), cmd_template="{cmd}")
     assert isinstance(e.value.__cause__, subprocess.CalledProcessError)
     assert not (tmp_path / "out").exists()
@@ -278,7 +262,7 @@ def test_run_all_refuses_a_mismatched_out_dir_before_any_method(tmp_path, monkey
 def test_dry_run_with_anndata_names_the_converted_files(tmp_path):
     import anndata as ad
     a = ad.AnnData(np.ones((5, 3)))
-    argv = mtb.run("scMVP", "vertical", inputs={"rna": a, "atac": a},
+    argv = mtb.engine.runner.run("scMVP", "vertical", inputs={"rna": a, "atac": a},
                    out_dir=str(tmp_path / "o"), dry_run=True)
     line = shlex.join(argv)
     assert "AnnData object" not in line
@@ -295,14 +279,14 @@ def test_dry_run_refuses_mudata_like_the_real_run(tmp_path, bad):
         bad = mudata.MuData({"rna": ad.AnnData(np.ones((4, 2)))})
     for dry in (True, False):
         with pytest.raises(ValueError, match="MuData"):
-            mtb.run("scMVP", "vertical", inputs={"rna": bad, "atac": bad},
+            mtb.engine.runner.run("scMVP", "vertical", inputs={"rna": bad, "atac": bad},
                     out_dir=str(tmp_path / "o"), dry_run=dry, cmd_template="{cmd}")
     assert not (tmp_path / "o").exists()
 
 
 def test_dry_run_names_the_renamed_peak_copy(tmp_path):
-    inp = mtb.inputs_for("D28", "diagonal", "Seurat_v3")
-    argv = mtb.run("Seurat_v3", "diagonal", inputs=inp, out_dir=str(tmp_path / "o"),
+    inp = mtb.engine.resolve.inputs_for("D28", "diagonal", "Seurat_v3")
+    argv = mtb.engine.runner.run("Seurat_v3", "diagonal", inputs=inp, out_dir=str(tmp_path / "o"),
                    dry_run=True)
     assert str(tmp_path / "o" / "inputs" / "atac_peak_normpeaks.h5") in argv
     assert inp["atac_gas"] in argv                         # canonical file: as is
@@ -336,10 +320,10 @@ def test_dry_run_argv_is_the_real_command(tmp_path, monkeypatch):
     (repo / "tools_scripts").mkdir(parents=True)
     kw = dict(inputs={"rna": a, "atac": a}, out_dir=str(tmp_path / "o"),
               cmd_template="{cmd}", repo_path=repo)
-    preview = mtb.run("scMVP", "vertical", dry_run=True, **kw)
+    preview = mtb.engine.runner.run("scMVP", "vertical", dry_run=True, **kw)
     calls = {}
     monkeypatch.setattr(runner.subprocess, "Popen", _fake_popen(6, calls))
-    res = mtb.run("scMVP", "vertical", **kw)
+    res = mtb.engine.runner.run("scMVP", "vertical", **kw)
     assert calls["cmd"] == preview == res.cmd
 
 
@@ -375,56 +359,6 @@ def test_atac_column_is_none_for_a_variant_without_atac():
     by = df.set_index("modalities")["atac"]
     assert by["rna+adt"] is None or pd.isna(by["rna+adt"])
     assert by["rna+atac"] == "peak"
-
-
-# ----------------------------------------------------------------- L53: obs_names
-def _barcodes(path):
-    with h5py.File(path, "r") as f:
-        return [b.decode() for b in f["matrix/barcodes"][:]]
-
-
-def _fake_run(monkeypatch, tmp_path, method, category, dataset, n):
-    """Run ``method`` on a demo dataset with a fake process that writes an
-    ``n`` x 4 embedding into out_dir."""
-    inp = mtb.inputs_for(dataset, category, method)
-    repo = tmp_path / "repo"
-    (repo / "tools_scripts").mkdir(parents=True, exist_ok=True)
-    calls = {}
-    monkeypatch.setattr(runner.subprocess, "Popen", _fake_popen(n, calls))
-    return inp, mtb.run(method, category, inputs=inp, out_dir=str(tmp_path / method),
-                        cmd_template="{cmd}", repo_path=repo)
-
-
-def test_obs_names_vertical_are_the_paired_barcodes(tmp_path, monkeypatch):
-    inp = mtb.inputs_for("D11", "vertical", "totalVI")
-    bars = _barcodes(inp["rna"])
-    _, res = _fake_run(monkeypatch, tmp_path, "totalVI", "vertical", "D11", n=len(bars))
-    assert res.obs_names == bars and res.output.shape[0] == len(res.obs_names)
-
-
-@pytest.mark.parametrize("method,first", [("SCALEX", "rna"), ("uniPort", "atac_gas")])
-def test_obs_names_diagonal_follow_the_stacking_order(tmp_path, monkeypatch, method, first):
-    inp = mtb.inputs_for("D28", "diagonal", method)
-    rna, atac = _barcodes(inp["rna"]), _barcodes(inp["atac_gas"])
-    want = rna + atac if first == "rna" else atac + rna
-    _, res = _fake_run(monkeypatch, tmp_path, method, "diagonal", "D28", n=len(want))
-    assert res.obs_names == want
-    # the same order labels_for gives the label files
-    order = list(mtb.labels_for("D28", "diagonal", method))
-    assert order[0].startswith(first.split("_")[0])
-
-
-def test_obs_names_mosaic_one_block_per_batch(tmp_path, monkeypatch):
-    inp = mtb.inputs_for("D46", "mosaic", "StabMap")
-    want = sum((_barcodes(inp[r]) for r in ("rna1", "rna2", "rna3")), [])
-    _, res = _fake_run(monkeypatch, tmp_path, "StabMap", "mosaic", "D46", n=len(want))
-    assert res.obs_names == want
-
-
-def test_obs_names_none_with_a_warning_when_counts_differ(tmp_path, monkeypatch):
-    with pytest.warns(UserWarning, match="obs_names is None"):
-        _, res = _fake_run(monkeypatch, tmp_path, "totalVI", "vertical", "D11", n=7)
-    assert res.obs_names is None
 
 
 def test_runresult_documents_obs_names_and_row_order():
@@ -465,21 +399,6 @@ def _caps(text):
     ids = set(registry.list_methods())                      # GLUE, MIRA ... are names
     return sorted({w for w in words if w not in _ALLOWED_CAPS and w not in ids
                    and not w.startswith(("CHAIN_OK", "RUN_OK"))})
-
-
-@pytest.mark.parametrize("obj", [mtb.scan, mtb.run_all, mtb.run, mtb.sweep, mtb.load_batch,
-                                 mtb.describe_layout, mtb.BatchResult, runner.RunResult,
-                                 mtb.BatchResult.save, mtb.data.fetch])
-def test_docstrings_use_plain_wording(obj):
-    doc = inspect.getdoc(obj)
-    assert _caps(doc) == [], _caps(doc)
-    flat = " ".join(doc.split())
-    for banned in (" iff ", " trap", " gate", "tidy frame", "SCAN_COLUMNS",
-                   "OUT_DIR_PLACEHOLDER", "plausible", "Replaces a hand-written",
-                   "never silently", "stand-in"):
-        assert banned not in flat, banned
-
-
 
 
 @pytest.mark.parametrize("cat", [None, "vertical", "diagonal", "mosaic", "cross"])

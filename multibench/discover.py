@@ -2,14 +2,12 @@
 from __future__ import annotations
 
 import functools
-import os
 from pathlib import Path
 from urllib.parse import quote as _quote
 
 from . import _compat
 from .config import _and_list
 from .engine import registry, upstream, envs
-from .engine import resolve as _resolve
 from .engine.schema import AmbiguousVariantError, is_label_role
 from .engine.schema import base_modality as _base_modality
 
@@ -26,25 +24,19 @@ def _representations(toks) -> set[str]:
 _BOTH_FILES = frozenset(_REPRESENTATION_TOKENS)
 
 
-def _modality_filter(modalities, atac) -> tuple[set[str] | None, str | None]:
-    """``(base types every matching variant must consume, atac)``: the modality rule
-    of ``find_methods`` and ``recommend`` (see the ``find_methods`` Notes)."""
+def _modality_filter(modalities) -> tuple[set[str] | None, str | None]:
+    """``(base types every matching variant must consume, ATAC representation)``:
+    the modality rule of ``find_methods`` and ``recommend`` (see the
+    ``find_methods`` Notes)."""
     if isinstance(modalities, str):
         raise TypeError(
             f"modalities must be a list of modality tokens, got the string "
             f"{modalities!r} - did you mean modalities=[{modalities!r}]?")
-    atac = registry.check_atac(atac)
     if modalities is None:
-        return None, atac
+        return None, None
     toks = registry.normalize_modalities(modalities)
     reps = sorted(_representations(toks))
-    if len(reps) == 1:
-        if atac is not None and atac != reps[0]:
-            raise ValueError(
-                f"modalities={list(modalities)} selects methods that read "
-                f"{reps[0].replace('_', ' ')} but atac={atac!r}; pass one of the two")
-        atac = reps[0]
-    return {_base_modality(t) for t in toks}, atac
+    return {_base_modality(t) for t in toks}, (reps[0] if len(reps) == 1 else None)
 
 
 def _reads_both_files(modalities) -> bool:
@@ -68,10 +60,6 @@ def _variant_matches(v, category, want, needs_labels, atac) -> bool:
     return True
 
 
-@_compat.keywords("find_methods", private="_find_methods", kept={
-    "task": _compat.note("it has no replacement"), "runnable": _compat.use("mtb.scan"),
-    "atac": _compat.use('modalities=["atac_peak"] or ["atac_gas"]'),
-    "tunable": _compat.use("mtb.params_for")})
 def find_methods(category: str | None = None, *,
                  modalities: list[str] | set[str] | None = None,
                  needs_labels: bool | None = None) -> list[str]:
@@ -116,30 +104,12 @@ def find_methods(category: str | None = None, *,
     mtb.method_info : the per-variant ``supports`` table these filters are read from.
     mtb.scan : which of these methods can actually run on a given dataset.
     """
-    return _find_methods(category, needs_labels=needs_labels, modalities=modalities)
-
-
-def _find_methods(category: str | None = None, *, task: str | None = None,
-                  needs_labels: bool | None = None, atac: str | None = None,
-                  modalities: list[str] | set[str] | None = None,
-                  runnable: bool | None = None, tunable: bool | None = None) -> list[str]:
-    """:func:`find_methods`, with the deprecated ``task``, ``runnable`` and
-    ``tunable``: ``task`` keeps the methods that declare it, ``runnable=True``
-    those with a variant the package runs and ``False`` the declared stubs,
-    ``tunable=True`` those with a hyperparameter ``params=`` can set."""
     registry.check_category(category)
-    registry.check_task(task)
-    want, atac = _modality_filter(modalities, atac)
+    want, atac = _modality_filter(modalities)
     both = _reads_both_files(modalities)
     out = []
     for s in registry.load():
         if category and category not in s.categories:
-            continue
-        if task and task not in s.tasks:
-            continue
-        if runnable is not None and bool(s.variants) != runnable:
-            continue
-        if tunable is not None and any(v.tunable for v in s.variants) != tunable:
             continue
         # atac is declared per method, but only a variant with an ATAC input honours it
         if atac and s.atac != atac:
@@ -154,10 +124,6 @@ def _find_methods(category: str | None = None, *, task: str | None = None,
             continue
         out.append(s.id)
     return out
-
-
-#: deprecated alias of :func:`find_methods`
-list_methods = _compat.renamed("list_methods", "find_methods", find_methods)
 
 
 def _effective(v) -> dict:
@@ -195,14 +161,6 @@ class _Info(dict):
         raise KeyError(key)
 
 
-#: the keys ``verbose=True`` adds (the maintainer's)
-_VERBOSE_KEYS = ("status", "variants", "driver", "scripts_url", "version", "params",
-                 "fixed_in_script", "upstream_knobs", "upstream_url", "gpu_evidence",
-                 "notes_long")
-
-
-@_compat.keywords("method_info", private="_method_info",
-                  kept={"verbose": _compat.use("mtb.params_for")})
 def method_info(method: str) -> dict:
     """Return everything known about one method as a flat dict.
 
@@ -251,12 +209,6 @@ def method_info(method: str) -> dict:
     mtb.find_methods : filter methods by category, modalities, labels, ATAC representation.
     mtb.cite : the paper to cite for a method.
     """
-    return _method_info(method)
-
-
-def _method_info(method: str, verbose: bool = False) -> dict:
-    """:func:`method_info`, with the deprecated ``verbose=True``, which adds the
-    maintainer's keys (``params``, ``status``, ``variants``, ``driver`` ...)."""
     s = registry.get(method)
     method = s.id
     if not s.variants:
@@ -295,8 +247,7 @@ def _method_info(method: str, verbose: bool = False) -> dict:
     info["cpu_params"] = dict(s.cpu_params)
     info["gpu_evidence"] = s.gpu_evidence or None
     info["notes_long"] = up["notes"]
-    keys = _INFO_KEYS + (_VERBOSE_KEYS if verbose else ())
-    return _Info((k, info[k]) for k in keys)
+    return _Info((k, info[k]) for k in _INFO_KEYS)
 
 
 # ------------------------------------------------------------ observed runtimes
@@ -327,11 +278,6 @@ def _variant_key(v) -> str:
     return registry._variant_key({**v.when, "modalities": v.shown_modalities})
 
 
-_DATASET_VARIANT = _compat.use("params_for(method, category, modalities)")
-
-
-@_compat.keywords("params_for", private="_params_for",
-                  kept={"dataset": _DATASET_VARIANT, "data_path": _DATASET_VARIANT})
 def params_for(method: str, category: str | None = None,
                modalities: list[str] | set[str] | None = None) -> dict:
     """Return the hyperparameters of one method variant.
@@ -380,18 +326,6 @@ def params_for(method: str, category: str | None = None,
     --------
     mtb.run_all : takes these keys as ``params={method: {key: value}}``.
     """
-    return _params_for(method, category, modalities)
-
-
-def _params_for(method: str, category: str | None = None,
-                modalities: list[str] | set[str] | None = None, *,
-                dataset: str | None = None,
-                data_path: Path | str | None = None) -> dict:
-    """:func:`params_for`, with the deprecated ``dataset=`` and ``data_path=``:
-    the variant whose input files the dataset folder holds settles an
-    ambiguous selection."""
-    if dataset is not None:
-        dataset, data_path = _resolve.split_dataset(dataset, data_path)
     s = registry.get(method)
     method = s.id
     registry.check_category(category)
@@ -400,28 +334,12 @@ def _params_for(method: str, category: str | None = None,
         raise KeyError(f"{method}: no variants (declared stub); nothing to tune")
 
     def _example(v):
-        from . import config
         mods = list(v.when.get("modalities", []))
         return f"params_for({method!r}, {v.when.get('category')!r}, {mods})"
 
-    ds_dir = None
-    if dataset is not None:
-        from . import config
-        root = data_path if data_path is not None else config.DEFAULT.data_path
-        ds_dir = Path(os.path.abspath(os.fspath(root))) / dataset
-
-    def _by_folder(cands):
-        """The one candidate the dataset folder satisfies (of nested ones the largest,
-        as in ``inputs_for``), else None."""
-        if ds_dir is None or not ds_dir.is_dir():
-            return None
-        ok = _resolve._drop_nested(
-            [x for x in cands if _resolve._variant_satisfiable(x, ds_dir, s.id)])
-        return ok[0] if len(ok) == 1 else None
-
     if category is None and modalities is None:
         if len(s.variants) > 1:
-            v = _by_folder(s.variants) or _agreed(s.variants)
+            v = _agreed(s.variants)
             if v is None:
                 keys = _and_list(_variant_key(x) for x in s.variants)
                 raise AmbiguousVariantError(
@@ -437,7 +355,7 @@ def _params_for(method: str, category: str | None = None,
             from .engine.schema import no_category_message
             raise KeyError(no_category_message(method, s.wired_categories, category))
         if len(cands) > 1:
-            v = _by_folder(cands) or _agreed(cands)
+            v = _agreed(cands)
             if v is None:
                 mods = _and_list("+".join(x.when.get("modalities", []))
                                           for x in cands)
@@ -462,7 +380,7 @@ def _params_for(method: str, category: str | None = None,
                 f"No variant of {method} takes the modalities "
                 f"{_and_list(sorted(modalities))}. Its variants: {keys}.")
         if len(cands) > 1:
-            v = _by_folder(cands) or _agreed(cands)
+            v = _agreed(cands)
             if v is None:
                 keys = _and_list(_variant_key(x) for x in cands)
                 raise AmbiguousVariantError(
@@ -481,7 +399,7 @@ def _params_for(method: str, category: str | None = None,
             cands = _same_types([x for x in s.variants
                                  if x.when.get("category") == category], modalities)
             if len(cands) > 1:
-                v = _by_folder(cands) or _agreed(cands)
+                v = _agreed(cands)
                 if v is None:
                     keys = _and_list("+".join(x.when.get("modalities", [])) for x in cands)
                     raise AmbiguousVariantError(
@@ -546,7 +464,6 @@ def _format_entry(tag: str, ref: dict, fmt: str) -> str:
     return line
 
 
-@_compat.keywords("cite", renamed={"fmt": "format"})
 def cite(*methods, format: str = "text") -> str:
     """Return citation text for the benchmark and, optionally, the methods you ran.
 

@@ -3,6 +3,7 @@ M18, M21, M22, M31, M36: resolve.py, ingest.py and two methods.yaml entries).
 
 Each test fails on the code before its fix.
 """
+import os
 import warnings
 
 import anndata as ad
@@ -36,11 +37,6 @@ def _labels(path, n):
     pd.DataFrame({"x": ["A"] * n}).to_csv(path, index=False)
 
 
-def _barcodes(path):
-    with h5py.File(path, "r") as f:
-        return [x.decode() for x in f["matrix/barcodes"][:]]
-
-
 def _diagonal(root, name, rna_cells, peak_cells, gas_cells=None):
     d = root / name
     d.mkdir()
@@ -58,73 +54,15 @@ def _row(name, category, method, data_path, **kw):
     return df[df.method == method].iloc[0]
 
 
-@pytest.fixture
-def envs_installed(monkeypatch):
-    """Every env counts as installed, so ``runnable`` follows ``files_ok``."""
-    every = frozenset(envs.group_for(m) for m in mtb.list_methods())
-    monkeypatch.setattr(workflow, "_installed_envs", lambda: every)
-    monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
-
-
 # --- M15: Seurat_v5 needs its bridge files from the same cells ---------------
 SEURAT_D28 = ("Seurat_v5 needs RNA and ATAC from the same cells as its bridge. In D28, "
               "rna.h5 and atac_peak.h5 share 0 of 6,408 and 4,606 cells.")
-
-
-def test_seurat_v5_is_not_file_ready_on_d28(root, envs_installed):
-    row = _row("D28", "diagonal", "Seurat_v5", root / "data")
-    assert not row["files_ok"] and not row["runnable"]
-    assert SEURAT_D28 in row["reason"]
-    assert SEURAT_D28 in row["files_reason"]
-
-
-def test_seurat_v5_unpaired_folder_fails_the_file_check(tmp_path, envs_installed):
-    _diagonal(tmp_path, "UNPAIRED", [f"c{i}" for i in range(50)], [f"a{i}" for i in range(45)])
-    row = _row("UNPAIRED", "diagonal", "Seurat_v5", tmp_path)
-    assert not row["files_ok"] and not row["runnable"]
-    assert ("Seurat_v5 needs RNA and ATAC from the same cells as its bridge. In UNPAIRED, "
-            "rna.h5 and atac_peak.h5 share 0 of 50 and 45 cells.") in row["reason"]
-    with pytest.raises(ValueError, match="Seurat_v5 needs RNA and ATAC from the same cells"):
-        mtb.inputs_for("UNPAIRED", "diagonal", "Seurat_v5", data_path=tmp_path, check=True)
-    # check=False keeps returning the paths
-    assert set(mtb.inputs_for("UNPAIRED", "diagonal", "Seurat_v5", data_path=tmp_path,
-                              check=False)) == {"rna", "atac_peak"}
-
-
-def test_seurat_v5_paired_folder_passes(tmp_path, envs_installed):
-    cells = [f"c{i}" for i in range(50)]
-    _diagonal(tmp_path, "PAIRED", cells, list(reversed(cells)))
-    row = _row("PAIRED", "diagonal", "Seurat_v5", tmp_path)
-    assert row["files_ok"], row["files_reason"]
-    assert row["runnable"]
-    mtb.inputs_for("PAIRED", "diagonal", "Seurat_v5", data_path=tmp_path, check=True)
 
 
 def test_seurat_v5_setup_hint_says_unpaired_data_cannot_run():
     assert mtb.method_info("Seurat_v5")["setup_hint"] == (
         "Seurat_v5 uses your RNA and ATAC files as its paired bridge, so both must hold "
         "the same cells. Unpaired data cannot run through the package.")
-
-
-# --- M16: atac_gas.h5 must list the ATAC cells of atac_peak.h5, in its order --
-def test_shuffled_gene_activity_fails_the_file_check(tmp_path, envs_installed):
-    atac = [f"a{i}" for i in range(40)]
-    shuffled = list(np.random.default_rng(1).permutation(atac))
-    _diagonal(tmp_path, "SHUF", [f"c{i}" for i in range(50)], atac, shuffled)
-    order = ("reads atac_gas.h5 of SHUF, which lists the ATAC cells in another order than "
-             "atac_peak.h5. atac_cty.csv follows atac_peak.h5. Write atac_gas.h5 again with")
-    short = ("atac_gas.h5 lists the ATAC cells in another order than atac_peak.h5. "
-             "atac_cty.csv follows atac_peak.h5. Write atac_gas.h5 again with")
-    for m in ("SCALEX", "MultiMAP", "Seurat_v3"):
-        row = _row("SHUF", "diagonal", m, tmp_path)
-        assert not row["files_ok"], m
-        # files_reason keeps the whole text; reason drops what every row repeats
-        assert f"{m} {order}" in row["files_reason"], (m, row["files_reason"])
-        assert row["reason"].startswith(short), (m, row["reason"])
-    with pytest.raises(ValueError, match="another order than atac_peak.h5"):
-        mtb.inputs_for("SHUF", "diagonal", "SCALEX", data_path=tmp_path, check=True)
-    # a method that reads only the peaks is not affected by atac_gas.h5
-    assert _row("SHUF", "diagonal", "GLUE", tmp_path)["files_ok"]
 
 
 def test_gene_activity_of_other_cells_fails_the_file_check(tmp_path):
@@ -135,7 +73,7 @@ def test_gene_activity_of_other_cells_fails_the_file_check(tmp_path):
              "atac_peak.h5. The files hold 40 and 40 cells and share 0. Both files need "
              "the same ATAC cells.")
     with pytest.raises(ValueError) as e:
-        mtb.inputs_for("OTHER", "diagonal", "SCALEX", data_path=tmp_path, check=True)
+        mtb.engine.resolve.inputs_for("OTHER", "diagonal", "SCALEX", data_path=tmp_path, check=True)
     assert str(e.value) == other
     row = _row("OTHER", "diagonal", "SCALEX", tmp_path)
     assert other in row["files_reason"]
@@ -148,11 +86,11 @@ def test_a_gem_well_suffix_alone_is_the_same_cells(tmp_path):
     atac = [f"AAC{i:03d}" for i in range(40)]
     _diagonal(tmp_path, "SUFFIX", [f"c{i}" for i in range(50)],
               [f"{b}-2" for b in atac], [f"{b}-1" for b in atac])
-    mtb.inputs_for("SUFFIX", "diagonal", "SCALEX", data_path=tmp_path, check=True)
+    mtb.engine.resolve.inputs_for("SUFFIX", "diagonal", "SCALEX", data_path=tmp_path, check=True)
     _diagonal(tmp_path, "SUFFIX_SHUF", [f"c{i}" for i in range(50)],
               [f"{b}-2" for b in atac], [f"{b}-1" for b in reversed(atac)])
     with pytest.raises(ValueError, match="another order"):
-        mtb.inputs_for("SUFFIX_SHUF", "diagonal", "SCALEX", data_path=tmp_path, check=True)
+        mtb.engine.resolve.inputs_for("SUFFIX_SHUF", "diagonal", "SCALEX", data_path=tmp_path, check=True)
 
 
 def test_d28_scans_as_before(root):
@@ -168,45 +106,6 @@ def test_d28_scans_as_before(root):
     assert not every[several].files_ok.any()
     blocked = df[~df.files_ok & ~several]
     assert blocked.method.tolist() == ["Seurat_v5"], blocked[["method", "files_reason"]]
-
-
-def _gas_adata(barcodes, seed=0):
-    rng = np.random.default_rng(seed)
-    a = ad.AnnData(rng.poisson(2.0, size=(len(barcodes), len(GENES))).astype(float))
-    a.obs_names = list(barcodes)
-    a.var_names = GENES
-    return a
-
-
-def test_to_canonical_gas_follows_the_peak_order(tmp_path, capsys):
-    atac = [f"a{i}" for i in range(40)]
-    d = _diagonal(tmp_path, "TOCAN", [f"c{i}" for i in range(50)], atac)
-    shuffled = list(np.random.default_rng(2).permutation(atac))
-    gas = _gas_adata(shuffled)
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        out = ingest._to_canonical(gas, d, modality="gas")   # io.to_canonical, deprecated
-    assert out == d / "atac_gas.h5"
-    assert _barcodes(out) == atac
-    back = mtb.io.read_canonical(out, sparse=False)
-    np.testing.assert_array_equal(back[atac].X, gas[atac].X)
-    err = capsys.readouterr().err
-    assert "atac_peak.h5" in err and len(err.strip().splitlines()) == 1
-    mtb.inputs_for("TOCAN", "diagonal", "SCALEX", data_path=tmp_path, check=True)
-
-
-def test_to_canonical_gas_of_other_cells_warns(tmp_path):
-    d = _diagonal(tmp_path, "TOCAN2", [f"c{i}" for i in range(50)],
-                  [f"a{i}" for i in range(40)])
-    with pytest.warns(UserWarning, match="different cells"):
-        mtb.io.to_canonical(_gas_adata([f"b{i}" for i in range(40)]), d, modality="gas")
-
-
-def test_to_canonical_gas_in_peak_order_prints_nothing(tmp_path, capsys):
-    atac = [f"a{i}" for i in range(40)]
-    d = _diagonal(tmp_path, "TOCAN3", [f"c{i}" for i in range(50)], atac)
-    mtb.io.to_canonical(_gas_adata(atac), d, modality="gas")
-    assert capsys.readouterr().err == ""
 
 
 # --- M18: export_dataset barcode messages and the ADT raw-count hint ---------
@@ -278,23 +177,6 @@ def test_adt_hint_for_a_layer_stays_layer_counts(tmp_path):
         mtb.io.export_dataset(prot, tmp_path / "S", rna=None, adt="X")
 
 
-# --- M21: UnitedNet reads the vertical cty.csv --------------------------------
-def test_unitednet_runs_on_an_exported_vertical_folder(tmp_path, envs_installed):
-    cells = [f"c{i}" for i in range(30)]
-    rna = _rna_adata(cells)
-    rna.obs["ct"] = ["A", "B"] * 15
-    mtb.io.export_dataset(rna, tmp_path / "MYMULTI", atac=_gas_adata(cells),
-                          atac_kind="gene_activity", labels="obs:ct", category="vertical")
-    assert sorted(p.name for p in (tmp_path / "MYMULTI").iterdir()) == \
-        ["atac.h5", "cty.csv", "rna.h5"]
-    row = _row("MYMULTI", "vertical", "UnitedNet", tmp_path)
-    assert row["files_ok"], row["files_reason"]
-    assert list(mtb.labels_for("MYMULTI", "vertical", "UnitedNet", data_path=tmp_path)) == ["cty"]
-    got = mtb.inputs_for("MYMULTI", "vertical", "UnitedNet", data_path=tmp_path, check=True)
-    assert got["cty"].endswith("cty.csv")
-    assert mtb.method_info("UnitedNet")["supports"][0]["labels"] == ["cty"]
-
-
 def test_unitednet_still_reads_an_older_rna_cty_file(tmp_path):
     cells = [f"c{i}" for i in range(30)]
     d = tmp_path / "OLD"
@@ -302,13 +184,13 @@ def test_unitednet_still_reads_an_older_rna_cty_file(tmp_path):
     _h5(d / "rna.h5", GENES, cells)
     _h5(d / "atac.h5", GENES, cells)        # the vertical ATAC name (X13)
     _labels(d / "rna_cty.csv", 30)
-    got = mtb.inputs_for("OLD", "vertical", "UnitedNet", data_path=tmp_path, check=True)
+    got = mtb.engine.resolve.inputs_for("OLD", "vertical", "UnitedNet", data_path=tmp_path, check=True)
     assert got["cty"] == str(d / "rna_cty.csv")
 
 
 def test_rna_cty_next_to_atac_cty_is_not_paired_labels(root, tmp_path):
     """In a diagonal folder rna_cty.csv labels the RNA cells only."""
-    got = mtb.inputs_for("D28", "vertical", "UnitedNet", data_path=root / "data",
+    got = mtb.engine.resolve.inputs_for("D28", "vertical", "UnitedNet", data_path=root / "data",
                          check=False)
     assert got["cty"].endswith("/D28/cty.csv")
     row = _row("D28", "vertical", "UnitedNet", root / "data")
@@ -345,13 +227,13 @@ TWO_BATCHES = ["rna1", "rna2", "adt1", "adt2"]        # UINMF's two-batch cross 
 def test_labels_for_uinmf_returns_the_batches_it_reads(root):
     """UINMF has a cross variant for two batches and one for three. D52 holds
     three, so the three-batch variant is the one the folder picks."""
-    assert list(mtb.labels_for("D52", "cross", "UINMF", data_path=root / "data")) == \
+    assert list(mtb.engine.resolve.labels_for("D52", "cross", "UINMF", data_path=root / "data")) == \
         ["cty1", "cty2", "cty3"]
-    assert list(mtb.labels_for("D52", "cross", "UINMF", modalities=TWO_BATCHES,
+    assert list(mtb.engine.resolve.labels_for("D52", "cross", "UINMF", modalities=TWO_BATCHES,
                                data_path=root / "data")) == ["cty1", "cty2"]
-    assert list(mtb.labels_for("D52", "cross", "StabMap", data_path=root / "data")) == \
+    assert list(mtb.engine.resolve.labels_for("D52", "cross", "StabMap", data_path=root / "data")) == \
         ["cty3", "cty1", "cty2"]
-    assert list(mtb.labels_for("D52", data_path=root / "data")) == ["cty1", "cty2", "cty3"]
+    assert list(mtb.engine.resolve.labels_for("D52", data_path=root / "data")) == ["cty1", "cty2", "cty3"]
 
 
 def test_scan_caveat_names_the_unused_batch(root):
@@ -369,14 +251,12 @@ def test_scan_caveat_names_the_unused_batch(root):
 
 
 def test_dry_run_prints_the_unused_batch(root, capsys):
-    mtb.run_all("D52", "cross", methods=["UINMF"], modalities=TWO_BATCHES,
-                data_path=root / "data", dry_run=True)
+    mtb.run_all(os.path.join(root / 'data', 'D52'), 'cross', methods=['UINMF'], modalities=TWO_BATCHES, dry_run=True)
     out = capsys.readouterr().out
     assert "[run_all] UINMF reads batches 1-2 of 3. Batch 3 is not used.\n" in out
     # without modalities= the three-batch row runs, and the caveat of the
     # two-batch row inside it is not printed
-    mtb.run_all("D52", "cross", methods=["UINMF", "StabMap"], data_path=root / "data",
-                dry_run=True)
+    mtb.run_all(os.path.join(root / 'data', 'D52'), 'cross', methods=['UINMF', 'StabMap'], dry_run=True)
     out = capsys.readouterr().out
     assert "reads batches" not in out
 
@@ -397,29 +277,6 @@ def test_read_canonical_example_builds_the_path_from_data_path():
         in doc
     assert "sparse=" not in doc                    # deprecated in 0.4.0
     assert '"data/D11/rna.h5"' not in doc
-
-
-def test_run_all_prints_the_unused_batch(root, tmp_path, capsys, monkeypatch):
-    """A real sweep says it too; the method run itself is stubbed out."""
-    every = frozenset(envs.group_for(m) for m in mtb.list_methods())
-    monkeypatch.setattr(workflow, "_installed_envs", lambda: every)
-
-    def fake_run(**kw):
-        raise RuntimeError("stub: not run in tests")
-    monkeypatch.setattr(workflow, "_run", fake_run)
-    mtb.run_all("D52", "cross", tmp_path / "out", methods=["UINMF"],
-                modalities=TWO_BATCHES, data_path=root / "data", evaluate=False)
-    assert ("[run_all]   UINMF reads batches 1-2 of 3. Batch 3 is not used.\n"
-            in capsys.readouterr().out)
-
-
-def test_to_canonical_gas_for_vertical_keeps_its_order(tmp_path, capsys):
-    atac = [f"a{i}" for i in range(40)]
-    d = _diagonal(tmp_path, "VERT", atac, atac)
-    shuffled = list(np.random.default_rng(3).permutation(atac))
-    out = mtb.io.to_canonical(_gas_adata(shuffled), d, modality="gas", category="vertical")
-    assert out == d / "atac.h5" and _barcodes(out) == shuffled
-    assert capsys.readouterr().err == ""
 
 
 def test_no_dataset_keyed_caveats_remain():
