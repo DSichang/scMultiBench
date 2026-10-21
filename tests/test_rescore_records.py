@@ -67,8 +67,8 @@ def test_rescore_words_the_caveat_as_this_version_does(tmp_path, monkeypatch):
     blob = json.loads(p.read_text())
     blob["records"][0]["caveat"] = "totalVI needs about 5,000 cells in total."
     p.write_text(json.dumps(blob))
-    new = _quiet(mtb.load_batch(out).rescore, metrics=["ARI"], verbose=False)
-    plan = mtb.run(os.path.join(tmp_path / 'data', 'MYCROSS'), 'cross', methods=['totalVI'], dry_run=True, verbose=False)
+    new = _quiet(mtb.load_run(out).rescore, metrics=["ARI"], verbose=False)
+    plan = mtb.scan(os.path.join(tmp_path / 'data', 'MYCROSS'), 'cross', methods=['totalVI'], verbose=False)
     assert new.records[0]["caveat"] == W._run_caveat(plan["caveat"].iloc[0])
     assert "5,000" not in new.records[0]["caveat"]
 
@@ -80,7 +80,7 @@ def test_a_rescored_record_keeps_the_version_that_ran(tmp_path, monkeypatch):
     blob = json.loads(p.read_text())
     blob["records"][0]["multibench_version"] = "0.3.9"
     p.write_text(json.dumps(blob))
-    new = _quiet(mtb.load_batch(out).rescore, metrics=["ARI"], verbose=False)
+    new = _quiet(mtb.load_run(out).rescore, metrics=["ARI"], verbose=False)
     rec = new.records[0]
     assert rec["multibench_version"] == "0.3.9"
     assert rec["scored_with"] == new.long["scored_with"].iloc[0]
@@ -90,11 +90,11 @@ def test_a_rescored_record_keeps_the_version_that_ran(tmp_path, monkeypatch):
 def test_save_writes_out_dir_relative_to_the_folder(tmp_path, monkeypatch):
     # Z02: a saved or rescored tree holds no host path of its own outputs
     _, out = _tree(tmp_path, monkeypatch)
-    back = mtb.load_batch(out)
+    back = mtb.load_run(out)
     _quiet(back.rescore, metrics=["ARI"], verbose=False).save(out)
     saved = json.loads((out / "batch_result.json").read_text())["records"][0]
     assert saved["out_dir"] == "totalVI_MYCROSS"
     moved = tmp_path / "moved"
     shutil.move(str(out), str(moved))
-    again = mtb.load_batch(moved)
+    again = mtb.load_run(moved)
     assert again.records[0]["out_dir"] == str((moved / "totalVI_MYCROSS").resolve())

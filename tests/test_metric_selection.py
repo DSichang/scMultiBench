@@ -3,7 +3,7 @@
 import pytest
 
 import multibench as mtb
-from multibench.data.catalog import metric_selection
+from multibench._data.catalog import metric_selection
 
 
 def test_one_code_is_a_list_of_one():

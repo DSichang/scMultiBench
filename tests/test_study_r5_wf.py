@@ -110,7 +110,7 @@ def swept(cite, tmp_path):
     data, batch, shuffled = cite
     mtb.config.data_path = data
     _quiet(mtb.run, 'MYCITE', 'vertical', tmp_path / 'a', **KW)
-    return mtb.load_batch(tmp_path / "a"), data, batch
+    return mtb.load_run(tmp_path / "a"), data, batch
 
 
 # ======================================================================= R5-01
@@ -220,7 +220,7 @@ def _diagonal_sweep(root):
                         "modalities": mods, "status": "RUN_OK", "out_dir": str(out),
                         "data_path": str(root / "data"), "output_kind": "embedding"})
     labels = pd.Series(np.concatenate([rna_lab, atac_lab]), index=rna_bars + atac_bars)
-    return W.BatchResult(records, "MYDIAG", "diagonal"), labels
+    return W.RunResult(records, "MYDIAG", "diagonal"), labels
 
 
 def test_a_diagonal_labels_series_is_put_in_each_methods_cell_order(tmp_path):
@@ -392,10 +392,10 @@ def test_summary_reason_comes_from_the_record_also_for_older_folders(tmp_path):
     # a folder saved before the column: batch_result.json only has error
     (out / "batch_result.json").write_text(json.dumps(
         {"dataset": "MYCITE", "category": "vertical", "records": recs}))
-    sm = mtb.load_batch(out).summary.set_index("method")
+    sm = mtb.load_run(out).summary.set_index("method")
     assert sm.loc["MIRA", "reason"] == "MIRA's script imports logger.py"
     assert sm.loc["Matilda", "reason"] == ""
-    assert W.BatchResult([], "MYCITE", "vertical").summary.columns[-1] == "reason"
+    assert W.RunResult([], "MYCITE", "vertical").summary.columns[-1] == "reason"
 
 
 def test_a_csv_with_foreign_barcodes_raises(cite, tmp_path, monkeypatch, capsys):

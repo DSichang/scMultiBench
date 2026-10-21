@@ -120,17 +120,17 @@ def test_the_summary_columns_and_reasons():
             {"method": "B", "status": "RUN_OK_EVAL_FAILED", "error": "ValueError: x"},
             {"method": "C", "status": "RUN_OK_NO_EMBEDDING"},
             {"method": "D", "status": "SKIPPED", "error": "needs labels", "requested": True}]
-    s = mtb.BatchResult(recs, "D11", "vertical").summary
+    s = mtb.RunResult(recs, "D11", "vertical").summary
     assert list(s.columns) == SUMMARY
     assert s.status.tolist() == ["scored", "ran", "ran", "skipped"]
     assert s.reason.tolist() == ["", "ValueError: x", "It writes a graph, not an embedding.",
                                  "needs labels"]
-    assert repr(mtb.BatchResult(recs, "D11", "vertical")) == \
-        "<BatchResult vertical/D11: 1 scored, 2 ran, 1 skipped>"
+    assert repr(mtb.RunResult(recs, "D11", "vertical")) == \
+        "<RunResult vertical/D11: 1 scored, 2 ran, 1 skipped>"
 
 
 def test_an_empty_summary_has_the_columns():
-    assert list(mtb.BatchResult([], "D11", "vertical").summary.columns) == \
+    assert list(mtb.RunResult([], "D11", "vertical").summary.columns) == \
         ["method", "status", "run_sec", "caveat", "reason"]
 
 
@@ -154,14 +154,14 @@ def _tree(tmp_path, dims=6):
 
 
 def test_load_batch_reads_an_old_tree_and_shows_the_new_statuses(tmp_path):
-    res = mtb.load_batch(_tree(tmp_path))
+    res = mtb.load_run(_tree(tmp_path))
     assert res.summary["status"].tolist() == ["scored"]
-    assert res.records[0]["status"] == "CHAIN_OK"          # the record keeps the detail
+    assert res.records[0]["status"] == "scored"          # the record keeps the detail
 
 
 def test_rescore_merges_the_named_metrics_and_save_writes_them(tmp_path):
     out = _tree(tmp_path)
-    new = mtb.load_batch(out).rescore(metrics=["ARI"], verbose=False)
+    new = mtb.load_run(out).rescore(metrics=["ARI"], verbose=False)
     assert new.records[0]["metrics"]["NMI"] == 0.8          # kept
     assert new.records[0]["metrics"]["ARI"] != 0.9          # scored again
     assert sorted(new.long["metric"]) == ["ARI", "NMI", "cLISI"]

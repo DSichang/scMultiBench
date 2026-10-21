@@ -23,18 +23,10 @@ from pathlib import Path
 
 import yaml
 
-from .. import _compat, config
+from .. import _text
+
+from .._settings import config
 from . import registry
-
-__all__ = ["install"]
-
-
-def __dir__() -> list[str]:
-    """``dir(mtb.env)`` lists :data:`__all__` and the dunders (PEP 562); the
-    other names (``recipe``, ``env_prefix``, ``host_has_gpu`` ...) stay
-    importable."""
-    return sorted(n for n in globals() if n in __all__ or n.startswith("__"))
-
 
 class LinuxOnlyError(OSError, RuntimeError):
     """The refusal of a method run or an env install off Linux. Both an
@@ -177,8 +169,8 @@ def host_has_gpu() -> bool:
 
     Examples
     --------
-    >>> import multibench as mtb
-    >>> mtb.env.host_has_gpu()
+    >>> from multibench.engine import envs
+    >>> envs.host_has_gpu()
 
     Notes
     -----
@@ -188,7 +180,7 @@ def host_has_gpu() -> bool:
     library on disk do not count.
 
     **Caching.** The result is cached per process;
-    ``mtb.env.host_has_gpu.cache_clear()`` probes again.
+    ``host_has_gpu.cache_clear()`` probes again.
     """
     smi = shutil.which("nvidia-smi")
     if smi:
@@ -269,7 +261,8 @@ def auto_flavor_note(flavor: str, *, planning: bool = False,
     ``None``: pass ``'gpu'`` when the jobs run on GPU nodes. ``planning``
     returns the advice alone (``env plan`` already names the CPU builds);
     ``dry_run`` says what would be installed."""
-    if flavor != "auto" or resolve_flavor(flavor) != "cpu":
+    if flavor != "auto" or resolve_flavor(flavor) != "cpu" or host_platform_problem():
+        # off Linux nothing is installed here: no GPU node to plan for
         return None
     gpu = "flavor='gpu'"
     if planning:
@@ -308,54 +301,10 @@ _GROUPS_YAML = Path(__file__).resolve().parent / "env_groups.yaml"
 _LOCKS_DIR = Path(__file__).resolve().parent / "env_locks"
 
 
-# --- recipes ---------------------------------------------------------------
-def recipe(method: str) -> dict:
-    """Return the hand-written environment recipe of a method.
-
-    The readable alternative to the lockfile: which Python, conda and pip
-    packages the method's env needs, with caveats.
-
-    Parameters
-    ----------
-    method : str
-        Method id, e.g. ``"Matilda"``; see ``mtb.find_methods()``.
-
-    Returns
-    -------
-    dict
-        The recipe; ``{}`` when the method declares none: ``python_version``,
-        ``conda_channels`` / ``conda_packages`` (the create line),
-        ``pip_packages`` / ``pip_git``, ``package_source``, ``difficulty``,
-        ``verified_working`` and ``caveats``.
-
-    Raises
-    ------
-    KeyError
-        Unknown method id; the message suggests a close match, if any.
-
-    Examples
-    --------
-    >>> import multibench as mtb
-    >>> recipe("Matilda")["conda_packages"]
-    >>> recipe("Matilda").get("caveats")
-
-    See Also
-    --------
-    mtb.env.install : installs the env ``mtb.run`` relies on (packed archive or lockfile).
-    """
-    return registry.get(method).env_spec
-
-
 def own_env_name(method: str) -> str:
     """The method's own env name, ``scmb_<method>``: :func:`group_for`'s
     fallback for a method in no shared group."""
     return f"scmb_{method.lower()}"
-
-
-def default_env_name(method: str) -> str:
-    """The conda env name every entry point uses for ``method``:
-    :func:`group_for` after validating the id."""
-    return group_for(registry.check_method(method))
 
 
 def _conda_bin(prefer: str = "mamba") -> str:
@@ -365,57 +314,6 @@ def _conda_bin(prefer: str = "mamba") -> str:
         if found:
             return found
     return prefer
-
-
-def _install_commands(spec: dict, env_name: str, conda: str | None) -> list[list[str]]:
-    """argv command(s) to create an env from a spec (recipe or group) and install."""
-    conda = conda or _conda_bin()
-    # channels first: newer mamba rejects packages placed after `-c`
-    create = [conda, "create", "-y", "-n", env_name]
-    for ch in spec.get("conda_channels", []):
-        create += ["-c", ch]
-    if spec.get("python_version"):
-        create.append(f"python={spec['python_version']}")
-    create += _conda_packages(spec)
-    pip_git = list(spec.get("pip_git", []))
-    pip_pkgs = list(spec.get("pip_packages", [])) + pip_git
-    if pip_pkgs:
-        create.append("pip")
-    cmds = [create]
-    if pip_pkgs:
-        runner = conda.replace("mamba", "conda")  # `conda run` for the pip step
-        pip = [runner, "run", "-n", env_name, "pip", "install", *pip_pkgs]
-        # git installs of setuptools_scm packages fail on shallow/tagless clones
-        # (`git tag --points-at HEAD` -> 128); a pretend version makes them build.
-        if pip_git:
-            pip = ["env", "SETUPTOOLS_SCM_PRETEND_VERSION=0.0.0", *pip]
-        cmds.append(pip)
-    return cmds
-
-
-def _conda_packages(spec: dict) -> list[str]:
-    """The recipe's conda packages, minus a ``python`` pin when
-    ``python_version`` already gives one."""
-    pkgs = list(spec.get("conda_packages", []))
-    if not spec.get("python_version"):
-        return pkgs
-    return [c for c in pkgs if not _is_python_pin(c)]
-
-
-def _is_python_pin(package: str) -> bool:
-    """``True`` for ``python``, ``python=3.7``, ``python==3.7.10``, ``python>=3``."""
-    name = re.split(r"[=<>!~ ]", str(package).strip(), maxsplit=1)[0]
-    return name == "python"
-
-
-def create_commands(method: str, env_name: str | None = None,
-                    conda: str | None = None) -> list[list[str]]:
-    """The create+install commands of a method's hand-written recipe, into
-    ``env_name`` (default :func:`default_env_name`)."""
-    r = recipe(method)
-    if not r:
-        raise ValueError(f"no recipe declared for {method!r}")
-    return _install_commands(r, env_name or default_env_name(method), conda)
 
 
 # --- shared group environments --------------------------------------------
@@ -431,25 +329,6 @@ def _method_env() -> dict:
     return (yaml.safe_load(_GROUPS_YAML.read_text()) or {}).get("method_env", {}) or {}
 
 
-def groups() -> dict:
-    """``{env_name: spec}`` of every env: the shared ones and each method's own."""
-    merged = _merged_groups()
-    covered = {m for g in merged.values() for m in g.get("members", [])}
-    out = {name: {**g, "shared": True} for name, g in merged.items()}
-    for method, env in _method_env().items():
-        g = out.setdefault(env, {"members": [], "shared": True})
-        g.setdefault("members", [])
-        if method not in g["members"]:
-            g["members"].append(method)
-        covered.add(method)
-    for s in registry.load():
-        if s.id not in covered:
-            out[own_env_name(s.id)] = {
-                **s.env_spec, "members": [s.id], "shared": False,
-            }
-    return out
-
-
 def group_for(method: str) -> str:
     """The env that serves this method: its override, its shared group, or
     its own ``scmb_<method>`` env."""
@@ -460,16 +339,6 @@ def group_for(method: str) -> str:
         if method in g.get("members", []):
             return name
     return own_env_name(method)
-
-
-def group_create_commands(group: str, env_name: str | None = None,
-                          conda: str | None = None) -> list[list[str]]:
-    """Create+install commands for a group env, into ``env_name`` (default:
-    the group name)."""
-    spec = groups().get(group)
-    if spec is None:
-        raise KeyError(f"unknown group {group!r}; see envs.groups()")
-    return _install_commands(spec, env_name or group, conda)
 
 
 def _check_methods(methods):
@@ -676,8 +545,8 @@ def env_prefix(env: str, conda: str | None = None) -> Path | None:
 
     Examples
     --------
-    >>> import multibench as mtb
-    >>> mtb.env.env_prefix("matilda")       # None until the env is installed
+    >>> from multibench.engine import envs
+    >>> envs.env_prefix("matilda")       # None until the env is installed
 
     Notes
     -----
@@ -831,7 +700,7 @@ def _ensure_layer(name: str, info: dict, envs_root: Path) -> Path:
     """``<envs_root>/.layers/<name>``, downloaded and unpacked on first use;
     ``RuntimeError`` when its digest is not the one ``info`` names."""
     import tarfile
-    from ..data.fetch import safe_extract
+    from .._data.fetch import safe_extract
     dest = envs_root / LAYERS_DIR / name
     if not (dest / LAYER_INFO).is_file():
         entry = packed_layers().get(name)
@@ -922,7 +791,7 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
     manifest, sizes = packed_manifest(), packed_sizes()
     key, installed = archive_for(env, flavor, manifest=manifest, sizes=sizes)
     if resolve_flavor(flavor) == "cpu" and installed == "gpu":
-        _compat.warn(_cpu_fallback_warning(env, manifest, sizes), UserWarning)
+        _text.warn(_cpu_fallback_warning(env, manifest, sizes), UserWarning)
     urls = archive_urls(key, manifest)
     build = "single" if _single_build(env, manifest=manifest) else installed
     envs_root.mkdir(parents=True, exist_ok=True)
@@ -937,7 +806,7 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
         tgz.unlink(missing_ok=True)
         raise
     print(f"[env] unpacking {env} -> {dest} ...", flush=True)
-    from ..data.fetch import safe_extract
+    from .._data.fetch import safe_extract
     part = dest.with_name(dest.name + ".partial")
     try:
         shutil.rmtree(part, ignore_errors=True)
@@ -981,12 +850,6 @@ def _conda_unpack(prefix: Path) -> None:
     env = {**os.environ,
            "PATH": f"{prefix / 'bin'}{os.pathsep}{os.environ.get('PATH', '')}"}
     subprocess.run(argv, check=True, capture_output=True, env=env)
-
-
-def _all_env_names(conda: str | None = None) -> list[str]:
-    """Names of every env here, whoever made it: the prefixes under
-    ``envs_dir`` first, then those ``conda`` lists, without duplicates."""
-    return list(dict.fromkeys(name for name, _ in _all_prefixes(conda)))
 
 
 def _all_prefixes(conda: str | None = None) -> list[tuple[str, Path]]:
@@ -1065,8 +928,7 @@ def post_install(env_name: str):
     """Path to the shipped post-install script of an env, or None.
 
     It restores what a lockfile cannot record: R packages from
-    ``install.packages()``, pip packages on no index (:data:`_NOT_ON_PYPI`)
-    and editable installs (matilda, scMVP).
+    ``install.packages()``, pip packages on no index and editable installs (matilda, scMVP).
     """
     p = _LOCKS_DIR / f"{env_name}.post.sh"
     return p if p.is_file() else None
@@ -1089,10 +951,7 @@ def create_env(env_name: str, conda: str | None = None,
     lock = lockfile(env_name)
     if lock is None:
         raise FileNotFoundError(
-            f"no lockfile for env {env_name!r} (expected {_LOCKS_DIR / (env_name + '.yml')}). "
-            f"Capture it on a host where the env exists via freeze({env_name!r}), "
-            f"or build from the hand recipe via create_commands()."
-        )
+            f"no lockfile for env {env_name!r} (expected {_LOCKS_DIR / (env_name + '.yml')}).")
     conda = conda or _conda_bin("conda")
     conda_yaml, req, pip_lines = _materialise_split(env_name, lock)
     cmds = [[conda, "env", "create", "-n", env_name, "-f", str(conda_yaml)]]
@@ -1182,7 +1041,8 @@ def packed_manifest() -> dict:
 
 
 #: the first columns of install's and doctor's frames
-_INSTALL_FIRST = ("env", "methods", "state")
+#: The columns of :func:`install`'s table; the rows hold more, for the package.
+INSTALL_COLUMNS = ("env", "methods", "state", "flavor", "archive_bytes", "unpacked_bytes")
 def _frame(rows: list[dict], first: tuple):
     """``rows`` as a DataFrame, ``first`` columns first."""
     import pandas as pd
@@ -1195,7 +1055,7 @@ def _frame(rows: list[dict], first: tuple):
 
 def install(methods: list[str] | None = None, *, category: str | None = None,
             dry_run: bool = False, flavor: str = "auto", build: bool = False):
-    """Install the conda envs a set of methods needs; Linux only.
+    """Install the environments a set of methods needs; Linux only.
 
     Each env is unpacked from its published archive, or built from its
     lockfile where none is published. Installed envs are skipped.
@@ -1223,10 +1083,9 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
         One row per env, the env serving the most methods first: ``env``,
         ``methods``, ``state`` (``'have'``, ``'packed archive published'``,
         ``'name taken'`` ... on a dry run; ``'PACKED'``, ``'BUILD'`` after an
-        install), ``exists``, ``has_lock``, ``other_env`` (a same-named env
-        multibench did not make, which is not used), ``archive_bytes`` /
-        ``unpacked_bytes``, ``packed_url``, ``flavor``, ``cmds`` and
-        ``fallback_cmds``.
+        install), ``flavor`` (``'cpu'``, ``'gpu'``, or ``'any'`` for one
+        archive for both), ``archive_bytes`` (the download) and
+        ``unpacked_bytes`` (on disk).
 
     Raises
     ------
@@ -1244,7 +1103,7 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
     """
     rows = _install_rows(methods, category=category, packed=not build, dry_run=dry_run,
                          flavor=flavor)
-    plan = _frame(rows, _INSTALL_FIRST)
+    plan = _frame(rows, INSTALL_COLUMNS)[list(INSTALL_COLUMNS)]
     if dry_run and not build:
         todo = to_download(rows)
         totals, line = plan_totals(todo)
@@ -1265,7 +1124,7 @@ def _install_rows(methods: list[str] | None = None, *, category: str | None = No
                   force: bool = False, flavor: str = "auto") -> list[dict]:
     """The rows of :func:`install`, as dicts."""
     check_flavor(flavor)
-    if isinstance(methods, str) and methods in config._CATEGORY_FOLDERS:
+    if isinstance(methods, str) and methods in registry.CATEGORIES:
         raise TypeError(f"methods must be a list of ids, got the category {methods!r} - "
                         f"did you mean category={methods!r}?")
     methods = _check_methods(methods)
@@ -1372,196 +1231,6 @@ def _doctor_rows(category: str | None = None,
 
 def _str_or_none(path) -> str | None:
     return None if path is None else str(path)
-
-
-_LOCAL_PIP_RE = re.compile(r"@\s*file://|feedstock_root")
-# `pip freeze` in a conda env reports the conda name, which pip cannot resolve
-_CONDA_TO_PYPI = {
-    "python-graphviz": "graphviz",
-}
-# on no index: restored by <env>.post.sh
-_NOT_ON_PYPI = frozenset({"cobolt", "multimap"})
-# conda's own tools: `pip freeze` lists them, only conda channels ship them
-_CONDA_ONLY_PIP = frozenset({
-    "conda", "mamba", "libmambapy", "boa",
-    "conda-build", "conda-libmamba-solver", "conda-content-trust",
-})
-_CUDA_PIN_RE = re.compile(r"==[0-9][^\s]*\+(cu\d+)")
-
-
-def sanitize_lock(text: str) -> str:
-    """Make an exported lockfile rebuildable on a different machine.
-
-    Drops the pip entries that point into the conda-forge build tree
-    (``... @ file:///home/conda/feedstock_root/...``; conda already provides
-    them) and those no index can supply (:data:`_CONDA_ONLY_PIP`,
-    :data:`_NOT_ON_PYPI`); renames conda names to PyPI names
-    (:data:`_CONDA_TO_PYPI`); and for a CUDA-local torch pin
-    (``torch==2.6.0+cu118``) adds the download.pytorch.org
-    ``--extra-index-url`` rather than relaxing the pin.
-
-    The pip block is found by indentation (conda writes six spaces,
-    :func:`freeze`'s fallback four). Idempotent.
-    """
-    out, cuda_tags = [], []
-    pip_indent = None
-    entry_indent = None
-    for ln in text.splitlines():
-        stripped = ln.strip()
-        indent = len(ln) - len(ln.lstrip())
-        if stripped == "- pip:":
-            pip_indent, entry_indent = indent, None
-            out.append(ln)
-            continue
-        if pip_indent is not None and stripped:
-            if indent <= pip_indent:
-                pip_indent = None
-            else:
-                if entry_indent is None:
-                    entry_indent = indent
-                if _LOCAL_PIP_RE.search(stripped):
-                    continue
-                name = re.split(r"[=<>!~\s\[]", stripped[2:].strip())[0].lower()
-                if name in _CONDA_ONLY_PIP or name in _NOT_ON_PYPI:
-                    continue
-                if name in _CONDA_TO_PYPI:
-                    ln = ln.replace(name, _CONDA_TO_PYPI[name], 1)
-                m = _CUDA_PIN_RE.search(stripped)
-                if m and m.group(1) not in cuda_tags:
-                    cuda_tags.append(m.group(1))
-        out.append(ln)
-
-    if cuda_tags:
-        pad = " " * (entry_indent if entry_indent is not None else 6)
-        merged, inserted = [], False
-        for ln in out:
-            merged.append(ln)
-            if not inserted and ln.strip() == "- pip:":
-                for tag in cuda_tags:
-                    url = f"https://download.pytorch.org/whl/{tag}"
-                    if not any(url in x for x in out):
-                        merged.append(f"{pad}- --extra-index-url {url}")
-                inserted = True
-        out = merged
-    return "\n".join(out) + "\n"
-
-
-def _has_own_python(env_name: str, conda: str | None = None) -> bool:
-    """Does this env contain its own python interpreter?
-
-    In an env without one (``scmb_r``), ``conda run -n <env> pip freeze``
-    runs the base env's pip and would record the base env's packages.
-    """
-    conda = conda or _conda_bin("conda")
-    probe = subprocess.run(
-        [conda, "run", "-n", env_name, "python", "-c",
-         "import sys; print(sys.prefix)"],
-        capture_output=True, text=True)
-    if probe.returncode != 0:
-        return False
-    prefix = probe.stdout.strip()
-    return bool(prefix) and Path(prefix).name == env_name
-
-
-def freeze(env_name: str, conda: str | None = None,
-           out_dir: Path | str | None = None) -> Path:
-    """Capture an existing env to a lockfile ``env_locks/<env>.yml`` (maintainer
-    tool): ``conda env export --no-builds`` without the ``prefix:`` line,
-    through :func:`sanitize_lock`."""
-    conda = conda or _conda_bin("conda")
-    # an export of a name that does not exist succeeds, empty: it would
-    # overwrite a lockfile with a stub
-    if env_name not in _all_env_names(conda):
-        raise FileNotFoundError(
-            f"no conda env named {env_name!r} on this machine "
-            f"(conda env list shows them); freeze captures existing envs only")
-    dst_dir = Path(out_dir) if out_dir else _LOCKS_DIR
-    dst_dir.mkdir(parents=True, exist_ok=True)
-
-    def _run(args):
-        return subprocess.run([conda, *args], capture_output=True, text=True)
-
-    def _has_real_deps(text: str) -> bool:
-        # real = a conda package beyond python/pip, or a pip: section
-        if "- pip:" in text:
-            return True
-        in_deps = False
-        for ln in text.splitlines():
-            if ln.startswith("dependencies:"):
-                in_deps = True
-                continue
-            if in_deps and ln.lstrip().startswith("- "):
-                name = re.split(r"[=<>\s]", ln.split("- ", 1)[1].strip())[0]
-                if name not in ("python", "pip"):
-                    return True
-        return False
-
-    # a full export, else the explicit specs when it fails or lists nothing
-    export = _run(["env", "export", "-n", env_name, "--no-builds"])
-    if export.returncode == 0 and _has_real_deps(export.stdout):
-        body = export.stdout
-    else:
-        history = _run(["env", "export", "-n", env_name, "--from-history"])
-        body = history.stdout if history.returncode == 0 else (
-            f"name: {env_name}\nchannels:\n  - conda-forge\ndependencies:\n  - python\n")
-    lines = [ln for ln in body.splitlines() if not ln.startswith("prefix:")]
-    # pip packages the export missed, from `pip freeze`
-    if "- pip:" not in "\n".join(lines) and _has_own_python(env_name, conda):
-        pip = _run(["run", "-n", env_name, "pip", "freeze"]).stdout
-        pip_pkgs = [ln.strip() for ln in pip.splitlines()
-                    if ln.strip() and not ln.startswith("-e ")]
-        if pip_pkgs:
-            if not any(l.startswith("dependencies:") for l in lines):
-                lines.append("dependencies:")
-            lines += ["  - pip", "  - pip:"] + [f"    - {p}" for p in pip_pkgs]
-    dst = dst_dir / f"{env_name}.yml"
-    dst.write_text(sanitize_lock("\n".join(lines)))
-    return dst
-
-
-# --- recipe/lockfile provisioning entry points -----------------------------
-def create(method: str, env_name: str | None = None, conda: str | None = None,
-           dry_run: bool = True, *, force: bool = False) -> list[list[str]]:
-    """Provision the env a method runs in, from its lockfile, else its recipe.
-
-    ``env_name`` builds into another env. ``dry_run=False`` runs the
-    commands; on a non-Linux host it raises ``RuntimeError`` unless ``force``.
-
-    Returns
-    -------
-    list of list of str
-        The argv commands.
-    """
-    method = registry.check_method(method)
-    target = env_name or group_for(method)
-    if lockfile(target) is not None:
-        return create_env(target, conda=conda, dry_run=dry_run, force=force)
-    cmds = create_commands(method, env_name=env_name, conda=conda)
-    if not dry_run:
-        _require_linux(force)
-        _build(env_name or default_env_name(method), cmds, conda, "recipe")
-    return cmds
-
-
-def create_group(group: str, env_name: str | None = None, conda: str | None = None,
-                 dry_run: bool = True, *, force: bool = False) -> list[list[str]]:
-    """Provision a group env (:func:`groups`), from its lockfile, else its recipe.
-
-    As :func:`create`; an unknown ``group`` raises ``KeyError``.
-
-    Returns
-    -------
-    list of list of str
-        The argv commands.
-    """
-    target = env_name or group
-    if lockfile(target) is not None:
-        return create_env(target, conda=conda, dry_run=dry_run, force=force)
-    cmds = group_create_commands(group, env_name=env_name, conda=conda)
-    if not dry_run:
-        _require_linux(force)
-        _build(env_name or group, cmds, conda, "recipe")
-    return cmds
 
 
 #: R's variables that name a library of the user's own; :func:`without_user_r_library`

@@ -6,7 +6,7 @@ Nothing here needs a real env or a conda binary: a *fake prefix* under
 conda-pack archive, and ``shutil.which`` is pinned to ``None`` so the host's
 conda - if any - is invisible. The cases pin:
 
-* ``config.Config.envs_dir`` resolution order and settability;
+* ``mtb.config.envs_dir`` resolution order and settability;
 * ``env_prefix`` / ``installed_envs`` seeing the fake prefix without conda;
 * the runner's ``prefix`` mode: the argv is the ``bash -c`` wrapper, and
   RUNNING it executes the stub with the activate.d marker set;
@@ -28,6 +28,7 @@ from pathlib import Path
 import pytest
 
 import multibench as mtb
+from multibench import _settings
 from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, runner
@@ -62,7 +63,7 @@ def make_prefix(envs_dir: Path, env: str) -> Path:
 
 def _clear_caches():
     """Drop the per-process conda probes (a test may have replaced one)."""
-    for fn in (config._conda_envs_dir, envs._conda_prefixes):
+    for fn in (_settings._conda_envs_dir, envs._conda_prefixes):
         clear = getattr(fn, "cache_clear", None)
         if clear:
             clear()
@@ -72,7 +73,7 @@ def _clear_caches():
 def no_conda(monkeypatch):
     """Hide any conda/mamba on this host from every discovery path."""
     monkeypatch.setattr(envs.shutil, "which", lambda *a, **k: None)
-    monkeypatch.setattr(config._shutil, "which", lambda *a, **k: None)
+    monkeypatch.setattr(_settings.shutil, "which", lambda *a, **k: None)
     _clear_caches()
     monkeypatch.delenv("CONDA_EXE", raising=False)
     monkeypatch.delenv(runner.RUN_MODE_VAR, raising=False)
@@ -86,7 +87,7 @@ def envs_dir(tmp_path, monkeypatch, no_conda):
     d = tmp_path / "envs"
     d.mkdir()
     monkeypatch.setattr(config, "envs_dir", d)
-    monkeypatch.delenv(config.ENVS_DIR_VAR, raising=False)
+    monkeypatch.delenv(_settings.ENVS_DIR_VAR, raising=False)
     yield d
 
 
@@ -96,10 +97,10 @@ SCALEX_ENV = envs.group_for("SCALEX")
 
 def test_import_does_not_probe_conda():
     """``config`` is built at import; the probe must not run then."""
-    code = ("import multibench.config as c, multibench; "
-            "print('envs_dir' not in c._values, c._conda_envs_dir.cache_info().currsize)")
+    code = ("import multibench, multibench._settings as s; "
+            "print(multibench.config._envs_dir is None, s._conda_envs_dir.cache_info().currsize)")
     out = subprocess.run([os.sys.executable, "-c", code], capture_output=True, text=True,
-                         env={**os.environ, "PYTHONPATH": str(Path(config.__file__).parents[1])},
+                         env={**os.environ, "PYTHONPATH": str(Path(_settings.__file__).parents[1])},
                          check=True).stdout.split()
     assert out == ["True", "0"]
 
@@ -135,8 +136,7 @@ def test_env_prefix_asks_conda_when_not_under_envs_dir(envs_dir, monkeypatch, tm
 # ---------------------------------------------------------------- runner: prefix mode
 def test_runner_argv_is_the_bash_wrapper_and_it_runs(envs_dir, tmp_path):
     prefix = make_prefix(envs_dir, SCALEX_ENV)
-    argv = mtb.engine.runner.run("SCALEX", "diagonal", inputs=SCALEX_INPUTS, out_dir=tmp_path / "o",
-                   dry_run=True)
+    argv = mtb.engine.runner.preview("SCALEX", "diagonal", inputs=SCALEX_INPUTS, out_dir=tmp_path / "o")[0]
     assert argv[:2] == ["bash", "-c"]
     assert argv[3] == "--" and argv[4] == "python"
     act = argv[2]
@@ -171,16 +171,8 @@ def test_run_mode_defaults(envs_dir):
 
 
 def test_conda_mode_when_no_prefix(envs_dir, tmp_path):
-    argv = mtb.engine.runner.run("SCALEX", "diagonal", inputs=SCALEX_INPUTS, out_dir=tmp_path / "o",
-                   dry_run=True)
+    argv = mtb.engine.runner.preview("SCALEX", "diagonal", inputs=SCALEX_INPUTS, out_dir=tmp_path / "o")[0]
     assert argv[:4] == ["conda", "run", "-n", SCALEX_ENV]
-
-
-def test_cmd_template_overrides_the_prefix(envs_dir, tmp_path):
-    make_prefix(envs_dir, SCALEX_ENV)
-    argv = mtb.engine.runner.run("SCALEX", "diagonal", inputs=SCALEX_INPUTS, out_dir=tmp_path / "o",
-                   dry_run=True, cmd_template="docker run img {cmd}")
-    assert argv[:3] == ["docker", "run", "img"] and "bash" not in argv
 
 
 def test_pty_wrap_stays_inside_the_prefix_wrapper(envs_dir, tmp_path, monkeypatch):
@@ -188,16 +180,14 @@ def test_pty_wrap_stays_inside_the_prefix_wrapper(envs_dir, tmp_path, monkeypatc
     from multibench.engine import registry
     variant = registry.get("SCALEX").select("diagonal", {"rna", "atac_gas"})
     monkeypatch.setattr(variant, "pty", True)
-    argv = mtb.engine.runner.run("SCALEX", "diagonal", inputs=SCALEX_INPUTS, out_dir=tmp_path / "o",
-                   dry_run=True)
+    argv = mtb.engine.runner.preview("SCALEX", "diagonal", inputs=SCALEX_INPUTS, out_dir=tmp_path / "o")[0]
     assert argv[:2] == ["bash", "-c"] and argv[4] == "script"
 
 
 def test_forced_prefix_without_prefix_raises(envs_dir, monkeypatch, tmp_path):
     monkeypatch.setenv(runner.RUN_MODE_VAR, "prefix")
     with pytest.raises(OSError) as e:
-        mtb.engine.runner.run("SCALEX", "diagonal", inputs=SCALEX_INPUTS, out_dir=tmp_path / "o",
-                dry_run=True)
+        mtb.engine.runner.preview("SCALEX", "diagonal", inputs=SCALEX_INPUTS, out_dir=tmp_path / "o")[0]
     msg = str(e.value)
     assert str(envs_dir) in msg and "mtb.env.install" in msg and SCALEX_ENV in msg
 
@@ -205,8 +195,7 @@ def test_forced_prefix_without_prefix_raises(envs_dir, monkeypatch, tmp_path):
 def test_forced_conda_ignores_the_prefix(envs_dir, monkeypatch, tmp_path):
     make_prefix(envs_dir, SCALEX_ENV)
     monkeypatch.setenv(runner.RUN_MODE_VAR, "conda")
-    argv = mtb.engine.runner.run("SCALEX", "diagonal", inputs=SCALEX_INPUTS, out_dir=tmp_path / "o",
-                   dry_run=True)
+    argv = mtb.engine.runner.preview("SCALEX", "diagonal", inputs=SCALEX_INPUTS, out_dir=tmp_path / "o")[0]
     assert argv[:4] == ["conda", "run", "-n", SCALEX_ENV]
 
 
@@ -332,35 +321,35 @@ def test_scan_env_gate_flips_on_the_fake_prefix(envs_dir):
 
 
 def test_envs_dir_env_var_wins(monkeypatch, tmp_path):
-    monkeypatch.setenv(config.ENVS_DIR_VAR, str(tmp_path / "mine"))
+    monkeypatch.setenv(_settings.ENVS_DIR_VAR, str(tmp_path / "mine"))
     config.envs_dir = None                                  # unset: the default
     assert config.envs_dir == tmp_path / "mine"
 
 
 def test_envs_dir_uses_conda_envs_dir_when_conda_found(monkeypatch, tmp_path):
-    monkeypatch.delenv(config.ENVS_DIR_VAR, raising=False)
-    monkeypatch.setattr(config._shutil, "which", lambda name: "/fake/bin/" + name)
+    monkeypatch.delenv(_settings.ENVS_DIR_VAR, raising=False)
+    monkeypatch.setattr(_settings.shutil, "which", lambda name: "/fake/bin/" + name)
     monkeypatch.setattr(envs, "_envs_dir", lambda exe: tmp_path / "conda-envs")
-    config._conda_envs_dir.cache_clear()
+    _settings._conda_envs_dir.cache_clear()
     try:
         config.envs_dir = None
         assert config.envs_dir == tmp_path / "conda-envs"
     finally:
-        config._conda_envs_dir.cache_clear()
+        _settings._conda_envs_dir.cache_clear()
 
 
 def test_envs_dir_falls_back_to_the_user_cache(no_conda, monkeypatch):
-    monkeypatch.delenv(config.ENVS_DIR_VAR, raising=False)
+    monkeypatch.delenv(_settings.ENVS_DIR_VAR, raising=False)
     config.envs_dir = None
     d = config.envs_dir
-    assert d == config._CACHE / "envs"
+    assert d == _settings._CACHE / "envs"
     assert d.parts[-2:] == ("multibench", "envs")
 
 
 def test_envs_dir_is_a_settable_field_and_lazy(monkeypatch, tmp_path):
-    assert "envs_dir" in config.__all__
+    assert "envs_dir" in config.FIELDS
     config.envs_dir = None
-    assert config._values["envs_dir"] is None, "resolved on first read, not when unset"
+    assert config._envs_dir is None, "resolved on first read, not when unset"
     config.envs_dir = str(tmp_path / "x")
     assert config.envs_dir == tmp_path / "x" and isinstance(config.envs_dir, Path)
     monkeypatch.setattr(config, "envs_dir", tmp_path / "z")

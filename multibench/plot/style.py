@@ -11,7 +11,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from ..config import _and_list
+from .._text import _and_list
 
 #: values that agree to this many decimal places are ties: floating-point
 #: noise (an iLISI of 2.2e-16 next to 0.0) must not decide a rank or a fill
@@ -119,7 +119,7 @@ def coverage(parts: dict) -> pd.Series:
 
 
 #: ``source`` values of the stored tables (``mtb.load_results``)
-STORED_SOURCES = ("published", "stored", "rerun")
+STORED_SOURCES = ("stored", "rerun")
 
 
 #: a value of your rows this close to a stored value is that value: re-scoring noise
@@ -128,8 +128,8 @@ SNAP = 1e-6
 
 def stored_pairs() -> frozenset:
     """``{(dataset, method)}`` of the stored results ``mtb.load_results`` reads
-    (under ``config._RESULT_PATH``)."""
-    from ..data.results import _base_path
+    (under ``_settings._RESULT_PATH``)."""
+    from .._data.results import _base_path
     base = _base_path()
     # the folders' times: tables written after a first call are read again
     stamp = tuple(p.stat().st_mtime_ns if p.exists() else 0 for p in (base, base / "rerun"))
@@ -138,7 +138,7 @@ def stored_pairs() -> frozenset:
 
 @functools.lru_cache(maxsize=8)
 def _pairs_under(base: str, stamp: tuple) -> frozenset:
-    from ..data.results import _load_results
+    from .._data.results import _load_results
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")     # load_results says them when it is called
         try:

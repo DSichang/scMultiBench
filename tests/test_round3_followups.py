@@ -14,7 +14,7 @@ def test_io_dir_hides_leaked_imports():
     assert "export_dataset" in names and "read_canonical" in names
     for leaked in ("annotations", "np", "os", "re", "Path"):
         assert leaked not in names
-    assert mtb.io.annotations is not None      # attribute itself untouched
+    assert not hasattr(mtb.io, "annotations")  # d1: a facade, no module internals
 
 
 def test_load_results_canonicalises_dataset_case():

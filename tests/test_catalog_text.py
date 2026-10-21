@@ -12,7 +12,7 @@ import warnings
 import pandas as pd
 
 import multibench as mtb
-from multibench.data import catalog
+from multibench._data import catalog
 
 
 def _desc():
@@ -36,12 +36,3 @@ def test_every_metric_states_direction_and_the_clustering_used():
     for code in ("ARI", "NMI"):
         assert "Leiden clusters, one per cell type" in d[code]
         assert "Louvain" not in d[code]
-
-
-def test_datasets_keeps_a_descriptive_column_a_csv_fills(tmp_path, monkeypatch):
-    pd.DataFrame({"dataset": ["D11", "D28"], "assay": ["CITE-seq", None],
-                  "tissue": [None, None]}).to_csv(tmp_path / "dataset.csv", index=False)
-    monkeypatch.setattr(catalog.config, "_FILES_PATH", tmp_path)
-    df = catalog.datasets().set_index("dataset")
-    assert "assay" in df.columns and "tissue" not in df.columns
-    assert df.loc["D11", "assay"] == "CITE-seq"

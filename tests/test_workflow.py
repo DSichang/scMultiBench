@@ -1,4 +1,4 @@
-"""Tests for the high-level workflow API (scan / run / BatchResult).
+"""Tests for the high-level workflow API (scan / run / RunResult).
 
 The runnable COUNTS below are reference-host values (every method env
 installed). They are skipped, not failed, on a host without the envs; the
@@ -26,26 +26,20 @@ def _has_dataset(name):
 
 
 def test_run_all_dry_run_respects_method_filter():
-    plan = mtb.run("D11", "vertical", out_dir="/tmp/unused",
-                       methods=["Matilda", "totalVI"], dry_run=True)
+    plan = mtb.scan("D11", "vertical", methods=["Matilda", "totalVI"])
     assert set(plan["method"]) == {"Matilda", "totalVI"}
 
 
-def test_run_all_dry_run_is_the_scan_frame():
-    """Holds on every host: dry_run == scan(dataset, category), row for row, less
-    the rows a run leaves out (0.4.0): a row whose files are part of another row
-    of its method."""
-    from multibench import workflow as W
+def test_scan_is_one_row_per_method_of_the_full_plan():
+    """Holds on every host: scan has one row per method, each a row of the full
+    plan, with its command."""
     for ds, cat in [("D11", "vertical"), ("D52", "cross"), ("D45", "mosaic")]:
         if not _has_dataset(ds):
             continue
-        plan = mtb.run(ds, cat, out_dir="/tmp/unused", dry_run=True, verbose=False)
-        assert list(plan.columns)[-1] == "command"      # the CLI csv's column, in scan too
-        scan = full_scan(ds, cat, out_dir="/tmp/unused", verbose=False)
-        nested = W._nested_rows(scan[[W._would_run(r) for _, r in scan.iterrows()]])[0]
-        pd.testing.assert_frame_equal(
-            plan, W._shown_modalities(scan.drop(index=nested).reset_index(drop=True))[
-                W.PLAN_COLUMNS])                                          # c1 (C32)
+        plan = mtb.scan(ds, cat, verbose=False)
+        assert list(plan.columns)[-1] == "command"
+        full = full_scan(ds, cat, verbose=False)
+        assert plan["method"].is_unique and set(plan["method"]) == set(full["method"])
 
 
 def test_method_info_supports_multi_category_methods():
@@ -58,8 +52,8 @@ def test_method_info_supports_multi_category_methods():
 
 
 def test_batch_result_shape():
-    from multibench.workflow import BatchResult
-    r = BatchResult([{"method": "X", "status": "CHAIN_OK", "run_sec": 1.0,
+    from multibench.workflow import RunResult
+    r = RunResult([{"method": "X", "status": "CHAIN_OK", "run_sec": 1.0,
                       "output_kind": "embedding", "emb_shape": [10, 2],
                       "n_tunable": 0, "metrics": {"ARI": 0.5}, "_long": None}],
                     "D11", "vertical")
@@ -72,7 +66,7 @@ def test_batch_result_shape():
                                   "source"]
     assert lng.loc[0, "metric"] == "ARI" and lng.loc[0, "value"] == 0.5
     assert lng.loc[0, "dataset"] == "D11" and lng.loc[0, "category"] == "vertical"
-    empty = BatchResult([{"method": "X", "status": "FAIL", "error": "boom", "_long": None}],
+    empty = RunResult([{"method": "X", "status": "FAIL", "error": "boom", "_long": None}],
                         "D11", "vertical")
     assert empty.long.empty and list(empty.long.columns) == list(lng.columns)
     with pytest.raises(ValueError):
@@ -103,8 +97,7 @@ def test_scan_returns_runnable_and_reasons():
 def test_run_all_dry_run_lists_the_plan():
     """dry_run returns the WHOLE plan (blocked rows kept with a reason); the
     runnable subset is what will be attempted - 14 rows on the reference host."""
-    plan = mtb.run("D11", "vertical", out_dir="/tmp/unused", dry_run=True,
-                       verbose=False)
+    plan = mtb.scan("D11", "vertical", verbose=False)
     assert isinstance(plan, pd.DataFrame)
     ok = plan[plan["runnable"]]
     assert (ok["reason"] == "").all()
@@ -119,6 +112,6 @@ def test_run_all_plans_match_scan():
                        ("D45", "mosaic", 4)]:
         if not _has_dataset(ds):
             continue
-        plan = mtb.run(ds, cat, out_dir="/tmp/unused", dry_run=True, verbose=False)
+        plan = mtb.scan(ds, cat, verbose=False)
         assert int(plan["runnable"].sum()) == n, f"{ds}/{cat}: {int(plan['runnable'].sum())} != {n}"
 

@@ -47,6 +47,13 @@ PEAK_METHODS = {"MIRA", "Seurat_WNN", "VIMCCA", "iPOLNG", "moETM", "scMM", "scMV
                 "MOFA2", "Multigrate", "UINMF", "scMoMaT"}
 
 
+def _wrong_atac(reasons):
+    """The scan rows blocked by the ATAC file they would read."""
+    text = reasons.astype(str)
+    return text.str.contains("Export the ATAC as ", regex=False) | text.str.contains(
+        W.PEAK_NAMES_REASON, regex=False)
+
+
 @pytest.fixture(autouse=True)
 def three_methods_read_gene_activity(monkeypatch):
     for m in GAS_METHODS:
@@ -88,7 +95,7 @@ def _quiet(fn, *a, **kw):
 def test_peak_token_still_keeps_the_peak_methods_behind_an_atac_gas_role(tmp_path):
     root = _vertical(tmp_path, "MU_PK", "atac.h5", PEAKS)
     def plan(ds, cat, data_path, **k):
-        return mtb.run(os.path.join(data_path, ds), cat, dry_run=True, **k)
+        return mtb.scan(os.path.join(data_path, ds), cat, **k)
     for call in (full_scan, plan):
         df = _quiet(call, "MU_PK", "vertical", modalities=["rna", "atac_peak"],
                     data_path=root, verbose=False)
@@ -126,7 +133,7 @@ class _Res:
 
 def test_old_records_without_a_caveat_still_summarise():
     rec = {"method": "Matilda", "status": "RUN_OK", "run_sec": 1.0}
-    sm = W.BatchResult([rec], "D11", "vertical").summary
+    sm = W.RunResult([rec], "D11", "vertical").summary
     assert list(sm.columns[-2:]) == ["caveat", "reason"] and sm["caveat"].isna().all()
 
 
@@ -135,7 +142,7 @@ def test_old_records_without_a_caveat_still_summarise():
                                               ("D52", "cross")])
 def test_demo_datasets_have_no_row_blocked_by_the_atac_kind(dataset, category):
     df = _quiet(full_scan, dataset, category, verbose=False)
-    assert not W._is_wrong_atac(df["reason"]).any(), df.loc[
-        W._is_wrong_atac(df["reason"]), ["method", "reason"]]
+    assert not _wrong_atac(df["reason"]).any(), df.loc[
+        _wrong_atac(df["reason"]), ["method", "reason"]]
 
 

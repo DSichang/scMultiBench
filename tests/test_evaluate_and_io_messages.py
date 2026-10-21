@@ -40,8 +40,7 @@ def gpu(monkeypatch):
 
 
 def _dry(method, category, inputs, params, tmp_path):
-    return mtb.engine.runner.run(method, category, inputs=inputs, out_dir=str(tmp_path / "o"),
-                   params=params, dry_run=True, cmd_template="conda run -n x {cmd}")
+    return mtb.engine.runner.preview(method, category, inputs=inputs, out_dir=str(tmp_path / "o"), params=params)[0]
 
 
 # --- evaluate, io, catalog lookups: X09, X10, X12, X36, X37, X47, X49, X50,
@@ -160,8 +159,7 @@ def test_x74_an_h5mu_path_names_the_fix(tmp_path):
 
 def test_x76_tokens_ignore_letter_case():
     import numpy as np
-    plan = mtb.run("D11", "vertical", modalities=["RNA", "ADT"], dry_run=True,
-                       verbose=False)
+    plan = mtb.scan("D11", "vertical", modalities=["RNA", "ADT"], verbose=False)
     assert len(plan)
     emb = np.random.default_rng(5).normal(size=(60, 4))
     got = mtb.evaluate(emb, labels=np.repeat(["a", "b", "c"], 20), metrics="Clustering")

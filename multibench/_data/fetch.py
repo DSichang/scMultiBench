@@ -7,7 +7,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from .. import config
+from .._settings import config
 
 
 def safe_extract(tar: tarfile.TarFile, dest) -> None:

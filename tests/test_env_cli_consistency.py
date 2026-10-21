@@ -57,19 +57,6 @@ def test_size_total_counts_unknowns_per_column():
     assert totals["total_disk_bytes"] == 2_000_000_000
 
 
-def test_python_pin_detection():
-    for p in ("python", "python=3.7", "python==3.7.10", "python>=3.8", "python 3.9"):
-        assert envs._is_python_pin(p)
-    for p in ("pytorch=1.9.1", "python-igraph", "ipython", "r-base=4"):
-        assert not envs._is_python_pin(p)
-
-
-def test_conda_packages_untouched_without_python_version():
-    spec = {"conda_packages": ["python=3.8", "numpy"]}
-    assert envs._conda_packages(spec) == ["python=3.8", "numpy"]
-    assert envs._conda_packages({**spec, "python_version": "3.8"}) == ["numpy"]
-
-
 def test_every_blocked_script_method_names_the_block_in_its_setup_hint():
     for s in registry.load():
         if (s.env_spec or {}).get("difficulty") == "blocked-script":

@@ -30,6 +30,8 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+from multibench.engine import scripts
+from multibench import _settings
 from multibench import config, discover
 from multibench import workflow as W
 from multibench.engine import envs, registry
@@ -54,8 +56,8 @@ def pinned(monkeypatch, tmp_path):
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
     monkeypatch.setattr(config, "repo_path", tmp_path / "no_scripts")
-    monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
-    monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
+    monkeypatch.setattr(_settings, "_ROOT", tmp_path / "pkg")
+    monkeypatch.delenv(scripts.SCRIPTS_REF_VAR, raising=False)
 
 
 def _quiet(fn, *a, **kw):
@@ -110,31 +112,15 @@ class _Res:
         self.output = out
 
 
-def test_is_wrong_atac_reads_the_blocking_atac_reasons_not_other_prose():
-    kind = ("Matilda needs gene-activity ATAC, and atac.h5 holds peaks. Export the ATAC "
-            "as gene activity.")
-    names = ("GLUE reads peak names such as chr1:100-200. atac_peak.h5 holds other "
-             "names, for example peak_0. Rename them to chr:start-end.")
-    assert W._is_wrong_atac(kind) and W._is_wrong_atac(names)
-    assert W._is_wrong_atac("StabMap needs peak ATAC, and atac2.h5 holds gene activity. "
-                            "Export the ATAC as peaks.")
-    assert not W._is_wrong_atac("conda env 'x' is not installed")
-    assert not W._is_wrong_atac("moETM needs an NVIDIA GPU.")
-    assert not W._is_wrong_atac("missing atac.h5")
-    s = pd.Series([kind, names, "missing adt.h5", None])
-    assert list(W._is_wrong_atac(s)) == [True, True, False, False]
-
-
-def test_run_dry_run_notes_and_real_run_warns(tmp_path, pinned, monkeypatch, capsys,
-                                              gas_matilda):
+def test_scan_blocks_and_real_run_warns(tmp_path, pinned, monkeypatch, capsys,
+                                        gas_matilda):
     root = _vertical(tmp_path, "MU_PEAK", PEAKS)
     inp = mtb.engine.resolve.inputs_for("MU_PEAK", "vertical", "Matilda", modalities=["rna", "atac"],
                          data_path=root)
-    _quiet(mtb.engine.runner.run, "Matilda", "vertical", inputs=inp, out_dir=str(tmp_path / "o"),
-           dry_run=True)
-    err = capsys.readouterr().err
-    assert re.search(r"^# Matilda needs gene-activity ATAC\. The features of atac\.h5 look "
-                     r"like chr:start-end, so it holds peaks\.$", err, re.M), err
+    row = _quiet(mtb.scan, str(root / "MU_PEAK"), "vertical", methods=["Matilda"],
+                 modalities=["rna", "atac"], verbose=False).iloc[0]
+    assert row["reason"].startswith("Matilda needs gene-activity ATAC, and atac.h5 holds "
+                                    "peaks."), row["reason"]
 
     class Stop(Exception):
         pass
@@ -149,11 +135,9 @@ def test_run_dry_run_notes_and_real_run_warns(tmp_path, pinned, monkeypatch, cap
             mtb.engine.runner.run("Matilda", "vertical", inputs=inp, out_dir=str(tmp_path / "o"))
     # the right representation: no note
     root2 = _vertical(tmp_path, "MU_GA", GENES)
-    inp2 = mtb.engine.resolve.inputs_for("MU_GA", "vertical", "Matilda", modalities=["rna", "atac"],
-                          data_path=root2)
-    _quiet(mtb.engine.runner.run, "Matilda", "vertical", inputs=inp2, out_dir=str(tmp_path / "o2"),
-           dry_run=True)
-    assert "needs gene-activity ATAC" not in capsys.readouterr().err
+    row = _quiet(mtb.scan, str(root2 / "MU_GA"), "vertical", methods=["Matilda"],
+                 modalities=["rna", "atac"], verbose=False).iloc[0]
+    assert "needs gene-activity ATAC" not in row["reason"] + row["caveat"]
 
 
 # ======================================================================= R4-02
@@ -215,7 +199,7 @@ def test_rescore_aligns_a_barcode_indexed_series(cite, tmp_path):
     data, batch, shuffled = cite
     mtb.config.data_path = data
     res = _quiet(mtb.run, 'MYCITE', 'vertical', tmp_path / 'a', methods=['Matilda'], modalities=['rna', 'adt'], verbose=False)
-    back = mtb.load_batch(tmp_path / "a")
+    back = mtb.load_run(tmp_path / "a")
     assert _batch_metrics(_quiet(back.rescore, batch=shuffled)) == \
         _batch_metrics(_quiet(res.rescore, batch=batch))
 
@@ -225,11 +209,9 @@ def test_a_series_with_foreign_ids_raises(cite, tmp_path):
     bad = shuffled.rename(index=lambda b: "x" + b)
     mtb.config.data_path = data
     kw = dict(methods=['Matilda'], modalities=['rna', 'adt'], verbose=False)
-    for extra in ({}, {"dry_run": True}):
-        with pytest.raises(ValueError, match=r"batch: 120 ids are not cells of MYCITE "
-                                             r"\(first: \['xc"):
-            _quiet(mtb.run, "MYCITE", "vertical", tmp_path / "x", batch=bad,
-                   **kw, **extra)
+    with pytest.raises(ValueError, match=r"batch: 120 ids are not cells of MYCITE "
+                                         r"\(first: \['xc"):
+        _quiet(mtb.run, "MYCITE", "vertical", tmp_path / "x", batch=bad, **kw)
     assert not (tmp_path / "x").exists()
     res = _quiet(mtb.run, "MYCITE", "vertical", tmp_path / "a", **kw)
     with pytest.raises(ValueError, match="are not cells of MYCITE"):
@@ -281,8 +263,8 @@ def _skip_setup(monkeypatch, tmp_path):
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
     monkeypatch.setattr(config, "repo_path", tmp_path / "no_scripts")
-    monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
-    monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
+    monkeypatch.setattr(_settings, "_ROOT", tmp_path / "pkg")
+    monkeypatch.delenv(scripts.SCRIPTS_REF_VAR, raising=False)
     real = W._missing_script
 
     def missing(variant, *, method=None):
@@ -324,15 +306,15 @@ def test_named_blocked_methods_are_logged_and_recorded(tmp_path, monkeypatch, ca
     assert disk.loc["MIRA", "status"] == "skipped"
     blob = json.loads((tmp_path / "out" / "batch_result.json").read_text())
     rec = next(r for r in blob["records"] if r["method"] == "MIRA")
-    assert rec["status"] == "SKIPPED" and rec["requested"] is True
-    back = mtb.load_batch(tmp_path / "out")
+    assert rec["status"] == "skipped" and rec["requested"] is True
+    back = mtb.load_run(tmp_path / "out")
     assert set(back.summary.query("status == 'skipped'")["method"]) == {"UnitedNet", "MIRA"}
     assert "2 skipped" in repr(back)
     # rescore keeps a SKIPPED record as it is (scMVP's fake run left no output,
     # and a tree with no output to score raises: MIRA alone)
-    again = _quiet(mtb.load_batch(tmp_path / "out", methods=["MIRA"]).rescore,
+    again = _quiet(mtb.load_run(tmp_path / "out", methods=["MIRA"]).rescore,
                    metrics=["ARI"])
-    assert {r["method"]: r["status"] for r in again.records}["MIRA"] == "SKIPPED"
+    assert {r["method"]: r["status"] for r in again.records}["MIRA"] == "skipped"
     with pytest.raises(FileNotFoundError, match="^No output of "):
         _quiet(back.rescore, metrics=["ARI"])
 
@@ -369,7 +351,7 @@ def test_a_named_method_with_a_runnable_mosaic_variant_is_not_a_failure(
     res = _quiet(mtb.run, "D45", "mosaic", tmp_path / "out", methods=["Multigrate"],
                  evaluate=False, modalities="all")
     log = capsys.readouterr().out
-    assert [r["status"] for r in res.records] == ["RUN_OK"]
+    assert [r["status"] for r in res.records] == ["ran"]
     # Multigrate's three other mosaic rows are for patterns D45 does not hold
     assert ("[run] 3 more rows need files this folder does not have. mtb.scan shows "
             "them.") in log
@@ -380,22 +362,22 @@ def test_a_skipped_record_never_replaces_an_earlier_run(tmp_path):
     out = tmp_path / "out"
     ok = {"method": "Matilda", "status": "CHAIN_OK", "metrics": {"ARI": 0.5},
           "scripts_commit": "abc", "env_flavor": "gpu", "hostname": "h"}
-    W.BatchResult([ok], "D11", "vertical").save(out)
+    W.RunResult([ok], "D11", "vertical").save(out)
     skip = {"method": "Matilda", "status": "SKIPPED", "error": "env", "requested": True}
     other = {"method": "totalVI", "status": "SKIPPED", "error": "env", "requested": False}
-    _quiet(W.BatchResult([skip, other], "D11", "vertical").save, out)
-    back = {r["method"]: r["status"] for r in mtb.load_batch(out).records}
-    assert back == {"Matilda": "CHAIN_OK", "totalVI": "SKIPPED"}
+    _quiet(W.RunResult([skip, other], "D11", "vertical").save, out)
+    back = {r["method"]: r["status"] for r in mtb.load_run(out).records}
+    assert back == {"Matilda": "scored", "totalVI": "skipped"}
     assert {m: r["hostname"] for m, r in W._saved_records(out).items()} == {"Matilda": "h"}
     # a later run of the method replaces a SKIPPED record
     ran = {"method": "totalVI", "status": "RUN_OK"}
-    _quiet(W.BatchResult([ran], "D11", "vertical").save, out)
-    assert {r["method"]: r["status"] for r in mtb.load_batch(out).records}["totalVI"] \
-        == "RUN_OK"
+    _quiet(W.RunResult([ran], "D11", "vertical").save, out)
+    assert {r["method"]: r["status"] for r in mtb.load_run(out).records}["totalVI"] \
+        == "ran"
 
 
 def test_summary_notes_list_skipped():
-    doc = " ".join(inspect.getdoc(W.BatchResult.summary).split())
+    doc = " ".join(inspect.getdoc(W.RunResult.summary).split())
     assert "skipped or timeout" in doc and "why the method has no scores" in doc
 
 
@@ -404,12 +386,12 @@ def test_old_records_show_nan_and_new_ones_keep_their_text():
     old = {"method": "UINMF", "status": "CHAIN_OK", "n_batches": 2}
     new = {"method": "StabMap", "status": "CHAIN_OK", "caveat": ""}
     cav = {"method": "sciPENN", "status": "CHAIN_OK", "caveat": "reads batches 1-2 of 3"}
-    sm = W.BatchResult([old, new, cav], "D52", "cross").summary.set_index("method")
+    sm = W.RunResult([old, new, cav], "D52", "cross").summary.set_index("method")
     v = sm.loc["UINMF", "caveat"]
     assert v is not None and isinstance(v, float) and np.isnan(v)
     assert sm.loc["StabMap", "caveat"] == ""
     assert sm.loc["sciPENN", "caveat"] == "reads batches 1-2 of 3"
-    none = W.BatchResult([dict(old, caveat=None)], "D52", "cross").summary
+    none = W.RunResult([dict(old, caveat=None)], "D52", "cross").summary
     assert isinstance(none["caveat"].iloc[0], float)
 
 

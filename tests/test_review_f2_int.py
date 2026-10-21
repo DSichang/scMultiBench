@@ -31,6 +31,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+from multibench.engine import scripts
 from multibench import config, workflow as W
 from multibench.engine import envs, registry, resolve, runner
 from multibench.plot import bubble as B
@@ -113,18 +114,16 @@ def _diagonal(root, name, gas_order):
     return d
 
 
-def test_run_refuses_a_gene_activity_file_in_another_cell_order(tmp_path):
+def test_run_refuses_a_gene_activity_file_in_another_cell_order(tmp_path, linux_with_envs):
     d = _diagonal(tmp_path, "SHUF", list(range(23, -1, -1)))
     inp = {r: str(d / f"{r}.h5") for r in ("rna", "atac_peak", "atac_gas")}
     with pytest.raises(ValueError, match=r"^MultiMAP reads atac_gas\.h5 of SHUF, which "
                                          r"lists the ATAC cells in another order than "
                                          r"atac_peak\.h5\."):
-        mtb.engine.runner.run("MultiMAP", "diagonal", inputs=inp, out_dir=str(tmp_path / "o"),
-                dry_run=True)
+        mtb.engine.runner.run("MultiMAP", "diagonal", inputs=inp, out_dir=str(tmp_path / "o"))
     # SCALEX reads rna + atac_gas: the peak file next to it sets the order
     with pytest.raises(ValueError, match="another order"):
-        mtb.engine.runner.run("SCALEX", "diagonal", inputs={"rna": inp["rna"], "atac_gas": inp["atac_gas"]},
-                out_dir=str(tmp_path / "o"), dry_run=True)
+        mtb.engine.runner.run("SCALEX", "diagonal", inputs={"rna": inp["rna"], "atac_gas": inp["atac_gas"]}, out_dir=str(tmp_path / "o"))
     # other cells
     d2 = tmp_path / "OTHER"
     d2.mkdir()
@@ -132,16 +131,14 @@ def test_run_refuses_a_gene_activity_file_in_another_cell_order(tmp_path):
         shutil.copy(d / f, d2 / f)
     _h5(d2 / "atac_gas.h5", [f"g{i}" for i in range(20)], [f"x{i}" for i in range(24)])
     with pytest.raises(ValueError, match="which holds other cells than atac_peak.h5"):
-        mtb.engine.runner.run("MultiMAP", "diagonal",
-                inputs={r: str(d2 / f"{r}.h5") for r in ("rna", "atac_peak", "atac_gas")},
-                out_dir=str(tmp_path / "o"), dry_run=True)
+        mtb.engine.runner.run("MultiMAP", "diagonal", inputs={r: str(d2 / f"{r}.h5") for r in ("rna", "atac_peak", "atac_gas")}, out_dir=str(tmp_path / "o"))
+    assert not (tmp_path / "o").exists()
 
 
 def test_run_passes_files_that_agree(tmp_path):
     d = _diagonal(tmp_path, "OK", list(range(24)))
     inp = {r: str(d / f"{r}.h5") for r in ("rna", "atac_peak", "atac_gas")}
-    argv = mtb.engine.runner.run("MultiMAP", "diagonal", inputs=inp, out_dir=str(tmp_path / "o"),
-                   dry_run=True)
+    argv = mtb.engine.runner.preview("MultiMAP", "diagonal", inputs=inp, out_dir=str(tmp_path / "o"))[0]
     assert isinstance(argv, list) and argv
     # Seurat_v5 on RNA and ATAC of the same cells
     p = tmp_path / "PAIRED"
@@ -150,16 +147,14 @@ def test_run_passes_files_that_agree(tmp_path):
     _h5(p / "rna.h5", [f"g{i}" for i in range(20)], cells)
     _h5(p / "atac_peak.h5", [f"chr1:{i * 100}-{i * 100 + 50}" for i in range(30)],
         cells[::-1])
-    argv = mtb.engine.runner.run("Seurat_v5", "diagonal",
-                   inputs={"rna": str(p / "rna.h5"), "atac_peak": str(p / "atac_peak.h5")},
-                   out_dir=str(tmp_path / "o5"), dry_run=True)
+    argv = mtb.engine.runner.preview("Seurat_v5", "diagonal", inputs={"rna": str(p / "rna.h5"), "atac_peak": str(p / "atac_peak.h5")}, out_dir=str(tmp_path / "o5"))[0]
     assert isinstance(argv, list) and argv
 
 
 # ====================================================================== M33
 def _reused_matilda(tmp_path, monkeypatch, earlier=None):
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
-    monkeypatch.setattr(config, "scripts_commit", lambda repo=None: "e" * 40)
+    monkeypatch.setattr(scripts, "scripts_commit", lambda repo=None: "e" * 40)
     monkeypatch.setattr(W, "_run", lambda **kw: pytest.fail("reused output was re-run"))
     mdir = tmp_path / "Matilda_D11"
     mdir.mkdir()
@@ -193,7 +188,7 @@ def test_reused_output_copies_the_earlier_record(tmp_path, monkeypatch):
 
 
 def test_reused_output_next_to_a_record_without_a_method_still_runs(tmp_path, monkeypatch):
-    # BatchResult.save writes whatever records it was given, also one without a method
+    # RunResult.save writes whatever records it was given, also one without a method
     earlier = {"status": "CHAIN_OK", "metrics": {"ARI": 0.5}}
     rec = _reused_matilda(tmp_path, monkeypatch, earlier)
     assert rec["reused"] is True and rec["env_flavor"] == "unknown"
@@ -351,10 +346,9 @@ def test_api_and_changes_pages_say_cell_order():
 def test_run_refuses_seurat_v5_on_files_from_different_cells(tmp_path, capsys):
     inp = mtb.engine.resolve.inputs_for('D28', 'diagonal', 'Seurat_v5', check=False)
     want = 'Seurat_v5 needs RNA and ATAC from the same cells as its bridge. In D28, rna.h5 and atac_peak.h5 share 0 of 6,408 and 4,606 cells.'
-    for dry in (True, False):
-        with pytest.raises(ValueError) as e:
-            mtb.engine.runner.run('Seurat_v5', 'diagonal', inputs=inp, out_dir=str(tmp_path / 'o'), dry_run=dry)
-        assert str(e.value) == want
+    with pytest.raises(ValueError) as e:
+        mtb.engine.runner.run('Seurat_v5', 'diagonal', inputs=inp, out_dir=str(tmp_path / 'o'))
+    assert str(e.value) == want
     assert not (tmp_path / 'o').exists()
 
 

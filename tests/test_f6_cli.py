@@ -82,21 +82,9 @@ def _lung(tmp_path):
     return d
 
 
-def test_python_dry_run_notes_a_missing_input(tmp_path, capsys):
-    d = _lung(tmp_path)
-    inp = {"rna": str(d / "rna.h5"), "atac_gas": str(d / "atac_gas.h5")}
-    argv = mtb.engine.runner.run("SCALEX", "diagonal", inputs=inp, out_dir=str(tmp_path / "o"),
-                   dry_run=True)
-    assert isinstance(argv, list) and str(d / "atac_gas.h5") in argv
-    err = capsys.readouterr().err
-    assert (f"# SCALEX reads {d / 'atac_gas.h5'}, which does not exist. mtb.scan shows "
-            f"what the folder holds.") in err.splitlines()
-    assert "rna.h5, which" not in err
-
-
 def test_dry_run_with_existing_inputs_has_no_missing_note(tmp_path, capsys):
     inp = mtb.engine.resolve.inputs_for("D28", "diagonal", "SCALEX", data_path=_DATA)
-    mtb.engine.runner.run("SCALEX", "diagonal", inputs=inp, out_dir=str(tmp_path / "o"), dry_run=True)
+    mtb.engine.runner.preview("SCALEX", "diagonal", inputs=inp, out_dir=str(tmp_path / "o"))[0]
     assert "which does not exist" not in capsys.readouterr().err
 
 

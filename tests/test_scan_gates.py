@@ -127,7 +127,7 @@ def test_scan_env_reason_names_method_and_category(no_envs):
 def test_scan_new_columns_present_and_old_order_kept(all_envs):
     df = full_scan("D11", modalities="all")
     assert list(df.columns[:len(OLD_COLUMNS)]) == OLD_COLUMNS
-    assert list(df.columns) == W.SCAN_COLUMNS == OLD_COLUMNS + NEW_COLUMNS
+    assert list(df.columns) == W.PLAN_COLUMNS == OLD_COLUMNS + NEW_COLUMNS
     assert set(df["atac"].dropna()) <= {"peak", "gene_activity"}
     assert df["needs_labels"].dtype == bool
     assert df["files_ok"].dtype == bool and df["env_ok"].dtype == bool
@@ -167,7 +167,7 @@ def test_scan_verbose_prints_one_summary_line(capsys, no_envs):
     # verbose=False is silent (run(verbose=False) passes it through)
     full_scan("D11", "vertical", verbose=False)
     assert capsys.readouterr().out == ""
-    mtb.run("D11", "vertical", methods=["Matilda"], dry_run=True, verbose=False)
+    mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False)
     assert capsys.readouterr().out == ""
 
 
@@ -213,57 +213,51 @@ def test_scan_atac_gas_peak_caveat(tmp_path, all_envs):
 # --- run(dry_run=True) is the scan frame, never silently empty ------------
 
 def test_run_all_dry_run_keeps_blocked_rows_with_reason(no_envs):
-    plan = mtb.run("D11", "vertical", out_dir="/tmp/unused", methods=["Matilda"],
-                       dry_run=True, verbose=False)
+    plan = mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False)
     assert len(plan) >= 1
     assert not plan["runnable"].any()
     assert plan["reason"].str.contains("not installed").all()
-    assert list(plan.columns) == W.PLAN_COLUMNS                  # c1 (C32)
+    assert list(plan.columns) == ["method", "modalities", "runnable", "reason", "env", "caveat", "command"]
 
 
-def test_run_all_dry_run_prints_summary(capsys, no_envs):
-    mtb.run("D11", "vertical", out_dir="/tmp/unused", methods=["Matilda"],
-                dry_run=True, verbose=True)
+def test_scan_prints_summary(capsys, no_envs):
+    mtb.scan("D11", "vertical", methods=["Matilda"], verbose=True)
     out = capsys.readouterr().out
-    assert "[run] Dry run: 0 of" in out and "reason column" in out
+    assert "[scan] 1 of 1 method has its input files in D11. 0 of 1 can run" in out
+    assert "[scan] Matilda: Environment " in out
 
 
 def test_run_all_dry_run_never_returns_empty():
     with pytest.raises(ValueError, match="Matilda does not run on diagonal data"):
-        mtb.run("D28", "diagonal", out_dir="/tmp/unused", methods=["Matilda"],
-                    dry_run=True, verbose=False)
+        mtb.scan("D28", "diagonal", methods=["Matilda"], verbose=False)
 
 
-def test_run_all_dry_run_equals_scan_with_methods():
-    plan = mtb.run("D11", "vertical", out_dir="/tmp/unused",
-                       methods=["Matilda", "totalVI"], dry_run=True, verbose=False)
-    # the plan is seven columns of the scan frame (c1, C32), rendered for out_dir
-    assert list(plan.columns) == W.PLAN_COLUMNS and plan.columns[-1] == "command"
-    pd.testing.assert_frame_equal(
-        plan, full_scan("D11", "vertical", methods=["Matilda", "totalVI"],
-                        out_dir="/tmp/unused", verbose=False)[W.PLAN_COLUMNS])
+def test_scan_has_the_command_with_a_placeholder_out_dir():
+    plan = mtb.scan("D11", "vertical", methods=["Matilda", "totalVI"], verbose=False)
+    # d1: scan is the plan, its command written for <out_dir>
+    assert list(plan.columns) == ["method", "modalities", "runnable", "reason", "env", "caveat", "command"]
+    full = full_scan("D11", "vertical", methods=["Matilda", "totalVI"], verbose=False)
+    assert plan["command"].tolist() == full["command"].tolist()
+    assert all(f"{W.OUT_DIR_PLACEHOLDER}/{m}_D11" in c
+               for m, c in zip(plan["method"], plan["command"]))
 
 
 def test_run_all_dry_run_unknown_method_still_keyerror():
     with pytest.raises(KeyError, match="Unknown method"):
-        mtb.run("D28", "diagonal", out_dir="/tmp/unused", methods=["NotAMethod"],
-                    dry_run=True, verbose=False)
+        mtb.scan("D28", "diagonal", methods=["NotAMethod"], verbose=False)
     with pytest.raises(KeyError, match="Did you mean StabMap"):
-        mtb.run("D11", "cross", out_dir="/tmp/unused", methods=["StabMapp"],
-                    dry_run=True, verbose=False)
+        mtb.scan("D11", "cross", methods=["StabMapp"], verbose=False)
 
 
 def test_run_all_dry_run_missing_dataset_raises_filenotfound():
     with pytest.raises(FileNotFoundError, match="does not exist"):
-        mtb.run("NO_SUCH_DATASET_XYZ", "vertical", out_dir="/tmp/unused",
-                    dry_run=True, verbose=False)
+        mtb.scan("NO_SUCH_DATASET_XYZ", "vertical", verbose=False)
 
 
-def test_scan_is_the_dry_run_frame(no_envs):
+def test_scan_is_the_plan_frame(no_envs):
     a = full_scan("D11", "vertical", methods=["Matilda"], verbose=False)
-    b = mtb.run("D11", "vertical", out_dir=None, methods=["Matilda"],
-                    dry_run=True, verbose=False)
-    pd.testing.assert_frame_equal(a[W.PLAN_COLUMNS], b)
+    b = mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False)
+    pd.testing.assert_frame_equal(a[["method", "modalities", "runnable", "reason", "env", "caveat", "command"]], b)
     assert len(a) >= 1 and not a["runnable"].any()
     with pytest.raises(ValueError, match="Matilda does not run on diagonal data"):
         full_scan("D28", "diagonal", methods=["Matilda"], verbose=False)

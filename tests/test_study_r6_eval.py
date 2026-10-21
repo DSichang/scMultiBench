@@ -78,7 +78,7 @@ def test_python_errors_suggest_a_series_that_works(cite, tmp_path):
                                          r"Pass "
                                          r"one column, for example "
                                          r"pd\.read_csv\("):
-        mtb.run(os.path.join(data, 'MYCITE'), 'vertical', dry_run=True, batch=dsheet, **KW)
+        mtb.run(os.path.join(data, 'MYCITE'), 'vertical', tmp_path / "out", batch=dsheet, **KW)
 
 
 def test_files_without_an_id_column_and_tsv_files(tmp_path):

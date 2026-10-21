@@ -2,7 +2,7 @@
 
 - The ``-> FAIL`` line of ``run`` (R4-03) ended with R's trailing warning
   or call trace instead of the error, because R prints both after the error.
-- ``BatchResult.rescore`` scored FAIL and TIMEOUT records again, so a method
+- ``RunResult.rescore`` scored FAIL and TIMEOUT records again, so a method
   that failed to run came back as ``RUN_OK_EVAL_FAILED``, ``CHAIN_OK`` or
   ``RUN_OK_NO_EMBEDDING`` and was no longer ``failed``.
 
@@ -99,7 +99,7 @@ def fail_early(tmp_path, monkeypatch):
 
 
 def _rescored(out):
-    res = mtb.load_batch(out)
+    res = mtb.load_run(out)
     assert res.summary.loc[0, "status"] == "failed"
     batch = pd.Series(["b1", "b2"] * 60)
     return res, res.rescore(batch=batch.to_numpy())
@@ -110,7 +110,7 @@ def test_rescore_keeps_a_fail_record_without_output(fail_early, tmp_path):
     assert _run_py(fail_early, out).summary.status.tolist() == ["failed"]
     res, new = _rescored(out)
     rec = new.records[0]
-    assert rec["status"] == "FAIL"
+    assert rec["status"] == "failed"
     assert rec["error"] == res.records[0]["error"]
     assert new.summary["status"].tolist() == ["failed"]
 
@@ -121,7 +121,7 @@ def test_rescore_keeps_a_fail_record_whose_output_exists(fail_after_writing, tmp
     assert _run_py(fail_after_writing, out).summary.status.tolist() == ["failed"]
     assert list(out.rglob("embedding.h5"))
     res, new = _rescored(out)
-    assert new.records[0]["status"] == "FAIL"
+    assert new.records[0]["status"] == "failed"
     assert not new.records[0].get("metrics")
     assert new.summary["status"].tolist() == ["failed"]
     new.save(tmp_path / "rescored")

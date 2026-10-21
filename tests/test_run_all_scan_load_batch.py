@@ -1,4 +1,4 @@
-"""run, scan and load_batch: plans, hints, saved trees."""
+"""run, scan and load_run: plans, hints, saved trees."""
 from __future__ import annotations
 
 import warnings
@@ -41,11 +41,10 @@ def gpu(monkeypatch):
 
 
 def _dry(method, category, inputs, params, tmp_path):
-    return mtb.engine.runner.run(method, category, inputs=inputs, out_dir=str(tmp_path / "o"),
-                   params=params, dry_run=True, cmd_template="conda run -n x {cmd}")
+    return mtb.engine.runner.preview(method, category, inputs=inputs, out_dir=str(tmp_path / "o"), params=params)[0]
 
 
-# --- run, scan, load_batch: X01, X11, X13, X35, X63-X66, X68, X79-X81 ----
+# --- run, scan, load_run: X01, X11, X13, X35, X63-X66, X68, X79-X81 ----
 
 def _tree(tmp_path, scored_with="leidenalg/search/0.4.0", version="0.4.0"):
     """A saved run folder of one scored method."""
@@ -66,14 +65,14 @@ def _tree(tmp_path, scored_with="leidenalg/search/0.4.0", version="0.4.0"):
 @pytest.mark.parametrize("scored_with,warns", [
     (None, True), ("leidenalg/sweep/0.3.9", True), ("leidenalg/search/0.4.0", False)])
 def test_x01_load_batch_warns_for_scores_before_040(tmp_path, scored_with, warns):
-    _, msgs = _messages(mtb.load_batch, _tree(tmp_path, scored_with))
+    _, msgs = _messages(mtb.load_run, _tree(tmp_path, scored_with))
     hit = "These scores come from multibench 0.3.x. res.rescore() scores them as " \
           "0.4.0 does."
     assert (hit in msgs) is warns, msgs
 
 
 def test_x35_summary_puts_the_scores_first(tmp_path):
-    res, _ = _messages(mtb.load_batch, _tree(tmp_path))
+    res, _ = _messages(mtb.load_run, _tree(tmp_path))
     cols = res.summary.columns.tolist()
     assert cols[:4] == ["method", "status", "ARI", "run_sec"]
     assert cols[-2:] == ["caveat", "reason"]
@@ -82,10 +81,8 @@ def test_x35_summary_puts_the_scores_first(tmp_path):
 @pytest.mark.parametrize("value", [2.5, "abc", True, 3.0])
 def test_x63_param_values_are_type_checked(value):
     with pytest.raises(TypeError, match=r"^Multigrate: epochs takes a whole number, got "):
-        mtb.run("D52mini", "cross", methods=["Multigrate"],
-                    params={"Multigrate": {"epochs": value}}, dry_run=True, verbose=False)
-    plan = mtb.run("D52mini", "cross", methods=["Multigrate"],
-                       params={"Multigrate": {"epochs": "3"}}, dry_run=True, verbose=False)
+        mtb.scan("D52mini", "cross", methods=["Multigrate"], params={"Multigrate": {"epochs": value}}, verbose=False)
+    plan = mtb.scan("D52mini", "cross", methods=["Multigrate"], params={"Multigrate": {"epochs": "3"}}, verbose=False)
     assert "--epochs 3 " in plan.command.iloc[0] + " "
 
 
@@ -96,21 +93,20 @@ def test_x64_tunable_leaves_out_what_the_package_or_script_sets():
         assert name not in tun, name
     assert {"batch_size", "epochs_stage1", "lr_stage1"} <= set(tun)
     with pytest.raises(KeyError, match=r"scJoint does not accept \['cty_path1'\]"):
-        mtb.run("D28", "diagonal", methods=["scJoint"],
-                    params={"scJoint": {"cty_path1": "x.csv"}}, dry_run=True, verbose=False)
+        mtb.scan("D28", "diagonal", methods=["scJoint"], params={"scJoint": {"cty_path1": "x.csv"}}, verbose=False)
     assert "r_dim" not in mtb.params_for("scMM", "vertical", ["rna", "atac"])["tunable"]
 
 
 def test_x65_method_colon_key_gets_the_nested_example():
     with pytest.raises(TypeError, match=r"such as params=\{'Multigrate': \{'epochs': 3\}\}\.$"):
-        mtb.run("D52mini", "cross", params={"Multigrate:epochs": 3}, dry_run=True)
+        mtb.scan("D52mini", "cross", params={"Multigrate:epochs": 3})
 
 
-def test_x66_dry_run_refuses_skip_existing_with_params():
+def test_x66_run_refuses_skip_existing_with_params(tmp_path):
     with pytest.raises(ValueError, match=r"^skip_existing=True with params="):
-        mtb.run("D52mini", "cross", methods=["Multigrate"],
-                    params={"Multigrate": {"epochs": 3}}, skip_existing=True,
-                    dry_run=True, verbose=False)
+        mtb.run("D52mini", "cross", tmp_path / "out", methods=["Multigrate"],
+                params={"Multigrate": {"epochs": 3}}, skip_existing=True, verbose=False)
+    assert not (tmp_path / "out").exists()
 
 
 def test_x68_size_error_names_the_label_files_that_fit(tmp_path):
@@ -124,27 +120,24 @@ def test_x68_size_error_names_the_label_files_that_fit(tmp_path):
         mtb.evaluate(emb, labels=labels, category="cross", metrics=["ARI"])
 
 
-def test_x68_dry_run_leaves_out_the_nested_variant(capsys):
-    # 0.4.0: the plan leaves out the row a run leaves out, and says once which runs
-    plan = mtb.run("D52mini", "cross", methods=["UINMF"], dry_run=True)
+def test_x68_scan_leaves_out_the_nested_variant():
+    # 0.4.0: the plan leaves out the row a run leaves out
+    plan = mtb.scan("D52mini", "cross", methods=["UINMF"], verbose=False)
     assert list(plan.modalities) == ["rna1+rna2+rna3+adt1+adt2+adt3"]
-    assert ("[run] UINMF runs on rna1+rna2+rna3+adt1+adt2+adt3, not on "
-            "rna1+rna2+adt1+adt2") in capsys.readouterr().out
 
 
 def test_x80_one_batch_folder_lists_no_batched_variant(capsys):
-    plan = mtb.run("D27mini", "diagonal", methods=["iNMF", "online_iNMF"],
-                       dry_run=True)
+    plan = mtb.scan("D27mini", "diagonal", methods=["iNMF", "online_iNMF"], verbose=False)
     assert set(plan.modalities) == {"rna+atac_gas"}
-    assert "Variants for numbered batches are not listed." in capsys.readouterr().out
-    every = mtb.run("D27mini", "diagonal", methods=["iNMF"], dry_run=True,
-                        modalities="all", verbose=False)
+    from tests.conftest import full_scan
+    every = full_scan("D27mini", "diagonal", methods=["iNMF"], modalities="all", verbose=False)
     assert len(every) == 2
+    assert len(mtb.scan("D27mini", "diagonal", methods=["iNMF"], modalities="all",
+                        verbose=False)) == 1                      # one row per method
 
 
 def test_x81_online_inmf_size_note_only_on_a_small_folder():
-    big = mtb.run("D28", "diagonal", methods=["online_iNMF"], dry_run=True,
-                      verbose=False)
+    big = mtb.scan("D28", "diagonal", methods=["online_iNMF"], verbose=False)
     assert not big.caveat.str.contains("5,000 cells").any()
     from multibench.engine import registry
     v = registry.get("online_iNMF").select("diagonal", {"rna", "atac_gas"})
@@ -183,8 +176,7 @@ def test_x13_vertical_peak_methods_read_the_atac_role():
         got = mtb.engine.resolve.inputs_for("D27mini_vertical", "vertical", m)
         assert "atac" in got and "atac_gas" not in got, m
         assert got["atac"].endswith("atac_peak.h5"), m
-    plan = mtb.run("D27mini_vertical", "vertical", modalities=["rna", "atac"],
-                       dry_run=True, verbose=False)
+    plan = mtb.scan("D27mini_vertical", "vertical", modalities=["rna", "atac"], verbose=False)
     assert {"scMM", "scMDC", "moETM", "UnitedNet", "iPOLNG"} <= set(plan.method)
     # saved records still select the variant
     from multibench.engine import registry
@@ -218,7 +210,7 @@ def test_scan_names_the_category_that_fits():
     assert workflow._category_hint(df.assign(files_ok=True), None) == ""
 
 
-# load_batch reads a relative out_dir from the tree's folder
+# load_run reads a relative out_dir from the tree's folder
 def test_load_batch_reads_a_relative_out_dir_from_the_tree(tmp_path, monkeypatch):
     import json
     tree = tmp_path / "trees" / "D11"
@@ -231,7 +223,7 @@ def test_load_batch_reads_a_relative_out_dir_from_the_tree(tmp_path, monkeypatch
     (elsewhere / "Matilda_D11").mkdir(parents=True)   # must not be picked
     monkeypatch.chdir(elsewhere)
     with pytest.warns(UserWarning):
-        res = mtb.load_batch(tree)
+        res = mtb.load_run(tree)
     assert [r["out_dir"] for r in res.records] == [
         str((tree / f"{m}_D11").resolve()) for m in ("Matilda", "MOFA2", "scMoMaT")]
 
@@ -244,11 +236,11 @@ def test_a_stored_tree_of_0_3_says_to_rescore(tmp_path):
     _write_tree(tree)                               # long.csv without scored_with
     with pytest.warns(UserWarning, match=r"^These scores come from multibench 0\.3\.x\. "
                       r"res\.rescore\(\) scores them as 0\.4\.0 does\.$"):
-        mtb.load_batch(tree)
+        mtb.load_run(tree)
 
 
 def test_hidden_rows_no_sentence(capsys):
     mtb.scan('D11', 'vertical')
     assert 'not listed' not in capsys.readouterr().out
-    mtb.run('D11', 'vertical', out_dir='/o', dry_run=True)
+    mtb.scan('D11', 'vertical')
     assert 'not listed' not in capsys.readouterr().out

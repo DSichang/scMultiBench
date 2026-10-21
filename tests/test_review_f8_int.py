@@ -35,7 +35,7 @@ import pytest
 import multibench as mtb
 from multibench import config
 from multibench import workflow as W
-from multibench.data import results as RS
+from multibench._data import results as RS
 from multibench.engine import envs
 from multibench.engine import runner as R
 from tests.test_docs_r4 import _flat, needs_docs
@@ -55,7 +55,7 @@ def test_a_stored_minus_zero_ari_reads_zero_in_summary(tmp_path):
     (tmp_path / "batch_result.json").write_text(json.dumps(
         {"dataset": "X", "category": "vertical", "records": [rec]}))
     assert '"ARI": -0.0' in (tmp_path / "batch_result.json").read_text()
-    sm = mtb.load_batch(tmp_path).summary
+    sm = mtb.load_run(tmp_path).summary
     ari = sm.loc[0, "ARI"]
     assert ari == 0.0 and math.copysign(1, ari) == 1
     assert "-0.0" not in sm.to_csv(index=False)
@@ -84,8 +84,7 @@ def test_the_macos_list_counts_only_rows_whose_files_are_present(macos_no_gpu):
     # 0.4: off Linux the GPU sentence is left out (the OS already blocks), so no
     # method is listed as also blocked by something else
     assert lines[2] == f"{lacking} rows need files that D11 does not have."
-    assert lines[3].startswith("mtb.run('D11', 'vertical', modalities=\"all\", dry_run=True) shows "
-                               "every row.")
+    assert lines[3].startswith("mtb.scan('D11', 'vertical', modalities=\"all\") says why.")
     assert "NVIDIA GPU" not in msg and "also blocked" not in msg
     assert "atac" not in msg
     # with modalities= the rows the folder cannot have are not in the scan

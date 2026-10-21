@@ -1,6 +1,6 @@
 import pytest
 
-from multibench.data import results
+from multibench._data import results
 
 # source= / result_path= / clustering= and available_datasets are deprecated in
 # 0.4 (one FutureWarning each); the published-table tests pass them on purpose.

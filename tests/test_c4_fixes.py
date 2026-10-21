@@ -9,6 +9,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+from multibench import _settings
 from multibench import config
 from multibench.eval import pipeline
 
@@ -181,7 +182,7 @@ def test_stored_rows_under_a_custom_result_path_stay_stored(tmp_path, monkeypatc
             for m in ("ARI", "NMI")]
     (tmp_path / "rerun").mkdir()
     pd.DataFrame(rows).to_csv(tmp_path / "rerun" / "long_all_x.csv", index=False)
-    monkeypatch.setattr(config, "_RESULT_PATH", tmp_path)
+    monkeypatch.setattr(_settings, "_RESULT_PATH", tmp_path)
     st = _quiet(mtb.load_results, "vertical")
     assert set(st["dataset"]) == {"DX"}
     mine = st[st["method"] == "scMM"].assign(method="mine", source="user", value=0.7)
@@ -266,7 +267,7 @@ def test_a_renamed_run_keeps_its_language_chip():
 
 # ------------------------------------------- rescore, embedding, export
 def test_rescore_of_a_folder_without_outputs_prints_no_status_line(tmp_path, capsys):
-    res = mtb.BatchResult([{"method": "Matilda", "status": "RUN_OK", "out_dir":
+    res = mtb.RunResult([{"method": "Matilda", "status": "RUN_OK", "out_dir":
                             str(tmp_path / "Matilda_D11"), "modalities": ["rna", "adt"]}],
                           "D11", "vertical", out_dir=str(tmp_path))
     with pytest.raises(FileNotFoundError, match="^No output of Matilda"):
@@ -290,7 +291,7 @@ def _fake_run(tmp_path, method, mods, n):
     out.mkdir(parents=True)
     with h5py.File(out / "embedding.h5", "w") as f:
         f.create_dataset("data", data=np.zeros((4, n)))
-    return mtb.BatchResult([{"method": method, "status": "RUN_OK", "out_dir": str(out),
+    return mtb.RunResult([{"method": method, "status": "RUN_OK", "out_dir": str(out),
                              "modalities": mods}], "D28", "diagonal", out_dir=str(tmp_path))
 
 

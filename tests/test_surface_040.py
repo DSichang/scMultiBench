@@ -1,6 +1,5 @@
 """The public surface of 0.4.0, pinned: ``mtb.__all__`` and each namespace's
 ``__all__``, no command line, and no FutureWarning from any public call."""
-import importlib
 import inspect
 import warnings
 from pathlib import Path
@@ -14,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 TOP = ["config", "plot", "catalog", "io", "env", "data",
        "find_methods", "method_info", "params_for", "cite",
-       "scan", "run", "load_batch", "BatchResult",
+       "scan", "run", "load_run", "RunResult",
        "evaluate", "load_results", "recommend",
        "__version__"]
 
@@ -28,10 +27,11 @@ SIGNATURES = {
     "method_info": ["method"],
     "params_for": ["method", "category", "modalities"],
     "cite": ["methods", "format"],
-    "scan": ["dataset", "category", "methods", "modalities", "assume_gpu", "verbose"],
+    "scan": ["dataset", "category", "methods", "modalities", "params", "assume_gpu",
+             "verbose"],
     "run": ["dataset", "category", "out_dir", "methods", "modalities", "params", "batch",
-            "evaluate", "dry_run", "timeout", "skip_existing", "verbose"],
-    "load_batch": ["out_dir", "methods"],
+            "evaluate", "timeout", "skip_existing", "verbose"],
+    "load_run": ["out_dir", "methods"],
     "evaluate": ["embedding", "labels", "dataset", "method", "category", "batch",
                  "metrics", "obsm", "verbose"],
     "load_results": ["category", "dataset", "methods", "metrics"],
@@ -53,7 +53,7 @@ REMOVED = ["run_all", "inputs_for", "labels_for", "to_long", "sweep", "classify"
            "classification_metrics", "results_coverage", "list_methods",
            "list_categories", "list_tasks", "available_datasets",
            "AmbiguousVariantError", "DegenerateRerunWarning", "plan", "plan_commands",
-           "runtime_hint"]
+           "runtime_hint", "BatchResult", "load_batch"]
 
 
 def test_top_level_all_is_pinned():
@@ -62,11 +62,17 @@ def test_top_level_all_is_pinned():
         n for n in TOP if not n.startswith("__"))
 
 
-@pytest.mark.parametrize("ns", sorted(NAMESPACES))
+@pytest.mark.parametrize("ns", sorted(set(NAMESPACES) - {"config"}))
 def test_namespace_all_is_pinned(ns):
     module = getattr(mtb, ns)
     assert module.__all__ == NAMESPACES[ns]
     assert [n for n in dir(module) if not n.startswith("__")] == sorted(NAMESPACES[ns])
+
+
+def test_config_fields_are_pinned():
+    assert list(mtb.config.FIELDS) == NAMESPACES["config"]
+    public = [n for n in dir(mtb.config) if not n.startswith("_")]
+    assert public == sorted(["FIELDS", *NAMESPACES["config"]])
 
 
 @pytest.mark.parametrize("name", sorted(SIGNATURES))
@@ -86,28 +92,28 @@ def test_removed_namespace_names_are_gone():
     for ns, name in [("data", "fetchable"), ("data", "fetch_outputs"),
                      ("catalog", "methods"), ("io", "to_canonical"), ("config", "Config"),
                      ("plot", "build_table"), ("plot", "BubbleTable"), ("env", "doctor"),
-                     ("env", "status"), ("env", "plan"), ("eval", "to_long")]:
+                     ("env", "status"), ("env", "plan"), ("eval", "to_long"),
+                     # internals are not reachable through the public namespaces
+                     ("env", "recipe"), ("env", "group_for"), ("io", "export_canonical"),
+                     ("io", "suffix_fix"), ("catalog", "FAMILY_METRICS"),
+                     ("data", "catalog"), ("data", "results"), ("config", "ensure_repo")]:
         assert not hasattr(getattr(mtb, ns), name), f"{ns}.{name}"
-    assert not hasattr(mtb.BatchResult([], "D11", "vertical"), "results")
+    assert not hasattr(mtb.RunResult([], "D11", "vertical"), "results")
 
 
 def test_there_is_no_command_line():
     assert not (ROOT / "multibench" / "cli.py").exists()
     assert not (ROOT / "multibench" / "__main__.py").exists()
-    with pytest.raises(ImportError):
-        importlib.import_module("multibench.cli")
-    with pytest.raises(ImportError):
-        importlib.import_module("multibench.__main__")
     text = (ROOT / "pyproject.toml").read_text()
     assert "[project.scripts]" not in text and "console_scripts" not in text
     assert not hasattr(mtb.config, "hint") and not hasattr(mtb.config, "_CLI")
 
 
 def test_no_deprecation_machinery_is_left():
-    from multibench import _compat
+    from multibench import _text
     for name in ("deprecated", "renamed", "keywords", "module_getattr", "use", "note",
                  "removed_text", "NO_EFFECT"):
-        assert not hasattr(_compat, name), name
+        assert not hasattr(_text, name), name
 
 
 def test_public_calls_emit_no_future_warning(tmp_path):
@@ -131,7 +137,7 @@ def test_public_calls_emit_no_future_warning(tmp_path):
         mtb.plot.bar(long, save=tmp_path / "a.png")
         mtb.evaluate(emb, labels=lab, metrics=["ARI", "NMI"], verbose=False)
         mtb.scan("D11", "vertical", verbose=False)
-        mtb.run("D11", "vertical", methods=["Matilda"], dry_run=True, verbose=False)
+        mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False)
         mtb.env.install(["Matilda"], dry_run=True)
         print(mtb.config)
     future = [str(w.message) for w in rec

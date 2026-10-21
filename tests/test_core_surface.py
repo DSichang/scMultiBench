@@ -8,7 +8,7 @@ import pytest
 import multibench as mtb
 
 TOP = {"config", "plot", "catalog", "io", "env", "data", "find_methods", "method_info",
-       "params_for", "cite", "scan", "run", "load_batch", "BatchResult", "evaluate",
+       "params_for", "cite", "scan", "run", "load_run", "RunResult", "evaluate",
        "load_results", "recommend", "__version__"}
 MEMBERS = {"io": ["export_dataset", "read_canonical"], "env": ["install"],
            "plot": ["bubble", "bar"], "data": ["fetch", "write_example"],
@@ -25,6 +25,9 @@ def test_top_level_is_the_eighteen_names():
 def test_each_namespace_lists_its_members():
     for ns, names in MEMBERS.items():
         mod = getattr(mtb, ns)
+        if ns == "config":              # the settings object: its fields
+            assert list(mod.FIELDS) == names
+            continue
         assert list(mod.__all__) == names, ns
         assert {n for n in dir(mod) if not n.startswith("__")} == set(names), ns
 

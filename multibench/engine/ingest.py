@@ -14,16 +14,10 @@ from pathlib import Path
 import h5py
 import numpy as np
 
-from .. import _compat, config
+from .. import _text
+
+from .._settings import config
 from .registry import ATAC_VALUES as _ATAC_KINDS
-
-__all__ = ["export_dataset", "read_canonical"]
-
-
-def __dir__() -> list[str]:
-    """``dir(mtb.io)`` lists the public API and the dunders only (PEP 562); the
-    other names stay reachable."""
-    return sorted(set(__all__) | {n for n in globals() if n.startswith("__")})
 
 # peak ids come as chr_start_end, chr-start-end or chr:start-end; Signac needs the last
 _PEAK_RE = re.compile(r"^(.+?)[-_:](\d+)[-_](\d+)$")
@@ -86,7 +80,7 @@ def _warn_not_counts(X, name: str, hint: str, *,
     log-normalised; ``hint`` is the selector of the raw counts. ``how``
     replaces the sentence that names it, for a matrix no selector reads."""
     if _matrix_has_fraction(X):
-        _compat.warn(
+        _text.warn(
             f"The {name} values are not whole numbers, so they look log-normalised. "
             + (how or f"The methods normalise raw counts themselves. Export raw counts, "
                       f"for example with {hint}."),
@@ -230,7 +224,7 @@ def _follow_peak_order(out: Path, X, bars):
               f"{peak}, which atac_cty.csv follows", file=sys.stderr, flush=True)
     elif kind == "other":
         shared = len(set(bars) & set(ref))
-        _compat.warn(
+        _text.warn(
             f"{Path(out).name} holds different cells than {peak} ({len(bars):,} and "
             f"{len(ref):,}, {shared:,} shared). Diagonal methods need gene activity for "
             f"the ATAC cells of atac_peak.h5.", UserWarning)
@@ -394,7 +388,7 @@ def _norm_modality(modality):
         valid = [m + (f" (or {', '.join(alias[m])})" if alias[m] else "")
                  for m in _MODALITIES]
         raise ValueError(f"Unknown modality {modality}. The modalities are "
-                         f"{config._and_list(valid)}.")
+                         f"{_text._and_list(valid)}.")
     return m
 
 
@@ -491,7 +485,7 @@ def _pick_matrix(adata, *, layer=None, obsm=None, feature_names=None, what=None,
             fix = (f"Pass {names_arg}=, {store}." if names_arg
                    else f"{store[:1].upper()}{store[1:]}.")
             if n_feat:                  # 0 features have no names, and are refused
-                _compat.warn(_no_names_message(what or "obsm", slot, n_feat, fix),
+                _text.warn(_no_names_message(what or "obsm", slot, n_feat, fix),
                              UserWarning)
         return X, names
     _check_one_feature_type(adata, arg=arg, spec=spec, role=role or what)
@@ -575,7 +569,7 @@ def _warn_dense_size(out: Path, n_feat: int, n_cell: int, dtype) -> None:
     itemsize = int(np.dtype(dtype).itemsize)
     size = int(n_feat) * int(n_cell) * itemsize
     if size > DENSE_WARN_BYTES:
-        _compat.warn(
+        _text.warn(
             f"{out.name}: matrix/data is stored dense (features x cells): "
             f"{n_feat} x {n_cell} x {itemsize} B = {size / 1e9:.1f} GB uncompressed "
             f"on disk (limit for this warning: {DENSE_WARN_BYTES / 1e9:.0f} GB); "
@@ -604,7 +598,7 @@ def _check_peak_names(modality, feats, *, rna_feats=None, kind_arg=False):
         as_peak = "modality='atac_peak'"
         as_gas = "modality='atac_gas'"
     if modality == "atac_gas" and frac > 0.5:
-        _compat.warn(
+        _text.warn(
             f"{frac:.0%} of the ATAC feature names look like peaks such as "
             f"chr1:100-200, not genes. If the matrix holds peaks, pass {as_peak}.",
             UserWarning)
@@ -623,7 +617,7 @@ def _check_peak_names(modality, feats, *, rna_feats=None, kind_arg=False):
             text = head + f", and {share:.0%} are RNA gene names." + gas
         else:
             text = head + rename
-        _compat.warn(text, UserWarning)
+        _text.warn(text, UserWarning)
 
 
 #: the ATAC role of each ``atac_kind=``
@@ -770,20 +764,31 @@ def read_canonical(path: Path | str):
     """
     import anndata as ad
     import scipy.sparse as sp
-    if not Path(path).exists():
+    path = Path(path).expanduser()
+    if not path.exists():
         raise FileNotFoundError(
             f"{os.fspath(path)} not found. Demo datasets are under "
             f"mtb.config.data_path ({config.data_path}).")
+    if path.is_dir():
+        raise ValueError(f"{path.name} is a folder: pass one of its .h5 files, such as "
+                         f"{path.name}/rna.h5.")
+    if not h5py.is_hdf5(path):
+        raise ValueError(f"{path.name} is not an .h5 file. read_canonical reads the .h5 "
+                         f"files of a dataset folder and a run's embedding.h5; read a "
+                         f"table with pandas.read_csv.")
     if not _is_canonical_h5(path) and _is_tenx_h5(path):
         # its 1-D matrix/data would fail below with a line about unpacking
         raise ValueError(_tenx_message(path))
     with h5py.File(path, "r") as f:
         if "matrix/data" not in f and isinstance(f.get("data"), h5py.Dataset):
             # a method's embedding.h5: the embedding goes to .obsm["X_emb"]
-            from ..eval.io import read_embedding
+            from ..eval.io import read_cell_names, read_embedding
             emb = read_embedding(path)
             a = ad.AnnData(np.zeros((emb.shape[0], 0)))
             a.obsm["X_emb"] = emb
+            names = read_cell_names(path)
+            if names is not None and len(names) == emb.shape[0]:
+                a.obs_names = names
             return a
         if "matrix/data" not in f:
             raise ValueError(f"{Path(path).name} has no matrix/data: it is not a "
@@ -1062,7 +1067,7 @@ def _as_modality(data, spec, *, what, master, feature_names=None):
             fix = (f"Pass adt_names=, or {named}." if what == "adt"
                    else f"{named[:1].upper()}{named[1:]}.")
             if n_feat:                  # 0 features have no names, and are refused
-                _compat.warn(_no_names_message(what, "array", n_feat, fix),
+                _text.warn(_no_names_message(what, "array", n_feat, fix),
                              UserWarning)
             feature_names = [f"feature_{i}" for i in range(n_feat)]
         a.var_names = [str(x) for x in feature_names]
@@ -1206,7 +1211,7 @@ def _as_obs_vector(data, spec, *, what, master):
         if isinstance(spec.index, pd.RangeIndex) and len(spec) == len(m):
             # a filtered or sorted column would go to other cells
             from ..eval import io as eio
-            _compat.warn(eio._by_position(what), UserWarning)
+            _text.warn(eio._by_position(what), UserWarning)
             return np.asarray(spec)
         lack = [x for x in m if x not in set(idx)]
         fix = suffix_fix(what, m, idx) if len(lack) == len(m) else ""
@@ -1319,7 +1324,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         raise TypeError("export_dataset takes an AnnData or MuData object, not a path: "
                         "read the file first, e.g. anndata.read_h5ad(path).")
     dtype = "float64"
-    out = Path(dataset_dir)
+    out = Path(dataset_dir).expanduser()
     category = _check_category(category)
     if data is None and isinstance(rna, str) and rna == "X":
         rna = None                      # no data to select from: no RNA
@@ -1336,7 +1341,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         raise ValueError("atac_kind= given without atac=")
     if category == "vertical" and atac is not None and atac_kind == "gene_activity" \
             and not _vertical_gene_activity_readers():
-        _compat.warn(_VERTICAL_GAS, UserWarning)
+        _text.warn(_VERTICAL_GAS, UserWarning)
     if rna is None and adt is None and atac is None and labels is None:
         raise ValueError("nothing to export: give at least one of rna=, adt=, atac=, labels=")
     _check_batch_args(batch, batch_index, category, adt=adt, atac=atac)
@@ -1354,7 +1359,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
             "category='diagonal' names the label file after the modality it labels "
             "(rna_cty.csv, atac_cty.csv): pass rna= or atac= together with labels=")
     if category in ("mosaic", "cross") and batch is None and batch_index is None:
-        _compat.warn(f"category={category!r} methods read numbered files (rna1.h5, "
+        _text.warn(f"category={category!r} methods read numbered files (rna1.h5, "
                      f"cty1.csv, ...): pass batch_index= (this object is one batch) "
                      f"or batch= (a column that splits it)", UserWarning)
 
@@ -1417,8 +1422,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                 raise ValueError(_NO_CELLS)     # labels alone, and none of them
             _check_labels_complete(
                 vec, spec=labels, where=f"the cells ({_labels_where(data, labels)})",
-                advice="give every cell a label, or subset the data to the labelled cells "
-                       "first")
+                advice=_keep_labelled_advice(data, labels, vec))
             labels_by_side["rna"] = vec
 
     # --- batches
@@ -1459,7 +1463,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                     feats, arg=what, spec=given[what], role=role, obsm=kw.get("obsm"),
                     mudata=_is_mudata(data))
                 if repeated:
-                    _compat.warn(repeated, UserWarning)
+                    _text.warn(repeated, UserWarning)
             if what == "rna" and feats is not None and _peak_fraction(feats) > 0.5:
                 raise ValueError(f"rna= holds peaks ({feats[0]}): pass it as atac=.")
             if what == "atac":
@@ -1469,10 +1473,10 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                     role = _atac_role(feats, rna_feats)
                     if category == "vertical" and role == "atac_gas" \
                             and not _vertical_gene_activity_readers():
-                        _compat.warn(_VERTICAL_GAS, UserWarning)
+                        _text.warn(_VERTICAL_GAS, UserWarning)
                 _check_peak_names(role, feats, rna_feats=rna_feats, kind_arg=True)
                 if category == "mosaic" and role == "atac_gas":
-                    _compat.warn("Every mosaic method reads peak ATAC. Export the ATAC as "
+                    _text.warn("Every mosaic method reads peak ATAC. Export the ATAC as "
                                  "peaks (atac_kind='peak').", UserWarning)
             if role in _COUNT_ROLES:
                 selector = {"rna": rna, "adt": adt, "atac": atac}[what]
@@ -1520,7 +1524,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         raise FileExistsError(_leftover_message(out, found, held=held))
     if existing and not overwrite:
         raise FileExistsError(
-            f"{out} already holds {config._and_list(existing)}. Pass "
+            f"{out} already holds {_text._and_list(existing)}. Pass "
             f"{'overwrite=True'} to replace "
             f"{'it' if len(existing) == 1 else 'them'}.")
     # --- cells that the folder already holds keep the row order of its files
@@ -1828,7 +1832,7 @@ def _check_batch_args(batch, batch_index, category, *, adt, atac) -> None:
             + _one_file_advice(category, has_adt=adt is not None and atac is None))
     if batch is not None and category is None and atac is not None:
         from .resolve import _batch_column_advice
-        _compat.warn(
+        _text.warn(
             "batch= with atac=: only mosaic methods read numbered ATAC files. For mosaic "
             "pass category='mosaic'; otherwise " + _batch_column_advice(),
             UserWarning)
@@ -2039,6 +2043,22 @@ def _check_labels_complete(vals, *, spec, where: str, advice: str,
         raise ValueError(
             f"labels={_shown(spec)}: {n} of the {len(vals)} labels for {where} are missing "
             f"({forms}); {advice}")
+
+
+def _keep_labelled_advice(data, spec, vals) -> str:
+    """The end of the missing-label error of a paired export: the code that keeps
+    the labelled cells, or, for labels that are no obs column, the rule."""
+    if isinstance(spec, str) and not _is_mudata(data) and not spec.startswith("mod:"):
+        from ..eval import io as eio
+        col = f'adata.obs["{spec[4:] if spec.startswith("obs:") else spec}"]'
+        words = eio.missing_words(vals)
+        null, text = eio._null_and_text(vals)
+        if not words and not (text[~null] == "").any():
+            return f"keep the labelled cells first: adata = adata[{col}.notna()]"
+        gone = sorted({"", "nan", "None", *words})
+        return (f"keep the labelled cells first: adata = adata[~{col}.astype(str)"
+                f".str.strip().isin({gone!r})]")
+    return "give every cell a label, or keep the labelled cells first"
 
 
 def _labels_where(data, spec) -> str:

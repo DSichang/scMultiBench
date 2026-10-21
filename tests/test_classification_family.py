@@ -17,7 +17,7 @@ import pytest
 import multibench as mtb
 import multibench.eval.classify  # noqa: F401  (mtb.eval.classify)
 from multibench import workflow as W
-from multibench.data import catalog
+from multibench._data import catalog
 B = importlib.import_module("multibench.plot.bubble")   # the module
 
 CODES = ["OCA", "ACA", "Spec", "Sens", "F1"]
@@ -255,16 +255,16 @@ def test_score_record_carries_the_codes(three, tmp_path):
     rec = _record(tmp_path, emb)
     embedding = SimpleNamespace(output=SimpleNamespace(kind="embedding"))
     _quiet(W._score_record, rec, emb, "MB", "cross", tmp_path, embedding)
-    assert rec["status"] == "CHAIN_OK"
+    assert rec["status"] == "scored"
     assert list(rec["metrics"])[-5:] == CODES
-    res = W.BatchResult([rec], "MB", "cross")
+    res = W.RunResult([rec], "MB", "cross")
     assert list(res.summary.columns[res.summary.columns.isin(CODES)]) == CODES
     assert set(CODES) <= set(res.long["metric"])
     # the UMAP of a graph method has no classification scores
     graph = SimpleNamespace(output=SimpleNamespace(kind="graph"))
     g = dict(rec)
     _quiet(W._score_record, g, emb, "MB", "cross", tmp_path, graph)
-    assert g["status"] == "CHAIN_OK_GRAPH_METHOD" and not set(CODES) & set(g["metrics"])
+    assert g["status"] == "scored" and not set(CODES) & set(g["metrics"])
     with pytest.raises(ValueError) as e:
         W._score_record(dict(rec), emb, "MB", "cross", tmp_path, graph,
                         metrics="classification")
@@ -281,9 +281,9 @@ def test_score_record_carries_the_codes(three, tmp_path):
 
 def test_rescore_carries_the_codes(three, tmp_path):
     emb, paths = three
-    res = W.BatchResult([_record(tmp_path, emb)], "MB", "cross")
+    res = W.RunResult([_record(tmp_path, emb)], "MB", "cross")
     new = _quiet(res.rescore, metrics="classification")
-    assert new.records[0]["status"] == "CHAIN_OK", new.records[0].get("error")
+    assert new.records[0]["status"] == "scored", new.records[0].get("error")
     assert list(new.records[0]["metrics"]) == CODES
     ref = _reference(emb, paths)
     assert new.records[0]["metrics"]["OCA"] == round(float(ref["OCA"]), 4)

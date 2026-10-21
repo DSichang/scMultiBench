@@ -20,9 +20,10 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+from multibench.engine import scripts
 from multibench import config
 from multibench.engine import envs
-from multibench.data import results as R
+from multibench._data import results as R
 from tests.test_f4_cli import _diag_folder
 from tests.conftest import full_scan
 
@@ -56,8 +57,6 @@ def test_peak_name_note_and_warning_end_with_the_fix(tmp_path, pinned, capsys):
     inputs = {"rna": str(d / "rna.h5"), "atac_peak": str(d / "atac_peak.h5")}
     note = ("GLUE reads peak names such as chr1:100-200. atac_peak.h5 holds other names, "
             "for example peak_0. Rename them to chr:start-end.")
-    _quiet(mtb.engine.runner.run, "GLUE", "diagonal", inputs=inputs, out_dir=tmp_path / "o", dry_run=True)
-    assert f"# {note}\n" in capsys.readouterr().err
     with pytest.warns(UserWarning) as rec:
         with pytest.raises(Exception):
             mtb.engine.runner.run("GLUE", "diagonal", inputs=inputs, out_dir=tmp_path / "o2")
@@ -91,10 +90,9 @@ def test_count_lines_say_rows_without_plural_brackets(monkeypatch, capsys, tmp_p
     assert out == (f"[scan] {k} of {n} rows have their input files. 0 of {n} have their "
                    f"environment installed. mtb.env.install(dry_run=True) checks the "
                    f"environments.\n")
-    mtb.run("D11", "vertical", out_dir=tmp_path, dry_run=True, modalities="all")
-    line = next(l for l in capsys.readouterr().out.splitlines() if "Dry run" in l)
-    assert line == (f"[run] Dry run: 0 of {n} requested rows can run on D11 "
-                    f"(vertical); the reason column says why.")
+    mtb.scan("D11", "vertical", modalities="all")
+    line = capsys.readouterr().out.splitlines()[0]
+    assert line.startswith("[scan] 14 of 18 methods have their input files in D11. ")
     with pytest.raises(ValueError) as e:
         mtb.run("D11", "vertical", out_dir=tmp_path, verbose=False, modalities="all")
     assert f"\nThe first 3 of {n} blocked rows:\n" in str(e.value)
@@ -130,7 +128,7 @@ def test_fetch_progress_line_is_a_sentence(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(subprocess, "run", fake_run)
     fresh = tmp_path / "fresh"
     try:
-        config.ensure_repo(fresh)
+        scripts.ensure_repo(fresh)
     except Exception:  # noqa: BLE001 - only the progress line is checked here
         pass
     assert capsys.readouterr().out.startswith(

@@ -147,14 +147,12 @@ def test_run_all_with_modalities_runs_the_smaller_variant(tmp_path, all_envs, mo
 def test_dry_run_leaves_out_the_nested_rows_and_names_the_row_that_runs(tmp_path, all_envs,
                                                                          capsys):
     _tri(tmp_path)
-    plan = mtb.run(os.path.join(tmp_path, 'TRI'), 'vertical', methods=['scMoMaT', 'VIMCCA'], dry_run=True)
-    # 0.4.0: scMoMaT's rna+adt and rna+atac rows are left out, as a run leaves them out
+    plan = mtb.scan(os.path.join(tmp_path, 'TRI'), 'vertical', methods=['scMoMaT', 'VIMCCA'],
+                    verbose=False)
+    # scan has one row per method: scMoMaT's largest row, as a run runs it
     assert plan["runnable"].all()
     assert list(plan.loc[plan.method == "scMoMaT", "modalities"]) == ["rna+adt+atac"]
-    assert (plan.method == "VIMCCA").sum() == 2
-    out = capsys.readouterr().out
-    assert "[run] scMoMaT runs on rna+adt+atac, not on rna+adt and rna+atac" in out
-    assert "[run] VIMCCA runs on" not in out       # its two rows are not nested
+    assert (plan.method == "VIMCCA").sum() == 1
 
 
 def test_a_blocked_larger_row_leaves_the_smaller_one_running(tmp_path, all_envs, monkeypatch,

@@ -20,9 +20,10 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+from multibench import _settings
 from multibench import config
 from multibench import workflow as W
-from multibench.data import results
+from multibench._data import results
 from multibench.engine import envs, runner
 
 N = 120
@@ -76,7 +77,7 @@ _WRITER = textwrap.dedent('''\
 
 def _clear_env_caches():
     """Drop the per-process env probes, so the stand-in prefix is seen (and forgotten)."""
-    for fn in (config._conda_envs_dir, envs._conda_prefixes):
+    for fn in (_settings._conda_envs_dir, envs._conda_prefixes):
         fn.cache_clear()
 
 

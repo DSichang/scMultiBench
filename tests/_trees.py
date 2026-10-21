@@ -1,5 +1,5 @@
-"""A saved ``run`` output tree, as ``BatchResult.save`` lays it out, for the
-load_batch tests."""
+"""A saved ``run`` output tree, as ``RunResult.save`` lays it out, for the
+load_run tests."""
 import json
 from pathlib import Path
 
@@ -12,7 +12,7 @@ DATASET = "D11"
 
 
 def _write_tree(d: Path, dataset=DATASET, methods=METHODS) -> None:
-    """A run output tree exactly as BatchResult.save + the method runs lay it out."""
+    """A run output tree exactly as RunResult.save + the method runs lay it out."""
     d.mkdir(parents=True)
     recs, rows = [], []
     rng = np.random.default_rng(0)

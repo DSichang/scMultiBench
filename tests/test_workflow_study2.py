@@ -72,10 +72,11 @@ def test_scan_reason_is_short_but_files_reason_is_verbatim(no_envs):
     assert "cty" not in row["reason"]
 
 
-def test_scan_docs_name_the_four_columns():
+def test_scan_docs_name_the_seven_columns():
     returns = " ".join(inspect.getdoc(mtb.scan).split("Returns", 1)[1].split("Raises")[0].split())
     assert ("``method``, ``modalities`` (of the variant ``run`` would run, ``+``-joined), "
-            "``runnable`` and ``reason``.") in returns
+            "``runnable``, ``reason`` (why it cannot run), ``env``, ``caveat`` (what to know "
+            "before running it) and ``command``") in returns
 
 
 # ----------------------------------------------------------------- P17: str is not a list
@@ -84,8 +85,7 @@ def test_scan_docs_name_the_four_columns():
     lambda: full_scan("D11", "vertical", methods="StabMap", out_dir="runs"),
     lambda: mtb.run("D11", "vertical", methods="StabMap", out_dir="/tmp/unused",
                         verbose=False),
-    lambda: mtb.run("D11", "vertical", methods="StabMap", out_dir=None, dry_run=True,
-                        verbose=False),
+    lambda: mtb.scan("D11", "vertical", methods="StabMap", verbose=False),
 ])
 def test_methods_as_a_string_raises_pass_a_list(call):
     with pytest.raises(TypeError) as e:
@@ -110,7 +110,7 @@ def test_run_all_real_run_raises_on_missing_dataset_before_any_dispatch(monkeypa
         warnings.simplefilter("error")           # no warning may stand in for the error
         with pytest.raises(FileNotFoundError, match="does not exist"):
             mtb.run("NO_SUCH_DATASET_XYZ", "vertical", out_dir="/tmp/unused",
-                        dry_run=False, verbose=False)
+                    verbose=False)
 
 
 # ----------------------------------------------------------------- P03: data_dir note

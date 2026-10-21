@@ -17,8 +17,7 @@ def gpu(monkeypatch):
 
 
 def _dry(method, category, inputs, params, tmp_path):
-    return mtb.engine.runner.run(method, category, inputs=inputs, out_dir=str(tmp_path / "o"),
-                   params=params, dry_run=True, cmd_template="conda run -n x {cmd}")
+    return mtb.engine.runner.preview(method, category, inputs=inputs, out_dir=str(tmp_path / "o"), params=params)[0]
 
 
 # X63: a param is rendered by the type the script declares
@@ -73,8 +72,7 @@ def test_tunable_leaves_out_what_the_package_sets(method, category, mods, gone):
 
 def test_a_package_set_key_is_refused():
     with pytest.raises(KeyError, match=r"scMDC does not accept \['nbatch'\]"):
-        mtb.run("D52mini", "cross", methods=["scMDC"], params={"scMDC": {"nbatch": 5}},
-                    dry_run=True, verbose=False)
+        mtb.scan("D52mini", "cross", methods=["scMDC"], params={"scMDC": {"nbatch": 5}}, verbose=False)
 
 
 # Y38: one default, the one a run uses
@@ -87,8 +85,6 @@ def test_tunable_default_is_what_a_run_uses():
 
 def test_run_all_params_for_a_method_not_run():
     with pytest.raises(ValueError, match=r"^params names scMM, which is not in methods=\.$"):
-        mtb.run("D52mini", "cross", methods=["Multigrate"],
-                    params={"scMM": {"epochs": 3}}, out_dir="/o", dry_run=True,
-                    verbose=False)
+        mtb.scan("D52mini", "cross", methods=["Multigrate"], params={"scMM": {"epochs": 3}}, verbose=False)
 
 

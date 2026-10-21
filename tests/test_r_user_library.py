@@ -26,7 +26,7 @@ def test_without_user_r_library():
     assert env["PATH"] == "/bin" and env["HOME"] == "/home/u"
 
 
-def _launch_env(monkeypatch, tmp_path, method, category, cmd_template=None):
+def _launch_env(monkeypatch, tmp_path, method, category):
     for k, v in USER.items():
         monkeypatch.setenv(k, v)
     captured = {}
@@ -44,8 +44,7 @@ def _launch_env(monkeypatch, tmp_path, method, category, cmd_template=None):
     inp = mtb.engine.resolve.inputs_for("D11", category, method, modalities=["rna", "adt"])
     with pytest.raises(RuntimeError, match="stop after env capture"):
         runner.run(method=method, category=category, inputs=inp,
-                   out_dir=str(tmp_path / "out"),
-                   cmd_template=cmd_template)
+                   out_dir=str(tmp_path / "out"))
     return captured["env"]
 
 
@@ -56,14 +55,6 @@ def test_an_r_method_runs_without_the_user_r_library(monkeypatch, tmp_path):
     assert env["PYTHONNOUSERSITE"] == "1"
     # the process's own environment is left as it was
     assert os.environ["R_LIBS_USER"] == USER["R_LIBS_USER"]
-
-
-def test_a_command_template_of_the_users_own_env_keeps_their_library(monkeypatch, tmp_path):
-    """``cmd_template`` without {env_cmd} runs the method in the user's env,
-    whose R packages may live in their library."""
-    env = _launch_env(monkeypatch, tmp_path, "MOFA2", "vertical", cmd_template="{cmd}")
-    for k, v in USER.items():
-        assert env[k] == v
 
 
 def test_the_env_build_does_not_read_the_user_r_library(monkeypatch):

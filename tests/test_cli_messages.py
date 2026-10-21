@@ -34,34 +34,9 @@ def gpu(monkeypatch):
 
 
 def _dry(method, category, inputs, params, tmp_path):
-    return mtb.engine.runner.run(method, category, inputs=inputs, out_dir=str(tmp_path / "o"),
-                   params=params, dry_run=True, cmd_template="conda run -n x {cmd}")
+    return mtb.engine.runner.preview(method, category, inputs=inputs, out_dir=str(tmp_path / "o"), params=params)[0]
 
 
 from tests.test_evaluate_and_io_messages import _adata  # noqa: E402 - an AnnData of 60 cells
 
 # --- command line: X15, X17-X24, X31, X33, X53, X77, X78, X95, X97, X98 ------
-
-# Y03: the cmd-template placeholder is replaced token by token
-def test_cmd_template_bare_quoted_and_mid_string():
-    from multibench.engine.runner import wrap_command
-    cmd = ["python", "x.py", "--a", "1"]
-    assert wrap_command(cmd, "srun {cmd}") == ["srun", *cmd]
-    assert wrap_command(cmd, "sbatch --wrap '{cmd}'") == ["sbatch", "--wrap",
-                                                         "python x.py --a 1"]
-    assert wrap_command(cmd, "bash -c '{cmd} > log'") == ["bash", "-c",
-                                                         "python x.py --a 1 > log"]
-
-
-def test_cmd_template_needs_one_placeholder(tmp_path):
-    for bad in ("srun", "{env_cmd} {env_cmd}"):
-        with pytest.raises(ValueError, match=r"must hold \{env_cmd\} \(or \{cmd\}\) once"):
-            mtb.engine.runner.run("Matilda", "vertical", inputs=MATILDA, out_dir=str(tmp_path),
-                    dry_run=True, cmd_template=bad)
-
-
-def test_cmd_template_env_cmd_in_quotes(tmp_path):
-    argv = mtb.engine.runner.run("Matilda", "vertical", inputs=MATILDA, out_dir=str(tmp_path),
-                   dry_run=True, cmd_template="sbatch --wrap '{env_cmd}'")
-    assert argv[:2] == ["sbatch", "--wrap"] and len(argv) == 3
-    assert argv[2].startswith("conda run -n ") or " run_matilda.py " in argv[2]

@@ -17,6 +17,8 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+from multibench.engine import scripts
+from multibench import _settings
 from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, ingest, registry
@@ -99,8 +101,8 @@ def ready(monkeypatch, tmp_path):
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
     monkeypatch.setattr(config, "repo_path", tmp_path / "no_scripts")
-    monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
-    monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
+    monkeypatch.setattr(_settings, "_ROOT", tmp_path / "pkg")
+    monkeypatch.delenv(scripts.SCRIPTS_REF_VAR, raising=False)
 
 
 def _tenx(path, second, n=100, genes=50):
@@ -152,7 +154,7 @@ def test_a_10x_atac_file_is_named_where_a_method_reads_another_atac_file(
     reasons = [f"atac.h5 {TENX}",
                "Seurat_v5 needs peak ATAC (atac_peak.h5), and the folder has ATAC (atac.h5)."]
     assert list(df["reason"]) == reasons
-    plan = mtb.run("STRAY", "diagonal", out_dir=tmp_path / "out", dry_run=True, **kw)
+    plan = mtb.scan("STRAY", "diagonal", **kw)
     assert list(plan["reason"]) == reasons and not plan["runnable"].any()
     pm = mtb.scan("STRAY", "diagonal", **kw)
     assert list(pm["reason"]) == reasons

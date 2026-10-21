@@ -25,7 +25,7 @@ from multibench.eval import pipeline as P
 matplotlib.use("Agg")
 
 B = importlib.import_module("multibench.plot.bubble")
-R = importlib.import_module("multibench.data.results")
+R = importlib.import_module("multibench._data.results")
 W = importlib.import_module("multibench.workflow")
 
 HEADERS = {label for label, _, _ in B.FAMILIES} | {"Other"}

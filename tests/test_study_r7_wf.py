@@ -8,7 +8,7 @@ R7-01  run's Notes quoted the "nothing runnable" message with bare
 R7-02  the "No method can run" error named a ``mtb.scan`` call without the
        caller's ``data_path`` / ``modalities`` / ... (it failed or showed other
        rows), and its list header said "rows" when each method has one row.
-R7-05  ``BatchResult.long`` did not name the ``scored_with`` column.
+R7-05  ``RunResult.long`` did not name the ``scored_with`` column.
 R7-06  ``rescore(verbose=True)`` also prints a line before each label-order
        ranking; the parameter row said one line per method.
 R7-12  template-like passages in workflow.py docstrings, reworded.
@@ -186,11 +186,11 @@ def _nothing_runnable(dataset="MYDATA", **kw):
 def test_the_scan_hint_carries_the_callers_arguments(no_envs, mydata):
     msg = _nothing_runnable(os.path.join("data", "MYDATA"), modalities=["rna", "adt"])
     last = msg.splitlines()[-1]
-    call = "mtb.run('data/MYDATA', 'vertical', modalities=['rna', 'adt'], dry_run=True)"
-    assert last.startswith(f"{call} shows every row. "), last
+    call = "mtb.scan('data/MYDATA', 'vertical', modalities=['rna', 'adt'])"
+    assert last.startswith(f"{call} says why. "), last
     # run as printed, from the same directory, it shows the rows the call selected
     shown = eval(call, {"mtb": mtb})                      # noqa: S307 - our own hint
-    plan = mtb.run(os.path.join('data', 'MYDATA'), 'vertical', modalities=['rna', 'adt'], dry_run=True, verbose=False)
+    plan = mtb.scan(os.path.join('data', 'MYDATA'), 'vertical', modalities=['rna', 'adt'], verbose=False)
     assert list(shown["method"]) == list(plan["method"])
     assert set(shown["modalities"]) == {"rna+adt"}
     n = int(re.search(r"^The first 3 of (\d+) blocked ", msg, re.M).group(1))
@@ -210,8 +210,8 @@ def test_the_list_header_counts_methods_when_each_has_one_row(no_envs, mydata):
                             modalities=["rna", "adt"])
     assert "\nBlocked, one line per requested method:\n" in msg
     assert msg.splitlines()[-1].startswith(
-        "mtb.run('data/MYDATA', 'vertical', methods=['Matilda', "
-        "'totalVI'], modalities=['rna', 'adt'], dry_run=True) shows these rows.")
+        "mtb.scan('data/MYDATA', 'vertical', methods=['Matilda', "
+        "'totalVI'], modalities=['rna', 'adt']) says why.")
 
 
 def test_a_call_with_default_arguments_keeps_the_hint(no_envs, tmp_path, root):
@@ -219,24 +219,24 @@ def test_a_call_with_default_arguments_keeps_the_hint(no_envs, tmp_path, root):
         with pytest.raises(ValueError) as e:
             mtb.run(ds, "vertical", out_dir=tmp_path, verbose=False)
         assert e.value.args[0].splitlines()[-1].startswith(
-            "mtb.run('D11', 'vertical', dry_run=True) shows the listed rows. ")
+            "mtb.scan('D11', 'vertical') says why. ")
 
 
 # ============================================================ R7-06
 def test_rescore_verbose_names_the_ranking_line():
-    doc = _flat(W.BatchResult.rescore)
+    doc = _flat(W.RunResult.rescore)
     assert ("verbose : bool Print one line per method, and one before each "
             "label-order ranking.") in doc
 
 
 # ============================================================ R7-12
 def test_workflow_passages_read_as_plain_sentences():
-    cls = inspect.getdoc(W.BatchResult).splitlines()[0]
+    cls = inspect.getdoc(W.RunResult).splitlines()[0]
     assert cls == "The result of ``mtb.run``: its summary table, long table and figure."
-    load = _flat(mtb.load_batch)
+    load = _flat(mtb.load_run)
     assert "data_path :" not in load
-    summary = _flat(W.BatchResult.summary)
-    rescore = _flat(W.BatchResult.rescore)
+    summary = _flat(W.RunResult.summary)
+    rescore = _flat(W.RunResult.rescore)
     for old in ("Outcome of", "Data root for re-scoring", "finds moved folders",
                 "clear-cut", "small optimistic bias"):
         assert old not in " ".join([cls, load, summary, rescore]), old

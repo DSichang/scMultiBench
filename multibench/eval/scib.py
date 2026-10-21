@@ -15,7 +15,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from .. import _compat
+from .. import _text
 
 #: metrics that run scib's prebuilt LISI helper binary
 _LISI_METRICS = ("cLISI", "iLISI")
@@ -222,7 +222,7 @@ def _resolve_flavor(flavor) -> str:
     default, downgraded to ``"leidenalg"`` (one warning) where igraph cannot run."""
     global _fallback_warned
     if flavor is None:
-        from .. import config
+        from .._settings import config
         flavor = config.leiden_flavor
     if flavor not in LEIDEN_FLAVORS:
         raise ValueError(
@@ -230,7 +230,7 @@ def _resolve_flavor(flavor) -> str:
     if flavor == "igraph" and not igraph_flavor_available():
         if not _fallback_warned:
             from importlib.metadata import version
-            _compat.warn(
+            _text.warn(
                 f"scanpy {version('scanpy')} cannot run flavor='igraph' "
                 f"(needs scanpy>=1.10 and the igraph package); using leidenalg for "
                 f"this process - same metrics, slower clustering", UserWarning)
@@ -484,10 +484,9 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
         flavor = _resolve_flavor(flavor)
         if verbose or (verbose is None and n > _SWEEP_NOTICE_CELLS):
             import sys
-            from .. import config
             needs = ((wanted(_CLUSTER_METRICS) if search_ct else [])
                      + (wanted(_BATCH_CLUSTER_METRICS) if search_bat else []))
-            names = config._and_list(needs)
+            names = _text._and_list(needs)
             print(f"Clustering {n:,} cells for {names} with the {flavor} Leiden "
                   f"backend.", file=sys.stderr, flush=True)
     if search_ct or search_bat:
@@ -508,7 +507,7 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
         if name in _LISI_METRICS:
             problem = _lisi_helper_problem()
             if problem:
-                _compat.warn(_lisi_fallback_message(name, problem))
+                _text.warn(_lisi_fallback_message(name, problem))
                 out[name] = float("nan")
                 return
         try:
@@ -518,7 +517,7 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
                 warnings.simplefilter("ignore")
                 out[name] = _tidy_value(name, fn())
         except Exception as exc:  # noqa: BLE001 - report and continue
-            _compat.warn(
+            _text.warn(
                 f"scib metric {name!r} could not be computed "
                 f"({type(exc).__name__}: {str(exc)[:160]}); recording NaN."
             )

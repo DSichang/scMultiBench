@@ -25,7 +25,7 @@ pytest.importorskip("scib")
 # --------------------------------------------------------------- integration repairs
 # wf R6-02 x R6-05: rescore reuses the batch run saved. That batch is not
 # one the caller gave, so a metrics= without a batch metric must not warn
-# 'batch= changes nothing here' (the first Example of BatchResult.rescore).
+# 'batch= changes nothing here' (the first Example of RunResult.rescore).
 from tests.test_study_r4_wf import N, _batch_metrics, cite  # noqa: E402,F401
 from multibench.eval import pipeline  # noqa: E402
 
@@ -36,7 +36,7 @@ def test_rescore_with_the_saved_batch_and_no_batch_metric_does_not_warn(cite, tm
     data, batch, shuffled = cite
     mtb.config.data_path = data
     res = _quiet(mtb.run, 'MYCITE', 'vertical', tmp_path / 'out', batch=shuffled, **_KW)
-    back = mtb.load_batch(tmp_path / "out")
+    back = mtb.load_run(tmp_path / "out")
     with warnings.catch_warnings():
         warnings.simplefilter("error", UserWarning)
         # the toy cells give no resolution with one cluster per cell type
@@ -44,7 +44,7 @@ def test_rescore_with_the_saved_batch_and_no_batch_metric_does_not_warn(cite, tm
         warnings.filterwarnings("ignore", message="ARI_batch and NMI_batch use")
         new = back.rescore(metrics=["ARI", "NMI"])
     rec = new.records[0]
-    assert rec["status"] == "CHAIN_OK"
+    assert rec["status"] == "scored"
     # c1 (C10): ARI and NMI are scored again, the other saved scores stay
     assert set(rec["metrics"]) == set(back.records[0]["metrics"])
     assert round(float(new.summary["ARI"].iloc[0]), 4) == round(
@@ -53,7 +53,7 @@ def test_rescore_with_the_saved_batch_and_no_batch_metric_does_not_warn(cite, tm
     assert (rec["batch_source"], rec["n_batches"]) == ("user", 2)
     assert rec["batch_file"] == res.records[0]["batch_file"]
     new.save(tmp_path / "ari_only")
-    again = _quiet(mtb.load_batch(tmp_path / "ari_only").rescore)
+    again = _quiet(mtb.load_run(tmp_path / "ari_only").rescore)
     assert _batch_metrics(again) == _batch_metrics(res)
     # a batch the caller gives still warns, as R6-05 keeps
     with pytest.warns(UserWarning, match=r"^batch= changes nothing here, because "

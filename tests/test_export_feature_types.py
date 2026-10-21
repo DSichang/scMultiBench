@@ -284,7 +284,7 @@ def test_other_h5_files_keep_their_message(tmp_path):
 
 def _demo_h5_files():
     """The .h5 files of the package's demo datasets that are on disk."""
-    from multibench.data.fetch import AVAILABLE
+    from multibench._data.fetch import AVAILABLE
     root = config.data_path
     return sorted(p for ds in AVAILABLE for p in (root / ds).glob("*.h5"))
 

@@ -10,13 +10,14 @@ import numpy as np
 import pandas as pd
 
 from . import io
-from .. import _compat, config
-from ..config import _and_list
-from ..data import catalog
-from ..data.results import COLUMNS as _RESULT_COLUMNS
+from .. import _text
+from ..engine import registry
+from .._text import _and_list
+from .._data import catalog
+from .._data.results import COLUMNS as _RESULT_COLUMNS
 
 #: the long table's columns; the stored tables' constant ``clustering`` is not written
-LONG_COLUMNS = [c for c in _RESULT_COLUMNS if c != "clustering"]
+LONG_COLUMNS = list(_RESULT_COLUMNS)
 
 #: the ``attrs`` keys evaluate() sets and the long table joins into ``scored_with``
 PROVENANCE_ATTRS = ("leiden_flavor", "clustering", "multibench_version")
@@ -52,7 +53,7 @@ def _long_table(value_df, *, method: str, dataset: str | None = None,
     plus ``scored_with``. ``dataset=None`` writes ``"all"``, ``category=None``
     leaves the column empty."""
     if category is not None:
-        config.category_folder(category)        # "verticall" is refused here
+        registry.check_category(category)        # "verticall" is refused here
     out = value_df.rename(columns={"Value": "value"}).copy()
     out = out.reset_index()
     out = out.rename(columns={out.columns[0]: "metric"})   # the index, whatever its name
@@ -103,11 +104,14 @@ def _is_label_path_list(x) -> bool:
 
 def _cell_ids(output):
     """Cell ids of ``output``: AnnData ``obs_names``, a DataFrame's index unless
-    a ``RangeIndex``; ``None`` for anything else."""
+    a ``RangeIndex``, the ``barcodes`` a run wrote into an ``.h5`` file;
+    ``None`` for anything else."""
     if io._is_anndata(output):
         return pd.Index(output.obs_names)
     if isinstance(output, pd.DataFrame) and not isinstance(output.index, pd.RangeIndex):
         return output.index
+    if isinstance(output, (str, Path)):
+        return io.read_cell_names(output)
     return None
 
 
@@ -253,7 +257,7 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
                                     fix=f"Pass {what} for the cells of {table.name}."):
                 table.moved.append(name)
             return io._align_vector(x, ids, what=what, column=column, cells=cells)
-        _compat.warn(
+        _text.warn(
             f"The {what} {type(x).__name__} is matched by position, because the embedding "
             f"has no cell ids. Check that it follows the embedding rows, or pass an AnnData "
             f"whose obs_names are the barcodes.",
@@ -286,7 +290,7 @@ def _file_barcodes(files, counts=None, read=()):
     one with as many cells (``cty2.csv`` -> ``rna2.h5``, ...; the files a method
     read, ``read``, first); ``None`` when one has no such matrix. Where barcodes
     repeat, each is named by its label file, ``cty2:<barcode>``, as
-    ``BatchResult.embedding`` names it."""
+    ``RunResult.embedding`` names it."""
     raw = _raw_barcodes(files, counts, read)
     if raw is None:
         return None
@@ -325,7 +329,7 @@ def _folder_ids(files, counts, ids, read=(), others=None):
     """:func:`_file_barcodes` of ``files`` when the embedding's cells ``ids`` are
     distinct cells among them (all of them, or a subset); ``None`` when the
     folder does not name its cells. The files a method read (``read``) name the
-    cells first, as ``BatchResult.embedding`` names them, then the folder's
+    cells first, as ``RunResult.embedding`` names them, then the folder's
     default files. Any other ids raise: by position, the labels would be a
     guess. ``others()``: ``{read files: [package methods]}`` of the dataset,
     to name the method whose output names the cells so."""
@@ -335,6 +339,12 @@ def _folder_ids(files, counts, ids, read=(), others=None):
     unique = len(set(ids)) == len(ids)
     for keys in found:
         if unique and set(ids) <= set(keys):
+            return keys
+    # the names of the files another package method reads (a run's embedding.h5
+    # of scJoint names its ATAC cells by atac_gas.h5)
+    for r in (others() if others and unique else {}):
+        keys = _file_barcodes(files, counts, r)
+        if keys is not None and set(ids) <= set(keys):
             return keys
     if not found:
         return None
@@ -746,7 +756,7 @@ def _plan_metrics(metrics, *, has_batch: bool):
 
 def _unused_batch_warning(metrics) -> None:
     """The warning for a batch that no selected metric uses."""
-    _compat.warn(
+    _text.warn(
         "batch= changes nothing here, because "
         + f"{_metrics_spelling(metrics)} has no batch metric. Add "
         + _and_list([c for c in _metric_families()[1] if c != "kBET"], "or")
@@ -816,11 +826,11 @@ def _classification_scores(request, emb, ct, cb, *, category, not_embedding, gra
         if "mean" in table.index:
             mean = table.loc["mean"]
             for w in caught:      # a skipped reference batch: said once, as classify says it
-                _compat.warn(w.message, w.category)
+                _text.warn(w.message, w.category)
             one_type = [str(r) for r in table.index[:-1] if np.isnan(table.loc[r, "Spec"])]
             if "Spec" in codes and one_type:
                 # specificity needs cells of a second true cell type
-                _compat.warn(
+                _text.warn(
                     f"Spec is NaN: when batch {_and_list(one_type, 'or')} is the reference, "
                     f"the cells it predicts are all of one cell type. Compare methods on "
                     f"the other metrics.", UserWarning)
@@ -830,7 +840,7 @@ def _classification_scores(request, emb, ct, cb, *, category, not_embedding, gra
         if how == "explicit":
             raise ValueError(_classification_error(metrics, why, what))
         # evaluate <- its keyword wrapper <- the caller
-        _compat.warn(_classification_warning(why, what),
+        _text.warn(_classification_warning(why, what),
                      UserWarning)
         return {c: float("nan") for c in codes}
     return {c: float(mean[c]) for c in codes}
@@ -921,17 +931,23 @@ def evaluate(embedding, labels=None, *, dataset: str | None = None,
     """
     if not isinstance(method, str) or not method.strip():
         raise TypeError(f"method= takes a name, such as method='Matilda'; got {method!r}.")
+    if isinstance(embedding, (str, Path)):
+        embedding = Path(embedding).expanduser()
     name = cells = None
     if dataset is not None:
         from ..engine import resolve
-        from ..workflow import known_category
+        from ..workflow import known_category, _run_record_for
         name, data_path = resolve.split_dataset(dataset, None)
         bench = known_category(name)             # a benchmark dataset has one
-        category = bench if category is None else category
+        # a file of a run folder: its record says whose cell order it has
+        record = _run_record_for(embedding, name)
+        order = record["method"] if record else method
+        if category is None:
+            category = record["category"] if record else bench
         from_files = labels is None
         if labels is None:
-            labels = _dataset_labels(name, category, method, data_path)
-        cells = _expected_cells(name, category, method, data_path,
+            labels = _dataset_labels(name, category, order, data_path)
+        cells = _expected_cells(name, category, order, data_path,
                                 labels if from_files else None, whole=bench is not None)
     elif labels is None:
         raise ValueError("evaluate needs labels=, one cell type per cell, or dataset= "
@@ -994,7 +1010,7 @@ def _expected_cells(dataset, category, method, data_path, read, *,
     them: your own labels for your own method on your own folder, or a dataset
     folder that is not here. ``read``: the label files evaluate read from the
     dataset, ``None`` when labels= was given."""
-    from ..engine import registry, resolve
+    from ..engine import resolve
     own = registry.method_of(method)
     from_files = read is not None
     if from_files:
@@ -1041,7 +1057,7 @@ def _dataset_labels(dataset, category, method, data_path):
     package method (``registry.method_of``), which needs ``category``; else the
     folder's, with one did-you-mean warning when ``method`` is close to a
     package method that puts the cells in another order."""
-    from ..engine import registry, resolve
+    from ..engine import resolve
     from ..workflow import known_category
     own = registry.method_of(method)
     cats = registry.get(own).categories if own is not None else []
@@ -1077,10 +1093,24 @@ def _dataset_labels(dataset, category, method, data_path):
             except Exception:  # noqa: BLE001 - no variant here: nothing to suggest
                 theirs = list(labels)
         if theirs != list(labels):
-            _compat.warn(f"Did you mean method={near!r}? "
+            _text.warn(f"Did you mean method={near!r}? "
                          + f"{near} puts the cells of {dataset} in another order; "
                          f"{method!r} reads the folder's order.", UserWarning)
     return labels
+
+
+def _check_finite(emb) -> None:
+    """``ValueError`` for an embedding with NaN or infinite values, naming the rows."""
+    try:
+        bad = ~np.isfinite(np.asarray(emb, dtype=float)).all(axis=1)
+    except (TypeError, ValueError):
+        return                     # not numbers: the scoring says what it is
+    if bad.any():
+        rows = np.flatnonzero(bad)
+        raise ValueError(
+            f"{len(rows):,} of the {len(bad):,} rows of the embedding hold NaN or "
+            f"infinite values, such as row {rows[0]}: drop those cells from the "
+            f"embedding and the labels.")
 
 
 def _scores(
@@ -1158,27 +1188,16 @@ def _scores(
                                     others=others), None
     # many run outputs are dims x cells; the label count says which axis holds the cells
     if emb.ndim == 2 and emb.shape[0] != len(ct) and emb.shape[1] == len(ct):
-        _compat.warn(
+        _text.warn(
             f"embedding was (dims x cells) {emb.shape}; transposed to (cells x dims)")
         emb = emb.T
+    _check_finite(emb)
     if want_cls and not (graph or not_embedding):
         from .classify import _is_neighbour_index
         if emb.ndim == 2 and (emb.shape[0] == emb.shape[1] or _is_neighbour_index(emb)):
             graph = "output"                       # cells x cells, or a kNN index
-    if clusters is None:
-        cl = None
-    elif isinstance(clusters, (str, Path)) \
-            and Path(clusters).suffix.lower() not in io._LABEL_FILE_SUFFIXES \
-            and not (adata is not None and isinstance(clusters, str)
-                     and _obs_column_name(clusters, adata) is not None):
-        if _column_without_obs(clusters, adata) \
-                and Path(clusters).suffix.lower() not in {".h5", ".hdf5", ".hdf"}:
-            # "leiden" next to an array; "clusters.h5" keeps the missing-file error
-            raise FileNotFoundError(_no_column_error("clusters", clusters))
-        cl = io.read_clustering(clusters)          # the benchmark's h5 layout
-    else:
-        cl = _obs_or_vector(clusters, adata, what="clusters", ids=ids, table=table,
-                            cells=obs_ids, read=read)
+    # the clusters of run's label-order screening, an array in the embedding's rows
+    cl = None if clusters is None else np.asarray(clusters)
     if batch is not None:
         ba = _obs_or_vector(batch, adata, what="batch", ids=ba_ids, table=table,
                             cells=obs_ids, read=read)
@@ -1240,7 +1259,7 @@ def _scores(
     odd = io._labels_look_measured(ct)
     if odd:
         # evaluate <- its keyword wrapper <- the caller
-        _compat.warn(_measured_warning(labels, adata, *odd), UserWarning)
+        _text.warn(_measured_warning(labels, adata, *odd), UserWarning)
     if group is None:           # classification only: no scIB metric
         out = pd.DataFrame(columns=["Value"], dtype=float)
         out.attrs = {"leiden_flavor": None, "clustering": None}

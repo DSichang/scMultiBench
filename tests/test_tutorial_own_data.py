@@ -27,9 +27,11 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+from multibench.engine import scripts
+from multibench import _settings
 from multibench import config
 from multibench import workflow as W
-from multibench.data.examples import EXAMPLES
+from multibench._data.examples import EXAMPLES
 from multibench.engine import envs, registry
 
 from _own_cells_034 import OLD
@@ -199,8 +201,8 @@ def linux(monkeypatch, tmp_path):
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
     monkeypatch.setattr(config, "repo_path", tmp_path / "no_scripts")
-    monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
-    monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
+    monkeypatch.setattr(_settings, "_ROOT", tmp_path / "pkg")
+    monkeypatch.delenv(scripts.SCRIPTS_REF_VAR, raising=False)
     calls = []
 
     class _Res:
@@ -646,10 +648,13 @@ def test_the_documented_batch_call_works(key, linux, tmp_path, monkeypatch):
     ns[obj].obs["donor"] = np.where(np.arange(ns[obj].n_obs) % 2, "donor1", "donor2")
     _run_cell(src[EXPORT], ns)                 # without batch=, as the sentence says
     assert not list((Path("mydata") / NAMES[key]).glob("*[0-9].*"))
-    call = (f'mtb.run("mydata/" + NAME, "vertical", methods=METHODS, '
-            f'batch={obj}.obs["donor"], dry_run=True, verbose=False)')
-    plan = eval(call, ns)
-    assert set(plan["method"][plan["runnable"]]) == set(GEN.TASKS[key]["methods"])
+    call = (f'mtb.run("mydata/" + NAME, "vertical", methods=METHODS, out_dir="out/donors", '
+            f'batch={obj}.obs["donor"], verbose=False)')
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        res = eval(call, ns)
+    assert {r["method"] for r in res.records if r["status"] == "scored"} == \
+        set(GEN.TASKS[key]["methods"])
     # "a column name alone is not enough there"
     with pytest.raises(FileNotFoundError, match="batch='donor' is not a file"):
         eval(call.replace(f'{obj}.obs["donor"]', '"donor"'), ns)
@@ -730,7 +735,7 @@ CHECK_CROSS = (" With fewer batches than the methods read, such a line names the
 #: the tutorials whose folder holds the ATAC peaks under two names
 TWO_ATAC_NAMES = {"vertical_rna_atac", "vertical_rna_adt_atac"}
 
-SMALL_DATASET_ROW = ("| a method fails on a small dataset | `mtb.run(..., dry_run=True)` "
+SMALL_DATASET_ROW = ("| a method fails on a small dataset | `mtb.scan` "
                      "names what the method needs from the data's size in its `caveat` column |")
 WRONG_NAME = ("A wrong name after `obsm:`, `layer:` or `obs:` raises an error that lists the "
               "names the file has.")
@@ -878,8 +883,9 @@ def test_the_check_sentence_covers_the_further_lines(linux, tmp_path, monkeypatc
         f"[scan] Cells per file: rna1.h5 {n1}, adt1.h5 {n1}, rna2.h5 {n2}, adt2.h5 {n2}.",
         "[scan] StabMap: rna3.h5, adt3.h5 are missing.",
         "[scan] sciPENN: rna3.h5, adt3.h5 are missing."]
-    assert table.drop(columns="modalities").to_dict("list") == {"method": ["StabMap", "sciPENN"], "runnable": [False] * 2,
-                                     "reason": ["rna3.h5, adt3.h5 are missing."] * 2}
+    assert table[["method", "runnable", "reason"]].to_dict("list") == {
+        "method": ["StabMap", "sciPENN"], "runnable": [False] * 2,
+        "reason": ["rna3.h5, adt3.h5 are missing."] * 2}
 
     # five donors: the methods run, and leave two batches out
     five = every.copy()
@@ -899,15 +905,14 @@ def test_the_check_sentence_covers_the_further_lines(linux, tmp_path, monkeypatc
         "[scan] StabMap reads batches 1-3 of 5. Batches 4-5 are not used.",
         "[scan] sciPENN reads batches 1-3 of 5. Batches 4-5 are not used."]
     assert table["reason"].map(_ready).all()
-    assert table.drop(columns=["modalities", "reason"]).to_dict("list") == {
+    assert table[["method", "runnable"]].to_dict("list") == {
         "method": ["StabMap", "sciPENN"], "runnable": [True] * 2}
 
 
 def test_the_small_dataset_row_names_the_scan_that_has_the_column(tmp_path, monkeypatch,
                                                                   capsys):
     """The Troubleshooting row sends a reader to the ``caveat`` column of the
-    full plan. The check cell of the tutorial has no such column, so the row
-    names the call that has it: ``run(..., dry_run=True)``."""
+    check: ``mtb.scan``, the call of the check cell of the tutorial."""
     for key in KEYS:
         rows = [ln for _, s in _cells(key) for ln in s.splitlines()
                 if ln.startswith("| a method fails on a small dataset |")]
@@ -918,10 +923,9 @@ def test_the_small_dataset_row_names_the_scan_that_has_the_column(tmp_path, monk
     src, ns = _sources(key), _namespace(key)
     for i in (EXAMPLE, READ, EXPORT):
         _run_cell(src[i], ns)
-    assert list(_run_cell(src[CHECK], ns).columns) == ["method", "modalities", "runnable",
-                                                       "reason"]
-    full = _run_cell(src[CHECK].replace("mtb.scan(", "mtb.run(").replace(
-        ")", ", dry_run=True)"), ns)
+    full = _run_cell(src[CHECK], ns)
+    assert list(full.columns) == ["method", "modalities", "runnable", "reason", "env",
+                                  "caveat", "command"]
     capsys.readouterr()
     needs = "online_iNMF needs about 5,000 cells in total. On fewer it stops with std::exception."
     assert needs in [v.size_hint for v in registry.get("online_iNMF").variants]

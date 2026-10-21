@@ -67,7 +67,7 @@ def test_changes_page_quotes_the_live_ari_tail():
 @needs_docs
 def test_changes_page_named_method_entry_follows_the_package(no_envs, labmos):
     with pytest.raises(ValueError, match=r"^totalVI does not run on mosaic data\."):
-        mtb.run(os.path.join('data', 'LABMOS'), 'mosaic', methods=['StabMap', 'totalVI'], dry_run=True)
+        mtb.scan(os.path.join('data', 'LABMOS'), 'mosaic', methods=['StabMap', 'totalVI'])
 
 
 @needs_docs

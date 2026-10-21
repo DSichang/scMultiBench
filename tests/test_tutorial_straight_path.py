@@ -487,8 +487,7 @@ def _would_run(key, methods, **where):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         # the full plan behind run(dry_run=True), on a GPU node
-        plan = W._run_all(where.pop("dataset", t["ds"]), t["cat"], methods=methods,
-                          dry_run=True, verbose=False, assume_gpu=True, **where)
+        plan = W._scan(where.pop("dataset", t["ds"]), t["cat"], methods=methods, verbose=False, assume_gpu=True, **where)[0]
     other = [str(r).replace(str(e), "").strip() for r, e in zip(plan.reason, plan.env_reason)]
     rows = plan[[bool(f) and o == "" for f, o in zip(plan.files_ok, other)]]
     return rows.drop(index=W._nested_rows(rows)[0])

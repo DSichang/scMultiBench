@@ -60,22 +60,21 @@ def _():
     return mtb.params_for(s)["variant"]
 
 # ---------------- data resolution ----------------
-@check("scan + run(dry_run=True)")
+@check("scan: the plan, with each command")
 def _():
     t = mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False)
-    plan = mtb.run("D52", "cross", methods=["totalVI"], dry_run=True, verbose=False)
-    return f"{list(t.columns)}; {len(plan)} cross row(s)"
+    plan = mtb.scan("D52", "cross", methods=["totalVI"], verbose=False)
+    return f"{list(t.columns)}; {plan.command.iloc[0][:40]}"
 
 # ---------------- catalog / config ----------------
 @check("catalog.datasets")
 def _(): return f"{mtb.catalog.datasets().shape}"
 @check("catalog.metrics")
 def _(): return f"{mtb.catalog.metrics().shape}"
-@check("config.__all__ (the four settings)")
+@check("config (the four settings)")
 def _():
-    assert mtb.config.__all__ == ["data_path", "repo_path", "envs_dir", "leiden_flavor"]
-    assert "category_folder" not in dir(mtb.config)
-    return "category_folder hidden (internal-only since 0.3.0)"
+    assert mtb.config.FIELDS == ("data_path", "repo_path", "envs_dir", "leiden_flavor")
+    return repr(mtb.config)
 @check("config.data_path")
 def _(): return str(mtb.config.data_path)
 
@@ -95,7 +94,7 @@ def _():
 @check("env.__all__ / dir")
 def _():
     assert mtb.env.__all__ == ["install"], mtb.env.__all__
-    assert "group_for" not in dir(mtb.env) and callable(mtb.env.group_for)   # importable, not advertised
+    assert not hasattr(mtb.env, "group_for")
     return "install"
 @check("env.install(dry_run=True) - the plan, nothing built")
 def _():
@@ -105,7 +104,7 @@ def _():
 @check("env.install(dry_run=True, build=True)")
 def _():
     rows = mtb.env.install(["Matilda"], build=True, dry_run=True)
-    return f"{rows.env.iloc[0]}: {rows.state.iloc[0]}, {len(rows.cmds.iloc[0])} cmds"
+    return f"{rows.env.iloc[0]}: {rows.state.iloc[0]}"
 
 # ---------------- results ----------------
 @check("load_results")

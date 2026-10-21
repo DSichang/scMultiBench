@@ -65,7 +65,7 @@ def test_inputs_for_default_no_warning_when_present(tmp_path):
     assert got["atac_peak"].endswith("/D27/peak.h5")
 def test_recommend_unknown_result_id_and_modalities(result_dir):
     import pandas as pd
-    from multibench.data.results import recommend
+    from multibench._data.results import recommend
     # a non-registry id (e.g. a result-dir token or the user's own method) gets
     # None metadata, no KeyError
     long = mtb.load_results("vertical", dataset="D11")
@@ -88,7 +88,7 @@ def test_recommend_unknown_result_id_and_modalities(result_dir):
 # --- P04: unscored methods are named, source/family recorded on the frame ---
 
 def test_recommend_task_error_names_real_metrics(result_dir):
-    from multibench.data.results import recommend
+    from multibench._data.results import recommend
     # vertical ships no batch metrics; the error must list what IS there,
     # not "metrics present: []" (the loader used to pre-filter by task)
     # the family on a single-batch category says so (X89)
@@ -100,19 +100,16 @@ def test_recommend_task_error_names_real_metrics(result_dir):
 
 
 def test_namespace_all_hygiene():
-    # env/config/io expose a curated __all__ (no leaked stdlib imports)
-    # recipe left __all__ in 0.4.0 (X34); it stays importable
-    assert "recipe" not in mtb.env.__all__ and "subprocess" not in mtb.env.__all__
-    assert callable(mtb.env.recipe)
-    # mtb.config is the settings object: its names are the settings
-    assert mtb.config.__all__ == ["data_path", "repo_path", "envs_dir", "leiden_flavor"]
-    assert "category_folder" not in mtb.config.__all__      # internal token map
+    # env/config/io expose a curated __all__ (no leaked stdlib imports); the
+    # internals are not reachable through them
+    assert mtb.env.__all__ == ["install"] and not hasattr(mtb.env, "recipe")
+    assert mtb.config.FIELDS == ("data_path", "repo_path", "envs_dir", "leiden_flavor")
     assert sorted(mtb.io.__all__) == ["export_dataset", "read_canonical"]
 
 
 def _rec(*a, **k):
     import warnings
-    from multibench.data.results import recommend
+    from multibench._data.results import recommend
     with warnings.catch_warnings(record=True) as rec:
         warnings.simplefilter("always")
         r = recommend(*a, **k)

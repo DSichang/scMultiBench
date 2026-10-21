@@ -19,6 +19,8 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+from multibench.engine import scripts
+from multibench import _settings
 from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, registry, runner
@@ -142,20 +144,20 @@ needs_git = pytest.mark.skipif(shutil.which("git") is None, reason="git not inst
 @needs_git
 def test_scripts_commit_matches_git_rev_parse(tmp_path):
     head = _git_repo(tmp_path / "repo")
-    assert config.scripts_commit(tmp_path / "repo") == head
+    assert scripts.scripts_commit(tmp_path / "repo") == head
     (tmp_path / "plain" / "tools_scripts").mkdir(parents=True)
-    assert config.scripts_commit(tmp_path / "plain") is None      # not a checkout
+    assert scripts.scripts_commit(tmp_path / "plain") is None      # not a checkout
 
 
 def test_clone_failure_names_the_offline_route(tmp_path, monkeypatch):
-    monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
+    monkeypatch.setattr(_settings, "_ROOT", tmp_path / "pkg")
     target = tmp_path / "fresh"
 
     def dead_proxy(argv, **kw):
         raise subprocess.CalledProcessError(128, argv)
     monkeypatch.setattr(subprocess, "run", dead_proxy)
     with pytest.raises(RuntimeError) as e:
-        config.ensure_repo(target)
+        scripts.ensure_repo(target)
     msg = str(e.value)
     assert msg.startswith("Could not reach github.com to fetch the method scripts.")
     assert "copy the folder" in msg and "set MULTIBENCH_REPO_PATH" in msg
@@ -174,7 +176,7 @@ def test_run_result_carries_provenance(tmp_path, monkeypatch):
 
 def test_run_all_records_the_provenance(tmp_path, monkeypatch):
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
-    monkeypatch.setattr(config, "scripts_commit", lambda repo=None: "e" * 40)
+    monkeypatch.setattr(scripts, "scripts_commit", lambda repo=None: "e" * 40)
     monkeypatch.setattr(envs, "installed_flavor", lambda env, conda=None: None)
 
     class _Res:

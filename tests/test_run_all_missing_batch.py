@@ -3,8 +3,8 @@
 ``batch=adata.obs["donor"]`` with a donor missing for some cells counted the
 missing value as one more batch up to 0.3.4 (iLISI of the same embedding:
 0.8076 with every donor, 0.7541 with 90 of them missing, no warning). The
-vector is now checked where it is aligned to the cells, so a dry run stops
-too.
+vector is now checked where it is aligned to the cells, before anything
+runs.
 
 A synthetic CITE-seq folder and a fake ``_run`` that writes ``embedding.h5``
 keep these independent of any conda env.
@@ -19,6 +19,8 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+from multibench.engine import scripts
+from multibench import _settings
 from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, registry
@@ -61,8 +63,8 @@ def cite(tmp_path, monkeypatch):
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
     monkeypatch.setattr(config, "repo_path", tmp_path / "no_scripts")
-    monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
-    monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
+    monkeypatch.setattr(_settings, "_ROOT", tmp_path / "pkg")
+    monkeypatch.delenv(scripts.SCRIPTS_REF_VAR, raising=False)
     calls = []
 
     def fake_run(method, category, inputs, out_dir, params=None):
@@ -107,9 +109,6 @@ def test_run_all_stops_on_a_missing_batch(cite, tmp_path, gap, seen):
     for batch in (series, series.sample(frac=1, random_state=0), series.to_numpy(),
                   list(series), series.to_frame()):
         with pytest.raises(ValueError) as e:
-            _quiet(mtb.run, "MYCITE", "vertical", dry_run=True, batch=batch, **kw)
-        assert str(e.value) == _bv2(5, seen)
-        with pytest.raises(ValueError) as e:
             _quiet(mtb.run, "MYCITE", "vertical", tmp_path / "out", batch=batch, **kw)
         assert str(e.value) == _bv2(5, seen)
     assert calls == [] and not (tmp_path / "out").exists()
@@ -128,7 +127,7 @@ def test_a_float_batch_with_a_gap(cite, tmp_path):
 def test_a_batch_file_names_the_word_it_holds(cite, tmp_path):
     data, calls = cite
     mtb.config.data_path = data
-    kw = dict(methods=['totalVI'], verbose=False, dry_run=True)
+    kw = dict(methods=['totalVI'], verbose=False, out_dir=tmp_path / "out")
     sheet = tmp_path / "donor.csv"
     _donor("NA").to_frame().to_csv(sheet)                 # barcodes, then the donor
     for batch in (sheet, str(sheet)):
@@ -150,7 +149,7 @@ def test_rescore_stops_on_a_missing_batch(cite, tmp_path):
     data, calls = cite
     mtb.config.data_path = data
     res = _quiet(mtb.run, 'MYCITE', 'vertical', tmp_path / 'out', methods=['totalVI'], verbose=False)
-    assert [r["status"] for r in res.records] == ["CHAIN_OK"]
+    assert [r["status"] for r in res.records] == ["scored"]
     for gap, seen in ((np.nan, NAN), ("nan", ", for example 'nan'")):
         series = _donor(gap)
         for batch in (series, series.to_numpy()):
@@ -165,7 +164,7 @@ def test_rescore_stops_on_a_missing_batch(cite, tmp_path):
     # with labels in the rows of the embedding as well
     with pytest.raises(ValueError, match="5 of the 120 cells of MYCITE have no batch"):
         res.rescore(labels=np.array(["A"] * 60 + ["B"] * 60), batch=_donor(np.nan))
-    assert [r["status"] for r in res.records] == ["CHAIN_OK"] and calls == ["totalVI"]
+    assert [r["status"] for r in res.records] == ["scored"] and calls == ["totalVI"]
 
 
 def test_a_complete_batch_runs(cite, tmp_path):
@@ -173,11 +172,11 @@ def test_a_complete_batch_runs(cite, tmp_path):
     series = _donor(n_gaps=0)
     mtb.config.data_path = data
     kw = dict(methods=['totalVI'], verbose=False)
-    plan = mtb.run("MYCITE", "vertical", dry_run=True, batch=series, **kw)
+    plan = mtb.scan("MYCITE", "vertical", **kw)
     assert len(plan) == 1 and plan["runnable"].all()
     res = _quiet(mtb.run, "MYCITE", "vertical", tmp_path / "out", batch=series, **kw)
     (rec,) = res.records
-    assert rec["status"] == "CHAIN_OK" and rec["batch_source"] == "user"
+    assert rec["status"] == "scored" and rec["batch_source"] == "user"
     assert rec["n_batches"] == 2 and rec["metrics"]["ASW_batch"] is not None
     # names that only look like missing values are batches
     odd = pd.Series(["na", "none"] * (N // 2), index=BARS)

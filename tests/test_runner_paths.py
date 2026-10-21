@@ -47,14 +47,14 @@ def test_normalize_paths_absolutizes_and_marks_directories(tmp_path, monkeypatch
     assert out == os.path.join(str(tmp_path / "out" / "x"), "")
 
 
-def test_run_keeps_in_memory_anndata_inputs(tmp_path, monkeypatch):
+def test_run_keeps_in_memory_anndata_inputs(tmp_path, monkeypatch, linux_with_envs):
     ad = pytest.importorskip("anndata")
     monkeypatch.chdir(tmp_path)
     calls = {}
     monkeypatch.setattr(runner.subprocess, "Popen", _popen_honouring_save_path(calls))
     rna = ad.AnnData(np.ones((6, 4)))
     atac = ad.AnnData(np.ones((6, 5)))
-    res = mtb.engine.runner.run('SCALEX', 'diagonal', inputs={'rna': rna, 'atac_gas': atac}, out_dir='out/y', cmd_template='conda run -n scalex {cmd}')
+    res = mtb.engine.runner.run('SCALEX', 'diagonal', inputs={'rna': rna, 'atac_gas': atac}, out_dir='out/y')
     cmd = calls["cmd"]
     p1 = cmd[cmd.index("--path1") + 1]
     assert os.path.isabs(p1) and p1 == str(tmp_path / "out" / "y" / "inputs" / "rna.h5")

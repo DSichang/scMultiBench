@@ -250,15 +250,15 @@ def test_scan_caveat_names_the_unused_batch(root):
     assert not any("reads batches" in by[k] for k in others)
 
 
-def test_dry_run_prints_the_unused_batch(root, capsys):
-    mtb.run(os.path.join(root / 'data', 'D52'), 'cross', methods=['UINMF'], modalities=TWO_BATCHES, dry_run=True)
-    out = capsys.readouterr().out
-    assert "[run] UINMF reads batches 1-2 of 3. Batch 3 is not used.\n" in out
+def test_scan_says_the_unused_batch(root, capsys):
+    plan = mtb.scan(os.path.join(root / 'data', 'D52'), 'cross', methods=['UINMF'],
+                    modalities=TWO_BATCHES, verbose=False)
+    assert plan.caveat.iloc[0].startswith("UINMF reads batches 1-2 of 3. Batch 3 is not used.")
     # without modalities= the three-batch row runs, and the caveat of the
-    # two-batch row inside it is not printed
-    mtb.run(os.path.join(root / 'data', 'D52'), 'cross', methods=['UINMF', 'StabMap'], dry_run=True)
-    out = capsys.readouterr().out
-    assert "reads batches" not in out
+    # two-batch row inside it is not given
+    plan = mtb.scan(os.path.join(root / 'data', 'D52'), 'cross', methods=['UINMF', 'StabMap'],
+                    verbose=False)
+    assert not plan.caveat.str.contains("reads batches").any()
 
 
 # --- M36: read_canonical after pip install ------------------------------------
@@ -380,13 +380,13 @@ def test_to_canonical_gas_of_other_cells_warns(tmp_path):
     d = _diagonal(tmp_path, "TOCAN2", [f"c{i}" for i in range(50)],
                   [f"a{i}" for i in range(40)])
     with pytest.warns(UserWarning, match="different cells"):
-        mtb.io._to_canonical(_gas_adata([f'b{i}' for i in range(40)]), d, modality='gas')
+        mtb.engine.ingest._to_canonical(_gas_adata([f'b{i}' for i in range(40)]), d, modality='gas')
 
 
 def test_to_canonical_gas_in_peak_order_prints_nothing(tmp_path, capsys):
     atac = [f"a{i}" for i in range(40)]
     d = _diagonal(tmp_path, "TOCAN3", [f"c{i}" for i in range(50)], atac)
-    mtb.io._to_canonical(_gas_adata(atac), d, modality='gas')
+    mtb.engine.ingest._to_canonical(_gas_adata(atac), d, modality='gas')
     assert capsys.readouterr().err == ""
 
 
@@ -425,7 +425,7 @@ def test_to_canonical_gas_for_vertical_keeps_its_order(tmp_path, capsys):
     atac = [f"a{i}" for i in range(40)]
     d = _diagonal(tmp_path, "VERT", atac, atac)
     shuffled = list(np.random.default_rng(3).permutation(atac))
-    out = mtb.io._to_canonical(_gas_adata(shuffled), d, modality='gas', category='vertical')
+    out = mtb.engine.ingest._to_canonical(_gas_adata(shuffled), d, modality='gas', category='vertical')
     assert out == d / "atac.h5" and _barcodes(out) == shuffled
     assert capsys.readouterr().err == ""
 

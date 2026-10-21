@@ -33,14 +33,6 @@ def test_load_labels_output(tmp_path):
     assert list(labels) == ["B", "T", "NK"]
 
 
-def test_wrap_cmd_template():
-    from multibench.engine import runner
-    wrapped = runner.wrap_command(["python", "x.py", "--a", "1"],
-                                  cmd_template="conda run -n scalex {cmd}")
-    assert wrapped[:4] == ["conda", "run", "-n", "scalex"]
-    assert wrapped[-1] == "1"
-
-
 # --- P12: run() preflights the conda env before touching the disk -----------
 
 # --- the dry run applies the conversion's feature-type check -----------------
@@ -81,7 +73,10 @@ def test_the_dry_run_refuses_two_feature_types(tmp_path, monkeypatch):
     monkeypatch.setattr(runner.subprocess, "Popen",
                         lambda *a, **k: pytest.fail("the method was started"))
     monkeypatch.setattr(mtb.config, "repo_path", tmp_path / "repo")
-    real_kw = dict(out_dir=str(out), cmd_template="{cmd}")
+    real_kw = dict(out_dir=str(out))
+    monkeypatch.setattr(runner, "linux_only_sentence", lambda: None)
+    monkeypatch.setattr(envs, "installed_envs",
+                        lambda conda=None: {envs.group_for(m) for m in ("VIMCCA", "SCALEX")})
     for method, category, roles in (
             ("VIMCCA", "vertical", {"rna": "unsplit", "atac": "unsplit"}),
             ("VIMCCA", "vertical", {"rna": "rna", "atac": "unsplit"}),
@@ -98,7 +93,7 @@ def test_the_dry_run_refuses_two_feature_types(tmp_path, monkeypatch):
             shutil.rmtree(out)                  # the conversion had made inputs/
             # the dry run says the same, and so does the real run, before it writes
             with pytest.raises(ValueError) as dry:
-                mtb.engine.runner.run(method, category, inputs=inputs, out_dir=str(out), dry_run=True)
+                mtb.engine.runner.preview(method, category, inputs=inputs, out_dir=str(out))[0]
             with pytest.raises(ValueError) as real:
                 mtb.engine.runner.run(method, category, inputs=inputs, **real_kw)
             assert str(dry.value) == str(real.value) == texts[role]
@@ -108,19 +103,16 @@ def test_the_dry_run_refuses_two_feature_types(tmp_path, monkeypatch):
     with monkeypatch.context() as m:
         m.setattr(ad, "read_h5ad", lambda *a, **k: pytest.fail("the file was read"))
         with pytest.raises(ValueError) as dry:
-            mtb.engine.runner.run("VIMCCA", "vertical", out_dir=str(out), dry_run=True,
-                    inputs={"rna": files["unsplit"], "atac": files["unsplit"]})
+            mtb.engine.runner.preview("VIMCCA", "vertical", out_dir=str(out), inputs={"rna": files["unsplit"], "atac": files["unsplit"]})[0]
         assert str(dry.value) == texts["rna"]
         # the split objects and their files return the command
         for inputs in ({"rna": rna, "atac": atac},
                        {"rna": files["rna"], "atac": files["atac"]}):
-            argv = mtb.engine.runner.run("VIMCCA", "vertical", inputs=inputs, out_dir=str(out),
-                           dry_run=True)
+            argv = mtb.engine.runner.preview("VIMCCA", "vertical", inputs=inputs, out_dir=str(out))[0]
             assert argv[-6:] == ["--path1", f"{out}/inputs/rna.h5", "--path2",
                                  f"{out}/inputs/atac.h5", "--save_path", f"{out}/"]
         # a file that is no .h5ad inside is left to the conversion, as before
         (tmp_path / "broken.h5ad").write_text("not hdf5")
-        argv = mtb.engine.runner.run("VIMCCA", "vertical", out_dir=str(out), dry_run=True,
-                       inputs={"rna": str(tmp_path / "broken.h5ad"), "atac": atac})
+        argv = mtb.engine.runner.preview("VIMCCA", "vertical", out_dir=str(out), inputs={"rna": str(tmp_path / "broken.h5ad"), "atac": atac})[0]
         assert argv[-5] == f"{out}/inputs/rna.h5"
     assert not out.exists()

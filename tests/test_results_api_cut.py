@@ -12,8 +12,8 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench.data import results
-from multibench.data.catalog import metric_selection
+from multibench._data import results
+from multibench._data.catalog import metric_selection
 
 
 def _quiet(fn, *a, **k):

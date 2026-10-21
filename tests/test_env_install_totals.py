@@ -13,6 +13,9 @@ def test_the_total_names_the_shared_layer():
     assert f"(with the shared layer {name}, " in line and line.endswith(", downloaded once)")
 
 
-def test_the_dry_run_has_the_doctor_columns():
+def test_the_dry_run_shows_the_user_columns_only():
+    """d1 (u1, u4): the table a user reads; the commands, URLs and lock flags
+    stay in the package's rows."""
     plan = mtb.env.install(["Matilda"], dry_run=True)
-    assert {"env", "methods", "state", "exists", "has_lock", "other_env"} <= set(plan.columns)
+    assert list(plan.columns) == ["env", "methods", "state", "flavor", "archive_bytes",
+                                  "unpacked_bytes"]

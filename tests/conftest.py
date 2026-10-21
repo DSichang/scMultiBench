@@ -94,11 +94,23 @@ def _no_stray_envs(request, monkeypatch):
     monkeypatch.setattr(envs, "other_env_prefix", lambda env, conda=None: None)
 
 
+# ---- a run that reaches its subprocess --------------------------------------
+@_pytest.fixture
+def linux_with_envs(monkeypatch):
+    """``runner.run`` as on Linux with every environment installed (conda mode),
+    for tests that fake the method's subprocess."""
+    from multibench.engine import envs, registry, runner
+    every = {envs.group_for(m) for m in registry.list_methods()}
+    monkeypatch.setattr(runner, "linux_only_sentence", lambda: None)
+    monkeypatch.setattr(envs, "installed_envs", lambda conda=None: every)
+    monkeypatch.setattr(runner, "run_mode", lambda env: ("conda", None))
+    return every
+
+
 # ---- the full plan behind scan ----------------------------------------------
 def full_scan(*args, **kwargs):
-    """The plan of ``scan``'s checks, one row per method variant with every
-    column: the frame ``run(dry_run=True)`` returns, also without a
-    category. ``mtb.scan`` returns one row per method since 0.4."""
+    """The plan behind ``scan``, one row per method variant with every check
+    column (``workflow._scan``); ``mtb.scan`` returns one row per method."""
     from multibench import workflow
     return workflow._scan(*args, **kwargs)[0]
 
@@ -133,7 +145,7 @@ def _fresh_session_notes(monkeypatch):
 @_pytest.fixture(autouse=True)
 def _restore_config():
     from multibench import config
-    saved = dict(config._values)
+    saved = {slot: object.__getattribute__(config, slot) for slot in config.__slots__}
     yield
-    config._values.clear()
-    config._values.update(saved)
+    for slot, value in saved.items():
+        object.__setattr__(config, slot, value)

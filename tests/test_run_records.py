@@ -7,7 +7,7 @@ from multibench import workflow
 def test_summary_has_no_n_tunable():
     recs = [{"method": "Matilda", "status": "CHAIN_OK", "n_tunable": 21,
              "metrics": {"ARI": 0.5}}]
-    summary = mtb.BatchResult(recs, "D11", "vertical").summary
+    summary = mtb.RunResult(recs, "D11", "vertical").summary
     assert "n_tunable" not in summary.columns
 
 
@@ -19,7 +19,7 @@ def test_rescore_keeps_the_saved_caveat_when_no_plan_can_be_made(tmp_path):
     rec = {"method": "Matilda", "status": "CHAIN_OK", "caveat": "the saved caveat",
            "modalities": ["rna", "adt"], "out_dir": str(tmp_path / "gone"),
            "data_path": str(tmp_path / "nowhere"), "n_tunable": 9}
-    res = mtb.BatchResult([rec], "NOSUCH", "vertical", out_dir=tmp_path)
+    res = mtb.RunResult([rec], "NOSUCH", "vertical", out_dir=tmp_path)
     assert workflow._plan_caveats("NOSUCH", "vertical", str(tmp_path / "nowhere"),
                                   ["Matilda"]) is None
     try:

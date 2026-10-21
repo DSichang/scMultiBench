@@ -18,8 +18,9 @@ WIDTH = 80
 def _public_objects():
     seen = set()
     for info in pkgutil.walk_packages(multibench.__path__, "multibench."):
+        # the package's private modules (_data, _settings) hold public functions
         if info.name.endswith("__main__") or any(
-                p.startswith("_") for p in info.name.split(".")[1:]):
+                p.startswith("__") for p in info.name.split(".")[1:]):
             continue
         mod = importlib.import_module(info.name)
         for name, obj in vars(mod).items():
@@ -59,6 +60,6 @@ def test_examples_lines_fit_the_code_box():
 def test_the_scan_reads_examples():
     paths = {p for p, o in _public_objects() if _examples(inspect.getdoc(o) or "")}
     for want in ("multibench.eval.pipeline.evaluate", "multibench.plot.bar.bar",
-                 "multibench.workflow.run", "multibench.data.results.load_results",
-                 "multibench.workflow.BatchResult.summary"):
+                 "multibench.workflow.run", "multibench._data.results.load_results",
+                 "multibench.workflow.RunResult.summary"):
         assert want in paths, want

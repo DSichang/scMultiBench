@@ -8,8 +8,10 @@ import sys
 import warnings
 from pathlib import Path
 
-from .. import _compat, config
-from ..config import _and_list
+from .. import _text
+
+from .._settings import config
+from .._text import _and_list
 from . import registry
 from .schema import (_NON_MODALITY_ROLES, AmbiguousVariantError, _batch_of,
                      base_modality, is_label_role)
@@ -78,10 +80,7 @@ def _one_file_advice(category: str, *, stem: str = "rna", has_adt: bool = False)
     advice = advice[:1].upper() + advice[1:] + "."
     if category == "diagonal":
         several = _several_batch_diagonal_methods()
-        counts = {len(_variant_batches(v.when.get("modalities") or []))
-                  for spec in registry.load() for v in spec.variants
-                  if v.when.get("category") == "diagonal"} - {0}
-        n = f"exactly {counts.pop()}" if len(counts) == 1 else "several"
+        n = f"exactly {_diagonal_batch_count()}"
         also = (f" {_and_list(several)} also read {n} numbered RNA and ATAC batches, "
                 "written one batch per call with "
                 + "batch_index=." if several else "")
@@ -111,10 +110,40 @@ def _per_batch_hint(ds_dir: Path, category: str | None, stems=None) -> str | Non
     if category == "diagonal" and _per_batch_diagonal_methods(ds_dir):
         return None
     ex = hit[0]
+    if category == "diagonal":
+        return _numbered_diagonal_hint(ds_dir, numbered)
     return (f"This folder holds per-batch files ({ex}1.h5, {ex}2.h5, ...). "
             + _one_file_advice(category, stem=ex,
                                has_adt="adt" in numbered
                                and not any(b.startswith("atac") for b in numbered)))
+
+
+def _diagonal_batch_count() -> int:
+    """How many numbered RNA (and ATAC) batches the several-batch diagonal
+    variants read."""
+    counts = {len(_variant_batches(v.when.get("modalities") or []))
+              for spec in registry.load() for v in spec.variants
+              if v.when.get("category") == "diagonal"} - {0}
+    (n,) = counts            # one number: the messages say "exactly n"
+    return n
+
+
+def _numbered_diagonal_hint(ds_dir: Path, numbered) -> str:
+    """For a diagonal folder of numbered batches that no several-batch variant
+    reads: what is missing, and the one-file layout with ``run(batch=)``."""
+    n = _diagonal_batch_count()
+    missing = [f"{st}{i}.h5" for i in range(1, n + 1) for st in numbered
+               if not (ds_dir / f"{st}{i}.h5").is_file()]
+    have = sorted({int(m.group(1)) for q in ds_dir.glob("rna*.h5")
+                   if (m := re.fullmatch(r"rna(\d+)\.h5", q.name))})
+    tail = (f"{_and_list(missing)} {'is' if len(missing) == 1 else 'are'} missing"
+            if missing else f"{ds_dir.name} has {len(have)}")
+    ex = numbered[0]
+    return (f"{ds_dir.name} holds numbered batches ({ex}1.h5, {ex}2.h5, ...). "
+            f"{_and_list(_several_batch_diagonal_methods())} read exactly {n} numbered RNA "
+            f"and ATAC batches, and {tail}. The other diagonal methods read one rna.h5 "
+            f"and one ATAC file: write those with every cell, and pass the batches "
+            f'as run(batch=adata.obs["donor"]).')
 
 
 def _several_batch_diagonal_methods() -> list[str]:
@@ -306,14 +335,14 @@ def _note_local_folder(base: Path, name: str) -> None:
     # once per call: a call resolves the name several times. The call is its
     # outermost package frame, held so that no later call reuses its identity
     outer, frame = None, sys._getframe(1)
-    while frame is not None and frame.f_code.co_filename.startswith(_compat._PACKAGE):
+    while frame is not None and frame.f_code.co_filename.startswith(_text._PACKAGE):
         outer, frame = frame, frame.f_back
     key = (os.path.abspath(base), name)
     if _NOTED[0] is outer and _NOTED[1] == key:
         return
     _NOTED[:] = [outer, key]
     path = f"./{name}"
-    _compat.warn(f"Using {base / name}; {path} also exists: pass "
+    _text.warn(f"Using {base / name}; {path} also exists: pass "
                  + f"{path!r} for it.", UserWarning)
 
 
@@ -338,7 +367,7 @@ def canonical_dataset(base, dataset: str) -> str:
     same = [n for n in listing if n.lower() == name.lower() and (base / n).is_dir()]
     if len(same) != 1:
         return name
-    _compat.warn(
+    _text.warn(
         f"dataset {name!r} is not a folder under {base}, but {same[0]!r} is - using "
         f"that on-disk spelling (this file system ignores letter case; Linux does "
         f"not, and results, out_dir names and records carry {same[0]!r})",
@@ -353,7 +382,7 @@ def split_dataset(dataset, data_path) -> tuple[str, Path | str | None]:
     if not isinstance(dataset, os.PathLike) and "/" not in str(dataset) \
             and os.sep not in str(dataset):
         return dataset, data_path
-    folder = Path(os.path.abspath(Path(data_path or "") / dataset))
+    folder = Path(os.path.abspath(Path(data_path or "") / Path(dataset).expanduser()))
     return folder.name, folder.parent
 
 
@@ -461,7 +490,7 @@ def inputs_for(dataset: str, category: str, method: str, *,
                 _check_atac_gas_cells(method, dataset, named)
                 _check_diagonal_label_files(named)
     elif check is None and missing:
-        _compat.warn(
+        _text.warn(
             _missing_inputs_text(method, category, ds_dir, missing, near)
             + " Pass check=True to raise this as an error, or check=False to silence it.",
             UserWarning)
@@ -1405,7 +1434,7 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
         msg = f"labels_for({dataset!r}, {category!r}): {hint}"
         if check:
             raise ValueError(msg)
-        _compat.warn(msg, UserWarning)
+        _text.warn(msg, UserWarning)
     files = {p.stem: str(p) for p in ds_dir.glob("*cty*.csv")
              if "scjoint" not in p.name.lower()}
     stems = sorted(files, key=_label_sort_key)
@@ -1414,7 +1443,7 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
         key = (os.path.abspath(base / dataset), category)
         if note and key not in _ORDER_NOTED:      # once a session per dataset
             _ORDER_NOTED.add(key)
-            _compat.warn(note, UserWarning)
+            _text.warn(note, UserWarning)
     if method is not None and category is not None:
         spec = registry.get(method)
         mods = registry.normalize_modalities(modalities)

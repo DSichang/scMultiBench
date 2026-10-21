@@ -15,6 +15,7 @@ import pandas as pd
 import pytest
 
 import multibench
+from multibench import _settings
 import multibench as mtb
 from multibench import config, workflow
 from multibench.engine import envs, ingest, registry, resolve, runner
@@ -29,25 +30,6 @@ def no_envs(monkeypatch):
 # ================================================================ L26 {env_cmd}
 def _inputs():
     return {"rna": "/d/rna.h5", "adt": "/d/adt.h5", "cty": "/d/cty.csv"}
-
-
-def test_env_cmd_keeps_the_env_activation_and_cmd_stays_bare(monkeypatch):
-    kept = mtb.engine.runner.run("Matilda", "vertical", inputs=_inputs(), out_dir="/o", dry_run=True,
-                   cmd_template="srun --gres=gpu:1 {env_cmd}")
-    bare = mtb.engine.runner.run("Matilda", "vertical", inputs=_inputs(), out_dir="/o", dry_run=True,
-                   cmd_template="srun --gres=gpu:1 {cmd}")
-    assert kept[:2] == ["srun", "--gres=gpu:1"] and bare[:2] == ["srun", "--gres=gpu:1"]
-    assert kept[3:6] == ["run", "-n", "matilda"] and kept[2].endswith("conda")
-    assert bare[2] == "python" and bare[3:] == kept[6 + 1:]
-    # prefix mode: {env_cmd} carries the bash activation
-    monkeypatch.delenv("MULTIBENCH_RUN_MODE", raising=False)
-    monkeypatch.setattr(runner.envs, "env_prefix", lambda env, conda=None: Path("/envs") / env)
-    kept = mtb.engine.runner.run("Matilda", "vertical", inputs=_inputs(), out_dir="/o", dry_run=True,
-                   cmd_template="srun {env_cmd}")
-    assert kept[:3] == ["srun", "bash", "-c"] and "CONDA_PREFIX=/envs/matilda" in kept[3]
-    with pytest.raises(ValueError, match="both"):
-        mtb.engine.runner.run("Matilda", "vertical", inputs=_inputs(), out_dir="/o", dry_run=True,
-                cmd_template="srun {cmd} {env_cmd}")
 
 
 # ================================================================ L27 total line
@@ -80,11 +62,11 @@ def test_cpu_fallback_warning_names_no_internal_file():
 
 
 def test_data_and_repo_path_variables(monkeypatch, tmp_path):
-    for var, field in ((config.DATA_PATH_VAR, "data_path"), (config.REPO_PATH_VAR, "repo_path")):
+    for var, field in ((_settings.DATA_PATH_VAR, "data_path"), (_settings.REPO_PATH_VAR, "repo_path")):
         monkeypatch.delenv(var, raising=False)
         setattr(config, field, None)
         default = getattr(config, field)
-        assert default.parent == config._BASE
+        assert default.parent == _settings._BASE
         monkeypatch.setenv(var, str(tmp_path / field))
         cfg = config
         assert getattr(cfg, field) == tmp_path / field           # the variable wins

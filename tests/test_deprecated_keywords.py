@@ -27,8 +27,7 @@ def gpu(monkeypatch):
 
 
 def _dry(method, category, inputs, params, tmp_path):
-    return mtb.engine.runner.run(method, category, inputs=inputs, out_dir=str(tmp_path / "o"),
-                   params=params, dry_run=True, cmd_template="conda run -n x {cmd}")
+    return mtb.engine.runner.preview(method, category, inputs=inputs, out_dir=str(tmp_path / "o"), params=params)[0]
 
 
 # --- deprecations and catalog: X39, X40, X41, X43 ----------------------------

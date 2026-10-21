@@ -6,7 +6,7 @@ on an AnnData or a folder whose cell ids are '0'..'n-1'. Several label files
 and ``evaluate --column`` are aligned by their barcode column too. A
 repeated sample column is not taken for cell ids, a repeated barcode is
 named, and the command line names the label files instead of a Python call.
-Also: ``_error_tail`` keeps a whole first word, ``load_batch`` finds the
+Also: ``_error_tail`` keeps a whole first word, ``load_run`` finds the
 method folders of a moved tree, ``rescore(metrics=[...])`` without ARI
 scores a one-order dataset, CLI help has no backticks, and the scan reasons
 fit the table.
@@ -77,7 +77,8 @@ def test_a_repeated_barcode_is_named(cite, tmp_path):
     pd.DataFrame({"sample": batch}, index=bars).to_csv(drep)
     with pytest.raises(ValueError, match=r"^batch: the first column of d_rep\.csv repeats "
                                          r"1 id"):
-        mtb.run(str(data / "MYCITE"), "vertical", dry_run=True, batch=drep, **KW)
+        mtb.run(str(data / "MYCITE"), "vertical", tmp_path / "out", batch=drep, **KW)
+    assert not (tmp_path / "out").exists()
     # a file with several columns: the fix names no column= argument (R6-03:
     # it suggests a Series)
     wide = tmp_path / "wide.csv"
@@ -106,7 +107,7 @@ def test_a_moved_run_all_folder_rescores(swept, tmp_path):
     moved = tmp_path / "moved"
     shutil.copytree(res.out_dir, moved)
     shutil.rmtree(res.out_dir)
-    again = mtb.load_batch(moved)
+    again = mtb.load_run(moved)
     assert [r["out_dir"] for r in again.records] == [str(moved / "Matilda_MYCITE")]
     assert _quiet(again.rescore).summary["status"].tolist() == ["scored"]
 

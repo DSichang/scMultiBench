@@ -17,24 +17,12 @@ The four ``category`` values are ``vertical``, ``diagonal``, ``mosaic`` and
 https://dsichang.github.io/scMultiBench/tutorials/run/#folder-layout.
 """
 
-from . import config
-from . import plot
-from . import eval
-from . import data
-from .data import catalog
-from .data.results import load_results, recommend
+from ._settings import config
+from . import plot, catalog, io, env, data
+from ._data.results import load_results, recommend
 from .eval.pipeline import evaluate
-from .engine import ingest as io
-from .engine import envs as env
 from .discover import find_methods, method_info, params_for, cite
-from .workflow import scan, run, BatchResult, load_batch
-
-# `import multibench.io` / `from multibench.env import install` work as for a
-# real submodule: the three namespaces live elsewhere in the package
-import sys as _sys
-for _name, _module in (("io", io), ("catalog", catalog), ("env", env)):
-    _sys.modules.setdefault(f"{__name__}.{_name}", _module)
-del _sys, _name, _module
+from .workflow import scan, run, RunResult, load_run
 
 __version__ = "0.4.0"
 
@@ -44,7 +32,7 @@ __all__ = [
     # methods
     "find_methods", "method_info", "params_for", "cite",
     # run
-    "scan", "run", "load_batch", "BatchResult",
+    "scan", "run", "load_run", "RunResult",
     # metrics
     "evaluate", "load_results", "recommend",
     # version

@@ -19,6 +19,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+from multibench.engine import scripts
 from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, ingest, registry
@@ -65,7 +66,7 @@ def pinned(monkeypatch, tmp_path):
     """Every env installed, a GPU, no scripts ref."""
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
-    monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
+    monkeypatch.delenv(scripts.SCRIPTS_REF_VAR, raising=False)
 
 
 def test_single_file_variant_keeps_the_method_info_pointer(tmp_path, pinned):
@@ -82,22 +83,21 @@ WRONG_REF = "The method scripts are at 0000000, not deadbeef (MULTIBENCH_SCRIPTS
 
 @pytest.fixture
 def wrong_ref(monkeypatch):
-    monkeypatch.setattr(config, "scripts_ref_problem", lambda repo=None: WRONG_REF)
+    monkeypatch.setattr(scripts, "scripts_ref_problem", lambda repo=None: WRONG_REF)
     return WRONG_REF
 
 
 def test_python_run_all_dry_run_prints_the_ref_note_only_when_verbose(wrong_ref, capsys):
-    df = mtb.run("D11", "vertical", methods=["totalVI"], dry_run=True, verbose=False)
+    df = mtb.scan("D11", "vertical", methods=["totalVI"], verbose=False)
     cap = capsys.readouterr()
     assert WRONG_REF not in cap.out and WRONG_REF not in cap.err
     assert df["reason"].str.contains(WRONG_REF[:-1], regex=False).all()
-    mtb.run("D11", "vertical", methods=["totalVI"], dry_run=True, verbose=True)
+    mtb.scan("D11", "vertical", methods=["totalVI"], verbose=True)
     cap = capsys.readouterr()
     assert WRONG_REF not in cap.err
     lines = cap.out.splitlines()
-    count = next(i for i, ln in enumerate(lines) if ln.startswith("[run] Dry run: "))
-    assert lines.count(f"[run] {WRONG_REF}") == 1, cap.out
-    assert lines.index(f"[run] {WRONG_REF}") > count
+    assert lines[0].startswith("[scan] 1 of 1 method has its input files in D11.")
+    assert sum(WRONG_REF[:-1] in ln for ln in lines) == 1, cap.out
 
 
 def test_no_overlap_of_own_datasets_gives_one_action():

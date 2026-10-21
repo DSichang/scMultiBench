@@ -14,7 +14,7 @@ import pytest
 
 import multibench as mtb
 from multibench import workflow as W
-from multibench.config import _and_list
+from multibench._text import _and_list
 from multibench.engine import resolve
 from multibench.engine.schema import _batch_of, base_modality
 
@@ -70,4 +70,5 @@ def test_the_diagonal_atac_table_is_the_registrys():
 
 def test_the_several_batch_diagonal_methods_are_the_registrys():
     several = resolve._several_batch_diagonal_methods()
-    assert f"{_and_list(several)} read them." in " ".join(_section().split())
+    assert (f"For several RNA and several ATAC batches in diagonal, {_and_list(several)} "
+            f"read exactly 3 of each") in " ".join(_section().split())

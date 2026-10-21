@@ -1,4 +1,4 @@
-"""Run a method variant: build cmd, wrap via cmd_template, exec in a workdir, load output."""
+"""Run a method variant: build its command, enter its env, exec in a workdir, load output."""
 from __future__ import annotations
 
 import os
@@ -10,8 +10,11 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from .. import _compat, config
-from . import builder, io, ingest, registry, envs
+from .. import _text
+
+from .. import _settings
+from .._settings import config
+from . import builder, io, ingest, registry, envs, scripts
 from .schema import _batch_of, base_modality, is_label_role
 
 
@@ -85,46 +88,6 @@ class RunResult:
         return (f"RunResult(method={self.method!r}, out_dir={str(self.out_dir)!r}, "
                 f"output={shape(self.output)}, extra={sorted(map(str, self.extra or {}))}, "
                 f"obs_names={cells})")
-
-
-def wrap_command(cmd: list[str], cmd_template: str | None) -> list[str]:
-    """Wrap argv with a cmd_template like 'conda run -n env {cmd}', token by
-    token: a ``{cmd}`` token becomes the argv, a token that holds it (a quoted
-    ``'{cmd} > log'``) holds the quoted command line."""
-    if not cmd_template or cmd_template.strip() == "{cmd}":
-        return cmd
-    # two words in place of {cmd}: still two when it stood unquoted, one when quoted
-    a, b = "MBCMDXA", "MBCMDXB"
-    toks = shlex.split(cmd_template.replace("{cmd}", f"{a} {b}"))
-    out: list[str] = []
-    i = 0
-    while i < len(toks):
-        if toks[i] == a and toks[i + 1:i + 2] == [b]:
-            out += cmd
-            i += 2
-            continue
-        out.append(toks[i].replace(f"{a} {b}", shlex.join(cmd)))
-        i += 1
-    if any(a in t or b in t for t in out):
-        raise ValueError(f"cmd_template {cmd_template!r}: put the placeholder in a word "
-                         f"of its own or in quotes.")
-    return out
-
-
-#: The ``cmd_template`` placeholder for the command inside the method env.
-ENV_CMD = "{env_cmd}"
-
-
-def _check_template(cmd_template: str | None) -> None:
-    """``ValueError`` for a template that does not hold exactly one placeholder."""
-    if cmd_template and ENV_CMD in cmd_template and "{cmd}" in cmd_template:
-        raise ValueError(
-            f"cmd_template {cmd_template!r} uses both {{cmd}} and {ENV_CMD}; use "
-            f"{ENV_CMD} to run inside the method env, or {{cmd}} for the bare command")
-    if cmd_template and cmd_template.count(ENV_CMD) + cmd_template.count("{cmd}") != 1:
-        raise ValueError(
-            f"cmd_template {cmd_template!r} must hold {ENV_CMD} (or {{cmd}}) once, "
-            f"e.g. \"sbatch --wrap '{ENV_CMD}'\".")
 
 
 #: The environment variable that forces a run mode (``conda`` | ``prefix``).
@@ -229,19 +192,19 @@ def _check_input_cells(method: str, category: str, inputs: dict) -> None:
 
 
 def _repo_root_no_fetch() -> Path:
-    """Where :func:`run` finds ``tools_scripts/``, in ``config.ensure_repo``'s
+    """Where :func:`run` finds ``tools_scripts/``, in ``scripts.ensure_repo``'s
     order, without fetching; else the configured path, where a real run puts them."""
     p = Path(config.repo_path)
     if (p / "tools_scripts").is_dir():
         return p
-    root = Path(config.__file__).resolve().parent.parent
+    root = _settings._ROOT
     if (root / "tools_scripts").is_dir():
         return root
     return p
 
 
 #: The command that fetches the method scripts by hand, ahead of a run.
-FETCH_SCRIPTS_CMD = config.FETCH_SCRIPTS
+FETCH_SCRIPTS_CMD = scripts.FETCH_SCRIPTS
 
 
 def linux_only_sentence() -> str | None:
@@ -260,7 +223,7 @@ def missing_script_fix(repo) -> str:
     A folder that is not a git checkout (often one made by hand for GLUE's
     annotation) blocks the fetch until it is moved away.
     """
-    if config.scripts_commit(repo) is not None:
+    if scripts.scripts_commit(repo) is not None:
         return ("update it with git pull, or delete it so the next run fetches a "
                 "fresh copy")
     return (f"that folder is not a git checkout. If you made it by hand, move out "
@@ -340,7 +303,7 @@ def script_notes(spec, variant, repo: Path) -> list[str]:
             fix = missing_script_fix(repo)
             notes.append(f"{spec.id}'s script {entrypoint} is not in the checkout at {repo}. "
                          f"{fix[:1].upper()}{fix[1:]}.")
-        elif not config.scripts_folder_problem(repo):      # else preview() names it
+        elif not scripts.scripts_folder_problem(repo):      # else preview() names it
             notes.append(f"{SCRIPTS_NOT_HERE}{repo}. The first real run clones "
                          f"PYangLab/scMultiBench with git. On a host without network, "
                          f"run {FETCH_SCRIPTS_CMD} first.")
@@ -428,14 +391,6 @@ def _check_input(role: str, val, *, real: bool) -> str:
                 "alternatively convert the input to .h5ad/.csv first.")
         return "convert"
     raise ValueError(f"unsupported input format: {path.name}")
-
-
-def _missing_input_notes(method: str, inputs: dict) -> list[str]:
-    """One note per input path that does not exist, for ``run(dry_run=True)``."""
-    return [f"{method} reads {val}, which does not exist. mtb.scan shows what the "
-            f"folder holds."
-            for val in inputs.values()
-            if isinstance(val, (str, os.PathLike)) and not Path(val).exists()]
 
 
 def _plan_inputs(variant, inputs: dict, inputs_dir: Path, *, convert: bool,
@@ -529,7 +484,7 @@ def _obs_names(method: str, variant, values: dict, output) -> list[str] | None:
                    f"{shape}")
     if why is None:
         return names
-    _compat.warn(f"{method}: RunResult.obs_names is None ({why}); the rows follow "
+    _text.warn(f"{method}: RunResult.obs_names is None ({why}); the rows follow "
                  f"the order of {method}'s label files",
                  UserWarning)
     return None
@@ -554,12 +509,12 @@ def _host_run_env(run_env: dict | None) -> dict:
 
 
 def _argv(variant, method: str, values: dict, out_str: str, repo: Path,
-          params: dict | None, cmd_template: str | None) -> list[str]:
+          params: dict | None) -> list[str]:
     """The exact argv a method run executes (shared by the run and the dry run).
 
     The variant's command, with its package-side ``driver`` in place of the
     script when it has one, the pseudo-tty wrap when declared, then the env
-    wrap: ``cmd_template``, else the mode :func:`run_mode` picks.
+    wrap of the mode :func:`run_mode` picks.
     """
     cmd = builder.build_command(variant, values=values, out_dir=out_str, params=params)
     # a driver runs the unmodified script from its folder (--script_dir)
@@ -570,31 +525,18 @@ def _argv(variant, method: str, values: dict, out_str: str, repo: Path,
         cmd = [cmd[0], str(driver_abs), "--script_dir", str(script_dir)] + cmd[2:]
     else:
         cmd[1] = str(repo / cmd[1])
-    activate = None
-    outer = None
-    if cmd_template is not None and ENV_CMD in cmd_template:
-        # {env_cmd}: the default env wrap below, then the caller's launcher
-        outer, cmd_template = cmd_template.replace(ENV_CMD, "{cmd}"), None
-    if cmd_template is None:
-        env_name = envs.group_for(method)
-        mode, prefix = run_mode(env_name)
-        if mode == "prefix":
-            activate = (env_name, prefix)      # applied last, outside the pty wrap
-        else:
-            # CONDA_EXE: bare `conda` may not be on the subprocess's PATH
-            conda = os.environ.get("CONDA_EXE", "conda")
-            cmd_template = f"{conda} run -n {env_name} {{cmd}}"
+    env_name = envs.group_for(method)
+    mode, prefix = run_mode(env_name)
     # `script` gives the method a pty (scJoint reads the terminal size) and
     # passes its exit code on (-e); it must be innermost, as conda run
     # redirects stdio
     if variant.pty:
         cmd = ["script", "-q", "-e", "-c",
                " ".join(shlex.quote(c) for c in cmd), "/dev/null"]
-    if activate is not None:
-        cmd = wrap_prefix(cmd, *activate)
-    else:
-        cmd = wrap_command(cmd, cmd_template)
-    return wrap_command(cmd, outer) if outer is not None else cmd
+    if mode == "prefix":
+        return wrap_prefix(cmd, env_name, prefix)
+    # CONDA_EXE: bare `conda` may not be on the subprocess's PATH
+    return [os.environ.get("CONDA_EXE", "conda"), "run", "-n", env_name, *cmd]
 
 
 def unknown_params_error(method: str, unknown: list, allowed: set) -> KeyError:
@@ -658,7 +600,7 @@ def check_param_types(method: str, variant, params: dict | None) -> None:
                             f"Its default is {variant.params.get(key, decl.get('default'))!r}.")
         choices = decl.get("choices")
         if choices and value is not None and str(value) not in map(str, choices):
-            raise ValueError(f"{method}: {key} takes {config._and_list(map(str, choices), 'or')}, "
+            raise ValueError(f"{method}: {key} takes {_text._and_list(map(str, choices), 'or')}, "
                              f"got {value!r}.")
 
 
@@ -688,8 +630,7 @@ def check_gpu_requirement(spec) -> None:
 
 
 def run(method: str, category: str, *, inputs: dict, out_dir: str,
-        params: dict | None = None, cmd_template: str | None = None,
-        dry_run: bool = False):
+        params: dict | None = None):
     """Run one method on explicit inputs and load its output (internal:
     ``mtb.run`` calls it for each runnable method of a dataset folder).
 
@@ -708,24 +649,18 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     params : dict | None
         Hyperparameter overrides merged over the variant's defaults, keyed
         by parameter name (``mtb.params_for``); ``None`` = the defaults.
-    cmd_template : str | None
-        Launcher template: ``{cmd}`` = the bare command, ``{env_cmd}`` = the
-        command inside the method env; ``None`` = enter the method env.
-    dry_run : bool
-        ``True`` = return the command without running it or writing anything.
 
     Returns
     -------
-    RunResult or list[str]
-        ``RunResult`` - read ``output`` (the primary output, loaded),
-        ``obs_names`` (its cell barcodes) and ``stderr``. With
-        ``dry_run=True``, the argv list.
+    RunResult
+        Read ``output`` (the primary output, loaded), ``obs_names`` (its cell
+        barcodes) and ``stderr``.
 
     Raises
     ------
     KeyError
         Unknown method, no variant fits ``category`` and the input roles, or
-        a ``params`` key the variant does not accept (also on a dry run).
+        a ``params`` key the variant does not accept.
     ValueError
         An input the run cannot convert, such as an ``.h5mu`` file or a MuData.
     ValueError
@@ -746,23 +681,15 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
         An ATAC input holds the other representation or peak names the method cannot read.
 
     """
-    _check_template(cmd_template)
     method = registry.check_method(method)
     check_params(method, registry.get(method).select(category, _modality_roles(inputs)),
                  params)
     _check_input_cells(method, category, inputs)
     from ..workflow import _atac_mismatch_caveats     # workflow imports this module
     mismatch = _atac_mismatch_caveats(method, category, inputs)
-    if dry_run:
-        argv, notes = preview(method, category, inputs=inputs, out_dir=out_dir,
-                              params=params, cmd_template=cmd_template)
-        notes = _missing_input_notes(method, inputs) + notes
-        for note in notes + mismatch:
-            print(f"# {note}", file=sys.stderr, flush=True)
-        return argv
     if mismatch:
         # one sentence per file: the peak-name caveat already ends with its fix
-        _compat.warn(" ".join(m if m.endswith(".") else m + "." for m in mismatch),
+        _text.warn(" ".join(m if m.endswith(".") else m + "." for m in mismatch),
                      UserWarning)
 
     spec = registry.get(method)
@@ -776,27 +703,26 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     # the env check of scan, before anything is written: off Linux always; on
     # Linux when the probe finds some env (else the subprocess reports the
     # failure) or an env of that name multibench did not install
-    if cmd_template is None or ENV_CMD in cmd_template:
-        env_name = envs.group_for(method)
-        linux_only = linux_only_sentence()
-        if linux_only:
-            raise envs.LinuxOnlyError(
-                f"{linux_only} Run this call on a Linux machine. dry_run=True "
-                f"previews the method's command here.")
+    env_name = envs.group_for(method)
+    linux_only = linux_only_sentence()
+    if linux_only:
+        raise envs.LinuxOnlyError(
+            f"{linux_only} Run this call on a Linux machine. mtb.scan shows the "
+            f"method's command here.")
+    have = envs.installed_envs()
+    if env_name not in have:
+        # conda's env list is cached per process: probe once more
+        envs._conda_prefixes.cache_clear()
         have = envs.installed_envs()
-        if env_name not in have:
-            # conda's env list is cached per process: probe once more
-            envs._conda_prefixes.cache_clear()
-            have = envs.installed_envs()
-        other = envs.other_env_prefix(env_name) if env_name not in have else None
-        if other is not None:
-            raise EnvironmentError(envs.other_env_text(
-                env_name, other,
-                f"call mtb.env.install([{method!r}])."))
-        if have and env_name not in have:
-            raise EnvironmentError(
-                f"Environment {env_name} of {method} is not installed. Run "
-                f"mtb.env.install([{method!r}]).")
+    other = envs.other_env_prefix(env_name) if env_name not in have else None
+    if other is not None:
+        raise EnvironmentError(envs.other_env_text(
+            env_name, other,
+            f"call mtb.env.install([{method!r}])."))
+    if have and env_name not in have:
+        raise EnvironmentError(
+            f"Environment {env_name} of {method} is not installed. Run "
+            f"mtb.env.install([{method!r}]).")
 
     inputs, out_str = normalize_paths(inputs, out_dir)
     out = Path(out_str)
@@ -817,14 +743,12 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
         if step["normpeaks_from"] is not None:
             ingest._normalize_peak_names(step["normpeaks_from"], step["value"])
         values[role] = step["value"]
-    cmd = _argv(variant, method, values, out_str, repo, params, cmd_template)
-    # a {cmd} template runs the method in the caller's env, whose build is not ours
-    ours = cmd_template is None or ENV_CMD in cmd_template
-    provenance = config.run_provenance(envs.group_for(method) if ours else None, repo)
+    cmd = _argv(variant, method, values, out_str, repo, params)
+    provenance = scripts.run_provenance(env_name, repo)
 
     # user site-packages (~/.local) can shadow the env's packages, and so can
     # the user's personal R library: our env holds every package it needs
-    base_env = envs.without_user_r_library(os.environ) if ours else dict(os.environ)
+    base_env = envs.without_user_r_library(os.environ)
     run_env = {**base_env, "PYTHONNOUSERSITE": "1", **_host_run_env(variant.run_env)}
     # a Jupyter kernel's MPLBACKEND (matplotlib_inline) does not exist in the env
     if "MPLBACKEND" not in (variant.run_env or {}):
@@ -861,10 +785,10 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
 
 
 def preview(method: str, category: str, *, inputs: dict, out_dir, params=None,
-            convert: bool = True, cmd_template: str | None = None,
-            repo_path=None, gpu: bool | None = None) -> tuple[list[str], list[str]]:
-    """``(argv, notes)`` a run would execute and show, for ``run(dry_run=True)``
-    and ``mtb.scan``; nothing is written, fetched or launched.
+            convert: bool = True, repo_path=None,
+            gpu: bool | None = None) -> tuple[list[str], list[str]]:
+    """``(argv, notes)`` a run would execute and show, for ``mtb.scan``;
+    nothing is written, fetched or launched.
 
     The notes: a scripts checkout problem first, then :func:`script_notes`,
     then the prepared-files note. ``gpu`` goes to :func:`cpu_params_for`.
@@ -872,15 +796,16 @@ def preview(method: str, category: str, *, inputs: dict, out_dir, params=None,
     spec = registry.get(method)
     method = spec.id
     variant = spec.select(category, _modality_roles(inputs))
+    check_params(method, variant, params)            # as the run checks them
     params, _ = cpu_params_for(spec, params, gpu=gpu)
     values, out_str = normalize_paths(inputs, out_dir)
     plan = _plan_inputs(variant, values, Path(out_str) / "inputs", convert=convert,
                         real=False)
     values = {role: step["value"] for role, step in plan.items()}
     repo = Path(repo_path) if repo_path else _repo_root_no_fetch()
-    argv = _argv(variant, method, values, out_str, repo, params, cmd_template)
-    # the real run refuses these (config.ensure_repo)
-    ref = config.scripts_ref_problem(repo) or config.scripts_folder_problem(repo)
+    argv = _argv(variant, method, values, out_str, repo, params)
+    # the real run refuses these (scripts.ensure_repo)
+    ref = scripts.scripts_ref_problem(repo) or scripts.scripts_folder_problem(repo)
     notes = ([ref] if ref else []) + script_notes(spec, variant, repo)
     prepared = _prepared_note(plan, out_str, spec.id)
     return argv, notes + ([prepared] if prepared else [])
@@ -913,10 +838,10 @@ def _prepared_note(plan: dict, out_str: str, method: str) -> str | None:
 
 
 def _fetch_scripts(repo_path) -> Path:
-    """``config.ensure_repo``; a failed clone raises ``RuntimeError`` naming
+    """``scripts.ensure_repo``; a failed clone raises ``RuntimeError`` naming
     the offline route."""
     try:
-        return Path(config.ensure_repo(repo_path))
+        return Path(scripts.ensure_repo(repo_path))
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         target = Path(repo_path) if repo_path else Path(config.repo_path)
         raise RuntimeError(

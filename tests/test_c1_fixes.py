@@ -34,7 +34,7 @@ def test_kept_docstrings_name_no_cut_name():
         objs[ns] = m
         objs.update({f"{ns}.{a}": getattr(m, a) for a in dir(m) if not a.startswith("_")})
     for a in ("summary", "long", "plot", "rescore", "save", "embedding"):
-        objs[f"BatchResult.{a}"] = getattr(mtb.BatchResult, a)
+        objs[f"RunResult.{a}"] = getattr(mtb.RunResult, a)
     hits = {n: [w for w in _CUT if w in (inspect.getdoc(o) or "")] for n, o in objs.items()}
     assert {n: h for n, h in hits.items() if h} == {}
 
@@ -69,7 +69,7 @@ def test_method_info_without_repeated_keys():
 
 
 def test_the_dry_run_plan_has_seven_columns():
-    plan = mtb.run("D11", "vertical", dry_run=True, verbose=False)
+    plan = mtb.scan("D11", "vertical", verbose=False)
     assert list(plan.columns) == ["method", "modalities", "runnable", "reason", "env",
                                   "caveat", "command"]
 
@@ -106,9 +106,12 @@ def test_a_two_batch_diagonal_folder_gets_one_folder_line(tmp_path, capsys):
     capsys.readouterr()
     out = mtb.scan(d, "diagonal")
     log = capsys.readouterr().out
-    assert log.count("This folder holds per-batch files") == 1
-    assert "also read exactly 3 numbered RNA and ATAC batches" in log
-    assert not out["reason"].str.contains("per-batch files").any()
+    # d1 (u3): the line names the missing batch files and gives one action
+    assert log.count("DIAG2 holds numbered batches (rna1.h5, rna2.h5, ...).") == 1
+    assert ("scJoint, GLUE, iNMF and online_iNMF read exactly 3 numbered RNA and ATAC "
+            "batches, and rna3.h5 and atac_gas3.h5 are missing.") in log
+    assert "Export without batch=" not in log
+    assert not out["reason"].str.contains("holds numbered batches").any()
 
 
 def test_the_batch_gap_is_named(tmp_path, capsys):
@@ -122,7 +125,7 @@ def test_the_batch_gap_is_named(tmp_path, capsys):
 
 
 def test_a_shared_barcode_gets_its_batch_and_one_batch_names_none():
-    one = mtb.load_batch(Path(__file__).resolve().parent.parent / "data" / "outputs" / "D11")
+    one = mtb.load_run(Path(__file__).resolve().parent.parent / "data" / "outputs" / "D11")
     m = one.records[0]["method"]
     assert "batch" not in one.embedding(m).obs                     # c3 (E02)
 
@@ -136,8 +139,7 @@ def test_recommend_gives_this_run_rows_their_method_chips():
 
 
 def test_modalities_select_the_variant_spelled_so(capsys):
-    plan = mtb.run("D28", "diagonal", methods=["scJoint"], modalities=["rna", "atac_gas"],
-                       dry_run=True, verbose=False)
+    plan = mtb.scan("D28", "diagonal", methods=["scJoint"], modalities=["rna", "atac_gas"], verbose=False)
     assert plan["modalities"].tolist() == ["rna+atac_gas"]
     # base tokens still reach the numbered variants of another category
     mosaic = mtb.scan("D45", "mosaic", modalities=["rna", "atac"], verbose=False)
@@ -145,7 +147,7 @@ def test_modalities_select_the_variant_spelled_so(capsys):
 
 
 def test_a_folder_method_shows_the_files_it_reads():
-    plan = mtb.run("D28", "diagonal", methods=["scBridge"], dry_run=True, verbose=False)
+    plan = mtb.scan("D28", "diagonal", methods=["scBridge"], verbose=False)
     assert plan["modalities"].tolist() == ["rna+atac_gas"]
 
 
@@ -156,7 +158,7 @@ def test_the_shadow_folder_note_is_left_out_for_a_path_and_in_rescore(tmp_path, 
         warnings.simplefilter("always")
         resolve._note_local_folder(tmp_path / "elsewhere", "D11")   # a path the caller named
         _tree(tmp_path / "t")
-        mtb.load_batch(tmp_path / "t" / "out").rescore(metrics=["NMI"], verbose=False)
+        mtb.load_run(tmp_path / "t" / "out").rescore(metrics=["NMI"], verbose=False)
     assert not [x for x in w if "also exists" in str(x.message)]
 
 

@@ -11,6 +11,8 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+from multibench.engine import scripts as _scripts
+from multibench import _settings
 from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, ingest, registry
@@ -53,8 +55,7 @@ def test_underscore_peaks_are_passed_as_a_rewritten_copy(tmp_path, method):
     _diagonal(tmp_path, "LUNG_us", [f"chr4_{171325400 + 10 * i}_{171325903 + 10 * i}"
                                     for i in range(60)])
     inp = mtb.engine.resolve.inputs_for("LUNG_us", "diagonal", method, data_path=tmp_path)
-    argv = mtb.engine.runner.run(method, "diagonal", inputs=inp, out_dir=str(tmp_path / "o"),
-                   dry_run=True)
+    argv = mtb.engine.runner.preview(method, "diagonal", inputs=inp, out_dir=str(tmp_path / "o"))[0]
     assert str(tmp_path / "o" / "inputs" / "atac_peak_normpeaks.h5") in argv
     assert inp["atac_peak"] not in argv
     row = _scan_row(tmp_path, "LUNG_us", method)
@@ -111,10 +112,10 @@ def scripts(tmp_path, monkeypatch):
     repo = tmp_path / "scripts"
     head = _scripts_repo(repo)
     monkeypatch.setattr(config, "repo_path", repo)
-    monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
+    monkeypatch.setattr(_settings, "_ROOT", tmp_path / "pkg")
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
-    monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
+    monkeypatch.delenv(_scripts.SCRIPTS_REF_VAR, raising=False)
     return repo, head
 
 
@@ -129,12 +130,12 @@ def test_scan_blocks_every_row_under_another_scripts_ref(scripts, monkeypatch):
     before = full_scan("D11", "vertical", methods=["Matilda"], modalities=["rna", "adt"],
                       verbose=False)
     assert before["runnable"].all()
-    monkeypatch.setenv(config.SCRIPTS_REF_VAR, "deadbeef")
+    monkeypatch.setenv(_scripts.SCRIPTS_REF_VAR, "deadbeef")
     sc = full_scan("D11", "vertical", verbose=False)
     assert not sc["runnable"].any()
     assert (sc["reason"].str.startswith(_mismatch(head))).all()
     # the matching ref changes nothing
-    monkeypatch.setenv(config.SCRIPTS_REF_VAR, head[:7])
+    monkeypatch.setenv(_scripts.SCRIPTS_REF_VAR, head[:7])
     after = full_scan("D11", "vertical", methods=["Matilda"], modalities=["rna", "adt"],
                      verbose=False)
     pd.testing.assert_frame_equal(before, after)
@@ -142,19 +143,14 @@ def test_scan_blocks_every_row_under_another_scripts_ref(scripts, monkeypatch):
 
 def test_scripts_ref_problem_is_none_without_scripts_or_variable(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "repo_path", tmp_path / "none")
-    monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
-    monkeypatch.setenv(config.SCRIPTS_REF_VAR, "deadbeef")
-    assert config.scripts_ref_problem() is None          # the first fetch checks it out
-    monkeypatch.delenv(config.SCRIPTS_REF_VAR)
-    assert config.scripts_ref_problem(tmp_path) is None
+    monkeypatch.setattr(_settings, "_ROOT", tmp_path / "pkg")
+    monkeypatch.setenv(_scripts.SCRIPTS_REF_VAR, "deadbeef")
+    assert _scripts.scripts_ref_problem() is None          # the first fetch checks it out
+    monkeypatch.delenv(_scripts.SCRIPTS_REF_VAR)
+    assert _scripts.scripts_ref_problem(tmp_path) is None
 
 
 # ============================================================ R3-12 Slurm example
-def test_slurm_example_dry_run_works(tmp_path):
-    argv = mtb.engine.runner.run("scMoMaT", "mosaic", inputs=mtb.engine.resolve.inputs_for("D46", "mosaic", "scMoMaT"),
-                   out_dir=str(tmp_path / "scMoMaT"),
-                   cmd_template="srun --gres=gpu:1 {env_cmd}", dry_run=True)
-    assert argv[:2] == ["srun", "--gres=gpu:1"]
 
 
 # ---- the Python part of tests that also ran the command line
@@ -162,12 +158,14 @@ def test_slurm_example_dry_run_works(tmp_path):
 def test_dry_runs_note_another_scripts_ref(scripts, monkeypatch, capsys, tmp_path):
     repo, head = scripts
     inp = mtb.engine.resolve.inputs_for('D11', 'vertical', 'Matilda')
-    mtb.engine.runner.run('Matilda', 'vertical', inputs=inp, out_dir=str(tmp_path / 'o'), dry_run=True)
-    monkeypatch.setenv(config.SCRIPTS_REF_VAR, 'deadbeef')
-    mtb.engine.runner.run('Matilda', 'vertical', inputs=inp, out_dir=str(tmp_path / 'o'), dry_run=True)
-    mtb.run('D11', 'vertical', methods=['Matilda'], dry_run=True, verbose=False)
-    mtb.run('D11', 'vertical', methods=['Matilda'], dry_run=True, verbose=True)
-    assert capsys.readouterr().out.count(f'[run] {_mismatch(head)}\n') == 1
+    assert not any("MULTIBENCH_SCRIPTS_REF" in n for n in mtb.engine.runner.preview(
+        'Matilda', 'vertical', inputs=inp, out_dir=str(tmp_path / 'o'))[1])
+    monkeypatch.setenv(_scripts.SCRIPTS_REF_VAR, 'deadbeef')
+    assert _mismatch(head) in mtb.engine.runner.preview(
+        'Matilda', 'vertical', inputs=inp, out_dir=str(tmp_path / 'o'))[1]
+    mtb.scan('D11', 'vertical', methods=['Matilda'], verbose=False)
+    mtb.scan('D11', 'vertical', methods=['Matilda'], verbose=True)
+    assert capsys.readouterr().out.count(_mismatch(head)[:-1]) == 1
     pairs = [a for role, path in inp.items() for a in ('--input', f'{role}={path}')]
     with pytest.raises(RuntimeError, match=re.escape(f'The method scripts in {repo} are at ' + _mismatch(head).split('The method scripts are at ', 1)[1])):
-        config.ensure_repo()
+        _scripts.ensure_repo()

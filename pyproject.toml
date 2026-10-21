@@ -23,7 +23,7 @@ eval = []  # kept for compatibility: evaluation now ships with the core install
 loom = ["loompy>=3.0"]
 
 [tool.setuptools]
-packages = ["multibench", "multibench.data", "multibench.eval", "multibench.plot", "multibench.engine"]
+packages = ["multibench", "multibench._data", "multibench.eval", "multibench.plot", "multibench.engine"]
 
 [tool.setuptools.dynamic]
 # one source: the string in multibench/__init__.py (read statically, no import)

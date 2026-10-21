@@ -4,7 +4,7 @@
   as given when the dataset folder is not found: it drops it, with a note
   and a warning. Against labels in embedding row order it follows the
   stored ``labels_used`` order, not ``labels_for``.
-- ``load_batch(data_path=)`` that does not hold the dataset raises; the
+- ``load_run(data_path=)`` that does not hold the dataset raises; the
   moved-folder messages name the roots tried; the root found is recorded as
   an absolute path, and so is a re-pointed ``out_dir``.
 - No unsaved-batch warning when ``metrics=`` has no batch metric.
@@ -40,7 +40,7 @@ from tests.test_study_r4_wf import ALL_ENVS, _h5, _quiet, _Res, cite  # noqa: F4
 from tests.test_study_r6_msg import _lung_ids, needs_git, pinned, wrong_ref
 from tests.test_study_r6_wf import KW, _shuffled_labels, rel  # noqa: F401
 
-#: 0.4: data_path= of load_batch is deprecated, so the fix names the config
+#: 0.4: data_path= of load_run is deprecated, so the fix names the config
 MOVED = ("Set mtb.config.data_path to the folder that holds it, or run rescore "
          "from the folder where mtb.run ran.")
 from tests.conftest import full_scan
@@ -121,7 +121,7 @@ def test_positional_labels_place_the_saved_batch_in_the_stored_order(stacked):
     rec = res.records[0]
     assert rec["labels_used"] == [f"cty{b}.csv" for b in EMB_ORDER]
     assert rec["batch_source"] == "user" and rec["n_batches"] == 2
-    new, caught = _rescore(mtb.load_batch("out"), labels=emb_labels)
+    new, caught = _rescore(mtb.load_run("out"), labels=emb_labels)
     assert "+".join(new.records[0]["labels_used"]) == "(user labels)"
     assert _batch_cols(new) == _batch_cols(res), caught
 
@@ -129,10 +129,10 @@ def test_positional_labels_place_the_saved_batch_in_the_stored_order(stacked):
 def test_a_saved_batch_is_dropped_when_the_dataset_folder_is_not_found(stacked):
     res, emb_labels, root = stacked
     shutil.move(str(root / "data"), str(root / "gone"))
-    back = mtb.load_batch("out")
+    back = mtb.load_run("out")
     new, caught = _rescore(back, labels=emb_labels)
     rec = new.records[0]
-    assert rec["status"] == "CHAIN_OK" and "ARI" in rec["metrics"]
+    assert rec["status"] == "scored" and "ARI" in rec["metrics"]
     for k in ("ASW_batch", "iLISI", "GC"):
         assert k not in rec["metrics"], k
     assert rec.get("batch_source") is None and rec["n_batches"] == 1
@@ -143,7 +143,7 @@ def test_a_saved_batch_is_dropped_when_the_dataset_folder_is_not_found(stacked):
     # the file still travels with the result, so the right directory recovers it
     new.save(root / "again")
     shutil.move(str(root / "gone"), str(root / "data"))
-    back = mtb.load_batch(root / "again")
+    back = mtb.load_run(root / "again")
     assert back.records[0]["batch_file"] == res.records[0]["batch_file"]
     assert _batch_cols(_quiet(back.rescore)) == _batch_cols(res)
 
@@ -160,14 +160,14 @@ def test_no_unsaved_batch_warning_without_a_batch_metric(cite, tmp_path):
     for r in blob["records"]:                      # a folder from before 0.3.2
         (tmp_path / "out" / r.pop("batch_file")).unlink()
     p.write_text(json.dumps(blob))
-    old = mtb.load_batch(tmp_path / "out")
+    old = mtb.load_run(tmp_path / "out")
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         # the toy cells give no resolution with one cluster per cell type
         warnings.filterwarnings("ignore", message="No Leiden resolution gave")
         warnings.filterwarnings("ignore", message="ARI_batch and NMI_batch use")
         new = old.rescore(metrics=["ARI"])
-    assert new.records[0]["status"] == "CHAIN_OK"
+    assert new.records[0]["status"] == "scored"
     with pytest.warns(UserWarning, match="which older versions did not save"):
         old.rescore(metrics=["ARI", "iLISI"])
 
@@ -258,8 +258,8 @@ def test_the_scbridge_error_names_the_method_once(tmp_path):
 # =========================================================== docstrings
 def test_docstrings_quote_the_current_texts():
     flat = {k: " ".join(inspect.getdoc(o).split()) for k, o in {
-        "run": mtb.run, "save": W.BatchResult.save, "runner": mtb.engine.runner.run,
-        "rescore": W.BatchResult.rescore, "load_batch": mtb.load_batch}.items()}
+        "run": mtb.run, "save": W.RunResult.save, "runner": mtb.engine.runner.run,
+        "rescore": W.RunResult.rescore, "load_run": mtb.load_run}.items()}
     assert "nothing is runnable" not in flat["run"]
     # 0.4: the Notes of run, the runner and rescore that quoted these texts are cut
     for key in ("run", "runner"):
@@ -269,7 +269,7 @@ def test_docstrings_quote_the_current_texts():
     assert "every file in the list above is rewritten from the merged set" in flat["save"]
     assert "see its Notes" not in flat["rescore"]
     assert ("each record's output folder is looked for next to ``batch_result.json`` when "
-            "its recorded path is gone") in flat["load_batch"]
+            "its recorded path is gone") in flat["load_run"]
 
 
 # ============================================================ docs pages

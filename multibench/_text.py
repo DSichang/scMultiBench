@@ -1,5 +1,5 @@
-"""Small helpers every module uses: :class:`Text` for printable text and
-:func:`warn`, a warning attributed to the user's line."""
+"""Small helpers every module uses: :class:`Text` for printable text,
+:func:`warn`, a warning attributed to the user's line, and :func:`_and_list`."""
 from __future__ import annotations
 
 import os
@@ -30,3 +30,9 @@ def warn(message: str, category: type = UserWarning) -> None:
     """``warnings.warn`` attributed to the user's line: the first frame outside
     the package (a script, a notebook cell, a test), whatever the call depth."""
     warnings.warn(message, category, stacklevel=caller_stacklevel())
+
+
+def _and_list(items, last: str = "and") -> str:
+    """``'A'``, ``'A and B'``, ``'A, B and C'`` (``last='or'``: ``'A, B or C'``); repeats stay."""
+    items = [str(i) for i in items]
+    return items[0] if len(items) == 1 else f"{', '.join(items[:-1])} {last} {items[-1]}"

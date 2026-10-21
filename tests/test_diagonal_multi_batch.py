@@ -158,8 +158,9 @@ def test_the_hint_still_fires_when_no_variant_reads_the_folder(tmp_path):
     for i in (1, 2):
         _h5(d / f"rna{i}.h5", ["g0", "g1", "g2"], [f"c{i}_{k}" for k in range(5)])
     _h5(d / "atac_gas.h5", ["g0", "g1", "g2"], [f"a{k}" for k in range(5)])
-    assert "per-batch files (rna1.h5, rna2.h5, ...)" in resolve._per_batch_hint(d, "diagonal")
-    with pytest.warns(UserWarning, match="This folder holds per-batch files"):
+    assert "SPLIT holds numbered batches (rna1.h5, rna2.h5, ...)" in \
+        resolve._per_batch_hint(d, "diagonal")
+    with pytest.warns(UserWarning, match="SPLIT holds numbered batches"):
         mtb.engine.resolve.labels_for("SPLIT", "diagonal", data_path=tmp_path)
     # vertical is not affected by the diagonal rule
     assert resolve._per_batch_hint(_folder(tmp_path), "vertical") is not None

@@ -19,6 +19,8 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+from multibench.engine import scripts
+from multibench import _settings
 from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, registry
@@ -61,8 +63,8 @@ def cite(tmp_path, monkeypatch):
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
     monkeypatch.setattr(config, "repo_path", tmp_path / "no_scripts")
-    monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
-    monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
+    monkeypatch.setattr(_settings, "_ROOT", tmp_path / "pkg")
+    monkeypatch.delenv(scripts.SCRIPTS_REF_VAR, raising=False)
     monkeypatch.chdir(tmp_path)
     calls = []
 
@@ -89,9 +91,6 @@ def test_a_column_name_is_explained(cite, tmp_path, given):
     mtb.config.data_path = data
     kw = dict(methods=['totalVI'], verbose=False)
     with pytest.raises(FileNotFoundError) as e:
-        mtb.run("MYCITE", "vertical", dry_run=True, batch=given, **kw)
-    assert str(e.value) == _c1("batch", given, "donor")
-    with pytest.raises(FileNotFoundError) as e:
         mtb.run("MYCITE", "vertical", tmp_path / "out", batch=given, **kw)
     assert str(e.value) == _c1("batch", given, "donor")
     assert calls == [] and not (tmp_path / "out").exists()
@@ -102,13 +101,13 @@ def test_a_column_name_is_explained(cite, tmp_path, given):
     with pytest.raises(FileNotFoundError) as e:
         res.rescore(labels=given.replace("donor", "celltype"))
     assert str(e.value) == _c1("labels", given.replace("donor", "celltype"), "celltype")
-    assert [r["status"] for r in res.records] == ["CHAIN_OK"]
+    assert [r["status"] for r in res.records] == ["scored"]
 
 
 def test_other_names_that_are_no_file(cite, tmp_path):
     data, _ = cite
     mtb.config.data_path = data
-    kw = dict(methods=['totalVI'], verbose=False, dry_run=True)
+    kw = dict(methods=['totalVI'], verbose=False, out_dir=tmp_path / "out")
     for given, col in (("sample id", "sample id"), ("rna:donor", "rna:donor"),
                        ("donor.h5ad", "donor.h5ad"), ("obs:", "")):
         with pytest.raises(FileNotFoundError) as e:
@@ -127,14 +126,11 @@ def test_a_missing_csv_keeps_its_text(cite, tmp_path):
                 f"{cwd}, the path resolves to {Path(name).resolve()}.")
     for name in ("missing.csv", "donor.tsv", "x.TXT", "sub/donor", "./donor"):
         with pytest.raises(FileNotFoundError) as e:
-            mtb.run("MYCITE", "vertical", dry_run=True, batch=name, **kw)
-        assert str(e.value) == gone(name), name
-        with pytest.raises(FileNotFoundError) as e:
             mtb.run("MYCITE", "vertical", tmp_path / "out", batch=name, **kw)
         assert str(e.value) == gone(name), name
     # a Path is a path, whatever its name
     with pytest.raises(FileNotFoundError) as e:
-        mtb.run("MYCITE", "vertical", dry_run=True, batch=Path("donor"), **kw)
+        mtb.run("MYCITE", "vertical", tmp_path / "out", batch=Path("donor"), **kw)
     assert str(e.value) == gone("donor")
     res = _quiet(mtb.run, "MYCITE", "vertical", tmp_path / "out", **kw)
     with pytest.raises(FileNotFoundError) as e:
@@ -150,8 +146,9 @@ def test_a_file_named_like_a_column_is_read(cite, tmp_path):
     data, _ = cite
     donor = pd.Series(["d1", "d2"] * (N // 2), index=BARS, name="donor")
     donor.to_frame().to_csv(tmp_path / "donor")        # no suffix: it is there, so a file
-    plan = mtb.run(os.path.join(data, 'MYCITE'), 'vertical', methods=['totalVI'], verbose=False, dry_run=True, batch='donor')
-    assert len(plan) == 1
+    res = _quiet(mtb.run, os.path.join(data, 'MYCITE'), 'vertical', tmp_path / "out",
+                 methods=['totalVI'], verbose=False, batch='donor')
+    assert res.records[0]["n_batches"] == 2
 
 
 def test_the_column_itself_works(cite, tmp_path):
@@ -162,22 +159,20 @@ def test_the_column_itself_works(cite, tmp_path):
     kw = dict(methods=['totalVI'], verbose=False)
     # in another row order: matched to the cells by barcode
     shuffled = obs.sample(frac=1, random_state=3)
-    plan = mtb.run("MYCITE", "vertical", dry_run=True, batch=shuffled["donor"], **kw)
-    assert plan["runnable"].all()
     res = _quiet(mtb.run, "MYCITE", "vertical", tmp_path / "out",
                  batch=shuffled["donor"], **kw)
     (rec,) = res.records
-    assert rec["status"] == "CHAIN_OK" and rec["batch_source"] == "user"
+    assert rec["status"] == "scored" and rec["batch_source"] == "user"
     assert rec["n_batches"] == 2
     straight = _quiet(mtb.run, "MYCITE", "vertical", tmp_path / "out2",
                       batch=obs["donor"], **kw).records[0]
     assert straight["metrics"] == rec["metrics"]
     again = res.rescore(batch=shuffled["donor"], labels=shuffled["celltype"])
-    assert again.records[0]["status"] == "CHAIN_OK"
+    assert again.records[0]["status"] == "scored"
     assert again.records[0]["metrics"]["ARI"] == rec["metrics"]["ARI"]
     assert calls == ["totalVI", "totalVI"]
 
 
 def test_the_docstrings_state_the_rule():
-    flat = " ".join(W.BatchResult.rescore.__doc__.split())
+    flat = " ".join(W.RunResult.rescore.__doc__.split())
     assert 'Pass the column itself: ``batch=adata.obs["donor"]``.' in flat

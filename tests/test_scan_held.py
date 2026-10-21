@@ -18,6 +18,8 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+from multibench.engine import scripts
+from multibench import _settings
 from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, registry
@@ -106,8 +108,8 @@ def linux(monkeypatch, tmp_path):
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
     monkeypatch.setattr(config, "repo_path", tmp_path / "no_scripts")
-    monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
-    monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
+    monkeypatch.setattr(_settings, "_ROOT", tmp_path / "pkg")
+    monkeypatch.delenv(scripts.SCRIPTS_REF_VAR, raising=False)
     calls = []
 
     class _Res:
@@ -153,10 +155,10 @@ def test_all_is_every_variant(ds, cat):
 
 
 def test_all_is_the_one_string_modalities_takes():
-    for call in (lambda m: full_scan("D11", "vertical", modalities=m, verbose=False),
-                 lambda m: mtb.run("D11", "vertical", modalities=m, dry_run=True,
-                                       verbose=False)):
-        assert len(call("all")) == 33
+    # the plan has a row per variant, scan a row per method
+    for call, n in ((lambda m: full_scan("D11", "vertical", modalities=m, verbose=False), 33),
+                    (lambda m: mtb.scan("D11", "vertical", modalities=m, verbose=False), 18)):
+        assert len(call("all")) == n
         for other in ("rna", "ALL", "all "):
             with pytest.raises(TypeError) as e:
                 call(other)
@@ -172,20 +174,26 @@ def test_all_is_the_one_string_modalities_takes():
 @pytest.mark.parametrize("mods", [None, "all"])
 @pytest.mark.parametrize("ds,cat", [("D11", "vertical"), ("D52", "cross"),
                                     ("D27mini", "diagonal")])
-def test_scan_and_dry_run_are_one_table(ds, cat, mods, capsys):
+def test_scan_rows_are_rows_of_the_plan(ds, cat, mods, capsys):
+    """0.4.0 (d1): scan returns the plan, one row per method: the row of the
+    full plan that run runs (or that says why not), with its env, caveat and
+    command."""
     _on_disk(ds)
-    scan = _quiet(full_scan, ds, cat, modalities=mods, verbose=False)
-    plan = _quiet(mtb.run, ds, cat, modalities=mods, dry_run=True, verbose=False)
-    # 0.4.0: the plan leaves out the rows a run leaves out, a row whose files are
-    # part of another row of its method (UINMF's 2-batch row on D52)
-    would = scan[[W._would_run(r) for _, r in scan.iterrows()]]
-    nested = W._nested_rows(would)[0]
-    assert set(scan.loc[nested, "method"]) == ({"UINMF"} if ds == "D52" else set())
-    # c1 (C32): the plan holds seven of the columns
-    pd.testing.assert_frame_equal(
-        W._shown_modalities(scan.drop(index=nested).reset_index(drop=True))[W.PLAN_COLUMNS],
-        plan)
-    assert scan.attrs == plan.attrs
+    plan = W._shown_modalities(_quiet(full_scan, ds, cat, modalities=mods, verbose=False))
+    scan = _quiet(mtb.scan, ds, cat, modalities=mods, verbose=False)
+    assert list(scan.columns) == [c for c in W.SCAN_COLUMNS if c != "category"]
+    assert len(scan) == scan["method"].nunique() == plan["method"].nunique()
+    both = scan.merge(plan, on=["method", "modalities"], suffixes=("", "_plan"))
+    assert len(both) == len(scan)
+    for col in ("runnable", "env", "caveat", "command"):
+        assert (both[col] == both[f"{col}_plan"]).all(), col
+    blocked = both[~both["runnable"]]
+    assert (blocked["reason"] == blocked["reason_plan"]).all()
+    # a row whose files are part of another row of its method is not the one run
+    # runs (UINMF's 2-batch row on D52)
+    if ds == "D52" and mods is None:
+        assert scan.set_index("method").loc["UINMF", "modalities"].count("rna") == 3
+    assert {k: scan.attrs[k] for k in plan.attrs} == plan.attrs
     assert capsys.readouterr().out == ""
 
 
@@ -217,7 +225,7 @@ def test_skipped_records_of_named_methods_are_the_same(linux, tmp_path):
         records[mods] = {r["method"]: (r["status"], r["modalities"], r.get("error"))
                          for r in res.records}
     assert {m: s for m, (s, _, _) in records[None].items()} == \
-        {"Matilda": "RUN_OK", "moETM": "SKIPPED", "MIRA": "SKIPPED"}
+        {"Matilda": "ran", "moETM": "skipped", "MIRA": "skipped"}
     assert {m: s for m, (s, _, _) in records["all"].items()} == \
         {m: s for m, (s, _, _) in records[None].items()}
     # a named method with a row whose files are there: the same record
@@ -351,9 +359,10 @@ def test_attrs():
     _on_disk("D22mini")
     assert _core(full_scan("D22mini", "vertical", verbose=False).attrs) == \
         {"held": ["rna", "adt", "atac"], "not_listed": 0, "not_held": []}
-    # the dry run carries them, and a selection of rows keeps them
-    plan = mtb.run("D11", "vertical", dry_run=True, verbose=False)
-    assert plan.attrs == df.attrs and plan[plan["runnable"]].attrs == df.attrs
+    # scan carries them, with the cells per file, and a selection of rows keeps them
+    plan = mtb.scan("D11", "vertical", verbose=False)
+    assert plan.attrs == {**df.attrs, "cells": {"rna.h5": 2864, "adt.h5": 2864}}
+    assert plan[plan["runnable"]].attrs == plan.attrs
     assert W._held_families(config.data_path / "D11", "vertical") == ["rna", "adt"]
     assert W._held_families(config.data_path / "D11", None) == ["rna", "adt"]
     # a numbered folder holds no file of an unnumbered role, and the other way
@@ -375,7 +384,7 @@ def test_verbose_false_prints_nothing_and_sets_attrs(capsys):
     df = full_scan("D11", "vertical", verbose=False)
     assert capsys.readouterr().out == ""
     assert len(df) == 14 and df.attrs["not_listed"] == 19 and df.attrs["not_held"] == ["atac"]
-    assert type(df) is pd.DataFrame and list(df.columns) == W.SCAN_COLUMNS
+    assert type(df) is pd.DataFrame and list(df.columns) == W.PLAN_COLUMNS
 
 
 def test_two_donor_folder_keeps_the_missing_batch_reason(tmp_path, linux):
@@ -398,19 +407,19 @@ def _nothing_runnable(**kw):
 
 def test_the_hint_carries_all(no_envs, capsys):
     lines = _nothing_runnable(modalities="all")
-    call = "mtb.run('D11', 'vertical', modalities=\"all\", dry_run=True)"
-    assert lines[-1] == (f"{call} shows every row. Its reason column says "
-                         f"which check failed. mtb.env.install(dry_run=True) checks the environments.")
+    call = "mtb.scan('D11', 'vertical', modalities=\"all\")"
+    assert lines[-1] == (f"{call} says why. mtb.env.install(dry_run=True) checks the "
+                         f"environments.")
     n = int(re.fullmatch(r"The first 3 of (\d+) blocked rows:", lines[1]).group(1))
     shown = eval(call, {"mtb": mtb})                      # noqa: S307 - our own hint
-    assert len(shown) == n == 33
+    assert n == 33 and len(shown) == 18 and not shown["runnable"].any()
     assert "not listed" not in "\n".join(lines)
     # the default call: the rows it lists, the same count; c3 (C55): no sentence on
     # the rows that read ATAC
     lines = _nothing_runnable()
-    call = "mtb.run('D11', 'vertical', dry_run=True)"
-    assert lines[-1] == (f"{call} shows the listed rows. Its reason column "
-                         f"says which check failed. mtb.env.install(dry_run=True) checks the environments.")
+    call = "mtb.scan('D11', 'vertical')"
+    assert lines[-1] == (f"{call} says why. mtb.env.install(dry_run=True) checks the "
+                         f"environments.")
     assert "not listed" not in "\n".join(lines)
     n = int(re.fullmatch(r"The first 3 of (\d+) blocked methods:", lines[1]).group(1))
     shown = eval(call, {"mtb": mtb})                      # noqa: S307 - our own hint
@@ -421,24 +430,22 @@ def test_the_hint_carries_all(no_envs, capsys):
 def test_named_methods_keep_the_error_of_0_3_4(no_envs):
     # with methods=, and when every row is listed, the text is unchanged
     lines = _nothing_runnable(methods=["Matilda"])
-    assert lines[-1].startswith("mtb.run('D11', 'vertical', methods=['Matilda'], dry_run=True) shows "
-                                "these rows. ")
+    assert lines[-1].startswith("mtb.scan('D11', 'vertical', methods=['Matilda']) says why. ")
     assert "not listed" not in "\n".join(lines)
     _on_disk("D22mini")
     with pytest.raises(ValueError) as e:
         mtb.run("D22mini", "vertical", out_dir="unused_out", verbose=False)
     lines = str(e.value).splitlines()
-    assert lines[-1].startswith("mtb.run('D22mini', 'vertical', dry_run=True) shows every row. ")
+    assert lines[-1].startswith("mtb.scan('D22mini', 'vertical') says why. ")
     assert "not listed" not in str(e.value)
 
 
-def test_dry_run_prints_the_note_after_its_count_line(no_envs, capsys):
-    mtb.run("D11", "vertical", dry_run=True)
-    out = capsys.readouterr().out.splitlines()
-    assert out[0] == ("[run] Dry run: 0 of 14 requested methods can run on D11 "
-                      "(vertical); the reason column says why.")
-    assert len(out) == 1                    # c3 (C55): no sentence on the rows of ATAC
-    mtb.run("D11", "vertical", dry_run=True, modalities="all")
+def test_scan_says_nothing_of_the_rows_it_does_not_list(no_envs, capsys):
+    mtb.scan("D11", "vertical")
     out = capsys.readouterr().out
-    assert out.startswith("[run] Dry run: 0 of 33 requested rows can run on D11 ")
+    assert out.startswith("[scan] 14 of 14 methods have their input files in D11. ")
+    assert "not listed" not in out          # c3 (C55): no sentence on the rows of ATAC
+    mtb.scan("D11", "vertical", modalities="all")
+    out = capsys.readouterr().out
+    assert out.startswith("[scan] 14 of 18 methods have their input files in D11. ")
     assert "not listed" not in out

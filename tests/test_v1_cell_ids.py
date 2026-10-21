@@ -79,7 +79,7 @@ def test_the_stored_d28_scjoint_embedding_scores_shuffled_as_in_order():
     folder = stored if (stored / "batch_result.json").is_file() else repo
     if not (folder / "batch_result.json").is_file():
         pytest.skip("no stored D28 outputs")
-    e = _quiet(mtb.load_batch, folder).embedding("scJoint")
+    e = _quiet(mtb.load_run, folder).embedding("scJoint")
     kw = dict(dataset="D28", category="diagonal", method="scJoint",
               metrics=["cLISI", "GC"], verbose=False)
     want = _values(_quiet(mtb.evaluate, e, **kw))
@@ -111,26 +111,14 @@ def test_your_own_diagonal_embedding_with_the_atac_cells_first():
     assert own == pytest.approx(want, abs=0.005)
 
 
-def test_a_package_methods_cell_names_under_another_name_name_the_method():
-    """v1 NEW-6: scJoint's names (atac_gas.h5) are none of the folder's default
-    cells; scored as your own method, the error names the methods whose output
-    is named so."""
+def test_a_package_methods_cell_names_under_another_name_score_as_the_method():
+    """v1 NEW-6, d1: scJoint's names (atac_gas.h5) are none of the folder's
+    default cells, but they are cells of the files a package method reads: the
+    labels follow them by name, whatever method= says."""
     e = _embedding("D28", "diagonal", "scJoint")
-    for kw in ({}, {"method": "mine"}):
-        with pytest.raises(ValueError) as err:
-            _quiet(mtb.evaluate, e, dataset="D28", category="diagonal", metrics=["cLISI"],
-                   verbose=False, **kw)
-        msg = str(err.value)
-        assert msg.startswith(
-            f"None of the embedding's cell ids is a cell of rna_cty.csv and atac_cty.csv, "
-            f"such as {e.obs_names[0]!r}. These cells are named as the output of "), msg
-        m = msg.split("such as method=", 1)[1].split(" ", 1)[0].strip("'")
-        assert msg.endswith(f"pass method= the method that made it, such as "
-                            f"method={m!r} (or '{m} (this run)').")
-    # the method named works, and so does the method that made it, renamed
     want = _values(_quiet(mtb.evaluate, e, dataset="D28", category="diagonal",
                           method="scJoint", metrics=["cLISI"], verbose=False))
-    for name in (m, "scJoint (this run)"):
+    for name in ("embedding", "mine", "scJoint (this run)"):
         got = _values(_quiet(mtb.evaluate, e, dataset="D28", category="diagonal",
                              method=name, metrics=["cLISI"], verbose=False))
         assert got == pytest.approx(want, abs=1e-9)

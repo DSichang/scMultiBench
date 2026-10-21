@@ -25,6 +25,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+from multibench import _settings
 from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, runner
@@ -64,9 +65,9 @@ def _standin(tmp_path, monkeypatch, script):
     py.chmod(py.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     (envs_dir / "matilda" / envs.FLAVOR_FILE).write_text("build\n")   # made by multibench
     monkeypatch.setattr(config, "envs_dir", envs_dir)
-    monkeypatch.delenv(config.ENVS_DIR_VAR, raising=False)
+    monkeypatch.delenv(_settings.ENVS_DIR_VAR, raising=False)
     monkeypatch.setattr(envs.shutil, "which", lambda *a, **k: None)
-    monkeypatch.setattr(config._shutil, "which", lambda *a, **k: None)
+    monkeypatch.setattr(_settings.shutil, "which", lambda *a, **k: None)
     monkeypatch.delenv("CONDA_EXE", raising=False)
     monkeypatch.setenv(runner.RUN_MODE_VAR, "prefix")
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)

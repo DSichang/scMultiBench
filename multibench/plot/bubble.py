@@ -15,10 +15,10 @@ import numpy as np
 import pandas as pd
 
 from . import style
-from .. import _compat
-from ..config import _and_list
+from .. import _text
+from .._text import _and_list
 
-from ..data.catalog import FAMILY_METRICS as _FAMILY_METRICS
+from .._data.catalog import FAMILY_METRICS as _FAMILY_METRICS
 
 # column order within each family: catalog.metrics()'s
 FAMILIES = [
@@ -190,7 +190,7 @@ def _expand_families(metrics, available) -> list:
     names are kept for ``_resolve``. A family the frame has no code of
     raises ``ValueError``."""
     from .bar import FAMILY_METRICS
-    from ..data import catalog
+    from .._data import catalog
     paper = [c for _, codes, _ in FAMILIES for c in codes]
 
     def in_figure_order(names):
@@ -219,7 +219,7 @@ def _expand_families(metrics, available) -> list:
 
 def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None) -> BubbleTable:
     """The :class:`BubbleTable` of ``long_df``, as :func:`bubble` draws it."""
-    from ..data import catalog
+    from .._data import catalog
 
     need = {"method", "metric", "value"}
     have = set(long_df.columns)
@@ -262,12 +262,12 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None) -> Bubble
         # the per-dataset view, only to see which datasets share methods; the
         # figure itself shows raw values
         for msg in style.dataset_mode_warnings(style.per_dataset_ranks(df)):
-            _compat.warn(msg, UserWarning)
+            _text.warn(msg, UserWarning)
     raw_all = df.pivot_table(index="method", columns="metric", values="value",
                              aggfunc="mean")
     backend = style.backend_warning(df)
     if backend:
-        _compat.warn(backend, UserWarning)
+        _text.warn(backend, UserWarning)
 
     def _block(label, cmap, raw):
         family_overall = style.overall(df, list(raw.columns)).reindex(raw.index)
@@ -314,13 +314,13 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None) -> Bubble
     # the n/a cells of a family that counts in no Overall need no words
     missing = _na_missing(counted)
     if na_cells and missing:
-        _compat.warn(_na_message(missing, df), UserWarning)
+        _text.warn(_na_message(missing, df), UserWarning)
 
     drawn = pd.concat([b.raw for b in blocks], axis=1)
     msg = _no_comparison_message(rows, style.constant_columns(drawn),
                                  partial=set(drawn.columns[drawn.isna().any()]))
     if msg:
-        _compat.warn(msg, UserWarning)
+        _text.warn(msg, UserWarning)
 
     return BubbleTable(
         methods=rows, blocks=blocks,
@@ -782,7 +782,7 @@ def bubble(long_df, *, metrics=None, methods=None, title=None, save=None):
     long_df : pandas.DataFrame
         A long table (``method``, ``metric``, ``value`` and optional
         ``dataset``), as ``mtb.load_results``, ``mtb.evaluate`` and
-        ``BatchResult.long`` return; stored and your own rows can be concatenated.
+        ``RunResult.long`` return; stored and your own rows can be concatenated.
     metrics : str, list of str | None
         A family (``"clustering"``, ``"batch"``, ``"classification"``,
         ``"all"``), a code, or codes in their column order; ``None`` = every

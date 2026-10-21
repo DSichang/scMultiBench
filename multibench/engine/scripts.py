@@ -1,50 +1,15 @@
-"""The settings every multibench function reads: ``mtb.config`` itself.
-
-Set one to use your own data folder, env folder or Leiden backend, for
-example ``mtb.config.data_path = "/scratch/data"``. ``print(mtb.config)``
-shows them all.
-"""
+"""The method scripts: where ``run`` finds them (``mtb.config.repo_path``),
+how it fetches them, and the commit a run record names."""
 from __future__ import annotations
 
-import functools
-import os as _os
-import re as _re
-import shutil as _shutil
-import socket as _socket
-import sys as _sys
-import types as _types
+import os
+import re
+import socket
 from pathlib import Path
 
-#: The settings, in the order ``print(mtb.config)`` shows them.
-_FIELDS = ("data_path", "repo_path", "envs_dir", "leiden_flavor")
+from .. import _settings
+from .._settings import REPO_PATH_VAR, config
 
-__all__ = list(_FIELDS)
-
-
-def __dir__() -> list[str]:
-    """``dir(mtb.config)`` lists the settings only (PEP 562)."""
-    return sorted(n for n in globals() if n.startswith("__")) + sorted(__all__)
-
-_CATEGORY_FOLDERS = {
-    "vertical": "vertical integration",
-    "diagonal": "diagonal integration",
-    "mosaic": "mosaic integration",
-    "cross": "cross integration",
-}
-
-_ROOT = Path(__file__).resolve().parent.parent
-# datasets and the scripts clone sit next to the package in a checkout; a wheel
-# install keeps them out of site-packages, in a per-user cache
-_IN_REPO = (_ROOT / "pyproject.toml").is_file()
-_CACHE = (Path(_os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
-          / "multibench")
-_BASE = _ROOT if _IN_REPO else _CACHE
-
-#: The environment variables that set the ``mtb.config`` paths. Each wins over
-#: the built-in default; a value assigned in Python wins over the variable.
-ENVS_DIR_VAR = "MULTIBENCH_ENVS_DIR"
-DATA_PATH_VAR = "MULTIBENCH_DATA_PATH"
-REPO_PATH_VAR = "MULTIBENCH_REPO_PATH"
 #: The commit or tag of the method scripts a fetch checks out; unset = the
 #: repository's default branch.
 SCRIPTS_REF_VAR = "MULTIBENCH_SCRIPTS_REF"
@@ -54,171 +19,9 @@ SCRIPTS_URL = "https://github.com/PYangLab/scMultiBench.git"
 FETCH_SCRIPTS = f"git clone --depth 1 {SCRIPTS_URL} <folder>"
 
 
-def _and_list(items, last: str = "and") -> str:
-    """``'A'``, ``'A and B'``, ``'A, B and C'`` (``last='or'``: ``'A, B or C'``); repeats stay."""
-    items = [str(i) for i in items]
-    return items[0] if len(items) == 1 else f"{', '.join(items[:-1])} {last} {items[-1]}"
-
-
-def _from_env(var: str) -> Path | None:
-    """The path in environment variable ``var`` (``~`` expanded), or ``None`` if unset or empty."""
-    value = _os.environ.get(var)
-    return Path(value).expanduser() if value else None
-
-
-def _default_data_path() -> Path:
-    """``$MULTIBENCH_DATA_PATH``, else ``<base>/data`` (see ``mtb.config.data_path``)."""
-    return _from_env(DATA_PATH_VAR) or _BASE / "data"
-
-
-def _default_repo_path() -> Path:
-    """``$MULTIBENCH_REPO_PATH``, else ``<base>/scMultiBench_ref`` (see ``mtb.config.repo_path``)."""
-    return _from_env(REPO_PATH_VAR) or _BASE / "scMultiBench_ref"
-
-
-@functools.lru_cache(maxsize=1)
-def _conda_envs_dir() -> Path | None:
-    """The first writable envs dir of the conda/mamba on PATH, or ``None``; one
-    ``info --json`` subprocess per process (tests that fake conda clear the cache)."""
-    exe = _shutil.which("mamba") or _shutil.which("conda")
-    if exe is None:
-        return None
-    from .engine.envs import _envs_dir
-    return _envs_dir(exe)
-
-
-def _default_envs_dir() -> Path:
-    """Resolve where method env prefixes live (see ``mtb.config.envs_dir``)."""
-    override = _from_env(ENVS_DIR_VAR)
-    if override is not None:
-        return override
-    found = _conda_envs_dir()
-    if found is not None:
-        return found
-    return _CACHE / "envs"
-
-
-class _Setting:
-    """One setting of ``mtb.config``. A value assigned is kept in the module's
-    ``_values``; unset, or set to ``None``, it reads ``default()`` on every
-    read. ``cache=True`` keeps the first default instead (``envs_dir``: probing
-    conda at import would slow every import). ``path=True`` stores a ``Path``."""
-
-    def __init__(self, default, *, path: bool = True, cache: bool = False):
-        self._default = default
-        self._path = path
-        self._cache = cache
-
-    def __set_name__(self, owner, name):
-        self._name = name
-
-    def __get__(self, obj, objtype=None):
-        if obj is None:
-            return self
-        values = obj.__dict__.setdefault("_values", {})
-        value = values.get(self._name)
-        if value is None:
-            value = self._default()
-            if self._cache:
-                values[self._name] = value
-        return value
-
-    def __set__(self, obj, value):
-        if value is not None and self._path:
-            value = Path(value).expanduser()
-        obj.__dict__.setdefault("_values", {})[self._name] = value
-
-
-def category_folder(token: str) -> str:
-    """``"vertical"`` -> ``"vertical integration"`` (internal); ``ValueError`` listing
-    the valid tokens for an unknown one (``registry.check_category`` relies on it)."""
-    try:
-        return _CATEGORY_FOLDERS[token]
-    except (KeyError, TypeError):
-        # an assay name is the usual slip: say where it belongs
-        assay = ". CITE-seq and 10x Multiome are vertical." if str(token).lower().replace(
-            "-", "").replace(" ", "") in _ASSAY_TOKENS else ""
-        raise ValueError(
-            f"unknown category {token!r}; valid: {sorted(_CATEGORY_FOLDERS)}{assay}"
-        ) from None
-
-
-#: assay names a category= gets by mistake (lower case, no dash or space)
-_ASSAY_TOKENS = ("citeseq", "multiome", "10xmultiome", "sharesesq", "shareseq",
-                 "teaseq", "asapseq", "dogmaseq", "snareseq")
-
-
-class _Settings(_types.ModuleType):
-    """The paths and settings every multibench function reads.
-
-    ``mtb.config`` is this object: set a field to change it, for example
-    ``mtb.config.data_path = "/scratch/data"``, or set
-    ``MULTIBENCH_DATA_PATH``, ``MULTIBENCH_REPO_PATH`` and
-    ``MULTIBENCH_ENVS_DIR`` in the shell. A value assigned in Python wins
-    over the variable; ``None`` goes back to the default.
-    ``print(mtb.config)`` shows every field.
-
-    Attributes
-    ----------
-    data_path : pathlib.Path
-        Data root that holds the dataset folders; ``mtb.data.fetch``,
-        ``mtb.scan`` and ``mtb.run`` use it. Default
-        ``$MULTIBENCH_DATA_PATH``, else ``<base>/data``.
-    repo_path : pathlib.Path
-        Checkout holding the upstream ``tools_scripts/`` (the method scripts),
-        cloned on first use when absent or empty. Default
-        ``$MULTIBENCH_REPO_PATH``, else ``<base>/scMultiBench_ref``.
-    envs_dir : pathlib.Path
-        Where the method environments live (``<envs_dir>/<env>``). Default
-        ``$MULTIBENCH_ENVS_DIR``, else the first writable envs folder of the
-        conda on ``PATH``, else ``~/.cache/multibench/envs``.
-    leiden_flavor : str
-        Leiden backend of the clustering in ``mtb.evaluate``: ``"leidenalg"``
-        (default, the article's and the stored results') or ``"igraph"``
-        (faster).
-
-    Examples
-    --------
-    >>> import multibench as mtb
-    >>> mtb.config.data_path = "/scratch/data"
-    >>> # before mtb.env.install(...)
-    >>> mtb.config.envs_dir = "/scratch/envs"
-    >>> print(mtb.config)
-
-    See Also
-    --------
-    mtb.env.install : provisions the method envs under ``envs_dir``.
-    mtb.data.fetch : downloads demo datasets into ``data_path``.
-    """
-
-    data_path = _Setting(_default_data_path)
-    repo_path = _Setting(_default_repo_path)
-    envs_dir = _Setting(_default_envs_dir, cache=True)
-    leiden_flavor = _Setting(lambda: "leidenalg", path=False)
-
-    def __repr__(self) -> str:
-        return "mtb.config(" + ", ".join(f"{k}={getattr(self, k)!r}" for k in _FIELDS) + ")"
-
-    def __setattr__(self, name, value):
-        # a typo such as data_dir= would otherwise be a new attribute nothing reads
-        if not name.startswith("_") and name not in _FIELDS and name not in vars(self):
-            raise AttributeError(f"mtb.config has no setting {name!r}. Its settings are "
-                                 f"{_and_list(_FIELDS)}.")
-        super().__setattr__(name, value)
-
-
-#: The settings assigned so far, by name (``_Setting`` reads and writes it).
-_values: dict = {}
-
-#: The package's own tables (the stored results, the dataset and metric lists):
-#: read by the package, not settings.
-_RESULT_PATH = _ROOT / "multibench" / "result"
-_FILES_PATH = _ROOT / "multibench" / "files"
-
-
 def _scripts_checkout() -> Path | None:
     """The folder holding ``tools_scripts/`` that :func:`ensure_repo` would use, or ``None``."""
-    for p in (Path(_settings.repo_path), _ROOT):
+    for p in (Path(config.repo_path), _settings._ROOT):
         if (p / "tools_scripts").is_dir():
             return p
     return None
@@ -247,7 +50,7 @@ def scripts_commit(repo=None) -> str | None:
             return None
         head = (git / "HEAD").read_text().strip()
         if not head.startswith("ref:"):
-            return head.lower() if _re.fullmatch(r"[0-9a-fA-F]{40}", head) else None
+            return head.lower() if re.fullmatch(r"[0-9a-fA-F]{40}", head) else None
         ref = head[4:].strip()
         common = git
         if (git / "commondir").is_file():                  # a linked worktree
@@ -276,7 +79,7 @@ def _ref_mismatch(repo: Path, ref: str, *, folder: bool = False) -> str | None:
     rev-parse``; a folder that is not a checkout passes."""
     import subprocess
     head = scripts_commit(repo)
-    if head is None or (_re.fullmatch(r"[0-9a-fA-F]{7,40}", ref)
+    if head is None or (re.fullmatch(r"[0-9a-fA-F]{7,40}", ref)
                         and head.startswith(ref.lower())):
         return None
     git = _git_dir(repo)
@@ -307,7 +110,7 @@ def _check_ref(repo: Path, ref: str) -> None:
 def scripts_ref_problem(repo=None) -> str | None:
     """Why the method scripts do not match ``$MULTIBENCH_SCRIPTS_REF``, or ``None``
     (also when it is unset or no scripts are here yet: the first fetch checks it out)."""
-    ref = _os.environ.get(SCRIPTS_REF_VAR) or None
+    ref = os.environ.get(SCRIPTS_REF_VAR) or None
     repo = _scripts_checkout() if repo is None else Path(repo)
     if ref is None or repo is None or not (repo / "tools_scripts").is_dir():
         return None
@@ -320,12 +123,12 @@ def run_provenance(env: str | None, repo=None) -> dict:
     flavor = None
     if env:
         try:
-            from .engine import envs
+            from . import envs
             flavor = envs.installed_flavor(env)
         except Exception:  # noqa: BLE001 - a record field must never fail a run
             flavor = None
     return {"scripts_commit": scripts_commit(repo), "env_flavor": flavor or "unknown",
-            "hostname": _socket.gethostname()}
+            "hostname": socket.gethostname()}
 
 
 #: Where a fetch into an existing empty ``repo_path`` clones, inside that folder.
@@ -346,8 +149,8 @@ def _fillable(p: Path) -> bool:
 def scripts_folder_problem(repo=None) -> str | None:
     """Why a fetch refuses the scripts folder ``repo`` (default ``repo_path``): it holds
     other files. No final period: ``mtb.scan`` joins it into its reason column."""
-    p = Path(_settings.repo_path if repo is None else repo)
-    if any((q / "tools_scripts").is_dir() for q in (p, _ROOT)) or _fillable(p):
+    p = Path(config.repo_path if repo is None else repo)
+    if any((q / "tools_scripts").is_dir() for q in (p, _settings._ROOT)) or _fillable(p):
         return None
     where = "MULTIBENCH_REPO_PATH or mtb.config.repo_path"
     return (f"{p} holds other files and no method scripts. Set {where} to an empty "
@@ -377,9 +180,9 @@ def ensure_repo(path=None):
     import subprocess
     import shutil as _sh
 
-    ref = _os.environ.get(SCRIPTS_REF_VAR) or None
-    p = Path(path) if path else _settings.repo_path
-    for have in (p, _ROOT):
+    ref = os.environ.get(SCRIPTS_REF_VAR) or None
+    p = Path(path) if path else config.repo_path
+    for have in (p, _settings._ROOT):
         if (have / "tools_scripts").is_dir():
             if ref:
                 _check_ref(have, ref)
@@ -433,8 +236,3 @@ def ensure_repo(path=None):
     else:
         part.rename(p)
     return p
-
-
-# mtb.config is the settings object: this module, with the fields of _Settings
-_settings = _sys.modules[__name__]
-_settings.__class__ = _Settings

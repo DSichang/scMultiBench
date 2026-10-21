@@ -8,7 +8,7 @@ would fix the embedding's rows differently per host.
 
 This driver runs the unmodified main_Concerto.py with ``os.listdir`` giving
 the shards in batch order, so the rows follow the argument order, the order
-``mtb.labels_for`` returns. Any other listing is left as the filesystem gives it.
+of the dataset's numbered label files. Any other listing is left as the filesystem gives it.
 
 Args: ``--script_dir <dir of main_Concerto.py>``, then main_Concerto.py's own.
 Kept to Python 3.8 syntax (the scmb_concerto env).

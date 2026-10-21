@@ -13,6 +13,7 @@ import pytest
 
 import multibench as mtb
 from multibench import workflow
+from multibench.engine import envs
 from tests.test_c1_decisions import _tree
 
 
@@ -35,7 +36,7 @@ def test_rescore_does_not_rank_a_recorded_label_order(tmp_path, monkeypatch):
         seen.append(len(cands))
         return real(emb, category, cands, **kw)
     monkeypatch.setattr(workflow, "_evaluate_best_order", spy)
-    mtb.load_batch(_old_tree(tmp_path)).rescore(metrics=["cLISI"], verbose=False)
+    mtb.load_run(_old_tree(tmp_path)).rescore(metrics=["cLISI"], verbose=False)
     assert seen == [1]
 
 
@@ -44,17 +45,19 @@ def test_the_summary_has_no_label_order_confidence_and_the_records_keep_the_orde
     cands = [{"order": ["a.csv", "b.csv"], "ARI": 0.6}, {"order": ["b.csv", "a.csv"], "ARI": 0.1}]
     rec = {"method": "M", "status": "CHAIN_OK", "metrics": {"ARI": 0.6},
            "labels_used": ["a.csv", "b.csv"], "label_order_candidates": cands}
-    res = mtb.BatchResult([rec], "D28", "diagonal")
+    res = mtb.RunResult([rec], "D28", "diagonal")
     assert "label_order_confidence" not in res.summary.columns
     assert res.records[0]["label_order_candidates"] == cands
     assert not hasattr(workflow, "_order_confidence")
 
 
-def test_every_record_code_the_package_writes_has_a_status():
+def test_every_record_status_the_package_writes_is_one_of_five():
+    """d1: records hold the summary's five statuses; 0.3 codes are mapped on load."""
     src = Path(workflow.__file__).read_text()
-    written = set(re.findall(r'rec\["status"\](?:, rec\["error"\])? = "([A-Z_]+)"', src))
-    written |= set(re.findall(r'"status": "([A-Z_]+)"', src))
-    assert written and written <= set(workflow._STATUS)
+    written = set(re.findall(r'rec\["status"\](?:, rec\["(?:error|note)"\])? = "(\w+)"', src))
+    written |= set(re.findall(r'"status": "(\w+)"', src))
+    assert written == set(workflow.STATUSES)
+    assert set(workflow._STATUS.values()) == set(workflow.STATUSES)
     # outside _STATUS, the code reads a record's status through _status only
     body = src[src.index("_RAN_REASON = "):]
     assert not re.search(r'get\("status"\) *(==|!=) *"|get\("status"\) +in +\(', body)
@@ -65,12 +68,13 @@ def test_every_record_code_the_package_writes_has_a_status():
 def test_one_plan_column_list():
     assert not hasattr(workflow, "COMPACT_COLUMNS")
     assert not hasattr(workflow, "compact_columns")
-    assert workflow.PLAN_COLUMNS[:4] == ["method", "modalities", "runnable", "reason"]
+    assert workflow.SCAN_COLUMNS[:5] == ["method", "category", "modalities", "runnable",
+                                         "reason"]
 
 
 # --------------------------------------------------------------- C43, C57
 def test_fetch_returns_the_dataset_folder(monkeypatch):
-    fetch = importlib.import_module("multibench.data.fetch")
+    fetch = importlib.import_module("multibench._data.fetch")
     root = Path(mtb.config.data_path)
     assert mtb.data.fetch("D11") == root / "D11"           # present: nothing downloads
     monkeypatch.setattr(fetch, "_download", lambda url: pytest.fail("downloaded"))
@@ -116,7 +120,7 @@ def _mosaic(root):
 
 
 def test_a_size_caveat_states_the_folders_number(tmp_path):
-    plan = mtb.run(_mosaic(tmp_path), "mosaic", dry_run=True, verbose=False)
+    plan = mtb.scan(_mosaic(tmp_path), "mosaic", verbose=False)
     cav = plan.set_index("method").loc["Multigrate", "caveat"]
     assert cav == ("Multigrate needs about 1,300 cells in every batch, and batch 1 of this "
                    "folder has 250: leave Multigrate out.")
@@ -132,14 +136,18 @@ def test_the_benchmarks_own_mosaic_batches_hold_the_same_cells():
 
 
 def test_the_dry_run_command_keeps_the_out_dir_placeholder():
-    plan = mtb.run("D28", "diagonal", methods=["iNMF"], dry_run=True, verbose=False)
+    plan = mtb.scan("D28", "diagonal", methods=["iNMF"], verbose=False)
     assert plan["command"].iloc[0].endswith("'<out_dir>/iNMF_D28/'")
 
 
-def test_a_batch_of_the_wrong_length_is_refused_before_anything_runs(tmp_path):
+def test_a_batch_of_the_wrong_length_is_refused_before_anything_runs(tmp_path, monkeypatch):
+    monkeypatch.setattr(workflow, "_installed_envs",
+                        lambda: frozenset({envs.group_for("Matilda")}))
+    monkeypatch.setattr(workflow._runner, "linux_only_sentence", lambda: None)
     with pytest.raises(ValueError) as e:
-        mtb.run("D11", "vertical", methods=["Matilda"], dry_run=True, verbose=False,
-                    batch=["a"] * 100)
+        mtb.run("D11", "vertical", tmp_path / "out", methods=["Matilda"], verbose=False,
+                batch=["a"] * 100)
+    assert not (tmp_path / "out").exists()
     assert str(e.value) == ("batch has 100 entries for the 2,864 cells of D11: give one "
                             "batch per cell.")
 
@@ -242,7 +250,8 @@ def test_a_two_batch_diagonal_folder_names_each_methods_files_once(tmp_path):
         mtb.io.export_dataset(rna, d, atac=atac, atac_kind="gene_activity",
                               labels="obs:celltype", category="diagonal", batch_index=b)
     reason = mtb.scan(d, "diagonal", verbose=False).set_index("method")["reason"]
-    assert reason["iNMF"].startswith("iNMF reads rna.h5 and atac_gas.h5. Environment")
+    # d1 (u3): the row of the numbered batches, which names the missing batch
+    assert reason["iNMF"].startswith("rna3.h5, atac_gas3.h5 are missing. Environment")
 
 
 def test_cross_messages_name_the_files_export_writes(tmp_path):

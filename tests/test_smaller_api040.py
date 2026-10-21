@@ -33,7 +33,7 @@ def test_runresult_repr_is_short():
 
 
 def test_rescore_prints_by_default():
-    assert inspect.signature(mtb.BatchResult.rescore).parameters["verbose"].default is True
+    assert inspect.signature(mtb.RunResult.rescore).parameters["verbose"].default is True
 
 
 def test_data_has_a_module_docstring():

@@ -25,26 +25,26 @@ def test_skip_existing_with_params_is_refused():
 def test_batch_result_attributes_are_documented():
     import inspect
     for attr in ("summary", "long", "plot"):
-        a = getattr(mtb.BatchResult, attr)
+        a = getattr(mtb.RunResult, attr)
         doc = inspect.getdoc(a.fget if isinstance(a, property) else a)
-        assert doc and len(doc) > 40, f"BatchResult.{attr} needs a real docstring"
+        assert doc and len(doc) > 40, f"RunResult.{attr} needs a real docstring"
     # records (results until 0.4) is an instance attribute, documented on the class
-    assert "records : list[dict]" in inspect.getdoc(mtb.BatchResult)
+    assert "records : list[dict]" in inspect.getdoc(mtb.RunResult)
 
 
 def test_a_graph_only_run_counts_as_ran_not_failed():
     """Seurat_WNN and MIRA write a neighbour graph and no embedding: they ran,
     and there is nothing to score."""
-    from multibench.workflow import BatchResult
+    from multibench.workflow import RunResult
     recs = [{"method": "Seurat_WNN", "status": "RUN_OK_NO_EMBEDDING", "_long": None},
             {"method": "MIRA", "status": "RUN_OK_NO_EMBEDDING", "_long": None},
             {"method": "Broken", "status": "FAIL", "error": "boom", "_long": None},
             {"method": "Slow", "status": "TIMEOUT", "error": "too long", "_long": None},
             {"method": "Good", "status": "CHAIN_OK", "_long": None}]
-    r = BatchResult(recs, "D11", "vertical")
-    assert repr(r) == "<BatchResult vertical/D11: 1 scored, 2 ran, 1 failed, 1 timeout>"
+    r = RunResult(recs, "D11", "vertical")
+    assert repr(r) == "<RunResult vertical/D11: 1 scored, 2 ran, 1 failed, 1 timeout>"
 import multibench as mtb
-from multibench.workflow import BatchResult
+from multibench.workflow import RunResult
 
 
 def test_runresult_is_documented():
@@ -67,7 +67,7 @@ def test_run_all_raises_when_nothing_can_run(tmp_path, monkeypatch):
     with pytest.raises(ValueError) as e:
         mtb.run(os.path.join(tmp_path, 'EMPTYDS'), 'vertical', out_dir=tmp_path / 'out', verbose=False)
     assert str(e.value).startswith("No method can run on EMPTYDS (vertical).\n")
-    assert "mtb.run" in str(e.value)       # tells you how to diagnose it
+    assert "mtb.scan" in str(e.value)      # tells you how to diagnose it
 
 
 def test_run_all_missing_dataset_folder_is_filenotfound():
@@ -95,5 +95,5 @@ def test_read_labels_reads_cty_and_obs_exports(tmp_path):
 def test_batch_result_plot_docstring_names_the_kept_keywords():
     # c1 (C05): bubble has no order= since 0.4.0
     import inspect
-    doc = inspect.getdoc(mtb.BatchResult.plot)
+    doc = inspect.getdoc(mtb.RunResult.plot)
     assert "order=" not in doc and "``methods=``" in doc

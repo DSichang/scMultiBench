@@ -19,6 +19,8 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+from multibench.engine import scripts
+from multibench import _settings
 from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, registry
@@ -72,8 +74,8 @@ def host(monkeypatch, tmp_path):
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
     monkeypatch.setattr(config, "repo_path", tmp_path / "no_scripts")
-    monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
-    monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
+    monkeypatch.setattr(_settings, "_ROOT", tmp_path / "pkg")
+    monkeypatch.delenv(scripts.SCRIPTS_REF_VAR, raising=False)
     calls = []
 
     def fake_run(method, category, inputs, out_dir, params=None):
@@ -137,7 +139,7 @@ def test_run_all_stops_before_any_method(cite, tmp_path, host):
 def test_complete_labels_run_as_before(cite, tmp_path, host):
     res = _run(cite, tmp_path, ["Matilda", "totalVI"])
     assert host == ["Matilda", "totalVI"]
-    assert [r["status"] for r in res.records] == ["CHAIN_OK", "CHAIN_OK"]
+    assert [r["status"] for r in res.records] == ["scored", "scored"]
     assert all(r["metrics"]["ARI"] > 0.9 for r in res.records)
 
 
@@ -181,7 +183,7 @@ def test_a_blank_line_of_a_one_column_file_is_no_row(cite, tmp_path, host):
     assert len(eio.read_labels(cite / "MYCITE" / "cty.csv")) == N - 1
     assert W._label_gaps("MYCITE", cite) == {}
     res = _run(cite, tmp_path, ["totalVI"])
-    assert [r["status"] for r in res.records] == ["RUN_OK_NO_LABEL_MATCH"]
+    assert [r["status"] for r in res.records] == ["ran"]
 
 
 def test_labels_that_are_not_missing_run(cite, tmp_path, host):
@@ -189,7 +191,7 @@ def test_labels_that_are_not_missing_run(cite, tmp_path, host):
     lab[:4] = ["na", "none", "Unknown", "-"]
     _write(cite / "MYCITE" / "cty.csv", lab)
     res = _run(cite, tmp_path, ["totalVI"])
-    assert [r["status"] for r in res.records] == ["CHAIN_OK"]
+    assert [r["status"] for r in res.records] == ["scored"]
 
 
 def test_the_way_out_follows_the_methods(cite, tmp_path, host):
@@ -221,33 +223,27 @@ def test_two_methods_that_read_the_label_file(cite, tmp_path, host):
 
 
 # ------------------------------------------------------------------ a dry run
-def test_dry_run_prints_the_same_fact(cite, tmp_path, host, capsys):
+def test_scan_prints_the_same_fact(cite, tmp_path, host, capsys):
     _write(cite / "MYCITE" / "cty.csv", _with_gaps())
     mtb.config.data_path = cite
-    kw = dict(dry_run=True)
-    plan = mtb.run("MYCITE", "vertical", methods=["Matilda", "sciPENN"], **kw)
+    plan = mtb.scan("MYCITE", "vertical", methods=["Matilda", "sciPENN"])
     out = capsys.readouterr().out.splitlines()
-    assert out[-1] == "[run] " + M1
+    assert out[-1] == "[scan] " + M1
     assert len(plan) == 2 and plan["runnable"].all() and host == []
-    mtb.run("MYCITE", "vertical", methods=["totalVI"], **kw)
-    assert capsys.readouterr().out.splitlines()[-1] == "[run] " + M1
-    # evaluate=False: only a method that reads the file stops the run
-    mtb.run("MYCITE", "vertical", methods=["Matilda", "sciPENN"], evaluate=False, **kw)
-    assert capsys.readouterr().out.splitlines()[-1] == "[run] " + M1_MATILDA
-    mtb.run("MYCITE", "vertical", methods=["totalVI"], evaluate=False, **kw)
-    assert "without a label" not in capsys.readouterr().out
+    mtb.scan("MYCITE", "vertical", methods=["totalVI"])
+    assert capsys.readouterr().out.splitlines()[-1] == "[scan] " + M1
     # verbose=False prints nothing, and nothing is raised
-    mtb.run("MYCITE", "vertical", methods=["Matilda"], verbose=False, **kw)
+    mtb.scan("MYCITE", "vertical", methods=["Matilda"], verbose=False)
     assert capsys.readouterr().out == ""
 
 
-def test_dry_run_of_complete_labels_prints_no_such_line(cite, capsys):
-    mtb.run(os.path.join(cite, 'MYCITE'), 'vertical', methods=['Matilda'], dry_run=True)
+def test_scan_of_complete_labels_prints_no_such_line(cite, capsys):
+    mtb.scan(os.path.join(cite, 'MYCITE'), 'vertical', methods=['Matilda'])
     out = capsys.readouterr().out
-    assert "without a label" not in out and out.startswith("[run] Dry run: 1 of 1 ")
+    assert "without a label" not in out and out.startswith("[scan] 1 of 1 method ")
 
 
-def test_a_dry_run_off_linux_names_the_method_that_would_read_the_file(
+def test_scan_off_linux_names_the_gap(
         cite, monkeypatch, capsys):
     # no environment can be installed here; the rows would run on Linux
     from multibench.engine import runner as R
@@ -255,13 +251,9 @@ def test_a_dry_run_off_linux_names_the_method_that_would_read_the_file(
                         lambda: "Methods run only on Linux, and this computer runs macOS.")
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     _write(cite / "MYCITE" / "cty.csv", _with_gaps())
-    plan = mtb.run(os.path.join(cite, 'MYCITE'), 'vertical', methods=['Matilda', 'totalVI'], dry_run=True)
+    plan = mtb.scan(os.path.join(cite, 'MYCITE'), 'vertical', methods=['Matilda', 'totalVI'])
     assert not plan["runnable"].any()
-    assert capsys.readouterr().out.splitlines()[-1] == "[run] " + M1
-    # the method is named when the run does not score
-    plan = mtb.run(os.path.join(cite, 'MYCITE'), 'vertical', methods=['Matilda', 'totalVI'], dry_run=True, evaluate=False)
-    assert not plan["runnable"].any()
-    assert capsys.readouterr().out.splitlines()[-1] == "[run] " + M1_MATILDA
+    assert capsys.readouterr().out.splitlines()[-1] == "[scan] " + M1
 
 
 # ------------------------------------------------------------------ evaluate=False
@@ -269,8 +261,8 @@ def test_evaluate_false_runs_methods_that_do_not_read_labels(cite, tmp_path, hos
     _write(cite / "MYCITE" / "cty.csv", _with_gaps())
     res = _run(cite, tmp_path, ["totalVI", "sciPENN"], evaluate=False)
     assert sorted(host) == ["sciPENN", "totalVI"]
-    assert {r["method"]: r["status"] for r in res.records} == {"totalVI": "RUN_OK",
-                                                               "sciPENN": "RUN_OK"}
+    assert {r["method"]: r["status"] for r in res.records} == {"totalVI": "ran",
+                                                               "sciPENN": "ran"}
 
 
 def test_evaluate_false_stops_methods_that_read_labels(cite, tmp_path, host):
@@ -316,7 +308,7 @@ def test_only_the_files_a_method_reads_stop_a_run_without_scores(tmp_path, host)
     kw = dict(verbose=False)
     res = _quiet(mtb.run, "DONORS", "cross", tmp_path / "out", methods=["totalVI"],
                  evaluate=False, **kw)
-    assert [r["status"] for r in res.records] == ["RUN_OK"]
+    assert [r["status"] for r in res.records] == ["ran"]
     with pytest.raises(ValueError) as e:
         _quiet(mtb.run, "DONORS", "cross", tmp_path / "out2", methods=["totalVI"], **kw)
     assert str(e.value) == (
@@ -332,23 +324,23 @@ M2 = ("ValueError: 9 of the 120 labels in {files} are missing, for example 'NA'.
 
 def test_rescore_records_the_error(cite, tmp_path, host, monkeypatch):
     res = _run(cite, tmp_path, ["Matilda", "totalVI"])
-    assert [r["status"] for r in res.records] == ["CHAIN_OK", "CHAIN_OK"]
+    assert [r["status"] for r in res.records] == ["scored", "scored"]
     _write(cite / "MYCITE" / "cty.csv", _with_gaps())
     # the ranking would take the error of an order and go on: it is not reached
     monkeypatch.setattr(W, "_evaluate_best_order", lambda *a, **k: 1 / 0)
     again = res.rescore()
     for rec in again.records:
-        assert rec["status"] == "RUN_OK_EVAL_FAILED"
+        assert rec["status"] == "ran"
         assert rec["error"] == M2.format(files="cty.csv")
         assert not rec.get("metrics") and rec.get("_long") is None
         assert "labels_used" not in rec
     assert list(again.summary["status"]) == ["ran"] * 2
     assert "ARI" not in again.summary.columns
     # the first result is untouched, and complete labels score again
-    assert [r["status"] for r in res.records] == ["CHAIN_OK", "CHAIN_OK"]
+    assert [r["status"] for r in res.records] == ["scored", "scored"]
     monkeypatch.undo()
     _write(cite / "MYCITE" / "cty.csv", LABELS)
-    assert [r["status"] for r in again.rescore().records] == ["CHAIN_OK", "CHAIN_OK"]
+    assert [r["status"] for r in again.rescore().records] == ["scored", "scored"]
 
 
 def test_several_label_files_are_not_ranked(tmp_path, host, monkeypatch):
@@ -364,7 +356,7 @@ def test_several_label_files_are_not_ranked(tmp_path, host, monkeypatch):
     kw = dict(verbose=False)
     res = _quiet(mtb.run, "DONORS", "cross", tmp_path / "out", methods=["totalVI"], **kw)
     (rec,) = res.records
-    assert rec["status"] == "CHAIN_OK" and len(rec["label_order_candidates"]) > 1
+    assert rec["status"] == "scored" and len(rec["label_order_candidates"]) > 1
     lab = np.array(["A"] * 20 + ["B"] * 20, dtype=object)
     lab[[3, 30]] = "None"
     _write(d / "cty2.csv", lab)
@@ -373,7 +365,7 @@ def test_several_label_files_are_not_ranked(tmp_path, host, monkeypatch):
     monkeypatch.setattr(W, "_evaluate_best_order",
                         lambda *a, **k: ranked.append(1) or real(*a, **k))
     (rec,) = res.rescore().records
-    assert rec["status"] == "RUN_OK_EVAL_FAILED" and ranked == []
+    assert rec["status"] == "ran" and ranked == []
     # c2 (D28): the files in the order the record was scored with
     a, b, c = res.records[0]["labels_used"]
     assert rec["error"] == (
@@ -397,21 +389,21 @@ def test_labels_passed_to_rescore(cite, tmp_path, host):
     # in the rows of the embedding, and by barcode
     for labels in (gaps, list(gaps), pd.Series(gaps, index=[f"c{i}" for i in range(N)])):
         (rec,) = res.rescore(labels=labels).records
-        assert (rec["status"], rec["error"]) == ("RUN_OK_EVAL_FAILED", passed)
+        assert (rec["status"], rec["error"]) == ("ran", passed)
         assert "metrics" not in rec
     # a file: the same record
     sheet = tmp_path / "labels.csv"
     pd.DataFrame({"celltype": gaps}, index=[f"c{i}" for i in range(N)]).to_csv(sheet)
     (rec,) = res.rescore(labels=sheet).records
-    assert (rec["status"], rec["error"]) == ("RUN_OK_EVAL_FAILED", passed)
+    assert (rec["status"], rec["error"]) == ("ran", passed)
     # complete labels from a file score as the same labels in memory
     pd.DataFrame({"celltype": LABELS}, index=[f"c{i}" for i in range(N)]).to_csv(sheet)
     (from_file,) = res.rescore(labels=sheet).records
     (in_memory,) = res.rescore(labels=pd.Series(LABELS, index=[f"c{i}" for i in range(N)])
                                ).records
-    assert from_file["status"] == "CHAIN_OK" and from_file["metrics"] == in_memory["metrics"]
+    assert from_file["status"] == "scored" and from_file["metrics"] == in_memory["metrics"]
     (rec,) = res.rescore(labels=LABELS[::-1].copy()).records
-    assert rec["status"] == "CHAIN_OK"
+    assert rec["status"] == "scored"
 
 
 def test_the_error_of_a_record_counts_with_separators(tmp_path, host):

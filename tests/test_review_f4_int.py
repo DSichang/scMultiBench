@@ -7,7 +7,7 @@
 - The ATAC override ends the reason, after the env and GPU sentences.
 - run with allow_atac_mismatch=True reports the caveat once, not again
   as a UserWarning; a direct mtb.run still warns.
-- BatchResult's repr counts a named SKIPPED method once; summary keeps
+- RunResult's repr counts a named SKIPPED method once; summary keeps
   n_batches whole next to SKIPPED rows.
 - Batch Series errors: row-number indexes, missing ids and foreign ids each
   get their own fix.
@@ -27,6 +27,8 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+from multibench.engine import scripts
+from multibench import _settings
 from multibench import config, discover
 from multibench import workflow as W
 from multibench.engine import envs, registry
@@ -49,8 +51,8 @@ def pinned(monkeypatch, tmp_path):
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
     monkeypatch.setattr(config, "repo_path", tmp_path / "no_scripts")
-    monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
-    monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
+    monkeypatch.setattr(_settings, "_ROOT", tmp_path / "pkg")
+    monkeypatch.delenv(scripts.SCRIPTS_REF_VAR, raising=False)
 
 
 def _quiet(fn, *a, **kw):
@@ -154,7 +156,7 @@ def test_a_gpu_blocked_row_ends_with_the_export_fix_and_no_override(
     assert "allow_atac_mismatch" not in row["reason"] and "anyway" not in row["reason"]
 
 
-# ------------------------------------------------------ BatchResult counts, dtypes
+# ------------------------------------------------------ RunResult counts, dtypes
 def _rec(method, status, **kw):
     return {"method": method, "category": "vertical", "dataset": "MYMULTIOME",
             "status": status, "n_tunable": 3, **kw}
@@ -164,14 +166,14 @@ def test_repr_counts_a_named_skipped_method_once():
     recs = [_rec("Matilda", "FAIL", error="x")] + [
         _rec(m, "SKIPPED", error="blocked", requested=True)
         for m in ("scMDC", "UnitedNet", "scMVP", "MIRA")]
-    res = W.BatchResult(recs, "MYMULTIOME", "vertical")
+    res = W.RunResult(recs, "MYMULTIOME", "vertical")
     assert (res.summary.status != "scored").sum() == 5
     # c1 (C38): one count per status
-    assert repr(res) == "<BatchResult vertical/MYMULTIOME: 1 failed, 4 skipped>"
-    unnamed = W.BatchResult([_rec("Matilda", "FAIL", error="x"),
+    assert repr(res) == "<RunResult vertical/MYMULTIOME: 1 failed, 4 skipped>"
+    unnamed = W.RunResult([_rec("Matilda", "FAIL", error="x"),
                              _rec("scMDC", "SKIPPED", error="blocked")],
                             "MYMULTIOME", "vertical")
-    assert repr(unnamed) == "<BatchResult vertical/MYMULTIOME: 1 failed, 1 skipped>"
+    assert repr(unnamed) == "<RunResult vertical/MYMULTIOME: 1 failed, 1 skipped>"
 
 
 # -------------------------------------------------------- batch Series messages
@@ -236,11 +238,11 @@ def test_a_single_build_env_reports_single(tmp_path, monkeypatch):
     assert envs._single_build("scmb_r") and not envs._single_build("matilda")
     assert envs.installed_flavor("scmb_r") == "single"      # a record saying gpu
     assert envs.installed_flavor("matilda") == "gpu"        # a real GPU build
-    assert config.run_provenance("scmb_r")["env_flavor"] == "single"
+    assert scripts.run_provenance("scmb_r")["env_flavor"] == "single"
 
 
 def test_cite_example_cites_only_the_methods_that_finished():
     ex = inspect.getdoc(mtb.cite).split("Examples\n--------\n")[1].split("\n\n")[0]
-    # 0.4: cite takes the BatchResult and cites the methods that ran
-    assert 'mtb.cite(mtb.load_batch("out/"), format="bibtex")' in ex
+    # 0.4: cite takes the RunResult and cites the methods that ran
+    assert 'mtb.cite(mtb.load_run("out/"), format="bibtex")' in ex
     assert "list(res.summary.method)" not in ex

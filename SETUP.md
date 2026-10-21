@@ -38,8 +38,8 @@ file gate, `evaluate`, the figures - works on any machine.
 `scan()` checks two gates per method - `files_ok` (the dataset folder itself; this
 gate runs on any machine, no environments needed) and `env_ok` (the method's conda
 env exists here) - and marks a method runnable only when both pass, so a sweep
-never starts something it cannot finish. `mtb.run(dataset, category, dry_run=True)`
-is the plan with the blocked rows and their reasons kept.
+never starts something it cannot finish. `mtb.scan(dataset, category)` returns that
+plan, with each blocked method's reason and each method's command.
 
 ## Things worth knowing before you start
 

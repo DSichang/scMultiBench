@@ -50,7 +50,7 @@ def test_two_representations_select_the_methods_that_read_both_files(data):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         sc = full_scan("D28", "diagonal", modalities=BOTH, data_path=data, verbose=False)
-        plan = mtb.run(os.path.join(data, 'D28'), 'diagonal', modalities=BOTH, dry_run=True)
+        plan = mtb.scan(os.path.join(data, 'D28'), 'diagonal', modalities=BOTH)
     want = {"MultiMAP", "Seurat_v3"}
     assert set(sc["method"]) == want and set(plan["method"]) == want
     assert set(sc["modalities"]) == {"rna+atac_peak+atac_gas"}
@@ -129,9 +129,9 @@ def test_scan_keeps_one_combination_and_find_methods_at_least(data):
     assert "a row's modalities must be exactly the named combination" not in fm_doc
 
 
-# ------------------------------------------------------------------ L48 BatchResult.plot
+# ------------------------------------------------------------------ L48 RunResult.plot
 def test_batchresult_plot_reads_the_fill_as_scaled_per_column():
-    doc = " ".join(mtb.BatchResult.plot.__doc__.split())
+    doc = " ".join(mtb.RunResult.plot.__doc__.split())
     assert "darker is higher" not in doc and "rank 1 is the largest" not in doc
     assert "Circle size shows the rank within a column (bigger is better)." in doc
     assert "the lightest is the lowest in this figure, not zero." in doc

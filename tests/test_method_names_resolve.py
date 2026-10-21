@@ -52,10 +52,8 @@ def test_inputs_and_labels(tmp_path):
 
 
 def test_run_dry_run_uses_the_methods_env():
-    argv = mtb.engine.runner.run("totalvi", "vertical", inputs={"rna": "/a.h5", "adt": "/b.h5"},
-                   out_dir="/o", dry_run=True)
-    assert argv == mtb.engine.runner.run("totalVI", "vertical", inputs={"rna": "/a.h5", "adt": "/b.h5"},
-                           out_dir="/o", dry_run=True)
+    argv = mtb.engine.runner.preview("totalvi", "vertical", inputs={"rna": "/a.h5", "adt": "/b.h5"}, out_dir="/o")[0]
+    assert argv == mtb.engine.runner.preview("totalVI", "vertical", inputs={"rna": "/a.h5", "adt": "/b.h5"}, out_dir="/o")[0]
 
 
 def test_scan_and_run_all_take_any_case(tmp_path):
@@ -66,6 +64,6 @@ def test_scan_and_run_all_take_any_case(tmp_path):
     df = mtb.scan(os.path.join(tmp_path, 'V'), 'vertical', methods=['totalvi'], verbose=False)
     assert list(df.method) == ["totalVI"]
     with pytest.raises(KeyError, match="totalVI does not accept"):
-        mtb.run(os.path.join(tmp_path, 'V'), 'vertical', methods=['TotalVI'], params={'TOTALVI': {'nonsense': 1}}, dry_run=True, verbose=False)
+        mtb.scan(os.path.join(tmp_path, 'V'), 'vertical', methods=['TotalVI'], params={'TOTALVI': {'nonsense': 1}}, verbose=False)
 
 

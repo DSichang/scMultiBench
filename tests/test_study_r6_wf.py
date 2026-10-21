@@ -3,7 +3,7 @@
 R6-01: a saved result read from another directory lost its dataset folder
 (``data_path`` recorded as given, relative). rescore then matched a barcode
 Series by position and blamed the files. run records ``data_root``;
-load_batch takes ``data_path=``; a folder that is not found is named.
+load_run takes ``data_path=``; a folder that is not found is named.
 
 R6-02: run(batch=) kept only batch_source and n_batches, not the vector,
 so every rescore without batch= lost the batch metrics.
@@ -91,11 +91,11 @@ def test_run_all_records_the_absolute_data_root(rel):
 
 def test_rescore_from_another_directory_aligns_the_labels_by_barcode(rel, monkeypatch):
     res, root = rel
-    at_root = _quiet(mtb.load_batch("out").rescore, labels=_shuffled_labels())
+    at_root = _quiet(mtb.load_run("out").rescore, labels=_shuffled_labels())
     assert "+".join(at_root.records[0]["labels_used"]) == "cty.csv"
     assert _ari(at_root) == _ari(res) > 0.3
     monkeypatch.chdir(root / "nb")
-    back = mtb.load_batch("../out")
+    back = mtb.load_run("../out")
     assert Path(back.records[0]["data_path"]).samefile(root / "data")
     new, caught = _rescore(back, labels=_shuffled_labels())
     assert not _by_position(caught), caught
@@ -116,7 +116,7 @@ def test_a_folder_that_is_not_found_is_named(rel, monkeypatch):
     res, root = rel
     shutil.move(str(root / "data"), str(root / "moved"))
     monkeypatch.chdir(root / "nb")
-    back = mtb.load_batch("../out")
+    back = mtb.load_run("../out")
     assert back.records[0]["data_path"] == str(root / "data")         # left as recorded
     # the roots tried: the recorded data_path, then data_root (the same folder)
     where = back.records[0]["data_root"]
@@ -133,7 +133,7 @@ def test_a_folder_that_is_not_found_is_named(rel, monkeypatch):
         back.rescore(labels=csv)
     new = _quiet(back.rescore, metrics=["ARI"])
     rec = new.records[0]
-    assert rec["status"] == "RUN_OK_NO_LABEL_MATCH"
+    assert rec["status"] == "ran"
     assert rec["note"] == f"The dataset folder MYCITE is not found in {where}. {MOVED}"
     for k in ("metrics", "batch_source", "n_batches", "labels_used"):
         assert k not in rec, k
@@ -178,7 +178,7 @@ def test_rescore_reuses_the_saved_batch(batched):
     res, batch, tmp = batched
     before = _batch_metrics(res)
     assert before[1] is not None
-    back = mtb.load_batch(tmp / "out")
+    back = mtb.load_run(tmp / "out")
     for kw in ({}, {"labels": _shuffled_labels(2)}):
         new, caught = _rescore(back, **kw)
         rec = new.records[0]
@@ -188,14 +188,14 @@ def test_rescore_reuses_the_saved_batch(batched):
     # the reference example: the re-scored result keeps the batch on disk
     _quiet(back.rescore, labels=_shuffled_labels(2)).save(tmp / "rescored")
     assert (tmp / "rescored" / res.records[0]["batch_file"]).is_file()
-    again = _quiet(mtb.load_batch(tmp / "rescored").rescore)
+    again = _quiet(mtb.load_run(tmp / "rescored").rescore)
     assert _batch_metrics(again) == before
     # a batch that is given wins, and is saved in its turn
     ones = _quiet(back.rescore, batch=np.ones(N, dtype=int))
     assert ones.records[0]["n_batches"] == 1
     assert ones.records[0]["batch_file"] != res.records[0]["batch_file"]
     ones.save(tmp / "ones")
-    assert _quiet(mtb.load_batch(tmp / "ones").rescore).records[0]["n_batches"] == 1
+    assert _quiet(mtb.load_run(tmp / "ones").rescore).records[0]["n_batches"] == 1
 
 
 def test_a_folder_without_the_saved_batch_warns_once(batched):
@@ -205,7 +205,7 @@ def test_a_folder_without_the_saved_batch_warns_once(batched):
     for r in blob["records"]:
         (tmp / "out" / r.pop("batch_file")).unlink()
     p.write_text(json.dumps(blob))
-    old = mtb.load_batch(tmp / "out")
+    old = mtb.load_run(tmp / "out")
     text = ("This result was scored with your batch vector, which older versions did "
             "not save. Pass batch= again to keep the batch metrics.")
     new, caught = _rescore(old)
@@ -214,7 +214,7 @@ def test_a_folder_without_the_saved_batch_warns_once(batched):
     failed, caught = _rescore(old, metrics="all")
     assert caught.count(text) == 1, caught
     rec = failed.records[0]
-    assert rec["status"] == "RUN_OK_EVAL_FAILED"
+    assert rec["status"] == "ran"
     assert ("metrics='all' needs batch labels for ASW_batch, ARI_batch, NMI_batch, GC and iLISI. "
             "Pass batch=<vector>, or metrics='clustering'.") in rec["error"]
     for k in ("batch_source", "n_batches", "metrics"):
@@ -283,12 +283,12 @@ def test_rescore_keeps_the_recorded_label_order(cross, tmp_path, monkeypatch):
     rec = res.records[0]
     assert rec["labels_used"] == ["cty1.csv", "cty2.csv", "cty3.csv"]
     assert len(rec["label_order_candidates"]) == 6
-    back = mtb.load_batch(tmp_path / "totalVI")
+    back = mtb.load_run(tmp_path / "totalVI")
     calls = _count_sweeps(monkeypatch)
     new = back.rescore(metrics=["ASW"])
     assert len(calls) == 0
     out = new.records[0]
-    assert out["status"] == "CHAIN_OK"
+    assert out["status"] == "scored"
     assert out["metrics"]["ASW"] == rec["metrics"]["ASW"]
     assert out["labels_used"] == rec["labels_used"]
     assert out["label_order_candidates"] == rec["label_order_candidates"]
@@ -305,7 +305,7 @@ def test_rescore_keeps_the_recorded_candidates(cross, tmp_path, monkeypatch, cap
            {"order": ["cty2.csv", "cty1.csv", "cty3.csv"], "ARI": 0.01}]
     blob["records"][0]["label_order_candidates"] = old
     p.write_text(json.dumps(blob))
-    new = _quiet(mtb.load_batch(tmp_path / "totalVI").rescore, metrics=["ARI"],
+    new = _quiet(mtb.load_run(tmp_path / "totalVI").rescore, metrics=["ARI"],
                  verbose=True)
     out = new.records[0]
     assert out["label_order_candidates"] == old
@@ -321,7 +321,7 @@ def test_rescore_ranks_the_orders_of_a_record_without_one(cross, tmp_path, monke
     blob["records"][0].pop("labels_used")
     p.write_text(json.dumps(blob))
     calls = _count_sweeps(monkeypatch)
-    _quiet(mtb.load_batch(tmp_path / "totalVI").rescore, metrics=["ARI"], verbose=True)
+    _quiet(mtb.load_run(tmp_path / "totalVI").rescore, metrics=["ARI"], verbose=True)
     assert len(calls) == 1
     lines = capsys.readouterr().out.splitlines()
     assert lines[0] == ("[rescore] totalVI: ranking 6 label orders on 150 cells with "
@@ -335,7 +335,7 @@ def test_a_stored_order_that_no_longer_fits_is_ranked_again(cross, tmp_path, mon
     blob["records"][0]["labels_used"] = ["cty1.csv", "cty2.csv"]     # 90 of 150 cells
     p.write_text(json.dumps(blob))
     calls = _count_sweeps(monkeypatch)
-    new = _quiet(mtb.load_batch(tmp_path / "totalVI").rescore, metrics=["ASW"])
+    new = _quiet(mtb.load_run(tmp_path / "totalVI").rescore, metrics=["ASW"])
     assert len(calls) == 1
     assert new.records[0]["labels_used"] == ["cty1.csv", "cty2.csv", "cty3.csv"]
 
@@ -362,14 +362,14 @@ def test_rescore_does_not_warn_about_its_own_file_of_origin_batch(cross, tmp_pat
 # ================================================================ docstrings
 def test_docstrings_state_the_new_rules():
     flat = {k: " ".join(inspect.getdoc(o).split()) for k, o in {
-        "rescore": W.BatchResult.rescore, "load_batch": mtb.load_batch,
-        "save": W.BatchResult.save}.items()}
+        "rescore": W.RunResult.rescore, "load_run": mtb.load_run,
+        "save": W.RunResult.save}.items()}
     assert "is handed to ``evaluate(metrics=)``" not in flat["rescore"]
     assert ("``None`` = the batch ``run`` was given, else each cell's label "
             "file.") in flat["rescore"]
     # R7-12 (b); 0.4.0: data_path= is deprecated, the Notes give the search order
-    assert "data_path :" not in flat["load_batch"]
+    assert "data_path :" not in flat["load_run"]
     assert ("the dataset folder under the recorded data root, then "
-            "``mtb.config.data_path``.") in flat["load_batch"]
+            "``mtb.config.data_path``.") in flat["load_run"]
     assert "``batch_<hash>.csv``" in flat["save"]
-    assert "data_path" not in inspect.signature(mtb.load_batch).parameters
+    assert "data_path" not in inspect.signature(mtb.load_run).parameters

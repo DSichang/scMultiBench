@@ -39,15 +39,6 @@ def test_read_labels_skips_header_and_codes(tmp_path):
     assert list(labels) == ["B", "T", "B", "NK"]
 
 
-def test_read_clustering_decodes_bytes(tmp_path):
-    p = tmp_path / "cluster.h5"
-    with h5py.File(p, "w") as f:
-        grp = f.create_group("obs")
-        grp.create_dataset("cluster_leiden", data=np.array([b"0", b"1", b"0"]))
-    c = io.read_clustering(p)
-    assert list(c) == [0, 1, 0]
-
-
 def test_evaluate_rejects_non_scib():
     import pytest
     from multibench.eval import pipeline
@@ -406,7 +397,6 @@ def test_align_vector_matches_as_evaluate_does():
     from multibench.eval import pipeline
     ids = pd.Index([f"c{i}" for i in range(6)])
     x = pd.Series([f"t{i}" for i in range(6)], index=ids).iloc[[3, 0, 5, 1, 4, 2]]
-    mine = io.align_vector(x, ids)
+    mine = io._align_vector(x, ids, what="labels", column=None, cells=None)
     assert list(mine) == [f"t{i}" for i in range(6)]
     assert list(pipeline._obs_or_vector(x, None, what="labels", ids=ids)) == list(mine)
-    assert "calls this" not in io.align_vector.__doc__

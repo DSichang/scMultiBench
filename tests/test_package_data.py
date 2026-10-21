@@ -26,7 +26,6 @@ RUNTIME_READ = [
     "engine/drivers/run_matilda.py",
     "engine/drivers/run_stabmap.R",
     "engine/drivers/run_concerto.py",
-    "files/dataset.csv",
     "files/metric_full.csv",
 ]
 

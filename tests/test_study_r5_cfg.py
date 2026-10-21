@@ -26,7 +26,7 @@ from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, ingest, registry
 
-F = importlib.import_module("multibench.data.fetch")
+F = importlib.import_module("multibench._data.fetch")
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 
 

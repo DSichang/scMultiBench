@@ -10,6 +10,7 @@ the Troubleshooting sentence on the live package. (R5-05, the download error of 
 in tests/test_study_r5_cfg.py.)
 """
 import importlib.util
+from multibench.engine import scripts
 import json
 import re
 import warnings
@@ -102,7 +103,7 @@ def test_a_named_skipped_method_has_its_reason_in_summary(tmp_path, monkeypatch)
     monkeypatch.setattr(W, "_installed_envs", lambda: every - {missing})
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
     monkeypatch.setattr(config, "repo_path", tmp_path / "no_scripts")
-    monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
+    monkeypatch.delenv(scripts.SCRIPTS_REF_VAR, raising=False)
 
     class _Res:
         output = np.zeros((2864, 5))

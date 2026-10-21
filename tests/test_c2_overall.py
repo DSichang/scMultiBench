@@ -13,7 +13,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench.data.catalog import FAMILY_METRICS
+from multibench._data.catalog import FAMILY_METRICS
 from multibench.plot import style
 from multibench.plot.bubble import _build_table
 

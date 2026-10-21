@@ -7,15 +7,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from .. import config
-
-__all__ = ["datasets", "metrics"]
-
-
-def __dir__() -> list[str]:
-    """``dir(mtb.catalog)`` lists the public API and the dunders only (PEP 562);
-    the other names stay reachable."""
-    return sorted(set(__all__) | {n for n in globals() if n.startswith("__")})
+from .. import _settings
+from ..engine import registry
 
 #: display and result-folder spellings -> method id
 _ALIASES = {
@@ -42,7 +35,6 @@ _ALIASES = {
 
 def _registry_ids() -> list[str]:
     """The registry's method ids."""
-    from ..engine import registry     # lazy: registry imports config
     return [s.id for s in registry.load()]
 
 
@@ -63,7 +55,6 @@ def _canonical_id(name: str, *, strict: bool = False) -> str:
         return by_lower[folded.lower()]
     if strict:
         import difflib
-        from ..engine import registry
         hint = difflib.get_close_matches(folded, ids, n=1, cutoff=0.6)
         raise KeyError(registry.unknown_method_message(name, hint[0] if hint else ""))
     return folded
@@ -239,11 +230,6 @@ def _dataset_sort_key(ds: str):
     return (m.group(1).upper(), int(m.group(2)), m.group(3))
 
 
-#: descriptive columns of dataset.csv (the paper's dataset table); the shipped
-#: file leaves them empty, and datasets() returns only the filled ones
-_PAPER_COLUMNS = ["assay", "tissue", "n_cells", "n_batches", "source"]
-
-
 def datasets(*, category: str | None = None) -> pd.DataFrame:
     """The datasets ``mtb.data.fetch`` downloads or ``mtb.load_results`` holds.
 
@@ -256,8 +242,7 @@ def datasets(*, category: str | None = None) -> pd.DataFrame:
     Returns
     -------
     pandas.DataFrame
-        One row per dataset: ``dataset``, ``category`` (``;``-joined when the
-        benchmark scored it in several) and ``has_results``
+        One row per dataset: ``dataset``, ``category`` and ``has_results``
         (``mtb.load_results`` has stored results for it). ``mtb.data.fetch``
         downloads every one.
 
@@ -268,15 +253,9 @@ def datasets(*, category: str | None = None) -> pd.DataFrame:
     >>> ds.dataset.tolist()
     >>> ds[ds.has_results]
     """
-    raw = pd.read_csv(Path(config._FILES_PATH) / "dataset.csv")
-    raw = raw.rename(columns={c: c.strip() for c in raw.columns})
-    raw = raw.dropna(how="all", axis=0)
-    name_col = "dataset name" if "dataset name" in raw.columns else "dataset"
-    raw = raw.assign(**{name_col: raw[name_col].astype(str).str.strip()})
-
-    # from the result tree at each call, so no dataset load_results serves is
-    # missing; the article's tables give the category of D24 and D25 too
+    # from the result tree at each call, so no dataset load_results serves is missing
     from . import results
+    from .fetch import AVAILABLE, DEMO_CATEGORIES
     cat_of: dict[str, list[str]] = {}
     served: set[str] = set()
     for cat in results._CATEGORIES:
@@ -287,30 +266,19 @@ def datasets(*, category: str | None = None) -> pd.DataFrame:
             served.update(held)
         except Exception:       # a broken/absent tree must not break the catalog
             continue
-    csv_ids = list(raw[name_col])
-    extra = sorted((d for d in cat_of if d not in set(csv_ids)), key=_dataset_sort_key)
-    if extra:
-        raw = pd.concat([raw, pd.DataFrame({name_col: extra})], ignore_index=True)
-
-    from .fetch import AVAILABLE, DEMO_CATEGORIES
     for ds, cat in DEMO_CATEGORIES.items():
         cat_of.setdefault(ds, [cat])
-    demos = [d for d in DEMO_CATEGORIES if d not in set(raw[name_col])]
-    raw = pd.concat([raw, pd.DataFrame({name_col: sorted(demos, key=_dataset_sort_key)})],
-                    ignore_index=True)
-    out = pd.DataFrame()
-    out["dataset"] = raw[name_col].astype(str).str.strip()
+    # the full datasets first, then the small ones of the tutorials
+    ids = sorted(set(AVAILABLE) | served,
+                 key=lambda d: (bool(_dataset_sort_key(d)[2]), _dataset_sort_key(d)))
+    out = pd.DataFrame({"dataset": ids})
     out["category"] = out["dataset"].map(lambda d: ";".join(cat_of[d]) if d in cat_of else None)
     fetchable = out["dataset"].isin(set(AVAILABLE))
     out["has_results"] = out["dataset"].isin(served)
-
-    for col in _PAPER_COLUMNS:
-        if col in raw.columns and raw[col].notna().any():
-            out[col] = raw[col].values
     # the rows a user can act on: data to fetch or stored results to compare with
     out = out[fetchable | out["has_results"]]
     if category is not None:
-        config.category_folder(category)
+        registry.check_category(category)
         out = out[out["category"].fillna("").str.split(";").map(lambda cs: category in cs)]
     return out.reset_index(drop=True)
 
@@ -335,7 +303,7 @@ def metrics() -> pd.DataFrame:
     --------
     mtb.evaluate : computes these metrics for an embedding.
     """
-    raw = pd.read_csv(Path(config._FILES_PATH) / "metric_full.csv")
+    raw = pd.read_csv(Path(_settings._FILES_PATH) / "metric_full.csv")
     raw = raw.rename(columns={c: c.strip() for c in raw.columns})
     family = {c: f for f, codes in FAMILY_METRICS.items() for c in codes}
     raw.insert(1, "family", raw["metric"].map(family))

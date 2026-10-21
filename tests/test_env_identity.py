@@ -147,8 +147,9 @@ def test_scan_reports_the_users_env_and_does_not_run_it(fake_root):
 
 
 def test_install_does_not_take_the_users_env_as_installed(fake_root, monkeypatch):
-    row = mtb.env.install(["Matilda"], dry_run=True).to_dict("records")[0]
+    row = envs._install_rows(["Matilda"], dry_run=True)[0]
     assert row["state"] == "name taken" and row["exists"] is False
+    assert mtb.env.install(["Matilda"], dry_run=True)["state"].tolist() == ["name taken"]
     monkeypatch.setattr(envs, "install_packed",
                         lambda *a, **k: pytest.fail("downloaded despite the env in the way"))
     with pytest.raises(RuntimeError) as e:

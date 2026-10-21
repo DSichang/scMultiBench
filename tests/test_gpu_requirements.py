@@ -182,28 +182,18 @@ def test_cpu_params_for_merges_only_without_gpu(no_gpu, monkeypatch):
 
 
 def test_dry_run_shows_cpu_params_without_gpu(tmp_path, no_gpu):
-    argv = mtb.engine.runner.run("scMDC", "vertical", inputs=_cite_inputs(tmp_path),
-                   out_dir=str(tmp_path / "o"), dry_run=True,
-                   cmd_template="conda run -n x {cmd}")
+    argv = mtb.engine.runner.preview("scMDC", "vertical", inputs=_cite_inputs(tmp_path), out_dir=str(tmp_path / "o"))[0]
     i = argv.index("--device")
     assert argv[i + 1] == "cpu"
     # scJoint: the empty string, inside the pty wrap the variant opts into
-    argv = mtb.engine.runner.run("scJoint", "diagonal",
-                   inputs={"rna": "r.h5", "atac_gas": "a.h5", "rna_cty": "c.csv"},
-                   out_dir=str(tmp_path / "o"), dry_run=True,
-                   cmd_template="conda run -n x {cmd}")
+    argv = mtb.engine.runner.preview("scJoint", "diagonal", inputs={"rna": "r.h5", "atac_gas": "a.h5", "rna_cty": "c.csv"}, out_dir=str(tmp_path / "o"))[0]
     assert any("--use_cuda ''" in a for a in argv), argv
 
 
 def test_dry_run_unchanged_on_gpu_host(tmp_path, gpu):
-    argv = mtb.engine.runner.run("scMDC", "vertical", inputs=_cite_inputs(tmp_path),
-                   out_dir=str(tmp_path / "o"), dry_run=True,
-                   cmd_template="conda run -n x {cmd}")
+    argv = mtb.engine.runner.preview("scMDC", "vertical", inputs=_cite_inputs(tmp_path), out_dir=str(tmp_path / "o"))[0]
     assert "--device" not in argv
-    argv = mtb.engine.runner.run("scJoint", "diagonal",
-                   inputs={"rna": "r.h5", "atac_gas": "a.h5", "rna_cty": "c.csv"},
-                   out_dir=str(tmp_path / "o"), dry_run=True,
-                   cmd_template="conda run -n x {cmd}")
+    argv = mtb.engine.runner.preview("scJoint", "diagonal", inputs={"rna": "r.h5", "atac_gas": "a.h5", "rna_cty": "c.csv"}, out_dir=str(tmp_path / "o"))[0]
     assert not any("use_cuda" in a for a in argv), argv
 
 
@@ -211,8 +201,8 @@ def test_explicit_param_wins_over_cpu_params(tmp_path, no_gpu):
     # r3 (X64): the CUDA switch is the package's, so params= cannot set it
     with pytest.raises(KeyError, match=r"scMDC does not accept \['device'\]"):
         mtb.engine.runner.run("scMDC", "vertical", inputs=_cite_inputs(tmp_path),
-                out_dir=str(tmp_path / "o"), dry_run=True, params={"device": "cuda:1"},
-                cmd_template="conda run -n x {cmd}")
+                              out_dir=str(tmp_path / "o"), params={"device": "cuda:1"})
+    assert not (tmp_path / "o").exists()
 
 
 # ------------------------------------------------------------ runner: requires_gpu
@@ -221,9 +211,7 @@ MOETM_REASON = 'moETM needs an NVIDIA GPU, and this computer has none.'
 
 
 def test_requires_gpu_dry_run_still_previews(tmp_path, no_gpu):
-    argv = mtb.engine.runner.run("moETM", "vertical", inputs=_cite_inputs(tmp_path),
-                   out_dir=str(tmp_path / "o"), dry_run=True,
-                   cmd_template="conda run -n x {cmd}")
+    argv = mtb.engine.runner.preview("moETM", "vertical", inputs=_cite_inputs(tmp_path), out_dir=str(tmp_path / "o"))[0]
     assert any(a.endswith("main_moETM_rna_adt.py") for a in argv)
 
 
@@ -274,7 +262,7 @@ def test_scan_joins_missing_env_and_missing_gpu(tmp_path, no_gpu, monkeypatch):
 def test_run_all_never_dispatches_a_requires_gpu_method(tmp_path, no_gpu, all_envs, monkeypatch):
     _cite(tmp_path)
     monkeypatch.setattr(W, "_run", _must_not_spawn)
-    plan = mtb.run(os.path.join(tmp_path, 'CITE'), 'vertical', methods=['moETM'], out_dir=str(tmp_path / 'res'), dry_run=True, verbose=False)
+    plan = mtb.scan(os.path.join(tmp_path, 'CITE'), 'vertical', methods=['moETM'], verbose=False)
     row = plan[plan["modalities"] == "rna+adt"].iloc[0]
     assert not bool(row["runnable"]) and row["reason"] == MOETM_REASON
     with pytest.raises(ValueError, match=r"^None of the requested methods \(moETM\) can "

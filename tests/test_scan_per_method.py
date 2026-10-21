@@ -16,6 +16,8 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+from multibench.engine import scripts
+from multibench import _settings
 from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, registry
@@ -83,8 +85,8 @@ def linux(monkeypatch, tmp_path):
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
     monkeypatch.setattr(config, "repo_path", tmp_path / "no_scripts")
-    monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
-    monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
+    monkeypatch.setattr(_settings, "_ROOT", tmp_path / "pkg")
+    monkeypatch.delenv(scripts.SCRIPTS_REF_VAR, raising=False)
     calls = []
 
     class _Res:
@@ -156,9 +158,9 @@ def test_the_first_line_names_10x_files(linux, tmp_path, capsys):
         assert list(pm["method"]) == methods and not pm["runnable"].any()
     # with the rows that are not listed: the same sentence starts the note
     mtb.config.data_path = tmp_path
-    _quiet(mtb.run, 'TXADT', 'vertical', dry_run=True)
-    assert capsys.readouterr().out.splitlines()[1] == (
-        "[run] TXADT holds no dataset file: rna.h5 and adt.h5 are 10x Genomics files "
+    _quiet(mtb.scan, 'TXADT', 'vertical')
+    assert capsys.readouterr().out.splitlines()[0].endswith(
+        "TXADT holds no dataset file: rna.h5 and adt.h5 are 10x Genomics files "
         "under the names of dataset files.")
     # one of two: the family of the other file is held, and the 10x file is named
     _cite(tmp_path, "MIX")

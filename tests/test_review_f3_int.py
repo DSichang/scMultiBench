@@ -34,6 +34,8 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+from multibench.engine import scripts
+from multibench import _settings
 from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, ingest, registry
@@ -46,14 +48,21 @@ GAS_CAV = ("needs gene-activity ATAC. The features of atac.h5 look like chr:star
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 
 
+def _wrong_atac(reasons):
+    """The scan rows blocked by the ATAC file they would read."""
+    text = reasons.astype(str)
+    return text.str.contains("Export the ATAC as ", regex=False) | text.str.contains(
+        W.PEAK_NAMES_REASON, regex=False)
+
+
 @pytest.fixture
 def pinned(monkeypatch, tmp_path):
     """Every env installed, a GPU, no method scripts on this machine, no ref."""
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
     monkeypatch.setattr(config, "repo_path", tmp_path / "no_scripts")
-    monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
-    monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
+    monkeypatch.setattr(_settings, "_ROOT", tmp_path / "pkg")
+    monkeypatch.delenv(scripts.SCRIPTS_REF_VAR, raising=False)
 
 
 def _quiet(fn, *a, **kw):
@@ -230,7 +239,7 @@ def test_demo_datasets_keep_their_pinned_runnable_rows(dataset, pinned):
     df = _quiet(full_scan, dataset, verbose=False)
     got = sorted(f"{r.method}|{r.category}|{r.modalities}" for r in df[df.runnable].itertuples())
     assert got == sorted(PINNED[dataset])
-    blocked = df[W._is_wrong_atac(df["reason"])]
+    blocked = df[_wrong_atac(df["reason"])]
     # the vertical peak methods read the atac role since 0.4.0 (X13): on D28 they no
     # longer take atac_gas.h5 for their peaks, so none is blocked for the wrong ATAC
     want = set()
@@ -240,8 +249,8 @@ def test_demo_datasets_keep_their_pinned_runnable_rows(dataset, pinned):
 
 # ---------------------------------------------------------- smaller findings
 def test_the_empty_summary_ends_like_a_full_one():
-    empty = W.BatchResult([], "D11", "vertical").summary
-    full = W.BatchResult([{"method": "Matilda", "status": "RUN_OK"}], "D11",
+    empty = W.RunResult([], "D11", "vertical").summary
+    full = W.RunResult([{"method": "Matilda", "status": "RUN_OK"}], "D11",
                          "vertical").summary
     # R5-03: reason is the last column (the diagnostics before caveat since 0.4.0, X35)
     assert list(empty.columns)[-2:] == ["caveat", "reason"]
@@ -367,7 +376,7 @@ def test_deploy_gate_refuses_while_the_data_release_is_not_public(tmp_path, monk
     """mtb.data.fetch reads RELEASE_URL; a private release answers 404."""
     import importlib
     import importlib.util
-    fetch = importlib.import_module("multibench.data.fetch")     # the module, not mtb.data.fetch
+    fetch = importlib.import_module("multibench._data.fetch")     # the module, not mtb.data.fetch
     spec = importlib.util.spec_from_file_location(
         "deploy_gate", _docs_root().parent / "hooks" / "deploy_gate.py")
     gate = importlib.util.module_from_spec(spec)
@@ -401,7 +410,7 @@ def test_a_named_method_keeps_the_row_its_roles_spell(pinned, capsys):
     """moETM's own spelling, as scan and method_info show it (rna+atac since
     0.4.0, X13: the role names the peaks it reads)."""
     assert ['rna', 'atac'] in [s['modalities'] for s in mtb.method_info('moETM')['supports']]
-    for call in (full_scan, lambda *a, **k: mtb.run(*a, dry_run=True, **k)):
+    for call in (full_scan, lambda *a, **k: mtb.scan(*a, **k)):
         df = _quiet(call, 'D28', 'vertical', methods=['moETM'], modalities=['rna', 'atac'], verbose=False)
         assert list(df['modalities']) == ['rna+atac']
     df = _quiet(full_scan, 'D28', 'vertical', modalities=['rna', 'atac_gas'], verbose=False)
@@ -409,7 +418,7 @@ def test_a_named_method_keeps_the_row_its_roles_spell(pinned, capsys):
 
 
 def test_a_representation_token_that_drops_a_named_method_says_why(pinned, capsys):
-    for call in (full_scan, lambda *a, **k: mtb.run(*a, dry_run=True, **k)):
+    for call in (full_scan, lambda *a, **k: mtb.scan(*a, **k)):
         with pytest.raises(ValueError) as e:
             _quiet(call, 'D28', 'vertical', methods=['moETM'], modalities=['rna', 'gene_activity'], verbose=False)
         assert str(e.value) == "moETM does not read rna+gene_activity in vertical data. moETM reads peaks. Pass modalities=['rna', 'atac_peak'] or ['rna', 'atac'].", str(e.value)
@@ -420,15 +429,13 @@ def test_a_representation_token_that_drops_a_named_method_says_why(pinned, capsy
         _quiet(full_scan, 'D28', 'diagonal', methods=['SCALEX'], modalities=['rna', 'atac_peak'], verbose=False)
 
 
-def test_dry_run_prints_the_scripts_note_once_and_no_start_notes(pinned, capsys):
-    _quiet(mtb.run, 'D11', 'vertical', dry_run=True)
-    out = capsys.readouterr().out
-    assert out.count('The method scripts are not in') == 1, out
-    assert '[run] The method scripts are not in' in out
-    _quiet(mtb.run, 'D28', 'diagonal', dry_run=True)
+def test_scan_names_the_missing_scripts_and_no_start_notes(pinned, capsys):
+    plan = _quiet(mtb.scan, 'D11', 'vertical')
+    ok = plan[plan["runnable"]]
+    assert len(ok) and ok["caveat"].str.contains('The method scripts are not in').all()
+    _quiet(mtb.scan, 'D28', 'diagonal')
     out = capsys.readouterr().out
     assert 'the command reads' not in out and 'start the method with' not in out
-    assert out.count('The method scripts are not in') == 1
 
 
 def test_run_all_dry_run_checks_the_batch_length(tmp_path, pinned, capsys):
@@ -438,4 +445,6 @@ def test_run_all_dry_run_checks_the_batch_length(tmp_path, pinned, capsys):
     full = tmp_path / 'full.csv'
     pd.DataFrame({'b': np.tile(['s1', 's2'], 1432)}).to_csv(full, index=False)
     with pytest.raises(ValueError, match='^batch has 3 entries for the 2,864 cells of D11'):
-        _quiet(mtb.run, 'D11', 'vertical', methods=['totalVI'], dry_run=True, batch=str(short))
+        _quiet(mtb.run, 'D11', 'vertical', tmp_path / 'out', methods=['totalVI'],
+               batch=str(short))
+    assert not (tmp_path / 'out').exists()

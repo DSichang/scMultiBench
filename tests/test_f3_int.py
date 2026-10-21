@@ -19,6 +19,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+from multibench.engine import scripts
 from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, registry
@@ -88,7 +89,7 @@ def test_wrong_kind_and_scripts_ref_keep_both_reasons(tmp_path, monkeypatch, gas
         [f"c{i}" for i in range(60)])
     pd.DataFrame({"x": ["A", "B"] * 30}).to_csv(d / "cty.csv", index=False)
     wrong = "The method scripts are at 0000000, not deadbeef (MULTIBENCH_SCRIPTS_REF)."
-    monkeypatch.setattr(config, "scripts_ref_problem", lambda repo=None: wrong)
+    monkeypatch.setattr(scripts, "scripts_ref_problem", lambda repo=None: wrong)
     monkeypatch.setattr(W, "_run", lambda *a, **k: pytest.fail("no method may start"))
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")

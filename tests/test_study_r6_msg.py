@@ -25,6 +25,8 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+from multibench.engine import scripts
+from multibench import _settings
 from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, ingest, registry
@@ -47,8 +49,8 @@ def pinned(monkeypatch, tmp_path):
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
     monkeypatch.setattr(config, "repo_path", tmp_path / "no_scripts")
-    monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
-    monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
+    monkeypatch.setattr(_settings, "_ROOT", tmp_path / "pkg")
+    monkeypatch.delenv(scripts.SCRIPTS_REF_VAR, raising=False)
     return tmp_path / "no_scripts"
 
 
@@ -216,10 +218,10 @@ def wrong_ref(tmp_path, monkeypatch):
     repo = tmp_path / "scripts"
     head = _scripts_repo(repo)
     monkeypatch.setattr(config, "repo_path", repo)
-    monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
+    monkeypatch.setattr(_settings, "_ROOT", tmp_path / "pkg")
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
-    monkeypatch.setenv(config.SCRIPTS_REF_VAR, "deadbeef")
+    monkeypatch.setenv(scripts.SCRIPTS_REF_VAR, "deadbeef")
     return repo, head[:7]
 
 
@@ -252,13 +254,15 @@ def test_count_lines_say_methods_only_when_each_has_one_row(monkeypatch, capsys,
     d11 = full_scan("D11", "vertical", modalities="all")
     assert not d11["method"].is_unique
     assert f"of {len(d11)} rows have their input files." in capsys.readouterr().out
-    mtb.run("D52", "cross", out_dir=tmp_path, dry_run=True,
-                methods=["sciPENN", "totalVI", "Concerto"])
-    assert "[run] Dry run: 0 of 3 requested methods can run on D52 (cross); " in \
-        capsys.readouterr().out
-    # 0.4.0: the plan leaves out UINMF's two-batch row, as a run does
-    mtb.run("D52", "cross", out_dir=tmp_path, dry_run=True, modalities="all")
-    assert "[run] Dry run: 0 of 29 requested rows can run on D52 (cross); " in \
+    mtb.scan("D52", "cross", methods=["sciPENN", "totalVI", "Concerto"])
+    assert capsys.readouterr().out.startswith(
+        "[scan] 3 of 3 methods have their input files in D52. 0 of 3 can run on this "
+        "computer. ")
+    # scan counts methods, also when a method has several rows
+    n = full_scan("D52", "cross", modalities="all", verbose=False)["method"].nunique()
+    capsys.readouterr()
+    mtb.scan("D52", "cross", modalities="all")
+    assert f" of {n} methods have their input files in D52. 0 of {n} can run" in \
         capsys.readouterr().out
 
 
@@ -298,14 +302,14 @@ def test_save_merge_line_is_a_sentence(tmp_path, capsys):
         rec = {"method": method, "category": "vertical", "dataset": "D11",
                "modalities": ["rna", "adt"], "status": "CHAIN_OK", "out_dir": f"x/{method}",
                "metrics": {"ARI": 0.5, "NMI": 0.5}}
-        return mtb.BatchResult([rec], "D11", "vertical")
+        return mtb.RunResult([rec], "D11", "vertical")
     res("StabMap").save(tmp_path)
     res("scMoMaT").save(tmp_path)
     assert capsys.readouterr().out == (
-        f"# Merged with 1 earlier record in {tmp_path} (StabMap).\n")
+        f"[save] Merged with 1 earlier record in {tmp_path} (StabMap).\n")
     res("totalVI").save(tmp_path)
     assert capsys.readouterr().out == (
-        f"# Merged with 2 earlier records in {tmp_path} (StabMap, scMoMaT).\n")
+        f"[save] Merged with 2 earlier records in {tmp_path} (StabMap, scMoMaT).\n")
 
 
 def test_positional_warning_is_plural_for_several_files(tmp_path):
@@ -328,11 +332,11 @@ def test_positional_warning_is_plural_for_several_files(tmp_path):
 # ======================================================================= R6-14
 def test_notes_passages_have_no_dash_insertions():
     flat = {fn: " ".join(inspect.getdoc(fn).split()) for fn in (
-        mtb.BatchResult, mtb.engine.runner.run, mtb.io.export_dataset,
-        mtb.BatchResult.rescore, mtb.recommend)}
-    assert "the label orderings tried (``label_order_candidates``)" in flat[mtb.BatchResult]
+        mtb.RunResult, mtb.engine.runner.run, mtb.io.export_dataset,
+        mtb.RunResult.rescore, mtb.recommend)}
+    assert "``labels_used`` (the label files in the cell order scored)" in flat[mtb.RunResult]
     assert "Batch ids in the order of the dataset's label files" in \
-        flat[mtb.BatchResult.rescore]
+        flat[mtb.RunResult.rescore]
     for doc in flat.values():
         assert " - the evidence" not in doc and "- the flags" not in doc
         assert "written in one order -" not in doc and "need not score" not in doc
@@ -346,9 +350,8 @@ def test_callers_print_the_method_name_once(tmp_path, pinned, root, monkeypatch,
     data = root / 'data'
     two = ['rna1', 'rna2', 'adt1', 'adt2']
     mtb.config.data_path = data
-    _quiet(mtb.run, 'D52', 'cross', methods=['UINMF'], modalities=two, dry_run=True)
-    out = capsys.readouterr().out
-    assert '[run] UINMF reads batches 1-2 of 3. Batch 3 is not used.\n' in out
+    plan = _quiet(mtb.scan, 'D52', 'cross', methods=['UINMF'], modalities=two, verbose=False)
+    assert plan.caveat.iloc[0].startswith('UINMF reads batches 1-2 of 3. Batch 3 is not used.')
 
     def fake_run(**kw):
         raise RuntimeError('stub: not run in tests')

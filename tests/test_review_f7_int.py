@@ -8,7 +8,7 @@
 - The several-datasets warning of the plots lists its datasets in words.
 - The no-conda install error, the modalities warning of scan, the missing
   feature-names warning and the several-variants errors are sentences.
-- Docstrings: BatchResult.long, method_info, bubble's L badge,
+- Docstrings: RunResult.long, method_info, bubble's L badge,
   normalize_peak_names' example.
 """
 import inspect

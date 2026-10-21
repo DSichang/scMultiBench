@@ -70,7 +70,7 @@ def _saved_tree(tmp_path):
     from tests.test_c2_fixes import _old_tree
     out = _old_tree(tmp_path)
     blob = json.loads((out / "batch_result.json").read_text())
-    blob["records"][0]["out_dir"] = "Matilda_D11"          # as BatchResult.save writes it
+    blob["records"][0]["out_dir"] = "Matilda_D11"          # as RunResult.save writes it
     (out / "batch_result.json").write_text(json.dumps(blob))
     (tmp_path / "runs").mkdir()
     return out.rename(tmp_path / "runs" / "D11")
@@ -96,7 +96,7 @@ def test_rescore_refuses_a_batch_of_the_wrong_length_before_scoring(tmp_path, mo
     from multibench import workflow
     scored = []
     monkeypatch.setattr(workflow, "_score_record", lambda *a, **k: scored.append(a))
-    res = mtb.load_batch(_saved_tree(tmp_path))
+    res = mtb.load_run(_saved_tree(tmp_path))
     with pytest.raises(ValueError, match=r"^batch has 2,000 entries for the 2,864 cells of "
                                          r"D11: give one batch per cell\.$"):
         _quiet(res.rescore, batch=np.repeat(["a", "b"], 1000))
@@ -108,14 +108,14 @@ def test_rescore_without_outputs_names_the_methods_and_the_fix(tmp_path):
     folder = _saved_tree(tmp_path)
     (folder / "Matilda_D11" / "embedding.h5").unlink()
     with pytest.raises(FileNotFoundError) as e:
-        _quiet(mtb.load_batch(folder).rescore)
+        _quiet(mtb.load_run(folder).rescore)
     assert str(e.value) == (f"No output of Matilda in {folder}: load the folder that holds "
                             f"its method folder, or run it again.")
 
 
 # --------------------------------------------------------------- E02
 def test_the_embedding_of_a_one_batch_dataset_writes_h5ad(tmp_path):
-    emb = mtb.load_batch(_saved_tree(tmp_path)).embedding("Matilda")
+    emb = mtb.load_run(_saved_tree(tmp_path)).embedding("Matilda")
     assert "batch" not in emb.obs
     emb.write_h5ad(tmp_path / "e.h5ad")
 
@@ -126,7 +126,7 @@ def test_the_embedding_of_a_one_batch_dataset_writes_h5ad(tmp_path):
                                                 ("D52", "cross", "StabMap")])
 def test_dataset_labels_follow_reordered_cells(ds, category, method):
     """Also where barcodes repeat across batches (D45, D52): the folder's cells are
-    named as BatchResult.embedding names them, cty2:<barcode>."""
+    named as RunResult.embedding names them, cty2:<barcode>."""
     from multibench import workflow
     from multibench.eval.pipeline import _dataset_labels, _stack_label_files
     root = mtb.config.data_path
@@ -195,9 +195,9 @@ def _folder(root, name, files, n=60):
 
 def test_e07_paired_files_count_their_cells_once(tmp_path, capsys):
     d = _folder(tmp_path, "MULTI", {"rna.h5": "rna", "atac.h5": "peak", "cty.csv": ""}, n=600)
-    mtb.run(str(d), "vertical", methods=["MIRA"], dry_run=True)
-    out = capsys.readouterr().out
-    assert "MIRA needs about 3,000 cells, and this folder has 600: leave MIRA out." in out
+    plan = mtb.scan(str(d), "vertical", methods=["MIRA"], verbose=False)
+    assert "MIRA needs about 3,000 cells, and this folder has 600: leave MIRA out." in \
+        plan["caveat"].iloc[0]
 
 
 def test_c13_e20_numbered_diagonal_folders(tmp_path, capsys):
@@ -206,7 +206,7 @@ def test_c13_e20_numbered_diagonal_folders(tmp_path, capsys):
                            ("rna_cty", "csv", ""), ("atac_cty", "csv", ""))}
     mtb.scan(str(_folder(tmp_path, "DIAG2", two)), "diagonal")
     out = capsys.readouterr().out
-    assert "This folder holds per-batch files" in out
+    assert "DIAG2 holds numbered batches (rna1.h5, rna2.h5, ...)." in out
     assert "Conos reads" not in out                        # C13: the folder line says it
     three = dict(two, **{f"{m}3.{e}": k for m, e, k in (
         ("rna", "h5", "rna"), ("atac_gas", "h5", "gas"), ("rna_cty", "csv", ""),
@@ -220,7 +220,7 @@ def test_c13_e20_numbered_diagonal_folders(tmp_path, capsys):
 
 def test_c55_no_sentence_on_the_rows_of_a_modality_the_folder_lacks(capsys):
     mtb.scan("D11", "vertical")
-    mtb.run("D11", "vertical", methods=["Matilda", "totalVI"], dry_run=True)
+    mtb.scan("D11", "vertical", methods=["Matilda", "totalVI"])
     assert "not listed" not in capsys.readouterr().out
 
 

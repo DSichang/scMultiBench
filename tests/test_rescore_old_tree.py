@@ -1,5 +1,5 @@
 """A saved tree whose records have no ``out_dir`` (written by an older multibench):
-``load_batch`` points each record at ``<tree>/<method>_<dataset>``, and ``rescore``
+``load_run`` points each record at ``<tree>/<method>_<dataset>``, and ``rescore``
 raises when it finds no output to score instead of returning an empty table."""
 import json
 
@@ -52,18 +52,18 @@ def _tree(tmp_path, *, with_outputs=True):
 def test_records_without_out_dir_score_from_the_folders_next_to_the_json(tmp_path, monkeypatch):
     monkeypatch.setattr(mtb.config, "data_path", tmp_path / "data")
     tree = _tree(tmp_path)
-    res = mtb.load_batch(tree)
+    res = mtb.load_run(tree)
     assert [r["out_dir"] for r in res.records] == [
         str((tree / "totalVI_MYCITE").resolve()), str((tree / "Matilda_MYCITE").resolve())]
     again = res.rescore(metrics=["ARI", "NMI"], verbose=False)
-    assert [r["status"] for r in again.records] == ["CHAIN_OK", "CHAIN_OK"]
+    assert [r["status"] for r in again.records] == ["scored", "scored"]
     assert set(again.long["metric"]) == {"ARI", "NMI"}
 
 
 def test_rescore_raises_when_it_finds_no_output(tmp_path, monkeypatch):
     monkeypatch.setattr(mtb.config, "data_path", tmp_path / "data")
     tree = _tree(tmp_path, with_outputs=False)
-    res = mtb.load_batch(tree)
+    res = mtb.load_run(tree)
     with pytest.raises(FileNotFoundError) as e:
         res.rescore(metrics=["ARI"], verbose=False)
     assert str(e.value) == (
@@ -75,6 +75,6 @@ def test_a_method_without_output_is_recorded_when_another_scores(tmp_path, monke
     monkeypatch.setattr(mtb.config, "data_path", tmp_path / "data")
     tree = _tree(tmp_path)
     (tree / "Matilda_MYCITE" / "embedding.h5").unlink()
-    again = mtb.load_batch(tree).rescore(metrics=["ARI"], verbose=False)
-    assert [r["status"] for r in again.records] == ["CHAIN_OK", "RUN_OK_EVAL_FAILED"]
+    again = mtb.load_run(tree).rescore(metrics=["ARI"], verbose=False)
+    assert [r["status"] for r in again.records] == ["scored", "ran"]
     assert "embedding.h5 is missing: run the method again." in again.records[1]["error"]

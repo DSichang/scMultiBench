@@ -1,4 +1,4 @@
-"""BatchResult.embedding(method): the module-2 deliverable as an AnnData (0.4.0, O7)."""
+"""RunResult.embedding(method): the module-2 deliverable as an AnnData (0.4.0, O7)."""
 import h5py
 import numpy as np
 import pandas as pd
@@ -18,7 +18,7 @@ def _result(tmp_path, status="CHAIN_OK", method="Matilda"):
         h["data"] = np.arange(n * 3, dtype=float).reshape(n, 3)
     rec = {"method": method, "status": status, "out_dir": str(mdir), "dataset": "D11",
            "category": "vertical", "modalities": ["rna", "adt"], "labels_used": ["cty.csv"]}
-    return mtb.BatchResult([rec], "D11", "vertical", out_dir=out), n
+    return mtb.RunResult([rec], "D11", "vertical", out_dir=out), n
 
 
 def test_embedding_is_an_anndata_with_barcodes_labels_and_batch(tmp_path):
@@ -40,7 +40,7 @@ def test_a_method_without_a_record_names_the_ones_there(tmp_path):
 
 def test_a_failed_method_has_no_embedding(tmp_path):
     res, _ = _result(tmp_path, status="FAIL")
-    with pytest.raises(ValueError, match="Matilda has no output: its status is FAIL"):
+    with pytest.raises(ValueError, match="Matilda has no output: its status is failed"):
         res.embedding("Matilda")
 
 

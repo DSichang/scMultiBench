@@ -14,9 +14,10 @@ from pathlib import Path
 
 import pandas as pd
 
-from .. import config
-from ..config import _and_list
-from .. import _compat
+from .. import _settings
+from ..engine import registry
+from .._text import _and_list
+from .. import _text
 from . import catalog
 from ..engine.registry import _BASE_MODALITIES
 
@@ -26,7 +27,7 @@ __all__ = ["load_results", "recommend"]
 _CATEGORIES = ("cross", "diagonal", "mosaic", "vertical")
 
 #: fixed column order of every frame ``load_results`` returns
-COLUMNS = ["metric", "value", "method", "dataset", "category", "clustering", "source"]
+COLUMNS = ["metric", "value", "method", "dataset", "category", "source"]
 
 #: sub-directory of ``result_path`` holding the package re-run sweeps
 _RERUN_DIR = "rerun"
@@ -77,8 +78,8 @@ def _as_list(x) -> list | None:
 
 
 def _base_path() -> Path:
-    """The folder holding the stored results (``config._RESULT_PATH``)."""
-    return Path(config._RESULT_PATH)
+    """The folder holding the stored results (``_settings._RESULT_PATH``)."""
+    return Path(_settings._RESULT_PATH)
 
 
 def _no_dataset_msg(category, missing, have) -> str:
@@ -101,8 +102,6 @@ def _read_rerun_files(base: Path) -> list[tuple[Path, pd.DataFrame]]:
             df["source"] = _RERUN_SOURCE
         else:
             df["source"], versions = _split_rerun_tag(df["source"])
-        if "clustering" not in df.columns:
-            df["clustering"] = "default"
         df = df[COLUMNS]
         df.attrs["rerun_version"] = _version_attr(versions)
         out.append((f, df))
@@ -156,7 +155,7 @@ def _canonical_dataset_ids(category, datasets, base) -> list:
         s = str(d)
         canon = by_lower.get(s.lower())
         if canon is not None and canon != s and s not in have:
-            _compat.warn(
+            _text.warn(
                 f"dataset {s!r} is not in the stored results but {canon!r} is - using "
                 f"that spelling (dataset ids are case-sensitive: 'D52', not 'd52')",
                 UserWarning)
@@ -181,7 +180,6 @@ def _check_methods(wanted: list, present) -> None:
             import difflib
             pool = sorted(set(present) | set(catalog._registry_ids()))
             hint = difflib.get_close_matches(str(m), pool, n=1, cutoff=0.6)
-            from ..engine import registry
             raise KeyError(registry.unknown_method_message(m, hint[0] if hint else "")
                            ) from None
 
@@ -249,8 +247,7 @@ def load_results(
     mtb.evaluate : scores your own embedding into this shape.
     mtb.plot.bubble : draws the table.
     """
-    out = _load_results(category, dataset=dataset, methods=methods,
-                        metrics=metrics).drop(columns="clustering")
+    out = _load_results(category, dataset=dataset, methods=methods, metrics=metrics)
     version = out.attrs.get("rerun_version")
     if isinstance(version, str) and (out["source"] == _RERUN_SOURCE).all():
         # the stored re-runs were scored as evaluate scores: leidenalg, the search
@@ -271,7 +268,7 @@ def _load_results(
     sel = catalog.metric_selection(metrics) if metrics is None or isinstance(metrics, str) \
         else None
     if category is not None:
-        config.category_folder(category)      # validates
+        registry.check_category(category)      # validates
     datasets = _as_list(dataset)
     wanted_methods = _as_list(methods)
 
@@ -313,7 +310,7 @@ def _load_results(
         out = out[out["method"].map(lambda m: catalog._canonical_id(m).lower()).isin(want)]
         if out.empty:
             shown = wanted_methods if len(wanted_methods) > 1 else wanted_methods[0]
-            _compat.warn(
+            _text.warn(
                 f"no rerun rows for method {shown!r} in {where} (available: "
                 f"{avail})", UserWarning)
     have_metrics = sorted(out["metric"].unique())
@@ -324,12 +321,12 @@ def _load_results(
         out = out[out["metric"].isin(sel.codes)]
         absent = [c for c in sel.codes if c not in have_metrics]
         if sel.explicit and absent:
-            _compat.warn(f"The stored results have no {_and_list(absent)}.",
+            _text.warn(f"The stored results have no {_and_list(absent)}.",
                          UserWarning)
         elif out.empty and before:
             of = " of " + ", ".join(x for x in [category, *map(str, datasets or ())] if x) \
                 if category or datasets else ""
-            _compat.warn(
+            _text.warn(
                 f"The stored results{of} have no {sel.family} scores, so no rows are left. "
                 f"Leave out metrics= to get the scores they have "
                 f"({', '.join(have_metrics)}).", UserWarning)
@@ -441,7 +438,7 @@ def recommend(
     """
     from ..plot import style
 
-    config.category_folder(category)
+    registry.check_category(category)
     from ..discover import find_methods, _modality_filter
 
     min_methods = 2
@@ -534,13 +531,15 @@ def recommend(
     degenerate = sorted(ds for ds, ms in per_ds.items() if len(ms) < min_methods)
     kept = {ds: ms for ds, ms in per_ds.items() if ds not in degenerate}
     if not kept:
-        sizes = {ds: len(per_ds[ds]) for ds in sorted(per_ds)}
-        counts = ", ".join(f"{ds} has {k}" for ds, k in sizes.items())
-        one = (" A min-max score over one method is always 1.0."
-               if sizes and max(sizes.values()) == 1 else "")
-        raise ValueError(
-            f"No {category} dataset has {min_methods} or more methods. {counts}."
-            f"{one} Otherwise pass long_df= with more methods.")
+        lone = sorted({m for ms in per_ds.values() for m in ms}, key=str)
+        what = f"{metrics} scores" if isinstance(metrics, str) else "scores"
+        on = _and_list(sorted(map(str, per_ds))) or category
+        fix = ("Pass long_df= with the scores of more methods." if long_df_was_none
+               else "Add the scores of more methods to long_df.")
+        who = (f"Only {_and_list(lone)} {'has' if len(lone) == 1 else 'have'}" if lone
+               else "No method has")
+        raise ValueError(f"{who} {what} on {on}: a ranking needs {min_methods} or more "
+                         f"methods. {fix}")
     # igraph-scored rows ranked against leidenalg-scored stored rows
     backend = style.backend_warning(df[df["dataset"].isin(list(kept))])
     n_ds = pd.Series([m for ms in kept.values() for m in ms]).value_counts()
@@ -577,7 +576,7 @@ def recommend(
     # rows only in dropped datasets is another reason than no rows
     only_dropped = [m for m in missing if m in in_frame]
 
-    from ..engine import registry, envs
+    from ..engine import envs
     from ..discover import method_info
 
     rows = []
@@ -647,6 +646,6 @@ def recommend(
             f"datasets left out of the ranking, so {'it is' if one else 'they are'} "
             f"listed last.")
     if notes:
-        _compat.warn(f"recommend({category!r}):\n  - " + "\n  - ".join(notes),
+        _text.warn(f"recommend({category!r}):\n  - " + "\n  - ".join(notes),
                      UserWarning)
     return out

@@ -62,8 +62,6 @@ def test_missing_output_file_names_path_and_cwd(tmp_path):
     # an absolute path needs no working directory
     with pytest.raises(FileNotFoundError, match=r"^The labels file .*nothere\.csv does not exist\.$"):
         eio.read_labels(tmp_path / "nothere.csv")
-    with pytest.raises(FileNotFoundError, match="clustering file .* does not exist"):
-        eio.read_clustering(tmp_path / "nothere.h5")
 
 
 def test_input_matrix_passed_as_output_is_explained(tmp_path):
@@ -85,8 +83,6 @@ def test_input_matrix_passed_as_output_is_explained(tmp_path):
     with pytest.raises(ValueError, match=r"found keys \['X'\]") as e2:
         eio.read_embedding(g2)
     assert "input matrix" not in str(e2.value)
-    with pytest.raises(ValueError, match="/obs/cluster_leiden"):
-        eio.read_clustering(g2)
 
 
 def test_a_wrong_batch_column_gets_its_error_without_the_unused_batch_warning(tmp_path):
@@ -112,12 +108,12 @@ def test_docstrings_match_the_code():
     assert "v1" not in doc
     assert "verbose" in doc and "2,000 cells" in doc
     import multibench.plot as mplot
-    assert "BatchResult.long()" not in mplot.bubble.__doc__
-    assert ":meth:`BatchResult.long`" not in mplot.bar.__doc__
-    # 0.4.0 docstring: "as mtb.load_results, mtb.evaluate and BatchResult.long return"
-    assert "``mtb.evaluate`` and ``BatchResult.long`` return" in \
+    assert "RunResult.long()" not in mplot.bubble.__doc__
+    assert ":meth:`RunResult.long`" not in mplot.bar.__doc__
+    # 0.4.0 docstring: "as mtb.load_results, mtb.evaluate and RunResult.long return"
+    assert "``mtb.evaluate`` and ``RunResult.long`` return" in \
         " ".join(mplot.bubble.__doc__.split())
-    from multibench.data import results
+    from multibench._data import results
     assert "v1" not in results.__doc__ and "v1" not in results.load_results.__doc__
     assert not hasattr(pipeline, "to_long")      # evaluate returns the long table
 

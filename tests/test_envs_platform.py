@@ -89,8 +89,6 @@ def test_install_packed_refuses_off_linux_before_download(off_linux, monkeypatch
 
 
 @pytest.mark.parametrize("fn", [
-    lambda: envs.create("Matilda", dry_run=False),
-    lambda: envs.create_group("scmb_r", dry_run=False),
     lambda: envs.create_env("matilda", dry_run=False),
 ])
 def test_every_builder_refuses_off_linux(off_linux, monkeypatch, fn):
@@ -100,8 +98,7 @@ def test_every_builder_refuses_off_linux(off_linux, monkeypatch, fn):
 
 
 def test_builders_dry_run_everywhere(off_linux):
-    assert envs.create("Matilda")                      # commands, no build
-    assert envs.create_env("matilda")
+    assert envs.create_env("matilda")                  # commands, no build
 
 
 # ----------------------------------------------------------------- sizes

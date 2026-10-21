@@ -12,13 +12,11 @@ def test_params_for_lists_the_choices():
 
 def test_a_value_outside_the_choices_is_refused_in_the_dry_run():
     with pytest.raises(ValueError, match=r"^MIRA: acc takes cpu, gpu, .* or auto, got 'banana'\.$"):
-        mtb.run("D27mini_vertical", "vertical", methods=["MIRA"],
-                    params={"MIRA": {"acc": "banana"}}, dry_run=True, verbose=False)
+        mtb.scan("D27mini_vertical", "vertical", methods=["MIRA"], params={"MIRA": {"acc": "banana"}}, verbose=False)
 
 
 def test_a_listed_value_passes():
-    plan = mtb.run("D27mini_vertical", "vertical", methods=["MIRA"],
-                       params={"MIRA": {"acc": "cpu"}}, dry_run=True, verbose=False)
+    plan = mtb.scan("D27mini_vertical", "vertical", methods=["MIRA"], params={"MIRA": {"acc": "cpu"}}, verbose=False)
     assert "--acc cpu" in plan["command"].iloc[0]
 
 

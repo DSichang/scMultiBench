@@ -296,20 +296,20 @@ REFERENCE = {
     "mtb.cite": ("discover.md", "multibench.discover.cite"),
     "mtb.scan": ("run.md", "multibench.workflow.scan"),
     "mtb.run": ("run.md", "multibench.workflow.run"),
-    "mtb.load_batch": ("run.md", "multibench.workflow.load_batch"),
-    "mtb.BatchResult": ("run.md", "multibench.workflow.BatchResult"),
+    "mtb.load_run": ("run.md", "multibench.workflow.load_run"),
+    "mtb.RunResult": ("run.md", "multibench.workflow.RunResult"),
     "mtb.evaluate": ("score.md", "multibench.eval.pipeline.evaluate"),
-    "mtb.load_results": ("compare.md", "multibench.data.results.load_results"),
-    "mtb.recommend": ("compare.md", "multibench.data.results.recommend"),
+    "mtb.load_results": ("compare.md", "multibench._data.results.load_results"),
+    "mtb.recommend": ("compare.md", "multibench._data.results.recommend"),
     "mtb.env.install": ("env.md", "multibench.engine.envs.install"),
     "mtb.io.export_dataset": ("io.md", "multibench.engine.ingest.export_dataset"),
     "mtb.io.read_canonical": ("io.md", "multibench.engine.ingest.read_canonical"),
     "mtb.plot.bubble": ("plot.md", "multibench.plot.bubble.bubble"),
     "mtb.plot.bar": ("plot.md", "multibench.plot.bar.bar"),
-    "mtb.data.fetch": ("data.md", "multibench.data.fetch.fetch"),
-    "mtb.data.write_example": ("data.md", "multibench.data.examples.write_example"),
-    "mtb.catalog.datasets": ("catalog.md", "multibench.data.catalog.datasets"),
-    "mtb.catalog.metrics": ("catalog.md", "multibench.data.catalog.metrics"),
+    "mtb.data.fetch": ("data.md", "multibench._data.fetch.fetch"),
+    "mtb.data.write_example": ("data.md", "multibench._data.examples.write_example"),
+    "mtb.catalog.datasets": ("catalog.md", "multibench._data.catalog.datasets"),
+    "mtb.catalog.metrics": ("catalog.md", "multibench._data.catalog.metrics"),
 }
 #: on the reference pages, not on the API overview (maintainer tools)
 MAINTAINER_NAMES: set = set()      # mtb.env.recipe left __all__ in 0.4.0 (X34)
@@ -355,7 +355,7 @@ def _public_names():
             names[f"mtb.{n}"] = obj
     for ns in NAMESPACES:
         mod = getattr(mtb, ns)
-        for n in mod.__all__:
+        for n in getattr(mod, "__all__", ()):      # config holds settings, not functions
             obj = getattr(mod, n)
             if inspect.isfunction(obj) or inspect.isclass(obj):
                 names[f"mtb.{ns}.{n}"] = obj
@@ -1175,20 +1175,17 @@ def test_evaluate_guide_names_both_column_spellings_and_the_missing_values():
 
 @needs_docs
 def test_discover_guide_says_which_rows_scan_lists(tmp_path, monkeypatch):
-    """The guide names the default rows of ``scan``, the argument that lists
-    every method, and the call that gives one row per variant. On a folder with
-    RNA and ADT, the calls as the guide spells them list those rows."""
+    """The guide names the default rows of ``scan`` and the argument that lists
+    every method. On a folder with RNA and ADT, the calls as the guide spells
+    them list those rows, with the command of each."""
     pytest.importorskip("anndata")
     import multibench as mtb
     from multibench import workflow as W
-    from multibench.engine import registry
     guide = _flat("tutorials/discover.md")
     assert 'Check your folder with `mtb.scan("MYDATA", category)`.' in guide
     every, = re.search(
         r"By default `scan` lists the methods that read the modalities the folder holds, "
-        r"and `(modalities=\"\w+\")` lists every method\. "
-        r"`mtb\.run\(\"MYDATA\", category, dry_run=True\)` gives one row per method "
-        r"variant, with its file and environment checks and its command\.", guide).groups()
+        r"and `(modalities=\"\w+\")` lists every method\.", guide).groups()
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     mtb.io.export_dataset(_own_cells(), tmp_path / "MYDATA", adt="obsm:protein",
                           labels="obs:celltype")
@@ -1196,15 +1193,12 @@ def test_discover_guide_says_which_rows_scan_lists(tmp_path, monkeypatch):
     ns = {"mtb": mtb, "category": "vertical"}
     default = eval('mtb.scan("MYDATA", category, verbose=False)', ns)
     full = eval(f'mtb.scan("MYDATA", category, verbose=False, {every})', ns)
-    plan = eval('mtb.run("MYDATA", category, verbose=False, dry_run=True)', ns)
     # the methods that read the modalities the folder holds, one row each
     assert default["method"].is_unique
     assert {m for mods in default["modalities"] for m in mods.split("+")} == {"rna", "adt"}
     # every method of the category
     assert set(full["method"]) == set(mtb.find_methods("vertical")) > set(default["method"])
-    # one row per variant
-    assert set(plan["method"]) == set(default["method"]) and len(plan) >= len(default)
-    assert {"runnable", "reason", "command"} <= set(plan.columns)
+    assert {"runnable", "reason", "command"} <= set(default.columns)
 
 
 @needs_docs

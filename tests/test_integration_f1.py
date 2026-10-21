@@ -68,7 +68,7 @@ def test_scan_and_find_methods_read_two_representations_alike(root):
     sc = full_scan("D28", "diagonal", modalities=mods, data_path=root / "data",
                   verbose=False)
     assert set(sc["method"]) == want
-    plan = mtb.run(os.path.join(root / 'data', 'D28'), 'diagonal', modalities=mods, dry_run=True)
+    plan = mtb.scan(os.path.join(root / 'data', 'D28'), 'diagonal', modalities=mods)
     assert set(plan["method"]) == want
 
 
@@ -112,7 +112,7 @@ def test_off_linux_messages_say_to_make_the_commands_on_the_linux_machine(
         mtb.engine.runner.run("totalVI", "vertical", inputs=mtb.engine.resolve.inputs_for("D11", "vertical", "totalVI"),
                 out_dir=str(tmp_path / "out"))
     msg = str(e.value)
-    assert ("Run this call on a Linux machine. dry_run=True previews the method's "
+    assert ("Run this call on a Linux machine. mtb.scan shows the method's "
             "command here.") in msg
     assert "run it on a Linux machine" not in msg
 

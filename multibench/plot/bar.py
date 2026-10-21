@@ -5,8 +5,8 @@ from __future__ import annotations
 import pandas as pd
 
 from . import style
-from .. import _compat
-from ..data.catalog import FAMILY_METRICS
+from .. import _text
+from .._data.catalog import FAMILY_METRICS
 from .style import minmax
 
 CLUSTERING_METRICS = FAMILY_METRICS["clustering"]
@@ -29,7 +29,7 @@ def bar(long_df: pd.DataFrame, *, metrics=None, methods=None, title: str | None 
     long_df : pandas.DataFrame
         A long table (``method``, ``metric``, ``value`` and optional
         ``dataset``), as ``mtb.load_results``, ``mtb.evaluate`` and
-        ``BatchResult.long`` return.
+        ``RunResult.long`` return.
     metrics : str, list of str | None
         A family (``"clustering"``, ``"batch"``, ``"classification"``,
         ``"all"``) drawn in its colour, a code, or codes; ``None`` = every
@@ -69,7 +69,7 @@ def bar(long_df: pd.DataFrame, *, metrics=None, methods=None, title: str | None 
     """
     import matplotlib.pyplot as plt
     from .bubble import _resolve
-    from ..data import catalog
+    from .._data import catalog
 
     need = {"method", "metric", "value"}
     have = set(long_df.columns)
@@ -82,7 +82,7 @@ def bar(long_df: pd.DataFrame, *, metrics=None, methods=None, title: str | None 
             "long_df has no rows to plot. If it came from load_results, its "
             "UserWarning says why.")
     if methods is not None:
-        from ..data import catalog as _catalog
+        from .._data import catalog as _catalog
         methods = _resolve(methods, long_df["method"].unique().tolist(), "method",
                            _catalog._canonical_id)
         long_df = long_df[long_df["method"].isin(methods)]
@@ -117,14 +117,14 @@ def bar(long_df: pd.DataFrame, *, metrics=None, methods=None, title: str | None 
                                           values="value")).empty}
     lone = style.lone_message({ds: style.lone_columns(mat) for ds, mat in parts.items()})
     if lone:
-        _compat.warn(lone, UserWarning)
+        _text.warn(lone, UserWarning)
     for msg in style.coverage_warnings(
             parts, basis="mean_overall",
             incomplete_fix="Pass methods= with the methods scored on every dataset."):
-        _compat.warn(msg, UserWarning)
+        _text.warn(msg, UserWarning)
     backend = style.backend_warning(picked)
     if backend:
-        _compat.warn(backend, UserWarning)
+        _text.warn(backend, UserWarning)
     datasets = list(parts)
     mean = mean[::-1]                       # the best method is drawn on top
 

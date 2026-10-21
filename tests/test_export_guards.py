@@ -175,7 +175,15 @@ def test_a_complete_batch_column_writes_every_cell(tmp_path):
 
 # ------------------------------------------------------------- a missing label
 WHERE = "labels for the cells (the AnnData's obs) are missing"
-ADVICE = "give every cell a label, or subset the data to the labelled cells first"
+#: d1 (u1): the error gives the code that keeps the labelled cells
+KEEP = 'keep the labelled cells first: adata = adata['
+NOTNA = KEEP + 'adata.obs["ct"].notna()]'
+SERIES_ADVICE = "give every cell a label, or keep the labelled cells first"
+
+
+def _words(*words):
+    return (KEEP + '~adata.obs["ct"].astype(str).str.strip().isin('
+            + repr(sorted({"", "nan", "None", *words})) + ")]")
 
 
 @pytest.mark.parametrize("word", ["NA", "None", "nan", "null", "N/A", "NA "])
@@ -188,7 +196,7 @@ def test_labels_that_read_back_as_missing_are_refused(tmp_path, word):
     shown = repr(word.strip())
     assert _value_error(tmp_path, a, rna="X", labels="obs:ct") == (
         f"labels='obs:ct': 2 of the 60 {WHERE} (NaN, None, '' or text such as {shown}); "
-        f"{ADVICE}")
+        f"{_words(word.strip())}")
 
 
 def test_several_missing_words_show_the_first(tmp_path):
@@ -198,7 +206,7 @@ def test_several_missing_words_show_the_first(tmp_path):
     a.obs["ct"] = ct
     assert _value_error(tmp_path, a, rna="X", labels=a.obs["ct"]) == (
         f"labels=Series: 5 of the 60 labels for the cells (the labels you passed) are "
-        f"missing (NaN, None, '' or text such as 'NA'); {ADVICE}")
+        f"missing (NaN, None, '' or text such as 'NA'); {SERIES_ADVICE}")
 
 
 @pytest.mark.parametrize("gap", [np.nan, None, "", "   "], ids=["NaN", "None", "empty", "blank"])
@@ -208,7 +216,8 @@ def test_the_older_forms_keep_their_text(tmp_path, gap):
     ct[5] = gap
     a.obs["ct"] = ct
     assert _value_error(tmp_path, a, rna="X", labels="obs:ct") == (
-        f"labels='obs:ct': 1 of the 60 {WHERE} (NaN, None or ''); {ADVICE}")
+        f"labels='obs:ct': 1 of the 60 {WHERE} (NaN, None or ''); "
+        f"{_words() if gap in ('', '   ') else NOTNA}")
 
 
 ACCEPTED = ["na", "none", "Unknown", "-", "?", "NaT", "0", "T cell", "CD4+, naive",

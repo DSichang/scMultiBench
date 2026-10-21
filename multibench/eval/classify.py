@@ -10,8 +10,8 @@ import numpy as np
 import pandas as pd
 
 from . import io
-from .. import _compat
-from ..config import _and_list
+from .. import _text
+from .._text import _and_list
 from ..plot.bar import CLASSIFICATION_METRICS as _CLASSIFICATION_METRICS
 from .pipeline import (_Table, _as_written, _cell_ids, _count_error,
                        _is_label_path_list, _labels_from_dict, _n_values,
@@ -157,7 +157,7 @@ def classify(output, labels=None, *, batch=None, reference=None,
             f"reference={reference!r} is not a batch. Pass one of "
             f"{_and_list(batches, 'or')}.")
     if miss.any():
-        _compat.warn(f"{int(miss.sum()):,} of the {n_cells:,} cells have no label; "
+        _text.warn(f"{int(miss.sum()):,} of the {n_cells:,} cells have no label; "
                      f"they are left out.", UserWarning)
     cell = np.asarray(ids, dtype=object) if ids is not None else np.arange(n_cells)
     frames = []
@@ -166,7 +166,7 @@ def classify(output, labels=None, *, batch=None, reference=None,
         train = keep & (ba == ref)
         types = pd.unique(ct[train])
         if len(types) < 2:
-            _compat.warn(
+            _text.warn(
                 f"Reference batch {ref} has " + ("no labelled cell" if len(types) == 0
                                                  else "one cell type")
                 + "; skipped.", UserWarning)
@@ -174,7 +174,7 @@ def classify(output, labels=None, *, batch=None, reference=None,
         query = keep & (ba != ref) & np.isin(ct, types)
         left_out[ref] = int((keep & (ba != ref) & ~np.isin(ct, types)).sum())
         if not query.any():
-            _compat.warn(f"No other batch has a cell type of reference batch {ref}; "
+            _text.warn(f"No other batch has a cell type of reference batch {ref}; "
                          f"skipped.", UserWarning)
             continue
         predicted = _mlp(emb[train], ct[train], seed).predict(emb[query])

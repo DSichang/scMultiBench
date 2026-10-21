@@ -22,7 +22,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench.data import examples
+from multibench._data import examples
 from multibench.engine import ingest
 
 from _own_cells_034 import OLD
@@ -187,13 +187,13 @@ def test_the_docstring():
 def test_import_multibench_stays_light():
     """examples.py is loaded with the package. It must not load anndata and
     scanpy with it: that would triple the time of ``import multibench``."""
-    code = ("import sys, multibench, multibench.data.examples\n"
+    code = ("import sys, multibench, multibench._data.examples\n"
             "print('scanpy' in sys.modules, 'anndata' in sys.modules)")
     env = {**os.environ, "PYTHONPATH": str(ROOT)}
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
                          env=env, cwd=ROOT, check=True).stdout
     assert out.split() == ["False", "False"]
-    src = (ROOT / "multibench" / "data" / "examples.py").read_text()
+    src = (ROOT / "multibench" / "_data" / "examples.py").read_text()
     top = [ln for ln in src.splitlines() if re.match(r"(import|from) ", ln)]
     # 0.4.0: the deprecation helper and DATA_KEYWORDS come from the package itself
     # (light: the subprocess above shows that neither loads anndata or scanpy)

@@ -1,19 +1,17 @@
-"""Readers and coercers for evaluation inputs: embedding, labels, clustering.
+"""Readers and coercers for evaluation inputs: embedding and labels.
 
 Three groups:
 
 * ``read_*`` - file readers for the benchmark's on-disk formats (``embedding.h5``
-  with dataset ``data``; ``*cty*.csv`` label files; ``/obs/cluster_leiden`` in
-  an h5).
+  with dataset ``data`` and the ``barcodes`` a run writes; ``*cty*.csv`` label
+  files).
 * ``as_matrix`` / ``as_vector`` - coercers that accept whatever a user is
   likely to hold in memory (ndarray, DataFrame, Series, Categorical, list,
   AnnData, a path of any supported suffix, a list of label files) and return
   plain numpy arrays. :func:`multibench.evaluate` is built on these.
-* ``align_vector`` - reorders an indexed Series/DataFrame to an output's cell
-  ids (AnnData ``obs_names`` / DataFrame index), so a label Series is matched
-  by barcode rather than by position whenever both sides carry ids.
-  ``by_id_column`` does the same for a label CSV whose first column holds
-  the cell ids.
+* ``by_id_column`` - reorders a label CSV whose first column holds the cell
+  ids to an output's cell ids, so labels are matched by barcode rather than by
+  position whenever both sides carry ids.
 
 ``missing_mask`` / ``missing_words`` say which per-cell values count as
 missing: NaN, blank text, and text that a label file reads back as missing.
@@ -29,7 +27,7 @@ import h5py
 import numpy as np
 import pandas as pd
 
-from .. import _compat
+from .. import _text
 
 #: suffixes of a CSV-like label file; evaluate() reads a clusters= path with
 #: another suffix as an h5, and as_vector() takes other strings as label values
@@ -39,8 +37,8 @@ _LABEL_FILE_SUFFIXES = {".csv", ".tsv", ".txt"}
 def _require_file(path: Path | str, what: str = "file") -> Path:
     """``Path(path)`` when it is an existing file; else ``FileNotFoundError``
     naming ``what``, the path and, for a relative path, where it resolves from the
-    working directory (a notebook's cwd is the usual surprise)."""
-    p = Path(path)
+    working directory (a notebook's cwd is the usual surprise). ``~`` is expanded."""
+    p = Path(path).expanduser()
     where = ("" if p.is_absolute() else
              f" From the working directory {Path.cwd()}, the path resolves to "
              f"{p.resolve()}.")
@@ -120,6 +118,23 @@ def read_embedding(path: Path | str) -> np.ndarray:
     if X.shape[0] < X.shape[1]:
         X = X.T
     return X
+
+
+def read_cell_names(path) -> "pd.Index | None":
+    """The ``barcodes`` dataset ``mtb.run`` writes into an ``.h5`` embedding,
+    one cell name per row; ``None`` for another file or without it."""
+    path = Path(path)
+    if path.suffix.lower() not in (".h5", ".hdf5") or not path.is_file():
+        return None
+    try:
+        with h5py.File(path, "r") as f:
+            if not isinstance(f.get("barcodes"), h5py.Dataset):
+                return None
+            names = f["barcodes"][:]
+    except OSError:
+        return None
+    return pd.Index([b.decode() if isinstance(b, bytes) else str(b) for b in names],
+                    dtype=object)
 
 
 def _sep_for(path: Path) -> str:
@@ -438,7 +453,7 @@ def by_id_column(values, first, ids, *, what: str, name: str, target: str,
                    f"{order}")
     if ids is None:
         if text and first.is_unique:
-            _compat.warn(f"The first column of {name} looks like cell ids, but "
+            _text.warn(f"The first column of {name} looks like cell ids, but "
                          f"{no_ids}. {by_position}.", UserWarning)
         return vals, False
     keys = pd.Index([str(v) for v in first])
@@ -474,39 +489,6 @@ def by_id_column(values, first, ids, *, what: str, name: str, target: str,
     return np.asarray(pd.Series(vals, index=keys).reindex(ids).to_numpy()), True
 
 
-def read_clustering(path: Path | str) -> np.ndarray:
-    """Read a precomputed clustering from an h5 file's ``/obs/cluster_leiden``.
-
-    Parameters
-    ----------
-    path : str or Path
-        The benchmark's clustered-output layout (bytes or ints under
-        ``/obs/cluster_leiden``).
-
-    Returns
-    -------
-    numpy.ndarray
-        1-D integer cluster ids.
-
-    Raises
-    ------
-    FileNotFoundError
-        ``path`` does not exist (names the path and the cwd).
-    ValueError
-        No ``/obs/cluster_leiden`` in the file (lists the keys found).
-    """
-    path = _require_file(path, "clustering file")
-    with h5py.File(path, "r") as f:
-        if "obs" not in f or "cluster_leiden" not in f["obs"]:
-            raise ValueError(
-                f"{path} has no dataset '/obs/cluster_leiden'; found keys "
-                f"{sorted(f.keys())} - pass the clustering as a label CSV or a "
-                f"1-D array instead")
-        raw = np.asarray(f["/obs/cluster_leiden"]).flatten()
-    decoded = [x.decode("utf-8") if isinstance(x, (bytes, bytearray)) else x for x in raw]
-    return np.asarray(decoded).astype(int)
-
-
 def _is_label_file(e) -> bool:
     if isinstance(e, Path):
         return True
@@ -528,8 +510,8 @@ def as_vector(x, *, what: str = "labels", column: str | None = None,
     * ``list``/``tuple`` of paths (every element a ``Path`` or a ``str`` ending
       in ``.csv``/``.tsv``/``.txt``) - read each and concatenate in the given
       order, e.g. ``[cty1, cty2, cty3]`` for a multi-batch dataset;
-    * ``dict`` with one entry (:func:`multibench.labels_for` for a
-      single-label dataset) - that file. Several entries raise: this
+    * ``dict`` with one entry (``{stem: path}``, the label files of a
+      one-label dataset) - that file. Several entries raise: this
       coercer does not know the method's cell order.
     * ``numpy.ndarray`` (1-D, or ``(n, 1)``), ``pandas.Series``,
       ``pandas.Categorical``, ``pandas.Index``, or a list/tuple of scalars;
@@ -608,47 +590,9 @@ def _first(ix, n: int = 5) -> list:
     return [str(v) for v in list(ix[:n])]
 
 
-def align_vector(x, ids, *, what: str = "labels", column: str | None = None) -> np.ndarray:
-    """Align an indexed ``Series``/``DataFrame`` to the output's cell ids.
-
-    A Series indexed by cell barcode is matched by barcode, not by position
-    (the pandas convention). ``evaluate()`` matches the same way, through the
-    private ``_align_vector``, when ``output`` carries ids (an AnnData's
-    ``obs_names``, or a DataFrame with a non-default index) and ``x`` carries
-    a non-default index.
-
-    Parameters
-    ----------
-    x : pandas.Series or pandas.DataFrame
-        Labels indexed by cell id. A DataFrame must have one column, or
-        ``column=`` names the one to take.
-    ids : pandas.Index
-        The output's cell ids, in the output's row order.
-    what : str
-        Argument name for error messages (``'labels'``, ``'batch'``,
-        ``'clustering'``).
-    column : str, optional
-        Column of a multi-column DataFrame to take.
-
-    Returns
-    -------
-    numpy.ndarray
-        ``x`` reordered to ``ids`` (a no-op when the indexes already agree
-        element-wise, which also covers duplicated ids in that case).
-
-    Raises
-    ------
-    ValueError
-        ``x`` (or ``ids``) has duplicate ids so the mapping is ambiguous; some
-        of the output's ids are missing from ``x``; ``x`` has ids the output
-        lacks. The message names the first few offenders and the positional
-        escape hatch (``{what}.to_numpy()``).
-    """
-    return _align_vector(x, ids, what=what, column=column, cells="adata.obs_names")
-
-
 def _align_vector(x, ids, *, what: str, column: str | None, cells: str | None):
-    """:func:`align_vector` for ``evaluate``. ``cells`` is the expression for
+    """``x`` (an indexed Series or DataFrame) reordered to the output's cell
+    ``ids``, for ``evaluate``. ``cells`` is the expression for
     the output's cell ids (``adata.obs_names``), ``None`` when there is none."""
     if isinstance(x, pd.DataFrame):
         if column is not None:
@@ -755,6 +699,10 @@ def _anndata_matrix(adata, obsm: str | None) -> np.ndarray:
     if (obsm == "X" and has_x) or (obsm != "X" and key in adata.obsm):
         return _own_dtype(adata.X if obsm == "X" else adata.obsm[key])
     kind = type(adata).__name__            # AnnData, or MuData for a MuData
+    if key == "X_pca":
+        # the PCA has not been computed yet: the fix is to compute it
+        raise ValueError(f"The {kind} has no obsm['X_pca']. Make the PCA first, as "
+                         f"sc.pp.pca(adata).")
     keys = sorted(map(str, adata.obsm.keys()))
     picks = [f"obsm={k!r}" for k in keys[:1] if len(keys) == 1]
     picks = picks or (["obsm= with one of them"]

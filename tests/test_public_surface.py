@@ -10,16 +10,18 @@ import importlib
 import inspect
 import re
 import warnings
+from pathlib import Path
 
 import pytest
 
 import multibench as mtb
+from multibench.engine import scripts
 from multibench.engine import envs, ingest
 
 MTB_ALL = {                                       # the 0.4.0 core API (TARGET.txt)
     "config", "plot", "catalog", "io", "env", "data",
     "find_methods", "method_info", "params_for", "cite",
-    "scan", "run", "load_batch", "BatchResult",
+    "scan", "run", "load_run", "RunResult",
     "evaluate", "load_results", "recommend",
     "__version__",
 }
@@ -46,27 +48,30 @@ def test_top_level_all_is_exactly_the_contract():
 
 
 def test_io_all_is_exactly_the_contract():
-    assert set(mtb.io.__all__) == IO_ALL and mtb.io is ingest
+    assert set(mtb.io.__all__) == IO_ALL and mtb.io.export_dataset is ingest.export_dataset
     assert _leaks(mtb.io) == set()
 
 
-def test_config_all_is_exactly_the_contract():
-    assert set(mtb.config.__all__) == CONFIG_ALL
-    assert _leaks(mtb.config) == set()
-    # kept as functions for internal imports, hidden from dir()
-    assert mtb.config.category_folder("vertical") == "vertical integration"
-    assert "category_folder" not in dir(mtb.config) and "metric_set_dir" not in dir(mtb.config)
+def test_config_holds_the_four_settings_only():
+    assert set(mtb.config.FIELDS) == CONFIG_ALL
+    # a plain object: the scripts and git helpers live in engine.scripts
+    assert not any(hasattr(mtb.config, n) for n in ("category_folder", "ensure_repo",
+                                                    "scripts_commit", "_and_list"))
 
 
 def test_config_is_the_settings_object():
-    """``mtb.config`` holds the settings itself (0.4.0): no ``DEFAULT``."""
-    assert mtb.config is importlib.import_module("multibench.config")
+    """``mtb.config`` holds the settings itself (0.4.0): no ``DEFAULT``, no module."""
+    from multibench._settings import Settings
+    assert isinstance(mtb.config, Settings)
+    assert not (Path(mtb.__file__).parent / "config.py").exists()
     assert not hasattr(mtb.config, "DEFAULT") and not hasattr(mtb.config, "Config")
     text = repr(mtb.config)
     assert text.startswith("mtb.config(data_path=")
     assert all(f"{k}=" in text for k in CONFIG_ALL)
     with pytest.raises(AttributeError, match="mtb.config has no setting 'data_dir'"):
         mtb.config.data_dir = "x"
+    with pytest.raises(AttributeError, match="mtb.config has no setting 'ensure_repo'"):
+        mtb.config.ensure_repo = 3
 
 
 def test_catalog_and_data_all_are_exactly_the_contract():
@@ -89,7 +94,7 @@ def test_command_preview_is_gone_use_run_dry_run():
     from multibench import workflow
     assert not hasattr(workflow, "command_preview")
     inp = mtb.engine.resolve.inputs_for("D11", "vertical", "Matilda", modalities=["rna", "adt"])
-    argv = mtb.engine.runner.run("Matilda", "vertical", inputs=inp, out_dir="o", dry_run=True)
+    argv = mtb.engine.runner.preview("Matilda", "vertical", inputs=inp, out_dir="o")[0]
     assert isinstance(argv, list) and "--save_path" in argv
 
 
@@ -129,31 +134,31 @@ def test_cite_methods_keyword_is_gone():
     assert inspect.signature(mtb.cite).parameters["format"].default == "text"
 
 
-def test_scan_data_path_is_keyword_only_and_the_plan_has_command():
+def test_scan_is_the_plan_with_its_command():
+    """d1: one check, one run - scan returns the plan, run has no dry_run."""
     with pytest.raises(TypeError):
         mtb.scan("D11", "vertical", "data")
-    df = mtb.run("D11", "vertical", methods=["Matilda"], dry_run=True, verbose=False)
-    assert df.columns[-1] == "command" and len(df.columns) == 7          # c1 (C32)
-    assert list(mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False).columns) == \
-        ["method", "modalities", "runnable", "reason"]
+    df = mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False)
+    assert list(df.columns) == ["method", "modalities", "runnable", "reason", "env",
+                                "caveat", "command"]
+    assert df["command"].iloc[0].startswith("conda run -n matilda ")
+    assert "dry_run" not in inspect.signature(mtb.run).parameters
 
 
-def test_run_all_dry_run_is_the_full_plan_and_out_dir_is_required_for_a_real_run():
-    import pandas as pd
-    from tests.conftest import full_scan
-    a = mtb.run("D11", "vertical", methods=["Matilda"], dry_run=True, verbose=False)
-    b = full_scan("D11", "vertical", methods=["Matilda"], verbose=False)
-    from multibench import workflow as W
-    pd.testing.assert_frame_equal(a, b[W.PLAN_COLUMNS])                 # c1 (C32)
+def test_out_dir_is_required_for_a_run():
+    params = inspect.signature(mtb.run).parameters
+    assert params["out_dir"].default is inspect.Parameter.empty
     with pytest.raises(TypeError, match="out_dir"):
         mtb.run("D11", "vertical", methods=["Matilda"], verbose=False)
+    with pytest.raises(TypeError, match="out_dir"):
+        mtb.run("D11", "vertical", None, methods=["Matilda"], verbose=False)
 
 
 def test_rescore_only_is_gone():
-    res = mtb.BatchResult([], "D11", "vertical")
+    res = mtb.RunResult([], "D11", "vertical")
     with pytest.raises(TypeError, match="only"):
         res.rescore(only={"ARI"})
-    assert "metrics" in inspect.signature(mtb.BatchResult.rescore).parameters
+    assert "metrics" in inspect.signature(mtb.RunResult.rescore).parameters
 
 
 # ------------------------------------------------------------------ CLI help names real functions

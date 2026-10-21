@@ -10,7 +10,7 @@ from pathlib import Path
 
 import yaml
 
-from .. import config
+from .. import _text
 from .schema import (ArgSpec, MethodSpec, OutputSpec, Variant, base_modality,
                      is_label_role)
 
@@ -167,7 +167,7 @@ def check_method(method_id: str) -> str:
     if method_id in ids:
         return method_id
     if isinstance(method_id, str):
-        from ..data import catalog          # lazy: catalog imports registry lazily
+        from .._data import catalog          # lazy: catalog imports registry lazily
         canon = catalog._canonical_id(method_id)
         if canon in ids:
             return canon
@@ -194,7 +194,7 @@ def unknown_method_message(method_id, hint: str | None = None) -> str:
         # every id the name starts (Seurat: Seurat_v3, Seurat_v4, Seurat_v5, Seurat_WNN)
         low = str(method_id).lower()
         prefixed = [s.id for s in load() if s.id.lower().startswith(low)] if low else []
-        hint = (config._and_list(prefixed, "or") if len(prefixed) > 1
+        hint = (_text._and_list(prefixed, "or") if len(prefixed) > 1
                 else closest_method(method_id))
     return (f"Unknown method {method_id}."
             + (f" Did you mean {hint}?" if hint else "")
@@ -221,13 +221,23 @@ def check_id_list(value, name: str):
     return value
 
 
+#: The four integration categories.
+CATEGORIES = ("cross", "diagonal", "mosaic", "vertical")
+
+#: assay names a category= gets by mistake (lower case, no dash or space)
+_ASSAY_TOKENS = ("citeseq", "multiome", "10xmultiome", "sharesesq", "shareseq",
+                 "teaseq", "asapseq", "dogmaseq", "snareseq")
+
+
 def check_category(category: str | None) -> str | None:
-    """Validate a category token; ``None`` passes through. Raises the
-    ``ValueError`` of ``config.category_folder``."""
-    if category is None:
-        return None
-    config.category_folder(category)
-    return category
+    """Validate a category token; ``None`` passes through. An unknown one raises
+    ``ValueError`` listing the four."""
+    if category is None or (isinstance(category, str) and category in CATEGORIES):
+        return category
+    # an assay name is the usual slip: say where it belongs
+    assay = ". CITE-seq and 10x Multiome are vertical." if str(category).lower().replace(
+        "-", "").replace(" ", "") in _ASSAY_TOKENS else ""
+    raise ValueError(f"unknown category {category!r}; valid: {list(CATEGORIES)}{assay}")
 
 
 @functools.lru_cache(maxsize=1)

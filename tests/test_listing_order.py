@@ -102,7 +102,7 @@ os.listdir = _descending
 
 def test_concerto_cross_command_runs_the_driver(root):
     inputs = mtb.engine.resolve.inputs_for("D52", "cross", "Concerto", data_path=root / "data")
-    cmd = mtb.engine.runner.run("Concerto", "cross", inputs=inputs, out_dir="out/Concerto_D52", dry_run=True)
+    cmd = mtb.engine.runner.preview("Concerto", "cross", inputs=inputs, out_dir="out/Concerto_D52")[0]
     i = cmd.index(str(PKG / DRIVER))
     assert cmd[i - 1] == "python"
     assert cmd[i + 1] == "--script_dir"

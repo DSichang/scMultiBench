@@ -1,11 +1,8 @@
-"""High-level workflow: point at a dataset, run everything that applies, get metrics and a figure.
+"""Run the methods on a dataset folder, score them and keep the result.
 
-The low-level API (``inputs_for`` -> ``run`` -> ``evaluate`` -> ``plot``) needs a
-method, its category and its modality combination; this module starts from the dataset:
-
-    mtb.scan("D11")                                       # what can run on this data?
-    res = mtb.run("D11", "vertical", out_dir="out/")  # run it all, with metrics
-    res.plot()                                            # one figure
+    mtb.scan("D11")                                   # what can run here, and how
+    res = mtb.run("D11", "vertical", out_dir="out/")  # run them, with metrics
+    res.plot()                                        # one figure
 
 Two mistakes that give wrong numbers without an error are handled here. A method
 that writes a graph is recorded as such, not scored with embedding metrics (a kNN
@@ -27,17 +24,20 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import _compat, config
-from .config import _and_list
+from . import _text
+
+from . import _settings
+from ._settings import config
+from ._text import _and_list
 from .discover import _REPRESENTATION_TOKENS, _runtimes
-from .engine import envs, registry, resolve as _resolve
+from .engine import envs, registry, resolve as _resolve, scripts
 from .engine import runner as _runner
 from .engine.schema import base_modality as _schema_base
 from .engine.runner import run as _run
 from .eval import io as _eio, scib as _escib
 from .eval.pipeline import LONG_COLUMNS as _LONG_COLUMNS, _long_table as _to_long, _scores
 
-__all__ = ["scan", "run", "BatchResult", "load_batch"]
+__all__ = ["scan", "run", "RunResult", "load_run"]
 
 
 def _registry_id_or(name):
@@ -48,7 +48,7 @@ def _registry_id_or(name):
         return name
 
 
-def load_batch(out_dir, *, methods=None) -> "BatchResult":
+def load_run(out_dir, *, methods=None) -> "RunResult":
     """Reload a saved ``run`` result.
 
     Parameters
@@ -60,7 +60,7 @@ def load_batch(out_dir, *, methods=None) -> "BatchResult":
 
     Returns
     -------
-    BatchResult
+    RunResult
         The reloaded result; ``save()`` with no argument writes back to ``out_dir``.
 
     Raises
@@ -79,9 +79,9 @@ def load_batch(out_dir, *, methods=None) -> "BatchResult":
     Examples
     --------
     >>> import multibench as mtb
-    >>> res = mtb.load_batch("out/")
+    >>> res = mtb.load_run("out/")
     >>> res.summary
-    >>> mtb.load_batch("out/", methods=["Matilda", "scMM"]).plot()
+    >>> mtb.load_run("out/", methods=["Matilda", "scMM"]).plot()
 
     Notes
     -----
@@ -90,7 +90,7 @@ def load_batch(out_dir, *, methods=None) -> "BatchResult":
     gone, and the dataset folder under the recorded data root, then
     ``mtb.config.data_path``.
     """
-    folder = Path(out_dir)
+    folder = Path(out_dir).expanduser()
     if not (folder / "batch_result.json").is_file():
         raise FileNotFoundError(
             f"{folder} holds no batch_result.json, so it is not an out_dir of mtb.run. "
@@ -125,17 +125,39 @@ def load_batch(out_dir, *, methods=None) -> "BatchResult":
     long_path = folder / "long.csv"
     long_table = pd.read_csv(long_path) if long_path.exists() else None
     if _scored_before_040(long_table, records):
-        _compat.warn(OLD_TREE, UserWarning)
+        _text.warn(OLD_TREE, UserWarning)
     for r in records:
         rows = [] if long_table is None else long_table[long_table["method"] == r.get("method")]
         r["_long"] = rows if len(rows) else None
-    res = BatchResult(records, blob["dataset"], blob["category"], out_dir=folder)
+    res = RunResult(records, blob["dataset"], blob["category"], out_dir=folder)
     for r in records:
         res._batch_text(r.get("batch_file"))       # loads the saved batch, when present
     return res
 
 
-#: load_batch's warning for a folder scored before 0.4.0
+def _run_record_for(path, dataset: str) -> dict | None:
+    """The record of the run of ``dataset`` whose method folder holds the file
+    ``path`` (``<out_dir>/<method>_<dataset>/embedding.h5``), else ``None``."""
+    if not isinstance(path, (str, os.PathLike)):
+        return None
+    folder = Path(path).expanduser().resolve().parent
+    blob_path = folder.parent / "batch_result.json"
+    try:
+        with open(blob_path) as fh:
+            blob = json.load(fh)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(blob, dict) or blob.get("dataset") != dataset:
+        return None
+    for r in blob.get("records") or ():
+        saved = Path(str(r.get("out_dir") or f"{r.get('method')}_{dataset}"))
+        if saved.name == folder.name and registry.method_of(str(r.get("method"))):
+            return {"method": registry.method_of(r["method"]),
+                    "category": r.get("category") or blob.get("category")}
+    return None
+
+
+#: load_run's warning for a folder scored before 0.4.0
 OLD_TREE = ("These scores come from multibench 0.3.x. res.rescore() scores them as "
             "0.4.0 does.")
 
@@ -213,7 +235,7 @@ def _missing_script(variant, *, method: str | None = None) -> str:
     """Why this variant's script or a helper module it imports is missing from
     the scripts checkout, or "" (also when there is no checkout yet: run fetches it)."""
     entry = Path(variant.entrypoint)
-    for root in (Path(config.repo_path), Path(config.__file__).resolve().parent.parent):
+    for root in (Path(config.repo_path), _settings._ROOT):
         if (root / "tools_scripts").is_dir():
             # a script the package ships is copied in before the run
             shipped = (method and entry.name in variant.helpers
@@ -264,17 +286,17 @@ def _variant_rows(category=None):
             yield spec, v, cat, list(v.when.get("modalities", []))
 
 
-#: scan() columns. New columns go last, so positional readers keep working.
-SCAN_COLUMNS = ["method", "category", "modalities", "env", "output_kind", "n_tunable",
+#: The columns of the full plan, one row per method variant (``_scan``).
+PLAN_COLUMNS = ["method", "category", "modalities", "env", "output_kind", "n_tunable",
                 "runtime_tier", "observed_worst_sec", "caveat", "runnable", "reason",
                 "files_ok", "files_reason", "env_ok", "env_reason", "needs_labels", "atac",
                 "command"]
 
-#: The columns of ``run(dry_run=True)``; the first four are scan's.
-PLAN_COLUMNS = ["method", "modalities", "runnable", "reason", "env", "caveat", "command"]
+#: The columns of ``scan``, one row per method; ``category`` only without one.
+SCAN_COLUMNS = ["method", "category", "modalities", "runnable", "reason", "env", "caveat",
+                "command"]
 
-#: Default ``out_dir`` of the plan's ``command`` column: a preview needs no
-#: real directory.
+#: The ``out_dir`` of scan's ``command`` column.
 OUT_DIR_PLACEHOLDER = "<out_dir>"
 
 
@@ -359,10 +381,13 @@ def _missing_files_reason(spec, category: str, mods: list, dataset: str,
     has_other = {}         # (need, kinds found) -> its part: numbered files share one
     absent = {}            # need -> the files of a part none of whose kinds is here
     for role, p in missing.items():
-        if is_label_role(role) or _schema_base(role) != "atac":
+        digits = role[len(role.rstrip("0123456789")):]
+        # a numbered file whose other batches are here: only this batch is missing
+        siblings = digits and any(q.name != p.name for q in p.parent.glob(
+            f"{p.stem[:len(p.stem) - len(digits)]}[0-9]*.h5"))
+        if is_label_role(role) or _schema_base(role) != "atac" or siblings:
             other.append(p.name)
             continue
-        digits = role[len(role.rstrip("0123456789")):]
         stem = role.rstrip("0123456789")
         # the name export writes: atac.h5 (vertical), atac_peak<i>.h5 (cross)
         want_file = (f"atac{digits}.h5" if category == "vertical" else
@@ -459,10 +484,6 @@ _WRONG_ATAC_RE = re.compile(r"^\S+ " + _WRONG_ATAC_BODY)
 PEAK_NAMES_REASON = "reads peak names such as "
 _PEAK_NAMES_RE = re.compile(r"^\S+ " + re.escape(PEAK_NAMES_REASON)
                             + r"(\S+)\. (\S+) holds other names")
-#: What every blocking-ATAC reason says; what :func:`_is_wrong_atac` looks for.
-_ATAC_MARKS = ("Export the ATAC as ", PEAK_NAMES_REASON)
-
-
 def _blocking_caveats(caveats) -> list[str]:
     """The caveats that block a row: the ATAC file holds the other
     representation, or peak names the method's script cannot read."""
@@ -480,15 +501,6 @@ def _wrong_atac_reason(method: str, caveats) -> str:
                     f"{m.group(3)}. Export the ATAC as {as_}.")
         return text
     return ""
-
-
-def _is_wrong_atac(reason) -> "pd.Series | bool":
-    """Whether a scan ``reason`` (or a Series of them) carries :func:`_wrong_atac_reason`."""
-    if isinstance(reason, pd.Series):
-        text = reason.astype(str)
-        return text.str.contains(_ATAC_MARKS[0], regex=False) | text.str.contains(
-            _ATAC_MARKS[1], regex=False)
-    return any(o in str(reason or "") for o in _ATAC_MARKS)
 
 
 def _atac_mismatch_caveats(method: str, category: str, inputs) -> list[str]:
@@ -528,33 +540,6 @@ def _would_run(row) -> bool:
     """Whether the sweep would run this scan row: runnable, or blocked only by its env."""
     return bool(row["files_ok"]) and (not row["reason"]
                                       or row["reason"] == row.get("env_reason"))
-
-
-def _scripts_ref_note() -> str | None:
-    """The dry-run note that the method scripts are not at
-    ``$MULTIBENCH_SCRIPTS_REF`` or their folder cannot be filled, else ``None``."""
-    note = config.scripts_ref_problem() or config.scripts_folder_problem()
-    return _join_sentences([note]) if note else None
-
-
-def _dry_run_notes(plan: "pd.DataFrame", modalities=None) -> tuple:
-    """``(scripts_note, [(method, caveat)])``: the note that the method scripts are
-    not here yet, and the caveat of each row the sweep would run (nested rows out)."""
-    scripts = None
-    lines = []
-    left_out = set()
-    if modalities is None and len(plan):
-        left_out = set(_nested_rows(plan[[_would_run(r) for _, r in plan.iterrows()]])[0])
-    for index, r in plan.iterrows():
-        text = str(r.get("caveat") or "")
-        start = text.find(_runner.SCRIPTS_NOT_HERE)
-        if scripts is None and start >= 0:
-            end = _runner._prepared_at(text[start:])
-            scripts = text[start:][:end].rstrip() if end >= 0 else text[start:]
-        caveat = _run_caveat(text)
-        if _would_run(r) and caveat and index not in left_out:
-            lines.append((r["method"], caveat))
-    return scripts, lines
 
 
 def _variant_consumes_atac(variant) -> bool:
@@ -916,14 +901,14 @@ def _category_hint(df: "pd.DataFrame", category: str | None) -> str:
 def scan(dataset: str, category: str | None = None, *,
          methods: list[str] | None = None,
          modalities: list[str] | str | None = None,
+         params: dict | None = None,
          assume_gpu: bool = False,
          verbose: bool = True) -> pd.DataFrame:
-    """Report which methods can run on a dataset, and why the rest cannot.
+    """Check which methods can run on a dataset, and how ``run`` would run them.
 
-    Nothing is executed. Call it first on a new dataset. It prints what the
-    folder holds and why each method that cannot run cannot;
-    ``run(dry_run=True)`` returns the full plan, one row per method
-    variant with its checks and command.
+    Nothing is executed and no file is written. Call it first on a new
+    dataset: it prints what the folder holds and why each method that
+    cannot run cannot.
 
     Parameters
     ----------
@@ -939,6 +924,9 @@ def scan(dataset: str, category: str | None = None, *,
         Modality tokens of one combination, e.g. ``["rna", "adt"]``; ``None`` =
         the combinations whose modalities the folder holds; ``"all"`` = every
         combination.
+    params : dict | None
+        Hyperparameters per method, as ``run`` takes them; they are checked
+        and appear in ``command``.
     assume_gpu : bool
         ``True`` = skip this host's GPU test, to check a job for a GPU node
         from a login node.
@@ -950,10 +938,10 @@ def scan(dataset: str, category: str | None = None, *,
     pandas.DataFrame
         One row per method (per method and category when ``category`` is
         ``None``), runnable methods first: ``method``, ``modalities`` (of the
-        variant ``run`` would run, ``+``-joined), ``runnable`` and
-        ``reason``. ``attrs`` holds ``held`` (the modalities the folder
-        holds), ``not_listed``, ``not_held``, ``not_listed_batch`` (rows for
-        numbered batches the folder lacks) and ``cells`` (cells per file).
+        variant ``run`` would run, ``+``-joined), ``runnable``, ``reason``
+        (why it cannot run), ``env``, ``caveat`` (what to know before
+        running it) and ``command`` (the line ``run`` would execute, with
+        ``<out_dir>`` for the output folder).
 
     Raises
     ------
@@ -963,22 +951,23 @@ def scan(dataset: str, category: str | None = None, *,
         Unknown ``category`` or modality token, or a method in ``methods``
         without a variant there.
     KeyError
-        Unknown method id.
+        Unknown method id, or a ``params`` key the method does not accept.
 
     Examples
     --------
     >>> import multibench as mtb
     >>> mtb.scan("D11", "vertical")
-    >>> mtb.scan("data/MYCITE", "vertical", methods=["Matilda", "totalVI"])
+    >>> mtb.scan("data/MYCITE", "vertical", methods=["Matilda"],
+    ...          params={"Matilda": {"epochs": 10}}).command[0]
 
     See Also
     --------
-    mtb.run : runs the runnable methods; ``dry_run=True`` returns the full plan.
+    mtb.run : runs the runnable methods.
     """
     if category is None:
         category = known_category(dataset)
     df, private = _scan(dataset, category, methods=methods, modalities=modalities,
-                        verbose=False, assume_gpu=assume_gpu)
+                        params=params, verbose=False, assume_gpu=assume_gpu)
     return _per_method(df, private, verbose=verbose,
                        nested=not isinstance(modalities, (list, tuple)))
 
@@ -986,7 +975,7 @@ def scan(dataset: str, category: str | None = None, *,
 def known_category(dataset) -> str | None:
     """The one category the benchmark scored the dataset ``dataset`` names in
     (``catalog.datasets()``), or ``None`` for a dataset of its own."""
-    from .data import catalog
+    from ._data import catalog
     name = _resolve.split_dataset(dataset, None)[0]
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -998,7 +987,7 @@ def known_category(dataset) -> str | None:
 def _scan(dataset: str, category: str | None = None, *, methods=None, modalities=None,
           data_path=None, out_dir="<out_dir>", params: dict | None = None,
           verbose: bool = True, assume_gpu: bool = False) -> "tuple[pd.DataFrame, pd.DataFrame]":
-    """The full plan (every column of :data:`SCAN_COLUMNS`), and a second frame
+    """The full plan (every column of :data:`PLAN_COLUMNS`), and a second frame
     aligned with it: ``_other`` (the
     reason without the off-Linux sentence), ``_label_inputs`` and ``_folder_caveat``."""
     dataset, data_path = _resolve.split_dataset(dataset, data_path)
@@ -1008,9 +997,8 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
     registry.check_id_list(modalities, "modalities")
     if methods is not None:
         methods = [registry.check_method(m) for m in methods]
-    _check_params_shape(params, methods, "scan")
     # did-you-mean KeyError before any I/O; ids in any case or display names
-    params = {registry.check_method(m): v for m, v in (params or {}).items()}
+    params = _params_by_method(params, methods, "scan")
     wanted = _modality_matcher(modalities, methods) if modalities is not None else None
     base = Path(data_path) if data_path is not None else config.data_path
     dataset = _resolve.canonical_dataset(base, dataset)
@@ -1021,7 +1009,7 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
     repo = _runner._repo_root_no_fetch()
     label_files = {q.resolve(): q.name for q in _label_files(dataset, data_path)}
     # the real run refuses these scripts, so every row is blocked
-    wrong_ref = config.scripts_ref_problem(repo) or config.scripts_folder_problem(repo) or ""
+    wrong_ref = scripts.scripts_ref_problem(repo) or scripts.scripts_folder_problem(repo) or ""
     rows = []
     dropped_dirs: list[str] = []
     off_linux = bool(_runner.linux_only_sentence())
@@ -1126,7 +1114,7 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
             if notes:
                 rec["caveat"] = _join_sentences([rec["caveat"], *notes])
         rows.append(rec)
-    df = pd.DataFrame(rows, columns=[*SCAN_COLUMNS, *_PRIVATE_COLUMNS])
+    df = pd.DataFrame(rows, columns=[*PLAN_COLUMNS, *_PRIVATE_COLUMNS])
     df = df.sort_values(["runnable", "category", "method"],
                         ascending=[False, True, True]).reset_index(drop=True)
     private = pd.concat([df.pop(c) for c in _PRIVATE_COLUMNS], axis=1)
@@ -1138,7 +1126,7 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
     if params:
         _check_param_keys(df, params)
     if dropped_dirs and modalities:
-        _compat.warn(_dropped_dirs_message(modalities, dropped_dirs),
+        _text.warn(_dropped_dirs_message(modalities, dropped_dirs),
                      UserWarning)
     # last, so every check above saw every variant
     held = _held_families(ds_dir, category)
@@ -1268,6 +1256,7 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
     """The frame of ``scan`` (one row per method) from :func:`_scan`'s two frames; with
     ``verbose`` it prints the per-method lines (``nested``: leave out nested rows)."""
     dataset, ds_dir = private.attrs["dataset"], private.attrs["folder"]
+    data_path = ds_dir.parent if data_path is None else data_path
     rows, reasons, with_files = [], [], set()
     held = set(df.attrs["held"])
     several = df["category"].nunique() > 1
@@ -1281,7 +1270,8 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
                     key=lambda i: len(str(group.at[i, "modalities"]).split("+")))
             # the first run fetches the scripts: say so where nothing else does
             rows.append((method, cat, group.at[i, "modalities"], True,
-                         _scripts_caveat(group.at[i, "caveat"])))
+                         _scripts_caveat(group.at[i, "caveat"]),
+                         *group.loc[i, ["env", "caveat", "command"]]))
             continue
         # the row that speaks for the method: files on disk, the folder's number of
         # batches, families held, fewest missing, then the most modalities, as
@@ -1292,10 +1282,10 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
             len(_row_families(group.at[i, "modalities"]) - held),
             _missing_inputs(group.loc[i], dataset, data_path),
             -len(str(group.at[i, "modalities"]).split("+")), i))
-        rows.append((method, cat, group.at[i, "modalities"], False, group.at[i, "reason"]))
+        rows.append((method, cat, group.at[i, "modalities"], False, group.at[i, "reason"],
+                     *group.loc[i, ["env", "caveat", "command"]]))
         reasons.append((method, private.at[i, "_other"]))
-    out = pd.DataFrame(rows, columns=["method", "category", "modalities", "runnable",
-                                      "reason"])
+    out = pd.DataFrame(rows, columns=SCAN_COLUMNS)
     order = out.sort_values(["runnable", "method", "category"],
                             ascending=[False, True, True]).index
     out = out.loc[order].reset_index(drop=True)
@@ -1347,6 +1337,11 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
     for note in dict.fromkeys(private.loc[would, "_folder_caveat"]):
         if note:
             print(f"[scan] {note}", flush=True)
+    gaps = _label_gaps(dataset, data_path)
+    unlabelled = gaps and _missing_labels_problem(
+        dataset, gaps, _label_readers(df.loc[would], private, gaps), evaluate=True)
+    if unlabelled:
+        print(f"[scan] {unlabelled}", flush=True)
     return out
 
 
@@ -1367,7 +1362,7 @@ def _arm_deadline(seconds):
 
     if threading.current_thread() is not threading.main_thread():
         # signal.signal raises off the main thread
-        _compat.warn("timeout= is unavailable off the main thread; "
+        _text.warn("timeout= is unavailable off the main thread; "
                      "running without a deadline")
         return _NOT_ARMED
 
@@ -1454,7 +1449,7 @@ def _label_candidates(dataset, n, data_path=None):
 def _metric_codes(metrics):
     """The metric codes ``metrics=`` selects; ``None`` = every metric, also
     for a value ``evaluate`` will reject (it raises there, with its message)."""
-    from .data import catalog
+    from ._data import catalog
     try:
         return catalog.metric_selection(metrics).codes
     except (TypeError, ValueError):
@@ -1569,34 +1564,46 @@ def _evaluate_best_order(emb, category, cands, *, metrics=None, user_batch=False
 
 
 # ------------------------------------------------------------------------ results
-#: the summary's status of each record status; the record and the reason keep the detail
+#: the record status of each status code a 0.3 record holds
 _STATUS = {"CHAIN_OK": "scored", "CHAIN_OK_GRAPH_METHOD": "scored", "RUN_OK": "ran",
            "RUN_OK_EVAL_FAILED": "ran", "RUN_OK_NO_EMBEDDING": "ran",
            "RUN_OK_NO_LABEL_MATCH": "ran", "FAIL": "failed", "SKIPPED": "skipped",
            "TIMEOUT": "timeout"}
+#: the five record statuses, in the order ``repr`` counts them
+STATUSES = ("scored", "ran", "failed", "skipped", "timeout")
 
-#: the reason of a record that ran and holds no error of its own
+#: why a record that ran has no scores, for a 0.3 status code that said it
 _RAN_REASON = {"RUN_OK_NO_EMBEDDING": "It writes a graph, not an embedding.",
                "RUN_OK_NO_LABEL_MATCH": "No label file has as many cells as the output."}
 
 
 def _status(code) -> str:
-    """The summary status of a record status, as ``_STATUS`` maps it."""
+    """The record status of ``code``: one of :data:`STATUSES`, or a 0.3 code."""
     s = str(code or "")
-    if s in _STATUS.values():
+    if s in STATUSES:
         return s
     return _STATUS.get(s) or ("timeout" if s.startswith("TIMEOUT") else "failed")
 
 
+def _new_status(rec: dict) -> dict:
+    """``rec`` with a 0.3 status code replaced by its record status; the reason
+    the code alone said goes to ``note``."""
+    code = rec.get("status")
+    if code not in STATUSES:
+        rec["status"] = _status(code)
+        if code in _RAN_REASON and not (rec.get("error") or rec.get("note")):
+            rec["note"] = _RAN_REASON[code]
+    return rec
+
+
 def _reason(rec: dict) -> str:
     """Why ``rec`` has no scores, or ``""`` when it has them."""
-    code = str(rec.get("status") or "")
-    if _status(code) == "scored":
+    if _status(rec.get("status")) == "scored":
         return ""
-    return rec.get("error") or rec.get("note") or _RAN_REASON.get(code, "")
+    return rec.get("error") or rec.get("note") or ""
 
 
-#: the columns of BatchResult.summary; the metric columns come after status
+#: the columns of RunResult.summary; the metric columns come after status
 _SUMMARY_COLUMNS = ("method", "status", "run_sec", "caveat", "reason")
 
 
@@ -1613,9 +1620,9 @@ def _saved_records(folder: Path) -> dict:
             records = json.load(fh).get("records") or []
     except (OSError, ValueError, AttributeError):
         return {}
-    # a saved file may hold any records BatchResult was given
-    return {r["method"]: r for r in records if isinstance(r, dict) and r.get("method")
-            and _status(r.get("status")) != "skipped"}
+    # a saved file may hold any records RunResult was given
+    return {r["method"]: _new_status(r) for r in records
+            if isinstance(r, dict) and r.get("method") and _status(r.get("status")) != "skipped"}
 
 
 def _check_save_target(folder: Path, dataset: str, category: str) -> None:
@@ -1674,19 +1681,19 @@ def _warn_unsaved_batch(records, result) -> None:
             and result._batch_text(r.get("batch_file")) is None
             and (r.get("batch_file") or r.get("batch_source") == "user")]
     if old:
-        _compat.warn("This result was scored with your batch vector, which older "
+        _text.warn("This result was scored with your batch vector, which older "
                      "versions did not save. Pass batch= again to keep the batch "
                      "metrics.", UserWarning)
     elif lost:
-        _compat.warn("This result was scored with your batch vector, which is not "
+        _text.warn("This result was scored with your batch vector, which is not "
                      "saved with it. Pass batch= again to keep the batch metrics.",
                      UserWarning)
 
 
-class BatchResult:
+class RunResult:
     """The result of ``mtb.run``: its summary table, long table and figure.
 
-    ``mtb.run`` and ``mtb.load_batch`` build it. It keeps one record per
+    ``mtb.run`` and ``mtb.load_run`` build it. It keeps one record per
     method, which ``rescore`` and ``plot`` read.
 
     Parameters
@@ -1703,9 +1710,14 @@ class BatchResult:
     Attributes
     ----------
     records : list[dict]
-        One dict per method: ``method``, ``status``, ``out_dir``, ``metrics``
-        and, where they apply, the run's provenance and the label orderings
-        tried (``label_order_candidates``).
+        One dict per method, as saved in ``batch_result.json``: ``method``,
+        ``status`` (as in ``summary``), ``out_dir`` (its output folder),
+        ``params_used``, ``run_sec``, ``reused`` (``True`` when
+        ``skip_existing`` reused a saved output), ``metrics``,
+        ``labels_used`` (the label files in the cell order scored),
+        ``error`` or ``note`` (the ``reason`` of ``summary``) and the run's
+        provenance (``multibench_version``, ``scripts_commit``,
+        ``env_flavor``, ``hostname``).
     dataset : str
         Dataset folder name.
     category : str
@@ -1730,13 +1742,14 @@ class BatchResult:
     --------
     mtb.run : produces one.
 
-    mtb.load_batch : reloads one from ``save()``'s folder.
+    mtb.load_run : reloads one from ``save()``'s folder.
 
     mtb.plot.bubble : the figure ``plot`` draws from ``long``.
     """
 
     def __init__(self, records, dataset, category, out_dir=None):
-        self.records = records
+        # one status vocabulary: a record of 0.3 gets its 0.4 status
+        self.records = [_new_status(r) for r in records]
         self.dataset = dataset
         self.category = category
         self.out_dir = out_dir
@@ -1770,12 +1783,12 @@ class BatchResult:
 
         Examples
         --------
-        >>> res = mtb.load_batch("out/")
+        >>> res = mtb.load_run("out/")
         >>> res.summary[["method", "status", "ARI"]]
 
         See Also
         --------
-        mtb.load_batch : reads a saved folder; its ``batch_result.json`` holds every
+        mtb.load_run : reads a saved folder; its ``batch_result.json`` holds every
             record, with the label orders tried.
         """
         rows = [{"method": r.get("method"), "status": _status(r.get("status")),
@@ -1808,19 +1821,19 @@ class BatchResult:
 
         Examples
         --------
-        >>> res = mtb.load_batch("out/")
+        >>> res = mtb.load_run("out/")
         >>> mtb.plot.bubble(res.long, metrics=["ARI", "NMI"])
         >>> res.long.pivot_table(index="method", columns="metric", values="value")
 
         Notes
         -----
         **Source of the rows.** Each record contributes the unrounded frame
-        ``run`` attached (or ``long.csv`` via ``mtb.load_batch``) when
+        ``run`` attached (or ``long.csv`` via ``mtb.load_run``) when
         present. Otherwise the record contributes its ``metrics`` dict.
 
         See Also
         --------
-        BatchResult.plot : draws the bubble figure from this frame.
+        RunResult.plot : draws the bubble figure from this frame.
         """
         frames = []
         for r in self.records:
@@ -1869,7 +1882,7 @@ class BatchResult:
 
         Examples
         --------
-        >>> res = mtb.load_batch("out/")
+        >>> res = mtb.load_run("out/")
         >>> fig = res.plot()
         >>> fig = res.plot(metrics=["ARI", "NMI", "ASW"], title="D11 vertical")
         >>> fig.savefig("D11_vertical.png", dpi=200)
@@ -1887,7 +1900,7 @@ class BatchResult:
         --------
         mtb.plot.bubble : the underlying function and its full keyword list.
 
-        BatchResult.long : the frame handed to it.
+        RunResult.long : the frame handed to it.
         """
         from . import plot as _plot
         lng = self.long
@@ -1896,7 +1909,7 @@ class BatchResult:
         return _plot.bubble(lng, **kw)
 
     def rescore(self, *, batch=None, labels=None, metrics=None,
-                verbose: bool = True) -> "BatchResult":
+                verbose: bool = True) -> "RunResult":
         """Score the saved outputs again with new labels, batch or metrics.
 
         No method is re-run. Each record's embedding is read back from its
@@ -1924,7 +1937,7 @@ class BatchResult:
 
         Returns
         -------
-        BatchResult
+        RunResult
             A new result; this one is untouched. Call ``.save(out_dir)`` on it
             to persist it.
 
@@ -1948,23 +1961,23 @@ class BatchResult:
 
         Examples
         --------
-        >>> mtb.load_batch("out/").rescore().save()
+        >>> mtb.load_run("out/").rescore().save()
 
         See Also
         --------
         mtb.evaluate : the scoring function applied per record.
-        BatchResult.save : persist the re-scored result.
+        RunResult.save : persist the re-scored result.
         """
         with warnings.catch_warnings():
-            # load_batch chose the data folder: no note on a same-named one here
+            # load_run chose the data folder: no note on a same-named one here
             warnings.filterwarnings("ignore", message=r"Using .*; \./.* also exists")
             return self._rescore(batch=batch, labels=labels, metrics=metrics,
                                  verbose=verbose)
 
-    def _rescore(self, *, batch, labels, metrics, verbose) -> "BatchResult":
+    def _rescore(self, *, batch, labels, metrics, verbose) -> "RunResult":
         """:meth:`rescore`, without the note on a same-named folder here."""
         import copy
-        new = BatchResult([], self.dataset, self.category, out_dir=self.out_dir)
+        new = RunResult([], self.dataset, self.category, out_dir=self.out_dir)
         found = [_dataset_root(r, self.dataset) for r in self.records]
         roots = [root for root, _ in found]
         tried: dict = {}           # the roots searched, named when the folder is not found
@@ -2034,9 +2047,7 @@ class BatchResult:
                     no_output.append(method)
                     raise
                 if emb is None:
-                    rec["status"] = "RUN_OK_NO_EMBEDDING"
-                    rec["note"] = (f"output kind={variant.output.kind}; this method does not "
-                                   "produce an embedding, so embedding-based metrics do not apply")
+                    rec["status"], rec["note"] = "ran", _RAN_REASON["RUN_OK_NO_EMBEDDING"]
                 else:
                     label_ids, labels_by_cell = labels_at.get(root, (None, False))
                     if batch is not None:
@@ -2059,7 +2070,7 @@ class BatchResult:
                                   tried=tried[root])
             except Exception as e:  # noqa: BLE001 - one bad record must not abort the rest
                 _drop_scores(rec)
-                rec["status"] = "RUN_OK_EVAL_FAILED"
+                rec["status"] = "ran"
                 rec["error"] = _clip_error(f"{type(e).__name__}: {e}")
             if verbose and method not in no_output:      # its error says what is missing
                 print(f"[rescore] {method} -> {_status(rec['status'])} {_ari_tail(rec)}".rstrip(),
@@ -2067,7 +2078,7 @@ class BatchResult:
             if metrics is not None and rec.get("metrics") and r.get("metrics"):
                 # the named metrics replace theirs; the other scores stay
                 rec["metrics"] = {**r["metrics"], **rec["metrics"]}
-                both = pd.concat([BatchResult([r], self.dataset, self.category).long,
+                both = pd.concat([RunResult([r], self.dataset, self.category).long,
                                   rec["_long"]], ignore_index=True)
                 rec["_long"] = both.drop_duplicates("metric", keep="last").set_index(
                     "metric").loc[list(dict.fromkeys(both["metric"]))].reset_index()
@@ -2077,7 +2088,7 @@ class BatchResult:
                        if str(r.get("note") or "").startswith("The saved batch is not used")),
                       None)
         if unused:
-            _compat.warn(unused, UserWarning)
+            _text.warn(unused, UserWarning)
         # a tree whose outputs are all gone (moved, or an older layout): nothing
         # to score, so say so instead of returning a table without scores
         tried_records = [r for r in new.records if _scorable(r)]
@@ -2160,9 +2171,9 @@ class BatchResult:
 
         Examples
         --------
-        >>> res = mtb.load_batch("out/")
+        >>> res = mtb.load_run("out/")
         >>> res.rescore(metrics="clustering").save("out/clustering_only")
-        >>> mtb.load_batch("out/clustering_only").summary
+        >>> mtb.load_run("out/clustering_only").summary
 
         Notes
         -----
@@ -2179,34 +2190,37 @@ class BatchResult:
         records are merged. A method in this result replaces its earlier
         record, unless its status is ``skipped`` and the earlier one's is not; the other
         earlier records are kept, every file in the list above is rewritten
-        from the merged set, and a line ``# Merged with 1 earlier record in <folder>
+        from the merged set, and a line ``[save] Merged with 1 earlier record in <folder>
         (StabMap).`` names them. This result object is not changed. Jobs
         running at the same time should use one ``out_dir`` each; combine
         their ``long`` tables with ``pandas.concat`` to plot them together.
 
         See Also
         --------
-        mtb.load_batch : reads the folder back.
+        mtb.load_run : reads the folder back.
         """
-        folder = Path(out_dir or self.out_dir or ".")
+        folder = Path(out_dir or self.out_dir or ".").expanduser()
         _check_save_target(folder, self.dataset, self.category)
-        before = (load_batch(folder).records if (folder / "batch_result.json").exists()
+        before = (load_run(folder).records if (folder / "batch_result.json").exists()
                   else [])
-        # a SKIPPED record never replaces an earlier record of a run
+        # a skipped record never replaces an earlier record of a run
         ran = {r.get("method") for r in before if _status(r.get("status")) != "skipped"}
         new = [r for r in self.records
                if not (_status(r.get("status")) == "skipped" and r.get("method") in ran)]
-        mine = {r.get("method") for r in new}
+        mine = {r.get("method"): r for r in new}
         kept = [r for r in before if r.get("method") not in mine]
-        merged = BatchResult(kept + new, self.dataset, self.category,
-                             out_dir=folder) if kept else self
+        # the earlier order, each method in its place; new methods last
+        order = [mine.get(r.get("method"), r) for r in before]
+        order += [r for r in new if r.get("method") not in {b.get("method") for b in before}]
+        merged = RunResult(order, self.dataset, self.category,
+                           out_dir=folder) if kept else self
         folder.mkdir(parents=True, exist_ok=True)
         merged.summary.to_csv(folder / "summary.csv", index=False)
         long_table = merged.long
         if not long_table.empty:
             long_table.to_csv(folder / "long.csv", index=False)
         elif (folder / "long.csv").exists():
-            # an earlier long.csv would attach stale metrics on load_batch
+            # an earlier long.csv would attach stale metrics on load_run
             (folder / "long.csv").unlink()
         # failures.csv, written before 0.4.0, would disagree with summary.csv
         (folder / "failures.csv").unlink(missing_ok=True)
@@ -2227,7 +2241,7 @@ class BatchResult:
         if kept:
             names = ", ".join(dict.fromkeys(str(r.get("method")) for r in kept))
             records = "record" if len(kept) == 1 else "records"
-            print(f"# Merged with {len(kept)} earlier {records} in {folder} ({names}).",
+            print(f"[save] Merged with {len(kept)} earlier {records} in {folder} ({names}).",
                   flush=True)
         return folder
 
@@ -2236,13 +2250,13 @@ class BatchResult:
 
     def __repr__(self):
         counts = pd.Series([_status(r.get("status")) for r in self.records]).value_counts()
-        text = ", ".join(f"{counts[s]} {s}" for s in dict.fromkeys(_STATUS.values())
+        text = ", ".join(f"{counts[s]} {s}" for s in STATUSES
                          if s in counts) or "no method"
-        return f"<BatchResult {self.category}/{self.dataset}: {text}>"
+        return f"<RunResult {self.category}/{self.dataset}: {text}>"
 
 
 def _embedding_obs(rec, dataset, category, root, n, batch_text=None) -> pd.DataFrame:
-    """The ``obs`` of :meth:`BatchResult.embedding`: each row's barcode (the
+    """The ``obs`` of :meth:`RunResult.embedding`: each row's barcode (the
     index), ``label`` and ``batch``, from the label files in the order the
     record was scored with (else the method's order)."""
     folder = _dataset_folder(dataset, root)
@@ -2265,7 +2279,7 @@ def _embedding_obs(rec, dataset, category, root, n, batch_text=None) -> pd.DataF
         barcodes.append(bars)
         batch.append(np.full(len(lab), Path(f).stem, dtype=object))
     if sum(map(len, labels)) != n:
-        _compat.warn(f"The label files of {dataset} do not hold the {n:,} cells of "
+        _text.warn(f"The label files of {dataset} do not hold the {n:,} cells of "
                      f"{rec['method']}, so obs has no barcodes, labels or batches.",
                      UserWarning)
         return pd.DataFrame(index=pd.Index([str(i) for i in range(n)]))
@@ -2273,17 +2287,54 @@ def _embedding_obs(rec, dataset, category, root, n, batch_text=None) -> pd.DataF
              if all(b is not None for b in barcodes) else np.arange(n).astype(str))
     stems = np.concatenate(batch)
     obs = pd.DataFrame({"label": np.concatenate(labels)}, index=pd.Index(index, dtype=object))
-    if len(names) > 1:                  # one label file is one batch: no batch to name
-        obs["batch"] = stems
-    if batch_text:
-        saved = pd.read_csv(__import__("io").StringIO(batch_text), dtype=str,
-                            keep_default_na=False)
-        if "cell" in saved.columns and set(obs.index) <= set(saved["cell"]):
-            obs["batch"] = saved.set_index("cell")["batch"].reindex(obs.index).to_numpy()
+    given = _saved_batch(batch_text, obs.index, names, dataset, root)
+    batches = stems if given is None else given
+    if len(set(batches.tolist())) > 1:
+        obs["batch"] = batches
     if not obs.index.is_unique:
         # batches that share barcodes: each name gets its label file, as cty2:AAAC...
         obs.index = pd.Index([f"{s}:{i}" for s, i in zip(stems, obs.index)], dtype=object)
+    obs.attrs["barcodes"] = all(b is not None for b in barcodes)
     return obs
+
+
+#: The dataset of a run's ``embedding.h5`` that names its cells, one per row.
+CELLS_DATASET = "barcodes"
+
+
+def _write_cell_names(rec, path: Path, dataset, category, data_path) -> None:
+    """Write the cells of ``rec``'s embedding, named as ``RunResult.embedding``
+    names them, into its output file as :data:`CELLS_DATASET`; nothing when the
+    label files do not name them."""
+    import h5py
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        obs = _embedding_obs(rec, dataset, category, data_path, rec["emb_shape"][0])
+    if not obs.attrs.get("barcodes") or not path.is_file():
+        return
+    try:
+        with h5py.File(path, "a") as h:
+            if CELLS_DATASET in h:
+                del h[CELLS_DATASET]
+            h.create_dataset(CELLS_DATASET, data=np.asarray(obs.index, dtype=object),
+                             dtype=h5py.string_dtype())
+    except OSError as e:          # the run stands; evaluate reads its run record instead
+        _text.warn(f"Could not write the cell names into {path}: {e}", UserWarning)
+
+
+def _saved_batch(text, cells, names, dataset, root):
+    """The batch a run was given (its saved CSV ``text``) for ``cells``, which
+    come from the label files ``names`` in that order; ``None`` without one or
+    when it cannot be placed: by cell id, else by label file."""
+    if not text:
+        return None
+    saved = pd.read_csv(__import__("io").StringIO(text), dtype=str, keep_default_na=False)
+    if "cell" in saved.columns and cells.is_unique and set(cells) <= set(saved["cell"]):
+        return saved.set_index("cell")["batch"].reindex(cells).to_numpy(dtype=object)
+    by_file = _batch_segments(dataset, root, saved["batch"].to_numpy(dtype=object))
+    if by_file is None or not all(f in by_file for f in names):
+        return None
+    return np.concatenate([np.asarray(by_file[f], dtype=object) for f in names])
 
 
 # ---------------------------------------------------------------------- run
@@ -2338,9 +2389,10 @@ def _error_tail(error, width: int = 200) -> str:
 
 def _scan_hint(dataset: str, category: str, *, data_path=None, methods=None,
                modalities=None, every: bool = False) -> str:
-    """The ``mtb.run(..., dry_run=True)`` call that shows the rows of a
-    ``run`` call, with every non-default argument as the caller gave it. A folder outside the default data path is named by its
-    path, as the docs teach (relative to the working directory when inside it)."""
+    """The ``mtb.scan`` call that checks the rows of a ``run`` call, with every
+    non-default argument as the caller gave it. A folder outside the default
+    data path is named by its path, as the docs teach (relative to the working
+    directory when inside it)."""
     if data_path is not None and (os.path.realpath(data_path)
                                   != os.path.realpath(config.data_path)):
         folder = os.path.join(os.fspath(data_path), str(dataset))
@@ -2353,16 +2405,14 @@ def _scan_hint(dataset: str, category: str, *, data_path=None, methods=None,
         py.append(f"modalities={list(modalities)}")
     elif every:
         py.append('modalities="all"')
-    return f"mtb.run({', '.join(py + ['dry_run=True'])})"
+    return f"mtb.scan({', '.join(py)})"
 
 
 def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame,
                               methods, *, data_path=None, modalities=None, others=None,
-                              every: bool = False, note: str = "",
-                              hidden: bool = False) -> str:
+                              every: bool = False, note: str = "") -> str:
     """The ``ValueError`` text when no requested row can start (run's Notes);
-    ``others``: each row's blocks besides the platform; ``hidden``: the plan
-    leaves out some rows."""
+    ``others``: each row's blocks besides the platform."""
     def _line(r):
         return f"  {_row_label(r)}: {r['reason']}"
     # rows whose files are in place first: an env install fixes those
@@ -2374,7 +2424,7 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
                        modalities=modalities, every=every)
     lacking = ""
     if platform and others is not None:
-        # as for SKIPPED records: the rest are only counted
+        # as for skipped records: the rest are only counted
         shown, n_lacking = _skipped_rows(blocked, set(), methods, dataset, data_path)
         if shown and n_lacking:
             blocked = blocked.loc[[r.name for r, _ in shown]]
@@ -2394,10 +2444,9 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
     if only_platform:
         head = (f"None of the requested methods ({', '.join(methods)}) can run on "
                 if methods else "No method can run on ") + f"{dataset} ({category})."
-        what = "the plan" if methods else "the listed rows" if hidden else "every row"
         where = _scan_hint(dataset, category, data_path=data_path, methods=methods,
                            modalities=modalities, every=every)
-        return f"{head}\n{platform}" + (f"{note}\n" if note else "") + f"{where} shows {what}."
+        return f"{head}\n{platform}" + (f"{note}\n" if note else "") + f"{where} shows the plan."
     if methods:
         head = (f"None of the requested methods ({', '.join(methods)}) can run on "
                 f"{dataset} ({category})")
@@ -2406,8 +2455,7 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
                    f"Blocked, one line per requested {_rows_word(blocked, 1)}:\n"
                    + "\n".join(_line(r) for _, r in blocked.iterrows()) + lacking)
         return (f"{head}.\n{platform}{listing}"
-                f"\n{where} shows these rows. Its reason column says "
-                f"which check failed. {doctor} checks the environments.")
+                f"\n{where} says why. {doctor} checks the environments.")
     head = f"No method can run on {dataset} ({category})"
     if platform and others is not None:
         listing = (_other_blocks(blocked, others, requested=False) + lacking).lstrip("\n")
@@ -2418,8 +2466,7 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
                  else f"The blocked {rows}" if n == 1 else f"The {n} blocked {rows}")
         listing = f"{shown}:\n" + "\n".join(_line(r) for _, r in blocked.head(k).iterrows())
     return (f"{head}.\n{platform}{listing}" + (f"\n{note}" if note else "") +
-            f"\n{where} shows {'the listed rows' if hidden else 'every row'}. Its "
-            f"reason column says which check failed. {doctor} checks the environments.")
+            f"\n{where} says why. {doctor} checks the environments.")
 
 
 def _other_blocks(blocked: pd.DataFrame, others: pd.Series, *, requested: bool) -> str:
@@ -2476,6 +2523,18 @@ def _check_params_shape(params, methods, fn: str) -> None:
         example = {methods[0] if methods else "Matilda": flat}
     raise TypeError(f"{fn}(params=) takes one dict per method, such as "
                     f"params={example!r}.")
+
+
+def _params_by_method(params, methods, fn: str) -> dict:
+    """``params`` keyed by method id; raises for a flat dict and for a method
+    that is not in ``methods`` (ids already checked)."""
+    _check_params_shape(params, methods, fn)
+    params = {registry.check_method(m): v for m, v in (params or {}).items()}
+    stray = [m for m in params if methods is not None and m not in methods]
+    if stray:
+        raise ValueError(f"params names {_and_list(stray)}, which "
+                         f"{'is' if len(stray) == 1 else 'are'} not in methods=.")
+    return params
 
 
 def _check_param_keys(plan_df: pd.DataFrame, params: dict) -> None:
@@ -2704,11 +2763,11 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
     if not _carries_ids(x):
         if what == "batch" and isinstance(x, pd.Series) \
                 and _eio._numbers_rows(x, _dataset_cell_ids(dataset, data_path)):
-            _compat.warn(_eio._by_position(what), UserWarning)
+            _text.warn(_eio._by_position(what), UserWarning)
         return vals, False
     ids = _dataset_cell_ids(dataset, data_path)
     if ids is None:
-        _compat.warn(f"The {what} {type(x).__name__} is matched by position, because "
+        _text.warn(f"The {what} {type(x).__name__} is matched by position, because "
                      f"{why}. {fix}", UserWarning)
         return vals, False
     index = pd.Index([str(i) for i in x.index])
@@ -2877,7 +2936,7 @@ def _skipped_rows(blocked, attempted, methods, dataset, data_path) -> tuple[list
 
 def _skipped_records(shown, attempted, methods, *, category, dataset, data_path,
                      version, data_root=None) -> list[dict]:
-    """One ``SKIPPED`` record per method not attempted, from its first reported row
+    """One ``skipped`` record per method not attempted, from its first reported row
     (one with its files on disk first)."""
     named = set(methods or ())
     first: dict = {}
@@ -2887,7 +2946,7 @@ def _skipped_records(shown, attempted, methods, *, category, dataset, data_path,
     return [{"method": m, "category": category, "dataset": dataset,
              "modalities": _row_modalities(r["modalities"]),
              "output_kind": r["output_kind"], "env": r["env"],
-             "status": "SKIPPED",
+             "status": "skipped",
              "error": r["reason"], "requested": m in named, "_long": None,
              "caveat": _run_caveat(r["caveat"]),
              "data_path": str(data_path) if data_path else None,
@@ -3029,7 +3088,7 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
     same = [c for c in cands if labels is None and list(c[0]) == list(stored_used or ())]
     cands = same or cands
     if not cands:
-        rec["status"] = "RUN_OK_NO_LABEL_MATCH"
+        rec["status"], rec["note"] = "ran", _RAN_REASON["RUN_OK_NO_LABEL_MATCH"]
         if not _dataset_folder(dataset, data_path).is_dir():
             why = _folder_missing(dataset, tried or [data_path])
             rec["note"] = f"{why[:1].upper()}{why[1:]}. {_MOVED_FIX}"
@@ -3037,14 +3096,14 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
     # not inside the ranking: it would take the error of each order and rank on
     unlabelled = _unlabelled_error(cands, dataset, data_path, user=labels is not None)
     if unlabelled:
-        rec["status"], rec["error"] = "RUN_OK_EVAL_FAILED", unlabelled
+        rec["status"], rec["error"] = "ran", unlabelled
         return rec
     names, val, spread = _evaluate_best_order(emb, category, cands, metrics=metrics,
                                               user_batch=batch is not None,
                                               batch_given=batch_given,
                                               on_rank=on_rank, embedding=embedding)
     if val is None:
-        rec["status"] = "RUN_OK_EVAL_FAILED"
+        rec["status"] = "ran"
         errs = [s["error"] for s in spread if s.get("error")]
         if errs:
             rec["error"] = errs[0]
@@ -3069,19 +3128,20 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
     from . import __version__
     # next to multibench_version, the version that ran the method
     rec["scored_by_version"] = __version__
-    rec["status"] = "CHAIN_OK" if embedding else "CHAIN_OK_GRAPH_METHOD"
+    rec["status"] = "scored"
     return rec
 
 
-def run(dataset: str, category: str, out_dir=None, *, methods=None, modalities=None,
-            params: dict | None = None, batch=None, evaluate: bool = True,
-            dry_run: bool = False, timeout: float | None = None,
-            skip_existing: bool = False, verbose: bool = True) -> "BatchResult | pd.DataFrame":
+def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
+        params: dict | None = None, batch=None, evaluate: bool = True,
+        timeout: float | None = None, skip_existing: bool = False,
+        verbose: bool = True) -> "RunResult":
     """Run the runnable methods of a category on a dataset folder, and score them.
 
     Only the methods ``mtb.scan`` marks runnable run. A method's failure is
     recorded, never raised, and the results are saved under ``out_dir``.
-    ``methods=["Matilda"]`` runs one method.
+    ``methods=["Matilda"]`` runs one method. ``mtb.scan`` shows the plan
+    first, with each command.
 
     Parameters
     ----------
@@ -3090,9 +3150,8 @@ def run(dataset: str, category: str, out_dir=None, *, methods=None, modalities=N
         ``mtb.config.data_path``.
     category : str
         Integration category: ``vertical``, ``diagonal``, ``mosaic`` or ``cross``.
-    out_dir : path | None
-        Output root, one ``<out_dir>/<method>_<dataset>/`` per method; required
-        unless ``dry_run=True``.
+    out_dir : path
+        Output root, one ``<out_dir>/<method>_<dataset>/`` per method.
     methods : list[str] | None
         Method ids to run, as a list; ``None`` = every runnable method.
     modalities : list[str] | str | None
@@ -3106,10 +3165,6 @@ def run(dataset: str, category: str, out_dir=None, *, methods=None, modalities=N
         barcode. ``None`` = each cell's label file.
     evaluate : bool
         Score each embedding; ``False`` only runs (status ``ran``).
-    dry_run : bool
-        ``True`` = run nothing and return the plan: one row per method
-        variant, the columns of ``mtb.scan`` and ``env``, ``caveat`` and
-        ``command``.
     timeout : float | None
         Wall-clock limit per method, in seconds; ``None`` = none.
     skip_existing : bool
@@ -3120,9 +3175,8 @@ def run(dataset: str, category: str, out_dir=None, *, methods=None, modalities=N
 
     Returns
     -------
-    BatchResult or pandas.DataFrame
-        A ``BatchResult``: read ``summary`` first,
-        ``embedding(method)`` for an embedding. With ``dry_run=True``, the plan.
+    RunResult
+        Read ``summary`` first, ``embedding(method)`` for an embedding.
 
     Raises
     ------
@@ -3139,26 +3193,14 @@ def run(dataset: str, category: str, out_dir=None, *, methods=None, modalities=N
     --------
     >>> import multibench as mtb
     >>> res = mtb.run("D11", "vertical", out_dir="out/")
-    >>> plan = mtb.run("D11", "vertical", dry_run=True)    # nothing runs
-    >>> res = mtb.run("D11", "vertical", methods=["Matilda"], out_dir="out/",
-    ...                   params={"Matilda": {"epochs": 10}})
+    >>> res = mtb.run("D11", "vertical", out_dir="out/", methods=["Matilda"],
+    ...               params={"Matilda": {"epochs": 10}})
     """
-    out = _run_all(dataset, category, out_dir, methods=methods, modalities=modalities,
-                   params=params, batch=batch, evaluate=evaluate, dry_run=dry_run,
-                   timeout=timeout, skip_existing=skip_existing, verbose=verbose)
-    return _shown_modalities(out)[PLAN_COLUMNS] if dry_run else out
-
-
-def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalities=None,
-             params: dict | None = None, evaluate: bool = True,
-             dry_run: bool = False, verbose: bool = True,
-             timeout: float | None = None,
-             skip_existing: bool = False,
-             batch=None, assume_gpu: bool = False) -> "BatchResult | pd.DataFrame":
-    """:func:`run` before the plan's columns are picked: a dry run returns
-    every column of the scan frame. ``assume_gpu=True`` (a dry run only) skips
-    this host's GPU test, for tools/gen_tut.py's plans of the GPU host."""
     dataset, data_path = _resolve.split_dataset(dataset, None)
+    if not isinstance(out_dir, (str, os.PathLike)):
+        raise TypeError(f"run() takes out_dir, the folder the outputs go to, such as "
+                        f"out_dir='out/'; got {out_dir!r}.")
+    out_dir = Path(out_dir).expanduser()
     # the arguments first, so a bad combination is not reported as an I/O error
     registry.check_category(category)
     registry.check_id_list(methods, "methods")
@@ -3166,13 +3208,7 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
     registry.check_id_list(modalities, "modalities")
     if methods is not None:
         methods = [registry.check_method(m) for m in methods]
-    _check_params_shape(params, methods, "run")
-    params = {registry.check_method(m): v for m, v in (params or {}).items()}
-    if methods is not None:
-        stray = [m for m in params if m not in methods]
-        if stray:
-            raise ValueError(f"params names {_and_list(stray)}, which "
-                             f"{'is' if len(stray) == 1 else 'are'} not in methods=.")
+    params = _params_by_method(params, methods, "run")
     if skip_existing and params:
         raise ValueError("skip_existing=True with params=... would return results computed with the "
             "earlier parameters (reuse is keyed on the output file, not on params). "
@@ -3180,15 +3216,10 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
     # the on-disk spelling, once, so out_dir names and records agree (one warning)
     dataset = _resolve.canonical_dataset(
         Path(data_path) if data_path is not None else config.data_path, dataset)
-    if not dry_run and out_dir is None:
-        raise TypeError("run() needs out_dir= for a real run (dry_run=True "
-                        "returns the scan frame without one)")
     # a real run checks params per method and records a bad key as FAIL
     plan_df, private = _scan(dataset, category, data_path=data_path, methods=methods,
                              modalities="all" if every else modalities, verbose=False,
-                             assume_gpu=assume_gpu and dry_run,
-                             params=params if dry_run else None,
-                             out_dir=OUT_DIR_PLACEHOLDER if out_dir is None else out_dir)
+                             out_dir=out_dir)
     not_listed = (_not_listed_note(plan_df, dataset, private.attrs["folder"], category)
                   if plan_df.attrs["not_listed"] or plan_df.attrs.get("not_listed_batch")
                   else "")
@@ -3197,47 +3228,11 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
         # a modalities= selection that matches nothing, without methods=
         raise _no_variant_error(category, methods, modalities)
     batch_vec = None if batch is None else _batch_vector(batch, dataset, data_path)
-    bad = batch_vec is not None and (evaluate or dry_run) and _batch_length_problem(
+    bad = batch_vec is not None and evaluate and _batch_length_problem(
         [(r["method"], _row_modalities(r["modalities"])) for _, r in plan_df.iterrows()
          if _would_run(r)], batch_vec, dataset, category, data_path)
     if bad:
         raise ValueError(bad)
-    if dry_run:
-        nested_notes = []
-        if modalities is None:
-            # the rows a real run leaves out: another row of the method holds their files
-            would = plan_df[[_would_run(r) for _, r in plan_df.iterrows()]]
-            nested, nested_notes = _nested_rows(would)
-            keep = ~plan_df.index.isin(nested)
-            plan_df = plan_df[keep].reset_index(drop=True)
-            private = private[keep].reset_index(drop=True)
-        if verbose:
-            k, n = int(plan_df["runnable"].sum()), len(plan_df)
-            msg = (f"[run] Dry run: {k} of {n} requested {_rows_word(plan_df, n)} "
-                   f"can run on {dataset} ({category})")
-            print(msg + ("; the reason column says why." if n > k else "."), flush=True)
-            if not_listed:
-                print(f"[run] {not_listed}", flush=True)
-            wrong_ref = _scripts_ref_note()
-            if wrong_ref:
-                print(f"[run] {wrong_ref}", flush=True)
-            # in full: the compact table views clip them
-            scripts, lines = _dry_run_notes(plan_df, modalities)
-            if scripts:
-                print(f"[run] {scripts}", flush=True)
-            for _method, caveat in lines:
-                print(f"[run] {caveat}", flush=True)
-            for note in nested_notes:
-                print(f"[run] {note}", flush=True)
-            gaps = _label_gaps(dataset, data_path)
-            if gaps:
-                would = plan_df[[_would_run(r) for _, r in plan_df.iterrows()]]
-                unlabelled = _missing_labels_problem(
-                    dataset, gaps, _label_readers(would, private, gaps),
-                    evaluate=evaluate)
-                if unlabelled:
-                    print(f"[run] {unlabelled}", flush=True)
-        return plan_df
     if skip_existing:
         # a saved output is only scored: it needs no environment
         saved = [(Path(out_dir) / f"{r['method']}_{dataset}" / registry.get(r["method"]).select(
@@ -3258,9 +3253,7 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
         raise ValueError(_nothing_runnable_message(
             dataset, category, blocked, methods, data_path=data_path,
             modalities=modalities, others=private["_other"], every=every,
-            note="" if methods else not_listed,
-            hidden=bool(plan_df.attrs.get("not_listed")
-                        or plan_df.attrs.get("not_listed_batch"))))
+            note="" if methods else not_listed))
     if modalities is None:
         nested, nested_notes = _nested_rows(plan_df)
         plan_df = plan_df.drop(index=nested)
@@ -3281,7 +3274,6 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
     # absolute: a saved result read from another directory still finds the data
     data_root = os.path.abspath(config.data_path if data_path is None
                                 else data_path)
-    out_dir = Path(out_dir)
     # the save after the sweep would refuse this folder: refuse it now
     _check_save_target(out_dir, dataset, category)
     attempted = set(plan_df["method"])
@@ -3322,10 +3314,15 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
         ).exists():
             # a saved run is scored again, as rescore does: its record is kept,
             # with its folder as found from here
-            rec = (BatchResult([dict(saved, out_dir=str(method_dir))], dataset, category,
+            rec = (RunResult([dict(saved, out_dir=str(method_dir))], dataset, category,
                                out_dir)._rescore(
                 batch=batch, labels=None, metrics=None, verbose=False).records[0]
                 if evaluate else dict(saved))
+            rec["reused"] = True
+            variant = registry.get(method).select(category, set(mods))
+            if variant.output.kind == "embedding" and rec.get("emb_shape"):
+                _write_cell_names(rec, method_dir / variant.output.file, dataset,
+                                  category, data_path)
             if verbose:
                 print(f"[run] {method} ({category}/{dataset}): reusing the saved run "
                       f"-> {_status(rec['status'])} {_ari_tail(rec)}".rstrip(), flush=True)
@@ -3368,14 +3365,11 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
             else:
                 emb = _load_embedding(method_dir, variant)
             if emb is None:
-                rec["status"] = "RUN_OK_NO_EMBEDDING"
-                rec["note"] = (f"output kind={variant.output.kind}; this method does not "
-                               "produce an embedding, so embedding-based clustering metrics "
-                               "do not apply")
+                rec["status"], rec["note"] = "ran", _RAN_REASON["RUN_OK_NO_EMBEDDING"]
             else:
                 rec["emb_shape"] = list(emb.shape)
                 if not evaluate:
-                    rec["status"] = "RUN_OK"
+                    rec["status"] = "ran"
                 else:
                     if batch_file:
                         rec["batch_file"] = batch_file[0]
@@ -3385,14 +3379,18 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
                     except TimeoutError:
                         raise
                     except Exception as e:      # the run itself succeeded
-                        rec["status"] = "RUN_OK_EVAL_FAILED"
+                        rec["status"] = "ran"
                         rec["error"] = f"{type(e).__name__}: {e}"
+                if variant.output.kind == "embedding":
+                    # evaluate on the file then finds each cell by its name
+                    _write_cell_names(rec, method_dir / variant.output.file, dataset,
+                                      category, data_path)
         except TimeoutError as e:
-            rec["status"] = "TIMEOUT"
+            rec["status"] = "timeout"
             rec["error"] = str(e)
             rec["run_sec"] = round(time.time() - start, 1)
         except Exception as e:
-            rec["status"] = "FAIL"
+            rec["status"] = "failed"
             rec["error"] = _clip_error(f"{type(e).__name__}: {e}")
             rec["traceback"] = traceback.format_exc()[-1200:]
             rec["run_sec"] = round(time.time() - start, 1)
@@ -3405,14 +3403,21 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
         if rec.get("reused"):
             rec.update(_UNKNOWN_PROVENANCE)
         else:
-            rec.update(config.run_provenance(row["env"]))   # scripts_commit, env_flavor, hostname
+            rec.update(scripts.run_provenance(row["env"]))   # scripts_commit, env_flavor, hostname
         records.append(rec)
     records += _skipped_records(shown, attempted, methods, category=category,
                                 dataset=dataset, data_path=data_path,
                                 version=_pkg_version, data_root=data_root)
 
-    result = BatchResult(records, dataset, category, out_dir)
+    result = RunResult(records, dataset, category, out_dir)
     if batch_file and any(r.get("batch_file") for r in records):
         result._batches[batch_file[0]] = batch_file[1]
-    result.save()
+    if earlier:
+        # resuming: a method that cannot run here leaves the saved folder as it was
+        kept = RunResult([r for r in records if r["status"] != "skipped"], dataset,
+                         category, out_dir)
+        kept._batches = result._batches
+        kept.save()
+    else:
+        result.save()
     return result

@@ -151,22 +151,20 @@ def test_nothing_runnable_tail_is_plain(no_envs, root):
     # D11 holds no ATAC file: the rows that read one are not listed, and, since
     # c3 (C55), no line says so
     for kw, where in (
-            ({}, "mtb.run('D11', 'vertical', dry_run=True) shows the listed rows."),
+            ({}, "mtb.scan('D11', 'vertical') says why."),
             ({"methods": ["Matilda"]},
-             "mtb.run('D11', 'vertical', methods=['Matilda'], dry_run=True) shows these rows.")):
+             "mtb.scan('D11', 'vertical', methods=['Matilda']) says why.")):
         with pytest.raises(ValueError) as e:
             mtb.run(os.path.join(root / 'data', 'D11'), 'vertical', out_dir='/tmp/unused', verbose=False, **kw)
         lines = str(e.value).splitlines()
-        assert lines[-1] == (f"{where} Its reason column says which check "
-                             f"failed. mtb.env.install(dry_run=True) checks the environments.")
+        assert lines[-1] == f"{where} mtb.env.install(dry_run=True) checks the environments."
         assert "not listed" not in str(e.value)
 
 
-def test_dry_run_count_line_is_plain(no_envs, root, capsys, tmp_path):
-    mtb.run(os.path.join(root / 'data', 'D11'), 'vertical', out_dir=tmp_path, dry_run=True, verbose=True)
-    (line,) = [ln for ln in capsys.readouterr().out.splitlines()
-               if ln.startswith("[run] Dry run:")]
-    assert line.endswith(" (vertical); the reason column says why.")    # Z19 (r3)
+def test_scan_count_line_is_plain(no_envs, root, capsys, tmp_path):
+    mtb.scan(os.path.join(root / 'data', 'D11'), 'vertical', verbose=True)
+    line = capsys.readouterr().out.splitlines()[0]
+    assert line.startswith("[scan] 14 of 14 methods have their input files in D11. ")
     assert "doctor" not in line
     _no_log_joins(line)
 

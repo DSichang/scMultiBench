@@ -19,8 +19,7 @@ ACCEPTS = ("it accepts ['augmentation', 'batch_size', 'epochs', 'hidden_adt', "
 
 def test_run_dry_run_refuses_an_unknown_key():
     with pytest.raises(KeyError) as e:
-        mtb.engine.runner.run("Matilda", "vertical", inputs=INPUTS, out_dir="/o", params={"epoch": 3},
-                dry_run=True)
+        mtb.engine.runner.preview("Matilda", "vertical", inputs=INPUTS, out_dir="/o", params={"epoch": 3})[0]
     assert e.value.args[0] == f"Matilda does not accept ['epoch']; {ACCEPTS}"
 
 
@@ -32,22 +31,19 @@ def test_a_real_run_refuses_before_anything_is_written(tmp_path):
 
 
 def test_a_known_key_still_reaches_the_command():
-    argv = mtb.engine.runner.run("Matilda", "vertical", inputs=INPUTS, out_dir="/o", params={"epochs": 3},
-                   dry_run=True)
+    argv = mtb.engine.runner.preview("Matilda", "vertical", inputs=INPUTS, out_dir="/o", params={"epochs": 3})[0]
     assert argv[-2:] == ["--epochs", "3"] or "--epochs" in argv
 
 
 def test_run_all_says_the_same():
     with pytest.raises(KeyError) as e:
-        mtb.run("D11", "vertical", methods=["Matilda"], modalities=["rna", "adt"],
-                    params={"Matilda": {"epoch": 3}}, dry_run=True, verbose=False)
+        mtb.scan("D11", "vertical", methods=["Matilda"], modalities=["rna", "adt"], params={"Matilda": {"epoch": 3}}, verbose=False)
     assert e.value.args[0] == f"Matilda does not accept ['epoch']; {ACCEPTS}"
 
 
 def test_a_method_without_hyperparameters_says_so():
     # Z16 (r3): the hardcoded-upstream sentence only where the set is empty
     with pytest.raises(KeyError) as e:
-        mtb.run("D11", "vertical", methods=["totalVI"], modalities=["rna", "adt"],
-                    params={"totalVI": {"epochs": 3}}, dry_run=True, verbose=False)
+        mtb.scan("D11", "vertical", methods=["totalVI"], modalities=["rna", "adt"], params={"totalVI": {"epochs": 3}}, verbose=False)
     assert e.value.args[0] == ("totalVI does not accept ['epochs']; totalVI takes no "
                                "hyperparameters (its script hardcodes them).")

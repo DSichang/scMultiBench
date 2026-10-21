@@ -133,11 +133,10 @@ def test_host_has_gpu_true_from_the_driver_record(probe):
     assert envs.host_has_gpu() is True
 
 
-def test_host_has_gpu_is_importable_but_not_in_all():
-    # dir(mtb.env) == __all__ since 0.4.0 (X34); the helpers stay importable
-    assert callable(envs.host_has_gpu) and callable(mtb.env.host_has_gpu)
-    assert "host_has_gpu" not in mtb.env.__all__ and "host_has_gpu" not in dir(mtb.env)
-    assert "env_prefix" not in dir(mtb.env)
+def test_host_has_gpu_is_internal():
+    # mtb.env is a facade (d1): the helpers are not reachable through it
+    assert callable(envs.host_has_gpu) and not hasattr(mtb.env, "host_has_gpu")
+    assert not hasattr(mtb.env, "env_prefix")
     assert set(mtb.env.__all__) == {"install"}      # doctor is deprecated in 0.4.0
 
 
@@ -304,7 +303,7 @@ def _by_env(rows):
 
 def test_install_dry_run_sizes_follow_the_flavour(plan_rows, monkeypatch):
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
-    cpu = _by_env(mtb.env.install(["Matilda", "SCALEX", "UINMF"], flavor="cpu", dry_run=True).to_dict("records"))
+    cpu = _by_env(envs._install_rows(["Matilda", "SCALEX", "UINMF"], flavor="cpu", dry_run=True))
     assert cpu["matilda"]["flavor"] == "cpu"
     assert cpu["matilda"]["archive_bytes"] == 800_000_000
     assert cpu["matilda"]["unpacked_bytes"] == 2_500_000_000
@@ -316,16 +315,16 @@ def test_install_dry_run_sizes_follow_the_flavour(plan_rows, monkeypatch):
     assert cpu["scmb_torch"]["packed_url"] == "https://x/scmb_torch.tar.gz"
     assert cpu["scmb_r"]["flavor"] == "any" and cpu["scmb_r"]["archive_bytes"] == 900_000_000
     assert all(r["state"] == "packed archive published" for r in cpu.values())
-    auto = _by_env(mtb.env.install(["Matilda", "SCALEX", "UINMF"], dry_run=True).to_dict("records"))      # auto on a CPU host
+    auto = _by_env(envs._install_rows(["Matilda", "SCALEX", "UINMF"], dry_run=True))      # auto on a CPU host
     assert {k: (v["flavor"], v["archive_bytes"]) for k, v in auto.items()} == \
         {k: (v["flavor"], v["archive_bytes"]) for k, v in cpu.items()}
-    gpu = _by_env(mtb.env.install(["Matilda", "SCALEX", "UINMF"], flavor="gpu", dry_run=True).to_dict("records"))
+    gpu = _by_env(envs._install_rows(["Matilda", "SCALEX", "UINMF"], flavor="gpu", dry_run=True))
     assert gpu["matilda"]["flavor"] == "gpu"
     assert gpu["matilda"]["archive_bytes"] == 3_000_000_000
     assert gpu["matilda"]["unpacked_bytes"] == 9_000_000_000
     assert gpu["matilda"]["packed_url"] == "https://x/matilda.tar.gz"
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
-    auto = _by_env(mtb.env.install(["Matilda", "SCALEX", "UINMF"], dry_run=True).to_dict("records"))      # auto on a GPU host
+    auto = _by_env(envs._install_rows(["Matilda", "SCALEX", "UINMF"], dry_run=True))      # auto on a GPU host
     assert auto["matilda"]["flavor"] == "gpu" and auto["matilda"]["archive_bytes"] == 3_000_000_000
 
 

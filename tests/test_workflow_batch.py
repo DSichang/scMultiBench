@@ -1,4 +1,4 @@
-"""P15: run(batch=) override, BatchResult.rescore(), summary batch_source/n_batches.
+"""P15: run(batch=) override, RunResult.rescore(), summary batch_source/n_batches.
 
 A synthetic 120-cell CITE-seq folder and a fake `_run` that WRITES embedding.h5
 (so rescore can read it back) keep these independent of any conda env.
@@ -84,8 +84,8 @@ def test_run_all_batch_override_scores_batch_metrics(cite, tmp_path):
     assert res.records[0]["batch_source"] == "user" and res.records[0]["n_batches"] == 2
     assert "ASW_batch" in sm.columns and pd.notna(sm.loc[0, "ASW_batch"])
     assert sm.loc[0, "ARI"] > 0.9
-    # survives save/load_batch
-    back = mtb.load_batch(tmp_path / "out")
+    # survives save/load_run
+    back = mtb.load_run(tmp_path / "out")
     assert back.records[0]["batch_source"] == "user"
 
 
@@ -104,7 +104,7 @@ def test_rescore_with_batch_and_labels(cite, tmp_path):
     assert res.records[0]["batch_source"] is None
     batch = np.tile([1, 2], N // 2)
     re = res.rescore(batch=batch)
-    assert isinstance(re, mtb.BatchResult) and re is not res
+    assert isinstance(re, mtb.RunResult) and re is not res
     assert re.records[0]["batch_source"] == "user" and re.records[0]["n_batches"] == 2
     assert "ASW_batch" in re.summary.columns
     assert re.summary.loc[0, "ARI"] == res.summary.loc[0, "ARI"]   # same labels, same ARI
@@ -125,9 +125,9 @@ def test_rescore_with_batch_and_labels(cite, tmp_path):
                                          r"MYCITE: give one batch per cell\.$"):
         res.rescore(batch=np.ones(3))
     # not persisted until asked; .save() writes the new numbers
-    assert mtb.load_batch(tmp_path / "out").records[0]["batch_source"] is None
+    assert mtb.load_run(tmp_path / "out").records[0]["batch_source"] is None
     re.save(tmp_path / "out2")
-    assert mtb.load_batch(tmp_path / "out2").records[0]["batch_source"] == "user"
+    assert mtb.load_run(tmp_path / "out2").records[0]["batch_source"] == "user"
 
 
 def test_rescore_handles_missing_output(cite, tmp_path):
@@ -143,8 +143,8 @@ def test_rescore_handles_missing_output(cite, tmp_path):
 
 def test_rescore_is_documented():
     import inspect
-    doc = inspect.getdoc(mtb.BatchResult.rescore)
+    doc = inspect.getdoc(mtb.RunResult.rescore)
     for w in ("batch", "labels", "metrics", "save"):
         assert w in doc
-    doc = inspect.getdoc(mtb.BatchResult.summary.fget)
+    doc = inspect.getdoc(mtb.RunResult.summary.fget)
     assert "scored, ran, failed, skipped or timeout" in doc

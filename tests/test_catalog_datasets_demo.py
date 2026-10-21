@@ -2,7 +2,7 @@
 has_results (core040 O8); every row is one mtb.data.fetch downloads, so no fetchable
 column (v1 u5#5)."""
 import multibench as mtb
-from multibench.data.fetch import AVAILABLE, DEMO_CATEGORIES
+from multibench._data.fetch import AVAILABLE, DEMO_CATEGORIES
 
 
 def test_columns_and_rows():

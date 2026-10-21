@@ -18,6 +18,7 @@ live package, so a later package change that makes the sentence untrue fails
 here too.
 """
 import importlib.util
+from multibench.engine import scripts
 import json
 import re
 import warnings
@@ -99,7 +100,7 @@ def test_a_named_method_without_its_environment_is_skipped_with_the_reason(
     monkeypatch.setattr(W, "_installed_envs", lambda: every - {missing})
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
     monkeypatch.setattr(config, "repo_path", tmp_path / "no_scripts")
-    monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
+    monkeypatch.delenv(scripts.SCRIPTS_REF_VAR, raising=False)
 
     class _Res:
         output = np.zeros((2864, 5))
@@ -253,9 +254,9 @@ def test_runnable_sentence_holds_for_the_named_method_calls_of_the_run_cells(
     trio, mods = task["methods"], "+".join(task["variants"][0])
     sc = _quiet(full_scan, "MYMOSAIC", "mosaic", methods=trio, data_path=tmp_path,
                 verbose=False)
-    # the full plan behind run(dry_run=True), with its file and env checks
-    plan = _quiet(W._run_all, str(folder), "mosaic", tmp_path / "out", methods=trio,
-                  dry_run=True, verbose=False)
+    # the plan of scan, from a run's out_dir, with its file and env checks
+    plan = _quiet(W._scan, str(folder), "mosaic", methods=trio, out_dir=tmp_path / "out",
+                  verbose=False)[0]
     for df in (sc, plan):
         # a method has one row per mosaic pattern: the row of this pattern
         df = df[df.modalities == mods].set_index("method")

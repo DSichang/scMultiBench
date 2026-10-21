@@ -42,7 +42,7 @@ def test_nothing_runnable_lists_only_requested_methods(no_envs):
     # nobody else's reason - Concerto/MIRA/MOFA2 were not requested
     for other in ("Concerto", "MIRA", "MOFA2", "scmb_concerto"):
         assert other not in msg
-    assert "mtb.run('D11', 'vertical', methods=['Matilda'], modalities=\"all\", dry_run=True)" in msg
+    assert "mtb.scan('D11', 'vertical', methods=['Matilda'], modalities=\"all\") says why." in msg
 
 
 def test_nothing_runnable_without_methods_says_first_3_of_n(no_envs):
@@ -61,10 +61,11 @@ def test_nothing_runnable_without_methods_says_first_3_of_n(no_envs):
 def test_requested_method_with_no_variant_in_category_is_a_request_error(no_envs):
     """methods=['Matilda'] under cross used to yield the generic 'nothing is
     runnable' text with other methods' reasons; plan() already said it right."""
-    for dry in (False, True):
+    for call in (lambda: mtb.run("D52", "cross", methods=["Matilda"], out_dir="/tmp/unused",
+                                 verbose=False),
+                 lambda: mtb.scan("D52", "cross", methods=["Matilda"], verbose=False)):
         with pytest.raises(ValueError) as e:
-            mtb.run("D52", "cross", methods=["Matilda"], out_dir="/tmp/unused",
-                        dry_run=dry, verbose=False)
+            call()
         assert str(e.value) == "Matilda does not run on cross data. Its categories: vertical."
         assert "nothing is runnable" not in str(e.value)
 
@@ -91,7 +92,7 @@ def test_scan_command_column_renders_for_out_dir():
     df = full_scan("D11", "vertical", out_dir="runs", methods=["Matilda"], verbose=False)
     plan = full_scan("D11", "vertical", methods=["Matilda"], verbose=False)
     # the '<out_dir>' placeholder by default; a real out_dir renders paste-ready lines
-    assert list(df.columns) == list(plan.columns) == workflow.SCAN_COLUMNS
+    assert list(df.columns) == list(plan.columns) == workflow.PLAN_COLUMNS
     pd.testing.assert_frame_equal(df.drop(columns="command"), plan.drop(columns="command"))
     assert (plan[plan["files_ok"]]["command"].str.contains("<out_dir>/Matilda_D11")).all()
     assert (df[df["files_ok"]]["command"].str.contains("runs/Matilda_D11")).all()
@@ -102,18 +103,13 @@ def test_scan_command_column_renders_for_out_dir():
 
 def test_run_dry_run_mirrors_run_builder():
     inp = mtb.engine.resolve.inputs_for("D11", "vertical", "Matilda", modalities=["rna", "adt"])
-    argv = mtb.engine.runner.run("Matilda", "vertical", inputs=inp, out_dir="o",
-                   params={"epochs": 5}, dry_run=True)
+    argv = mtb.engine.runner.preview("Matilda", "vertical", inputs=inp, out_dir="o", params={"epochs": 5})[0]
     assert argv[:4] == ["conda", "run", "-n", "matilda"] or argv[1:4] == ["run", "-n", "matilda"]
     assert "--epochs" in argv and argv[argv.index("--epochs") + 1] == "5"
     assert argv[argv.index("--save_path") + 1] == os.path.join(os.path.abspath("o"), "")
     assert not os.path.exists("o")                       # nothing created
-    # a custom template is honoured verbatim, like the real run
-    argv2 = mtb.engine.runner.run("Matilda", "vertical", inputs=inp, out_dir="o",
-                    cmd_template="srun {cmd}", dry_run=True)
-    assert argv2[0] == "srun" and "conda" not in argv2
     with pytest.raises(KeyError, match="Did you mean"):
-        mtb.engine.runner.run("Matlda", "vertical", inputs=inp, out_dir="o", dry_run=True)
+        mtb.engine.runner.preview("Matlda", "vertical", inputs=inp, out_dir="o")[0]
 
 
 def test_run_all_params_unknown_method_before_io_and_dry_run_key_check():
@@ -121,12 +117,10 @@ def test_run_all_params_unknown_method_before_io_and_dry_run_key_check():
         mtb.run("/nonexistent/NOPE", "vertical", out_dir="/tmp/unused",
                     params={"Matlda": {"epochs": 5}}, verbose=False)
     with pytest.raises(KeyError) as e:
-        mtb.run("D11", "vertical", out_dir=None, dry_run=True, methods=["Matilda"],
-                    params={"Matilda": {"bogus": 1}}, verbose=False)
+        mtb.scan("D11", "vertical", methods=["Matilda"], params={"Matilda": {"bogus": 1}}, verbose=False)
     assert "does not accept ['bogus']" in str(e.value)
     # a valid key passes and the plan comes back
-    plan = mtb.run("D11", "vertical", out_dir=None, dry_run=True, methods=["Matilda"],
-                       params={"Matilda": {"epochs": 5}}, verbose=False)
+    plan = mtb.scan("D11", "vertical", methods=["Matilda"], params={"Matilda": {"epochs": 5}}, verbose=False)
     assert set(plan["method"]) == {"Matilda"}
 
 
@@ -134,16 +128,14 @@ def test_run_all_params_unknown_method_before_io_and_dry_run_key_check():
 _SAMPLE = ["Matilda", "UINMF", "SCALEX", "Concerto", "totalVI", "MOFA2", "scMoMaT"]
 
 
-def test_default_env_name_is_the_env_every_entry_point_uses():
+def test_group_for_is_the_env_every_entry_point_uses():
     scan_env = dict(zip(*[full_scan("D11", "vertical")[c] for c in ("method", "env")]))
     for m in _SAMPLE:
-        assert envs.default_env_name(m) == envs.group_for(m) == mtb.method_info(m)["env"]
+        assert envs.group_for(m) == mtb.method_info(m)["env"]
         if m in scan_env:
-            assert envs.default_env_name(m) == scan_env[m]
-    assert envs.default_env_name("Matilda") == "matilda"
+            assert envs.group_for(m) == scan_env[m]
+    assert envs.group_for("Matilda") == "matilda"
     assert envs.own_env_name("Matilda") == "scmb_matilda"       # the old answer, renamed
-    with pytest.raises(KeyError, match="Did you mean"):
-        envs.default_env_name("Matlda")
 
 
 # ------------------------------------------------------------------ J7: stdout / stderr discipline

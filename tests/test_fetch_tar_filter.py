@@ -10,8 +10,8 @@ import warnings
 
 import pytest
 
-# `multibench.data.fetch` the attribute is the fetch() FUNCTION; this is the module
-fetch = importlib.import_module("multibench.data.fetch")
+# `multibench._data.fetch` the attribute is the fetch() FUNCTION; this is the module
+fetch = importlib.import_module("multibench._data.fetch")
 
 
 def _tar(tmp_path, entries):

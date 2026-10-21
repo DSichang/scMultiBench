@@ -40,14 +40,14 @@ def gpu(monkeypatch):
 
 
 def _dry(method, category, inputs, params, tmp_path):
-    return mtb.engine.runner.run(method, category, inputs=inputs, out_dir=str(tmp_path / "o"),
-                   params=params, dry_run=True, cmd_template="conda run -n x {cmd}")
+    return mtb.engine.runner.preview(method, category, inputs=inputs, out_dir=str(tmp_path / "o"), params=params)[0]
 
 
 # --- environments: X25, X26, X27, X29, X30, X32, X33, X34 --------------------
 
 def test_x29_x30_dry_run_rows_say_what_runs():
-    plan = mtb.env.install(["Multigrate", "scMM"], dry_run=True).set_index("env")
+    from multibench.engine import envs
+    plan = pd.DataFrame(envs._install_rows(["Multigrate", "scMM"], dry_run=True)).set_index("env")
     published = plan[plan.state == "packed archive published"]
     assert len(published)
     for env, row in published.iterrows():

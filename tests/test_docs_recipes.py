@@ -33,6 +33,8 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+from multibench.engine import scripts
+from multibench import _settings
 from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, ingest, registry, resolve, schema
@@ -72,6 +74,7 @@ FENCES = {
                          'mtb.io.export_dataset(adata, "mydata/" + NAME, rna=None, '
                          'labels="obs:celltype",'],
     "recipe-donors": ['NAME = "MYDONORS"   # <- a name for your data',
+                      'mine = mtb.run("mydata/" + NAME, "diagonal", methods=METHODS,',
                       'print(adata.obs["donor"].value_counts())   # the names in your file',
                       'adata = adata[adata.obs["donor"].isin(["A", "B", "C"])].copy()'
                       '   # <- three donors'],
@@ -268,8 +271,8 @@ def host(monkeypatch, tmp_path):
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
     monkeypatch.setattr(config, "repo_path", tmp_path / "no_scripts")
-    monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
-    monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
+    monkeypatch.setattr(_settings, "_ROOT", tmp_path / "pkg")
+    monkeypatch.delenv(scripts.SCRIPTS_REF_VAR, raising=False)
     calls = []
 
     def fake_run(method, category, inputs, out_dir, params=None):
@@ -517,8 +520,9 @@ def test_csv_recipe_names_another_missing_text(tmp_path, monkeypatch, capsys):
         mtb.io.export_dataset(ns["adata"], "mydata/MYCSV", rna="X", labels="obs:celltype")
     assert str(e.value) == (
         "labels='obs:celltype': 12 of the 300 labels for the cells (the AnnData's obs) are missing "
-        "(NaN, None, '' or text such as 'N/A'); give every cell a label, or subset the data "
-        "to the labelled cells first")
+        "(NaN, None, '' or text such as 'N/A'); keep the labelled cells first: adata = "
+        "adata[~adata.obs[\"celltype\"].astype(str).str.strip().isin(['', 'N/A', 'None', "
+        "'nan'])]")
     assert not Path("mydata").exists()
     ns = {"mtb": mtb, "adata": adata.copy()}
     _run_cell(add.replace(listed, '["", "NA", "nan", "N/A"]'), ns)
@@ -769,9 +773,9 @@ def test_a_diagonal_folder_with_labels_for_one_side_is_not_scored(host, tmp_path
     # nor does a label file of one side, put there by hand, give scores
     rna.obs["celltype"].rename("x").to_csv(out / "rna_cty.csv", index=False)
     res = mtb.run(os.path.join('mydata', 'ONESIDE'), 'diagonal', methods=['SCALEX'], out_dir='out/ONESIDE', verbose=False)
-    assert [r["status"] for r in res.records] == ["RUN_OK_NO_LABEL_MATCH"]
+    assert [r["status"] for r in res.records] == ["ran"]
     res = mtb.run(os.path.join('mydata', 'ONESIDE'), 'diagonal', methods=['SCALEX'], out_dir='out/UNSCORED', evaluate=False, verbose=False)
-    assert [r["status"] for r in res.records] == ["RUN_OK"]
+    assert [r["status"] for r in res.records] == ["ran"]
 
 
 # ------------------------------------------------ cell types later, per layout
@@ -815,7 +819,7 @@ def _unlabelled_run(key, ns, host):
     first = mtb.run(os.path.join('mydata', ns['NAME']), GEN.TASKS[key]['cat'], methods=ns['METHODS'], out_dir='out/' + ns['NAME'], evaluate=False, verbose=False)
     status = {r["method"]: r["status"] for r in first.records}
     ran = sorted(m for m, _ in host)
-    assert ran == sorted(m for m in status if status[m] == "RUN_OK") and ran
+    assert ran == sorted(m for m in status if status[m] == "ran") and ran
     host.clear()
     return folder, {p.name: _h5(p, "barcodes") for p in sorted(folder.glob("*.h5"))}, ran
 
@@ -826,7 +830,7 @@ def _later():
     lines = _fences("recipe-no-labels")[2].splitlines()
     assert lines[0].startswith("mtb.io.export_dataset(adata, ") and len(lines) == 5
     # c1 (C10): the new scores are saved into the folder
-    assert lines[2:] == ['mine = mtb.load_batch("out/" + NAME).rescore()',
+    assert lines[2:] == ['mine = mtb.load_run("out/" + NAME).rescore()',
                          "mine.save()                        # the new scores into out/MYDATA",
                          "mine.summary"]
     return "\n".join(lines[:2]), "\n".join(lines[2:])
@@ -959,7 +963,7 @@ def test_the_block_that_prints_the_donors_changes_nothing(capsys):
     """The block that prints the donor names is run before the reader knows
     them. It holds the print alone, and leaves ``adata`` as it was, so the
     block that keeps three donors starts from every cell."""
-    _run, show, keep_three = _fences("recipe-donors")
+    _run, _diagonal, show, keep_three = _fences("recipe-donors")
     assert "adata =" not in show and "isin" not in show
     assert [type(node) for node in ast.parse(show).body] == [ast.Expr]
     adata = _cite(150, donors=DONORS)
@@ -988,7 +992,7 @@ def test_a_wrong_donor_name_is_undone_by_the_read_cell(tmp_path, monkeypatch, ca
     _cite(150, donors=DONORS).write_h5ad("my_file.h5ad")
     read = _sources("cross_rna_adt")[READ]
     assert 'adata = ad.read_h5ad("my_file.h5ad")' in read
-    _run, show, keep_three = _fences("recipe-donors")
+    _run, _diagonal, show, keep_three = _fences("recipe-donors")
     right = keep_three.replace(PLACEHOLDERS, json.dumps(DONORS[1:4]))
     for wrong, left in ((PLACEHOLDERS, 0), (json.dumps(DONORS[1:3] + ["X"]), 60)):
         ns = {"mtb": mtb}
@@ -1146,3 +1150,30 @@ def test_scores_of_one_labelled_side_do_not_see_the_other_side():
     # they are the scores of the RNA cells alone
     assert mtb.evaluate(_emb(rna, types), labels="label").equals(scores[0])
 
+
+
+def test_two_diagonal_donors_run_from_one_rna_and_one_atac_file(host, tmp_path, monkeypatch):
+    """d1 (u3): the several-batch diagonal methods read exactly 3 numbered
+    batches; for 2 donors the recipe writes one rna.h5 and one ATAC file, as
+    the diagonal RNA + ATAC tutorial does, and passes the donors as batch=.
+    The run scores the batch metrics of the 2 donors."""
+    _says("recipe-donors", "For diagonal data with another number of donors than 3, do the "
+                           "same in the diagonal RNA + ATAC tutorial: export `rna` and `atac` "
+                           "with all their cells, without `batch_index=`, and give `run` the "
+                           "donor of every RNA and ATAC cell:")
+    key = "diagonal_rna_atac"
+    _on_disk(key)
+    monkeypatch.chdir(tmp_path)
+    ns = _namespace(key)
+    src = _sources(key)
+    for i in (EXAMPLE, READ, EXPORT):
+        _quiet(_run_cell, src[i], ns)
+    for name in ("rna", "atac"):
+        n = ns[name].n_obs
+        ns[name].obs["donor"] = np.where(np.arange(n) < n // 2, "P01", "P02")
+    _diagonal = _fences("recipe-donors")[1]
+    _quiet(_run_cell, "import pandas as pd\n" + _diagonal, ns)
+    summary = ns["mine"].summary
+    assert set(summary["status"]) == {"scored"}, summary
+    assert {r["n_batches"] for r in ns["mine"].records} == {2}
+    assert summary["ASW_batch"].notna().all()
