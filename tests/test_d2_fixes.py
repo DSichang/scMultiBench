@@ -1,7 +1,8 @@
 """Round d2 of the 0.4.0 review: the cell names RunResult.embedding gives are
 accepted back as batch= / labels= ids; a misspelt method in another letter
 case gets a did-you-mean hint; messages name the embedding, a missing folder and
-an empty table."""
+an empty table; evaluate of a run's file reads the label files the run read."""
+import json
 import shutil
 import warnings
 
@@ -88,3 +89,31 @@ def test_an_empty_table_is_not_blamed_on_filters():
     empty = pd.DataFrame(columns=["method", "metric", "value"])
     with pytest.raises(ValueError, match=r"^The table has no rows\.$"):
         mtb.plot.bubble(empty)
+
+
+def test_evaluate_of_a_run_file_reads_the_label_files_the_run_read(tmp_path):
+    """UINMF on D52 reads two of the three batches; its record names them."""
+    data = tmp_path / "data" / "MYX"
+    data.mkdir(parents=True)
+    rng = np.random.default_rng(0)
+    labs = {}
+    for i, n in ((1, 40), (2, 30), (3, 50)):
+        labs[i] = np.array(list("abc") * n)[:n]
+        pd.DataFrame({"x": labs[i]}).to_csv(data / f"cty{i}.csv", index=False)
+    lab = np.concatenate([labs[1], labs[2]])
+    emb = rng.normal(scale=0.3, size=(len(lab), 5))
+    emb[np.arange(len(lab)), pd.factorize(lab)[0]] += 4.0
+    out = tmp_path / "out"
+    (out / "UINMF_MYX").mkdir(parents=True)
+    with h5py.File(out / "UINMF_MYX" / "embedding.h5", "w") as f:
+        f.create_dataset("data", data=emb.T)
+    (out / "batch_result.json").write_text(json.dumps(
+        {"dataset": "MYX", "category": "cross", "records": [
+            {"method": "UINMF", "status": "scored", "out_dir": str(out / "UINMF_MYX"),
+             "labels_used": ["cty1.csv", "cty2.csv"]}]}))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        got = mtb.evaluate(out / "UINMF_MYX" / "embedding.h5", dataset=str(data),
+                           metrics=["ARI"], verbose=False)
+        want = mtb.evaluate(emb, labels=lab, metrics=["ARI"], verbose=False)
+    assert got.value.tolist() == want.value.tolist()

@@ -282,8 +282,7 @@ def script_notes(spec, variant, repo: Path) -> list[str]:
 
     The method's ``setup_hint`` first (unless its helper files are all in
     place), then its ``size_hint``, then a note for a script that is not on
-    disk. Plain sentences: :func:`run` prints them on a dry run and
-    ``mtb.scan`` adds them to ``caveat``.
+    disk. Plain sentences: ``mtb.scan`` adds them to ``caveat``.
     """
     notes = []
     entrypoint = Path(variant.entrypoint)
@@ -396,7 +395,7 @@ def _check_input(role: str, val, *, real: bool) -> str:
 def _plan_inputs(variant, inputs: dict, inputs_dir: Path, *, convert: bool,
                  real: bool) -> dict:
     """``{role: {"value", "src", "convert", "normpeaks_from"}}``: the file each
-    role hands the script and how it gets there, for the run and the dry run.
+    role hands the script and how it gets there, for the run and scan.
 
     A canonical ``.h5`` passes as is, anything else becomes
     ``inputs/<role>.h5``, a ``normalize_peaks`` role
@@ -510,7 +509,7 @@ def _host_run_env(run_env: dict | None) -> dict:
 
 def _argv(variant, method: str, values: dict, out_str: str, repo: Path,
           params: dict | None) -> list[str]:
-    """The exact argv a method run executes (shared by the run and the dry run).
+    """The exact argv a method run executes (shared by the run and scan).
 
     The variant's command, with its package-side ``driver`` in place of the
     script when it has one, the pseudo-tty wrap when declared, then the env

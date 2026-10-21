@@ -57,13 +57,6 @@ def test_size_total_counts_unknowns_per_column():
     assert totals["total_disk_bytes"] == 2_000_000_000
 
 
-def test_every_blocked_script_method_names_the_block_in_its_setup_hint():
-    for s in registry.load():
-        if (s.env_spec or {}).get("difficulty") == "blocked-script":
-            assert s.setup_hint, f"{s.id}: blocked-script needs a setup_hint saying why"
-            assert any(v.helpers for v in s.variants) or "script" in s.setup_hint.lower()
-
-
 def test_missing_helper_module_blocks_the_script_gate(tmp_path, monkeypatch):
     script = tmp_path / "tools_scripts" / "MIRA" / "main_MIRA.py"
     script.parent.mkdir(parents=True)

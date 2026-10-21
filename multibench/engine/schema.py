@@ -356,7 +356,6 @@ class MethodSpec:
     setup_hint: str = ""
     status: str = "declared"            # declared | verified
     variants: list[Variant] = field(default_factory=list)
-    env_spec: dict = field(default_factory=dict)      # the env recipe (env_specs.yaml)
     reference: dict = field(default_factory=dict)     # provenance (references.yaml)
     # GPU/CPU keys, checked by validate_gpu_fields: the flags that turn CUDA
     # off (merged by runner.cpu_params_for on a host without a GPU), or a

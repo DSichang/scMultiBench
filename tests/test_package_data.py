@@ -18,7 +18,6 @@ RUNTIME_READ = [
     "engine/references.yaml",
     "result/rerun/long_all_D11.csv",
     "engine/runtimes.yaml",
-    "engine/env_specs.yaml",
     "engine/env_groups.yaml",
     "engine/packed_urls.json",
     "engine/packed_sizes.json",

@@ -103,7 +103,6 @@ def _parse_method(d: dict) -> MethodSpec:
         atac=d.get("atac"),
         setup_hint=d.get("setup_hint", ""), status=d.get("status", "declared"),
         variants=variants,
-        env_spec=d.get("env_spec", {}) or {},
         # any present value is handed over, so validate_gpu_fields refuses a wrong shape
         cpu_params=d["cpu_params"] if d.get("cpu_params") is not None else {},
         requires_gpu=d.get("requires_gpu", False),
@@ -125,9 +124,6 @@ def _parse_method(d: dict) -> MethodSpec:
     return spec
 
 
-_ENV_SPECS = Path(__file__).resolve().parent / "env_specs.yaml"
-
-
 @functools.lru_cache(maxsize=1)
 def _references() -> dict:
     """Parsed engine/references.yaml; a missing file raises."""
@@ -147,10 +143,6 @@ def benchmark_reference() -> dict:
 def load() -> list[MethodSpec]:
     data = yaml.safe_load(_YAML.read_text())
     specs = [_parse_method(m) for m in data["methods"]]
-    env_specs = yaml.safe_load(_ENV_SPECS.read_text()) or {}
-    for s in specs:
-        if not s.env_spec and s.id in env_specs:
-            s.env_spec = env_specs[s.id] or {}
     refs = _references()
     for s in specs:
         s.reference = dict(refs.get(s.id) or {})

@@ -155,7 +155,8 @@ def _run_record_for(path, dataset: str) -> dict | None:
         saved = Path(str(r.get("out_dir") or f"{r.get('method')}_{dataset}"))
         if saved.name == folder.name and registry.method_of(str(r.get("method"))):
             return {"method": registry.method_of(r["method"]),
-                    "category": r.get("category") or blob.get("category")}
+                    "category": r.get("category") or blob.get("category"),
+                    "labels_used": list(r.get("labels_used") or ())}
     return None
 
 
@@ -539,7 +540,7 @@ def _scripts_caveat(caveat) -> str:
 
 
 def _would_run(row) -> bool:
-    """Whether the sweep would run this scan row: runnable, or blocked only by its env."""
+    """Whether run would run this scan row: runnable, or blocked only by its env."""
     return bool(row["files_ok"]) and (not row["reason"]
                                       or row["reason"] == row.get("env_reason"))
 
@@ -1629,7 +1630,7 @@ def _saved_records(folder: Path) -> dict:
 
 def _check_save_target(folder: Path, dataset: str, category: str) -> None:
     """Raise ``ValueError`` when ``folder`` holds a saved result of another dataset
-    or category: merging the records would mix two sweeps."""
+    or category: merging the records would mix two runs."""
     path = Path(folder) / "batch_result.json"
     if not path.exists():
         return
@@ -2541,7 +2542,7 @@ def _params_by_method(params, methods, fn: str) -> dict:
 
 def _check_param_keys(plan_df: pd.DataFrame, params: dict) -> None:
     """Raise ``KeyError`` when ``params`` names a key no scanned variant of that
-    method accepts, so a dry run catches the typo; a method without rows is skipped."""
+    method accepts, so scan catches the typo; a method without rows is skipped."""
     for method, overrides in params.items():
         rows = plan_df[plan_df["method"] == method]
         if rows.empty or not overrides:
@@ -2992,7 +2993,7 @@ def _skipped_records(shown, attempted, methods, *, category, dataset, data_path,
 
 
 def _nested_rows(plan: "pd.DataFrame") -> tuple[list, list[str]]:
-    """``(indices, notes)``: the rows a sweep without ``modalities=`` leaves out
+    """``(indices, notes)``: the rows a run without ``modalities=`` leaves out
     because another row of the method holds their modalities, and why."""
     drop, notes = [], []
     # within one category: a scan without one also lists the other categories' rows
@@ -3310,7 +3311,7 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
     # absolute: a saved result read from another directory still finds the data
     data_root = os.path.abspath(config.data_path if data_path is None
                                 else data_path)
-    # the save after the sweep would refuse this folder: refuse it now
+    # the save after the run would refuse this folder: refuse it now
     _check_save_target(out_dir, dataset, category)
     attempted = set(plan_df["method"])
     shown, others = _skipped_rows(blocked, attempted, methods, dataset, data_path)

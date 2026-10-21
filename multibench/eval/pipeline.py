@@ -939,7 +939,7 @@ def evaluate(embedding, labels=None, *, dataset: str | None = None,
     name = cells = None
     if dataset is not None:
         from ..engine import resolve
-        from ..workflow import known_category, _run_record_for
+        from ..workflow import known_category, _run_record_for, _dataset_folder
         name, data_path = resolve.split_dataset(dataset, None)
         bench = known_category(name)             # a benchmark dataset has one
         # a file of a run folder: its record says whose cell order it has
@@ -948,7 +948,12 @@ def evaluate(embedding, labels=None, *, dataset: str | None = None,
         if category is None:
             category = record["category"] if record else bench
         from_files = labels is None
-        if labels is None:
+        # the label files the run read (UINMF on D52 reads two of three batches)
+        used = [_dataset_folder(name, data_path) / f for f in record["labels_used"]] \
+            if record and labels is None else []
+        if used and all(f.is_file() for f in used):
+            labels = used
+        elif labels is None:
             labels = _dataset_labels(name, category, order, data_path)
         cells = _expected_cells(name, category, order, data_path,
                                 labels if from_files else None, whole=bench is not None)
