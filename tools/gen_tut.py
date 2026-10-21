@@ -55,7 +55,8 @@ import nbformat as nbf
 
 import multibench as mtb
 from multibench import workflow
-from multibench.data.examples import EXAMPLES
+from multibench.engine import envs
+from multibench._data.examples import EXAMPLES
 from multibench.engine.resolve import labels_for
 
 OUT = "notebooks"
@@ -84,7 +85,7 @@ def _gb(rows):
     rows = rows.to_dict("records") if hasattr(rows, "to_dict") else rows
     known = [r["archive_bytes"] for r in rows if r["archive_bytes"]]
     # a layer several of the envs share is downloaded once
-    shared = mtb.env.layers_for([mtb.env.archive_key(r["env"], r["flavor"]) for r in rows],
+    shared = envs.layers_for([envs.archive_key(r["env"], r["flavor"]) for r in rows],
                                 missing_only=False)
     total = sum(known) + sum(e["archive_bytes"] for e in shared.values())
     return ("" if len(known) == len(rows) else "at least ") + f"{total / 1e9:.1f} GB"
@@ -115,7 +116,7 @@ def env_download_sentence(methods):
 
 def download_size(datasets):
     """The reference-data download size, from the package's own table."""
-    from multibench.data.fetch import AVAILABLE
+    from multibench._data.fetch import AVAILABLE
     return " + ".join(AVAILABLE[d] for d in datasets)
 
 
@@ -337,9 +338,9 @@ def would_run(key, methods, dataset=None, **where):
     t = TASKS[key]
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        # the full plan behind run(dry_run=True): its file and env checks too
-        plan = workflow._run_all(dataset or t["ds"], t["cat"], methods=methods,
-                                 dry_run=True, verbose=False, assume_gpu=True, **where)
+        # the full plan behind scan: its file and env checks too
+        plan, _ = workflow._scan(dataset or t["ds"], t["cat"], methods=methods,
+                                 verbose=False, assume_gpu=True, **where)
     other = [str(r).replace(str(e), "").strip() for r, e in zip(plan.reason, plan.env_reason)]
     rows = plan[[bool(f) and o == "" for f, o in zip(plan.files_ok, other)]]
     return rows.drop(index=workflow._nested_rows(rows)[0])
@@ -438,9 +439,18 @@ DIAG_ONE_SIDE = ("`labels=` needs the column in both files. With cell types for 
                  "cells only, leave `labels=` out and follow the recipe for no labels.")
 DIAG_PEAK = ("For ATAC as a peak matrix, pass `atac_kind=\"peak\"`. {peak_only} read "
              "peaks. [The folder layout](" + LAYOUT + ") lists the files each method needs.")
-MULTI_NUMBERING = ("The RNA batches and the ATAC batches are numbered separately. RNA batch 1 "
-                   "and ATAC batch 1 need not come from the same sample. The loop takes as "
-                   "many batches as the list `rna` holds.")
+def multi_numbering():
+    """The batch-count paragraph of the several-batch diagonal tutorial, from
+    the number of batches its methods read."""
+    from multibench.engine.resolve import (_diagonal_batch_count,
+                                           _several_batch_diagonal_methods)
+    n = NUMBER[_diagonal_batch_count()]
+    return (f"The RNA batches and the ATAC batches are numbered separately. RNA batch 1 "
+            f"and ATAC batch 1 need not come from the same sample. "
+            f"{and_list(_several_batch_diagonal_methods())} read exactly {n} RNA and {n} "
+            f"ATAC batches. For another number, such as two donors, write one `rna.h5` "
+            f"and one ATAC file with every cell, as in the diagonal RNA + ATAC tutorial, "
+            f"and pass the batches to `run` as `batch=`, one per RNA and ATAC cell.")
 MULTI_PEAK = ("For ATAC as a peak matrix, pass `atac_kind=\"peak\"`. {multi_peak} "
               "the peak matrix.")
 MOSAIC_LAYOUT = ("[The folder layout](" + LAYOUT + ") lists the batch patterns and the methods "
@@ -454,9 +464,8 @@ CROSS_INDEX = ("For one AnnData per batch, call `export_dataset` once per batch 
 FOLDER_NOTE = ("`\"mydata/\" + NAME` is the dataset folder that `scan` and `run` read. "
                "With a new value of `NAME`, the folder holds the files of your data only.")
 CHECK_NOTE = ("The check lists the methods you name. Without `methods=`, it lists every "
-              "method that reads the modalities in the folder. `mtb.run(..., "
-              "dry_run=True)` has one row per method variant, with the command of each "
-              "method.")
+              "method that reads the modalities in the folder. Its `command` column holds "
+              "the line `run` would execute for each method.")
 LEFTOVER = ("`export_dataset` raises `FileExistsError` when the folder holds files of other "
             "cells that the call does not write. `overwrite=True` does not remove them. Give "
             "`NAME` a new value.")
@@ -640,7 +649,7 @@ for b in range(len(rna)):      # one call per batch
                           labels="obs:celltype",      # <- the cell-type column
                           category="diagonal", batch_index=b + 1,
                           overwrite=True)''',
-   notes=[MULTI_NUMBERING, MULTI_PEAK],
+   notes=[multi_numbering(), MULTI_PEAK],
  ),
  "mosaic_rna_adt": dict(
    name="MYMOSAIC_RNA_ADT",
@@ -940,8 +949,7 @@ def check_own(key):
                 exec(compile(own["export"], f"tutorial_{key}: export cell", "exec"), ns)
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                frame = workflow._run_all("mydata/" + own["name"], t["cat"],
-                                          dry_run=True, verbose=False)
+                frame, _ = workflow._scan("mydata/" + own["name"], t["cat"], verbose=False)
         finally:
             os.chdir(here)
     warned = [str(w.message) for w in seen if issubclass(w.category, UserWarning)]
@@ -1160,7 +1168,7 @@ envs[["env", "methods", "state"]]''')
         "`params={\"Method\": {\"key\": value}}` "
         "sets a method's parameters, and `mtb.params_for` lists them. Many methods "
         "take none.",
-        f"`mtb.load_batch(\"out/{ds}\")` reloads these results later without running "
+        f"`mtb.load_run(\"out/{ds}\")` reloads these results later without running "
         f"anything.",
     ]
     md(f"""## 3. Run the method{'s' if len(methods) > 1 else ''}
@@ -1223,7 +1231,7 @@ To run them all, set `METHODS` to these names in section 2 and run the notebook 
 |---|---|
 | `env.install` refuses on macOS or Windows | methods run only on Linux: use Colab or a Linux machine |
 | a method needs an NVIDIA GPU | choose a GPU runtime on Colab, or a machine with a GPU |
-| a method fails on a small dataset | `mtb.run(..., dry_run=True)` names what the method needs from the data's size in its `caveat` column |
+| a method fails on a small dataset | `mtb.scan` names what the method needs from the data's size in its `caveat` column |
 | a warning that values are not whole numbers | export raw counts, for example with `rna="layer:counts"` |
 | `... matrix/data as cells x features` | the matrix is transposed: export it again with `mtb.io.export_dataset` |
 | a method times out | raise `timeout=` in `run` |
