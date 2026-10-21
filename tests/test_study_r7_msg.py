@@ -292,3 +292,15 @@ def test_orientation_error_starts_with_the_method(tmp_path, pinned):
                    "matrix/data needs features x cells, shape (60, 20). Export it again "
                    "with mtb.io.export_dataset, or transpose matrix/data.")
     assert " - " not in msg and "TRANS/vertical" not in msg
+
+
+# ---- the Python part of tests that also ran the command line
+@pytest.mark.parametrize('method', ['MultiMAP', 'Seurat_v3'])
+def test_both_file_variants_say_they_read_both_files(tmp_path, monkeypatch, method, pinned):
+    _lung(tmp_path)
+    both = f'{method} reads both atac_peak.h5 and atac_gas.h5.'
+    row = _quiet(full_scan, 'LUNG', 'diagonal', methods=[method], data_path=tmp_path, verbose=False).iloc[0]
+    assert both in row['files_reason'], row['files_reason']
+    assert 'method_info' not in row['files_reason']
+
+

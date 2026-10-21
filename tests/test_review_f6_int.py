@@ -31,6 +31,7 @@ import pytest
 
 import multibench
 import multibench as mtb
+from multibench.plot.bubble import _build_table
 from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs
@@ -278,3 +279,27 @@ def test_docstrings_quote_the_current_texts():
 def test_the_evaluate_page_names_no_vague_definitions():
     text = _flat("tutorials/evaluate.md")
     assert "with the same metric definitions" not in text
+
+
+def test_plot_unknown_names_are_one_sentence_form(tmp_path, capsys):
+    long = pd.DataFrame({'metric': ['ARI', 'NMI'] * 2, 'value': [0.5, 0.6, 0.4, 0.3], 'method': ['A', 'A', 'B', 'B'], 'dataset': 'D11', 'category': 'vertical'})
+    with pytest.raises(ValueError) as e:
+        _build_table(long, methods=['Matlida'])
+    assert str(e.value) == 'Unknown method Matlida. Did you mean Matilda? The table has A and B.'
+    csv = tmp_path / 'long.csv'
+    long.to_csv(csv, index=False)
+    empty = tmp_path / 'empty.csv'
+    long.iloc[:0].to_csv(empty, index=False)
+    with pytest.raises(KeyError) as e:
+        mtb.load_results('vertical', methods=['Matlida'])
+    assert e.value.args[0] == 'Unknown method Matlida. Did you mean Matilda? mtb.find_methods() shows all methods.'
+
+
+@needs_git
+def test_strict_without_methods_prints_the_scripts_ref_fix(wrong_ref, capsys):
+    repo, head = wrong_ref
+    ref = f'The method scripts are at {head}, not deadbeef (MULTIBENCH_SCRIPTS_REF). Unset MULTIBENCH_SCRIPTS_REF, or set MULTIBENCH_REPO_PATH to a new folder and run multibench fetch --scripts.'
+    n = len(list(W._variant_rows('cross')))
+    assert n == 30
+
+

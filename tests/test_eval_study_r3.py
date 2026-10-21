@@ -161,3 +161,34 @@ def test_run_on_linux_keeps_the_install_line(tmp_path, monkeypatch):
     assert "Methods run only on Linux" not in msg
 
 
+def test_label_files_of_one_diagonal_side_are_named(tmp_path, capsys):
+    """rna_cty.csv without atac_cty.csv: the 70 ATAC cells of the embedding
+    have no entry. The message names the side that is labelled and a recipe.
+    It does not blame the embedding or name the call that was made, and
+    missing_labels="drop" does not change it."""
+    emb = np.random.default_rng(0).normal(size=(150, 5))
+    np.save(tmp_path / 'emb.npy', emb)
+    data = tmp_path / 'data'
+    d = _folder(data, 'BRAIN', {'rna.h5': 80, 'atac_gas.h5': 70}, {'rna_cty.csv': 80})
+    found = mtb.engine.resolve.labels_for('BRAIN', 'diagonal', 'SCALEX', data_path=data)
+    assert list(found) == ['rna_cty']
+    out = ['--embedding', str(tmp_path / 'emb.npy'), '--metrics', 'ASW']
+    dataset = ['--dataset', 'BRAIN', '--method', 'SCALEX', '--category', 'diagonal', '--data-path', str(data)]
+    d = _folder(data, 'ATAC', {}, {'atac_cty.csv': 70})
+    d = _folder(data, 'RNA2', {}, {'rna_cty1.csv': 40, 'rna_cty2.csv': 40})
+
+
+def test_other_short_label_files_keep_their_advice(tmp_path, capsys):
+    """rna_cty.csv is also the older name of a paired folder's label file, and
+    a diagonal folder may hold atac_cty.csv next to it: those keep their text."""
+    emb = np.random.default_rng(0).normal(size=(150, 5))
+    np.save(tmp_path / 'emb.npy', emb)
+    np.save(tmp_path / 'emb80.npy', emb[:80])
+    data = tmp_path / 'data'
+    out = ['--embedding', str(tmp_path / 'emb.npy'), '--metrics', 'ASW']
+    _folder(data, 'OLDPAIR', {'rna.h5': 120, 'adt.h5': 120}, {'rna_cty.csv': 120})
+    d = _folder(data, 'BOTH', {'rna.h5': 80, 'atac_gas.h5': 70}, {'rna_cty.csv': 80, 'atac_cty.csv': 70})
+    with pytest.raises(ValueError) as e:
+        mtb.evaluate(emb, labels=str(d / 'rna_cty.csv'), metrics=['ASW'])
+    assert str(e.value) == 'labels has 80 entries for 150 cells in the embedding. For a folder with one label file per batch, pass dataset=, category= and method=.'
+    d = _folder(data, 'RNA2', {}, {'rna_cty1.csv': 40, 'rna_cty2.csv': 40})

@@ -162,3 +162,10 @@ def test_global_obs_miss_names_the_modality_spelling(tmp_path):
     assert "mdata['rna'].obs has 'cell_type': use labels='rna:cell_type'" in msg
 
 
+def test_run_dry_run_note_names_the_install_check(monkeypatch, capsys):
+    monkeypatch.setattr(W, '_installed_envs', lambda: frozenset())
+    mtb.run('D11', 'vertical', dry_run=True, methods=['Matilda'])
+    assert 'doctor' not in capsys.readouterr().out.splitlines()[0]
+    mtb.run('D11', 'vertical', dry_run=True, methods=['Matilda'])
+    out = capsys.readouterr().out
+    assert 'doctor' not in out.splitlines()[0] and 'mtb.' not in out

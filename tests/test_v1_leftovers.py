@@ -71,3 +71,20 @@ def test_the_quickstart_lines_for_counts_in_a_layer(tmp_path, monkeypatch, capsy
         plt.close("all")
     capsys.readouterr()
     np.testing.assert_allclose(pcs[1], pcs[0], rtol=1e-3, atol=1e-3)
+
+
+# ---- the Python part of tests that also ran the command line
+def test_an_unreadable_h5ad_is_named_in_one_sentence(tmp_path, capsys):
+    bad = tmp_path / 'bad.h5ad'
+    bad.write_text('not hdf5\n')
+    said = 'bad.h5ad cannot be read: it is not an .h5ad file, or it is damaged.'
+    with pytest.raises(ValueError) as e:
+        mtb.evaluate(str(bad), labels='celltype')
+    assert str(e.value) == said
+
+
+def test_one_cell_is_singular(tmp_path, capsys):
+    (tmp_path / 'one.csv').write_text('a,b\n1,2\n')
+    pd.DataFrame({'x': ['T', 'B', 'T']}).to_csv(tmp_path / 'lab.csv', index=False)
+    with pytest.raises(ValueError, match='^labels has 1 entry for 3 embedding rows: '):
+        _quiet(mtb.evaluate, np.zeros((3, 2)), labels=np.array(['T']), metrics=['ASW'])

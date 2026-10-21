@@ -248,3 +248,8 @@ def test_a_stored_tree_of_0_3_says_to_rescore(tmp_path):
         mtb.load_batch(tree)
 
 
+def test_hidden_rows_no_sentence(capsys):
+    mtb.scan('D11', 'vertical')
+    assert 'not listed' not in capsys.readouterr().out
+    mtb.run('D11', 'vertical', out_dir='/o', dry_run=True)
+    assert 'not listed' not in capsys.readouterr().out

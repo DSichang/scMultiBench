@@ -336,3 +336,49 @@ def test_notes_passages_have_no_dash_insertions():
     for doc in flat.values():
         assert " - the evidence" not in doc and "- the flags" not in doc
         assert "written in one order -" not in doc and "need not score" not in doc
+
+
+# ---- the Python part of tests that also ran the command line
+def test_callers_print_the_method_name_once(tmp_path, pinned, root, monkeypatch, capsys, gas_matilda):
+    """run's log, both dry runs and run's warning print the caveat alone.
+    UINMF's two-batch variant is named: on D52's three batches the folder
+    picks its three-batch one, which skips nothing."""
+    data = root / 'data'
+    two = ['rna1', 'rna2', 'adt1', 'adt2']
+    mtb.config.DEFAULT.data_path = data
+    _quiet(mtb.run, 'D52', 'cross', methods=['UINMF'], modalities=two, dry_run=True)
+    out = capsys.readouterr().out
+    assert '[run] UINMF reads batches 1-2 of 3. Batch 3 is not used.\n' in out
+
+    def fake_run(**kw):
+        raise RuntimeError('stub: not run in tests')
+    monkeypatch.setattr(W, '_run', fake_run)
+    mtb.config.DEFAULT.data_path = data
+    _quiet(mtb.run, 'D52', 'cross', tmp_path / 'out', methods=['UINMF'], modalities=two, evaluate=False)
+    log = capsys.readouterr().out
+    assert '[run]   UINMF reads batches 1-2 of 3. Batch 3 is not used.\n' in log
+    mu = _mu_peak(tmp_path / 'mu')
+    inp = mtb.engine.resolve.inputs_for('MU_PEAK', 'vertical', 'Matilda', modalities=['rna', 'atac'], data_path=mu)
+
+    class Stop(Exception):
+        pass
+
+    def stop(spec):
+        raise Stop
+    monkeypatch.setattr(R, 'check_gpu_requirement', stop)
+    with warnings.catch_warnings(record=True) as rec:
+        warnings.simplefilter('always')
+        with pytest.raises(Stop):
+            mtb.engine.runner.run('Matilda', 'vertical', inputs=inp, out_dir=str(tmp_path / 'o'))
+    msgs = [str(w.message) for w in rec if 'ATAC' in str(w.message)]
+    assert msgs and msgs[0].startswith('Matilda needs gene-activity ATAC. '), msgs
+
+
+def test_strict_counts_are_unchanged(tmp_path, pinned, root, capsys):
+    data = _lung_ids(tmp_path)
+    base = ['scan', 'LUNG_ids', '--category', 'diagonal', '--data-path', str(data), '--strict']
+    n = len(list(W._variant_rows('diagonal')))
+    assert n == 18
+    n -= 4
+
+

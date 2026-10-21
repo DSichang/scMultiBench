@@ -347,3 +347,11 @@ def test_the_peak_name_caveat_takes_its_action():
 def test_the_first_family_is_clustering():
     B = importlib.import_module("multibench.plot.bubble")
     assert [f[0] for f in B.FAMILIES] == ["Clustering", "Batch correction", "Classification"]
+
+
+def test_a_benchmark_dataset_gives_the_category(tmp_path, capsys):
+    out = mtb.evaluate(_emb(2864), dataset='D11', method='sciPENN', metrics=['ARI'], verbose=False)
+    assert out['category'].tolist() == ['vertical']
+    np.save(tmp_path / 'e.npy', _emb(2864))
+
+

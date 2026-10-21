@@ -398,3 +398,13 @@ def test_summary_reason_comes_from_the_record_also_for_older_folders(tmp_path):
     assert W.BatchResult([], "MYCITE", "vertical").summary.columns[-1] == "reason"
 
 
+def test_a_csv_with_foreign_barcodes_raises(cite, tmp_path, monkeypatch, capsys):
+    data, batch, _ = cite
+    half = _barcode_csv(tmp_path / 'half.csv', batch, index=BARS[:N // 2] + [f'x{i}' for i in range(N // 2)])
+    monkeypatch.setattr(W, '_run', lambda *a, **k: pytest.fail('a method was started'))
+    with pytest.raises(ValueError, match="^batch: 60 of the 120 ids in the first column of half\\.csv are not cells of MYCITE \\(first: \\['x"):
+        mtb.config.DEFAULT.data_path = data
+        mtb.run('MYCITE', 'vertical', tmp_path / 'out', batch=half, **KW)
+    assert not (tmp_path / 'out').exists()
+
+

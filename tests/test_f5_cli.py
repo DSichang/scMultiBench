@@ -144,3 +144,7 @@ def test_error_tail_is_clipped_at_a_word_boundary():
     assert tail[3:].split(" ", 1)[0] in {"could", "not", "reach", "github.com"}
 
 
+# ---- the Python part of tests that also ran the command line
+def test_prepared_note_starts_with_the_method(monkeypatch):
+    counts = 'GLUE needs raw counts. rna.h5 holds non-integer values.'
+    assert runner._prepared_at('GLUE reads peak names such as chr1:100-200.') == -1

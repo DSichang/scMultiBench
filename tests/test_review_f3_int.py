@@ -399,3 +399,48 @@ def test_deploy_gate_refuses_while_the_data_release_is_not_public(tmp_path, monk
         f"no RELEASE_URL in {tmp_path / 'multibench' / 'data' / 'fetch.py'}"]
     assert "data_problems(checkout)" in (_docs_root().parent / "hooks" /
                                          "deploy_gate.py").read_text()
+
+
+# ---- the Python part of tests that also ran the command line
+def test_a_named_method_keeps_the_row_its_roles_spell(pinned, capsys):
+    """moETM's own spelling, as scan and method_info show it (rna+atac since
+    0.4.0, X13: the role names the peaks it reads)."""
+    assert ['rna', 'atac'] in [s['modalities'] for s in mtb.method_info('moETM')['supports']]
+    for call in (full_scan, lambda *a, **k: mtb.run(*a, dry_run=True, **k)):
+        df = _quiet(call, 'D28', 'vertical', methods=['moETM'], modalities=['rna', 'atac'], verbose=False)
+        assert list(df['modalities']) == ['rna+atac']
+    df = _quiet(full_scan, 'D28', 'vertical', modalities=['rna', 'atac_gas'], verbose=False)
+    assert 'moETM' not in set(df['method'])
+
+
+def test_a_representation_token_that_drops_a_named_method_says_why(pinned, capsys):
+    for call in (full_scan, lambda *a, **k: mtb.run(*a, dry_run=True, **k)):
+        with pytest.raises(ValueError) as e:
+            _quiet(call, 'D28', 'vertical', methods=['moETM'], modalities=['rna', 'gene_activity'], verbose=False)
+        assert str(e.value) == "moETM does not read rna+gene_activity in vertical data. moETM reads peaks. Pass modalities=['rna', 'atac_peak'] or ['rna', 'atac'].", str(e.value)
+        assert "method_info(m)['supports']" not in str(e.value)
+    with pytest.raises(ValueError, match="Matilda reads peaks\\. Pass modalities=\\['rna', 'atac_peak'\\] or \\['rna', 'atac'\\]\\.$"):
+        _quiet(full_scan, 'D11', 'vertical', methods=['Matilda'], modalities=['rna', 'atac_gas'], verbose=False)
+    with pytest.raises(ValueError, match="SCALEX reads gene activity\\. Pass modalities=\\['rna', 'atac_gas'\\] or \\['rna', 'atac'\\]\\.$"):
+        _quiet(full_scan, 'D28', 'diagonal', methods=['SCALEX'], modalities=['rna', 'atac_peak'], verbose=False)
+
+
+def test_dry_run_prints_the_scripts_note_once_and_no_start_notes(pinned, capsys):
+    _quiet(mtb.run, 'D11', 'vertical', dry_run=True)
+    out = capsys.readouterr().out
+    assert out.count('The method scripts are not in') == 1, out
+    assert '[run] The method scripts are not in' in out
+    _quiet(mtb.run, 'D28', 'diagonal', dry_run=True)
+    out = capsys.readouterr().out
+    assert 'the command reads' not in out and 'start the method with' not in out
+    assert out.count('The method scripts are not in') == 1
+
+
+def test_run_all_dry_run_checks_the_batch_length(tmp_path, pinned, capsys):
+    short = tmp_path / 'short.csv'
+    pd.DataFrame({'b': ['s1', 's2', 's1']}).to_csv(short, index=False)
+    argv = ['run-all', 'D11', '--category', 'vertical', '--methods', 'totalVI', '--dry-run', '--batch']
+    full = tmp_path / 'full.csv'
+    pd.DataFrame({'b': np.tile(['s1', 's2'], 1432)}).to_csv(full, index=False)
+    with pytest.raises(ValueError, match='^batch has 3 entries for the 2,864 cells of D11'):
+        _quiet(mtb.run, 'D11', 'vertical', methods=['totalVI'], dry_run=True, batch=str(short))

@@ -155,3 +155,19 @@ def test_slurm_example_dry_run_works(tmp_path):
                    out_dir=str(tmp_path / "scMoMaT"),
                    cmd_template="srun --gres=gpu:1 {env_cmd}", dry_run=True)
     assert argv[:2] == ["srun", "--gres=gpu:1"]
+
+
+# ---- the Python part of tests that also ran the command line
+@needs_git
+def test_dry_runs_note_another_scripts_ref(scripts, monkeypatch, capsys, tmp_path):
+    repo, head = scripts
+    inp = mtb.engine.resolve.inputs_for('D11', 'vertical', 'Matilda')
+    mtb.engine.runner.run('Matilda', 'vertical', inputs=inp, out_dir=str(tmp_path / 'o'), dry_run=True)
+    monkeypatch.setenv(config.SCRIPTS_REF_VAR, 'deadbeef')
+    mtb.engine.runner.run('Matilda', 'vertical', inputs=inp, out_dir=str(tmp_path / 'o'), dry_run=True)
+    mtb.run('D11', 'vertical', methods=['Matilda'], dry_run=True, verbose=False)
+    mtb.run('D11', 'vertical', methods=['Matilda'], dry_run=True, verbose=True)
+    assert capsys.readouterr().out.count(f'[run] {_mismatch(head)}\n') == 1
+    pairs = [a for role, path in inp.items() for a in ('--input', f'{role}={path}')]
+    with pytest.raises(RuntimeError, match=re.escape(f'The method scripts in {repo} are at ' + _mismatch(head).split('The method scripts are at ', 1)[1])):
+        config.ensure_repo()

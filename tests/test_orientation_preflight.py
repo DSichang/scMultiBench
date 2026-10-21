@@ -7,6 +7,7 @@ wrong number (measured: the methods fail), but without this check it fails late,
 after conda-env startup and potentially hours of compute, with a third-party
 error that never mentions orientation.
 """
+import os
 
 import shutil
 
@@ -221,5 +222,32 @@ def test_scan_and_inputs_for_describe_the_check_of_matrix_files_alike():
     scan_doc = " ".join(mtb.scan.__doc__.split())
     inputs_doc = " ".join(mtb.engine.resolve.inputs_for.__doc__.split())
     assert "are dataset files" not in scan_doc + inputs_doc
+
+
+def test_the_reason_starts_with_the_file_when_the_data_path_has_a_space(ready, tmp_path, capsys):
+    """The reason column cuts a path to its file name, and takes a path to
+    end at white space: a sentence that led with the full path began
+    "My Data/TENX/rna.h5 is a 10x Genomics file"."""
+    base = tmp_path / 'My Data'
+    (base / 'TENX').mkdir(parents=True)
+    _tenx(base / 'TENX' / 'rna.h5', ('Antibody Capture', [f'AB{i}' for i in range(8)]))
+    shutil.copy(base / 'TENX' / 'rna.h5', base / 'TENX' / 'adt.h5')
+    (base / 'ZERO').mkdir()
+    _matrix(base / 'ZERO' / 'rna.h5', [], 100)
+    _matrix(base / 'ZERO' / 'adt.h5', [f'AB{i}' for i in range(8)], 100)
+    zero = 'rna.h5 holds 0 features. Write the folder again with mtb.io.export_dataset.'
+    for name, short in (('TENX', f'rna.h5 {TENX}'), ('ZERO', zero)):
+        mtb.config.DEFAULT.data_path = base
+        kw = dict(methods=['totalVI'])
+        df = full_scan(name, 'vertical', verbose=False, **kw)
+        assert list(df['reason']) == [short]
+        assert 'My Data' not in df['files_reason'][0]
+        pm = mtb.scan(name, 'vertical', **kw)
+        assert list(pm['reason']) == [short]
+        assert capsys.readouterr().out.splitlines()[-1] == f'[scan] totalVI: {short}'
+        with pytest.raises(ValueError) as e:
+            mtb.run(name, 'vertical', out_dir=tmp_path / 'out', **kw)
+        assert f'  totalVI (rna+adt): {short}\n' in str(e.value)
+    assert not (tmp_path / 'out').exists()
 
 

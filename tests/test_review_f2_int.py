@@ -345,3 +345,20 @@ def test_api_and_changes_pages_say_cell_order():
                     "in which Seurat_v5 stacks"):
             assert old not in text, (page, old)
     assert "Seurat_v5's cell order." in " ".join((docs / "changes.md").read_text().split())
+
+
+# ---- the Python part of tests that also ran the command line
+def test_run_refuses_seurat_v5_on_files_from_different_cells(tmp_path, capsys):
+    inp = mtb.engine.resolve.inputs_for('D28', 'diagonal', 'Seurat_v5', check=False)
+    want = 'Seurat_v5 needs RNA and ATAC from the same cells as its bridge. In D28, rna.h5 and atac_peak.h5 share 0 of 6,408 and 4,606 cells.'
+    for dry in (True, False):
+        with pytest.raises(ValueError) as e:
+            mtb.engine.runner.run('Seurat_v5', 'diagonal', inputs=inp, out_dir=str(tmp_path / 'o'), dry_run=dry)
+        assert str(e.value) == want
+    assert not (tmp_path / 'o').exists()
+
+
+def test_help_texts_put_the_object_first_and_end_in_plain_sentences():
+    import argparse
+    doc = ' '.join(mtb.scan.__doc__.split())
+    assert "``True`` = skip this host's GPU test, to check a job for a GPU node from a login node." in doc

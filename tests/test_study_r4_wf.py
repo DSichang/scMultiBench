@@ -426,3 +426,14 @@ def test_modality_token_notes_say_what_atac_peak_alone_keeps(pinned):
     both = _quiet(full_scan, "D28", "diagonal", modalities=["rna", "atac_peak", "atac_gas"],
                   verbose=False)
     assert set(both["method"]) == {"MultiMAP", "Seurat_v3"}
+
+
+def test_docstrings_name_the_override_not_methods():
+    from multibench.engine import ingest
+    for fn in (mtb.scan, mtb.run, ingest.export_dataset):
+        flat = ' '.join(inspect.getdoc(fn).split())
+        assert 'name it in' not in flat and 'Name the method in' not in flat
+        assert 'named in ``methods=``, or given' not in flat
+    for fn in (mtb.scan, mtb.run):
+        assert 'allow_atac_mismatch' not in ' '.join(inspect.getdoc(fn).split()), fn.__name__
+        assert 'allow_atac_mismatch' not in inspect.signature(fn).parameters

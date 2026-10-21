@@ -172,3 +172,35 @@ def test_mudata_spellings_are_unchanged(tmp_path):
         ingest.export_dataset(m, out, rna="rna", labels="site")
     assert str(err.value).startswith(
         "labels='site': 1 of the 60 labels for the cells (mdata.obs) are missing")
+
+
+# ---- the Python part of tests that also ran the command line
+def test_a_modality_prefix_on_an_anndata_names_the_obs_spelling(tmp_path, capsys):
+    """``'<mod>:<col>'`` reads a column of one modality of a MuData. Two
+    AnnData objects have no modalities: 0.3.4 answered with a ValueError
+    about the spelling, and so does this."""
+    rna, atac = (_cells(60, 'r'), _cells(40, 'a', seed=1))
+    kw = dict(rna='X', atac=atac, atac_kind='gene_activity', category='diagonal')
+    head = 'names a modality of a MuData, and this data is not one.'
+    assert _value_error(tmp_path, rna, labels='rna:celltype', **kw) == f"labels='rna:celltype' {head} Write labels='obs:celltype'."
+    assert _value_error(tmp_path, rna, labels='atac:nope', **kw) == f"labels='atac:nope' {head} Write labels='obs:<col>'."
+    bare = atac.copy()
+    del bare.obs['celltype']
+    assert _value_error(tmp_path, rna, labels='rna:celltype', **{**kw, 'atac': bare}) == f"labels='rna:celltype' {head} Write labels='obs:<col>'."
+    frames = [pd.DataFrame(a.X, index=a.obs_names, columns=a.var_names) for a in (rna, atac)]
+    assert _value_error(tmp_path, None, labels='rna:celltype', **{**kw, 'rna': frames[0], 'atac': frames[1]}) == f"labels='rna:celltype' {head} Write labels='obs:<col>'."
+    out = ingest.export_dataset(rna, tmp_path / 'OBS', labels='obs:celltype', **kw)
+    assert sorted(_files(out)) == ['atac_cty.csv', 'atac_gas.h5', 'rna.h5', 'rna_cty.csv']
+    for a in (rna, atac):
+        a.obs['rna:celltype'] = a.obs['celltype'].to_numpy()
+    named = ingest.export_dataset(rna, tmp_path / 'NAMED', labels='rna:celltype', **kw)
+    for name in ('rna_cty.csv', 'atac_cty.csv'):
+        assert (named / name).read_bytes() == (out / name).read_bytes()
+    for a in (rna, atac):
+        del a.obs['rna:celltype']
+    rna.write_h5ad(tmp_path / 'rna.h5ad')
+    atac.write_h5ad(tmp_path / 'atac.h5ad')
+    argv = ['convert', str(tmp_path / 'rna.h5ad'), str(tmp_path / 'OUT'), '--rna', 'X', '--atac-from', str(tmp_path / 'atac.h5ad'), '--atac-kind', 'gene_activity', '--category', 'diagonal', '--labels']
+    cli_head = 'names a modality of a .h5mu file, and SRC is not one.'
+    frames[0].to_csv(tmp_path / 'rna.csv')
+    assert not (tmp_path / 'OUT').exists()

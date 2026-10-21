@@ -149,3 +149,25 @@ def test_the_mira_and_bridge_reasons_are_sentences(tmp_path, monkeypatch):
                     "In D28, rna.h5 and atac_peak.h5 share 0 of 6,408 and 4,606 cells.")
 
 
+def test_run_all_reads_r_row_numbers_on_a_folder_with_numbered_barcodes(cite, tmp_path, capsys):
+    data, batch, _ = cite
+    d = data / 'NUMBC'
+    d.mkdir()
+    bars = [str(i) for i in range(N)]
+    _h5(d / 'rna.h5', [f'g{i}' for i in range(30)], bars)
+    _h5(d / 'adt.h5', [f'p{i}' for i in range(6)], bars)
+    pd.DataFrame({'x': CELLTYPE}).to_csv(d / 'cty.csv', index=False)
+    rb = _r_row_numbers(tmp_path / 'b_r.csv', batch)
+    (vec, aligned), warned = _recorded(W._cell_vector, rb, 'NUMBC', data)
+    assert not aligned and list(vec) == list(batch) and (warned == [])
+    by_r = _quiet(mtb.run, str(d), 'vertical', tmp_path / 'a', batch=rb, **KW)
+    by_one = _quiet(mtb.run, str(d), 'vertical', tmp_path / 'b', batch=_one_column(tmp_path / 'b1.csv', batch), **KW)
+    assert _batch_metrics(by_r) == _batch_metrics(by_one)
+    assert _batch_metrics(by_r)[0] == 'scored'
+
+
+def test_the_linux_only_reason_fits_the_table(monkeypatch):
+    monkeypatch.setattr(envs, 'host_platform_problem', lambda: 'Method environments are Linux-only; this host is darwin/arm64')
+    longest = max((envs.group_for(m) for m in registry.list_methods()), key=len)
+    reason = W._env_hint(longest, 'X', 'vertical')
+    assert reason == f'Environment {longest} runs only on Linux, not on this computer.'

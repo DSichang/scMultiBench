@@ -304,3 +304,41 @@ def test_canonical_files_still_pass(tmp_path):
     assert ingest._is_canonical_h5(made) and ingest._to_canonical(made) == made
 
 
+def test_the_10x_names_leave_out_the_advice_to_delete_the_column(tmp_path, capsys):
+    """Deleting var['feature_types'] of a 10x object would write genes and
+    peaks, or genes and antibodies, into one file. No message for the 10x
+    type names gives that advice, in Python or on the command line."""
+    arc, cite = (_arc(), _cite())
+    src = tmp_path / 'arc.h5ad'
+    arc.write_h5ad(src)
+    texts = [_raises(tmp_path, arc, rna='X'), _raises(tmp_path, arc, rna='X[genome=GRCh38]'), _raises(tmp_path, None, rna=arc), _raises(tmp_path, cite, rna='X'), _raises(tmp_path, cite, rna=None, adt='X')]
+    with pytest.raises(ValueError) as e:
+        ingest._to_canonical(arc, tmp_path / 'DIR' / 'rna.h5')
+    texts.append(str(e.value))
+    for text in texts:
+        assert 'delete' not in text and 'If all of them' not in text
+    mixed = _mixed([('Gene Expression', 30, 'GENE'), ('lncRNA', 50, 'LNC')])
+    assert _raises(tmp_path, mixed, rna='X') == "rna='X' selects features of 2 types, 'lncRNA' and 'Gene Expression'. Add a filter, as rna='X[feature_types=Gene Expression]'."
+
+
+def test_other_type_names_get_the_advice_to_delete_the_column(tmp_path, capsys):
+    """Names such as protein_coding and lncRNA may all be RNA features. None
+    of them is a 10x name, so the one action is to delete the column: the
+    object is then written as one file. The object is named where the
+    modality came as its own object, and the command line names no object."""
+    a = _mixed([('protein_coding', 30, 'A'), ('lncRNA', 50, 'B')])
+    head = "features of 2 types, 'lncRNA' and 'protein_coding'."
+    texts = [_raises(tmp_path, a, rna='X'), _raises(tmp_path, a, rna='X[genome=GRCh38]'), _raises(tmp_path, None, rna=a), _raises(tmp_path, _mixed([('Gene Expression', 5, 'G')]), adt=a), _raises(tmp_path, _mixed([('Gene Expression', 5, 'G')]), atac=a, atac_kind='gene_activity')]
+    assert texts == [f"rna='X' selects {head} If all are RNA features, {DELETE}", f"rna='X[genome=GRCh38]' holds {head} If all are RNA features, {DELETE}", f"rna=AnnData holds {head} If all are RNA features, run del rna.var['feature_types'] first.", f"adt=AnnData holds {head} If all are ADT features, run del adt.var['feature_types'] first.", f"atac=AnnData holds {head} If all are ATAC features, run del atac.var['feature_types'] first."]
+    with pytest.raises(ValueError) as e:
+        ingest._to_canonical(a, tmp_path / 'DIR' / 'rna.h5')
+    assert str(e.value) == f'The matrix holds {head} If all are RNA features, {DELETE}'
+    with pytest.raises(ValueError) as e:
+        ingest._to_canonical(a, tmp_path / 'DIR' / 'matrix.h5')
+    assert str(e.value) == f'The matrix holds {head} If all are features of one modality, {DELETE}'
+    src = tmp_path / 'typed.h5ad'
+    a.write_h5ad(src)
+    saved = 'delete the var column feature_types in Python and save the file again.'
+    assert not (tmp_path / 'OUT').exists() and (not (tmp_path / 'DIR').exists())
+
+
