@@ -1,18 +1,5 @@
 Catalog tables read by multibench.catalog (multibench/data/catalog.py).
 
-method.csv - one row per method of the registry (multibench/engine/methods.yaml).
-  Columns: Methods = the registry id (MOFA2 is shown as MOFA+, Seurat_WNN as
-  Seurat(WNN)), Programming Language = language, Deep Learning =
-  deep_learning, Peak/Gene Activity = atac, Output = output, CellType
-  Information Required = needs_labels, Integration Categories / Task
-  Categories = categories / tasks joined with ';'.
-  catalog.methods() overlays needs_labels, atac ('peak' | 'gene_activity' |
-  None), categories and tasks from the registry at call time for every
-  registered id, so those CSV columns are informational and may lag. The
-  registry derives needs_labels from the variants' label roles and validates
-  atac. language, deep_learning and output are read from the CSV and not
-  overlaid; the registry has no deep-learning field.
-
 dataset.csv - dataset ids from the benchmark's dataset tree (SD* = simulated).
   dataset      The id. catalog.datasets() also reads the older header
                'dataset name' and exposes a duplicate column of that name for

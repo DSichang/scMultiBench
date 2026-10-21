@@ -17,7 +17,6 @@ RUNTIME_READ = [
     "engine/upstream_knobs.yaml",
     "engine/references.yaml",
     "result/rerun/long_all_D11.csv",
-    "result/scib_metric/vertical integration/D11/scMoMaT/metric.csv",
     "engine/runtimes.yaml",
     "engine/env_specs.yaml",
     "engine/env_groups.yaml",
@@ -28,7 +27,7 @@ RUNTIME_READ = [
     "engine/drivers/run_stabmap.R",
     "engine/drivers/run_concerto.py",
     "files/dataset.csv",
-    "files/method.csv",
+    "files/metric_full.csv",
 ]
 
 
@@ -45,6 +44,14 @@ def test_every_runtime_read_file_is_packaged():
         assert (ROOT / "multibench" / rel).is_file(), f"missing on disk: {rel}"
         assert any(fnmatch.fnmatch(rel, g) for g in globs), (
             f"{rel} is read at runtime but matches no package-data glob {globs}")
+
+
+def test_the_published_tables_are_not_shipped():
+    """0.4.0: nothing reads the published scIB tables or method.csv, so the
+    wheel leaves them out; the stored results are result/rerun."""
+    assert not (ROOT / "multibench" / "result" / "scib_metric").exists()
+    assert not (ROOT / "multibench" / "files" / "method.csv").exists()
+    assert not any("scib_metric" in g or "method.csv" in g for g in _package_data_globs())
 
 
 def test_lockfiles_are_packaged():
