@@ -329,3 +329,39 @@ def test_scan_env_gate_flips_on_the_fake_prefix(envs_dir):
     assert row["command"].startswith("bash -c ")
     assert f"CONDA_PREFIX={envs_dir / env}" in row["command"]
     assert "run_matilda.py" in row["command"]
+
+
+def test_envs_dir_env_var_wins(monkeypatch, tmp_path):
+    monkeypatch.setenv(config.ENVS_DIR_VAR, str(tmp_path / "mine"))
+    assert config._Config().envs_dir == tmp_path / "mine"
+
+
+def test_envs_dir_uses_conda_envs_dir_when_conda_found(monkeypatch, tmp_path):
+    monkeypatch.delenv(config.ENVS_DIR_VAR, raising=False)
+    monkeypatch.setattr(config._shutil, "which", lambda name: "/fake/bin/" + name)
+    monkeypatch.setattr(envs, "_envs_dir", lambda exe: tmp_path / "conda-envs")
+    config._conda_envs_dir.cache_clear()
+    try:
+        assert config._Config().envs_dir == tmp_path / "conda-envs"
+    finally:
+        config._conda_envs_dir.cache_clear()
+
+
+def test_envs_dir_falls_back_to_the_user_cache(no_conda, monkeypatch):
+    monkeypatch.delenv(config.ENVS_DIR_VAR, raising=False)
+    d = config._Config().envs_dir
+    assert d == config._CACHE / "envs"
+    assert d.parts[-2:] == ("multibench", "envs")
+
+
+def test_envs_dir_is_a_settable_field_and_lazy(monkeypatch, tmp_path):
+    import dataclasses
+    assert "envs_dir" in [f.name for f in dataclasses.fields(config._Config)]
+    cfg = config._Config()
+    assert cfg.__dict__["_envs_dir"] is None, "resolved on first read, not at construction"
+    cfg.envs_dir = str(tmp_path / "x")
+    assert cfg.envs_dir == tmp_path / "x" and isinstance(cfg.envs_dir, Path)
+    assert config._Config(envs_dir=tmp_path / "y").envs_dir == tmp_path / "y"
+    monkeypatch.setattr(config.DEFAULT, "envs_dir", tmp_path / "z")
+    assert config.DEFAULT.envs_dir == tmp_path / "z"
+    assert "envs_dir" in repr(config.DEFAULT)

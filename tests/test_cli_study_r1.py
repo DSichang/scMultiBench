@@ -77,3 +77,27 @@ def test_cpu_fallback_warning_names_no_internal_file():
     msg = envs._cpu_fallback_warning("scmb_torch", {"scmb_torch-cpu": "u"}, {})
     assert msg == ("no CPU archive for scmb_torch; installing the GPU build (?) - the CPU "
                    "archive scmb_torch-cpu is not published yet")
+
+
+def test_data_and_repo_path_variables(monkeypatch, tmp_path):
+    for var, field in ((config.DATA_PATH_VAR, "data_path"), (config.REPO_PATH_VAR, "repo_path")):
+        monkeypatch.delenv(var, raising=False)
+        default = getattr(config._Config(), field)
+        assert default.parent == config._BASE
+        monkeypatch.setenv(var, str(tmp_path / field))
+        cfg = config._Config()
+        assert getattr(cfg, field) == tmp_path / field           # the variable wins
+        setattr(cfg, field, str(tmp_path / "mine"))              # an assignment wins over it
+        assert getattr(cfg, field) == tmp_path / "mine"
+        assert isinstance(getattr(cfg, field), Path)
+        setattr(cfg, field, None)                                # back to the variable
+        assert getattr(cfg, field) == tmp_path / field
+        monkeypatch.delenv(var)
+        assert getattr(cfg, field) == default                    # unset: the default again
+    assert config._Config(data_path="x").data_path == Path("x")
+
+
+def test_config_docstring_lists_the_variables():
+    doc = config._Config.__doc__
+    for var in ("MULTIBENCH_DATA_PATH", "MULTIBENCH_REPO_PATH", "MULTIBENCH_ENVS_DIR"):
+        assert var in doc
