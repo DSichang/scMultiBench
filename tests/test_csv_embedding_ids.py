@@ -417,7 +417,7 @@ def test_method_runs_are_scored_in_file_order_as_before(cite, tmp_path, monkeypa
                         lambda *a, **k: pytest.fail("a CSV embedding was read"))
     monkeypatch.setattr(pipeline, "_Table",
                         lambda *a, **k: pytest.fail("cell ids from a CSV embedding"))
-    mtb.config.DEFAULT.data_path = data
+    mtb.config.data_path = data
     kw = dict(methods=['Matilda'], modalities=['rna', 'adt'], verbose=False)
     plain = mtb.run("MYCITE", "vertical", out_dir=tmp_path / "plain", **kw)
     scores = plain.summary.loc[0, ["ARI", "NMI"]].tolist()

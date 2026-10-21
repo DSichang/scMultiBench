@@ -12,7 +12,7 @@ TOP = {"config", "plot", "catalog", "io", "env", "data", "find_methods", "method
        "load_results", "recommend", "__version__"}
 MEMBERS = {"io": ["export_dataset", "read_canonical"], "env": ["install"],
            "plot": ["bubble", "bar"], "data": ["fetch", "write_example"],
-           "catalog": ["datasets", "metrics"], "config": ["DEFAULT"]}
+           "catalog": ["datasets", "metrics"], "config": ["data_path", "repo_path", "envs_dir", "leiden_flavor"]}
 COMMANDS = ["find", "params", "info", "fetch", "config", "scan", "layout", "export", "cite",
             "plot", "run-all", "evaluate", "env", "env install"]
 

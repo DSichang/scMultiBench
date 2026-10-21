@@ -104,8 +104,8 @@ def test_namespace_all_hygiene():
     # recipe left __all__ in 0.4.0 (X34); it stays importable
     assert "recipe" not in mtb.env.__all__ and "subprocess" not in mtb.env.__all__
     assert callable(mtb.env.recipe)
-    # config.Config and io.to_canonical are deprecated in 0.4.0: out of __all__
-    assert mtb.config.__all__ == ["DEFAULT"]
+    # mtb.config is the settings object: its names are the settings
+    assert mtb.config.__all__ == ["data_path", "repo_path", "envs_dir", "leiden_flavor"]
     assert "category_folder" not in mtb.config.__all__      # internal token map
     assert sorted(mtb.io.__all__) == ["export_dataset", "read_canonical"]
 

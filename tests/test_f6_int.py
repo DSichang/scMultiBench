@@ -34,7 +34,7 @@ _KW = dict(methods=["Matilda"], modalities=["rna", "adt"], verbose=False)
 
 def test_rescore_with_the_saved_batch_and_no_batch_metric_does_not_warn(cite, tmp_path):
     data, batch, shuffled = cite
-    mtb.config.DEFAULT.data_path = data
+    mtb.config.data_path = data
     res = _quiet(mtb.run, 'MYCITE', 'vertical', tmp_path / 'out', batch=shuffled, **_KW)
     back = mtb.load_batch(tmp_path / "out")
     with warnings.catch_warnings():

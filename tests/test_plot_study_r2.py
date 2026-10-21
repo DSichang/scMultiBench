@@ -98,7 +98,7 @@ def test_constant_column_warns_and_uses_the_neutral_fill():
 
 BACKEND = ("The rows for {m} were clustered with the igraph Leiden backend. The stored "
            "results used leidenalg, which can move ARI by up to about 0.1. Set "
-           "mtb.config.DEFAULT.leiden_flavor = 'leidenalg' before evaluate to compare "
+           "mtb.config.leiden_flavor = 'leidenalg' before evaluate to compare "
            "them.")
 
 

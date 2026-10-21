@@ -78,7 +78,7 @@ def fake_root(tmp_path, monkeypatch):
     exe.write_text(FAKE_CONDA.replace("__ROOT__", str(root)))
     exe.chmod(exe.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     monkeypatch.setenv("PATH", f"{exe.parent}:/usr/bin:/bin")
-    monkeypatch.setattr(config.DEFAULT, "envs_dir", root / "envs")
+    monkeypatch.setattr(config, "envs_dir", root / "envs")
     _env(root, "matilda", history=f"{exe} create -n matilda python=3.11")
     _env(root, "env_sciPENN", history="/home/u/conda create -n env_sciPENN", flavor="cpu")
     _env(root, "scmb_torch",
@@ -189,7 +189,7 @@ def test_run_refuses_off_linux_also_when_the_env_is_installed(fake_root, tmp_pat
 
 
 def test_a_lockfile_build_marks_its_env_and_refuses_a_users_env(fake_root):
-    conda = str(Path(config.DEFAULT.envs_dir).parent.parent / "bin" / "conda")
+    conda = str(Path(config.envs_dir).parent.parent / "bin" / "conda")
     envs.create_env("glue", conda=conda, dry_run=False, force=True)
     assert (fake_root / "envs" / "glue" / envs.FLAVOR_FILE).read_text() == "build\n"
     assert envs.env_prefix("glue") == fake_root / "envs" / "glue"

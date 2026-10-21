@@ -17,17 +17,14 @@ def test_category_folder_rejects_unknown():
     assert "vertical" in str(exc.value)
 
 
-def test_defaults_point_at_local_data(tmp_path, monkeypatch):
-    cfg = config._Config()
-    # default result/files paths resolve under the repo's multibench/ dir
-    assert cfg.result_path.name == "result"
-    assert cfg.files_path.name == "files"
+def test_the_package_tables_are_under_the_package():
+    # the stored results and the dataset and metric lists: read, not settings
+    assert config._RESULT_PATH.name == "result" and config._FILES_PATH.name == "files"
+    assert config._RESULT_PATH.parent.name == "multibench"
 
 
-def test_config_signature_and_repr_leave_out_the_package_tables():
-    # Z32 (r3): result_path and files_path are the package's, still readable
-    import inspect
-    params = inspect.signature(config._Config).parameters
-    assert "result_path" not in params and "files_path" not in params
-    cfg = config._Config()
-    assert "result_path" not in repr(cfg) and cfg.result_path.name == "result"
+def test_the_repr_shows_the_settings_and_not_the_package_tables():
+    # Z32 (r3): result_path and files_path are the package's
+    text = repr(config)
+    assert "files_path" not in text and "result_path" not in text
+    assert text.count("=") == 4

@@ -129,7 +129,7 @@ def test_dataset_labels_follow_reordered_cells(ds, category, method):
     named as BatchResult.embedding names them, cty2:<barcode>."""
     from multibench import workflow
     from multibench.eval.pipeline import _dataset_labels, _stack_label_files
-    root = mtb.config.DEFAULT.data_path
+    root = mtb.config.data_path
     files = _quiet(_dataset_labels, ds, category, method, None)
     files = list(files.values()) if isinstance(files, dict) else list(files)
     n = sum(len(pd.read_csv(f)) for f in files)
@@ -236,7 +236,7 @@ def test_c22_one_sentence_for_the_missing_files_of_one_kind(tmp_path):
 # --------------------------------------------------------------- E13 / E14
 def test_e13_e14_a_benchmark_dataset_gives_its_category_and_its_cells():
     ad = pytest.importorskip("anndata")
-    n = len(pd.read_csv(mtb.config.DEFAULT.data_path / "D11" / "cty.csv"))
+    n = len(pd.read_csv(mtb.config.data_path / "D11" / "cty.csv"))
     a = ad.AnnData(np.random.default_rng(0).normal(size=(n, 4)),
                    obs=pd.DataFrame({"ct": ["A", "B"] * (n // 2)}))
     got = _quiet(mtb.evaluate, a, labels="ct", obsm="X", dataset="D11", method="mine",
@@ -269,7 +269,7 @@ def test_c43_the_labels_recipe_follows_the_package_order():
     page = _read("tutorials/evaluate.md")
     block = next(b for b in re.findall(r"```python\n(.*?)```", page, re.S) if "order = {" in b)
     code = "\n".join(line for line in block.splitlines() if "fetch(" not in line)
-    root = mtb.config.DEFAULT.data_path
+    root = mtb.config.data_path
     cats = mtb.catalog.datasets().set_index("dataset")["category"]
     seen = set()
     for folder in sorted(p for p in root.iterdir() if p.is_dir() and any(p.glob("*cty*.csv"))):

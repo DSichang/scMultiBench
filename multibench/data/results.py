@@ -77,8 +77,8 @@ def _as_list(x) -> list | None:
 
 
 def _base_path() -> Path:
-    """The folder holding the stored results (``mtb.config.DEFAULT.result_path``)."""
-    return Path(config.DEFAULT.result_path)
+    """The folder holding the stored results (``config._RESULT_PATH``)."""
+    return Path(config._RESULT_PATH)
 
 
 def _no_dataset_msg(category, missing, have) -> str:
@@ -116,9 +116,8 @@ def _load_rerun(category: str | None, datasets: list | None, base: Path) -> pd.D
     root = base / _RERUN_DIR
     if not files:
         raise FileNotFoundError(
-            f"no stored results ({_RERUN_GLOB}) under {root}. They ship inside the "
-            f"multibench wheel at multibench/result/rerun; check "
-            f"mtb.config.DEFAULT.result_path (currently {base}).")
+            f"No stored results ({_RERUN_GLOB}) under {root}. They ship inside the "
+            f"multibench wheel: reinstall multibench-sc.")
     frames = []
     versions: set[str] = set()
     for _, df in files:

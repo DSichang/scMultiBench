@@ -36,7 +36,7 @@ def _values(long) -> dict:
 def _embedding(ds, category, method):
     """An embedding of ``ds`` in ``method``'s cell order, its cells named as
     ``res.embedding(method)`` names them: one block per cell type, plus noise."""
-    root = mtb.config.DEFAULT.data_path
+    root = mtb.config.data_path
     files = _quiet(pipeline._dataset_labels, ds, category, method, None)
     files = list(files.values()) if isinstance(files, dict) else list(files)
     n = sum(len(pd.read_csv(f)) for f in files)
@@ -74,7 +74,7 @@ def test_a_shuffled_embedding_scores_as_in_order(ds, category, method, metrics):
 
 def test_the_stored_d28_scjoint_embedding_scores_shuffled_as_in_order():
     """The verification's case: cLISI 0.82 / GC 0.18 shuffled against 0.99 / 0.87."""
-    stored = Path(mtb.config.DEFAULT.data_path) / "outputs" / "D28"
+    stored = Path(mtb.config.data_path) / "outputs" / "D28"
     repo = Path(__file__).resolve().parent.parent / "data" / "outputs" / "D28"
     folder = stored if (stored / "batch_result.json").is_file() else repo
     if not (folder / "batch_result.json").is_file():
@@ -141,7 +141,7 @@ def _d28_raw():
     """D28's labels in the folder's order (RNA, then ATAC), an embedding of them,
     and the raw barcodes of rna.h5 and atac_gas.h5 (43 of them on both sides)."""
     from multibench.engine import resolve
-    folder = Path(mtb.config.DEFAULT.data_path) / "D28"
+    folder = Path(mtb.config.data_path) / "D28"
     labels = np.concatenate([pd.read_csv(folder / f).iloc[:, 0].to_numpy()
                              for f in ("rna_cty.csv", "atac_cty.csv")])
     rna = list(resolve._barcodes_of(folder / "rna.h5"))
@@ -166,7 +166,7 @@ def test_repeated_or_partly_matching_ids_are_refused_not_matched_by_position():
     x, rna, gas = _d28_raw()
     n = len(rna)
     atac_first = np.r_[np.arange(n, len(x)), np.arange(n)]
-    keys = pipeline._file_barcodes([Path(mtb.config.DEFAULT.data_path) / "D28" / f
+    keys = pipeline._file_barcodes([Path(mtb.config.data_path) / "D28" / f
                                     for f in ("rna_cty.csv", "atac_cty.csv")])
     fix = f"Name the embedding's cells as the folder does, such as {keys.iloc[0]!r}."
     with pytest.raises(ValueError) as err:          # was cLISI 0.8212, not 0.9904
@@ -188,7 +188,7 @@ def test_cells_in_the_folders_order_are_told_to_pass_an_array():
     assert str(err.value).endswith(
         "The cells are in the folder's order: pass the embedding as an array, as "
         "np.asarray(adata.obsm[key]) or adata.X, to match them by position.")
-    keys = pipeline._file_barcodes([Path(mtb.config.DEFAULT.data_path) / "D28" / f
+    keys = pipeline._file_barcodes([Path(mtb.config.data_path) / "D28" / f
                                     for f in ("rna_cty.csv", "atac_cty.csv")])
     by_id = _values(_quiet(mtb.evaluate, _named(x, list(keys), np.arange(len(x))), **KW28))
     as_array = _values(_quiet(mtb.evaluate, x, **KW28))

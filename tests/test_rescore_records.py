@@ -47,7 +47,7 @@ def _tree(tmp_path, monkeypatch, same_labels=False):
         return _Res(emb)
     monkeypatch.setattr(W, "_run", fake_run)
     out = tmp_path / "out"
-    mtb.config.DEFAULT.data_path = tmp_path / "data"
+    mtb.config.data_path = tmp_path / "data"
     res = _quiet(mtb.run, 'MYCROSS', 'cross', out, methods=['totalVI'], verbose=False)
     return res, out
 

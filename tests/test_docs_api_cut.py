@@ -57,8 +57,12 @@ STALE = {
     r"\bmtb\.(run_all|inputs_for|labels_for|to_long|sweep|classify|classification_metrics|"
     r"results_coverage|available_datasets)\(": "run(methods=[m]) / evaluate(dataset=, method=) / catalog.datasets()",
     r"\bmtb\.(env\.(doctor|status)|io\.to_canonical|plot\.(build_table|BubbleTable)|"
-    r"config\.Config|catalog\.methods|data\.fetchable)\b": "env.install(dry_run=True) / io.export_dataset / recommend(long_df=) / config.DEFAULT",
+    r"config\.Config|catalog\.methods|data\.fetchable)\b": "env.install(dry_run=True) / io.export_dataset / recommend(long_df=) / config",
     r"\bmultibench (convert|export|run-all|scan|env|fetch|plot|evaluate)\b": "the Python call (0.4.0: no command line)",
+    # 0.4.0: mtb.config is the settings object, and two names left the API
+    r"\bconfig\.DEFAULT\b": "mtb.config.<setting>",
+    r"\bdescribe_layout\b": "the run guide's Dataset folder layout",
+    r"\bres\.failures\b": "res.summary[res.summary.status != \"scored\"]",
 }
 
 
@@ -88,7 +92,7 @@ def _docs_pages(*names):
 
 
 def _mtb_tokens(text):
-    """Dotted names after ``mtb.`` (``mtb.plot.bubble``, ``mtb.config.DEFAULT.data_path``)."""
+    """Dotted names after ``mtb.`` (``mtb.plot.bubble``, ``mtb.config.data_path``)."""
     return sorted(set(re.findall(r"\bmtb\.([A-Za-z_][A-Za-z_0-9]*(?:\.[A-Za-z_][A-Za-z_0-9]*)*)", text)))
 
 

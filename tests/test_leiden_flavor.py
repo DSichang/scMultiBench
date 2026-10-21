@@ -1,4 +1,4 @@
-"""The Leiden backend knob: ``leiden_sweep(flavor=)`` / ``config.DEFAULT.leiden_flavor``.
+"""The Leiden backend knob: ``leiden_sweep(flavor=)`` / ``config.leiden_flavor``.
 
 scanpy's igraph backend (``flavor="igraph"``, ``n_iterations=2``,
 ``directed=False``) is several times faster than leidenalg on the 10-resolution
@@ -62,7 +62,7 @@ def _asked(seen):
 
 @pytest.mark.parametrize("flavor", ["igraph", "leidenalg"])
 def test_evaluate_recovers_the_blobs_on_either_flavor(flavor, monkeypatch):
-    monkeypatch.setattr(config.DEFAULT, "leiden_flavor", flavor, raising=False)
+    monkeypatch.setattr(config, "leiden_flavor", flavor, raising=False)
     seen = _spy_leiden(monkeypatch)
     emb, lab = _blobs()
     df = mtb.evaluate(emb, labels=lab, metrics=["ARI", "NMI", "iF1"]).set_index("metric")
@@ -78,7 +78,7 @@ def test_sweep_notice_names_the_flavor(monkeypatch, capsys):
     monkeypatch.setattr(S, "_SWEEP_NOTICE_CELLS", 0)
     emb, lab = _blobs(n_per=20)
     for flavor in ("igraph", "leidenalg"):
-        monkeypatch.setattr(config.DEFAULT, "leiden_flavor", flavor, raising=False)
+        monkeypatch.setattr(config, "leiden_flavor", flavor, raising=False)
         mtb.evaluate(emb, labels=lab, metrics=["ARI"])
         err = capsys.readouterr().err
         assert re.search(rf"cells for ARI with the {_eff(flavor)} Leiden "
@@ -124,9 +124,11 @@ def test_leidenalg_path_passes_no_flavor_keyword(monkeypatch):
 
 
 def test_shipped_default_is_leidenalg():
-    """0.4: ``config.DEFAULT.leiden_flavor`` defaults to ``"leidenalg"``, the
+    """0.4: ``config.leiden_flavor`` defaults to ``"leidenalg"``, the
     article's backend and the stored tables'; igraph stays selectable."""
-    assert config.DEFAULT.leiden_flavor == "leidenalg"
-    assert config._Config().leiden_flavor == "leidenalg"   # config._Config is deprecated
+    assert config.leiden_flavor == "leidenalg"
+    config.leiden_flavor = "igraph"
+    config.leiden_flavor = None                            # unset: the default again
+    assert config.leiden_flavor == "leidenalg"
     assert S._resolve_flavor(None) == "leidenalg"
     assert S._resolve_flavor("igraph") == _eff("igraph")

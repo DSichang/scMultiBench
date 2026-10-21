@@ -46,7 +46,7 @@ def pinned(monkeypatch, tmp_path):
     """Every env installed, a GPU, no method scripts on this machine, no ref."""
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
-    monkeypatch.setattr(config.DEFAULT, "repo_path", tmp_path / "no_scripts")
+    monkeypatch.setattr(config, "repo_path", tmp_path / "no_scripts")
     monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
     monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
     return tmp_path / "no_scripts"
@@ -215,7 +215,7 @@ def _scripts_repo(path):
 def wrong_ref(tmp_path, monkeypatch):
     repo = tmp_path / "scripts"
     head = _scripts_repo(repo)
-    monkeypatch.setattr(config.DEFAULT, "repo_path", repo)
+    monkeypatch.setattr(config, "repo_path", repo)
     monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
@@ -345,7 +345,7 @@ def test_callers_print_the_method_name_once(tmp_path, pinned, root, monkeypatch,
     picks its three-batch one, which skips nothing."""
     data = root / 'data'
     two = ['rna1', 'rna2', 'adt1', 'adt2']
-    mtb.config.DEFAULT.data_path = data
+    mtb.config.data_path = data
     _quiet(mtb.run, 'D52', 'cross', methods=['UINMF'], modalities=two, dry_run=True)
     out = capsys.readouterr().out
     assert '[run] UINMF reads batches 1-2 of 3. Batch 3 is not used.\n' in out
@@ -353,7 +353,7 @@ def test_callers_print_the_method_name_once(tmp_path, pinned, root, monkeypatch,
     def fake_run(**kw):
         raise RuntimeError('stub: not run in tests')
     monkeypatch.setattr(W, '_run', fake_run)
-    mtb.config.DEFAULT.data_path = data
+    mtb.config.data_path = data
     _quiet(mtb.run, 'D52', 'cross', tmp_path / 'out', methods=['UINMF'], modalities=two, evaluate=False)
     log = capsys.readouterr().out
     assert '[run]   UINMF reads batches 1-2 of 3. Batch 3 is not used.\n' in log

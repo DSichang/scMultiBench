@@ -99,7 +99,7 @@ def test_env_install_cell_follows_pip_and_needs_no_conda():
         assert "packed=False" not in src[i_env] and "conda=" not in src[i_env]
         section = next(c for c in src if c.startswith("## 2. Download the data and the environments"))
         if not name.endswith("_all"):          # the tutorial explains the step
-            assert "with no conda needed" in section and "mtb.config.DEFAULT.envs_dir" in section
+            assert "with no conda needed" in section and "mtb.config.envs_dir" in section
         assert "condacolab" not in "\n".join(src).lower(), f"{name}: no condacolab anywhere"
         assert "multibench env install" not in "\n".join(_code_cells(path)), \
             f"{name}: the notebook installs through the Python API, not a shell line"
@@ -288,7 +288,7 @@ def test_removed_methods_absent_from_docs_surfaces(path):
 # This table is the docstring contract's canonical-path table.
 REFERENCE = {
     # public name: (reference page, ``:::`` path). 0.4.0: the deprecated names
-    # left __all__ and the reference pages (inputs.md is gone); config.DEFAULT
+    # left __all__ and the reference pages (inputs.md is gone); config
     # is an instance, documented on config.md through its class.
     "mtb.find_methods": ("discover.md", "multibench.discover.find_methods"),
     "mtb.method_info": ("discover.md", "multibench.discover.method_info"),
@@ -1192,7 +1192,7 @@ def test_discover_guide_says_which_rows_scan_lists(tmp_path, monkeypatch):
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     mtb.io.export_dataset(_own_cells(), tmp_path / "MYDATA", adt="obsm:protein",
                           labels="obs:celltype")
-    monkeypatch.setattr(mtb.config.DEFAULT, "data_path", tmp_path)
+    monkeypatch.setattr(mtb.config, "data_path", tmp_path)
     ns = {"mtb": mtb, "category": "vertical"}
     default = eval('mtb.scan("MYDATA", category, verbose=False)', ns)
     full = eval(f'mtb.scan("MYDATA", category, verbose=False, {every})', ns)

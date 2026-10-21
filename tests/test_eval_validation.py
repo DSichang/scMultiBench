@@ -167,7 +167,7 @@ def test_rescore_keeps_its_text_for_a_label_file_without_every_cell(cite, tmp_pa
     cells of the dataset gives no advice about it."""
     import multibench as mtb
     data, _, _ = cite
-    mtb.config.DEFAULT.data_path = data
+    mtb.config.data_path = data
     _quiet(mtb.run, 'MYCITE', 'vertical', tmp_path / 'a', methods=['Matilda'], modalities=['rna', 'adt'], verbose=False)
     res = mtb.load_batch(tmp_path / "a")
     pd.DataFrame({"barcode": [f"c{i}" for i in range(N_CITE - 30)],

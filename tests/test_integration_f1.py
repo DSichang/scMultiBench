@@ -129,7 +129,7 @@ def test_vertical_tutorial_export_demo_writes_counts(root, tmp_path, monkeypatch
     assert "run" not in export and export.startswith('NAME = "MYCITE"')
     assert code[i + 1].startswith("mtb.scan(\"mydata/\" + NAME, ")
     assert code[i + 2].startswith("mine = mtb.run(\"mydata/\" + NAME")
-    monkeypatch.setattr(mtb.config.DEFAULT, "data_path", root / "data")
+    monkeypatch.setattr(mtb.config, "data_path", root / "data")
     monkeypatch.chdir(tmp_path)
     ns = {"mtb": mtb, "pd": pd}
     with warnings.catch_warnings(record=True) as seen:

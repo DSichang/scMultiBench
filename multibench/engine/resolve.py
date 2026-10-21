@@ -276,7 +276,7 @@ def missing_dataset_message(base, dataset: str) -> str:
     not of the default data path, gets the path to pass instead."""
     base = Path(base)
     here = Path(str(dataset))
-    default = Path(os.path.abspath(config.DEFAULT.data_path))
+    default = Path(os.path.abspath(config.data_path))
     near = next((p for p in (here, Path("data") / here) if p.is_dir()), None)
     if len(here.parts) == 1 and near is not None and Path(os.path.abspath(base)) == default:
         path = f"./{near}" if near == here else str(near)
@@ -288,7 +288,7 @@ def missing_dataset_message(base, dataset: str) -> str:
              f"{base} does not exist either.")
     return (f"The folder {base / dataset} does not exist. {holds} "
             + "dataset= is the folder's path, or its name under "
-            + f"mtb.config.DEFAULT.data_path. The folder layout is at {LAYOUT_URL}.")
+            + f"mtb.config.data_path. The folder layout is at {LAYOUT_URL}.")
 
 
 def _note_local_folder(base: Path, name: str) -> None:
@@ -299,7 +299,7 @@ def _note_local_folder(base: Path, name: str) -> None:
     here = Path(name)
     if len(here.parts) != 1 or not here.is_dir():
         return
-    if os.path.abspath(base) != os.path.abspath(config.DEFAULT.data_path):
+    if os.path.abspath(base) != os.path.abspath(config.data_path):
         return
     if os.path.abspath(here) == os.path.abspath(base / name):
         return
@@ -382,7 +382,7 @@ def inputs_for(dataset: str, category: str, method: str, *,
         ``None`` = the files in the dataset folder decide.
     data_path : Path | str | None
         Data root that holds the dataset folders; ``None`` =
-        ``mtb.config.DEFAULT.data_path``.
+        ``mtb.config.data_path``.
     check : bool | None
         ``True`` (default) = raise on a missing or malformed input;
         ``False`` = no checks; ``None`` = warn about missing files.
@@ -424,7 +424,7 @@ def inputs_for(dataset: str, category: str, method: str, *,
      'cty': '/abs/data/D11/cty.csv'}
     """
     dataset, data_path = split_dataset(dataset, data_path)
-    root = data_path if data_path is not None else config.DEFAULT.data_path
+    root = data_path if data_path is not None else config.data_path
     base = Path(os.path.abspath(os.fspath(root)))
     spec = registry.get(method)
     method = spec.id
@@ -1342,7 +1342,7 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
         ``category`` and ``method``.
     data_path : Path | str | None
         Data root that holds the dataset folders; ``None`` =
-        ``mtb.config.DEFAULT.data_path``.
+        ``mtb.config.data_path``.
     check : bool | None
         Vertical or diagonal ``category`` on a per-batch folder: ``None``
         warns, ``True`` raises, ``False`` = no check.
@@ -1394,7 +1394,7 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
         registry.check_category(category)
     if method is not None:
         method = registry.check_method(method)
-    root = data_path if data_path is not None else config.DEFAULT.data_path
+    root = data_path if data_path is not None else config.data_path
     base = Path(os.path.abspath(os.fspath(root)))
     dataset = canonical_dataset(base, dataset)
     ds_dir = base / dataset

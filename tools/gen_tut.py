@@ -1133,7 +1133,7 @@ def build_tutorial(key):
         "`state` is `PACKED` for an environment downloaded now and `have` for one that "
         "was already there. With `dry_run=True`, `mtb.env.install` downloads "
         "nothing and returns the plan with its sizes.",
-        "Environments go to `mtb.config.DEFAULT.envs_dir`. To use another disk, set it "
+        "Environments go to `mtb.config.envs_dir`. To use another disk, set it "
         "before this cell."))
     code(f'''import pandas as pd
 import multibench as mtb

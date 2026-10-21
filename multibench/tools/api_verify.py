@@ -71,13 +71,13 @@ def _():
 def _(): return f"{mtb.catalog.datasets().shape}"
 @check("catalog.metrics")
 def _(): return f"{mtb.catalog.metrics().shape}"
-@check("config.__all__ (DEFAULT only)")
+@check("config.__all__ (the four settings)")
 def _():
-    assert mtb.config.__all__ == ["DEFAULT"], mtb.config.__all__
+    assert mtb.config.__all__ == ["data_path", "repo_path", "envs_dir", "leiden_flavor"]
     assert "category_folder" not in dir(mtb.config)
     return "category_folder hidden (internal-only since 0.3.0)"
-@check("config.DEFAULT")
-def _(): return str(mtb.config.DEFAULT.data_path)
+@check("config.data_path")
+def _(): return str(mtb.config.data_path)
 
 # ---------------- io ----------------
 @check("io.export_dataset + scan on the folder")

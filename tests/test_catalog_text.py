@@ -41,7 +41,7 @@ def test_every_metric_states_direction_and_the_clustering_used():
 def test_datasets_keeps_a_descriptive_column_a_csv_fills(tmp_path, monkeypatch):
     pd.DataFrame({"dataset": ["D11", "D28"], "assay": ["CITE-seq", None],
                   "tissue": [None, None]}).to_csv(tmp_path / "dataset.csv", index=False)
-    monkeypatch.setattr(catalog.config.DEFAULT, "files_path", tmp_path)
+    monkeypatch.setattr(catalog.config, "_FILES_PATH", tmp_path)
     df = catalog.datasets().set_index("dataset")
     assert "assay" in df.columns and "tissue" not in df.columns
     assert df.loc["D11", "assay"] == "CITE-seq"

@@ -30,7 +30,7 @@ KEYS = list(GEN.TASKS)
 def test_scan_prints_one_count_line_on_the_tutorial_dataset(key, capsys):
     import multibench as mtb
     t = GEN.TASKS[key]
-    if not (mtb.config.DEFAULT.data_path / t["ds"]).is_dir():
+    if not (mtb.config.data_path / t["ds"]).is_dir():
         pytest.skip(f"{t['ds']} is not on disk")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -59,7 +59,7 @@ def test_scan_count_line_noun_on_the_tutorial_datasets(key, capsys):
     tasks of two modalities that is one row per method."""
     import multibench as mtb
     t = GEN.TASKS[key]
-    if not (mtb.config.DEFAULT.data_path / t["ds"]).is_dir():
+    if not (mtb.config.data_path / t["ds"]).is_dir():
         pytest.skip(f"{t['ds']} is not on disk")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")

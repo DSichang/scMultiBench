@@ -82,10 +82,11 @@ def test_cpu_fallback_warning_names_no_internal_file():
 def test_data_and_repo_path_variables(monkeypatch, tmp_path):
     for var, field in ((config.DATA_PATH_VAR, "data_path"), (config.REPO_PATH_VAR, "repo_path")):
         monkeypatch.delenv(var, raising=False)
-        default = getattr(config._Config(), field)
+        setattr(config, field, None)
+        default = getattr(config, field)
         assert default.parent == config._BASE
         monkeypatch.setenv(var, str(tmp_path / field))
-        cfg = config._Config()
+        cfg = config
         assert getattr(cfg, field) == tmp_path / field           # the variable wins
         setattr(cfg, field, str(tmp_path / "mine"))              # an assignment wins over it
         assert getattr(cfg, field) == tmp_path / "mine"
@@ -94,10 +95,11 @@ def test_data_and_repo_path_variables(monkeypatch, tmp_path):
         assert getattr(cfg, field) == tmp_path / field
         monkeypatch.delenv(var)
         assert getattr(cfg, field) == default                    # unset: the default again
-    assert config._Config(data_path="x").data_path == Path("x")
+    config.data_path = "x"
+    assert config.data_path == Path("x")
 
 
 def test_config_docstring_lists_the_variables():
-    doc = config._Config.__doc__
+    doc = type(config).__doc__
     for var in ("MULTIBENCH_DATA_PATH", "MULTIBENCH_REPO_PATH", "MULTIBENCH_ENVS_DIR"):
         assert var in doc

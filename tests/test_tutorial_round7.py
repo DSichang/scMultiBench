@@ -196,7 +196,7 @@ def test_env_reason_on_linux_holds_the_install_command_the_tutorials_name(name, 
     monkeypatch.setattr(R, "linux_only_sentence", lambda: None)
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     ds = t["ds"]
-    if not (mtb.config.DEFAULT.data_path / ds).is_dir():
+    if not (mtb.config.data_path / ds).is_dir():
         pytest.skip(f"{ds} is not on disk")
     for m in methods:
         row = _quiet(full_scan, ds, cat, methods=[m], verbose=False).iloc[0]

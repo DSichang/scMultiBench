@@ -41,7 +41,7 @@ from tests.test_study_r6_msg import _lung_ids, needs_git, pinned, wrong_ref
 from tests.test_study_r6_wf import KW, _shuffled_labels, rel  # noqa: F401
 
 #: 0.4: data_path= of load_batch is deprecated, so the fix names the config
-MOVED = ("Set mtb.config.DEFAULT.data_path to the folder that holds it, or run rescore "
+MOVED = ("Set mtb.config.data_path to the folder that holds it, or run rescore "
          "from the folder where mtb.run ran.")
 from tests.conftest import full_scan
 
@@ -94,7 +94,7 @@ def stacked(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     donor = np.concatenate([_donor(b, n) for b, n in SIZES.items()])
     batch = pd.Series(donor, index=bars).sample(frac=1.0, random_state=2)
-    mtb.config.DEFAULT.data_path = "data"
+    mtb.config.data_path = "data"
     res = _quiet(mtb.run, 'MYCROSS', 'cross', 'out', methods=['StabMap'], batch=batch, verbose=False)
     emb_labels = np.concatenate([labs[b] for b in EMB_ORDER])
     return res, emb_labels, tmp_path
@@ -153,7 +153,7 @@ def test_a_saved_batch_is_dropped_when_the_dataset_folder_is_not_found(stacked):
 
 def test_no_unsaved_batch_warning_without_a_batch_metric(cite, tmp_path):
     data, batch, shuffled = cite
-    mtb.config.DEFAULT.data_path = data
+    mtb.config.data_path = data
     _quiet(mtb.run, 'MYCITE', 'vertical', tmp_path / 'out', batch=shuffled, **KW)
     p = tmp_path / "out" / "batch_result.json"
     blob = json.loads(p.read_text())
@@ -228,7 +228,7 @@ def test_the_no_variant_and_missing_folder_errors_are_sentences(tmp_path):
         full_scan("MYCITE", data_path=tmp_path)
     assert str(e.value) == (f"The folder {tmp_path / 'MYCITE'} does not exist. {tmp_path} "
                             f"holds D11 and D28. dataset= is the folder's path, or its "
-                            f"name under mtb.config.DEFAULT.data_path. "
+                            f"name under mtb.config.data_path. "
                             f"The folder layout is at {mtb.engine.resolve.LAYOUT_URL}.")
 
 

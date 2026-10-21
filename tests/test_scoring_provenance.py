@@ -24,6 +24,6 @@ def test_the_shipped_rerun_tables_are_the_version_the_docs_name():
 
 
 def test_leiden_flavor_names_the_backend_of_the_stored_sources():
-    doc = _doc(config._Config)
+    doc = _doc(type(config))
     assert "up to about 0.1" not in doc                   # Z32 (r3)
     assert "backend of both stored sources" not in doc

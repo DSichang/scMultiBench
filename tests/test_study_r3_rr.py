@@ -110,7 +110,7 @@ def scripts(tmp_path, monkeypatch):
     """The method scripts at a git commit; every env installed; a GPU."""
     repo = tmp_path / "scripts"
     head = _scripts_repo(repo)
-    monkeypatch.setattr(config.DEFAULT, "repo_path", repo)
+    monkeypatch.setattr(config, "repo_path", repo)
     monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
@@ -141,7 +141,7 @@ def test_scan_blocks_every_row_under_another_scripts_ref(scripts, monkeypatch):
 
 
 def test_scripts_ref_problem_is_none_without_scripts_or_variable(tmp_path, monkeypatch):
-    monkeypatch.setattr(config.DEFAULT, "repo_path", tmp_path / "none")
+    monkeypatch.setattr(config, "repo_path", tmp_path / "none")
     monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
     monkeypatch.setenv(config.SCRIPTS_REF_VAR, "deadbeef")
     assert config.scripts_ref_problem() is None          # the first fetch checks it out

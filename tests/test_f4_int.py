@@ -26,13 +26,13 @@ def test_run_all_dry_run_names_a_scripts_folder_without_scripts(tmp_path, monkey
     repo = tmp_path / "other"
     repo.mkdir()
     (repo / "notes.txt").write_text("x")
-    monkeypatch.setattr(config.DEFAULT, "repo_path", repo)
+    monkeypatch.setattr(config, "repo_path", repo)
     root = _gasmos(tmp_path)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         df = W.run(os.path.join(root, 'GASMOS'), 'mosaic', dry_run=True, methods=['StabMap'], verbose=False)
     sentence = (f"{repo} holds other files and no method scripts. Set MULTIBENCH_REPO_PATH "
-                f"or mtb.config.DEFAULT.repo_path to an empty or new folder; the first run "
+                f"or mtb.config.repo_path to an empty or new folder; the first run "
                 f"fetches the scripts into it. If the folder is left over from an earlier "
                 f"fetch, you can remove it instead")
     assert not df["runnable"].any() and df["reason"].str.startswith(sentence).all()

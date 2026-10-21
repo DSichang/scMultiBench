@@ -120,7 +120,7 @@ def test_scan_assume_gpu_keeps_the_row_and_says_so(login_node):
 def test_scan_assume_gpu_previews_the_gpu_node_command(login_node, tmp_path):
     from tests.test_gpu_requirements import _cite
     _cite(tmp_path)
-    mtb.config.DEFAULT.data_path = tmp_path
+    mtb.config.data_path = tmp_path
     kw = dict(methods=['scMDC'], verbose=False)
     cpu = full_scan("CITE", "vertical", **kw)
     gpu = full_scan("CITE", "vertical", assume_gpu=True, **kw)

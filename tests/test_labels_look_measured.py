@@ -117,7 +117,7 @@ def test_cell_types_and_cluster_ids_do_not_warn(tmp_path):
 def test_no_label_file_of_a_local_dataset_looks_measured():
     """Every label file of the datasets under the data path (the demo and
     the mini datasets of the tutorials, when they were fetched)."""
-    root = config.DEFAULT.data_path
+    root = config.data_path
     files = sorted(root.glob("*/*cty*.csv")) if root.is_dir() else []
     if not files:
         pytest.skip(f"no dataset under {root}")

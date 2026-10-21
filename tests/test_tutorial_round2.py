@@ -124,7 +124,7 @@ class _Recorder:
 
     def evaluate(self, *a, **kw):
         import pandas as pd
-        self._seen.append(self._mtb.config.DEFAULT.leiden_flavor)
+        self._seen.append(self._mtb.config.leiden_flavor)
         return pd.DataFrame({"Value": [0.5]}, index=["ARI"])
 
 
@@ -134,7 +134,7 @@ def test_end_to_end_evaluates_with_the_default_backend(monkeypatch):
     import numpy as np
     import pandas as pd
     import multibench as mtb
-    monkeypatch.setattr(mtb.config.DEFAULT, "leiden_flavor", "igraph")
+    monkeypatch.setattr(mtb.config, "leiden_flavor", "igraph")
     seen = []
     ns = {"mtb": _Recorder(mtb, seen), "pd": pd, "emb": np.zeros((3, 2))}
     exec(_e2e_cell("mtb.evaluate("), ns)

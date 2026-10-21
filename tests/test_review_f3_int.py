@@ -51,7 +51,7 @@ def pinned(monkeypatch, tmp_path):
     """Every env installed, a GPU, no method scripts on this machine, no ref."""
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
-    monkeypatch.setattr(config.DEFAULT, "repo_path", tmp_path / "no_scripts")
+    monkeypatch.setattr(config, "repo_path", tmp_path / "no_scripts")
     monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
     monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
 

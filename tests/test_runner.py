@@ -80,7 +80,7 @@ def test_the_dry_run_refuses_two_feature_types(tmp_path, monkeypatch):
     monkeypatch.setattr(runner, "provide_script_files", lambda *a, **k: None)
     monkeypatch.setattr(runner.subprocess, "Popen",
                         lambda *a, **k: pytest.fail("the method was started"))
-    monkeypatch.setattr(mtb.config.DEFAULT, "repo_path", tmp_path / "repo")
+    monkeypatch.setattr(mtb.config, "repo_path", tmp_path / "repo")
     real_kw = dict(out_dir=str(out), cmd_template="{cmd}")
     for method, category, roles in (
             ("VIMCCA", "vertical", {"rna": "unsplit", "atac": "unsplit"}),

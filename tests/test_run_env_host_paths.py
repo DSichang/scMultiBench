@@ -115,7 +115,7 @@ def _child_env(monkeypatch, tmp_path, method: str, run_env: dict) -> dict:
 
     monkeypatch.setattr(runner.subprocess, "Popen", popen)
     (tmp_path / "repo" / "tools_scripts").mkdir(parents=True, exist_ok=True)
-    monkeypatch.setattr(runner.config.DEFAULT, "repo_path", tmp_path / "repo")
+    monkeypatch.setattr(runner.config, "repo_path", tmp_path / "repo")
     inputs = {role: str(tmp_path / f"{role}.h5") for role in variant.when["modalities"]}
     # the inputs pass through as they are: the env handed to the child is the subject
     monkeypatch.setattr(runner, "_plan_inputs", lambda variant, inputs, inputs_dir, **kw: {

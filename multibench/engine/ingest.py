@@ -766,14 +766,14 @@ def read_canonical(path: Path | str):
     Examples
     --------
     >>> import multibench as mtb
-    >>> rna = mtb.io.read_canonical(mtb.config.DEFAULT.data_path / "D11" / "rna.h5")
+    >>> rna = mtb.io.read_canonical(mtb.config.data_path / "D11" / "rna.h5")
     """
     import anndata as ad
     import scipy.sparse as sp
     if not Path(path).exists():
         raise FileNotFoundError(
             f"{os.fspath(path)} not found. Demo datasets are under "
-            f"mtb.config.DEFAULT.data_path ({config.DEFAULT.data_path}).")
+            f"mtb.config.data_path ({config.data_path}).")
     if not _is_canonical_h5(path) and _is_tenx_h5(path):
         # its 1-D matrix/data would fail below with a line about unpacking
         raise ValueError(_tenx_message(path))

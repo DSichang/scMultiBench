@@ -124,11 +124,11 @@ def test_batch_label_file_pairing_rule():
     assert resolve._batch_label_file("data_dir", "/d/") is None
 
 
-@pytest.mark.skipif(not (Path(config.DEFAULT.data_path) / "D52" / "cty1.csv").is_file(),
+@pytest.mark.skipif(not (Path(config.data_path) / "D52" / "cty1.csv").is_file(),
                     reason="reference dataset D52 not fetched")
 def test_reference_d52_copy_with_five_rows_cut(tmp_path, no_envs):
     """The exact repro from the re-test: copy D52, cut 5 rows from cty1.csv."""
-    src = Path(config.DEFAULT.data_path) / "D52"
+    src = Path(config.data_path) / "D52"
     bad = tmp_path / "BADLAB"
     bad.mkdir()
     for f in src.iterdir():

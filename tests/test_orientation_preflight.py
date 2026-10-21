@@ -98,7 +98,7 @@ def ready(monkeypatch, tmp_path):
     reason of a row is what the folder check says."""
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
-    monkeypatch.setattr(config.DEFAULT, "repo_path", tmp_path / "no_scripts")
+    monkeypatch.setattr(config, "repo_path", tmp_path / "no_scripts")
     monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
     monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
 
@@ -145,7 +145,7 @@ def test_a_10x_atac_file_is_named_where_a_method_reads_another_atac_file(
     assert "totalVI" in set(ok["method"]) and set(ok["modalities"]) == {"rna+adt"}
     # diagonal: a peak method does not find atac_peak.h5 and is told what is
     # there, a gene-activity method reads atac.h5
-    mtb.config.DEFAULT.data_path = tmp_path
+    mtb.config.data_path = tmp_path
     kw = dict(methods=['SCALEX', 'Seurat_v5'])
     df = mtb.scan("STRAY", "diagonal", verbose=False, **kw)
     assert list(df["method"]) == ["SCALEX", "Seurat_v5"]
@@ -203,7 +203,7 @@ def test_dataset_files_keep_passing_the_file_check(ready, tmp_path):
                                      index=a.obs_names, columns=[f"P{i}" for i in range(8)])
     ingest.export_dataset(a, tmp_path / "GOOD", rna="X", adt="obsm:protein",
                           labels="obs:celltype")
-    mtb.config.DEFAULT.data_path = tmp_path
+    mtb.config.data_path = tmp_path
     kw = dict(methods=['Seurat_WNN', 'totalVI'], verbose=False)
     df = full_scan("GOOD", "vertical", **kw)
     assert df["files_ok"].all() and list(df["reason"]) == ["", ""]
@@ -237,7 +237,7 @@ def test_the_reason_starts_with_the_file_when_the_data_path_has_a_space(ready, t
     _matrix(base / 'ZERO' / 'adt.h5', [f'AB{i}' for i in range(8)], 100)
     zero = 'rna.h5 holds 0 features. Write the folder again with mtb.io.export_dataset.'
     for name, short in (('TENX', f'rna.h5 {TENX}'), ('ZERO', zero)):
-        mtb.config.DEFAULT.data_path = base
+        mtb.config.data_path = base
         kw = dict(methods=['totalVI'])
         df = full_scan(name, 'vertical', verbose=False, **kw)
         assert list(df['reason']) == [short]

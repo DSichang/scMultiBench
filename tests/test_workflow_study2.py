@@ -53,7 +53,7 @@ def test_scan_reason_is_short_but_files_reason_is_verbatim(no_envs):
     df = full_scan("D11", "vertical", modalities="all")
     blocked = df[~df["files_ok"]]
     assert len(blocked) > 0
-    root = str(config.DEFAULT.data_path)
+    root = str(config.data_path)
     for _, r in blocked.iterrows():
         # the file half is verbatim: the exception class and the absolute
         # dataset path survive (a script-gate part, e.g. MIRA's missing

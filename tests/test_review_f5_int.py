@@ -132,7 +132,7 @@ def test_the_mira_and_bridge_reasons_are_sentences(tmp_path, monkeypatch):
     script = tmp_path / "tools_scripts" / "MIRA" / "main_MIRA.py"
     script.parent.mkdir(parents=True)
     script.write_text("")
-    monkeypatch.setattr(W.config.DEFAULT, "repo_path", tmp_path)
+    monkeypatch.setattr(W.config, "repo_path", tmp_path)
     # a helper the package does not ship (MIRA's logger.py is shipped since 0.3.4)
     monkeypatch.setattr("multibench.engine.runner.shipped_helper", lambda m, h: None)
     v = SimpleNamespace(entrypoint="tools_scripts/MIRA/main_MIRA.py",

@@ -10,7 +10,7 @@ from multibench.engine.ingest import read_canonical
 
 def _result(tmp_path, status="CHAIN_OK", method="Matilda"):
     """A run result of one D11 method whose output folder holds an embedding."""
-    n = len(pd.read_csv(mtb.config.DEFAULT.data_path / "D11" / "cty.csv"))
+    n = len(pd.read_csv(mtb.config.data_path / "D11" / "cty.csv"))
     out = tmp_path / "out"
     mdir = out / f"{method}_D11"
     mdir.mkdir(parents=True)
@@ -24,7 +24,7 @@ def _result(tmp_path, status="CHAIN_OK", method="Matilda"):
 def test_embedding_is_an_anndata_with_barcodes_labels_and_batch(tmp_path):
     res, n = _result(tmp_path)
     emb = res.embedding("matilda")                      # any letter case
-    d11 = mtb.config.DEFAULT.data_path / "D11"
+    d11 = mtb.config.data_path / "D11"
     assert emb.obsm["X_emb"].shape == (n, 3)
     assert list(emb.obs_names) == list(read_canonical(d11 / "rna.h5").obs_names)
     assert emb.obs["label"].tolist() == pd.read_csv(d11 / "cty.csv").iloc[:, -1].tolist()

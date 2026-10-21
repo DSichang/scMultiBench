@@ -6,6 +6,7 @@ leaks no import; every deprecated alias warns and forwards; every removed
 name / keyword fails loudly with the contract's message; every ``--help``
 line that names a Python function names one that exists.
 """
+import importlib
 import inspect
 import re
 import warnings
@@ -25,7 +26,7 @@ MTB_ALL = {                                       # the 0.4.0 core API (TARGET.t
 PLOT_ALL = {"bubble", "bar"}
 IO_ALL = {"export_dataset", "read_canonical"}
 ENV_ALL = {"install"}                    # recipe left __all__ in 0.4.0 (X34)
-CONFIG_ALL = {"DEFAULT"}
+CONFIG_ALL = {"data_path", "repo_path", "envs_dir", "leiden_flavor"}
 CATALOG_ALL = {"datasets", "metrics"}
 DATA_ALL = {"fetch", "write_example"}
 
@@ -55,6 +56,17 @@ def test_config_all_is_exactly_the_contract():
     # kept as functions for internal imports, hidden from dir()
     assert mtb.config.category_folder("vertical") == "vertical integration"
     assert "category_folder" not in dir(mtb.config) and "metric_set_dir" not in dir(mtb.config)
+
+
+def test_config_is_the_settings_object():
+    """``mtb.config`` holds the settings itself (0.4.0): no ``DEFAULT``."""
+    assert mtb.config is importlib.import_module("multibench.config")
+    assert not hasattr(mtb.config, "DEFAULT") and not hasattr(mtb.config, "Config")
+    text = repr(mtb.config)
+    assert text.startswith("mtb.config(data_path=")
+    assert all(f"{k}=" in text for k in CONFIG_ALL)
+    with pytest.raises(AttributeError, match="mtb.config has no setting 'data_dir'"):
+        mtb.config.data_dir = "x"
 
 
 def test_catalog_and_data_all_are_exactly_the_contract():

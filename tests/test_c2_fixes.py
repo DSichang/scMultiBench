@@ -71,7 +71,7 @@ def test_one_plan_column_list():
 # --------------------------------------------------------------- C43, C57
 def test_fetch_returns_the_dataset_folder(monkeypatch):
     fetch = importlib.import_module("multibench.data.fetch")
-    root = Path(mtb.config.DEFAULT.data_path)
+    root = Path(mtb.config.data_path)
     assert mtb.data.fetch("D11") == root / "D11"           # present: nothing downloads
     monkeypatch.setattr(fetch, "_download", lambda url: pytest.fail("downloaded"))
     assert mtb.data.fetch("D11", "D28") == [root / "D11", root / "D28"]
@@ -125,7 +125,7 @@ def test_a_size_caveat_states_the_folders_number(tmp_path):
 def test_the_benchmarks_own_mosaic_batches_hold_the_same_cells():
     # c2 (C12): why nothing refuses batches of the same cells: D45's are, by design
     from multibench.engine import resolve
-    d = Path(mtb.config.DEFAULT.data_path) / "D45"
+    d = Path(mtb.config.data_path) / "D45"
     assert resolve._barcodes_of(d / "rna1.h5") == resolve._barcodes_of(d / "rna2.h5")
     assert mtb.scan("D45", "mosaic", verbose=False)["reason"].str.contains(
         "same").sum() == 0
@@ -193,7 +193,7 @@ def test_label_files_without_ids_are_matched_by_position_without_a_warning():
 
 def test_diagonal_classification_follows_the_folders_sides_whatever_batch_is():
     from multibench.eval import pipeline
-    n = sum(len(pd.read_csv(Path(mtb.config.DEFAULT.data_path) / "D28" / f))
+    n = sum(len(pd.read_csv(Path(mtb.config.data_path) / "D28" / f))
             for f in ("rna_cty.csv", "atac_cty.csv"))
     e, donor = _emb(n), np.random.default_rng(1).choice(["d1", "d2"], n)
     kw = dict(dataset="D28", category="diagonal", method="PCA", metrics="classification",
@@ -296,8 +296,8 @@ def test_a_folder_reading_variant_shows_its_files():
     assert mtb.method_info("scBridge")["supports"][0]["modalities"] == ["rna", "atac_gas"]
 
 
-def test_the_default_settings_repr_names_the_instance():
-    assert repr(mtb.config.DEFAULT).startswith("mtb.config.DEFAULT(repo_path=")
+def test_the_settings_repr_names_the_object():
+    assert repr(mtb.config).startswith("mtb.config(data_path=")
 
 
 def test_peaks_given_as_rna_are_refused(tmp_path):

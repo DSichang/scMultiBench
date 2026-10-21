@@ -35,7 +35,7 @@ def _quiet(fn, *a, **kw):
 
 
 def _on_disk(ds):
-    if not (config.DEFAULT.data_path / ds).is_dir():
+    if not (config.data_path / ds).is_dir():
         pytest.skip(f"{ds} is not on disk")
 
 
@@ -82,7 +82,7 @@ def linux(monkeypatch, tmp_path):
     this machine, no ref. ``_run`` is faked and records the methods it ran."""
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
-    monkeypatch.setattr(config.DEFAULT, "repo_path", tmp_path / "no_scripts")
+    monkeypatch.setattr(config, "repo_path", tmp_path / "no_scripts")
     monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
     monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
     calls = []
@@ -135,7 +135,7 @@ def _tenx(path, n=60):
 def test_the_first_line_names_10x_files(linux, tmp_path, capsys):
     """A 10x file copied to rna.h5 is not RNA that the folder holds."""
     def first(*a, **kw):
-        mtb.config.DEFAULT.data_path = tmp_path
+        mtb.config.data_path = tmp_path
         pm = _quiet(mtb.scan, *a, **kw)
         return pm, capsys.readouterr().out.splitlines()[0]
 
@@ -155,7 +155,7 @@ def test_the_first_line_names_10x_files(linux, tmp_path, capsys):
         assert pm.attrs["held"] == ["rna", other[:-len(".h5")]]
         assert list(pm["method"]) == methods and not pm["runnable"].any()
     # with the rows that are not listed: the same sentence starts the note
-    mtb.config.DEFAULT.data_path = tmp_path
+    mtb.config.data_path = tmp_path
     _quiet(mtb.run, 'TXADT', 'vertical', dry_run=True)
     assert capsys.readouterr().out.splitlines()[1] == (
         "[run] TXADT holds no dataset file: rna.h5 and adt.h5 are 10x Genomics files "
@@ -208,7 +208,7 @@ def test_the_first_line_names_10x_files(linux, tmp_path, capsys):
 def test_files_of_another_layout_are_not_called_no_file(linux, tmp_path, capsys):
     """The line under it lists the matrix files, so "no file" was false."""
     def lines(*a, **kw):
-        mtb.config.DEFAULT.data_path = tmp_path
+        mtb.config.data_path = tmp_path
         pm = _quiet(mtb.scan, *a, **kw)
         return pm, capsys.readouterr().out.splitlines()
 
@@ -256,7 +256,7 @@ def test_one_method_that_is_not_listed(linux, monkeypatch, capsys):
 # ------------------------------------------------------------------ cells per file
 def test_cells_per_file_line(linux, tmp_path, capsys):
     def second(*a, **kw):
-        mtb.config.DEFAULT.data_path = tmp_path
+        mtb.config.data_path = tmp_path
         pm = _quiet(mtb.scan, *a, **kw)
         lines = capsys.readouterr().out.splitlines()
         return pm, [l for l in lines if l.startswith("[scan] Cells per file")]
@@ -300,7 +300,7 @@ def test_a_name_left_from_the_example_shows_in_the_cells(linux, tmp_path, capsys
     _cite(tmp_path)
     _h5(tmp_path / "MYCITE" / "adt.h5", [f"p{i}" for i in range(8)],
         [f"x{i}" for i in range(45)])
-    mtb.config.DEFAULT.data_path = tmp_path
+    mtb.config.data_path = tmp_path
     _quiet(mtb.scan, 'MYCITE', 'vertical', methods=['totalVI'])
     assert "[scan] Cells per file: rna.h5 60, adt.h5 45." in capsys.readouterr().out
 

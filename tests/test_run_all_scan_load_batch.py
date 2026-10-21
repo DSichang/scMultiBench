@@ -153,7 +153,7 @@ def test_x81_online_inmf_size_note_only_on_a_small_folder():
 
 def test_x79_scan_names_the_batch_renumbering(tmp_path, capsys, monkeypatch):
     import os
-    src = mtb.config.DEFAULT.data_path / "D45mini"
+    src = mtb.config.data_path / "D45mini"
     d = tmp_path / "MYMOSAIC"
     d.mkdir()
     for new, old in (("rna1", "rna2"), ("atac1", "atac2"), ("rna2", "rna1"),
@@ -171,7 +171,7 @@ def test_x11_a_local_folder_shadowed_by_the_data_path_is_named(tmp_path, monkeyp
     (tmp_path / "D11").mkdir()
     monkeypatch.chdir(tmp_path)
     _, msgs = _messages(mtb.engine.resolve.inputs_for, "D11", "vertical", "Matilda")
-    want = (f"Using {mtb.config.DEFAULT.data_path / 'D11'}; ./D11 also exists: pass "
+    want = (f"Using {mtb.config.data_path / 'D11'}; ./D11 also exists: pass "
             "'./D11' for it.")
     assert msgs.count(want) == 1, msgs
     _, msgs = _messages(mtb.engine.resolve.inputs_for, "D11", "vertical", "Matilda")
@@ -202,7 +202,7 @@ def test_scan_shows_the_variant_run_all_runs():
 def test_scan_names_data_folder_here(tmp_path, monkeypatch):
     (tmp_path / "data" / "CITE").mkdir(parents=True)
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(mtb.config.DEFAULT, "data_path", tmp_path / "cache")
+    monkeypatch.setattr(mtb.config, "data_path", tmp_path / "cache")
     with pytest.raises(FileNotFoundError, match=r"data/CITE exists here: pass 'data/CITE'\."):
         mtb.scan("CITE", "vertical")
 

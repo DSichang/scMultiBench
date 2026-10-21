@@ -44,8 +44,8 @@ pytest.importorskip("scib")
 KW = dict(methods=["Matilda"], modalities=["rna", "adt"], verbose=False)
 BARS = [f"c{i}" for i in range(N)]
 CELLTYPE = np.array(["A"] * (N // 2) + ["B"] * (N // 2))
-# the fix names config.DEFAULT.data_path
-MOVED = ("Set mtb.config.DEFAULT.data_path to the folder that holds it, or run rescore "
+# the fix names config.data_path
+MOVED = ("Set mtb.config.data_path to the folder that holds it, or run rescore "
          "from the folder where mtb.run ran.")
 
 
@@ -156,7 +156,7 @@ def test_unusable_barcodes_keep_their_own_message(rel):
 def batched(cite, tmp_path):
     """A sweep scored with a shuffled barcode-indexed batch Series."""
     data, batch, shuffled = cite
-    mtb.config.DEFAULT.data_path = data
+    mtb.config.data_path = data
     res = _quiet(mtb.run, 'MYCITE', 'vertical', tmp_path / 'out', batch=shuffled, **KW)
     return res, batch, tmp_path
 
@@ -260,7 +260,7 @@ def cross(tmp_path, monkeypatch):
 
 
 def _cross_run(data, tmp, method, **kw):
-    mtb.config.DEFAULT.data_path = data
+    mtb.config.data_path = data
     return _quiet(mtb.run, 'MYCROSS', 'cross', tmp / method, methods=[method], verbose=False, **kw)
 
 
@@ -370,6 +370,6 @@ def test_docstrings_state_the_new_rules():
     # R7-12 (b); 0.4.0: data_path= is deprecated, the Notes give the search order
     assert "data_path :" not in flat["load_batch"]
     assert ("the dataset folder under the recorded data root, then "
-            "``mtb.config.DEFAULT.data_path``.") in flat["load_batch"]
+            "``mtb.config.data_path``.") in flat["load_batch"]
     assert "``batch_<hash>.csv``" in flat["save"]
     assert "data_path" not in inspect.signature(mtb.load_batch).parameters

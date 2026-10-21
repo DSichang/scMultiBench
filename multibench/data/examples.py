@@ -290,7 +290,7 @@ def write_example(dataset: str, folder: Path | str = ".", *, verbose: bool = Tru
     if dataset not in EXAMPLES:
         raise ValueError(f"No example is defined for {dataset!r}. Examples exist for "
                          f"{', '.join(EXAMPLES)}.")
-    root = Path(config.DEFAULT.data_path)
+    root = Path(config.data_path)
     if not (root / dataset).is_dir():
         raise FileNotFoundError(f"{root / dataset} does not exist. Run "
                                 f"mtb.data.fetch({dataset!r}) first.")

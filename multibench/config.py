@@ -1,9 +1,8 @@
-"""The paths and settings every multibench function reads.
+"""The settings every multibench function reads: ``mtb.config`` itself.
 
-Change a field of ``mtb.config.DEFAULT`` to use your own data folder, env
-folder or Leiden backend, for example
-``mtb.config.DEFAULT.data_path = "/scratch/data"``. ``help(mtb.config.DEFAULT)``
-lists the fields; ``print(mtb.config.DEFAULT)`` shows their values.
+Set one to use your own data folder, env folder or Leiden backend, for
+example ``mtb.config.data_path = "/scratch/data"``. ``print(mtb.config)``
+shows them all.
 """
 from __future__ import annotations
 
@@ -12,15 +11,19 @@ import os as _os
 import re as _re
 import shutil as _shutil
 import socket as _socket
-from dataclasses import dataclass, field
+import sys as _sys
+import types as _types
 from pathlib import Path
 
-__all__ = ["DEFAULT"]
+#: The settings, in the order ``print(mtb.config)`` shows them.
+_FIELDS = ("data_path", "repo_path", "envs_dir", "leiden_flavor")
+
+__all__ = list(_FIELDS)
 
 
 def __dir__() -> list[str]:
-    """``dir(mtb.config)`` lists the public names only (PEP 562)."""
-    return sorted(n for n in globals() if n in __all__ or n.startswith("__"))
+    """``dir(mtb.config)`` lists the settings only (PEP 562)."""
+    return sorted(n for n in globals() if n.startswith("__")) + sorted(__all__)
 
 _CATEGORY_FOLDERS = {
     "vertical": "vertical integration",
@@ -37,7 +40,7 @@ _CACHE = (Path(_os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
           / "multibench")
 _BASE = _ROOT if _IN_REPO else _CACHE
 
-#: The environment variables that set :class:`Config` paths. Each wins over
+#: The environment variables that set the ``mtb.config`` paths. Each wins over
 #: the built-in default; a value assigned in Python wins over the variable.
 ENVS_DIR_VAR = "MULTIBENCH_ENVS_DIR"
 DATA_PATH_VAR = "MULTIBENCH_DATA_PATH"
@@ -64,12 +67,12 @@ def _from_env(var: str) -> Path | None:
 
 
 def _default_data_path() -> Path:
-    """``$MULTIBENCH_DATA_PATH``, else ``<base>/data`` (see :attr:`Config.data_path`)."""
+    """``$MULTIBENCH_DATA_PATH``, else ``<base>/data`` (see ``mtb.config.data_path``)."""
     return _from_env(DATA_PATH_VAR) or _BASE / "data"
 
 
 def _default_repo_path() -> Path:
-    """``$MULTIBENCH_REPO_PATH``, else ``<base>/scMultiBench_ref`` (see :attr:`Config.repo_path`)."""
+    """``$MULTIBENCH_REPO_PATH``, else ``<base>/scMultiBench_ref`` (see ``mtb.config.repo_path``)."""
     return _from_env(REPO_PATH_VAR) or _BASE / "scMultiBench_ref"
 
 
@@ -85,7 +88,7 @@ def _conda_envs_dir() -> Path | None:
 
 
 def _default_envs_dir() -> Path:
-    """Resolve where method env prefixes live (see :attr:`Config.envs_dir`)."""
+    """Resolve where method env prefixes live (see ``mtb.config.envs_dir``)."""
     override = _from_env(ENVS_DIR_VAR)
     if override is not None:
         return override
@@ -95,33 +98,35 @@ def _default_envs_dir() -> Path:
     return _CACHE / "envs"
 
 
-class _LazyPath:
-    """A path field whose default is resolved on read: ``cache=True`` keeps the first
-    answer (``envs_dir``: a ``default_factory`` would probe conda at import), ``cache=False``
-    re-reads the environment variable until a value is assigned; ``None`` resets it."""
+class _Setting:
+    """One setting of ``mtb.config``. A value assigned is kept in the module's
+    ``_values``; unset, or set to ``None``, it reads ``default()`` on every
+    read. ``cache=True`` keeps the first default instead (``envs_dir``: probing
+    conda at import would slow every import). ``path=True`` stores a ``Path``."""
 
-    def __init__(self, resolve, *, cache: bool):
-        self._resolve = resolve
+    def __init__(self, default, *, path: bool = True, cache: bool = False):
+        self._default = default
+        self._path = path
         self._cache = cache
 
     def __set_name__(self, owner, name):
-        self._slot = "_" + name
+        self._name = name
 
     def __get__(self, obj, objtype=None):
         if obj is None:
-            return self          # the dataclass default, i.e. "unset"
-        value = obj.__dict__.get(self._slot)
+            return self
+        values = obj.__dict__.setdefault("_values", {})
+        value = values.get(self._name)
         if value is None:
-            value = self._resolve()
+            value = self._default()
             if self._cache:
-                obj.__dict__[self._slot] = value
+                values[self._name] = value
         return value
 
     def __set__(self, obj, value):
-        # dataclass __init__ assigns the class-level default, i.e. this very
-        # descriptor, which means "not given": stay lazy
-        unset = value is None or isinstance(value, _LazyPath)
-        obj.__dict__[self._slot] = None if unset else Path(value).expanduser()
+        if value is not None and self._path:
+            value = Path(value).expanduser()
+        obj.__dict__.setdefault("_values", {})[self._name] = value
 
 
 def category_folder(token: str) -> str:
@@ -143,40 +148,42 @@ _ASSAY_TOKENS = ("citeseq", "multiome", "10xmultiome", "sharesesq", "shareseq",
                  "teaseq", "asapseq", "dogmaseq", "snareseq")
 
 
-@dataclass
-class Config:
-    """Resolved filesystem paths; override fields to point at custom locations.
+class _Settings(_types.ModuleType):
+    """The paths and settings every multibench function reads.
 
-    ``mtb.config.DEFAULT`` is the instance every function reads. Set its
-    fields directly, or set ``MULTIBENCH_DATA_PATH``, ``MULTIBENCH_REPO_PATH``
-    and ``MULTIBENCH_ENVS_DIR`` in the shell; ``print(mtb.config.DEFAULT)``
-    shows each path.
+    ``mtb.config`` is this object: set a field to change it, for example
+    ``mtb.config.data_path = "/scratch/data"``, or set
+    ``MULTIBENCH_DATA_PATH``, ``MULTIBENCH_REPO_PATH`` and
+    ``MULTIBENCH_ENVS_DIR`` in the shell. A value assigned in Python wins
+    over the variable; ``None`` goes back to the default.
+    ``print(mtb.config)`` shows every field.
 
     Attributes
     ----------
-    repo_path : pathlib.Path
-        Checkout holding the upstream ``tools_scripts/`` (the method scripts),
-        cloned on first use when absent or empty. Default
-        ``$MULTIBENCH_REPO_PATH``, else ``<base>/scMultiBench_ref``.
     data_path : pathlib.Path
         Data root that holds the dataset folders; ``mtb.data.fetch``,
         ``mtb.scan`` and ``mtb.run`` use it. Default
         ``$MULTIBENCH_DATA_PATH``, else ``<base>/data``.
-    leiden_flavor : str
-        Leiden backend of the clustering in ``mtb.evaluate``: ``"leidenalg"``
-        (default, the article's and the stored results') or ``"igraph"``
-        (faster).
+    repo_path : pathlib.Path
+        Checkout holding the upstream ``tools_scripts/`` (the method scripts),
+        cloned on first use when absent or empty. Default
+        ``$MULTIBENCH_REPO_PATH``, else ``<base>/scMultiBench_ref``.
     envs_dir : pathlib.Path
         Where the method environments live (``<envs_dir>/<env>``). Default
         ``$MULTIBENCH_ENVS_DIR``, else the first writable envs folder of the
         conda on ``PATH``, else ``~/.cache/multibench/envs``.
+    leiden_flavor : str
+        Leiden backend of the clustering in ``mtb.evaluate``: ``"leidenalg"``
+        (default, the article's and the stored results') or ``"igraph"``
+        (faster).
 
     Examples
     --------
     >>> import multibench as mtb
-    >>> mtb.config.DEFAULT.data_path = "/scratch/data"
+    >>> mtb.config.data_path = "/scratch/data"
     >>> # before mtb.env.install(...)
-    >>> mtb.config.DEFAULT.envs_dir = "/scratch/envs"
+    >>> mtb.config.envs_dir = "/scratch/envs"
+    >>> print(mtb.config)
 
     See Also
     --------
@@ -184,33 +191,34 @@ class Config:
     mtb.data.fetch : downloads demo datasets into ``data_path``.
     """
 
-    # the package's own tables: not set by users, so not in the signature or repr
-    result_path: Path = field(default_factory=lambda: _ROOT / "multibench" / "result",
-                              init=False, repr=False)
-    files_path: Path = field(default_factory=lambda: _ROOT / "multibench" / "files",
-                             init=False, repr=False)
-    repo_path: Path = _LazyPath(_default_repo_path, cache=False)
-    data_path: Path = _LazyPath(_default_data_path, cache=False)
-    leiden_flavor: str = "leidenalg"
-    envs_dir: Path = _LazyPath(_default_envs_dir, cache=True)
+    data_path = _Setting(_default_data_path)
+    repo_path = _Setting(_default_repo_path)
+    envs_dir = _Setting(_default_envs_dir, cache=True)
+    leiden_flavor = _Setting(lambda: "leidenalg", path=False)
 
     def __repr__(self) -> str:
-        # the class left the public names: the repr names the instance
-        return "mtb.config.DEFAULT(" + ", ".join(
-            f"{k}={getattr(self, k)!r}" for k in ("repo_path", "data_path",
-                                                 "leiden_flavor", "envs_dir")) + ")"
+        return "mtb.config(" + ", ".join(f"{k}={getattr(self, k)!r}" for k in _FIELDS) + ")"
+
+    def __setattr__(self, name, value):
+        # a typo such as data_dir= would otherwise be a new attribute nothing reads
+        if not name.startswith("_") and name not in _FIELDS and name not in vars(self):
+            raise AttributeError(f"mtb.config has no setting {name!r}. Its settings are "
+                                 f"{_and_list(_FIELDS)}.")
+        super().__setattr__(name, value)
 
 
-DEFAULT = Config()
-# a second settings object is not needed: the class leaves the public names
-_Config = Config
-del Config
+#: The settings assigned so far, by name (``_Setting`` reads and writes it).
+_values: dict = {}
+
+#: The package's own tables (the stored results, the dataset and metric lists):
+#: read by the package, not settings.
+_RESULT_PATH = _ROOT / "multibench" / "result"
+_FILES_PATH = _ROOT / "multibench" / "files"
 
 
-def _scripts_checkout(cfg: _Config | None = None) -> Path | None:
+def _scripts_checkout() -> Path | None:
     """The folder holding ``tools_scripts/`` that :func:`ensure_repo` would use, or ``None``."""
-    cfg = DEFAULT if cfg is None else cfg
-    for p in (Path(cfg.repo_path), _ROOT):
+    for p in (Path(_settings.repo_path), _ROOT):
         if (p / "tools_scripts").is_dir():
             return p
     return None
@@ -338,10 +346,10 @@ def _fillable(p: Path) -> bool:
 def scripts_folder_problem(repo=None) -> str | None:
     """Why a fetch refuses the scripts folder ``repo`` (default ``repo_path``): it holds
     other files. No final period: ``mtb.scan`` joins it into its reason column."""
-    p = Path(DEFAULT.repo_path if repo is None else repo)
+    p = Path(_settings.repo_path if repo is None else repo)
     if any((q / "tools_scripts").is_dir() for q in (p, _ROOT)) or _fillable(p):
         return None
-    where = "MULTIBENCH_REPO_PATH or mtb.config.DEFAULT.repo_path"
+    where = "MULTIBENCH_REPO_PATH or mtb.config.repo_path"
     return (f"{p} holds other files and no method scripts. Set {where} to an empty "
             f"or new folder; the first run fetches the scripts into it. If the folder is "
             f"left over from an earlier fetch, you can remove it instead")
@@ -370,7 +378,7 @@ def ensure_repo(path=None):
     import shutil as _sh
 
     ref = _os.environ.get(SCRIPTS_REF_VAR) or None
-    p = Path(path) if path else DEFAULT.repo_path
+    p = Path(path) if path else _settings.repo_path
     for have in (p, _ROOT):
         if (have / "tools_scripts").is_dir():
             if ref:
@@ -425,3 +433,8 @@ def ensure_repo(path=None):
     else:
         part.rename(p)
     return p
+
+
+# mtb.config is the settings object: this module, with the fields of _Settings
+_settings = _sys.modules[__name__]
+_settings.__class__ = _Settings

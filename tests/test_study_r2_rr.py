@@ -267,13 +267,13 @@ def test_read_canonical_missing_path_names_the_data_path(tmp_path, monkeypatch):
     with pytest.raises(FileNotFoundError) as e:
         mtb.io.read_canonical("data/D11/rna.h5")
     assert str(e.value) == (
-        f"data/D11/rna.h5 not found. Demo datasets are under mtb.config.DEFAULT.data_path "
-        f"({config.DEFAULT.data_path}).")
+        f"data/D11/rna.h5 not found. Demo datasets are under mtb.config.data_path "
+        f"({config.data_path}).")
 
 
 def test_read_canonical_example_builds_the_path_from_data_path():
     doc = mtb.io.read_canonical.__doc__
-    assert 'rna = mtb.io.read_canonical(mtb.config.DEFAULT.data_path / "D11" / "rna.h5")' \
+    assert 'rna = mtb.io.read_canonical(mtb.config.data_path / "D11" / "rna.h5")' \
         in doc
     assert "sparse=" not in doc                    # deprecated in 0.4.0
     assert '"data/D11/rna.h5"' not in doc
@@ -415,7 +415,7 @@ def test_run_all_prints_the_unused_batch(root, tmp_path, capsys, monkeypatch):
     def fake_run(**kw):
         raise RuntimeError("stub: not run in tests")
     monkeypatch.setattr(workflow, "_run", fake_run)
-    mtb.config.DEFAULT.data_path = root / "data"
+    mtb.config.data_path = root / "data"
     mtb.run('D52', 'cross', tmp_path / 'out', methods=['UINMF'], modalities=TWO_BATCHES, evaluate=False)
     assert ("[run]   UINMF reads batches 1-2 of 3. Batch 3 is not used.\n"
             in capsys.readouterr().out)

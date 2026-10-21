@@ -41,7 +41,7 @@ def test_export_dataset_reads_the_atac_kind_from_the_names(tmp_path):
 
 
 def test_a_dataset_can_be_a_folder_path(tmp_path, monkeypatch):
-    root = mtb.config.DEFAULT.data_path
+    root = mtb.config.data_path
     monkeypatch.chdir(root.parent)
     rel = f"{root.name}/D11"
     assert mtb.engine.resolve.inputs_for(rel, "vertical", "Matilda") == mtb.engine.resolve.inputs_for("D11", "vertical",

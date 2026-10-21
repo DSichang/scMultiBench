@@ -184,7 +184,7 @@ def test_run_off_linux_starts_with_the_platform(off_linux, tmp_path, monkeypatch
 @pytest.fixture
 def no_scripts(tmp_path, monkeypatch):
     empty = tmp_path / "cache" / "scMultiBench_ref"
-    monkeypatch.setattr(config.DEFAULT, "repo_path", empty)
+    monkeypatch.setattr(config, "repo_path", empty)
     monkeypatch.setattr(runner, "_repo_root_no_fetch", lambda: empty)
     monkeypatch.setattr(W._runner, "_repo_root_no_fetch", lambda: empty)
     return empty
@@ -318,7 +318,7 @@ def test_dry_run_argv_is_the_real_command(tmp_path, monkeypatch):
     a.obs_names = [f"c{i}" for i in range(6)]
     repo = tmp_path / "repo"
     (repo / "tools_scripts").mkdir(parents=True)
-    monkeypatch.setattr(config.DEFAULT, "repo_path", repo)
+    monkeypatch.setattr(config, "repo_path", repo)
     kw = dict(inputs={"rna": a, "atac": a}, out_dir=str(tmp_path / "o"),
               cmd_template="{cmd}")
     preview = mtb.engine.runner.run("scMVP", "vertical", dry_run=True, **kw)
@@ -334,7 +334,7 @@ def _lung(tmp_path):
     inside it)."""
     d = tmp_path / ("a_rather_long_folder_name_" * 4) / "data" / "LUNG"
     d.mkdir(parents=True)
-    src = Path(config.DEFAULT.data_path) / "D28"
+    src = Path(config.data_path) / "D28"
     for f in ("rna.h5", "atac_peak.h5", "rna_cty.csv", "atac_cty.csv"):
         (d / f).write_bytes((src / f).read_bytes())
     return d.parent
@@ -431,7 +431,7 @@ def _fake_run(monkeypatch, tmp_path, method, category, dataset, n):
     (repo / "tools_scripts").mkdir(parents=True, exist_ok=True)
     calls = {}
     monkeypatch.setattr(runner.subprocess, "Popen", _fake_popen(n, calls))
-    monkeypatch.setattr(config.DEFAULT, "repo_path", repo)
+    monkeypatch.setattr(config, "repo_path", repo)
     return inp, mtb.engine.runner.run(method, category, inputs=inp, out_dir=str(tmp_path / method),
                                       cmd_template="{cmd}")
 

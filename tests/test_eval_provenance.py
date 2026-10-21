@@ -51,7 +51,7 @@ def test_evaluate_without_clustering_metrics_records_none():
 
 def test_evaluate_records_the_configured_backend(monkeypatch):
     pytest.importorskip("leidenalg")
-    monkeypatch.setattr(config.DEFAULT, "leiden_flavor", "leidenalg")
+    monkeypatch.setattr(config, "leiden_flavor", "leidenalg")
     emb, lab = _blobs()
     wide = mtb.evaluate(emb, labels=lab, metrics=["ARI"])
     assert wide.attrs["leiden_flavor"] == "leidenalg"

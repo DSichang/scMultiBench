@@ -63,7 +63,7 @@ def _standin(tmp_path, monkeypatch, script):
     py.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{py_file}" "$@"\n')
     py.chmod(py.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     (envs_dir / "matilda" / envs.FLAVOR_FILE).write_text("build\n")   # made by multibench
-    monkeypatch.setattr(config.DEFAULT, "envs_dir", envs_dir)
+    monkeypatch.setattr(config, "envs_dir", envs_dir)
     monkeypatch.delenv(config.ENVS_DIR_VAR, raising=False)
     monkeypatch.setattr(envs.shutil, "which", lambda *a, **k: None)
     monkeypatch.setattr(config._shutil, "which", lambda *a, **k: None)

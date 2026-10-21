@@ -148,9 +148,9 @@ def run_mode(env: str) -> tuple[str, Path | None]:
     if forced == "prefix" and prefix is None:
         raise OSError(
             f"{RUN_MODE_VAR}=prefix but env {env!r} has no prefix under "
-            f"envs_dir {config.DEFAULT.envs_dir} (and conda reports none) - "
+            f"envs_dir {config.envs_dir} (and conda reports none) - "
             f"run mtb.env.install([<method>]) to unpack it, or "
-            f"point MULTIBENCH_ENVS_DIR / mtb.config.DEFAULT.envs_dir at it")
+            f"point MULTIBENCH_ENVS_DIR / mtb.config.envs_dir at it")
     if forced == "conda":
         return "conda", None
     return ("prefix", prefix) if prefix is not None else ("conda", None)
@@ -231,7 +231,7 @@ def _check_input_cells(method: str, category: str, inputs: dict) -> None:
 def _repo_root_no_fetch() -> Path:
     """Where :func:`run` finds ``tools_scripts/``, in ``config.ensure_repo``'s
     order, without fetching; else the configured path, where a real run puts them."""
-    p = Path(config.DEFAULT.repo_path)
+    p = Path(config.repo_path)
     if (p / "tools_scripts").is_dir():
         return p
     root = Path(config.__file__).resolve().parent.parent
@@ -918,7 +918,7 @@ def _fetch_scripts(repo_path) -> Path:
     try:
         return Path(config.ensure_repo(repo_path))
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        target = Path(repo_path) if repo_path else Path(config.DEFAULT.repo_path)
+        target = Path(repo_path) if repo_path else Path(config.repo_path)
         raise RuntimeError(
             f"could not clone the method scripts (PYangLab/scMultiBench) into "
             f"{target}: {e}. On a host without network, fetch them first on a "

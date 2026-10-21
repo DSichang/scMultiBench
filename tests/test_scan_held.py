@@ -59,7 +59,7 @@ def _quiet(fn, *a, **kw):
 
 
 def _on_disk(ds):
-    if not (config.DEFAULT.data_path / ds).is_dir():
+    if not (config.data_path / ds).is_dir():
         pytest.skip(f"{ds} is not on disk")
 
 
@@ -105,7 +105,7 @@ def linux(monkeypatch, tmp_path):
     this machine, no ref. ``_run`` is faked and records what it was given."""
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
-    monkeypatch.setattr(config.DEFAULT, "repo_path", tmp_path / "no_scripts")
+    monkeypatch.setattr(config, "repo_path", tmp_path / "no_scripts")
     monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
     monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
     calls = []
@@ -354,11 +354,11 @@ def test_attrs():
     # the dry run carries them, and a selection of rows keeps them
     plan = mtb.run("D11", "vertical", dry_run=True, verbose=False)
     assert plan.attrs == df.attrs and plan[plan["runnable"]].attrs == df.attrs
-    assert W._held_families(config.DEFAULT.data_path / "D11", "vertical") == ["rna", "adt"]
-    assert W._held_families(config.DEFAULT.data_path / "D11", None) == ["rna", "adt"]
+    assert W._held_families(config.data_path / "D11", "vertical") == ["rna", "adt"]
+    assert W._held_families(config.data_path / "D11", None) == ["rna", "adt"]
     # a numbered folder holds no file of an unnumbered role, and the other way
-    assert W._held_families(config.DEFAULT.data_path / "D52", "vertical") == []
-    assert W._held_families(config.DEFAULT.data_path / "D52", "cross") == ["rna", "adt"]
+    assert W._held_families(config.data_path / "D52", "vertical") == []
+    assert W._held_families(config.data_path / "D52", "cross") == ["rna", "adt"]
 
 
 def test_an_older_file_name_counts_as_held(tmp_path):

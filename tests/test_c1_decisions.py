@@ -139,7 +139,7 @@ def _tree(tmp_path, dims=6):
     random embedding."""
     out = tmp_path / "out"
     (out / "Matilda_D11").mkdir(parents=True)
-    n = len(pd.read_csv(Path(mtb.config.DEFAULT.data_path) / "D11" / "cty.csv"))
+    n = len(pd.read_csv(Path(mtb.config.data_path) / "D11" / "cty.csv"))
     with h5py.File(out / "Matilda_D11" / "embedding.h5", "w") as f:
         f["data"] = np.random.default_rng(0).normal(size=(n, dims))
     rec = {"method": "Matilda", "category": "vertical", "dataset": "D11",

@@ -94,14 +94,14 @@ def test_a_named_skipped_method_has_its_reason_in_summary(tmp_path, monkeypatch)
     from multibench import config
     from multibench import workflow as W
     from multibench.engine import envs, registry
-    if not (config.DEFAULT.data_path / "D11").is_dir():
+    if not (config.data_path / "D11").is_dir():
         pytest.skip("D11 is not on disk")
     trio = GEN.TASKS["vertical_rna_adt"]["methods"]
     missing = envs.group_for(trio[-1])
     every = frozenset(envs.group_for(m) for m in registry.list_methods())
     monkeypatch.setattr(W, "_installed_envs", lambda: every - {missing})
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
-    monkeypatch.setattr(config.DEFAULT, "repo_path", tmp_path / "no_scripts")
+    monkeypatch.setattr(config, "repo_path", tmp_path / "no_scripts")
     monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
 
     class _Res:

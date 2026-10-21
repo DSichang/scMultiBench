@@ -50,7 +50,7 @@ def _tree(tmp_path, *, with_outputs=True):
 
 
 def test_records_without_out_dir_score_from_the_folders_next_to_the_json(tmp_path, monkeypatch):
-    monkeypatch.setattr(mtb.config.DEFAULT, "data_path", tmp_path / "data")
+    monkeypatch.setattr(mtb.config, "data_path", tmp_path / "data")
     tree = _tree(tmp_path)
     res = mtb.load_batch(tree)
     assert [r["out_dir"] for r in res.records] == [
@@ -61,7 +61,7 @@ def test_records_without_out_dir_score_from_the_folders_next_to_the_json(tmp_pat
 
 
 def test_rescore_raises_when_it_finds_no_output(tmp_path, monkeypatch):
-    monkeypatch.setattr(mtb.config.DEFAULT, "data_path", tmp_path / "data")
+    monkeypatch.setattr(mtb.config, "data_path", tmp_path / "data")
     tree = _tree(tmp_path, with_outputs=False)
     res = mtb.load_batch(tree)
     with pytest.raises(FileNotFoundError) as e:
@@ -72,7 +72,7 @@ def test_rescore_raises_when_it_finds_no_output(tmp_path, monkeypatch):
 
 
 def test_a_method_without_output_is_recorded_when_another_scores(tmp_path, monkeypatch):
-    monkeypatch.setattr(mtb.config.DEFAULT, "data_path", tmp_path / "data")
+    monkeypatch.setattr(mtb.config, "data_path", tmp_path / "data")
     tree = _tree(tmp_path)
     (tree / "Matilda_MYCITE" / "embedding.h5").unlink()
     again = mtb.load_batch(tree).rescore(metrics=["ARI"], verbose=False)

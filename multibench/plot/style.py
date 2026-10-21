@@ -128,7 +128,7 @@ SNAP = 1e-6
 
 def stored_pairs() -> frozenset:
     """``{(dataset, method)}`` of the stored results ``mtb.load_results`` reads
-    under ``mtb.config.DEFAULT.result_path``."""
+    (under ``config._RESULT_PATH``)."""
     from ..data.results import _base_path
     base = _base_path()
     # the folders' times: tables written after a first call are read again
@@ -395,7 +395,7 @@ def backend_warning(df: pd.DataFrame) -> str | None:
     names = ", ".join(sorted(map(str, df.loc[hit, "method"].unique())))
     return (f"The rows for {names} were clustered with the igraph Leiden backend. "
             f"The stored results used leidenalg, which can move ARI by up to "
-            f"about 0.1. " + ("Set mtb.config.DEFAULT.leiden_flavor = 'leidenalg' before "
+            f"about 0.1. " + ("Set mtb.config.leiden_flavor = 'leidenalg' before "
                 "evaluate to compare them."))
 
 

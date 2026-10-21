@@ -88,7 +88,7 @@ def load_batch(out_dir, *, methods=None) -> "BatchResult":
     A copied ``run`` folder can be re-scored: each record's output folder
     is looked for next to ``batch_result.json`` when its recorded path is
     gone, and the dataset folder under the recorded data root, then
-    ``mtb.config.DEFAULT.data_path``.
+    ``mtb.config.data_path``.
     """
     folder = Path(out_dir)
     if not (folder / "batch_result.json").is_file():
@@ -213,7 +213,7 @@ def _missing_script(variant, *, method: str | None = None) -> str:
     """Why this variant's script or a helper module it imports is missing from
     the scripts checkout, or "" (also when there is no checkout yet: run fetches it)."""
     entry = Path(variant.entrypoint)
-    for root in (Path(config.DEFAULT.repo_path), Path(config.__file__).resolve().parent.parent):
+    for root in (Path(config.repo_path), Path(config.__file__).resolve().parent.parent):
         if (root / "tools_scripts").is_dir():
             # a script the package ships is copied in before the run
             shipped = (method and entry.name in variant.helpers
@@ -929,7 +929,7 @@ def scan(dataset: str, category: str | None = None, *,
     ----------
     dataset : str
         Dataset folder: its path, or its name under
-        ``mtb.config.DEFAULT.data_path``.
+        ``mtb.config.data_path``.
     category : str | None
         Integration category to scan; ``None`` = the benchmark's category of
         a dataset it scored (``D11`` is vertical), else all four.
@@ -1012,7 +1012,7 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
     # did-you-mean KeyError before any I/O; ids in any case or display names
     params = {registry.check_method(m): v for m, v in (params or {}).items()}
     wanted = _modality_matcher(modalities, methods) if modalities is not None else None
-    base = Path(data_path) if data_path is not None else config.DEFAULT.data_path
+    base = Path(data_path) if data_path is not None else config.data_path
     dataset = _resolve.canonical_dataset(base, dataset)
     ds_dir = base / dataset
     if not ds_dir.is_dir():
@@ -1391,7 +1391,7 @@ def _disarm_deadline(prev):
 def _label_files(dataset, data_path=None) -> list:
     """The label files of a dataset folder, sorted by name: every
     ``*cty*.csv`` except the tool-specific ``*scjoint*`` reformats."""
-    base = Path(data_path) if data_path is not None else config.DEFAULT.data_path
+    base = Path(data_path) if data_path is not None else config.data_path
     return [p for p in sorted((base / dataset).glob("*cty*.csv"))
             if "scjoint" not in p.name.lower()]
 
@@ -2342,7 +2342,7 @@ def _scan_hint(dataset: str, category: str, *, data_path=None, methods=None,
     ``run`` call, with every non-default argument as the caller gave it. A folder outside the default data path is named by its
     path, as the docs teach (relative to the working directory when inside it)."""
     if data_path is not None and (os.path.realpath(data_path)
-                                  != os.path.realpath(config.DEFAULT.data_path)):
+                                  != os.path.realpath(config.data_path)):
         folder = os.path.join(os.fspath(data_path), str(dataset))
         rel = os.path.relpath(folder)
         dataset = folder if rel.startswith("..") else rel
@@ -2586,7 +2586,7 @@ def _label_data_files(label: Path, read=()) -> list[Path]:
 
 def _dataset_folder(dataset, data_path) -> Path:
     """``<data_path>/<dataset>``, with ``None`` = config's data root."""
-    base = config.DEFAULT.data_path if data_path is None else data_path
+    base = config.data_path if data_path is None else data_path
     return Path(base) / dataset
 
 
@@ -2609,13 +2609,13 @@ def _dataset_root(rec: dict, dataset: str) -> tuple:
 
 
 #: what to do when a saved result's dataset folder is not found
-_MOVED_FIX = ("Set mtb.config.DEFAULT.data_path to the folder that holds it, or run "
+_MOVED_FIX = ("Set mtb.config.data_path to the folder that holds it, or run "
               "rescore from the folder where mtb.run ran.")
 
 
 def _folder_missing(dataset: str, roots) -> str:
     """The clause that the dataset folder is under none of ``roots``, each absolute."""
-    where = dict.fromkeys(os.path.abspath(config.DEFAULT.data_path if r is None else r)
+    where = dict.fromkeys(os.path.abspath(config.data_path if r is None else r)
                           for r in roots)
     return f"the dataset folder {dataset} is not found in {_and_list(where, 'or')}"
 
@@ -3087,7 +3087,7 @@ def run(dataset: str, category: str, out_dir=None, *, methods=None, modalities=N
     ----------
     dataset : str
         Dataset folder: its path, or its name under
-        ``mtb.config.DEFAULT.data_path``.
+        ``mtb.config.data_path``.
     category : str
         Integration category: ``vertical``, ``diagonal``, ``mosaic`` or ``cross``.
     out_dir : path | None
@@ -3179,7 +3179,7 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
             "Use a fresh out_dir per parameter setting, or skip_existing=False.")
     # the on-disk spelling, once, so out_dir names and records agree (one warning)
     dataset = _resolve.canonical_dataset(
-        Path(data_path) if data_path is not None else config.DEFAULT.data_path, dataset)
+        Path(data_path) if data_path is not None else config.data_path, dataset)
     if not dry_run and out_dir is None:
         raise TypeError("run() needs out_dir= for a real run (dry_run=True "
                         "returns the scan frame without one)")
@@ -3279,7 +3279,7 @@ def _run_all(dataset: str, category: str, out_dir=None, *, methods=None, modalit
     batch_file = (_batch_csv(batch_vec, dataset, data_path)
                   if batch_vec is not None and evaluate else None)
     # absolute: a saved result read from another directory still finds the data
-    data_root = os.path.abspath(config.DEFAULT.data_path if data_path is None
+    data_root = os.path.abspath(config.data_path if data_path is None
                                 else data_path)
     out_dir = Path(out_dir)
     # the save after the sweep would refuse this folder: refuse it now

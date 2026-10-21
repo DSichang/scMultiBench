@@ -60,7 +60,7 @@ def cite(tmp_path, monkeypatch):
                                                                    index=False)
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
-    monkeypatch.setattr(config.DEFAULT, "repo_path", tmp_path / "no_scripts")
+    monkeypatch.setattr(config, "repo_path", tmp_path / "no_scripts")
     monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
     monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
     monkeypatch.chdir(tmp_path)
@@ -86,7 +86,7 @@ def _c1(what, given, col):
 @pytest.mark.parametrize("given", ["donor", "obs:donor"])
 def test_a_column_name_is_explained(cite, tmp_path, given):
     data, calls = cite
-    mtb.config.DEFAULT.data_path = data
+    mtb.config.data_path = data
     kw = dict(methods=['totalVI'], verbose=False)
     with pytest.raises(FileNotFoundError) as e:
         mtb.run("MYCITE", "vertical", dry_run=True, batch=given, **kw)
@@ -107,7 +107,7 @@ def test_a_column_name_is_explained(cite, tmp_path, given):
 
 def test_other_names_that_are_no_file(cite, tmp_path):
     data, _ = cite
-    mtb.config.DEFAULT.data_path = data
+    mtb.config.data_path = data
     kw = dict(methods=['totalVI'], verbose=False, dry_run=True)
     for given, col in (("sample id", "sample id"), ("rna:donor", "rna:donor"),
                        ("donor.h5ad", "donor.h5ad"), ("obs:", "")):
@@ -118,7 +118,7 @@ def test_other_names_that_are_no_file(cite, tmp_path):
 
 def test_a_missing_csv_keeps_its_text(cite, tmp_path):
     data, calls = cite
-    mtb.config.DEFAULT.data_path = data
+    mtb.config.data_path = data
     kw = dict(methods=['totalVI'], verbose=False)
     cwd = Path.cwd()
 
@@ -158,7 +158,7 @@ def test_the_column_itself_works(cite, tmp_path):
     data, calls = cite
     donor = pd.Series(["d1", "d2"] * (N // 2), index=BARS, name="donor")
     obs = pd.DataFrame({"donor": donor, "celltype": ["A"] * 60 + ["B"] * 60}, index=BARS)
-    mtb.config.DEFAULT.data_path = data
+    mtb.config.data_path = data
     kw = dict(methods=['totalVI'], verbose=False)
     # in another row order: matched to the cells by barcode
     shuffled = obs.sample(frac=1, random_state=3)

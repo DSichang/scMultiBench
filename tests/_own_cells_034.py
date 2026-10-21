@@ -10,7 +10,7 @@ OLD = {
    name="MYCITE",
    data='''import scanpy as sc
 
-d = mtb.config.DEFAULT.data_path / "D11"
+d = mtb.config.data_path / "D11"
 adata = mtb.io.read_canonical(d / "rna.h5")
 adata.obsm["protein"] = mtb.io.read_canonical(d / "adt.h5").to_df()
 adata.obs["celltype"] = pd.read_csv(d / "cty.csv")["x"].values
@@ -23,7 +23,7 @@ adata''',
    name="MYMULTIOME",
    data='''import scanpy as sc
 
-d = mtb.config.DEFAULT.data_path / "D27mini_vertical"
+d = mtb.config.data_path / "D27mini_vertical"
 rna = mtb.io.read_canonical(d / "rna.h5")
 rna.obs["celltype"] = pd.read_csv(d / "cty.csv")["x"].values
 atac = mtb.io.read_canonical(d / "atac_peak.h5")
@@ -37,7 +37,7 @@ rna, atac''',
    name="MYTRI",
    data='''import scanpy as sc
 
-d = mtb.config.DEFAULT.data_path / "D22mini"
+d = mtb.config.data_path / "D22mini"
 adata = mtb.io.read_canonical(d / "rna.h5")
 adata.obsm["protein"] = mtb.io.read_canonical(d / "adt.h5").to_df()
 adata.obs["celltype"] = pd.read_csv(d / "cty.csv")["x"].values
@@ -52,7 +52,7 @@ adata, atac''',
    name="MYDIAG",
    data='''import scanpy as sc
 
-d = mtb.config.DEFAULT.data_path / "D27mini"
+d = mtb.config.data_path / "D27mini"
 rna = mtb.io.read_canonical(d / "rna.h5")
 rna.obs["celltype"] = pd.read_csv(d / "rna_cty.csv")["x"].values
 atac = mtb.io.read_canonical(d / "atac_gas.h5")
@@ -65,7 +65,7 @@ rna, atac''',
  ),
  "diagonal_multi": dict(
    name="MYDIAG",
-   data='''d = mtb.config.DEFAULT.data_path / "D37mini"
+   data='''d = mtb.config.data_path / "D37mini"
 n = 900
 rna, atac = [], []
 for b in (1, 2, 3):
@@ -83,7 +83,7 @@ rna, atac''',
  ),
  "mosaic_rna_adt": dict(
    name="MYMOSAIC",
-   data='''d = mtb.config.DEFAULT.data_path / "D38mini"
+   data='''d = mtb.config.data_path / "D38mini"
 n = 1500
 rna1 = mtb.io.read_canonical(d / "rna1.h5")[:n]
 rna2 = mtb.io.read_canonical(d / "rna2.h5")[:n]
@@ -103,7 +103,7 @@ mtb.io.export_dataset(adt3, out, rna=None, adt="X", labels=labels[2],
  ),
  "mosaic_rna_atac": dict(
    name="MYMOSAIC",
-   data='''d = mtb.config.DEFAULT.data_path / "D45mini"
+   data='''d = mtb.config.data_path / "D45mini"
 n = 1500
 rna1 = mtb.io.read_canonical(d / "rna1.h5")[:n]
 rna2 = mtb.io.read_canonical(d / "rna2.h5")[:n]
@@ -123,7 +123,7 @@ mtb.io.export_dataset(atac3, out, rna=None, atac="X", atac_kind="peak", labels=l
  ),
  "mosaic_shared": dict(
    name="MYMOSAIC",
-   data='''d = mtb.config.DEFAULT.data_path / "D46mini"
+   data='''d = mtb.config.data_path / "D46mini"
 n = 1000
 rna = [mtb.io.read_canonical(d / f"rna{b}.h5")[:n] for b in (1, 2, 3)]
 labels = [pd.read_csv(d / f"cty{b}.csv")["x"].values[:n] for b in (1, 2, 3)]
@@ -142,7 +142,7 @@ mtb.io.export_dataset(rna[2], out, labels=labels[2],
  ),
  "mosaic_unshared": dict(
    name="MYMOSAIC",
-   data='''d = mtb.config.DEFAULT.data_path / "D49mini"
+   data='''d = mtb.config.data_path / "D49mini"
 n = 1000
 rna1 = mtb.io.read_canonical(d / "rna1.h5")[:n]
 rna2 = mtb.io.read_canonical(d / "rna2.h5")[:n]
@@ -166,7 +166,7 @@ mtb.io.export_dataset(adt3, out, rna=None, adt="X", labels=labels[2],
    data='''import anndata as ad
 import scanpy as sc
 
-d = mtb.config.DEFAULT.data_path / "D52mini"
+d = mtb.config.data_path / "D52mini"
 batches = []
 for b in (1, 2, 3):
     a = mtb.io.read_canonical(d / f"rna{b}.h5")
@@ -185,7 +185,7 @@ adata''',
    data='''import anndata as ad
 import scanpy as sc
 
-d = mtb.config.DEFAULT.data_path / "D56mini"
+d = mtb.config.data_path / "D56mini"
 rna, atac = [], []
 for b in (1, 2, 3):
     r = mtb.io.read_canonical(d / f"rna{b}.h5")
@@ -206,7 +206,7 @@ rna, atac''',
    data='''import anndata as ad
 import scanpy as sc
 
-d = mtb.config.DEFAULT.data_path / "D58mini"
+d = mtb.config.data_path / "D58mini"
 adt, atac = [], []
 for b in (1, 2):
     a = mtb.io.read_canonical(d / f"adt{b}.h5")
@@ -227,7 +227,7 @@ adt, atac''',
    data='''import anndata as ad
 import scanpy as sc
 
-d = mtb.config.DEFAULT.data_path / "D59mini"
+d = mtb.config.data_path / "D59mini"
 batches, atac = [], []
 for b in (1, 2):
     a = mtb.io.read_canonical(d / f"rna{b}.h5")

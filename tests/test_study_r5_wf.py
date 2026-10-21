@@ -108,7 +108,7 @@ def _meta(batch):
 def swept(cite, tmp_path):
     """A saved one-method vertical sweep of the ``cite`` folder."""
     data, batch, shuffled = cite
-    mtb.config.DEFAULT.data_path = data
+    mtb.config.data_path = data
     _quiet(mtb.run, 'MYCITE', 'vertical', tmp_path / 'a', **KW)
     return mtb.load_batch(tmp_path / "a"), data, batch
 
@@ -342,7 +342,7 @@ def test_r_row_numbers_and_one_column_files_score_as_before(tmp_path, cite):
     for path in (rnum, one):
         with pytest.raises(ValueError, match="has no cell ids, and the embedding has"):
             mtb.evaluate(a, batch=str(path), **kw)
-    mtb.config.DEFAULT.data_path = data
+    mtb.config.data_path = data
     kw = dict(**KW)
     by_one = _quiet(mtb.run, "MYCITE", "vertical", tmp_path / "a",
                     batch=_one_column(tmp_path / "b1.csv", batch), **kw)
@@ -362,7 +362,7 @@ def test_files_without_an_id_column_are_read_as_before(tmp_path, cite):
             vec, aligned = W._cell_vector(f, "MYCITE", data)
             assert not aligned and list(vec) == list(SAMPLES)
         # the demo label files are single-column files, read as before
-        root = Path(mtb.config.DEFAULT.data_path)
+        root = Path(mtb.config.data_path)
         for ds, f in (("D11", "cty.csv"), ("D28", "rna_cty.csv"), ("D28", "atac_cty.csv")):
             p = root / ds / f
             if not p.exists():
@@ -403,7 +403,7 @@ def test_a_csv_with_foreign_barcodes_raises(cite, tmp_path, monkeypatch, capsys)
     half = _barcode_csv(tmp_path / 'half.csv', batch, index=BARS[:N // 2] + [f'x{i}' for i in range(N // 2)])
     monkeypatch.setattr(W, '_run', lambda *a, **k: pytest.fail('a method was started'))
     with pytest.raises(ValueError, match="^batch: 60 of the 120 ids in the first column of half\\.csv are not cells of MYCITE \\(first: \\['x"):
-        mtb.config.DEFAULT.data_path = data
+        mtb.config.data_path = data
         mtb.run('MYCITE', 'vertical', tmp_path / 'out', batch=half, **KW)
     assert not (tmp_path / 'out').exists()
 

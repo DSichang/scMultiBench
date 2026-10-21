@@ -48,7 +48,7 @@ def pinned(monkeypatch, tmp_path):
     """Every env installed, a GPU, no method scripts on this machine, no ref."""
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
-    monkeypatch.setattr(config.DEFAULT, "repo_path", tmp_path / "no_scripts")
+    monkeypatch.setattr(config, "repo_path", tmp_path / "no_scripts")
     monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
     monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
 
@@ -226,7 +226,7 @@ def test_run_all_raises_names_the_batch_series_error():
 
 # -------------------------------------------------------------- single builds
 def test_a_single_build_env_reports_single(tmp_path, monkeypatch):
-    monkeypatch.setattr(config.DEFAULT, "envs_dir", tmp_path / "envs")
+    monkeypatch.setattr(config, "envs_dir", tmp_path / "envs")
     monkeypatch.setattr(envs, "_find_conda", lambda: None)
     for env, word in (("scmb_r", "gpu"), ("matilda", "gpu")):
         prefix = tmp_path / "envs" / env

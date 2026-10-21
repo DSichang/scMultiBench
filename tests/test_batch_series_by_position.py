@@ -124,7 +124,7 @@ def test_evaluate_is_silent_for_the_usual_forms(no_scoring):
 def test_run_all_warns_and_is_silent_for_a_series_with_barcodes(cite, tmp_path):  # noqa: F811
     data, _ = cite
     batch = np.tile(["d1", "d2"], CITE_N // 2)
-    mtb.config.DEFAULT.data_path = data
+    mtb.config.data_path = data
     kw = dict(methods=['Matilda'], modalities=['rna', 'adt'], verbose=False)
     res, said = _caught(lambda: mtb.run("MYCITE", "vertical", batch=pd.Series(batch),
                                             out_dir=tmp_path / "rows", **kw))

@@ -215,11 +215,11 @@ def _fresh_session_notes(monkeypatch):
 
 # ---- the settings a test changes are put back --------------------------------
 # A dataset folder outside the data root is given by its path, or by setting
-# mtb.config.DEFAULT.data_path in the test; the settings are restored after it.
+# mtb.config.data_path in the test; the settings are restored after it.
 @_pytest.fixture(autouse=True)
 def _restore_config():
     from multibench import config
-    saved = dict(vars(config.DEFAULT))
+    saved = dict(config._values)
     yield
-    vars(config.DEFAULT).clear()
-    vars(config.DEFAULT).update(saved)
+    config._values.clear()
+    config._values.update(saved)

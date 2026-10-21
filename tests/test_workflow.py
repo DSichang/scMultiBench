@@ -22,7 +22,7 @@ def test_scan_filters_by_category():
 
 def _has_dataset(name):
     from multibench import config
-    return (config.DEFAULT.data_path / name).is_dir()
+    return (config.data_path / name).is_dir()
 
 
 def test_run_all_dry_run_respects_method_filter():

@@ -181,7 +181,7 @@ def test_stored_rows_under_a_custom_result_path_stay_stored(tmp_path, monkeypatc
             for m in ("ARI", "NMI")]
     (tmp_path / "rerun").mkdir()
     pd.DataFrame(rows).to_csv(tmp_path / "rerun" / "long_all_x.csv", index=False)
-    monkeypatch.setattr(config.DEFAULT, "result_path", tmp_path)
+    monkeypatch.setattr(config, "_RESULT_PATH", tmp_path)
     st = _quiet(mtb.load_results, "vertical")
     assert set(st["dataset"]) == {"DX"}
     mine = st[st["method"] == "scMM"].assign(method="mine", source="user", value=0.7)
@@ -297,7 +297,7 @@ def _fake_run(tmp_path, method, mods, n):
 def test_the_embedding_names_cells_by_the_file_the_method_read(tmp_path):
     """u4 #5: scJoint reads atac_gas.h5 (-1 barcodes), GLUE atac_peak.h5 (-2)."""
     from multibench.engine import resolve
-    folder = mtb.config.DEFAULT.data_path / "D28"
+    folder = mtb.config.data_path / "D28"
     n = sum(len(pd.read_csv(folder / f)) for f in ("rna_cty.csv", "atac_cty.csv"))
     gas = resolve._barcodes_of(folder / "atac_gas.h5")
     peak = resolve._barcodes_of(folder / "atac_peak.h5")

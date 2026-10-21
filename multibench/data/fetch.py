@@ -112,7 +112,7 @@ def fetch(*datasets: str, verbose: bool = True) -> "Path | list[Path]":
     import shutil as _shutil
     import tempfile as _tempfile
 
-    root = Path(config.DEFAULT.data_path)
+    root = Path(config.data_path)
     for ds in datasets:
         d = root / ds
         if d.is_dir() and any(d.iterdir()):

@@ -223,7 +223,7 @@ def _resolve_flavor(flavor) -> str:
     global _fallback_warned
     if flavor is None:
         from .. import config
-        flavor = config.DEFAULT.leiden_flavor
+        flavor = config.leiden_flavor
     if flavor not in LEIDEN_FLAVORS:
         raise ValueError(
             f"unknown leiden flavor {flavor!r}; valid: {'|'.join(LEIDEN_FLAVORS)}")
@@ -345,7 +345,7 @@ def leiden_n_clusters(emb, n: int, *, flavor=None) -> np.ndarray:
     n : int
         Number of clusters wanted, such as the number of cell types.
     flavor : {None, "igraph", "leidenalg"}
-        Leiden backend. ``None`` (default) reads ``config.DEFAULT.leiden_flavor``
+        Leiden backend. ``None`` (default) reads ``config.leiden_flavor``
         (``"igraph"``: scanpy's igraph backend with ``n_iterations=2``,
         ``directed=False``; ``"leidenalg"``: scanpy's default before 1.10).
 
@@ -425,7 +425,7 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
         always; ``False`` never.
     flavor : {None, "igraph", "leidenalg"}
         Leiden backend. ``None`` (default) reads
-        ``config.DEFAULT.leiden_flavor``; see :func:`leiden_n_clusters`.
+        ``config.leiden_flavor``; see :func:`leiden_n_clusters`.
 
     Returns
     -------

@@ -112,7 +112,7 @@ def test_recommend_long_df_warns_about_igraph_rows_of_a_stored_dataset():
     (msg,) = [m for m in msgs if m.startswith("recommend('vertical'):")]
     assert ("\n  - The rows for PriyaNet_ig were clustered with the igraph Leiden backend. "
             "The stored results used leidenalg") in msg
-    assert "mtb.config.DEFAULT.leiden_flavor = 'leidenalg'" in msg
+    assert "mtb.config.leiden_flavor = 'leidenalg'" in msg
 
 
 def test_recommend_backend_line_needs_igraph_rows_a_stored_dataset_and_a_sweep_metric():

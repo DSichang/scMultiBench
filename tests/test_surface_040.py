@@ -18,7 +18,7 @@ TOP = ["config", "plot", "catalog", "io", "env", "data",
        "evaluate", "load_results", "recommend",
        "__version__"]
 
-NAMESPACES = {"config": ["DEFAULT"], "plot": ["bubble", "bar"],
+NAMESPACES = {"config": ["data_path", "repo_path", "envs_dir", "leiden_flavor"], "plot": ["bubble", "bar"],
               "catalog": ["datasets", "metrics"], "io": ["export_dataset", "read_canonical"],
               "env": ["install"], "data": ["fetch", "write_example"]}
 
@@ -133,7 +133,7 @@ def test_public_calls_emit_no_future_warning(tmp_path):
         mtb.scan("D11", "vertical", verbose=False)
         mtb.run("D11", "vertical", methods=["Matilda"], dry_run=True, verbose=False)
         mtb.env.install(["Matilda"], dry_run=True)
-        print(mtb.config.DEFAULT)
+        print(mtb.config)
     future = [str(w.message) for w in rec
               if issubclass(w.category, (FutureWarning, DeprecationWarning))
               and ("/multibench/" in str(w.filename)

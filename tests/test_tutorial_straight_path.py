@@ -275,7 +275,7 @@ def test_every_method_reads_every_batch(key):
     notebook carries the sentence of the two-batch run."""
     import multibench as mtb
     t = GEN.TASKS[key]
-    if not (mtb.config.DEFAULT.data_path / t["ds"]).is_dir():
+    if not (mtb.config.data_path / t["ds"]).is_dir():
         pytest.skip(f"{t['ds']} is not on disk")
     n = len(mtb.engine.resolve.labels_for(t["ds"]))
     short = [m for m in GEN.task_methods(key)
@@ -322,7 +322,7 @@ def test_every_method_of_a_task_has_its_input_files_on_the_dataset(key):
     import warnings
     import multibench as mtb
     t = GEN.TASKS[key]
-    if not (mtb.config.DEFAULT.data_path / t["ds"]).is_dir():
+    if not (mtb.config.data_path / t["ds"]).is_dir():
         pytest.skip(f"{t['ds']} is not on disk")
     everyone = GEN.task_methods(key)
     with warnings.catch_warnings():
@@ -387,7 +387,7 @@ def test_methods_read_every_batch(key):
     comparison unequal; the generator refuses, and so does this test."""
     import multibench as mtb
     t = GEN.TASKS[key]
-    if not (mtb.config.DEFAULT.data_path / t["ds"]).is_dir():
+    if not (mtb.config.data_path / t["ds"]).is_dir():
         pytest.skip(f"{t['ds']} is not on disk")
     n = len(GEN.labels_for(t["ds"]))
     for m in t["methods"]:
@@ -515,7 +515,7 @@ def test_the_atac_check_stops_no_method_of_a_task():
     for m in ("Matilda", "scMDC", "UnitedNet"):
         assert mtb.method_info(m)["atac"] == "peak", m
     for key in ("vertical_rna_adt_atac", "cross_rna_atac", "vertical_rna_atac"):
-        if not (mtb.config.DEFAULT.data_path / GEN.TASKS[key]["ds"]).is_dir():
+        if not (mtb.config.data_path / GEN.TASKS[key]["ds"]).is_dir():
             pytest.skip(f"{GEN.TASKS[key]['ds']} is not on disk")
         everyone = GEN.task_methods(key)
         assert sorted(_would_run(key, everyone).method) == everyone, key
@@ -540,7 +540,7 @@ def test_the_generator_refuses_a_method_that_reads_only_some_batches(monkeypatch
     import multibench as mtb
     for key in ("cross_rna_adt", "cross_rna_atac"):
         ds = GEN.TASKS[key]["ds"]
-        if not (mtb.config.DEFAULT.data_path / ds).is_dir():
+        if not (mtb.config.data_path / ds).is_dir():
             pytest.skip(f"{ds} is not on disk")
         monkeypatch.setitem(GEN.TASKS[key], "methods", ["StabMap", "UINMF"])
         GEN.check_task(key)
@@ -561,7 +561,7 @@ def test_the_notebook_arguments_give_every_method_one_row_with_its_files(key):
     the task in the every-method notebook."""
     import multibench as mtb
     t = GEN.TASKS[key]
-    if not (mtb.config.DEFAULT.data_path / t["ds"]).is_dir():
+    if not (mtb.config.data_path / t["ds"]).is_dir():
         pytest.skip(f"{t['ds']} is not on disk")
     of_task = GEN.run_variants(key)
     runs = [(False, t["methods"])] + [(True, GEN.task_methods(key))] * GEN.has_all(key)
@@ -578,7 +578,7 @@ def test_uinmf_runs_its_three_batch_variant_on_the_three_batch_cross_datasets():
     takes the three-batch one, whose files hold the other's."""
     import multibench as mtb
     for key, second in (("cross_rna_adt", "adt"), ("cross_rna_atac", "atac")):
-        if not (mtb.config.DEFAULT.data_path / GEN.TASKS[key]["ds"]).is_dir():
+        if not (mtb.config.data_path / GEN.TASKS[key]["ds"]).is_dir():
             pytest.skip(f"{GEN.TASKS[key]['ds']} is not on disk")
         rows = _would_run(key, ["UINMF"])
         assert list(rows.modalities) == [

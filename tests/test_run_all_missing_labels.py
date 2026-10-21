@@ -71,7 +71,7 @@ def host(monkeypatch, tmp_path):
     fake ``_run`` writes an embedding of N cells and records the method."""
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
-    monkeypatch.setattr(config.DEFAULT, "repo_path", tmp_path / "no_scripts")
+    monkeypatch.setattr(config, "repo_path", tmp_path / "no_scripts")
     monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
     monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
     calls = []
@@ -101,7 +101,7 @@ def cite(tmp_path, host):
 
 
 def _run(data, tmp_path, methods, **kw):
-    mtb.config.DEFAULT.data_path = data
+    mtb.config.data_path = data
     return _quiet(mtb.run, 'MYCITE', 'vertical', tmp_path / 'out', methods=methods, verbose=False, **kw)
 
 
@@ -128,7 +128,7 @@ def test_run_all_stops_before_any_method(cite, tmp_path, host):
     assert {p.name: p.read_bytes() for p in (cite / "MYCITE").iterdir()} == before
     # every method of the category: the same stop
     with pytest.raises(ValueError) as e:
-        mtb.config.DEFAULT.data_path = cite
+        mtb.config.data_path = cite
         _quiet(mtb.run, 'MYCITE', 'vertical', tmp_path / 'out', verbose=False)
     assert str(e.value) == M1
     assert host == [] and not (tmp_path / "out").exists()
@@ -223,7 +223,7 @@ def test_two_methods_that_read_the_label_file(cite, tmp_path, host):
 # ------------------------------------------------------------------ a dry run
 def test_dry_run_prints_the_same_fact(cite, tmp_path, host, capsys):
     _write(cite / "MYCITE" / "cty.csv", _with_gaps())
-    mtb.config.DEFAULT.data_path = cite
+    mtb.config.data_path = cite
     kw = dict(dry_run=True)
     plan = mtb.run("MYCITE", "vertical", methods=["Matilda", "sciPENN"], **kw)
     out = capsys.readouterr().out.splitlines()
@@ -288,7 +288,7 @@ def test_a_method_that_is_fed_the_folder_reads_its_label_files(tmp_path, host):
     _h5(d / "atac_gas.h5", genes, [f"a{i}" for i in range(60)])
     _write(d / "rna_cty.csv", _with_gaps(60, na=3, empty=0))
     _write(d / "atac_cty.csv", ["A", "B"] * 30)
-    mtb.config.DEFAULT.data_path = tmp_path / "data"
+    mtb.config.data_path = tmp_path / "data"
     kw = dict(methods=['scBridge'], verbose=False)
     plan, private = _quiet(W._scan, "UNPAIRED", "diagonal", **kw)
     assert list(plan["modalities"]) == ["(data_dir)"] and plan["runnable"].all()
@@ -312,7 +312,7 @@ def test_only_the_files_a_method_reads_stop_a_run_without_scores(tmp_path, host)
         _h5(d / f"adt{b}.h5", [f"p{i}" for i in range(6)], bars)
         _write(d / f"cty{b}.csv", ["A", "B"] * 20)
     _write(d / "cty2.csv", _with_gaps(40, na=1200 // 400, empty=0))
-    mtb.config.DEFAULT.data_path = tmp_path / "data"
+    mtb.config.data_path = tmp_path / "data"
     kw = dict(verbose=False)
     res = _quiet(mtb.run, "DONORS", "cross", tmp_path / "out", methods=["totalVI"],
                  evaluate=False, **kw)
@@ -360,7 +360,7 @@ def test_several_label_files_are_not_ranked(tmp_path, host, monkeypatch):
         _h5(d / f"adt{b}.h5", [f"p{i}" for i in range(6)], bars)
         # r3 (Y12): files that differ, so that there are several orders to rank
         _write(d / f"cty{b}.csv", (["A"] * (20 + b) + ["B"] * (20 - b)))
-    mtb.config.DEFAULT.data_path = tmp_path / "data"
+    mtb.config.data_path = tmp_path / "data"
     kw = dict(verbose=False)
     res = _quiet(mtb.run, "DONORS", "cross", tmp_path / "out", methods=["totalVI"], **kw)
     (rec,) = res.records

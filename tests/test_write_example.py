@@ -86,7 +86,7 @@ def test_the_table_of_examples():
 def test_files_and_contents(ds, tmp_path, monkeypatch):
     """Each file holds the object of the 0.3.4 data cell: the same matrix,
     cells, features, cell types, batches and proteins."""
-    if not (mtb.config.DEFAULT.data_path / ds).is_dir():
+    if not (mtb.config.data_path / ds).is_dir():
         pytest.skip(f"{ds} is not on disk")
     monkeypatch.chdir(tmp_path)
     ns = {"mtb": mtb, "pd": pd}
@@ -162,7 +162,7 @@ def root(tmp_path):
 
 
 def test_the_first_line_of_the_first_tutorial(tmp_path, capsys, monkeypatch):
-    if not (mtb.config.DEFAULT.data_path / "D11").is_dir():
+    if not (mtb.config.data_path / "D11").is_dir():
         pytest.skip("D11 is not on disk")
     monkeypatch.chdir(tmp_path)
     mtb.data.write_example("D11")
@@ -204,7 +204,7 @@ def test_import_multibench_stays_light():
 def test_write_example_returns_nothing(tmp_path):
     # c3 (E15): the printed line names the file; the tutorial cells show no PosixPath('.')
     import multibench as mtb
-    if not (mtb.config.DEFAULT.data_path / "D11").is_dir():
+    if not (mtb.config.data_path / "D11").is_dir():
         pytest.skip("D11 is not in the data root")
     assert mtb.data.write_example('D11', tmp_path / 'ex', verbose=False) is None
     assert (tmp_path / "ex" / "my_file.h5ad").is_file()

@@ -268,7 +268,7 @@ def datasets(*, category: str | None = None) -> pd.DataFrame:
     >>> ds.dataset.tolist()
     >>> ds[ds.has_results]
     """
-    raw = pd.read_csv(Path(config.DEFAULT.files_path) / "dataset.csv")
+    raw = pd.read_csv(Path(config._FILES_PATH) / "dataset.csv")
     raw = raw.rename(columns={c: c.strip() for c in raw.columns})
     raw = raw.dropna(how="all", axis=0)
     name_col = "dataset name" if "dataset name" in raw.columns else "dataset"
@@ -335,7 +335,7 @@ def metrics() -> pd.DataFrame:
     --------
     mtb.evaluate : computes these metrics for an embedding.
     """
-    raw = pd.read_csv(Path(config.DEFAULT.files_path) / "metric_full.csv")
+    raw = pd.read_csv(Path(config._FILES_PATH) / "metric_full.csv")
     raw = raw.rename(columns={c: c.strip() for c in raw.columns})
     family = {c: f for f, codes in FAMILY_METRICS.items() for c in codes}
     raw.insert(1, "family", raw["metric"].map(family))

@@ -81,7 +81,7 @@ def test_missing_helper_module_blocks_the_script_gate(tmp_path, monkeypatch):
     script = tmp_path / "tools_scripts" / "MIRA" / "main_MIRA.py"
     script.parent.mkdir(parents=True)
     script.write_text("from logger import *")
-    monkeypatch.setattr(workflow.config.DEFAULT, "repo_path", tmp_path)
+    monkeypatch.setattr(workflow.config, "repo_path", tmp_path)
     v = SimpleNamespace(entrypoint="tools_scripts/MIRA/main_MIRA.py", helpers=["logger.py"])
     # the package ships MIRA's logger.py, so the real check passes without the file
     assert workflow._missing_script(v, method="MIRA") == ""
@@ -106,7 +106,7 @@ def test_scan_reports_the_mira_helper_when_the_checkout_lacks_it(tmp_path, monke
     script = tmp_path / "tools_scripts" / "MIRA" / "main_MIRA.py"
     script.parent.mkdir(parents=True)
     script.write_text("from logger import *")
-    monkeypatch.setattr(workflow.config.DEFAULT, "repo_path", tmp_path)
+    monkeypatch.setattr(workflow.config, "repo_path", tmp_path)
     # a helper the package does not ship (MIRA's logger.py is shipped since 0.3.4)
     monkeypatch.setattr("multibench.engine.runner.shipped_helper", lambda m, h: None)
     row = full_scan("D11", "vertical", methods=["MIRA"]).iloc[0]

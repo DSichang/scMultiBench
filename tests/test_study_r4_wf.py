@@ -53,7 +53,7 @@ def pinned(monkeypatch, tmp_path):
     """Every env installed, a GPU, no method scripts on this machine, no ref."""
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
-    monkeypatch.setattr(config.DEFAULT, "repo_path", tmp_path / "no_scripts")
+    monkeypatch.setattr(config, "repo_path", tmp_path / "no_scripts")
     monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
     monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
 
@@ -198,7 +198,7 @@ def _batch_metrics(res):
 
 def test_run_all_aligns_a_barcode_indexed_series(cite, tmp_path):
     data, batch, shuffled = cite
-    mtb.config.DEFAULT.data_path = data
+    mtb.config.data_path = data
     kw = dict(methods=['Matilda'], modalities=['rna', 'adt'], verbose=False)
     ordered = _quiet(mtb.run, "MYCITE", "vertical", tmp_path / "a", batch=batch, **kw)
     series = _quiet(mtb.run, "MYCITE", "vertical", tmp_path / "b", batch=shuffled,
@@ -213,7 +213,7 @@ def test_run_all_aligns_a_barcode_indexed_series(cite, tmp_path):
 
 def test_rescore_aligns_a_barcode_indexed_series(cite, tmp_path):
     data, batch, shuffled = cite
-    mtb.config.DEFAULT.data_path = data
+    mtb.config.data_path = data
     res = _quiet(mtb.run, 'MYCITE', 'vertical', tmp_path / 'a', methods=['Matilda'], modalities=['rna', 'adt'], verbose=False)
     back = mtb.load_batch(tmp_path / "a")
     assert _batch_metrics(_quiet(back.rescore, batch=shuffled)) == \
@@ -223,7 +223,7 @@ def test_rescore_aligns_a_barcode_indexed_series(cite, tmp_path):
 def test_a_series_with_foreign_ids_raises(cite, tmp_path):
     data, batch, shuffled = cite
     bad = shuffled.rename(index=lambda b: "x" + b)
-    mtb.config.DEFAULT.data_path = data
+    mtb.config.data_path = data
     kw = dict(methods=['Matilda'], modalities=['rna', 'adt'], verbose=False)
     for extra in ({}, {"dry_run": True}):
         with pytest.raises(ValueError, match=r"batch: 120 ids are not cells of MYCITE "
@@ -280,7 +280,7 @@ def _skip_setup(monkeypatch, tmp_path):
     """Stand-in envs on a host without a GPU; MIRA's script check fails."""
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
-    monkeypatch.setattr(config.DEFAULT, "repo_path", tmp_path / "no_scripts")
+    monkeypatch.setattr(config, "repo_path", tmp_path / "no_scripts")
     monkeypatch.setattr(config, "_ROOT", tmp_path / "pkg")
     monkeypatch.delenv(config.SCRIPTS_REF_VAR, raising=False)
     real = W._missing_script
@@ -306,7 +306,7 @@ def test_named_blocked_methods_are_logged_and_recorded(tmp_path, monkeypatch, ca
     as_gene_activity("UnitedNet")
     calls = _skip_setup(monkeypatch, tmp_path)
     root = _vertical(tmp_path, "MU_PEAK", PEAKS)
-    mtb.config.DEFAULT.data_path = root
+    mtb.config.data_path = root
     res = _quiet(mtb.run, 'MU_PEAK', 'vertical', tmp_path / 'out', methods=['scMVP', 'UnitedNet', 'MIRA'], evaluate=False)
     log = capsys.readouterr().out
     assert calls == ["scMVP"]
@@ -340,7 +340,7 @@ def test_named_blocked_methods_are_logged_and_recorded(tmp_path, monkeypatch, ca
 def test_unnamed_gpu_rows_are_skipped(tmp_path, monkeypatch, capsys):
     _skip_setup(monkeypatch, tmp_path)
     root = _vertical(tmp_path, "MU_PEAK", PEAKS)
-    mtb.config.DEFAULT.data_path = root
+    mtb.config.data_path = root
     res = _quiet(mtb.run, 'MU_PEAK', 'vertical', tmp_path / 'out', modalities=['rna', 'atac_peak'], evaluate=False)
     log = capsys.readouterr().out
     sm = res.summary.set_index("method")
@@ -353,7 +353,7 @@ def test_unnamed_gpu_rows_are_skipped(tmp_path, monkeypatch, capsys):
 def test_rows_without_files_are_counted_not_recorded(tmp_path, monkeypatch, capsys):
     _skip_setup(monkeypatch, tmp_path)
     root = _vertical(tmp_path, "MU_PEAK", PEAKS)
-    mtb.config.DEFAULT.data_path = root
+    mtb.config.data_path = root
     res = _quiet(mtb.run, 'MU_PEAK', 'vertical', tmp_path / 'out', evaluate=False, modalities='all')
     log = capsys.readouterr().out
     m = re.search(r"^\[run\] (\d+) more rows need files this folder does not "

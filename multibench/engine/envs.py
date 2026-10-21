@@ -610,7 +610,7 @@ def made_by_multibench(prefix: Path | str, env: str | None = None) -> bool:
 def _same_named(env: str, conda: str | None = None):
     """Every prefix named ``env``, lazily: ``<envs_dir>/<env>`` when it has
     ``bin/`` (no conda asked), then those ``conda env list`` reports."""
-    candidate = Path(config.DEFAULT.envs_dir) / env
+    candidate = Path(config.envs_dir) / env
     if (candidate / "bin").is_dir():
         yield candidate
     conda_exe = conda or _find_conda()
@@ -681,7 +681,7 @@ def env_prefix(env: str, conda: str | None = None) -> Path | None:
 
     Notes
     -----
-    ``<mtb.config.DEFAULT.envs_dir>/<env>`` when it contains ``bin/`` (no
+    ``<mtb.config.envs_dir>/<env>`` when it contains ``bin/`` (no
     conda needed); else the prefix ``conda env list`` reports for that name.
     Only an env multibench installed counts: every install writes the file
     ``.multibench_flavor`` into it, and an env built from a lockfile by an
@@ -781,7 +781,7 @@ def layers_for(keys, *, layers: dict | None = None, envs_dir=None,
     """``{layer: entry}`` the archive ``keys`` need, each layer once;
     ``missing_only`` leaves out those ``envs_dir`` already holds."""
     layers = packed_layers() if layers is None else layers
-    root = Path(envs_dir or config.DEFAULT.envs_dir) / LAYERS_DIR
+    root = Path(envs_dir or config.envs_dir) / LAYERS_DIR
     keys = set(keys)
     return {name: entry for name, entry in layers.items()
             if keys & set(entry.get("envs", ()))
@@ -890,7 +890,7 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
     Downloads the archive, extracts it into ``<envs_dir>/<env>`` and runs its
     own ``bin/conda-unpack``; no conda is needed. ``envs_dir`` defaults to
     that of ``conda`` when only it is given, else
-    ``mtb.config.DEFAULT.envs_dir``. ``flavor`` picks the archive as in
+    ``mtb.config.envs_dir``. ``flavor`` picks the archive as in
     :func:`install`; the prefix is the same whatever the flavour, and the
     flavour installed is written to :data:`FLAVOR_FILE`. A non-Linux host
     raises ``RuntimeError`` unless ``force``.
@@ -911,9 +911,9 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
     if envs_dir is not None:
         envs_root = Path(envs_dir)
     elif conda is not None and shutil.which(conda):
-        envs_root = _envs_dir(conda) or Path(config.DEFAULT.envs_dir)
+        envs_root = _envs_dir(conda) or Path(config.envs_dir)
     else:
-        envs_root = Path(config.DEFAULT.envs_dir)
+        envs_root = Path(config.envs_dir)
     dest = envs_root / env
     if dest.exists():
         if made_by_multibench(dest, env):
@@ -992,7 +992,7 @@ def _all_env_names(conda: str | None = None) -> list[str]:
 def _all_prefixes(conda: str | None = None) -> list[tuple[str, Path]]:
     """``(name, prefix)`` of every env under ``envs_dir``, then of those
     ``conda`` lists."""
-    out = list(_prefixes_on_disk(Path(config.DEFAULT.envs_dir)).items())
+    out = list(_prefixes_on_disk(Path(config.envs_dir)).items())
     conda_exe = conda or _find_conda()
     if conda_exe is not None:
         for p in _conda_prefixes(conda_exe):

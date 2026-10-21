@@ -242,7 +242,7 @@ def test_missing_script_in_a_folder_that_is_not_a_git_checkout(tmp_path, monkeyp
     glue = tmp_path / "tools_scripts" / "GLUE"
     glue.mkdir(parents=True)
     (glue / "gencode.v43.chr_patch_hapl_scaff.annotation.gtf.gz").write_bytes(b"")
-    monkeypatch.setattr(config.DEFAULT, "repo_path", tmp_path)
+    monkeypatch.setattr(config, "repo_path", tmp_path)
     variant = registry.get("GLUE").variants[0]
     why = W._missing_script(variant, method="GLUE")
     assert "missing from the reference checkout" in why
@@ -256,7 +256,7 @@ def test_missing_script_in_a_folder_that_is_not_a_git_checkout(tmp_path, monkeyp
 @needs_git
 def test_missing_script_in_a_git_checkout_keeps_git_pull(tmp_path, monkeypatch):
     _git_repo(tmp_path / "repo")
-    monkeypatch.setattr(config.DEFAULT, "repo_path", tmp_path / "repo")
+    monkeypatch.setattr(config, "repo_path", tmp_path / "repo")
     why = W._missing_script(registry.get("GLUE").variants[0], method="GLUE")
     assert "git pull" in why
 

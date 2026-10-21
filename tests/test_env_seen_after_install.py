@@ -10,7 +10,7 @@ from tests.conftest import full_scan
 
 
 def test_scan_sees_an_env_installed_after_the_first_scan(tmp_path, monkeypatch):
-    monkeypatch.setattr(mtb.config.DEFAULT, "envs_dir", tmp_path / "envs")
+    monkeypatch.setattr(mtb.config, "envs_dir", tmp_path / "envs")
     monkeypatch.setattr(envs, "_find_conda", lambda: None)
     monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
     before = full_scan("D11", "vertical", methods=["sciPENN"])

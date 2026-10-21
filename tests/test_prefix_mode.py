@@ -82,10 +82,10 @@ def no_conda(monkeypatch):
 
 @pytest.fixture
 def envs_dir(tmp_path, monkeypatch, no_conda):
-    """``config.DEFAULT.envs_dir`` pointed at a fresh directory."""
+    """``config.envs_dir`` pointed at a fresh directory."""
     d = tmp_path / "envs"
     d.mkdir()
-    monkeypatch.setattr(config.DEFAULT, "envs_dir", d)
+    monkeypatch.setattr(config, "envs_dir", d)
     monkeypatch.delenv(config.ENVS_DIR_VAR, raising=False)
     yield d
 
@@ -95,9 +95,9 @@ SCALEX_ENV = envs.group_for("SCALEX")
 
 
 def test_import_does_not_probe_conda():
-    """``config.DEFAULT`` is built at import; the probe must not run then."""
+    """``config`` is built at import; the probe must not run then."""
     code = ("import multibench.config as c, multibench; "
-            "print(c.DEFAULT.__dict__['_envs_dir'] is None, c._conda_envs_dir.cache_info().currsize)")
+            "print('envs_dir' not in c._values, c._conda_envs_dir.cache_info().currsize)")
     out = subprocess.run([os.sys.executable, "-c", code], capture_output=True, text=True,
                          env={**os.environ, "PYTHONPATH": str(Path(config.__file__).parents[1])},
                          check=True).stdout.split()
@@ -333,7 +333,8 @@ def test_scan_env_gate_flips_on_the_fake_prefix(envs_dir):
 
 def test_envs_dir_env_var_wins(monkeypatch, tmp_path):
     monkeypatch.setenv(config.ENVS_DIR_VAR, str(tmp_path / "mine"))
-    assert config._Config().envs_dir == tmp_path / "mine"
+    config.envs_dir = None                                  # unset: the default
+    assert config.envs_dir == tmp_path / "mine"
 
 
 def test_envs_dir_uses_conda_envs_dir_when_conda_found(monkeypatch, tmp_path):
@@ -342,26 +343,26 @@ def test_envs_dir_uses_conda_envs_dir_when_conda_found(monkeypatch, tmp_path):
     monkeypatch.setattr(envs, "_envs_dir", lambda exe: tmp_path / "conda-envs")
     config._conda_envs_dir.cache_clear()
     try:
-        assert config._Config().envs_dir == tmp_path / "conda-envs"
+        config.envs_dir = None
+        assert config.envs_dir == tmp_path / "conda-envs"
     finally:
         config._conda_envs_dir.cache_clear()
 
 
 def test_envs_dir_falls_back_to_the_user_cache(no_conda, monkeypatch):
     monkeypatch.delenv(config.ENVS_DIR_VAR, raising=False)
-    d = config._Config().envs_dir
+    config.envs_dir = None
+    d = config.envs_dir
     assert d == config._CACHE / "envs"
     assert d.parts[-2:] == ("multibench", "envs")
 
 
 def test_envs_dir_is_a_settable_field_and_lazy(monkeypatch, tmp_path):
-    import dataclasses
-    assert "envs_dir" in [f.name for f in dataclasses.fields(config._Config)]
-    cfg = config._Config()
-    assert cfg.__dict__["_envs_dir"] is None, "resolved on first read, not at construction"
-    cfg.envs_dir = str(tmp_path / "x")
-    assert cfg.envs_dir == tmp_path / "x" and isinstance(cfg.envs_dir, Path)
-    assert config._Config(envs_dir=tmp_path / "y").envs_dir == tmp_path / "y"
-    monkeypatch.setattr(config.DEFAULT, "envs_dir", tmp_path / "z")
-    assert config.DEFAULT.envs_dir == tmp_path / "z"
-    assert "envs_dir" in repr(config.DEFAULT)
+    assert "envs_dir" in config.__all__
+    config.envs_dir = None
+    assert config._values["envs_dir"] is None, "resolved on first read, not when unset"
+    config.envs_dir = str(tmp_path / "x")
+    assert config.envs_dir == tmp_path / "x" and isinstance(config.envs_dir, Path)
+    monkeypatch.setattr(config, "envs_dir", tmp_path / "z")
+    assert config.envs_dir == tmp_path / "z"
+    assert "envs_dir" in repr(config)
