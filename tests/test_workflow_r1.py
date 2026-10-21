@@ -1,4 +1,4 @@
-"""Student-study round 1, work package 'workflow': scan / run_all / run / save.
+"""Student-study round 1, work package 'workflow': scan / run / run / save.
 
 One block per ledger item: L13 (one rule for ``modalities``), L17 (setup
 steps in scan and the dry run), L18 (Linux-only wording off Linux), L20
@@ -100,7 +100,7 @@ def test_scan_unknown_modality_token_raises_with_the_vocabulary():
 
 def test_run_all_dry_run_uses_the_same_rule():
     with pytest.warns(UserWarning):
-        plan = mtb.run_all("D28", "diagonal", modalities=["rna", "atac"], dry_run=True,
+        plan = mtb.run("D28", "diagonal", modalities=["rna", "atac"], dry_run=True,
                            verbose=False)
     assert len(plan) >= 13
 
@@ -155,13 +155,13 @@ def test_scan_off_linux_keeps_env_reason_short_and_says_what_works(off_linux, no
     out = capsys.readouterr().out
     r = df.iloc[0]
     assert r["env_reason"] == f"Environment {r['env']} runs only on Linux, not on this computer."
-    assert "multibench env install" not in r["reason"]
+    assert "mtb.env.install" not in r["reason"]
     assert out.count("[scan]") == 1 and W.LINUX_ONLY_SUMMARY in out
 
 
 def test_scan_on_linux_keeps_the_install_command(no_envs, capsys):
     df = full_scan("D11", "vertical", methods=["totalVI"])
-    assert "multibench env install --methods totalVI." in df.iloc[0]["env_reason"]   # X27
+    assert "mtb.env.install(['totalVI'])." in df.iloc[0]["env_reason"]   # X27
     assert "Linux-only" not in capsys.readouterr().out
 
 
@@ -196,7 +196,7 @@ def test_dry_run_says_when_the_method_scripts_are_not_here(no_scripts, capsys):
     err = capsys.readouterr().err
     assert f"# The method scripts are not in {no_scripts}. The first real run clones " \
            f"PYangLab/scMultiBench with git." in err
-    assert "multibench fetch --scripts" in err
+    assert "git clone --depth 1 https://github.com/PYangLab/scMultiBench.git <folder>" in err
     assert not no_scripts.exists()                   # nothing fetched or created
 
 
@@ -210,7 +210,7 @@ def test_real_run_without_network_names_the_fetch_command(tmp_path, monkeypatch)
     def offline(path=None):
         raise subprocess.CalledProcessError(128, ["git", "clone"])
     monkeypatch.setattr(runner.config, "ensure_repo", offline)
-    with pytest.raises(RuntimeError, match="multibench fetch --scripts") as e:
+    with pytest.raises(RuntimeError, match="git clone --depth 1") as e:
         mtb.engine.runner.run("totalVI", "vertical", inputs=mtb.engine.resolve.inputs_for("D11", "vertical", "totalVI"),
                 out_dir=str(tmp_path / "out"), cmd_template="{cmd}")
     assert isinstance(e.value.__cause__, subprocess.CalledProcessError)
@@ -255,7 +255,7 @@ def test_run_all_refuses_a_mismatched_out_dir_before_any_method(tmp_path, monkey
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     monkeypatch.setattr(W, "_run", lambda **k: pytest.fail("dispatched"))
     with pytest.raises(ValueError, match="already holds a saved result"):
-        mtb.run_all("D11", "vertical", methods=["totalVI"], out_dir=tmp_path, verbose=False)
+        mtb.run("D11", "vertical", methods=["totalVI"], out_dir=tmp_path, verbose=False)
 
 
 # ----------------------------------------------------------------- L30: dry-run plan
@@ -318,8 +318,9 @@ def test_dry_run_argv_is_the_real_command(tmp_path, monkeypatch):
     a.obs_names = [f"c{i}" for i in range(6)]
     repo = tmp_path / "repo"
     (repo / "tools_scripts").mkdir(parents=True)
+    monkeypatch.setattr(config.DEFAULT, "repo_path", repo)
     kw = dict(inputs={"rna": a, "atac": a}, out_dir=str(tmp_path / "o"),
-              cmd_template="{cmd}", repo_path=repo)
+              cmd_template="{cmd}")
     preview = mtb.engine.runner.run("scMVP", "vertical", dry_run=True, **kw)
     calls = {}
     monkeypatch.setattr(runner.subprocess, "Popen", _fake_popen(6, calls))
@@ -364,7 +365,6 @@ def test_atac_column_is_none_for_a_variant_without_atac():
 def test_runresult_documents_obs_names_and_row_order():
     doc = inspect.getdoc(runner.RunResult)
     assert "obs_names" in doc and "labels_for" in doc
-    assert 'adata.obsm["X_totalVI"] = res.output' in doc
     assert runner.RunResult("m", Path("."), [], None, {}).obs_names is None   # positional OK
 
 

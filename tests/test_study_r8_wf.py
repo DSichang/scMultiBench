@@ -1,6 +1,6 @@
 """Round 8 of the virtual-student study, package work package 'wf' (workflow.py).
 
-R8-01  the ``run_all`` / ``rescore`` result line ended with a bare number, the
+R8-01  the ``run`` / ``rescore`` result line ended with a bare number, the
        ARI, and printed ``-0.0`` for a tiny negative ARI. It now reads
        ``ARI 0.000``; the records round negative zero to ``0.0``.
 R8-02  a peak token warned that scBridge was left out, although scBridge
@@ -50,7 +50,7 @@ def test_the_rewritten_passages_keep_their_facts():
         "Score the saved outputs again with new labels, batch or metrics.")
     assert "No method is re-run. Each record's embedding is read back from its " \
            "``out_dir``." in _doc(W.BatchResult.rescore)
-    assert "``mtb.run_all`` and ``mtb.load_batch`` build it. It keeps one record per " \
+    assert "``mtb.run`` and ``mtb.load_batch`` build it. It keeps one record per " \
            "method, which ``rescore`` and ``plot`` read." in _doc(W.BatchResult)
     # c2 (D04): the summary has no label_order_confidence; the records keep the orders
     assert "label_order_confidence" not in _doc(W.BatchResult.summary.fget)
@@ -70,7 +70,7 @@ def test_the_ari_tail_names_its_metric_and_never_prints_minus_zero():
 @pytest.fixture
 def near_zero_ari(monkeypatch):
     """Every evaluation that computes ARI reports -0.00004 (ARI at chance)."""
-    real = W._scores                        # the wide frame run_all scores with
+    real = W._scores                        # the wide frame run scores with
 
     def fake(*a, **k):
         val = real(*a, **k)
@@ -88,15 +88,15 @@ def _result_lines(text, prefix):
 def swept(working, near_zero_ari, tmp_path, capsys):
     """A one-method sweep (Matilda stand-in) whose ARI is -0.00004."""
     out = tmp_path / "py"
-    res = mtb.run_all(os.path.join(working, 'MYCITE'), 'vertical', out_dir=out, methods=['Matilda'], modalities=['rna', 'adt'])
+    res = mtb.run(os.path.join(working, 'MYCITE'), 'vertical', out_dir=out, methods=['Matilda'], modalities=['rna', 'adt'])
     return res, out, capsys.readouterr().out
 
 
 def test_the_run_all_line_ends_with_ari_0(swept):
     pytest.importorskip("scib")
     res, out, printed = swept
-    (line,) = _result_lines(printed, "[run_all]   -> ")
-    assert line.startswith("[run_all]   -> scored (") and line.endswith("s) ARI 0.000"), line
+    (line,) = _result_lines(printed, "[run]   -> ")
+    assert line.startswith("[run]   -> scored (") and line.endswith("s) ARI 0.000"), line
     # the record, the summary and summary.csv hold 0.0 with a positive sign
     for ari in (res.records[0]["metrics"]["ARI"], res.summary.loc[0, "ARI"],
                 pd.read_csv(out / "summary.csv").loc[0, "ARI"]):
@@ -196,7 +196,7 @@ def test_scan_raises_for_a_named_method_of_another_category(no_envs, labmos):
 def test_run_all_raises_before_anything_runs(no_envs, labmos, capsys):
     for kw in ({"dry_run": True}, {"out_dir": "out"}):
         with pytest.raises(ValueError) as e:
-            mtb.run_all(os.path.join('data', 'LABMOS'), 'mosaic', methods=['StabMap', 'scMoMaT', 'totalVI'], **kw)
+            mtb.run(os.path.join('data', 'LABMOS'), 'mosaic', methods=['StabMap', 'scMoMaT', 'totalVI'], **kw)
         assert str(e.value) == _TOTALVI
     assert not (labmos / "out").exists()
     assert capsys.readouterr().out == ""
@@ -228,7 +228,7 @@ def test_a_method_the_modalities_drop_raises_with_the_representation_note(lung):
 
 def test_the_docstrings_say_a_method_without_a_variant_raises():
     assert "or a method in ``methods`` without a variant there." in _doc(W.scan)
-    assert "checked before anything runs." in _doc(W.run_all)
+    assert "checked before anything runs." in _doc(W.run)
 
 
 # ============================================================ R8-05
@@ -256,7 +256,7 @@ def mydata(tmp_path, monkeypatch):
 
 def _nothing_runnable(**kw):
     with pytest.raises(ValueError) as e:
-        mtb.run_all(os.path.join('data', 'MYDATA'), 'vertical', out_dir='out', verbose=False, **kw)
+        mtb.run(os.path.join('data', 'MYDATA'), 'vertical', out_dir='out', verbose=False, **kw)
     return str(e.value)
 
 
@@ -270,11 +270,11 @@ def test_rows_blocked_only_by_the_platform_are_not_listed(macos, mydata):
     lines = msg.splitlines()
     assert lines[0] == "No method can run on MYDATA (vertical)."
     assert lines[1].startswith(MACOS)
-    assert lines[2] == ("mtb.run_all('data/MYDATA', 'vertical', modalities=['rna', 'adt'], "
+    assert lines[2] == ("mtb.run('data/MYDATA', 'vertical', modalities=['rna', 'adt'], "
                         "dry_run=True) shows every row.")
     assert len(lines) == 3 and "not on this computer" not in msg
     msg = _nothing_runnable(modalities=["rna", "adt"], methods=["Matilda", "totalVI"])
-    assert msg.splitlines()[2] == ("mtb.run_all('data/MYDATA', 'vertical', methods=['Matilda', "
+    assert msg.splitlines()[2] == ("mtb.run('data/MYDATA', 'vertical', methods=['Matilda', "
                                    "'totalVI'], modalities=['rna', 'adt'], dry_run=True) "
                                    "shows the plan.")                      # Y22
     msg = _nothing_runnable(modalities=["rna", "adt"], methods=["totalVI"])
@@ -292,7 +292,7 @@ def test_a_row_that_also_lacks_a_file_is_listed_with_that_reason(macos, mydata):
                         "which the folder does not have.")
     assert lines[4] == ("  Matilda (rna+adt+atac): Matilda needs peak ATAC (atac.h5), "
                         "which the folder does not have.")
-    assert lines[5].startswith("mtb.run_all('data/MYDATA', 'vertical', "
+    assert lines[5].startswith("mtb.run('data/MYDATA', 'vertical', "
                                "methods=['Matilda', 'totalVI'], modalities=\"all\", dry_run=True) "
                                "shows these rows.")
     assert "not on this computer" not in msg
@@ -318,7 +318,7 @@ def test_without_methods_the_first_3_other_blocks_are_shown(macos, mydata, monke
     assert [l.split(" (")[0].strip() for l in listed] == sorted(have["method"])[:3]
     assert all(l.startswith("  ") and "not on this computer" not in l for l in listed)
     assert lines[6] == f"{lacking} rows need files that MYDATA does not have."
-    assert lines[7].startswith("mtb.run_all('data/MYDATA', 'vertical', "
+    assert lines[7].startswith("mtb.run('data/MYDATA', 'vertical', "
                                "modalities=\"all\", dry_run=True) shows every row.")
 
 
@@ -330,7 +330,7 @@ def test_off_linux_a_gpu_block_is_left_out(macos, mydata, monkeypatch):
     assert any(mtb.method_info(m)["gpu"] == "required" for m in plan["method"])   # moETM
     assert "NVIDIA GPU" not in msg and "also blocked by something else" not in msg
     assert msg.splitlines()[2].startswith(
-        "mtb.run_all('data/MYDATA', 'vertical', modalities=['rna', 'adt'], dry_run=True) "
+        "mtb.run('data/MYDATA', 'vertical', modalities=['rna', 'adt'], dry_run=True) "
         "shows every row."), msg
     assert "not on this computer" not in msg
 
@@ -344,11 +344,11 @@ def test_on_linux_the_message_is_todays(no_envs, mydata, monkeypatch):
             f"The first 3 of {len(plan)} blocked methods:\n"
             + "\n".join(f"  {r.method} ({r.modalities}): {r.reason}"
                         for r in order.head(3).itertuples())
-            + "\nmtb.run_all('data/MYDATA', 'vertical', modalities=['rna', "
+            + "\nmtb.run('data/MYDATA', 'vertical', modalities=['rna', "
             "'adt'], dry_run=True) shows every row. Its reason column says which check "
             "failed. mtb.env.install(dry_run=True) checks the environments.")
     assert msg == want
-    assert "is not installed. Run multibench env install --methods" in msg
+    assert "is not installed. Run mtb.env.install([" in msg
     msg = _nothing_runnable(modalities=["rna", "adt"], methods=["totalVI"])
     assert "\nBlocked, one line per requested method:\n  totalVI (rna+adt): Environment " \
            in msg

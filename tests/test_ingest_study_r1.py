@@ -105,7 +105,7 @@ def test_batch_with_vertical_or_diagonal_is_refused_before_writing(tmp_path):
         assert str(ei.value) == (
             "batch= writes per-batch files (rna1.h5, rna2.h5, ...). "
             f"{cat.capitalize()} methods read {read}. Export without batch= and pass the "
-            f"column itself, as run_all(batch=adata.obs[\"donor\"]). {tail}")
+            f"column itself, as run(batch=adata.obs[\"donor\"]). {tail}")
         assert not (tmp_path / cat).exists()
         # cross is RNA+ADT: never offered to a diagonal (RNA+ATAC) user
         assert ('category="cross"' in str(ei.value)) == (cat == "vertical")

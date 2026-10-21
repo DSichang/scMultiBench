@@ -5,14 +5,14 @@ Round 4 changed what the notebooks tell a reader in five places:
 - R4-01: naming a method in ``methods=`` no longer runs it on the other ATAC
   representation, so the ATAC form section 5 names holds for the
   named-method calls the run cells make.
-- R4-04: ``run_all`` records a blocked method as ``SKIPPED``; the reason is in
+- R4-04: ``run`` records a blocked method as ``SKIPPED``; the reason is in
   ``res.failures`` for a method that ``methods=`` named, which every tutorial
   run does.
 - R4-08: an environment without a CPU archive has a single build, so a CPU
   runtime does not get a smaller build of every environment.
 - R4-13: a dry run's printed command alone fails in a job script when the
   method reads files that ``mtb.run`` writes first; and the batch advice
-  names ``run_all(batch=<column>)``, as the package's error does.
+  names ``run(batch=<column>)``, as the package's error does.
 
 Each prose test reads the committed notebooks and checks the same fact on the
 live package, so a later package change that makes the sentence untrue fails
@@ -74,7 +74,7 @@ SKIP_SENTENCE = "`res.failures` lists each method that failed or was skipped."
 @pytest.mark.parametrize("name", TUTORIALS)
 def test_troubleshooting_says_where_the_reason_of_a_skipped_method_is(name):
     """Visible under the Troubleshooting heading: a method the run cell names
-    and ``run_all`` skips shows ``SKIPPED`` in ``res.summary``, and
+    and ``run`` skips shows ``SKIPPED`` in ``res.summary``, and
     ``res.failures`` holds the reason (since round 5 the summary's ``reason``
     column holds it too, tests/test_tutorial_round5.py)."""
     md = next(src for kind, src in _cells(name)
@@ -105,14 +105,14 @@ def test_a_named_method_without_its_environment_is_in_failures_with_the_reason(
     class _Res:
         output = np.zeros((2864, 5))
     monkeypatch.setattr(W, "_run", lambda *a, **k: _Res())
-    res = _quiet(mtb.run_all, "D11", "vertical", tmp_path / "out", methods=trio,
+    res = _quiet(mtb.run, "D11", "vertical", tmp_path / "out", methods=trio,
                  evaluate=False, verbose=False)
     status = res.summary.set_index("method")["status"]
     assert status[trio[-1]] == "skipped"
     fails = res.failures.set_index("method")
     assert list(fails.index) == [trio[-1]]
     assert fails.loc[trio[-1], "status"] == "skipped"
-    assert f"multibench env install --methods {trio[-1]}" in fails.loc[trio[-1], "reason"]
+    assert f"mtb.env.install([{trio[-1]!r}])" in fails.loc[trio[-1], "reason"]
 
 
 # ------------------------------------------------- R4-08: single-build envs
@@ -169,8 +169,8 @@ def test_troubleshooting_does_not_hand_out_the_dry_run_command_to_run_alone(name
 def test_end_to_end_does_not_say_the_printed_command_runs_on_its_own():
     md = _markdown("tutorial_end_to_end")
     assert "prepare the command on a laptop and run it on Linux" not in md
-    # run(dry_run=True) returned the command (X84); 0.4.0 runs Matilda with run_all
-    assert ("`mtb.run_all(..., dry_run=True)` returns the plan and the command without "
+    # run(dry_run=True) returned the command (X84); 0.4.0 runs Matilda with run
+    assert ("`mtb.run(..., dry_run=True)` returns the plan and the command without "
             "running anything. It works on any computer.") in md
 
 
@@ -188,8 +188,8 @@ def test_a_dry_run_command_alone_can_fail():
 # Since 0.3.5 the visible text of section 5 shows the call with the column
 # itself, on an object that the tutorial's read cell assigns.
 BATCH_ADVICE = ("Several donors or samples in the file? Keep them in one folder, without "
-                "`batch=` in `export_dataset`, and give `run_all` the column itself: "
-                "`mtb.run_all(..., batch={obj}.obs[\"donor\"])`. The summary then has the "
+                "`batch=` in `export_dataset`, and give `run` the column itself: "
+                "`mtb.run(..., batch={obj}.obs[\"donor\"])`. The summary then has the "
                 "scores for how well they mix.")
 
 
@@ -200,7 +200,7 @@ def test_vertical_export_note_names_the_batch_call(key, obj):
 
 
 def test_the_package_gives_the_same_batch_advice(tmp_path):
-    """export_dataset(batch=) on a vertical dataset names the run_all call of
+    """export_dataset(batch=) on a vertical dataset names the run call of
     the tutorials, with the column itself."""
     import anndata as ad
     import multibench as mtb
@@ -215,15 +215,15 @@ def test_the_package_gives_the_same_batch_advice(tmp_path):
     assert str(e.value) == (
         "batch= writes per-batch files (rna1.h5, rna2.h5, ...). Vertical methods read one "
         'rna.h5. Export without batch= and pass the column itself, as '
-        'run_all(batch=adata.obs["donor"]). For RNA+ADT batches, use category="cross".')
+        'run(batch=adata.obs["donor"]). For RNA+ADT batches, use category="cross".')
 
 
 # ------------------------------------------------ R4-01: named methods
 def test_runnable_sentence_holds_for_the_named_method_calls_of_the_run_cells(
         tmp_path, monkeypatch):
-    """The run cells pass ``methods=`` to run_all. On a D46-like folder whose
+    """The run cells pass ``methods=`` to run. On a D46-like folder whose
     ATAC holds gene activity, the mosaic methods stay not runnable when
-    named, in scan and in run_all's plan."""
+    named, in scan and in run's plan."""
     import anndata as ad
     import multibench as mtb
     from multibench import workflow as W
@@ -254,8 +254,9 @@ def test_runnable_sentence_holds_for_the_named_method_calls_of_the_run_cells(
     trio, mods = task["methods"], "+".join(task["variants"][0])
     sc = _quiet(full_scan, "MYMOSAIC", "mosaic", methods=trio, data_path=tmp_path,
                 verbose=False)
-    mtb.config.DEFAULT.data_path = tmp_path
-    plan = _quiet(mtb.run_all, 'MYMOSAIC', 'mosaic', tmp_path / 'out', methods=trio, dry_run=True, verbose=False)
+    # the full plan behind run(dry_run=True), with its file and env checks
+    plan = _quiet(W._run_all, str(folder), "mosaic", tmp_path / "out", methods=trio,
+                  dry_run=True, verbose=False)
     for df in (sc, plan):
         # a method has one row per mosaic pattern: the row of this pattern
         df = df[df.modalities == mods].set_index("method")

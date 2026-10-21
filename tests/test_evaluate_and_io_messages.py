@@ -160,7 +160,7 @@ def test_x74_an_h5mu_path_names_the_fix(tmp_path):
 
 def test_x76_tokens_ignore_letter_case():
     import numpy as np
-    plan = mtb.run_all("D11", "vertical", modalities=["RNA", "ADT"], dry_run=True,
+    plan = mtb.run("D11", "vertical", modalities=["RNA", "ADT"], dry_run=True,
                        verbose=False)
     assert len(plan)
     emb = np.random.default_rng(5).normal(size=(60, 4))

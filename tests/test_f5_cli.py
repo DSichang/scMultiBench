@@ -91,12 +91,12 @@ def test_count_lines_say_rows_without_plural_brackets(monkeypatch, capsys, tmp_p
     assert out == (f"[scan] {k} of {n} rows have their input files. 0 of {n} have their "
                    f"environment installed. mtb.env.install(dry_run=True) checks the "
                    f"environments.\n")
-    mtb.run_all("D11", "vertical", out_dir=tmp_path, dry_run=True, modalities="all")
+    mtb.run("D11", "vertical", out_dir=tmp_path, dry_run=True, modalities="all")
     line = next(l for l in capsys.readouterr().out.splitlines() if "Dry run" in l)
-    assert line == (f"[run_all] Dry run: 0 of {n} requested rows can run on D11 "
+    assert line == (f"[run] Dry run: 0 of {n} requested rows can run on D11 "
                     f"(vertical); the reason column says why.")
     with pytest.raises(ValueError) as e:
-        mtb.run_all("D11", "vertical", out_dir=tmp_path, verbose=False, modalities="all")
+        mtb.run("D11", "vertical", out_dir=tmp_path, verbose=False, modalities="all")
     assert f"\nThe first 3 of {n} blocked rows:\n" in str(e.value)
     for text in (out, line, str(e.value)):
         assert "(s)" not in text and "variant" not in text
@@ -106,7 +106,7 @@ def test_platform_line_is_two_sentences(monkeypatch, tmp_path):
     monkeypatch.setattr(envs, "host_platform_problem", lambda: DARWIN)
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     with pytest.raises(ValueError) as e:
-        mtb.run_all("D11", "vertical", out_dir=tmp_path, verbose=False)
+        mtb.run("D11", "vertical", out_dir=tmp_path, verbose=False)
     assert str(e.value).splitlines()[1] == (
         "Methods run only on Linux, and this computer runs macOS. On this computer you "
         "can check files, score embeddings and plot. Run the methods on a Linux machine.")

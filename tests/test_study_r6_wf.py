@@ -2,10 +2,10 @@
 
 R6-01: a saved result read from another directory lost its dataset folder
 (``data_path`` recorded as given, relative). rescore then matched a barcode
-Series by position and blamed the files. run_all records ``data_root``;
+Series by position and blamed the files. run records ``data_root``;
 load_batch takes ``data_path=``; a folder that is not found is named.
 
-R6-02: run_all(batch=) kept only batch_source and n_batches, not the vector,
+R6-02: run(batch=) kept only batch_source and n_batches, not the vector,
 so every rescore without batch= lost the batch metrics.
 
 R6-04: rescore(metrics=) without a clustering metric still ranked the label
@@ -46,7 +46,7 @@ BARS = [f"c{i}" for i in range(N)]
 CELLTYPE = np.array(["A"] * (N // 2) + ["B"] * (N // 2))
 # the fix names config.DEFAULT.data_path
 MOVED = ("Set mtb.config.DEFAULT.data_path to the folder that holds it, or run rescore "
-         "from the folder where run_all ran.")
+         "from the folder where mtb.run ran.")
 
 
 def _ari(res):
@@ -74,7 +74,7 @@ def _rescore(res, **kw):
 def rel(cite, tmp_path, monkeypatch):
     """A sweep run from ``tmp_path`` with the relative ``data_path='data'``."""
     monkeypatch.chdir(tmp_path)
-    res = _quiet(mtb.run_all, os.path.join("data", "MYCITE"), "vertical", "out", **KW)
+    res = _quiet(mtb.run, os.path.join("data", "MYCITE"), "vertical", "out", **KW)
     (tmp_path / "nb").mkdir()
     return res, tmp_path
 
@@ -82,7 +82,7 @@ def rel(cite, tmp_path, monkeypatch):
 def test_run_all_records_the_absolute_data_root(rel):
     res, root = rel
     rec = res.records[0]
-    assert rec["data_path"] == "data"
+    assert Path(rec["data_path"]).samefile(root / "data")
     assert Path(rec["data_root"]).is_absolute()
     assert Path(rec["data_root"]).samefile(root / "data")
     saved = json.loads((root / "out" / "batch_result.json").read_text())["records"][0]
@@ -105,7 +105,7 @@ def test_rescore_from_another_directory_aligns_the_labels_by_barcode(rel, monkey
 
 def test_rescore_of_an_in_memory_result_after_a_chdir(rel, monkeypatch):
     _, root = rel
-    res = _quiet(mtb.run_all, os.path.join("data", "MYCITE"), "vertical", root / "abs", **KW)
+    res = _quiet(mtb.run, os.path.join("data", "MYCITE"), "vertical", root / "abs", **KW)
     monkeypatch.chdir(root / "nb")
     new, caught = _rescore(res, labels=_shuffled_labels())
     assert not _by_position(caught), caught
@@ -117,9 +117,9 @@ def test_a_folder_that_is_not_found_is_named(rel, monkeypatch):
     shutil.move(str(root / "data"), str(root / "moved"))
     monkeypatch.chdir(root / "nb")
     back = mtb.load_batch("../out")
-    assert back.records[0]["data_path"] == "data"         # left as recorded
-    # the roots tried: the recorded data_path from here, then data_root
-    where = f"{Path.cwd() / 'data'} or {back.records[0]['data_root']}"
+    assert back.records[0]["data_path"] == str(root / "data")         # left as recorded
+    # the roots tried: the recorded data_path, then data_root (the same folder)
+    where = back.records[0]["data_root"]
     with pytest.warns(UserWarning, match=re.escape(
             f"The labels Series is matched by position, because the dataset folder "
             f"MYCITE is not found in {where}. {MOVED}")):
@@ -157,7 +157,7 @@ def batched(cite, tmp_path):
     """A sweep scored with a shuffled barcode-indexed batch Series."""
     data, batch, shuffled = cite
     mtb.config.DEFAULT.data_path = data
-    res = _quiet(mtb.run_all, 'MYCITE', 'vertical', tmp_path / 'out', batch=shuffled, **KW)
+    res = _quiet(mtb.run, 'MYCITE', 'vertical', tmp_path / 'out', batch=shuffled, **KW)
     return res, batch, tmp_path
 
 
@@ -261,7 +261,7 @@ def cross(tmp_path, monkeypatch):
 
 def _cross_run(data, tmp, method, **kw):
     mtb.config.DEFAULT.data_path = data
-    return _quiet(mtb.run_all, 'MYCROSS', 'cross', tmp / method, methods=[method], verbose=False, **kw)
+    return _quiet(mtb.run, 'MYCROSS', 'cross', tmp / method, methods=[method], verbose=False, **kw)
 
 
 def _count_sweeps(monkeypatch, fail=False):
@@ -365,7 +365,7 @@ def test_docstrings_state_the_new_rules():
         "rescore": W.BatchResult.rescore, "load_batch": mtb.load_batch,
         "save": W.BatchResult.save}.items()}
     assert "is handed to ``evaluate(metrics=)``" not in flat["rescore"]
-    assert ("``None`` = the batch ``run_all`` was given, else each cell's label "
+    assert ("``None`` = the batch ``run`` was given, else each cell's label "
             "file.") in flat["rescore"]
     # R7-12 (b); 0.4.0: data_path= is deprecated, the Notes give the search order
     assert "data_path :" not in flat["load_batch"]

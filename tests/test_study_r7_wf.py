@@ -1,6 +1,6 @@
 """Round 7 of the virtual-student study, package work package 'wf' (workflow.py).
 
-R7-01  run_all's Notes quoted the "nothing runnable" message with bare
+R7-01  run's Notes quoted the "nothing runnable" message with bare
        ``<dataset>`` / ``<category>`` placeholders. Markdown reads them as HTML
        elements and the browser drops them, so the reference page showed empty
        parentheses. The bullet now quotes concrete messages in code spans, and a
@@ -163,14 +163,14 @@ def test_no_docs_page_holds_a_bare_placeholder_tag():
 
 
 def test_run_all_notes_quote_the_live_first_lines(no_envs, tmp_path):
-    doc = _flat(mtb.run_all)
+    doc = _flat(mtb.run)
     with pytest.raises(ValueError) as e:
-        mtb.run_all("D11", "vertical", out_dir=tmp_path, verbose=False)
+        mtb.run("D11", "vertical", out_dir=tmp_path, verbose=False)
     first = str(e.value).splitlines()[0]
     assert first == "No method can run on D11 (vertical)."
     assert "ValueError Nothing in the selection can run" in doc
     with pytest.raises(ValueError) as e:
-        mtb.run_all("D11", "vertical", out_dir=tmp_path, methods=["Matilda", "totalVI"],
+        mtb.run("D11", "vertical", out_dir=tmp_path, methods=["Matilda", "totalVI"],
                     verbose=False)
     first = str(e.value).splitlines()[0]
     assert first.startswith("None of the requested methods (Matilda, totalVI) can run on D11")
@@ -179,18 +179,18 @@ def test_run_all_notes_quote_the_live_first_lines(no_envs, tmp_path):
 # ============================================================ R7-02
 def _nothing_runnable(dataset="MYDATA", **kw):
     with pytest.raises(ValueError) as e:
-        mtb.run_all(dataset, "vertical", out_dir="out", verbose=False, **kw)
+        mtb.run(dataset, "vertical", out_dir="out", verbose=False, **kw)
     return str(e.value)
 
 
 def test_the_scan_hint_carries_the_callers_arguments(no_envs, mydata):
     msg = _nothing_runnable(os.path.join("data", "MYDATA"), modalities=["rna", "adt"])
     last = msg.splitlines()[-1]
-    call = "mtb.run_all('data/MYDATA', 'vertical', modalities=['rna', 'adt'], dry_run=True)"
+    call = "mtb.run('data/MYDATA', 'vertical', modalities=['rna', 'adt'], dry_run=True)"
     assert last.startswith(f"{call} shows every row. "), last
     # run as printed, from the same directory, it shows the rows the call selected
     shown = eval(call, {"mtb": mtb})                      # noqa: S307 - our own hint
-    plan = mtb.run_all(os.path.join('data', 'MYDATA'), 'vertical', modalities=['rna', 'adt'], dry_run=True, verbose=False)
+    plan = mtb.run(os.path.join('data', 'MYDATA'), 'vertical', modalities=['rna', 'adt'], dry_run=True, verbose=False)
     assert list(shown["method"]) == list(plan["method"])
     assert set(shown["modalities"]) == {"rna+adt"}
     n = int(re.search(r"^The first 3 of (\d+) blocked ", msg, re.M).group(1))
@@ -210,16 +210,16 @@ def test_the_list_header_counts_methods_when_each_has_one_row(no_envs, mydata):
                             modalities=["rna", "adt"])
     assert "\nBlocked, one line per requested method:\n" in msg
     assert msg.splitlines()[-1].startswith(
-        "mtb.run_all('data/MYDATA', 'vertical', methods=['Matilda', "
+        "mtb.run('data/MYDATA', 'vertical', methods=['Matilda', "
         "'totalVI'], modalities=['rna', 'adt'], dry_run=True) shows these rows.")
 
 
 def test_a_call_with_default_arguments_keeps_the_hint(no_envs, tmp_path, root):
     for ds in ("D11", str(root / "data" / "D11")):     # the default data root, spelled out
         with pytest.raises(ValueError) as e:
-            mtb.run_all(ds, "vertical", out_dir=tmp_path, verbose=False)
+            mtb.run(ds, "vertical", out_dir=tmp_path, verbose=False)
         assert e.value.args[0].splitlines()[-1].startswith(
-            "mtb.run_all('D11', 'vertical', dry_run=True) shows the listed rows. ")
+            "mtb.run('D11', 'vertical', dry_run=True) shows the listed rows. ")
 
 
 # ============================================================ R7-06
@@ -232,7 +232,7 @@ def test_rescore_verbose_names_the_ranking_line():
 # ============================================================ R7-12
 def test_workflow_passages_read_as_plain_sentences():
     cls = inspect.getdoc(W.BatchResult).splitlines()[0]
-    assert cls == "The result of ``mtb.run_all``: its summary table, long table and figure."
+    assert cls == "The result of ``mtb.run``: its summary table, long table and figure."
     load = _flat(mtb.load_batch)
     assert "data_path :" not in load
     summary = _flat(W.BatchResult.summary)

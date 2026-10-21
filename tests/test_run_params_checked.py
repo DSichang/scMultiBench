@@ -3,7 +3,7 @@
 ``run(params={"epoch": 3}, dry_run=True)`` returned a command ending
 ``--epoch 3`` (the script would stop on it) and ``run --param nonsense=1``
 did the same, though ``run --help`` says such a key is rejected. Both raise
-now, with the message ``run_all`` gives.
+now, with the message ``run`` gives.
 """
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ def test_a_known_key_still_reaches_the_command():
 
 def test_run_all_says_the_same():
     with pytest.raises(KeyError) as e:
-        mtb.run_all("D11", "vertical", methods=["Matilda"], modalities=["rna", "adt"],
+        mtb.run("D11", "vertical", methods=["Matilda"], modalities=["rna", "adt"],
                     params={"Matilda": {"epoch": 3}}, dry_run=True, verbose=False)
     assert e.value.args[0] == f"Matilda does not accept ['epoch']; {ACCEPTS}"
 
@@ -47,7 +47,7 @@ def test_run_all_says_the_same():
 def test_a_method_without_hyperparameters_says_so():
     # Z16 (r3): the hardcoded-upstream sentence only where the set is empty
     with pytest.raises(KeyError) as e:
-        mtb.run_all("D11", "vertical", methods=["totalVI"], modalities=["rna", "adt"],
+        mtb.run("D11", "vertical", methods=["totalVI"], modalities=["rna", "adt"],
                     params={"totalVI": {"epochs": 3}}, dry_run=True, verbose=False)
     assert e.value.args[0] == ("totalVI does not accept ['epochs']; totalVI takes no "
                                "hyperparameters (its script hardcodes them).")

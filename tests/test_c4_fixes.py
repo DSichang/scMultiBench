@@ -250,7 +250,7 @@ def test_the_default_bar_runs_no_rank_matrix(monkeypatch):
 
 def test_skip_existing_without_a_saved_run_says_so(tmp_path):
     with pytest.raises(ValueError) as e:
-        mtb.run_all("D11", "vertical", out_dir=str(tmp_path / "outs"), methods=["Matilda"],
+        mtb.run("D11", "vertical", out_dir=str(tmp_path / "outs"), methods=["Matilda"],
                     skip_existing=True, verbose=False)
     assert str(e.value) == (
         f"No saved output of Matilda in {tmp_path / 'outs'} (it would be "

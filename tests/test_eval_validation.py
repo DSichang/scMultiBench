@@ -72,7 +72,7 @@ def test_batch_metric_without_batch_labels_raises_not_empty():
 
 
 def test_metrics_none_computes_every_applicable_family():
-    from multibench.plot import BATCH_METRICS, CLASSIFICATION_METRICS, CLUSTERING_METRICS
+    from multibench.plot.bar import BATCH_METRICS, CLASSIFICATION_METRICS, CLUSTERING_METRICS
     emb, ct, bat, _ = _toy()
     clu = evaluate(emb, labels=ct)                       # no batch: clustering family
     assert set(_metrics(clu)) == set(CLUSTERING_METRICS)
@@ -168,7 +168,7 @@ def test_rescore_keeps_its_text_for_a_label_file_without_every_cell(cite, tmp_pa
     import multibench as mtb
     data, _, _ = cite
     mtb.config.DEFAULT.data_path = data
-    _quiet(mtb.run_all, 'MYCITE', 'vertical', tmp_path / 'a', methods=['Matilda'], modalities=['rna', 'adt'], verbose=False)
+    _quiet(mtb.run, 'MYCITE', 'vertical', tmp_path / 'a', methods=['Matilda'], modalities=['rna', 'adt'], verbose=False)
     res = mtb.load_batch(tmp_path / "a")
     pd.DataFrame({"barcode": [f"c{i}" for i in range(N_CITE - 30)],
                   "x": ["A"] * 60 + ["B"] * 30}).to_csv(tmp_path / "part.csv", index=False)

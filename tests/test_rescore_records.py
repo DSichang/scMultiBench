@@ -48,7 +48,7 @@ def _tree(tmp_path, monkeypatch, same_labels=False):
     monkeypatch.setattr(W, "_run", fake_run)
     out = tmp_path / "out"
     mtb.config.DEFAULT.data_path = tmp_path / "data"
-    res = _quiet(mtb.run_all, 'MYCROSS', 'cross', out, methods=['totalVI'], verbose=False)
+    res = _quiet(mtb.run, 'MYCROSS', 'cross', out, methods=['totalVI'], verbose=False)
     return res, out
 
 
@@ -68,7 +68,7 @@ def test_rescore_words_the_caveat_as_this_version_does(tmp_path, monkeypatch):
     blob["records"][0]["caveat"] = "totalVI needs about 5,000 cells in total."
     p.write_text(json.dumps(blob))
     new = _quiet(mtb.load_batch(out).rescore, metrics=["ARI"], verbose=False)
-    plan = mtb.run_all(os.path.join(tmp_path / 'data', 'MYCROSS'), 'cross', methods=['totalVI'], dry_run=True, verbose=False)
+    plan = mtb.run(os.path.join(tmp_path / 'data', 'MYCROSS'), 'cross', methods=['totalVI'], dry_run=True, verbose=False)
     assert new.records[0]["caveat"] == W._run_caveat(plan["caveat"].iloc[0])
     assert "5,000" not in new.records[0]["caveat"]
 

@@ -5,7 +5,7 @@ scan off, so a cluster gate that picks one method per job passed a folder of
 the other representation. An explicit allow_atac_mismatch replaces it; mtb.run
 notes and warns.
 
-R4-02: run_all(batch=) and rescore(batch=) matched a Series by position.
+R4-02: run(batch=) and rescore(batch=) matched a Series by position.
 
 R4-04: a real run dropped every blocked row except the wrong-ATAC ones
 without a word; they are now logged and recorded as SKIPPED.
@@ -200,13 +200,13 @@ def test_run_all_aligns_a_barcode_indexed_series(cite, tmp_path):
     data, batch, shuffled = cite
     mtb.config.DEFAULT.data_path = data
     kw = dict(methods=['Matilda'], modalities=['rna', 'adt'], verbose=False)
-    ordered = _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "a", batch=batch, **kw)
-    series = _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "b", batch=shuffled,
+    ordered = _quiet(mtb.run, "MYCITE", "vertical", tmp_path / "a", batch=batch, **kw)
+    series = _quiet(mtb.run, "MYCITE", "vertical", tmp_path / "b", batch=shuffled,
                     **kw)
     assert _batch_metrics(ordered)[0] == "scored"
     assert _batch_metrics(ordered)[1] is not None
     assert _batch_metrics(series) == _batch_metrics(ordered)
-    frame = _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "c",
+    frame = _quiet(mtb.run, "MYCITE", "vertical", tmp_path / "c",
                    batch=shuffled.to_frame("sample"), **kw)
     assert _batch_metrics(frame) == _batch_metrics(ordered)
 
@@ -214,7 +214,7 @@ def test_run_all_aligns_a_barcode_indexed_series(cite, tmp_path):
 def test_rescore_aligns_a_barcode_indexed_series(cite, tmp_path):
     data, batch, shuffled = cite
     mtb.config.DEFAULT.data_path = data
-    res = _quiet(mtb.run_all, 'MYCITE', 'vertical', tmp_path / 'a', methods=['Matilda'], modalities=['rna', 'adt'], verbose=False)
+    res = _quiet(mtb.run, 'MYCITE', 'vertical', tmp_path / 'a', methods=['Matilda'], modalities=['rna', 'adt'], verbose=False)
     back = mtb.load_batch(tmp_path / "a")
     assert _batch_metrics(_quiet(back.rescore, batch=shuffled)) == \
         _batch_metrics(_quiet(res.rescore, batch=batch))
@@ -228,10 +228,10 @@ def test_a_series_with_foreign_ids_raises(cite, tmp_path):
     for extra in ({}, {"dry_run": True}):
         with pytest.raises(ValueError, match=r"batch: 120 ids are not cells of MYCITE "
                                              r"\(first: \['xc"):
-            _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "x", batch=bad,
+            _quiet(mtb.run, "MYCITE", "vertical", tmp_path / "x", batch=bad,
                    **kw, **extra)
     assert not (tmp_path / "x").exists()
-    res = _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "a", **kw)
+    res = _quiet(mtb.run, "MYCITE", "vertical", tmp_path / "a", **kw)
     with pytest.raises(ValueError, match="are not cells of MYCITE"):
         _quiet(res.rescore, batch=bad)
     with pytest.raises(ValueError, match=r"have no id in batch"):
@@ -307,10 +307,10 @@ def test_named_blocked_methods_are_logged_and_recorded(tmp_path, monkeypatch, ca
     calls = _skip_setup(monkeypatch, tmp_path)
     root = _vertical(tmp_path, "MU_PEAK", PEAKS)
     mtb.config.DEFAULT.data_path = root
-    res = _quiet(mtb.run_all, 'MU_PEAK', 'vertical', tmp_path / 'out', methods=['scMVP', 'UnitedNet', 'MIRA'], evaluate=False)
+    res = _quiet(mtb.run, 'MU_PEAK', 'vertical', tmp_path / 'out', methods=['scMVP', 'UnitedNet', 'MIRA'], evaluate=False)
     log = capsys.readouterr().out
     assert calls == ["scMVP"]
-    assert "[run_all] skipping UnitedNet: " in log and "[run_all] skipping MIRA: " in log
+    assert "[run] skipping UnitedNet: " in log and "[run] skipping MIRA: " in log
     sm = res.summary.set_index("method")
     assert sm.loc["UnitedNet", "status"] == "skipped" == sm.loc["MIRA", "status"]
     fails = res.failures.set_index("method")
@@ -341,12 +341,12 @@ def test_unnamed_gpu_rows_are_skipped_but_not_failures(tmp_path, monkeypatch, ca
     _skip_setup(monkeypatch, tmp_path)
     root = _vertical(tmp_path, "MU_PEAK", PEAKS)
     mtb.config.DEFAULT.data_path = root
-    res = _quiet(mtb.run_all, 'MU_PEAK', 'vertical', tmp_path / 'out', modalities=['rna', 'atac_peak'], evaluate=False)
+    res = _quiet(mtb.run, 'MU_PEAK', 'vertical', tmp_path / 'out', modalities=['rna', 'atac_peak'], evaluate=False)
     log = capsys.readouterr().out
     sm = res.summary.set_index("method")
     for m in ("moETM", "iPOLNG"):
         assert sm.loc[m, "status"] == "skipped", m
-        assert f"[run_all] skipping {m}: " in log
+        assert f"[run] skipping {m}: " in log
     assert sm.loc["MIRA", "status"] == "skipped"
     assert res.failures.empty, res.failures
 
@@ -355,9 +355,9 @@ def test_rows_without_files_are_counted_not_recorded(tmp_path, monkeypatch, caps
     _skip_setup(monkeypatch, tmp_path)
     root = _vertical(tmp_path, "MU_PEAK", PEAKS)
     mtb.config.DEFAULT.data_path = root
-    res = _quiet(mtb.run_all, 'MU_PEAK', 'vertical', tmp_path / 'out', evaluate=False, modalities='all')
+    res = _quiet(mtb.run, 'MU_PEAK', 'vertical', tmp_path / 'out', evaluate=False, modalities='all')
     log = capsys.readouterr().out
-    m = re.search(r"^\[run_all\] (\d+) more rows need files this folder does not "
+    m = re.search(r"^\[run\] (\d+) more rows need files this folder does not "
                   r"have\. mtb\.scan shows them\.$", log, re.M)
     assert m, log
     statuses = {r["method"]: r["status"] for r in res.records}
@@ -368,13 +368,13 @@ def test_rows_without_files_are_counted_not_recorded(tmp_path, monkeypatch, caps
 def test_a_named_method_with_a_runnable_mosaic_variant_is_not_a_failure(
         tmp_path, monkeypatch, capsys):
     _skip_setup(monkeypatch, tmp_path)
-    res = _quiet(mtb.run_all, "D45", "mosaic", tmp_path / "out", methods=["Multigrate"],
+    res = _quiet(mtb.run, "D45", "mosaic", tmp_path / "out", methods=["Multigrate"],
                  evaluate=False, modalities="all")
     log = capsys.readouterr().out
     assert [r["status"] for r in res.records] == ["RUN_OK"]
     assert res.failures.empty
     # Multigrate's three other mosaic rows are for patterns D45 does not hold
-    assert ("[run_all] 3 more rows need files this folder does not have. mtb.scan shows "
+    assert ("[run] 3 more rows need files this folder does not have. mtb.scan shows "
             "them.") in log
     assert "skipping Multigrate" not in log
 

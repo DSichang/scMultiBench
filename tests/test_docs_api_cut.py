@@ -53,12 +53,12 @@ STALE = {
     r"17 columns|18 columns\b(?! - )|plan_commands adds": "scan's frame is SCAN_COLUMNS + command",
     # Colab speed round: the packed archives run without a conda binary
     r"(?i)\bcondacolab\b": "no condacolab: mtb.env.install(..., packed=True, dry_run=False) needs no conda binary",
-    # 0.4.0 core API: the deprecated names (they work until 0.5, the text teaches the kept ones)
-    r"\bmtb\.(run|inputs_for|labels_for|to_long|sweep|classify|classification_metrics|"
-    r"results_coverage|available_datasets)\(": "run_all(methods=[m]) / evaluate(dataset=, method=) / catalog.datasets()",
+    # 0.4.0: the removed names, and run_all, which is run now
+    r"\bmtb\.(run_all|inputs_for|labels_for|to_long|sweep|classify|classification_metrics|"
+    r"results_coverage|available_datasets)\(": "run(methods=[m]) / evaluate(dataset=, method=) / catalog.datasets()",
     r"\bmtb\.(env\.(doctor|status)|io\.to_canonical|plot\.(build_table|BubbleTable)|"
     r"config\.Config|catalog\.methods|data\.fetchable)\b": "env.install(dry_run=True) / io.export_dataset / recommend(long_df=) / config.DEFAULT",
-    r"\bmultibench convert\b": "multibench export",
+    r"\bmultibench (convert|export|run-all|scan|env|fetch|plot|evaluate)\b": "the Python call (0.4.0: no command line)",
 }
 
 

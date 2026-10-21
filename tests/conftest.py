@@ -34,7 +34,7 @@ def _pin_conda_run_mode(request, monkeypatch):
 
 
 # ---- host-agnostic platform -------------------------------------------------
-# Method environments are Linux-only. Off Linux, scan / run / run_all word their
+# Method environments are Linux-only. Off Linux, scan / run / run word their
 # environment messages for that ("Linux-only environment ..."), and run()
 # refuses a missing env even when the env probe finds nothing. Most tests
 # assert the Linux behaviour, so pin the platform to Linux everywhere except in
@@ -183,7 +183,7 @@ def _no_stray_envs(request, monkeypatch):
 # ---- the full plan behind scan ----------------------------------------------
 def full_scan(*args, **kwargs):
     """The plan of ``scan``'s checks, one row per method variant with every
-    column: the frame ``run_all(dry_run=True)`` returns, also without a
+    column: the frame ``run(dry_run=True)`` returns, also without a
     category. ``mtb.scan`` returns one row per method since 0.4."""
     from multibench import workflow
     return workflow._scan(*args, **kwargs)[0]

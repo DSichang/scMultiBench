@@ -1,7 +1,7 @@
-"""run_all and rescore say why they cannot take the name of an obs column (0.3.5).
+"""run and rescore say why they cannot take the name of an obs column (0.3.5).
 
 ``export_dataset`` and ``evaluate`` take ``"obs:donor"`` and ``"donor"``,
-because they are given the object. ``run_all`` and ``rescore`` are given a
+because they are given the object. ``run`` and ``rescore`` are given a
 folder. Up to 0.3.4 ``batch="donor"`` answered ``The batch file donor does
 not exist``; the message now says what to pass. A name that looks like a
 file keeps the file error.
@@ -89,13 +89,13 @@ def test_a_column_name_is_explained(cite, tmp_path, given):
     mtb.config.DEFAULT.data_path = data
     kw = dict(methods=['totalVI'], verbose=False)
     with pytest.raises(FileNotFoundError) as e:
-        mtb.run_all("MYCITE", "vertical", dry_run=True, batch=given, **kw)
+        mtb.run("MYCITE", "vertical", dry_run=True, batch=given, **kw)
     assert str(e.value) == _c1("batch", given, "donor")
     with pytest.raises(FileNotFoundError) as e:
-        mtb.run_all("MYCITE", "vertical", tmp_path / "out", batch=given, **kw)
+        mtb.run("MYCITE", "vertical", tmp_path / "out", batch=given, **kw)
     assert str(e.value) == _c1("batch", given, "donor")
     assert calls == [] and not (tmp_path / "out").exists()
-    res = _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "out", **kw)
+    res = _quiet(mtb.run, "MYCITE", "vertical", tmp_path / "out", **kw)
     with pytest.raises(FileNotFoundError) as e:
         res.rescore(batch=given)
     assert str(e.value) == _c1("batch", given, "donor")
@@ -112,7 +112,7 @@ def test_other_names_that_are_no_file(cite, tmp_path):
     for given, col in (("sample id", "sample id"), ("rna:donor", "rna:donor"),
                        ("donor.h5ad", "donor.h5ad"), ("obs:", "")):
         with pytest.raises(FileNotFoundError) as e:
-            mtb.run_all("MYCITE", "vertical", batch=given, **kw)
+            mtb.run("MYCITE", "vertical", batch=given, **kw)
         assert str(e.value) == _c1("batch", given, col)
 
 
@@ -127,16 +127,16 @@ def test_a_missing_csv_keeps_its_text(cite, tmp_path):
                 f"{cwd}, the path resolves to {Path(name).resolve()}.")
     for name in ("missing.csv", "donor.tsv", "x.TXT", "sub/donor", "./donor"):
         with pytest.raises(FileNotFoundError) as e:
-            mtb.run_all("MYCITE", "vertical", dry_run=True, batch=name, **kw)
+            mtb.run("MYCITE", "vertical", dry_run=True, batch=name, **kw)
         assert str(e.value) == gone(name), name
         with pytest.raises(FileNotFoundError) as e:
-            mtb.run_all("MYCITE", "vertical", tmp_path / "out", batch=name, **kw)
+            mtb.run("MYCITE", "vertical", tmp_path / "out", batch=name, **kw)
         assert str(e.value) == gone(name), name
     # a Path is a path, whatever its name
     with pytest.raises(FileNotFoundError) as e:
-        mtb.run_all("MYCITE", "vertical", dry_run=True, batch=Path("donor"), **kw)
+        mtb.run("MYCITE", "vertical", dry_run=True, batch=Path("donor"), **kw)
     assert str(e.value) == gone("donor")
-    res = _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "out", **kw)
+    res = _quiet(mtb.run, "MYCITE", "vertical", tmp_path / "out", **kw)
     with pytest.raises(FileNotFoundError) as e:
         res.rescore(labels="missing.csv")
     assert str(e.value) == gone("missing.csv", "labels")
@@ -150,7 +150,7 @@ def test_a_file_named_like_a_column_is_read(cite, tmp_path):
     data, _ = cite
     donor = pd.Series(["d1", "d2"] * (N // 2), index=BARS, name="donor")
     donor.to_frame().to_csv(tmp_path / "donor")        # no suffix: it is there, so a file
-    plan = mtb.run_all(os.path.join(data, 'MYCITE'), 'vertical', methods=['totalVI'], verbose=False, dry_run=True, batch='donor')
+    plan = mtb.run(os.path.join(data, 'MYCITE'), 'vertical', methods=['totalVI'], verbose=False, dry_run=True, batch='donor')
     assert len(plan) == 1
 
 
@@ -162,14 +162,14 @@ def test_the_column_itself_works(cite, tmp_path):
     kw = dict(methods=['totalVI'], verbose=False)
     # in another row order: matched to the cells by barcode
     shuffled = obs.sample(frac=1, random_state=3)
-    plan = mtb.run_all("MYCITE", "vertical", dry_run=True, batch=shuffled["donor"], **kw)
+    plan = mtb.run("MYCITE", "vertical", dry_run=True, batch=shuffled["donor"], **kw)
     assert plan["runnable"].all()
-    res = _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "out",
+    res = _quiet(mtb.run, "MYCITE", "vertical", tmp_path / "out",
                  batch=shuffled["donor"], **kw)
     (rec,) = res.records
     assert rec["status"] == "CHAIN_OK" and rec["batch_source"] == "user"
     assert rec["n_batches"] == 2
-    straight = _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "out2",
+    straight = _quiet(mtb.run, "MYCITE", "vertical", tmp_path / "out2",
                       batch=obs["donor"], **kw).records[0]
     assert straight["metrics"] == rec["metrics"]
     again = res.rescore(batch=shuffled["donor"], labels=shuffled["celltype"])

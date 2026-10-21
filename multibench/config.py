@@ -175,7 +175,7 @@ class Config:
         ``$MULTIBENCH_REPO_PATH``, else ``<base>/scMultiBench_ref``.
     data_path : pathlib.Path
         Data root that holds the dataset folders; ``mtb.data.fetch``,
-        ``mtb.scan`` and ``mtb.run_all`` use it. Default
+        ``mtb.scan`` and ``mtb.run`` use it. Default
         ``$MULTIBENCH_DATA_PATH``, else ``<base>/data``.
     leiden_flavor : str
         Leiden backend of the clustering in ``mtb.evaluate``: ``"leidenalg"``
@@ -419,7 +419,7 @@ def ensure_repo(path=None):
                 (part / ".git" / _REF_RECORD).write_text(ref + "\n")
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         _sh.rmtree(part, ignore_errors=True)
-        # run_all's FAIL line shows the last 200 characters of an error: each
+        # run's FAIL line shows the last 200 characters of an error: each
         # text keeps its subject within them ("RuntimeError: " in front, and
         # with a ref of up to 40 characters, a full commit SHA)
         if ref and not isinstance(e, FileNotFoundError):

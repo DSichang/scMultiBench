@@ -131,7 +131,7 @@ def _mosaic(root):
 
 
 def test_a_size_caveat_states_the_folders_number(tmp_path):
-    plan = mtb.run_all(_mosaic(tmp_path), "mosaic", dry_run=True, verbose=False)
+    plan = mtb.run(_mosaic(tmp_path), "mosaic", dry_run=True, verbose=False)
     cav = plan.set_index("method").loc["Multigrate", "caveat"]
     assert cav == ("Multigrate needs about 1,300 cells in every batch, and batch 1 of this "
                    "folder has 250: leave Multigrate out.")
@@ -147,13 +147,13 @@ def test_the_benchmarks_own_mosaic_batches_hold_the_same_cells():
 
 
 def test_the_dry_run_command_keeps_the_out_dir_placeholder():
-    plan = mtb.run_all("D28", "diagonal", methods=["iNMF"], dry_run=True, verbose=False)
+    plan = mtb.run("D28", "diagonal", methods=["iNMF"], dry_run=True, verbose=False)
     assert plan["command"].iloc[0].endswith("'<out_dir>/iNMF_D28/'")
 
 
 def test_a_batch_of_the_wrong_length_is_refused_before_anything_runs(tmp_path):
     with pytest.raises(ValueError) as e:
-        mtb.run_all("D11", "vertical", methods=["Matilda"], dry_run=True, verbose=False,
+        mtb.run("D11", "vertical", methods=["Matilda"], dry_run=True, verbose=False,
                     batch=["a"] * 100)
     assert str(e.value) == ("batch has 100 entries for the 2,864 cells of D11: give one "
                             "batch per cell.")

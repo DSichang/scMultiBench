@@ -29,7 +29,7 @@ def test_one_category_prints_only_that_category(cat):
     assert "Every file name the loader reads" not in txt    # the full table: overview only
     # the last line runs scan on this category, and the install line is per method
     assert txt.splitlines()[-1].startswith(f"Next: mtb.scan('data/MYDATA', '{cat}')")
-    assert "multibench env install --methods X\n" in txt          # no --run (X27)
+    assert "  mtb.env.install(['X'])\n" in txt
     assert "lockfiles" not in txt and "two gates" not in txt
     # 0.4: scan's table has one row per method, with runnable and reason
     assert ("mtb.scan says which methods can run on the folder, and why not the rest "
@@ -78,7 +78,7 @@ def test_mosaic_lists_every_registry_pattern_with_methods_and_demo():
     assert "Cobolt" in d45 and "MultiVI" in d45 and "atac" in d45
     assert "StabMap" in d46 and "scMoMaT" in d46 and "2 = rna+atac, 3 = rna" in d46
     # the per-batch recipe (one file per batch) and its Python form
-    assert txt.count("--batch-index") == 3 and "batch_index=1" in txt
+    assert txt.count("mtb.io.export_dataset(") == 3 and "batch_index=1" in txt
     assert "atac<i>.h5 holds peaks" in txt
 
 
@@ -118,5 +118,5 @@ def test_one_atac_rule_in_describe_layout():
             "and ``atac_gas.h5`` (gene activity). Mosaic reads ``atac<i>.h5`` (peaks). "
             "``peak.h5``, and ``atac.h5`` for gene activity, are accepted as older names.")
     assert rule in " ".join(inspect.getdoc(mtb.describe_layout).split())
-    flat = " ".join(inspect.getdoc(mtb.run_all).split())
+    flat = " ".join(inspect.getdoc(mtb.run).split())
     assert "plausible" not in flat and "peaks are ``peak.h5``" not in flat

@@ -8,7 +8,7 @@ import pytest
 import multibench as mtb
 
 TOP = {"config", "plot", "catalog", "io", "env", "data", "find_methods", "method_info",
-       "params_for", "cite", "scan", "run_all", "load_batch", "BatchResult", "evaluate",
+       "params_for", "cite", "scan", "run", "load_batch", "BatchResult", "evaluate",
        "load_results", "recommend", "describe_layout", "__version__"}
 MEMBERS = {"io": ["export_dataset", "read_canonical"], "env": ["install"],
            "plot": ["bubble", "bar"], "data": ["fetch", "write_example"],

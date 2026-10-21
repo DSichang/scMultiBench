@@ -83,7 +83,7 @@ def test_best_order_single_candidate_skips_screening():
     """One candidate has nothing to disambiguate; it must not pay for two passes."""
     emb, lab, bat = _blobs()
     calls = []
-    real = W._scores            # evaluate's wide scores, which run_all uses (0.4.0)
+    real = W._scores            # evaluate's wide scores, which run uses (0.4.0)
 
     def counting(*a, **k):
         calls.append(k.get("only"))

@@ -66,7 +66,7 @@ def _resolve_role(ds_dir: Path, role: str) -> Path:
 def _batch_column_advice() -> str:
     """Export without per-batch files, then where the batch column goes."""
     return ('export without batch= and pass the column itself, as '
-                       'run_all(batch=adata.obs["donor"])')
+                       'run(batch=adata.obs["donor"])')
 
 
 def _one_file_advice(category: str, *, stem: str = "rna", has_adt: bool = False) -> str:

@@ -1,4 +1,4 @@
-"""Tests for the high-level workflow API (scan / run_all / BatchResult).
+"""Tests for the high-level workflow API (scan / run / BatchResult).
 
 The runnable COUNTS below are reference-host values (every method env
 installed). They are skipped, not failed, on a host without the envs; the
@@ -26,7 +26,7 @@ def _has_dataset(name):
 
 
 def test_run_all_dry_run_respects_method_filter():
-    plan = mtb.run_all("D11", "vertical", out_dir="/tmp/unused",
+    plan = mtb.run("D11", "vertical", out_dir="/tmp/unused",
                        methods=["Matilda", "totalVI"], dry_run=True)
     assert set(plan["method"]) == {"Matilda", "totalVI"}
 
@@ -39,7 +39,7 @@ def test_run_all_dry_run_is_the_scan_frame():
     for ds, cat in [("D11", "vertical"), ("D52", "cross"), ("D45", "mosaic")]:
         if not _has_dataset(ds):
             continue
-        plan = mtb.run_all(ds, cat, out_dir="/tmp/unused", dry_run=True, verbose=False)
+        plan = mtb.run(ds, cat, out_dir="/tmp/unused", dry_run=True, verbose=False)
         assert list(plan.columns)[-1] == "command"      # the CLI csv's column, in scan too
         scan = full_scan(ds, cat, out_dir="/tmp/unused", verbose=False)
         nested = W._nested_rows(scan[[W._would_run(r) for _, r in scan.iterrows()]])[0]

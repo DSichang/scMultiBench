@@ -69,7 +69,7 @@ def test_python_errors_suggest_a_series_that_works(cite, tmp_path):
                             "the cell ids: celltype, sample. Pass one column, for "
                             f'example pd.read_csv({quoted}, index_col=0)["celltype"], '
                             "or name the label column x.")
-    # run_all reads the file before any method runs, with the same advice
+    # run reads the file before any method runs, with the same advice
     data, batch, _ = cite
     (tmp_path / "d").mkdir()
     dsheet = _sheet(tmp_path / "d" / "obs_sheet.csv", BARS, batch)
@@ -78,7 +78,7 @@ def test_python_errors_suggest_a_series_that_works(cite, tmp_path):
                                          r"Pass "
                                          r"one column, for example "
                                          r"pd\.read_csv\("):
-        mtb.run_all(os.path.join(data, 'MYCITE'), 'vertical', dry_run=True, batch=dsheet, **KW)
+        mtb.run(os.path.join(data, 'MYCITE'), 'vertical', dry_run=True, batch=dsheet, **KW)
 
 
 def test_files_without_an_id_column_and_tsv_files(tmp_path):

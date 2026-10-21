@@ -67,7 +67,7 @@ def test_glue_record_keeps_the_caveat_without_the_prepared_file_note(tmp_path, m
         warnings.simplefilter("ignore")
         row = full_scan("LUNG_us", "diagonal", methods=["GLUE"], data_path=tmp_path,
                        verbose=False).iloc[0]
-        res = mtb.run_all(os.path.join(tmp_path, 'LUNG_us'), 'diagonal', tmp_path / 'out', methods=['GLUE'], evaluate=False)
+        res = mtb.run(os.path.join(tmp_path, 'LUNG_us'), 'diagonal', tmp_path / 'out', methods=['GLUE'], evaluate=False)
     assert row["runnable"] and "GLUE reads inputs/atac_peak_normpeaks.h5" in row["caveat"]
     kept = res.summary["caveat"].iloc[0]
     assert kept.startswith("GLUE reads the GENCODE v43 human annotation")
@@ -75,11 +75,11 @@ def test_glue_record_keeps_the_caveat_without_the_prepared_file_note(tmp_path, m
     blob = json.loads((tmp_path / "out" / "batch_result.json").read_text())
     assert blob["records"][0]["caveat"] == kept
     # the caveat starts with the method name: the log line names it once
-    assert f"[run_all]   {kept}\n" in capsys.readouterr().out
+    assert f"[run]   {kept}\n" in capsys.readouterr().out
 
 
 def test_wrong_kind_and_scripts_ref_keep_both_reasons(tmp_path, monkeypatch, gas_matilda):
-    """Under a mismatched ref a wrong-kind row names both problems, and run_all
+    """Under a mismatched ref a wrong-kind row names both problems, and run
     still refuses before any method starts."""
     d = tmp_path / "MU_PEAK"
     d.mkdir()
@@ -101,4 +101,4 @@ def test_wrong_kind_and_scripts_ref_keep_both_reasons(tmp_path, monkeypatch, gas
         assert r["reason"].endswith("Matilda needs gene-activity ATAC, and atac.h5 holds "
                                     "peaks. Export the ATAC as gene activity.")
         with pytest.raises(ValueError, match=r"^No method can run on MU_PEAK \(vertical\)"):
-            mtb.run_all(os.path.join(tmp_path, 'MU_PEAK'), 'vertical', tmp_path / 'out', modalities=['rna', 'atac'], verbose=False)
+            mtb.run(os.path.join(tmp_path, 'MU_PEAK'), 'vertical', tmp_path / 'out', modalities=['rna', 'atac'], verbose=False)

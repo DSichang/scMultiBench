@@ -2,7 +2,7 @@
 
 A bare string was iterated character by character: ``methods='Matilda'``
 failed with ``unknown method 'M'``. It now raises the ``TypeError``
-``mtb.scan`` / ``mtb.run_all`` raise for the same mistake, with the same
+``mtb.scan`` / ``mtb.run`` raise for the same mistake, with the same
 message naming the list spelling. The list spelling is unchanged.
 """
 import pytest

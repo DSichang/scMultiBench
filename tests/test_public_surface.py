@@ -18,7 +18,7 @@ from multibench.engine import envs, ingest
 MTB_ALL = {                                       # the 0.4.0 core API (TARGET.txt)
     "config", "plot", "catalog", "io", "env", "data",
     "find_methods", "method_info", "params_for", "cite",
-    "scan", "run_all", "load_batch", "BatchResult",
+    "scan", "run", "load_batch", "BatchResult",
     "evaluate", "load_results", "recommend",
     "describe_layout", "__version__",
 }
@@ -67,7 +67,8 @@ def test_plot_all_is_exactly_the_contract():
     assert set(mtb.plot.__all__) == PLOT_ALL
     assert _leaks(mtb.plot) == set()
     # the drawing internals stay in their module
-    from multibench.plot import bubble as B
+    import importlib
+    B = importlib.import_module("multibench.plot.bubble")
     assert callable(B.render) and B.FamilyBlock is not None
 
 
@@ -120,7 +121,7 @@ def test_cite_methods_keyword_is_gone():
 def test_scan_data_path_is_keyword_only_and_the_plan_has_command():
     with pytest.raises(TypeError):
         mtb.scan("D11", "vertical", "data")
-    df = mtb.run_all("D11", "vertical", methods=["Matilda"], dry_run=True, verbose=False)
+    df = mtb.run("D11", "vertical", methods=["Matilda"], dry_run=True, verbose=False)
     assert df.columns[-1] == "command" and len(df.columns) == 7          # c1 (C32)
     assert list(mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False).columns) == \
         ["method", "modalities", "runnable", "reason"]
@@ -129,12 +130,12 @@ def test_scan_data_path_is_keyword_only_and_the_plan_has_command():
 def test_run_all_dry_run_is_the_full_plan_and_out_dir_is_required_for_a_real_run():
     import pandas as pd
     from tests.conftest import full_scan
-    a = mtb.run_all("D11", "vertical", methods=["Matilda"], dry_run=True, verbose=False)
+    a = mtb.run("D11", "vertical", methods=["Matilda"], dry_run=True, verbose=False)
     b = full_scan("D11", "vertical", methods=["Matilda"], verbose=False)
     from multibench import workflow as W
     pd.testing.assert_frame_equal(a, b[W.PLAN_COLUMNS])                 # c1 (C32)
     with pytest.raises(TypeError, match="out_dir"):
-        mtb.run_all("D11", "vertical", methods=["Matilda"], verbose=False)
+        mtb.run("D11", "vertical", methods=["Matilda"], verbose=False)
 
 
 def test_rescore_only_is_gone():

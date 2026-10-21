@@ -5,7 +5,7 @@
   stays runnable; GLUE and Seurat_v3 stay blocked by the peak-name check.
   Methods of either kind get a caveat that does not block.
 - The ATAC override ends the reason, after the env and GPU sentences.
-- run_all with allow_atac_mismatch=True reports the caveat once, not again
+- run with allow_atac_mismatch=True reports the caveat once, not again
   as a UserWarning; a direct mtb.run still warns.
 - BatchResult's repr counts a named SKIPPED method once; summary keeps
   n_batches whole next to SKIPPED rows.
@@ -219,7 +219,7 @@ def test_missing_and_foreign_ids_get_their_own_fix(mycite):
 
 
 def test_run_all_raises_names_the_batch_series_error():
-    doc = inspect.getdoc(mtb.run_all)
+    doc = inspect.getdoc(mtb.run)
     raises = doc.split("Raises\n------\n")[1].split("\n\n")[0]
     assert "a ``batch`` that does not fit the cells" in " ".join(raises.split())
 

@@ -1,5 +1,5 @@
 """The classification family (OCA, ACA, Spec, Sens, F1) in evaluate, to_long,
-run_all / rescore, the plots and the command line.
+run / rescore, the plots and the command line.
 
 ``evaluate`` reports the ``mean`` row of
 ``classification_metrics(classify(...))``; by default only for two or more
@@ -239,7 +239,7 @@ def test_batch_with_classification_only_is_used_not_warned(three):
     assert not [m for m in said if "changes nothing" in m]
 
 
-# ---------------------------------------------------------------- run_all / rescore
+# ---------------------------------------------------------------- run / rescore
 def _record(tmp_path, emb, method="StabMap"):
     out = tmp_path / "out" / f"{method}_MB"
     out.mkdir(parents=True)

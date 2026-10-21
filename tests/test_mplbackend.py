@@ -2,7 +2,7 @@
 
 Jupyter exports MPLBACKEND=module://matplotlib_inline.backend_inline; passed
 through `conda run` into a method env without matplotlib_inline, any method that
-imports matplotlib dies at import. Surfaced the first time run_all was executed
+imports matplotlib dies at import. Surfaced the first time run was executed
 FROM a notebook (Portal, diagonal tutorial section 8).
 """
 import os

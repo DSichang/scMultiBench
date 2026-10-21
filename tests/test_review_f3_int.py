@@ -171,7 +171,7 @@ def test_a_dataset_order_batch_is_cut_to_the_batches_a_method_reads(tmp_path, mo
 
 
 def test_batch_docs_name_the_label_file_order():
-    p = " ".join(inspect.getdoc(mtb.run_all).split("Parameters", 1)[1]
+    p = " ".join(inspect.getdoc(mtb.run).split("Parameters", 1)[1]
                  .split("Returns", 1)[0].split())
     # 0.4: labels_for is deprecated, so the doc no longer names it
     assert ("One batch per cell; a Series or a barcode-indexed CSV is aligned by barcode. "
@@ -275,7 +275,7 @@ def test_layout_and_export_notes_say_scan_skips_the_other_representation():
     assert "still runs" not in txt
     assert "A method whose ATAC file holds the other representation gives a wrong " \
            "embedding." in txt
-    assert "mtb.scan and mtb.run_all skip such a method." in txt
+    assert "mtb.scan and mtb.run skip such a method." in txt
     assert "allow_atac_mismatch" not in txt          # deprecated in 0.4.0
     notes = " ".join(inspect.getdoc(ingest.export_dataset).split())
     assert "reports the mismatch in its ``caveat`` column" not in notes
@@ -335,7 +335,7 @@ def test_job_script_is_valid_bash(tmp_path):
     script.write_text(job)
     res = subprocess.run(["bash", "-n", str(script)], capture_output=True, text=True)
     assert res.returncode == 0, res.stderr
-    assert "# export MULTIBENCH_SCRIPTS_REF=<commit>" in job
+    assert 'python run_one.py "$1"' in job
 
 
 @needs_docs

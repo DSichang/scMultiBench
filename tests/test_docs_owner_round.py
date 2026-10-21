@@ -135,7 +135,7 @@ def test_the_quickstart_tab_names_batch_for_donors():
     page = _flat("quickstart.md")
     tab = page.split('=== "Linux, environments installed"', 1)[1].split("10x Multiome,", 1)[0]
     assert ("With several donors or samples in the file, add `batch=adata.obs[\"donor\"]` to "
-            "`run_all`. The summary then has the batch metrics. The recipe "
+            "`run`. The summary then has the batch metrics. The recipe "
             "[Another number of donors](tutorials/run.md#recipe-donors) has the steps.") in tab
     # the recipe the bullet and the tab point at says the same
     recipe = _flat("tutorials/run.md").split("{ #recipe-donors }", 1)[1]

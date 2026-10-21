@@ -67,7 +67,7 @@ FENCES = {
                           'ann.index = ann.index + "-1"',
                           'adata = adata[adata.obs["celltype"].notna()].copy()'],
     "recipe-no-labels": ['NAME = "MYDATA"   # <- a name for your data',
-                         'mine = mtb.run_all("mydata/" + NAME, "vertical", '
+                         'mine = mtb.run("mydata/" + NAME, "vertical", '
                          'methods=METHODS,',
                          'mtb.io.export_dataset(adata, "mydata/" + NAME, rna=None, '
                          'labels="obs:celltype",'],
@@ -331,7 +331,7 @@ def test_the_fences_are_the_ones_these_tests_run():
     # the section opens by saying where a recipe runs and which names it uses
     opening = " ".join(_section().split("####", 1)[0].split())
     assert ("Run them in the tutorial notebook of your task: `mtb` is imported, `METHODS` is "
-            "the list of methods from its section 2, and its check cell and `run_all` cell "
+            "the list of methods from its section 2, and its check cell and `run` cell "
             "use `NAME`, the folder name that a recipe sets.") in opening
     assert ("The recipes write to `mydata/` and call the cell-type column `celltype`, as the "
             "tutorials do.") in opening
@@ -348,7 +348,7 @@ def test_the_dataset_folder_section_points_to_the_recipes():
                "another number of donors, see [Recipes for your own data](#own-data-recipes).")
     paragraphs = [" ".join(par.split()) for par in section.strip().split("\n\n")]
     assert paragraphs[0] == ("`mtb.io.export_dataset` writes an AnnData or MuData as a dataset "
-                             "folder, which `scan` and `run_all` read.")
+                             "folder, which `scan` and `run` read.")
     assert paragraphs[1] == pointer and " ".join(page.split()).count(pointer) == 1
     # before the first tab, and outside every collapsed block
     link = "[Recipes for your own data](#own-data-recipes)"
@@ -700,7 +700,7 @@ def test_the_label_file_that_the_check_names_depends_on_the_layout(host, tmp_pat
                             r"data it is `rna_cty\.csv`, for some methods together with "
                             r"`atac_cty\.csv`: the reason then holds `([^`]+)` or `([^`]+)` Without cell types, leave "
                             r"`labels=` out of the export and pass `evaluate=False` to "
-                            r"`run_all`\.")
+                            r"`run`\.")
     assert (one, both) == ("rna_cty.csv is missing.", "rna_cty.csv, atac_cty.csv are missing.")
     monkeypatch.chdir(tmp_path)
     rna = _cells(70)
@@ -750,7 +750,7 @@ def test_a_diagonal_folder_with_labels_for_one_side_is_not_scored(host, tmp_path
     """Diagonal data with cell types for the RNA cells only is the case of
     this recipe: nothing scores it."""
     monkeypatch.chdir(tmp_path)
-    assert ("`run_all` scores a diagonal folder only when both sides have labels. Leave "
+    assert ("`run` scores a diagonal folder only when both sides have labels. Leave "
             "`labels=` out and pass `evaluate=False`.") in _said("recipe-no-labels")
     rna = _cells(70)
     rna.obs["celltype"] = np.random.default_rng(0).choice(["T", "B"], 70)
@@ -766,9 +766,9 @@ def test_a_diagonal_folder_with_labels_for_one_side_is_not_scored(host, tmp_path
                                 category="diagonal")
     # nor does a label file of one side, put there by hand, give scores
     rna.obs["celltype"].rename("x").to_csv(out / "rna_cty.csv", index=False)
-    res = mtb.run_all(os.path.join('mydata', 'ONESIDE'), 'diagonal', methods=['SCALEX'], out_dir='out/ONESIDE', verbose=False)
+    res = mtb.run(os.path.join('mydata', 'ONESIDE'), 'diagonal', methods=['SCALEX'], out_dir='out/ONESIDE', verbose=False)
     assert [r["status"] for r in res.records] == ["RUN_OK_NO_LABEL_MATCH"]
-    res = mtb.run_all(os.path.join('mydata', 'ONESIDE'), 'diagonal', methods=['SCALEX'], out_dir='out/UNSCORED', evaluate=False, verbose=False)
+    res = mtb.run(os.path.join('mydata', 'ONESIDE'), 'diagonal', methods=['SCALEX'], out_dir='out/UNSCORED', evaluate=False, verbose=False)
     assert [r["status"] for r in res.records] == ["RUN_OK"]
 
 
@@ -866,7 +866,7 @@ def _unlabelled_run(key, ns, host):
     folder = Path("mydata") / NAMES[key]
     assert ns["NAME"] == NAMES[key]
     assert {p.suffix for p in folder.iterdir()} == {".h5"}          # no label file
-    first = mtb.run_all(os.path.join('mydata', ns['NAME']), GEN.TASKS[key]['cat'], methods=ns['METHODS'], out_dir='out/' + ns['NAME'], evaluate=False, verbose=False)
+    first = mtb.run(os.path.join('mydata', ns['NAME']), GEN.TASKS[key]['cat'], methods=ns['METHODS'], out_dir='out/' + ns['NAME'], evaluate=False, verbose=False)
     status = {r["method"]: r["status"] for r in first.records}
     ran = sorted(m for m, _ in host)
     assert ran == sorted(m for m in status if status[m] == "RUN_OK") and ran

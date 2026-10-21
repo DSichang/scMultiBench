@@ -1,11 +1,11 @@
 """Study round 3, work package wf: R3-01, R3-02 and the workflow part of R3-17.
 
 R3-01: a gene-activity token (``atac_gas`` / ``gas`` / ``gene_activity``)
-selected moETM, scMM and iPOLNG in scan and run_all, although they read peaks
+selected moETM, scMM and iPOLNG in scan and run, although they read peaks
 (their role is only named ``atac_gas``). The near-miss text of the
 gene-activity rows named a looser rule than the peak rows.
 
-R3-02: run_all attempted a row whose ATAC file held the other representation,
+R3-02: run attempted a row whose ATAC file held the other representation,
 printed only the unused-batch note and kept no caveat in the records.
 
 The env probe is pinned (every env installed, a GPU present) so the verdicts
@@ -20,6 +20,7 @@ here are what the package says about such a method, not about the real three.
 """
 import inspect
 import json
+import os
 import warnings
 
 import h5py
@@ -86,7 +87,9 @@ def _quiet(fn, *a, **kw):
 
 def test_peak_token_still_keeps_the_peak_methods_behind_an_atac_gas_role(tmp_path):
     root = _vertical(tmp_path, "MU_PK", "atac.h5", PEAKS)
-    for call in (full_scan, lambda *a, **k: mtb.run_all(*a, dry_run=True, **k)):
+    def plan(ds, cat, data_path, **k):
+        return mtb.run(os.path.join(data_path, ds), cat, dry_run=True, **k)
+    for call in (full_scan, plan):
         df = _quiet(call, "MU_PK", "vertical", modalities=["rna", "atac_peak"],
                     data_path=root, verbose=False)
         assert set(df["method"]) == PEAK_METHODS

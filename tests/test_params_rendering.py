@@ -73,7 +73,7 @@ def test_tunable_leaves_out_what_the_package_sets(method, category, mods, gone):
 
 def test_a_package_set_key_is_refused():
     with pytest.raises(KeyError, match=r"scMDC does not accept \['nbatch'\]"):
-        mtb.run_all("D52mini", "cross", methods=["scMDC"], params={"scMDC": {"nbatch": 5}},
+        mtb.run("D52mini", "cross", methods=["scMDC"], params={"scMDC": {"nbatch": 5}},
                     dry_run=True, verbose=False)
 
 
@@ -87,7 +87,7 @@ def test_tunable_default_is_what_a_run_uses():
 
 def test_run_all_params_for_a_method_not_run():
     with pytest.raises(ValueError, match=r"^params names scMM, which is not in methods=\.$"):
-        mtb.run_all("D52mini", "cross", methods=["Multigrate"],
+        mtb.run("D52mini", "cross", methods=["Multigrate"],
                     params={"scMM": {"epochs": 3}}, out_dir="/o", dry_run=True,
                     verbose=False)
 

@@ -23,7 +23,7 @@ def _h5(path, features, data):
 
 
 def _tree(tmp_path, *, with_outputs=True):
-    """``data/MYCITE`` (vertical RNA + ADT) and a run_all tree of totalVI and
+    """``data/MYCITE`` (vertical RNA + ADT) and a run tree of totalVI and
     Matilda whose records carry no ``out_dir``."""
     rng = np.random.default_rng(0)
     ds = tmp_path / "data" / "MYCITE"

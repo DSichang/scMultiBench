@@ -30,7 +30,7 @@ def test_relative_entrypoint_present_in_the_checkout(tmp_path, monkeypatch):
 
 
 def test_no_checkout_yet_reports_nothing(tmp_path, monkeypatch):
-    """run()/run_all() fetch the scripts; flagging them first would be wrong."""
+    """run()/run() fetch the scripts; flagging them first would be wrong."""
     monkeypatch.setattr(workflow.config.DEFAULT, "repo_path", tmp_path / "absent")
     monkeypatch.setattr(workflow.config, "__file__",
                         str(tmp_path / "pkg" / "multibench" / "config.py"))

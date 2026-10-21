@@ -9,7 +9,7 @@ from multibench.engine.ingest import read_canonical
 
 
 def _result(tmp_path, status="CHAIN_OK", method="Matilda"):
-    """A run_all result of one D11 method whose output folder holds an embedding."""
+    """A run result of one D11 method whose output folder holds an embedding."""
     n = len(pd.read_csv(mtb.config.DEFAULT.data_path / "D11" / "cty.csv"))
     out = tmp_path / "out"
     mdir = out / f"{method}_D11"

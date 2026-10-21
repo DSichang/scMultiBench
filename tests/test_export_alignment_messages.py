@@ -1,4 +1,4 @@
-"""export_dataset and run_all(batch=) say how a Series lines up with the cells: by
+"""export_dataset and run(batch=) say how a Series lines up with the cells: by
 position with a warning, or the barcode-suffix fix that evaluate names (core040 S-3, S-5)."""
 import anndata as ad
 import numpy as np

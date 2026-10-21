@@ -23,7 +23,7 @@ pytest.importorskip("scib")
 
 
 # --------------------------------------------------------------- integration repairs
-# wf R6-02 x R6-05: rescore reuses the batch run_all saved. That batch is not
+# wf R6-02 x R6-05: rescore reuses the batch run saved. That batch is not
 # one the caller gave, so a metrics= without a batch metric must not warn
 # 'batch= changes nothing here' (the first Example of BatchResult.rescore).
 from tests.test_study_r4_wf import N, _batch_metrics, cite  # noqa: E402,F401
@@ -35,7 +35,7 @@ _KW = dict(methods=["Matilda"], modalities=["rna", "adt"], verbose=False)
 def test_rescore_with_the_saved_batch_and_no_batch_metric_does_not_warn(cite, tmp_path):
     data, batch, shuffled = cite
     mtb.config.DEFAULT.data_path = data
-    res = _quiet(mtb.run_all, 'MYCITE', 'vertical', tmp_path / 'out', batch=shuffled, **_KW)
+    res = _quiet(mtb.run, 'MYCITE', 'vertical', tmp_path / 'out', batch=shuffled, **_KW)
     back = mtb.load_batch(tmp_path / "out")
     with warnings.catch_warnings():
         warnings.simplefilter("error", UserWarning)

@@ -1,4 +1,4 @@
-"""Work package J (workshop re-study, personas Chen and Ben): run_all error
+"""Work package J (workshop re-study, personas Chen and Ben): run error
 scoping, compact CLI tables, dry-run command preview, --param, one env-name
 resolver for every env command, did-you-mean before I/O, stdout/stderr
 discipline.
@@ -30,7 +30,7 @@ def no_envs(monkeypatch):
 # ------------------------------------------------------------------ J1: scoped "nothing is runnable"
 def test_nothing_runnable_lists_only_requested_methods(no_envs):
     with pytest.raises(ValueError) as e:
-        mtb.run_all("D11", "vertical", methods=["Matilda"], out_dir="/tmp/unused",
+        mtb.run("D11", "vertical", methods=["Matilda"], out_dir="/tmp/unused",
                     verbose=False, modalities="all")
     msg = str(e.value)
     assert msg.startswith("None of the requested methods (Matilda) can run on D11 "
@@ -42,12 +42,12 @@ def test_nothing_runnable_lists_only_requested_methods(no_envs):
     # nobody else's reason - Concerto/MIRA/MOFA2 were not requested
     for other in ("Concerto", "MIRA", "MOFA2", "scmb_concerto"):
         assert other not in msg
-    assert "mtb.run_all('D11', 'vertical', methods=['Matilda'], modalities=\"all\", dry_run=True)" in msg
+    assert "mtb.run('D11', 'vertical', methods=['Matilda'], modalities=\"all\", dry_run=True)" in msg
 
 
 def test_nothing_runnable_without_methods_says_first_3_of_n(no_envs):
     with pytest.raises(ValueError) as e:
-        mtb.run_all("D11", "vertical", out_dir="/tmp/unused", verbose=False,
+        mtb.run("D11", "vertical", out_dir="/tmp/unused", verbose=False,
                     modalities="all")
     msg = str(e.value)
     m = re.search(r"The first 3 of (\d+) blocked rows:\n", msg)
@@ -63,7 +63,7 @@ def test_requested_method_with_no_variant_in_category_is_a_request_error(no_envs
     runnable' text with other methods' reasons; plan() already said it right."""
     for dry in (False, True):
         with pytest.raises(ValueError) as e:
-            mtb.run_all("D52", "cross", methods=["Matilda"], out_dir="/tmp/unused",
+            mtb.run("D52", "cross", methods=["Matilda"], out_dir="/tmp/unused",
                         dry_run=dry, verbose=False)
         assert str(e.value) == "Matilda does not run on cross data. Its categories: vertical."
         assert "nothing is runnable" not in str(e.value)
@@ -72,9 +72,9 @@ def test_requested_method_with_no_variant_in_category_is_a_request_error(no_envs
 # ------------------------------------------------------------------ J6: did-you-mean before any I/O
 @pytest.mark.parametrize("call", [
     lambda: full_scan("NOPE", "vertical", data_path="/nonexistent/dir", methods=["StabMapp"]),
-    lambda: mtb.run_all("/nonexistent/dir/NOPE", "vertical", out_dir="/tmp/unused",
+    lambda: mtb.run("/nonexistent/dir/NOPE", "vertical", out_dir="/tmp/unused",
                         methods=["StabMapp"], verbose=False),
-    lambda: mtb.run_all("/nonexistent/dir/NOPE", "vertical", out_dir="/tmp/unused",
+    lambda: mtb.run("/nonexistent/dir/NOPE", "vertical", out_dir="/tmp/unused",
                         params={"StabMapp": {"k": 1}}, verbose=False),
     lambda: full_scan("NOPE", "vertical", data_path="/nonexistent/dir", methods=["StabMapp"],
                      out_dir="runs"),
@@ -118,14 +118,14 @@ def test_run_dry_run_mirrors_run_builder():
 
 def test_run_all_params_unknown_method_before_io_and_dry_run_key_check():
     with pytest.raises(KeyError, match="Did you mean Matilda"):
-        mtb.run_all("/nonexistent/NOPE", "vertical", out_dir="/tmp/unused",
+        mtb.run("/nonexistent/NOPE", "vertical", out_dir="/tmp/unused",
                     params={"Matlda": {"epochs": 5}}, verbose=False)
     with pytest.raises(KeyError) as e:
-        mtb.run_all("D11", "vertical", out_dir=None, dry_run=True, methods=["Matilda"],
+        mtb.run("D11", "vertical", out_dir=None, dry_run=True, methods=["Matilda"],
                     params={"Matilda": {"bogus": 1}}, verbose=False)
     assert "does not accept ['bogus']" in str(e.value)
     # a valid key passes and the plan comes back
-    plan = mtb.run_all("D11", "vertical", out_dir=None, dry_run=True, methods=["Matilda"],
+    plan = mtb.run("D11", "vertical", out_dir=None, dry_run=True, methods=["Matilda"],
                        params={"Matilda": {"epochs": 5}}, verbose=False)
     assert set(plan["method"]) == {"Matilda"}
 

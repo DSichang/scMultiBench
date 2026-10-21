@@ -157,7 +157,7 @@ def test_run_on_linux_keeps_the_install_line(tmp_path, monkeypatch):
         mtb.engine.runner.run("totalVI", "vertical", inputs=mtb.engine.resolve.inputs_for("D11", "vertical", "totalVI"),
                 out_dir=str(tmp_path / "out"))
     msg = str(e.value)
-    assert "is not installed" in msg and "multibench env install --methods totalVI" in msg
+    assert "is not installed" in msg and "mtb.env.install(['totalVI'])" in msg
     assert "Methods run only on Linux" not in msg
 
 

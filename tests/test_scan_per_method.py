@@ -114,7 +114,7 @@ def test_runnable_is_what_run_all_tries(ds, cat, linux, monkeypatch, tmp_path):
     for kw in ({}, {"methods": methods[:5]}, {"modalities": "all"}):
         pm = _quiet(mtb.scan, ds, cat, verbose=False, **kw)
         linux.clear()
-        _quiet(mtb.run_all, ds, cat, tmp_path / f"out{len(kw)}{list(kw)}", evaluate=False,
+        _quiet(mtb.run, ds, cat, tmp_path / f"out{len(kw)}{list(kw)}", evaluate=False,
                verbose=False, **kw)
         assert sorted(pm[pm["runnable"]]["method"]) == sorted(set(linux)) and linux, kw
         assert len(set(linux)) == len(linux)
@@ -156,9 +156,9 @@ def test_the_first_line_names_10x_files(linux, tmp_path, capsys):
         assert list(pm["method"]) == methods and not pm["runnable"].any()
     # with the rows that are not listed: the same sentence starts the note
     mtb.config.DEFAULT.data_path = tmp_path
-    _quiet(mtb.run_all, 'TXADT', 'vertical', dry_run=True)
+    _quiet(mtb.run, 'TXADT', 'vertical', dry_run=True)
     assert capsys.readouterr().out.splitlines()[1] == (
-        "[run_all] TXADT holds no dataset file: rna.h5 and adt.h5 are 10x Genomics files "
+        "[run] TXADT holds no dataset file: rna.h5 and adt.h5 are 10x Genomics files "
         "under the names of dataset files.")
     # one of two: the family of the other file is held, and the 10x file is named
     _cite(tmp_path, "MIX")

@@ -14,7 +14,7 @@
 - Old-style messages: an unknown modality, an unknown metrics= token, no
   conda, an empty bar table, the empty CLI table and the deprecated
   evaluate flags.
-- The fetch error with a ref keeps its subject in run_all's FAIL line.
+- The fetch error with a ref keeps its subject in run's FAIL line.
 - The ``env plan`` and ``env install`` descriptions are short sentences
   (the option help of ``scan`` and ``convert``: tests/test_study_r8_other.py);
   'preflight' is gone.
@@ -73,7 +73,7 @@ def macos_no_gpu(monkeypatch):
 
 def _nothing_runnable(dataset, category, **kw):
     with pytest.raises(ValueError) as e:
-        mtb.run_all(dataset, category, out_dir="out", verbose=False, **kw)
+        mtb.run(dataset, category, out_dir="out", verbose=False, **kw)
     return str(e.value)
 
 
@@ -85,7 +85,7 @@ def test_the_macos_list_counts_only_rows_whose_files_are_present(macos_no_gpu):
     # 0.4: off Linux the GPU sentence is left out (the OS already blocks), so no
     # method is listed as also blocked by something else
     assert lines[2] == f"{lacking} rows need files that D11 does not have."
-    assert lines[3].startswith("mtb.run_all('D11', 'vertical', modalities=\"all\", dry_run=True) shows "
+    assert lines[3].startswith("mtb.run('D11', 'vertical', modalities=\"all\", dry_run=True) shows "
                                "every row.")
     assert "NVIDIA GPU" not in msg and "also blocked" not in msg
     assert "atac" not in msg

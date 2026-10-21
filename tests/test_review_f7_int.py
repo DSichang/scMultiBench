@@ -37,10 +37,9 @@ ROOT = __import__("pathlib").Path(__file__).resolve().parent.parent
 def test_env_reason_names_the_category_in_a_sentence(monkeypatch):
     monkeypatch.setattr(R, "linux_only_sentence", lambda: None)
     text = W._env_hint("glue", "GLUE", "diagonal")
-    assert text == ("Environment glue is not installed. Run multibench env install "
-                    "--methods GLUE. Use --category diagonal to install the "
-                    "environments of every diagonal method.")
-    assert not re.search(r"\. --category", text)
+    assert text == ("Environment glue is not installed. Run mtb.env.install(['GLUE']). "
+                    "mtb.env.install(category='diagonal') installs the environments of "
+                    "every diagonal method.")
 
 
 # ======================================================================= R7-11

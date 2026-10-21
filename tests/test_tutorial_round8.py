@@ -5,10 +5,10 @@ and took ';' out of the package messages (R8-07). The notebook tutorials
 render on the same site, so their prose and the lines their cells print
 follow the same rule. Code and code comments are left as they are.
 
-R8-04 makes ``scan`` and ``run_all`` raise ``ValueError`` when ``methods=``
+R8-04 makes ``scan`` and ``run`` raise ``ValueError`` when ``methods=``
 names a method with no variant in the category, where they used to drop it.
 The run cells of the task tutorials pass a fixed method list to
-``run_all``. The guard below checks that list against the live package, so a
+``run``. The guard below checks that list against the live package, so a
 list that would now raise fails here instead of in a Run all.
 """
 import ast

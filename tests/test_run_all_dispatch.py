@@ -1,4 +1,4 @@
-"""Regression tests for the dispatch path of ``run_all``.
+"""Regression tests for the dispatch path of ``run``.
 
 Every pre-existing workflow test used ``dry_run=True``, so the branch that
 actually dispatches a method - and with it ``timeout``, ``skip_existing`` and
@@ -50,7 +50,7 @@ def _fake_run(calls, n_cells=2864, dims=20):
 
 
 def _plan_modalities(method, dataset, category):
-    plan = mtb.run_all(dataset, category, methods=[method],
+    plan = mtb.run(dataset, category, methods=[method],
                        out_dir="/tmp/unused", dry_run=True, verbose=False)
     ok = plan[plan["runnable"]]               # dry_run keeps blocked rows too
     return str((ok if len(ok) else plan).iloc[0]["modalities"]).split("+")
@@ -60,7 +60,7 @@ def test_timeout_path_dispatches_exactly_once(monkeypatch, tmp_path):
     """`timeout=` used to raise UnboundLocalError, then run the method twice."""
     calls = []
     monkeypatch.setattr(W, "_run", _fake_run(calls))
-    res = mtb.run_all("D11", "vertical", methods=["Matilda"],
+    res = mtb.run("D11", "vertical", methods=["Matilda"],
                       out_dir=str(tmp_path), timeout=600,
                       evaluate=False, verbose=False)
     assert len(calls) == 1, f"dispatched {len(calls)}x with timeout set, expected 1"
@@ -70,7 +70,7 @@ def test_timeout_path_dispatches_exactly_once(monkeypatch, tmp_path):
 def test_no_timeout_path_dispatches_exactly_once(monkeypatch, tmp_path):
     calls = []
     monkeypatch.setattr(W, "_run", _fake_run(calls))
-    res = mtb.run_all("D11", "vertical", methods=["Matilda"],
+    res = mtb.run("D11", "vertical", methods=["Matilda"],
                       out_dir=str(tmp_path), evaluate=False, verbose=False)
     assert len(calls) == 1, f"dispatched {len(calls)}x, expected 1"
     assert not len(res.failures), res.failures.to_string()
@@ -80,7 +80,7 @@ def test_unknown_override_rejected_on_the_timeout_path(monkeypatch, tmp_path):
     """Validation used to be skipped whenever `timeout` was set."""
     calls = []
     monkeypatch.setattr(W, "_run", _fake_run(calls))
-    res = mtb.run_all("D11", "vertical", methods=["Matilda"],
+    res = mtb.run("D11", "vertical", methods=["Matilda"],
                       params={"Matilda": {"not_a_real_parameter": 1}},
                       out_dir=str(tmp_path), timeout=600,
                       evaluate=False, verbose=False)
@@ -102,7 +102,7 @@ def test_valid_override_reaches_the_method_with_timeout(monkeypatch, tmp_path):
         pytest.skip(f"{method}'s first parameter has no default to pass")
     calls = []
     monkeypatch.setattr(W, "_run", _fake_run(calls))
-    mtb.run_all("D11", "vertical", methods=[method],
+    mtb.run("D11", "vertical", methods=[method],
                 params={method: {key: value}},
                 out_dir=str(tmp_path), timeout=600,
                 evaluate=False, verbose=False)
@@ -125,7 +125,7 @@ def test_timeout_bounds_evaluation_not_just_dispatch(monkeypatch, tmp_path):
     monkeypatch.setattr(W, "_evaluate_best_order", _slow_eval)
 
     t0 = time.time()
-    res = mtb.run_all("D11", "vertical", methods=["Matilda"], out_dir=str(tmp_path),
+    res = mtb.run("D11", "vertical", methods=["Matilda"], out_dir=str(tmp_path),
                       timeout=2, evaluate=True, verbose=False)
     elapsed = time.time() - t0
     assert res.summary.iloc[0]["status"] == "timeout", res.summary.to_string()
@@ -137,9 +137,9 @@ def test_deadline_is_disarmed_after_each_method(monkeypatch, tmp_path):
     import signal
     calls = []
     monkeypatch.setattr(W, "_run", _fake_run(calls))
-    mtb.run_all("D11", "vertical", methods=["Matilda"], out_dir=str(tmp_path),
+    mtb.run("D11", "vertical", methods=["Matilda"], out_dir=str(tmp_path),
                 timeout=600, evaluate=False, verbose=False)
-    assert signal.alarm(0) == 0, "an armed alarm outlived run_all"
+    assert signal.alarm(0) == 0, "an armed alarm outlived run"
 
 
 def test_skip_existing_does_not_redispatch(monkeypatch, tmp_path):
@@ -151,6 +151,6 @@ def test_skip_existing_does_not_redispatch(monkeypatch, tmp_path):
     (mdir / v0.output.file).write_bytes(b"")   # output already present
     calls = []
     monkeypatch.setattr(W, "_run", _fake_run(calls))
-    mtb.run_all("D11", "vertical", methods=["Matilda"], out_dir=str(tmp_path),
+    mtb.run("D11", "vertical", methods=["Matilda"], out_dir=str(tmp_path),
                 skip_existing=True, evaluate=False, verbose=False)
     assert calls == [], "skip_existing re-ran a method whose output already existed"

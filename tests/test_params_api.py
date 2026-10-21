@@ -171,7 +171,7 @@ def test_host_switches_and_dead_knobs_are_not_tunable():
         p = mtb.params_for(m, cat, list(mods))
         assert not keys & set(p["tunable"]), m
     # the package still turns CUDA off on a CPU host
-    plan = mtb.run_all("D52mini", "cross", methods=["scMDC"], dry_run=True, verbose=False)
+    plan = mtb.run("D52mini", "cross", methods=["scMDC"], dry_run=True, verbose=False)
     assert " --device cpu" in plan.command.iloc[0] or envs_has_gpu()
 
 

@@ -59,6 +59,6 @@ def test_examples_lines_fit_the_code_box():
 def test_the_scan_reads_examples():
     paths = {p for p, o in _public_objects() if _examples(inspect.getdoc(o) or "")}
     for want in ("multibench.eval.pipeline.evaluate", "multibench.plot.bar.bar",
-                 "multibench.workflow.run_all", "multibench.data.results.load_results",
+                 "multibench.workflow.run", "multibench.data.results.load_results",
                  "multibench.workflow.BatchResult.summary"):
         assert want in paths, want

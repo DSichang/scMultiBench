@@ -87,17 +87,17 @@ def wrong_ref(monkeypatch):
 
 
 def test_python_run_all_dry_run_prints_the_ref_note_only_when_verbose(wrong_ref, capsys):
-    df = mtb.run_all("D11", "vertical", methods=["totalVI"], dry_run=True, verbose=False)
+    df = mtb.run("D11", "vertical", methods=["totalVI"], dry_run=True, verbose=False)
     cap = capsys.readouterr()
     assert WRONG_REF not in cap.out and WRONG_REF not in cap.err
     assert df["reason"].str.contains(WRONG_REF[:-1], regex=False).all()
-    mtb.run_all("D11", "vertical", methods=["totalVI"], dry_run=True, verbose=True)
+    mtb.run("D11", "vertical", methods=["totalVI"], dry_run=True, verbose=True)
     cap = capsys.readouterr()
     assert WRONG_REF not in cap.err
     lines = cap.out.splitlines()
-    count = next(i for i, ln in enumerate(lines) if ln.startswith("[run_all] Dry run: "))
-    assert lines.count(f"[run_all] {WRONG_REF}") == 1, cap.out
-    assert lines.index(f"[run_all] {WRONG_REF}") > count
+    count = next(i for i, ln in enumerate(lines) if ln.startswith("[run] Dry run: "))
+    assert lines.count(f"[run] {WRONG_REF}") == 1, cap.out
+    assert lines.index(f"[run] {WRONG_REF}") > count
 
 
 def test_no_overlap_of_own_datasets_gives_one_action():
@@ -201,7 +201,7 @@ def test_run_all_refusal_off_linux_has_no_parenthesis_or_semicolon(off_linux, tm
                                                                     monkeypatch):
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     with pytest.raises(ValueError) as e:
-        mtb.run_all("D11", "vertical", methods=["totalVI"], out_dir=tmp_path, verbose=False)
+        mtb.run("D11", "vertical", methods=["totalVI"], out_dir=tmp_path, verbose=False)
     msg = str(e.value)
     assert "(this computer is" not in msg
     assert "Methods run only on Linux, and this computer runs macOS." in msg
@@ -211,17 +211,16 @@ def test_run_all_refusal_off_linux_has_no_parenthesis_or_semicolon(off_linux, tm
 def test_env_reason_on_linux_leads_with_the_install_command(monkeypatch):
     monkeypatch.setattr(R, "linux_only_sentence", lambda: None)
     text = W._env_hint("scmb_r", "StabMap", "mosaic")
-    assert text == ("Environment scmb_r is not installed. Run multibench env install "
-                    "--methods StabMap. Use --category mosaic to install "
-                    "the environments of every mosaic method.")
-    assert "multibench env install --methods StabMap." in text[:120]
+    assert text == ("Environment scmb_r is not installed. Run mtb.env.install(['StabMap']). "
+                    "mtb.env.install(category='mosaic') installs the environments of every "
+                    "mosaic method.")
+    assert "mtb.env.install(['StabMap'])." in text[:120]
     assert W._env_hint("scmb_r", "StabMap", None) == (
-        "Environment scmb_r is not installed. Run multibench env install --methods "
-        "StabMap.")
+        "Environment scmb_r is not installed. Run mtb.env.install(['StabMap']).")
     # every method's install command fits in the first 120 characters
     for m in registry.list_methods():
         env = envs.group_for(m)
-        cmd = f"multibench env install --methods {m}."
+        cmd = f"mtb.env.install([{m!r}])."
         assert cmd in W._env_hint(env, m, "vertical")[:120], m
 
 

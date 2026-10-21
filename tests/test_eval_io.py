@@ -247,7 +247,7 @@ def test_evaluate_list_of_label_paths_concatenates_in_order_and_builds_batch(tmp
     got = io.as_vector([p1, p2], what="labels")
     assert list(got) == list(ct)
     assert list(io.as_vector([p2, p1], what="labels")) == list(ct[30:]) + list(ct[:30])
-    # batch=None with several files -> batch = file of origin (1, 2), like run_all
+    # batch=None with several files -> batch = file of origin (1, 2), like run
     df = evaluate(emb, labels=[p1, str(p2)], metrics=["ARI", "GC", "ASW_batch"])
     ref = evaluate(emb, labels=ct, batch=np.array([1] * 30 + [2] * 60),
                    metrics=["ARI", "GC", "ASW_batch"])
@@ -387,7 +387,7 @@ def test_evaluate_warns_on_transpose():
 
 
 def test_read_labels_reads_benchmark_style_files(tmp_path):
-    """eval.io.read_labels is the label reader of run_all and evaluate() alike; it
+    """eval.io.read_labels is the label reader of run and evaluate() alike; it
     reads the benchmark's cty layout (single column, header "x")."""
     p = tmp_path / "cty.csv"
     vals = ["mDC.Lung", "T.CD.EM", "B", "T.CD.EM"]

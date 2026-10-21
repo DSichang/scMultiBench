@@ -68,7 +68,7 @@ def test_scan_and_find_methods_read_two_representations_alike(root):
     sc = full_scan("D28", "diagonal", modalities=mods, data_path=root / "data",
                   verbose=False)
     assert set(sc["method"]) == want
-    plan = mtb.run_all(os.path.join(root / 'data', 'D28'), 'diagonal', modalities=mods, dry_run=True)
+    plan = mtb.run(os.path.join(root / 'data', 'D28'), 'diagonal', modalities=mods, dry_run=True)
     assert set(plan["method"]) == want
 
 
@@ -125,10 +125,10 @@ def test_vertical_tutorial_export_demo_writes_counts(root, tmp_path, monkeypatch
     nb = json.loads((root / "notebooks" / "tutorial_vertical_rna_adt.ipynb").read_text())
     code = ["".join(c["source"]) for c in nb["cells"] if c["cell_type"] == "code"]
     i = next(i for i, src in enumerate(code) if "mtb.io.export_dataset(adata" in src)
-    export = code[i]                       # the check and run_all have a cell each
-    assert "run_all" not in export and export.startswith('NAME = "MYCITE"')
+    export = code[i]                       # the check and run have a cell each
+    assert "run" not in export and export.startswith('NAME = "MYCITE"')
     assert code[i + 1].startswith("mtb.scan(\"mydata/\" + NAME, ")
-    assert code[i + 2].startswith("mine = mtb.run_all(\"mydata/\" + NAME")
+    assert code[i + 2].startswith("mine = mtb.run(\"mydata/\" + NAME")
     monkeypatch.setattr(mtb.config.DEFAULT, "data_path", root / "data")
     monkeypatch.chdir(tmp_path)
     ns = {"mtb": mtb, "pd": pd}

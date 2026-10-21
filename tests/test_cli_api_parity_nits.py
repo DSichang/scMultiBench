@@ -3,7 +3,7 @@
 * ``multibench scan D52`` without ``--category`` scans all four, like Python;
 * ``inputs_for('D52', 'StabMap', 'cross')`` (the 0.2 order) is refused, never accepted;
 * a lower-case dataset id is canonicalised to the on-disk folder name;
-* ``run_all(dry_run=True)`` returns the ``command`` column the CLI csv carries;
+* ``run(dry_run=True)`` returns the ``command`` column the CLI csv carries;
 * ``multibench cite A,B`` works like ``multibench cite A B``.
 """
 import os
@@ -90,7 +90,7 @@ def test_run_all_names_out_dir_and_records_after_the_folder(tmp_path, monkeypatc
     _cite(tmp_path, "MYCITE")
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
-        res = mtb.run_all(os.path.join(tmp_path, 'mycite'), 'vertical', methods=['Matilda'], out_dir=str(tmp_path / 'runs'), evaluate=False, verbose=False)
+        res = mtb.run(os.path.join(tmp_path, 'mycite'), 'vertical', methods=['Matilda'], out_dir=str(tmp_path / 'runs'), evaluate=False, verbose=False)
     assert sum("on-disk spelling" in str(x.message) for x in w) == 1     # once, not per call
     assert res.dataset == "MYCITE"
     assert calls == [str(tmp_path / "runs" / "Matilda_MYCITE")]

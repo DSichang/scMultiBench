@@ -1,4 +1,4 @@
-"""run_all, scan and load_batch: plans, hints, saved trees."""
+"""run, scan and load_batch: plans, hints, saved trees."""
 from __future__ import annotations
 
 import warnings
@@ -45,10 +45,10 @@ def _dry(method, category, inputs, params, tmp_path):
                    params=params, dry_run=True, cmd_template="conda run -n x {cmd}")
 
 
-# --- run_all, scan, load_batch: X01, X11, X13, X35, X63-X66, X68, X79-X81 ----
+# --- run, scan, load_batch: X01, X11, X13, X35, X63-X66, X68, X79-X81 ----
 
 def _tree(tmp_path, scored_with="leidenalg/search/0.4.0", version="0.4.0"):
-    """A saved run_all folder of one scored method."""
+    """A saved run folder of one scored method."""
     import json
     rec = {"method": "Matilda", "status": "CHAIN_OK", "metrics": {"ARI": 0.5},
            "multibench_version": version, "out_dir": str(tmp_path / "Matilda_D11")}
@@ -82,9 +82,9 @@ def test_x35_summary_puts_the_scores_first(tmp_path):
 @pytest.mark.parametrize("value", [2.5, "abc", True, 3.0])
 def test_x63_param_values_are_type_checked(value):
     with pytest.raises(TypeError, match=r"^Multigrate: epochs takes a whole number, got "):
-        mtb.run_all("D52mini", "cross", methods=["Multigrate"],
+        mtb.run("D52mini", "cross", methods=["Multigrate"],
                     params={"Multigrate": {"epochs": value}}, dry_run=True, verbose=False)
-    plan = mtb.run_all("D52mini", "cross", methods=["Multigrate"],
+    plan = mtb.run("D52mini", "cross", methods=["Multigrate"],
                        params={"Multigrate": {"epochs": "3"}}, dry_run=True, verbose=False)
     assert "--epochs 3 " in plan.command.iloc[0] + " "
 
@@ -96,19 +96,19 @@ def test_x64_tunable_leaves_out_what_the_package_or_script_sets():
         assert name not in tun, name
     assert {"batch_size", "epochs_stage1", "lr_stage1"} <= set(tun)
     with pytest.raises(KeyError, match=r"scJoint does not accept \['cty_path1'\]"):
-        mtb.run_all("D28", "diagonal", methods=["scJoint"],
+        mtb.run("D28", "diagonal", methods=["scJoint"],
                     params={"scJoint": {"cty_path1": "x.csv"}}, dry_run=True, verbose=False)
     assert "r_dim" not in mtb.params_for("scMM", "vertical", ["rna", "atac"])["tunable"]
 
 
 def test_x65_method_colon_key_gets_the_nested_example():
     with pytest.raises(TypeError, match=r"such as params=\{'Multigrate': \{'epochs': 3\}\}\.$"):
-        mtb.run_all("D52mini", "cross", params={"Multigrate:epochs": 3}, dry_run=True)
+        mtb.run("D52mini", "cross", params={"Multigrate:epochs": 3}, dry_run=True)
 
 
 def test_x66_dry_run_refuses_skip_existing_with_params():
     with pytest.raises(ValueError, match=r"^skip_existing=True with params="):
-        mtb.run_all("D52mini", "cross", methods=["Multigrate"],
+        mtb.run("D52mini", "cross", methods=["Multigrate"],
                     params={"Multigrate": {"epochs": 3}}, skip_existing=True,
                     dry_run=True, verbose=False)
 
@@ -126,24 +126,24 @@ def test_x68_size_error_names_the_label_files_that_fit(tmp_path):
 
 def test_x68_dry_run_leaves_out_the_nested_variant(capsys):
     # 0.4.0: the plan leaves out the row a run leaves out, and says once which runs
-    plan = mtb.run_all("D52mini", "cross", methods=["UINMF"], dry_run=True)
+    plan = mtb.run("D52mini", "cross", methods=["UINMF"], dry_run=True)
     assert list(plan.modalities) == ["rna1+rna2+rna3+adt1+adt2+adt3"]
-    assert ("[run_all] UINMF runs on rna1+rna2+rna3+adt1+adt2+adt3, not on "
+    assert ("[run] UINMF runs on rna1+rna2+rna3+adt1+adt2+adt3, not on "
             "rna1+rna2+adt1+adt2") in capsys.readouterr().out
 
 
 def test_x80_one_batch_folder_lists_no_batched_variant(capsys):
-    plan = mtb.run_all("D27mini", "diagonal", methods=["iNMF", "online_iNMF"],
+    plan = mtb.run("D27mini", "diagonal", methods=["iNMF", "online_iNMF"],
                        dry_run=True)
     assert set(plan.modalities) == {"rna+atac_gas"}
     assert "Variants for numbered batches are not listed." in capsys.readouterr().out
-    every = mtb.run_all("D27mini", "diagonal", methods=["iNMF"], dry_run=True,
+    every = mtb.run("D27mini", "diagonal", methods=["iNMF"], dry_run=True,
                         modalities="all", verbose=False)
     assert len(every) == 2
 
 
 def test_x81_online_inmf_size_note_only_on_a_small_folder():
-    big = mtb.run_all("D28", "diagonal", methods=["online_iNMF"], dry_run=True,
+    big = mtb.run("D28", "diagonal", methods=["online_iNMF"], dry_run=True,
                       verbose=False)
     assert not big.caveat.str.contains("5,000 cells").any()
     from multibench.engine import registry
@@ -183,7 +183,7 @@ def test_x13_vertical_peak_methods_read_the_atac_role():
         got = mtb.engine.resolve.inputs_for("D27mini_vertical", "vertical", m)
         assert "atac" in got and "atac_gas" not in got, m
         assert got["atac"].endswith("atac_peak.h5"), m
-    plan = mtb.run_all("D27mini_vertical", "vertical", modalities=["rna", "atac"],
+    plan = mtb.run("D27mini_vertical", "vertical", modalities=["rna", "atac"],
                        dry_run=True, verbose=False)
     assert {"scMM", "scMDC", "moETM", "UnitedNet", "iPOLNG"} <= set(plan.method)
     # saved records still select the variant
@@ -192,7 +192,7 @@ def test_x13_vertical_peak_methods_read_the_atac_role():
         "modalities"] == ["rna", "atac"]
 
 
-# X68: scan shows the variant run_all runs
+# X68: scan shows the variant run runs
 def test_scan_shows_the_variant_run_all_runs():
     s = mtb.scan("D52mini", "cross", verbose=False)
     assert s.set_index("method").at["UINMF", "modalities"] == "rna1+rna2+rna3+adt1+adt2+adt3"

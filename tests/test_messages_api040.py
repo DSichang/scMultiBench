@@ -1,6 +1,6 @@
 """Three messages of the API review (D17).
 
-- run_all on a single-batch diagonal folder listed the multi-batch rows too
+- run on a single-batch diagonal folder listed the multi-batch rows too
   (about 1,700 characters); it lists the rows the folder can feed and counts
   the rest.
 - rescore with a batch that has one value among a method's cells said "Pass
@@ -25,7 +25,7 @@ def test_requested_rows_the_folder_cannot_feed_are_counted(tmp_path):
     for f in ("rna.h5", "atac_gas.h5", "rna_cty.csv", "atac_cty.csv"):
         (d / f).write_text("")
     with pytest.raises(ValueError) as e:
-        mtb.run_all(os.path.join(tmp_path, 'DG'), 'diagonal', methods=['iNMF'], out_dir=tmp_path / 'o', verbose=False)
+        mtb.run(os.path.join(tmp_path, 'DG'), 'diagonal', methods=['iNMF'], out_dir=tmp_path / 'o', verbose=False)
     text = str(e.value)
     assert "rna1+rna2+rna3" not in text
     # the row for numbered batches of this one-batch folder is not listed (X80)

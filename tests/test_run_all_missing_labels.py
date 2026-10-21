@@ -1,4 +1,4 @@
-"""run_all and rescore do not score a missing label, nor train on one (0.3.5).
+"""run and rescore do not score a missing label, nor train on one (0.3.5).
 
 A label file with ``NA`` or an empty field gave a ``CHAIN_OK`` record up to
 0.3.4: the missing labels were scored as one more cell type. A real run now
@@ -102,7 +102,7 @@ def cite(tmp_path, host):
 
 def _run(data, tmp_path, methods, **kw):
     mtb.config.DEFAULT.data_path = data
-    return _quiet(mtb.run_all, 'MYCITE', 'vertical', tmp_path / 'out', methods=methods, verbose=False, **kw)
+    return _quiet(mtb.run, 'MYCITE', 'vertical', tmp_path / 'out', methods=methods, verbose=False, **kw)
 
 
 def _refused(data, tmp_path, methods, **kw):
@@ -129,7 +129,7 @@ def test_run_all_stops_before_any_method(cite, tmp_path, host):
     # every method of the category: the same stop
     with pytest.raises(ValueError) as e:
         mtb.config.DEFAULT.data_path = cite
-        _quiet(mtb.run_all, 'MYCITE', 'vertical', tmp_path / 'out', verbose=False)
+        _quiet(mtb.run, 'MYCITE', 'vertical', tmp_path / 'out', verbose=False)
     assert str(e.value) == M1
     assert host == [] and not (tmp_path / "out").exists()
 
@@ -225,26 +225,26 @@ def test_dry_run_prints_the_same_fact(cite, tmp_path, host, capsys):
     _write(cite / "MYCITE" / "cty.csv", _with_gaps())
     mtb.config.DEFAULT.data_path = cite
     kw = dict(dry_run=True)
-    plan = mtb.run_all("MYCITE", "vertical", methods=["Matilda", "sciPENN"], **kw)
+    plan = mtb.run("MYCITE", "vertical", methods=["Matilda", "sciPENN"], **kw)
     out = capsys.readouterr().out.splitlines()
-    assert out[-1] == "[run_all] " + M1
+    assert out[-1] == "[run] " + M1
     assert len(plan) == 2 and plan["runnable"].all() and host == []
-    mtb.run_all("MYCITE", "vertical", methods=["totalVI"], **kw)
-    assert capsys.readouterr().out.splitlines()[-1] == "[run_all] " + M1
+    mtb.run("MYCITE", "vertical", methods=["totalVI"], **kw)
+    assert capsys.readouterr().out.splitlines()[-1] == "[run] " + M1
     # evaluate=False: only a method that reads the file stops the run
-    mtb.run_all("MYCITE", "vertical", methods=["Matilda", "sciPENN"], evaluate=False, **kw)
-    assert capsys.readouterr().out.splitlines()[-1] == "[run_all] " + M1_MATILDA
-    mtb.run_all("MYCITE", "vertical", methods=["totalVI"], evaluate=False, **kw)
+    mtb.run("MYCITE", "vertical", methods=["Matilda", "sciPENN"], evaluate=False, **kw)
+    assert capsys.readouterr().out.splitlines()[-1] == "[run] " + M1_MATILDA
+    mtb.run("MYCITE", "vertical", methods=["totalVI"], evaluate=False, **kw)
     assert "without a label" not in capsys.readouterr().out
     # verbose=False prints nothing, and nothing is raised
-    mtb.run_all("MYCITE", "vertical", methods=["Matilda"], verbose=False, **kw)
+    mtb.run("MYCITE", "vertical", methods=["Matilda"], verbose=False, **kw)
     assert capsys.readouterr().out == ""
 
 
 def test_dry_run_of_complete_labels_prints_no_such_line(cite, capsys):
-    mtb.run_all(os.path.join(cite, 'MYCITE'), 'vertical', methods=['Matilda'], dry_run=True)
+    mtb.run(os.path.join(cite, 'MYCITE'), 'vertical', methods=['Matilda'], dry_run=True)
     out = capsys.readouterr().out
-    assert "without a label" not in out and out.startswith("[run_all] Dry run: 1 of 1 ")
+    assert "without a label" not in out and out.startswith("[run] Dry run: 1 of 1 ")
 
 
 def test_a_dry_run_off_linux_names_the_method_that_would_read_the_file(
@@ -255,13 +255,13 @@ def test_a_dry_run_off_linux_names_the_method_that_would_read_the_file(
                         lambda: "Methods run only on Linux, and this computer runs macOS.")
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     _write(cite / "MYCITE" / "cty.csv", _with_gaps())
-    plan = mtb.run_all(os.path.join(cite, 'MYCITE'), 'vertical', methods=['Matilda', 'totalVI'], dry_run=True)
+    plan = mtb.run(os.path.join(cite, 'MYCITE'), 'vertical', methods=['Matilda', 'totalVI'], dry_run=True)
     assert not plan["runnable"].any()
-    assert capsys.readouterr().out.splitlines()[-1] == "[run_all] " + M1
+    assert capsys.readouterr().out.splitlines()[-1] == "[run] " + M1
     # the method is named when the run does not score
-    plan = mtb.run_all(os.path.join(cite, 'MYCITE'), 'vertical', methods=['Matilda', 'totalVI'], dry_run=True, evaluate=False)
+    plan = mtb.run(os.path.join(cite, 'MYCITE'), 'vertical', methods=['Matilda', 'totalVI'], dry_run=True, evaluate=False)
     assert not plan["runnable"].any()
-    assert capsys.readouterr().out.splitlines()[-1] == "[run_all] " + M1_MATILDA
+    assert capsys.readouterr().out.splitlines()[-1] == "[run] " + M1_MATILDA
 
 
 # ------------------------------------------------------------------ evaluate=False
@@ -294,7 +294,7 @@ def test_a_method_that_is_fed_the_folder_reads_its_label_files(tmp_path, host):
     assert list(plan["modalities"]) == ["(data_dir)"] and plan["runnable"].all()
     assert list(private["_label_inputs"]) == [("rna_cty.csv", "atac_cty.csv")]
     with pytest.raises(ValueError) as e:
-        _quiet(mtb.run_all, "UNPAIRED", "diagonal", tmp_path / "out", evaluate=False, **kw)
+        _quiet(mtb.run, "UNPAIRED", "diagonal", tmp_path / "out", evaluate=False, **kw)
     assert str(e.value) == (
         "rna_cty.csv of UNPAIRED has 3 of 60 cells without a label, for example 'NA', "
         "and scBridge reads the label files. Write the folder again with a label for "
@@ -314,11 +314,11 @@ def test_only_the_files_a_method_reads_stop_a_run_without_scores(tmp_path, host)
     _write(d / "cty2.csv", _with_gaps(40, na=1200 // 400, empty=0))
     mtb.config.DEFAULT.data_path = tmp_path / "data"
     kw = dict(verbose=False)
-    res = _quiet(mtb.run_all, "DONORS", "cross", tmp_path / "out", methods=["totalVI"],
+    res = _quiet(mtb.run, "DONORS", "cross", tmp_path / "out", methods=["totalVI"],
                  evaluate=False, **kw)
     assert [r["status"] for r in res.records] == ["RUN_OK"]
     with pytest.raises(ValueError) as e:
-        _quiet(mtb.run_all, "DONORS", "cross", tmp_path / "out2", methods=["totalVI"], **kw)
+        _quiet(mtb.run, "DONORS", "cross", tmp_path / "out2", methods=["totalVI"], **kw)
     assert str(e.value) == (
         "cty2.csv of DONORS has 3 of 40 cells without a label, for example 'NA'. Write "
         "the folder again with a label for every cell.")
@@ -362,7 +362,7 @@ def test_several_label_files_are_not_ranked(tmp_path, host, monkeypatch):
         _write(d / f"cty{b}.csv", (["A"] * (20 + b) + ["B"] * (20 - b)))
     mtb.config.DEFAULT.data_path = tmp_path / "data"
     kw = dict(verbose=False)
-    res = _quiet(mtb.run_all, "DONORS", "cross", tmp_path / "out", methods=["totalVI"], **kw)
+    res = _quiet(mtb.run, "DONORS", "cross", tmp_path / "out", methods=["totalVI"], **kw)
     (rec,) = res.records
     assert rec["status"] == "CHAIN_OK" and len(rec["label_order_candidates"]) > 1
     lab = np.array(["A"] * 20 + ["B"] * 20, dtype=object)
@@ -383,7 +383,7 @@ def test_several_label_files_are_not_ranked(tmp_path, host, monkeypatch):
     # a real run on this folder stops before the method
     host.clear()
     with pytest.raises(ValueError) as e:
-        _quiet(mtb.run_all, "DONORS", "cross", tmp_path / "out2", methods=["totalVI"], **kw)
+        _quiet(mtb.run, "DONORS", "cross", tmp_path / "out2", methods=["totalVI"], **kw)
     assert str(e.value) == ("cty2.csv of DONORS has 2 of 40 cells without a label, for "
                             "example 'None'. Write the folder again with a label for "
                             "every cell.")

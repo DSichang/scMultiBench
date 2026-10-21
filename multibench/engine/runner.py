@@ -59,7 +59,7 @@ class RunResult:
     a raw array itself.
 
     **Output kind.** Not every method returns an embedding: Seurat_WNN
-    writes only a neighbour graph, which ``mtb.run_all`` does not score.
+    writes only a neighbour graph, which ``mtb.run`` does not score.
     """
 
     method: str
@@ -599,7 +599,7 @@ def _argv(variant, method: str, values: dict, out_str: str, repo: Path,
 
 def unknown_params_error(method: str, unknown: list, allowed: set) -> KeyError:
     """The error for ``params`` keys a variant does not accept (``run`` and
-    ``mtb.run_all`` say the same)."""
+    ``mtb.run`` say the same)."""
     if not allowed:
         return KeyError(f"{method} does not accept {unknown}; {method} takes no "
                         f"hyperparameters (its script hardcodes them).")
@@ -691,7 +691,7 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
         params: dict | None = None, cmd_template: str | None = None,
         dry_run: bool = False):
     """Run one method on explicit inputs and load its output (internal:
-    ``mtb.run_all`` calls it for each runnable method of a dataset folder).
+    ``mtb.run`` calls it for each runnable method of a dataset folder).
 
     Parameters
     ----------
@@ -907,8 +907,8 @@ def _prepared_note(plan: dict, out_str: str, method: str) -> str | None:
     if not files:
         return None
     that = "that file" if len(files) == 1 else "those files"
-    return (f"{method} reads {', '.join(files)}. mtb.run_all writes {that} first, so "
-            f"start {method} with mtb.run_all. The printed command alone fails in a job "
+    return (f"{method} reads {', '.join(files)}. mtb.run writes {that} first, so "
+            f"start {method} with mtb.run. The printed command alone fails in a job "
             f"script.")
 
 

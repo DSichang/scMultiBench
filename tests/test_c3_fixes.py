@@ -66,7 +66,7 @@ def test_the_bar_axis_does_not_claim_0_1():
 
 # --------------------------------------------------------------- D03
 def _saved_tree(tmp_path):
-    """A saved run_all folder of D11 (its record names 'Matilda_D11'), under runs/."""
+    """A saved run folder of D11 (its record names 'Matilda_D11'), under runs/."""
     from tests.test_c2_fixes import _old_tree
     out = _old_tree(tmp_path)
     blob = json.loads((out / "batch_result.json").read_text())
@@ -85,7 +85,7 @@ def test_skip_existing_rescores_from_any_directory(where, tmp_path, monkeypatch)
                 "absolute": (tmp_path / "elsewhere", str(folder))}[where]
     monkeypatch.chdir(cwd)
     for _ in range(2):                                  # and again on what it saved
-        res = _quiet(mtb.run_all, "D11", "vertical", methods=["Matilda"], out_dir=out,
+        res = _quiet(mtb.run, "D11", "vertical", methods=["Matilda"], out_dir=out,
                      skip_existing=True)
         s = res.summary.set_index("method")
         assert (s.loc["Matilda", "status"], s.loc["Matilda", "run_sec"]) == ("scored", 17.0)
@@ -177,7 +177,7 @@ def test_a_batch_with_every_cell_and_some_others_is_matched_by_id():
                      metrics=["iLISI"])
 
 
-# --------------------------------------------------------------- scan and run_all texts
+# --------------------------------------------------------------- scan and run texts
 def _folder(root, name, files, n=60):
     """A dataset folder of ``n`` cells per file: {file: kind} with kind rna, gas or peak."""
     from tests.test_scan_held import _h5
@@ -195,7 +195,7 @@ def _folder(root, name, files, n=60):
 
 def test_e07_paired_files_count_their_cells_once(tmp_path, capsys):
     d = _folder(tmp_path, "MULTI", {"rna.h5": "rna", "atac.h5": "peak", "cty.csv": ""}, n=600)
-    mtb.run_all(str(d), "vertical", methods=["MIRA"], dry_run=True)
+    mtb.run(str(d), "vertical", methods=["MIRA"], dry_run=True)
     out = capsys.readouterr().out
     assert "MIRA needs about 3,000 cells, and this folder has 600: leave MIRA out." in out
 
@@ -220,7 +220,7 @@ def test_c13_e20_numbered_diagonal_folders(tmp_path, capsys):
 
 def test_c55_no_sentence_on_the_rows_of_a_modality_the_folder_lacks(capsys):
     mtb.scan("D11", "vertical")
-    mtb.run_all("D11", "vertical", methods=["Matilda", "totalVI"], dry_run=True)
+    mtb.run("D11", "vertical", methods=["Matilda", "totalVI"], dry_run=True)
     assert "not listed" not in capsys.readouterr().out
 
 

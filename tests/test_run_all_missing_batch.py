@@ -1,4 +1,4 @@
-"""run_all and rescore do not score a missing batch (0.3.5).
+"""run and rescore do not score a missing batch (0.3.5).
 
 ``batch=adata.obs["donor"]`` with a donor missing for some cells counted the
 missing value as one more batch up to 0.3.4 (iLISI of the same embedding:
@@ -107,10 +107,10 @@ def test_run_all_stops_on_a_missing_batch(cite, tmp_path, gap, seen):
     for batch in (series, series.sample(frac=1, random_state=0), series.to_numpy(),
                   list(series), series.to_frame()):
         with pytest.raises(ValueError) as e:
-            _quiet(mtb.run_all, "MYCITE", "vertical", dry_run=True, batch=batch, **kw)
+            _quiet(mtb.run, "MYCITE", "vertical", dry_run=True, batch=batch, **kw)
         assert str(e.value) == _bv2(5, seen)
         with pytest.raises(ValueError) as e:
-            _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "out", batch=batch, **kw)
+            _quiet(mtb.run, "MYCITE", "vertical", tmp_path / "out", batch=batch, **kw)
         assert str(e.value) == _bv2(5, seen)
     assert calls == [] and not (tmp_path / "out").exists()
 
@@ -120,7 +120,7 @@ def test_a_float_batch_with_a_gap(cite, tmp_path):
     batch = np.tile([1.0, 2.0], N // 2)
     batch[[3, 4, 50]] = np.nan
     with pytest.raises(ValueError) as e:
-        mtb.run_all(os.path.join(data, 'MYCITE'), 'vertical', tmp_path / 'out', methods=['totalVI'], verbose=False, batch=batch)
+        mtb.run(os.path.join(data, 'MYCITE'), 'vertical', tmp_path / 'out', methods=['totalVI'], verbose=False, batch=batch)
     assert str(e.value) == _bv2(3, NAN)
     assert calls == []
 
@@ -133,15 +133,15 @@ def test_a_batch_file_names_the_word_it_holds(cite, tmp_path):
     _donor("NA").to_frame().to_csv(sheet)                 # barcodes, then the donor
     for batch in (sheet, str(sheet)):
         with pytest.raises(ValueError) as e:
-            mtb.run_all("MYCITE", "vertical", batch=batch, **kw)
+            mtb.run("MYCITE", "vertical", batch=batch, **kw)
         assert str(e.value) == _bv2(5, ", for example 'NA'")
     _donor(np.nan).to_frame().to_csv(sheet)               # empty fields
     with pytest.raises(ValueError) as e:
-        mtb.run_all("MYCITE", "vertical", batch=sheet, **kw)
+        mtb.run("MYCITE", "vertical", batch=sheet, **kw)
     assert str(e.value) == _bv2(5, NAN)
     pd.DataFrame({"x": _donor("None", 2).to_numpy()}).to_csv(sheet, index=False)
     with pytest.raises(ValueError) as e:
-        mtb.run_all("MYCITE", "vertical", batch=sheet, **kw)
+        mtb.run("MYCITE", "vertical", batch=sheet, **kw)
     assert str(e.value) == _bv2(2, ", for example 'None'")
     assert calls == []
 
@@ -149,7 +149,7 @@ def test_a_batch_file_names_the_word_it_holds(cite, tmp_path):
 def test_rescore_stops_on_a_missing_batch(cite, tmp_path):
     data, calls = cite
     mtb.config.DEFAULT.data_path = data
-    res = _quiet(mtb.run_all, 'MYCITE', 'vertical', tmp_path / 'out', methods=['totalVI'], verbose=False)
+    res = _quiet(mtb.run, 'MYCITE', 'vertical', tmp_path / 'out', methods=['totalVI'], verbose=False)
     assert [r["status"] for r in res.records] == ["CHAIN_OK"]
     for gap, seen in ((np.nan, NAN), ("nan", ", for example 'nan'")):
         series = _donor(gap)
@@ -173,9 +173,9 @@ def test_a_complete_batch_runs(cite, tmp_path):
     series = _donor(n_gaps=0)
     mtb.config.DEFAULT.data_path = data
     kw = dict(methods=['totalVI'], verbose=False)
-    plan = mtb.run_all("MYCITE", "vertical", dry_run=True, batch=series, **kw)
+    plan = mtb.run("MYCITE", "vertical", dry_run=True, batch=series, **kw)
     assert len(plan) == 1 and plan["runnable"].all()
-    res = _quiet(mtb.run_all, "MYCITE", "vertical", tmp_path / "out", batch=series, **kw)
+    res = _quiet(mtb.run, "MYCITE", "vertical", tmp_path / "out", batch=series, **kw)
     (rec,) = res.records
     assert rec["status"] == "CHAIN_OK" and rec["batch_source"] == "user"
     assert rec["n_batches"] == 2 and rec["metrics"]["ASW_batch"] is not None

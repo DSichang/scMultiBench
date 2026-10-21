@@ -64,7 +64,7 @@ def test_scan_reason_is_short_but_files_reason_is_verbatim(no_envs):
         assert ".; " not in text
         assert "FileNotFoundError" not in r["reason"] and root not in r["reason"]
         assert r["reason"].endswith(". " + r["env_reason"])      # env half verbatim
-        assert "multibench env install --methods" in r["reason"]   # install command kept
+        assert "mtb.env.install([" in r["reason"]   # install command kept
     row = df[(df["method"] == "UnitedNet")].iloc[0]
     # the meaning first for ATAC (L31); D11's cty.csv is UnitedNet's label file (M21)
     assert row["reason"].startswith("UnitedNet needs peak ATAC (atac.h5), which the "
@@ -74,7 +74,7 @@ def test_scan_reason_is_short_but_files_reason_is_verbatim(no_envs):
 
 def test_scan_docs_name_the_four_columns():
     returns = " ".join(inspect.getdoc(mtb.scan).split("Returns", 1)[1].split("Raises")[0].split())
-    assert ("``method``, ``modalities`` (of the variant ``run_all`` would run, ``+``-joined), "
+    assert ("``method``, ``modalities`` (of the variant ``run`` would run, ``+``-joined), "
             "``runnable`` and ``reason``.") in returns
 
 
@@ -82,9 +82,9 @@ def test_scan_docs_name_the_four_columns():
 @pytest.mark.parametrize("call", [
     lambda: full_scan("D11", "vertical", methods="StabMap"),
     lambda: full_scan("D11", "vertical", methods="StabMap", out_dir="runs"),
-    lambda: mtb.run_all("D11", "vertical", methods="StabMap", out_dir="/tmp/unused",
+    lambda: mtb.run("D11", "vertical", methods="StabMap", out_dir="/tmp/unused",
                         verbose=False),
-    lambda: mtb.run_all("D11", "vertical", methods="StabMap", out_dir=None, dry_run=True,
+    lambda: mtb.run("D11", "vertical", methods="StabMap", out_dir=None, dry_run=True,
                         verbose=False),
 ])
 def test_methods_as_a_string_raises_pass_a_list(call):
@@ -99,7 +99,7 @@ def test_modalities_as_a_string_raises_pass_a_list():
     with pytest.raises(TypeError, match=r"modalities=\['rna'\]"):
         full_scan("D11", "vertical", modalities="rna")
     with pytest.raises(TypeError, match="must be a list"):
-        mtb.run_all("D11", "vertical", modalities="rna", out_dir="/tmp/unused", verbose=False)
+        mtb.run("D11", "vertical", modalities="rna", out_dir="/tmp/unused", verbose=False)
 
 
 def test_run_all_real_run_raises_on_missing_dataset_before_any_dispatch(monkeypatch):
@@ -109,7 +109,7 @@ def test_run_all_real_run_raises_on_missing_dataset_before_any_dispatch(monkeypa
     with warnings.catch_warnings():
         warnings.simplefilter("error")           # no warning may stand in for the error
         with pytest.raises(FileNotFoundError, match="does not exist"):
-            mtb.run_all("NO_SUCH_DATASET_XYZ", "vertical", out_dir="/tmp/unused",
+            mtb.run("NO_SUCH_DATASET_XYZ", "vertical", out_dir="/tmp/unused",
                         dry_run=False, verbose=False)
 
 
@@ -157,7 +157,7 @@ def test_nothing_runnable_message_names_the_platform_off_linux(no_envs, monkeypa
                         lambda: "method environments are linux-64 conda envs; this host is darwin/arm64")
     for kw in ({"methods": ["Matilda"]}, {}):
         with pytest.raises(ValueError) as e:
-            mtb.run_all("D11", "vertical", out_dir="/tmp/unused", verbose=False, **kw)
+            mtb.run("D11", "vertical", out_dir="/tmp/unused", verbose=False, **kw)
         msg = str(e.value)
         # the platform sentence is the first line after the head (L18)
         assert msg.splitlines()[1].startswith(
@@ -167,5 +167,5 @@ def test_nothing_runnable_message_names_the_platform_off_linux(no_envs, monkeypa
         assert not re.search(r"\n  Methods", msg)       # never looks like a variant line
     monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
     with pytest.raises(ValueError) as e:
-        mtb.run_all("D11", "vertical", methods=["Matilda"], out_dir="/tmp/unused", verbose=False)
+        mtb.run("D11", "vertical", methods=["Matilda"], out_dir="/tmp/unused", verbose=False)
     assert "Methods run only on Linux" not in str(e.value)

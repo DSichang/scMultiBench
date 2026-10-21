@@ -1186,7 +1186,7 @@ def _scores(
             # after the batch is read: a wrong column gets its error alone
             _unused_batch_warning(metrics)
     elif batch_from_files and group in {"batch", "all"}:
-        # the label file of each cell (1, 2, ...), as run_all
+        # the label file of each cell (1, 2, ...), as run
         ba = origin
     else:
         # the clustering metrics need a batch key but do not use it

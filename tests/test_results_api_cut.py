@@ -28,7 +28,7 @@ def _quiet(fn, *a, **k):
 def test_metric_selection_is_one_vocabulary():
     assert metric_selection(None).codes is None and metric_selection("all").codes is None
     clu = metric_selection("clustering")
-    assert clu.family == "clustering" and clu.codes == list(mtb.plot.CLUSTERING_METRICS)
+    assert clu.family == "clustering" and clu.codes == list(mtb.catalog.metrics().query('family == "clustering"').metric)
     assert not clu.explicit
     lst = metric_selection(["ari", "kbet"])
     assert lst.codes == ["ARI", "kBET"] and lst.family == "all" and lst.explicit

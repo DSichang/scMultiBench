@@ -2,7 +2,7 @@
 
 One-second placeholders (scBridge among them) once reported tier 'fast' while
 far longer runs had been recorded for the same methods;
-scan/recommend/run_all(timeout=) all surfaced them. The table is now the max
+scan/recommend/run(timeout=) all surfaced them. The table is now the max
 over its three sources and these invariants pin it.
 """
 import glob

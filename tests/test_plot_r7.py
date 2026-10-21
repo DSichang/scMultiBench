@@ -55,12 +55,11 @@ def _outside(fig, pad=0.5):
 
 
 @pytest.mark.parametrize("kw", [
-    {"metrics": ["ARI"], "methods": ["Conos"]},                     # one method, one metric
-    {"metrics": ["ARI"], "methods": ["Conos"], "title": "D28"},
+    {"metrics": ["ARI"], "methods": ["SCALEX"]},                    # one method, one metric
+    {"metrics": ["ARI"], "methods": ["SCALEX"], "title": "D28"},
     {"metrics": ["ARI", "NMI"]},                                    # two metrics
-    {"metrics": ["ARI", "NMI"], "methods": ["Conos"]},
+    {"metrics": ["ARI", "NMI"], "methods": ["SCALEX"]},
     {"metrics": ["ARI", "NMI", "cLISI"]},                           # the Quickstart figure
-    {"metrics": ["ARI"], "show_language": False},
 ])
 def test_narrow_figures_keep_legends_and_row_labels_inside(kw):
     fig = _quiet(mtb.plot.bubble, _d28(), **kw)
@@ -68,7 +67,7 @@ def test_narrow_figures_keep_legends_and_row_labels_inside(kw):
 
 
 def test_wide_figure_is_not_widened():
-    tbl = _quiet(B._build_table, _d28(), na="skip")
+    tbl = _quiet(B._build_table, _d28())
     fig = _quiet(B.render, tbl)
     total_w = sum(1.5 + 1.1 * b.raw.shape[1] + 0.5 for b in tbl.blocks) - 0.5
     assert fig.get_size_inches()[0] == pytest.approx(0.6 * total_w + 2.8)

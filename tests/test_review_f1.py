@@ -1,7 +1,7 @@
 """Findings of the review of the round-1 integration (wp/f1_int).
 
 - A scan row's ``modalities`` split on ``+`` selects that row again, in
-  scan, run_all and the CLI, also for moETM, scMM and iPOLNG (peak input
+  scan, run and the CLI, also for moETM, scMM and iPOLNG (peak input
   named atac_gas) when methods= names them; ``atac_peak`` with ``atac_gas``
   means "reads both files" (MultiMAP, Seurat_v3) instead of an error (L13
   kept 0.3.1's calls).
@@ -50,7 +50,7 @@ def test_two_representations_select_the_methods_that_read_both_files(data):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         sc = full_scan("D28", "diagonal", modalities=BOTH, data_path=data, verbose=False)
-        plan = mtb.run_all(os.path.join(data, 'D28'), 'diagonal', modalities=BOTH, dry_run=True)
+        plan = mtb.run(os.path.join(data, 'D28'), 'diagonal', modalities=BOTH, dry_run=True)
     want = {"MultiMAP", "Seurat_v3"}
     assert set(sc["method"]) == want and set(plan["method"]) == want
     assert set(sc["modalities"]) == {"rna+atac_peak+atac_gas"}

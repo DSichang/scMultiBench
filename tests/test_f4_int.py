@@ -30,16 +30,16 @@ def test_run_all_dry_run_names_a_scripts_folder_without_scripts(tmp_path, monkey
     root = _gasmos(tmp_path)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        df = W.run_all(os.path.join(root, 'GASMOS'), 'mosaic', dry_run=True, methods=['StabMap'], verbose=False)
+        df = W.run(os.path.join(root, 'GASMOS'), 'mosaic', dry_run=True, methods=['StabMap'], verbose=False)
     sentence = (f"{repo} holds other files and no method scripts. Set MULTIBENCH_REPO_PATH "
-                f"or mtb.config.DEFAULT.repo_path to an empty or new folder, then run "
-                f"multibench fetch --scripts. If the folder is left over from an earlier "
+                f"or mtb.config.DEFAULT.repo_path to an empty or new folder; the first run "
+                f"fetches the scripts into it. If the folder is left over from an earlier "
                 f"fetch, you can remove it instead")
     assert not df["runnable"].any() and df["reason"].str.startswith(sentence).all()
     # R7-07: the note is printed with verbose=True only, after the count line
     assert sentence not in capsys.readouterr().err
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        W.run_all(os.path.join(root, 'GASMOS'), 'mosaic', dry_run=True, methods=['StabMap'], verbose=True)
+        W.run(os.path.join(root, 'GASMOS'), 'mosaic', dry_run=True, methods=['StabMap'], verbose=True)
     out = capsys.readouterr().out
-    assert out.count(f"[run_all] {sentence}.\n") == 1, out
+    assert out.count(f"[run] {sentence}.\n") == 1, out

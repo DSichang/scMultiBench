@@ -10,7 +10,7 @@
 - No unsaved-batch warning when ``metrics=`` has no batch metric.
 - A headerless first column that repeats numbers is read as an index only
   in the ``pd.concat([...]).to_csv()`` pattern.
-- Messages as sentences: the run_all "more rows" line, ``files_reason``,
+- Messages as sentences: the run "more rows" line, ``files_reason``,
   the modality note, the no-variant error, the missing dataset folder, the
   label-count errors, the scBridge data_dir error, the several-columns
   error, the plot unknown-name errors, the overlay error for several
@@ -41,7 +41,7 @@ from tests.test_study_r6_wf import KW, _shuffled_labels, rel  # noqa: F401
 
 #: 0.4: data_path= of load_batch is deprecated, so the fix names the config
 MOVED = ("Set mtb.config.DEFAULT.data_path to the folder that holds it, or run rescore "
-         "from the folder where run_all ran.")
+         "from the folder where mtb.run ran.")
 from tests.conftest import full_scan
 
 pytest.importorskip("scib")
@@ -61,7 +61,7 @@ def _donor(b, n):
 @pytest.fixture
 def stacked(tmp_path, monkeypatch):
     """A cross folder of three batches, a StabMap-like fake run that stacks
-    them in EMB_ORDER with a donor effect, and run_all(batch=<donor Series>)
+    them in EMB_ORDER with a donor effect, and run(batch=<donor Series>)
     from ``tmp_path`` with the relative data_path 'data'."""
     d = tmp_path / "data" / "MYCROSS"
     d.mkdir(parents=True)
@@ -94,7 +94,7 @@ def stacked(tmp_path, monkeypatch):
     donor = np.concatenate([_donor(b, n) for b, n in SIZES.items()])
     batch = pd.Series(donor, index=bars).sample(frac=1.0, random_state=2)
     mtb.config.DEFAULT.data_path = "data"
-    res = _quiet(mtb.run_all, 'MYCROSS', 'cross', 'out', methods=['StabMap'], batch=batch, verbose=False)
+    res = _quiet(mtb.run, 'MYCROSS', 'cross', 'out', methods=['StabMap'], batch=batch, verbose=False)
     emb_labels = np.concatenate([labs[b] for b in EMB_ORDER])
     return res, emb_labels, tmp_path
 
@@ -153,7 +153,7 @@ def test_a_saved_batch_is_dropped_when_the_dataset_folder_is_not_found(stacked):
 def test_no_unsaved_batch_warning_without_a_batch_metric(cite, tmp_path):
     data, batch, shuffled = cite
     mtb.config.DEFAULT.data_path = data
-    _quiet(mtb.run_all, 'MYCITE', 'vertical', tmp_path / 'out', batch=shuffled, **KW)
+    _quiet(mtb.run, 'MYCITE', 'vertical', tmp_path / 'out', batch=shuffled, **KW)
     p = tmp_path / "out" / "batch_result.json"
     blob = json.loads(p.read_text())
     for r in blob["records"]:                      # a folder from before 0.3.2
@@ -257,12 +257,12 @@ def test_the_scbridge_error_names_the_method_once(tmp_path):
 # =========================================================== docstrings
 def test_docstrings_quote_the_current_texts():
     flat = {k: " ".join(inspect.getdoc(o).split()) for k, o in {
-        "run_all": mtb.run_all, "save": W.BatchResult.save, "run": mtb.engine.runner.run,
+        "run": mtb.run, "save": W.BatchResult.save, "run": mtb.engine.runner.run,
         "rescore": W.BatchResult.rescore, "load_batch": mtb.load_batch}.items()}
-    assert "nothing is runnable" not in flat["run_all"]
-    # 0.4: the Notes of run_all, run and rescore that quoted these texts are cut
-    assert "no 'cross' variant matches" not in flat["run_all"]
-    assert "and the ``batch`` vector" not in flat["run_all"]
+    assert "nothing is runnable" not in flat["run"]
+    # 0.4: the Notes of run, run and rescore that quoted these texts are cut
+    assert "no 'cross' variant matches" not in flat["run"]
+    assert "and the ``batch`` vector" not in flat["run"]
     assert "all four files" not in flat["save"]
     assert "every file in the list above is rewritten from the merged set" in flat["save"]
     assert "see its Notes" not in flat["rescore"]

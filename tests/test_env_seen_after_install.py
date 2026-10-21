@@ -1,7 +1,7 @@
 """An environment installed after a first scan() counts at once.
 
 scan() cached the installed envs for the session, so after
-mtb.env.install(...) the next scan()/run_all() still reported the env as
+mtb.env.install(...) the next scan()/run() still reported the env as
 not installed until the kernel restarted.
 """
 import multibench as mtb

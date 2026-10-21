@@ -3,7 +3,7 @@
 # Measured on one shared machine (2x RTX 4090, 64 cores, often under load) on the
 # datasets listed; runtime varies with hardware, cell count and load. Every value
 # is rounded up, so a listed time is never shorter than the run took. Use it to
-# size run_all(timeout=...), with headroom.
+# size run(timeout=...), with headroom.
 #
 # tier:   fast < 5 min | medium 5-30 min | slow 30 min-2 h | very_slow > 2 h
 # source: manual (hand-kept row) | summary_csv (run_sec in

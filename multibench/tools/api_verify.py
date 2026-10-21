@@ -60,10 +60,10 @@ def _():
     return mtb.params_for(s)["variant"]
 
 # ---------------- data resolution ----------------
-@check("scan + run_all(dry_run=True)")
+@check("scan + run(dry_run=True)")
 def _():
     t = mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False)
-    plan = mtb.run_all("D52", "cross", methods=["totalVI"], dry_run=True, verbose=False)
+    plan = mtb.run("D52", "cross", methods=["totalVI"], dry_run=True, verbose=False)
     return f"{list(t.columns)}; {len(plan)} cross row(s)"
 
 # ---------------- catalog / config ----------------

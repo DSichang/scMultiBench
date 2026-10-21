@@ -64,7 +64,7 @@ def test_total_line_does_not_sum_an_incomplete_column_as_a_total():
 
 def test_nothing_runnable_lists_rows_with_files_in_place_first(no_envs, tmp_path):
     with pytest.raises(ValueError) as e:
-        mtb.run_all("D11", "vertical", out_dir=str(tmp_path), verbose=False,
+        mtb.run("D11", "vertical", out_dir=str(tmp_path), verbose=False,
                     modalities="all")
     body = str(e.value).split("blocked rows:\n", 1)[1]
     lines = [l for l in body.splitlines() if l.startswith("  ")]

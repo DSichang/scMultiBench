@@ -4,7 +4,7 @@ name `multibench config` (R3-11; ``scan --strict`` is hidden since 0.4.0), and t
 
 The run-all test runs the real runner in prefix mode against a stand-in env
 prefix (a ``bin/python`` stub that writes an embedding), so the path from the
-command line to ``run_all(batch=)`` and the saved summary is exercised end to
+command line to ``run(batch=)`` and the saved summary is exercised end to
 end without conda or a method.
 """
 import argparse

@@ -38,7 +38,7 @@ file gate, `evaluate`, the figures - works on any machine.
 `scan()` checks two gates per method - `files_ok` (the dataset folder itself; this
 gate runs on any machine, no environments needed) and `env_ok` (the method's conda
 env exists here) - and marks a method runnable only when both pass, so a sweep
-never starts something it cannot finish. `mtb.run_all(dataset, category, dry_run=True)`
+never starts something it cannot finish. `mtb.run(dataset, category, dry_run=True)`
 is the plan with the blocked rows and their reasons kept.
 
 ## Things worth knowing before you start
@@ -83,7 +83,7 @@ Then the smallest real end-to-end check:
 import multibench as mtb
 mtb.data.fetch("D11")                                      # 11 MB reference dataset
 mtb.scan("D11", category="vertical")                       # files_ok 14 of 25 rows; env_ok per env built
-mtb.run_all("D11", "vertical", methods=["Matilda"], out_dir="/tmp/check")
+mtb.run("D11", "vertical", methods=["Matilda"], out_dir="/tmp/check")
 ```
 
 Matilda on D11 should reach `CHAIN_OK` in well under a minute. If it

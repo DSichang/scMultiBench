@@ -43,7 +43,7 @@ def _mosaic(root, n):
 def test_a_size_hint_shows_only_for_data_below_its_size(tmp_path, n, shown):
     # Z11 (r3): Multigrate's per-batch note is checked against the folder
     d = _mosaic(tmp_path, n)
-    plan = mtb.run_all(str(d), "mosaic", methods=["Multigrate"], dry_run=True, verbose=False)
+    plan = mtb.run(str(d), "mosaic", methods=["Multigrate"], dry_run=True, verbose=False)
     assert ("needs about 1,300 cells in every batch" in plan["caveat"].iloc[0]) is shown
 
 
@@ -59,6 +59,6 @@ def test_every_size_hint_is_checked_on_the_data():
 def test_a_variant_inside_a_larger_one_is_named_once():
     # X68 (r3): the dry run's one line says which row runs; no row repeats it.
     # 0.4.0: the nested row itself is left out, as a run leaves it out
-    plan = mtb.run_all("D52mini", "cross", methods=["UINMF"], dry_run=True, verbose=False)
+    plan = mtb.run("D52mini", "cross", methods=["UINMF"], dry_run=True, verbose=False)
     assert "rna1+rna2+adt1+adt2" not in set(plan["modalities"])
     assert not plan["caveat"].str.contains("so this row is not run").any()

@@ -101,9 +101,7 @@ def test_docstrings_match_the_code():
         " ".join(mplot.bubble.__doc__.split())
     from multibench.data import results
     assert "v1" not in results.__doc__ and "v1" not in results.load_results.__doc__
-    # to_long is deprecated since 0.4: evaluate returns the long table
-    assert pipeline.to_long.__doc__.strip() == \
-        "Deprecated: ``mtb.evaluate(..., method=, dataset=)`` returns the long table."
+    assert not hasattr(pipeline, "to_long")      # evaluate returns the long table
 
 
 def test_a_wrong_batch_column_gets_its_error_without_the_unused_batch_warning(tmp_path):

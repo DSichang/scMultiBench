@@ -54,13 +54,13 @@ def test_linux_tab_reads_the_file_itself():
 
 @needs_docs
 def test_dry_run_line_is_on_the_quickstart_only():
-    """R3-25: the CLI dry-run example stays on the Quickstart; Installation
-    no longer repeats it (tutorials/run carries the dry-run step)."""
+    """R3-25: the dry-run step stays on the Quickstart; Installation no longer
+    repeats it (tutorials/run carries the dry-run step)."""
     quick, install = _read("quickstart.md"), _read("installation.md")
     for text in (quick, install):
         assert "mtb.describe_layout(" in text
-    assert "multibench run-all D28 --category diagonal --methods SCALEX" in quick
-    assert "--dry-run" in quick
+    assert 'mtb.run("D28", "diagonal", methods=["SCALEX"]' in quick
+    assert "dry_run=True" in quick
     assert "**Preview a run.**" not in install and "**Custom launch.**" not in install
 
 
@@ -97,31 +97,32 @@ def test_step1_names_both_routes_for_citeseq_donors():
 
 @needs_docs
 def test_quickstart_batch_lines_name_run_all_as_the_guides_do():
-    """Integration of round 3: run_all without batch= scores a two-sample
-    folder as one batch, so the Quickstart names batch= on run_all as well as
+    """Integration of round 3: run without batch= scores a two-sample
+    folder as one batch, so the Quickstart names batch= on run as well as
     on evaluate, as tutorials/run and tutorials/discover do."""
     step1 = _flat("quickstart.md").split("## Step 1:", 1)[1].split("```", 1)[0]
     assert "`evaluate(batch=...)`" not in step1
-    assert "pass each cell's sample as `batch=` to `run_all` or `evaluate`." in step1
+    assert "pass each cell's sample as `batch=` to `run` or `evaluate`." in step1
     # R4-16: "in the same way" on the CITE-seq line refers to the Multiome line above it
-    assert step1.index("pass each cell's sample as `batch=` to `run_all` or `evaluate`.") \
+    assert step1.index("pass each cell's sample as `batch=` to `run` or `evaluate`.") \
         < step1.index("CITE-seq donors: use `vertical` in the same way.")
-    assert "pass each cell's sample as `batch=` to `run_all` or `evaluate`." \
+    assert "pass each cell's sample as `batch=` to `run` or `evaluate`." \
         in _flat("tutorials/discover.md")
 
 
 @needs_docs
 def test_cluster_recipe_pins_scripts_and_reads_strict():
-    """R3-26: both blocks can pin the scripts. The scan line no longer passes
-    --strict (deprecated in 0.4.0: scan prints mtb.scan's table)."""
+    """R3-26: the login node clones the scripts, then prepares in Python; the
+    job script calls Python (0.4.0: no command line)."""
     install = _read("installation.md")
     cluster = install.split("## On a cluster with offline compute nodes", 1)[1].split("\n## ", 1)[0]
-    # commented out: a bare <commit> is a bash redirection (review of f3_int)
-    line = "# export MULTIBENCH_SCRIPTS_REF=<commit>  # optional: pin the scripts"
-    assert cluster.count(line) == 2 and len(line) <= 80
     login = cluster.split('```bash title="login node"', 1)[1].split("```", 1)[0]
-    assert login.index(line) < login.index("multibench fetch --scripts")
-    assert "--strict" not in cluster and "multibench scan LAB" in login
+    assert login.index("git clone --depth 1") < login.index("python prepare.py")
+    prepare = cluster.split('```python title="prepare.py"', 1)[1].split("```", 1)[0]
+    assert 'mtb.scan("LAB", "mosaic"' in prepare and "assume_gpu=True" in prepare
+    job = cluster.split('```bash title="job.sh (Slurm)"', 1)[1].split("```", 1)[0]
+    assert 'python run_one.py "$1"' in job
+    assert "--strict" not in cluster and "multibench run" not in cluster
     assert "Check it with `du` after the first install." in cluster
 
 

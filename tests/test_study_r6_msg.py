@@ -105,6 +105,9 @@ def _caveats(df):
     return [(m, c) for m, c in zip(df["method"], df["caveat"]) if c]
 
 
+GIT = "git clone --depth 1 https://github.com/PYangLab/scMultiBench.git <folder>"
+
+
 # ======================================================================= R6-10
 def test_no_scan_caveat_has_a_semicolon_or_starts_in_lower_case(tmp_path, pinned, root,
                                                                 monkeypatch):
@@ -145,7 +148,7 @@ def test_the_glue_uinmf_and_raw_count_caveats_read_as_sentences(tmp_path, pinned
         "annotation (gencode.v43.chr_patch_hapl_scaff.annotation.gtf.gz, 53 MB) from "
         "<repo_path>/tools_scripts/GLUE/: on a host without network, put the file there. "
         f"{SCRIPTS_NOTE}{pinned}. The first real run clones PYangLab/scMultiBench with "
-        "git. On a host without network, run multibench fetch --scripts first. GLUE reads "
+        f"git. On a host without network, run {GIT} first. GLUE reads "
         "inputs/atac_peak_normpeaks.h5."), glue["caveat"]
     uinmf = _quiet(full_scan, "D52", "cross", methods=["UINMF"], data_path=root / "data",
                    modalities=["rna1", "rna2", "adt1", "adt2"], verbose=False).iloc[0]
@@ -224,10 +227,10 @@ def wrong_ref(tmp_path, monkeypatch):
 def test_nothing_runnable_heads_are_sentences(monkeypatch, tmp_path):
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     with pytest.raises(ValueError) as e:
-        mtb.run_all("D11", "vertical", out_dir=tmp_path, verbose=False)
+        mtb.run("D11", "vertical", out_dir=tmp_path, verbose=False)
     assert str(e.value).startswith("No method can run on D11 (vertical).\n")
     with pytest.raises(ValueError) as e:
-        mtb.run_all("D11", "vertical", out_dir=tmp_path, methods=["Matilda", "totalVI"],
+        mtb.run("D11", "vertical", out_dir=tmp_path, methods=["Matilda", "totalVI"],
                     verbose=False)
     assert str(e.value).startswith(
         "None of the requested methods (Matilda, totalVI) can run on D11 (vertical).\n")
@@ -249,13 +252,13 @@ def test_count_lines_say_methods_only_when_each_has_one_row(monkeypatch, capsys,
     d11 = full_scan("D11", "vertical", modalities="all")
     assert not d11["method"].is_unique
     assert f"of {len(d11)} rows have their input files." in capsys.readouterr().out
-    mtb.run_all("D52", "cross", out_dir=tmp_path, dry_run=True,
+    mtb.run("D52", "cross", out_dir=tmp_path, dry_run=True,
                 methods=["sciPENN", "totalVI", "Concerto"])
-    assert "[run_all] Dry run: 0 of 3 requested methods can run on D52 (cross); " in \
+    assert "[run] Dry run: 0 of 3 requested methods can run on D52 (cross); " in \
         capsys.readouterr().out
     # 0.4.0: the plan leaves out UINMF's two-batch row, as a run does
-    mtb.run_all("D52", "cross", out_dir=tmp_path, dry_run=True, modalities="all")
-    assert "[run_all] Dry run: 0 of 29 requested rows can run on D52 (cross); " in \
+    mtb.run("D52", "cross", out_dir=tmp_path, dry_run=True, modalities="all")
+    assert "[run] Dry run: 0 of 29 requested rows can run on D52 (cross); " in \
         capsys.readouterr().out
 
 
@@ -285,7 +288,7 @@ def test_per_batch_hint_is_sentences(tmp_path):
         f"totalVI (vertical) needs rna.h5 and adt.h5 in {d}. The folder holds adt1.h5, "
         "adt2.h5, cty1.csv, cty2.csv, rna1.h5 and rna2.h5. This folder holds per-batch files "
         "(rna1.h5, rna2.h5, ...). Vertical methods read one rna.h5. Export without batch= "
-        'and pass the column itself, as run_all(batch=adata.obs["donor"]). For RNA+ADT batches, '
+        'and pass the column itself, as run(batch=adata.obs["donor"]). For RNA+ADT batches, '
         'use category="cross".')
     assert " - " not in msg and "; " not in msg
 

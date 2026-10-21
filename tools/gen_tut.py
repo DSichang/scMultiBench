@@ -6,13 +6,13 @@ four mosaic and four cross. A task is named by its modality sets
 (``variants``), and a method belongs to the task when the registry gives it a
 variant with exactly one of those sets. Every variant of the four categories
 belongs to one task. Where a method has two variants in a task (UINMF on two
-and on three batches), ``run_all`` runs the larger one on the task's dataset.
+and on three batches), ``run`` runs the larger one on the task's dataset.
 ``not_wrapped`` names the methods the article evaluates on a task and the
 package does not run.
 
 Each tutorial is one straight path, run top to bottom on Linux or Colab:
 install the package, download the data and the method environments, run the
-task's default methods with ``run_all``, plot, run the same calls on data in
+task's default methods with ``run``, plot, run the same calls on data in
 the reader's own format, and draw the benchmark's stored results where the
 package ships them. There are no flags or fallbacks. No notebook defines a
 function. The example files of section 5 come from ``mtb.data.write_example``.
@@ -21,9 +21,9 @@ error: the environment install refuses off Linux.
 
 Every method of a task runs on the task's one dataset. The defaults are two
 methods of the task (one where it has one) that are fast and need no GPU,
-with the smallest environments. ``run_all`` gets the dataset, the category,
+with the smallest environments. ``run`` gets the dataset, the category,
 the methods and the output folder, and no other argument: where the dataset
-also holds the files of a smaller variant of a method, ``run_all`` runs the
+also holds the files of a smaller variant of a method, ``run`` runs the
 variant with the most modalities. ``check_task`` and ``check_own`` stop the
 generation when a notebook would not run as written. Every size quoted comes
 from the dry-run plans at generation time, never a hand-written figure.
@@ -331,7 +331,7 @@ def run_variants(key):
 
 
 def would_run(key, methods, dataset=None, **where):
-    """The rows ``run_all`` runs for ``methods`` with the notebook's
+    """The rows ``run`` runs for ``methods`` with the notebook's
     arguments, on a computer that has every environment: the rows with their
     input files that nothing but the environment blocks, less the rows inside
     a larger one of the same method."""
@@ -340,7 +340,7 @@ def would_run(key, methods, dataset=None, **where):
     t = TASKS[key]
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        # the full plan behind run_all(dry_run=True): its file and env checks too
+        # the full plan behind run(dry_run=True): its file and env checks too
         plan = workflow._run_all(dataset or t["ds"], t["cat"], methods=methods,
                                  dry_run=True, verbose=False, assume_gpu=True, **where)
     other = [str(r).replace(str(e), "").strip() for r, e in zip(plan.reason, plan.env_reason)]
@@ -349,7 +349,7 @@ def would_run(key, methods, dataset=None, **where):
 
 
 def check_task(key):
-    """Stop when the notebooks' ``run_all`` call would not run every method
+    """Stop when the notebooks' ``run`` call would not run every method
     of the task once, on the task's variant, when a method reads only some
     batches of the dataset, or when section 5 does not work as it stands
     (``check_own``)."""
@@ -361,7 +361,7 @@ def check_task(key):
     rows = would_run(key, everyone)
     ran = sorted(zip(rows.method, rows.modalities))
     if ran != sorted(run_variants(key).items()):
-        raise SystemExit(f"{key}: run_all on {t['ds']} would run {ran}, not one row per "
+        raise SystemExit(f"{key}: run on {t['ds']} would run {ran}, not one row per "
                          f"method of the task: change the dataset or name the modalities")
     with warnings.catch_warnings():          # a count of the files: no order needed
         warnings.simplefilter("ignore", UserWarning)
@@ -407,7 +407,7 @@ def diagonal_multi_sentence(key):
 
 # ---------------------------------------------------------------- own data
 # Section 5 per task: the files a reader's data usually comes in, the export
-# call, a check of the folder and the same run_all on it.
+# call, a check of the folder and the same run on it.
 # mtb.data.write_example writes example files under the names the read cell
 # reads, so the notebook runs before the reader has put a file in place. A
 # name the reader changes is marked "# <-". The folder name is the variable
@@ -454,10 +454,10 @@ CROSS_ORDER = ("The batches are numbered in the sorted order of their names, rea
                "donors `A`, `B` and `C` become batches 1, 2 and 3, and `10` comes before `2`.")
 CROSS_INDEX = ("For one AnnData per batch, call `export_dataset` once per batch with "
                "`batch_index=N` instead of `batch=`.")
-FOLDER_NOTE = ("`\"mydata/\" + NAME` is the dataset folder that `scan` and `run_all` read. "
+FOLDER_NOTE = ("`\"mydata/\" + NAME` is the dataset folder that `scan` and `run` read. "
                "With a new value of `NAME`, the folder holds the files of your data only.")
 CHECK_NOTE = ("The check lists the methods you name. Without `methods=`, it lists every "
-              "method that reads the modalities in the folder. `mtb.run_all(..., "
+              "method that reads the modalities in the folder. `mtb.run(..., "
               "dry_run=True)` has one row per method variant, with the command of each "
               "method.")
 LEFTOVER = ("`export_dataset` raises `FileExistsError` when the folder holds files of other "
@@ -479,12 +479,12 @@ def batch_advice(obj):
     paragraph of the collapsed block. ``obj`` is the variable of the read
     cell whose ``obs`` holds the column."""
     return (("Several donors or samples in the file? Keep them in one folder, without "
-             "`batch=` in `export_dataset`, and give `run_all` the column itself: "
-             f"`mtb.run_all(..., batch={obj}.obs[\"donor\"])`. The summary then has the "
+             "`batch=` in `export_dataset`, and give `run` the column itself: "
+             f"`mtb.run(..., batch={obj}.obs[\"donor\"])`. The summary then has the "
              "scores for how well they mix."),
-            ("The donors that `run_all` gets as `batch=` are matched to the cells by "
+            ("The donors that `run` gets as `batch=` are matched to the cells by "
              "barcode, and every cell needs a donor. A column name alone is not enough "
-             "there, because `run_all` reads the folder and the folder holds no `obs` "
+             "there, because `run` reads the folder and the folder holds no `obs` "
              "columns."))
 
 
@@ -1044,7 +1044,7 @@ def own_cells(key):
         ("markdown", check),
         ("code", f'mtb.scan("mydata/" + NAME, "{cat}", methods=METHODS)'),
         ("markdown", f"Run {same} on the folder:"),
-        ("code", f'mine = mtb.run_all("mydata/" + NAME, "{cat}", methods=METHODS,\n'
+        ("code", f'mine = mtb.run("mydata/" + NAME, "{cat}", methods=METHODS,\n'
                  f'                   out_dir="out/" + NAME)\n'
                  f'mine.summary'),
         ("code", "mine.plot()"),
@@ -1075,13 +1075,13 @@ def _install(md, code):
     code(INSTALL_CELL)
 
 
-#: what run_all scores besides the scIB metrics on data in several batches
+#: what run scores besides the scIB metrics on data in several batches
 SCORED_TOO = " and the classification scores (OCA, ACA, Spec, Sens, F1)"
 
 
 def no_classification_sentence(key, methods):
     """The sentence after ``SCORED_TOO`` for a tutorial that runs a method
-    whose output is a graph: run_all scores no classification for it."""
+    whose output is a graph: run scores no classification for it."""
     graphs = sorted({m for m, v in task_variants(key)
                      if m in methods and v.output.kind == "graph"})
     if not graphs:
@@ -1148,7 +1148,7 @@ envs[["env", "methods", "state"]]''')
 
     run_notes = [
         f"Each method writes an embedding: a table of numbers with one row per cell. "
-        f"`run_all` scores it against the cell-type labels of `{ds}`.",
+        f"`run` scores it against the cell-type labels of `{ds}`.",
         "The clustering metrics `ARI`, `NMI`, `ASW`, `iASW`, `iF1` and `cLISI` measure "
         "how well the embedding separates the cell types. The batch metrics "
         "`ASW_batch`, `ARI_batch`, `NMI_batch`, `GC` and `iLISI` measure how well the "
@@ -1156,7 +1156,7 @@ envs[["env", "methods", "state"]]''')
         "only when the data has several batches.",
     ]
     if "scMoMaT" in methods:
-        run_notes.append("scMoMaT writes a graph instead of an embedding. `run_all` scores "
+        run_notes.append("scMoMaT writes a graph instead of an embedding. `run` scores "
                          "its UMAP.")
     run_notes += [
         "`res.failures` says why a method failed. `params={\"Method\": {\"key\": value}}` "
@@ -1167,10 +1167,10 @@ envs[["env", "methods", "state"]]''')
     ]
     md(f"""## 3. Run the method{'s' if len(methods) > 1 else ''}
 
-`run_all` runs each method on `{ds}` and scores its output with the scIB metrics{SCORED_TOO + "." + no_classification_sentence(key, methods) if cat != "vertical" else "."} `res.summary` has one row per method with its status, run time and scores. Higher is better for every metric.
+`run` runs each method on `{ds}` and scores its output with the scIB metrics{SCORED_TOO + "." + no_classification_sentence(key, methods) if cat != "vertical" else "."} `res.summary` has one row per method with its status, run time and scores. Higher is better for every metric.
 
 """ + details(*run_notes))
-    code(f'''res = mtb.run_all("{ds}", "{cat}", methods=METHODS,
+    code(f'''res = mtb.run("{ds}", "{cat}", methods=METHODS,
                   out_dir="out/{ds}")
 res.summary''')
 
@@ -1225,10 +1225,10 @@ To run them all, set `METHODS` to these names in section 2 and run the notebook 
 |---|---|
 | `env.install` refuses on macOS or Windows | methods run only on Linux: use Colab or a Linux machine |
 | a method needs an NVIDIA GPU | choose a GPU runtime on Colab, or a machine with a GPU |
-| a method fails on a small dataset | `mtb.run_all(..., dry_run=True)` names what the method needs from the data's size in its `caveat` column |
+| a method fails on a small dataset | `mtb.run(..., dry_run=True)` names what the method needs from the data's size in its `caveat` column |
 | a warning that values are not whole numbers | export raw counts, for example with `rna="layer:counts"` |
 | `... matrix/data as cells x features` | the matrix is transposed: export it again with `mtb.io.export_dataset` |
-| a method times out | raise `timeout=` in `run_all` |
+| a method times out | raise `timeout=` in `run` |
 | batch metrics use the wrong batches | `res.rescore(batch=my_vector)` scores again without running the methods |"""))
 
     md(f"""## Next steps
@@ -1315,7 +1315,7 @@ envs[["env", "methods", "state"]]''')
                 "`ran` and no scores, and the figure leaves "
                 f"{'it' if len(graphs) == 1 else 'them'} out.")
     md(f"## 3. Run the method{'s' if len(everyone) > 1 else ''}" + note)
-    code(f'''res = mtb.run_all("{ds}", "{cat}", methods=METHODS,
+    code(f'''res = mtb.run("{ds}", "{cat}", methods=METHODS,
                   out_dir="out/{ds}_all")
 res.summary''')
     md("## 4. Plot\n\n" + PLOT_TEXT)

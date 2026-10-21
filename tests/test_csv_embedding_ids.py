@@ -20,7 +20,7 @@ import multibench as mtb
 from multibench.eval import io, pipeline
 from multibench.eval import scib as escib
 
-from .test_workflow_batch import N, cite  # noqa: F401 - the fixture of the run_all tests
+from .test_workflow_batch import N, cite  # noqa: F401 - the fixture of the run tests
 
 CELLS = 60
 TYPES = np.array(["T", "B", "NK"] * (CELLS // 3))
@@ -409,7 +409,7 @@ def test_a_dims_by_cells_table_with_another_number_of_labels(tmp_path, seen):
 # ------------------------------------------------------------- method outputs
 def test_method_runs_are_scored_in_file_order_as_before(cite, tmp_path, monkeypatch,  # noqa: F811
                                                         capsys):
-    """run_all scores embedding.h5, which has no cell ids: the label file is
+    """run scores embedding.h5, which has no cell ids: the label file is
     read in file order, whatever its first column holds, and no CSV
     embedding is read."""
     data, labels = cite
@@ -419,7 +419,7 @@ def test_method_runs_are_scored_in_file_order_as_before(cite, tmp_path, monkeypa
                         lambda *a, **k: pytest.fail("cell ids from a CSV embedding"))
     mtb.config.DEFAULT.data_path = data
     kw = dict(methods=['Matilda'], modalities=['rna', 'adt'], verbose=False)
-    plain = mtb.run_all("MYCITE", "vertical", out_dir=tmp_path / "plain", **kw)
+    plain = mtb.run("MYCITE", "vertical", out_dir=tmp_path / "plain", **kw)
     scores = plain.summary.loc[0, ["ARI", "NMI"]].tolist()
     assert plain.summary.loc[0, "status"] == "scored" and scores == [1.0, 1.0]
     # the scores of the same embedding and labels, passed in memory by position
@@ -432,12 +432,12 @@ def test_method_runs_are_scored_in_file_order_as_before(cite, tmp_path, monkeypa
     pd.DataFrame({"x": labels}, index=cells).to_csv(data / "MYCITE" / "cty.csv")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        named = mtb.run_all("MYCITE", "vertical", out_dir=tmp_path / "named", **kw)
+        named = mtb.run("MYCITE", "vertical", out_dir=tmp_path / "named", **kw)
     assert named.summary.loc[0, ["ARI", "NMI"]].tolist() == scores
     # the rows of that file reversed: scored by position, so the scores change
     pd.DataFrame({"x": labels}, index=cells).iloc[::-1].to_csv(data / "MYCITE" / "cty.csv")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        turned = mtb.run_all("MYCITE", "vertical", out_dir=tmp_path / "turned", **kw)
+        turned = mtb.run("MYCITE", "vertical", out_dir=tmp_path / "turned", **kw)
     assert turned.summary.loc[0, ["ARI", "NMI"]].tolist() == scores    # A|B halves swap
     assert "evaluate:" not in capsys.readouterr().err

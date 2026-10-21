@@ -224,7 +224,7 @@ SHIPPED_VARIANTS = {
 BANNED_PHRASES = {
     "in batch order": "labels_for() returns the files in stacking order; evaluate(labels=labels_for(ds)) needs no list-building",
     "list(labels_for(ds).values())": "pass the labels_for dict itself (or label_order=) - the .values() recipe is retired from the docs",
-    "First reasons:": "run_all's 'nothing is runnable' error now lists one line per requested variant",
+    "First reasons:": "run's 'nothing is runnable' error now lists one line per requested variant",
     "scmb_matilda": "env recipe/yml name the env scan expects ('matilda'); own_env_name is the only place scmb_<method> survives",
     "in v1": "no release-numbered wording: say 'currently' / name the one wired value (polish round 2)",
     "184 KB": "the wheel is ~0.5 MB and ships the stored tables; state the measured number",
@@ -296,7 +296,7 @@ REFERENCE = {
     "mtb.describe_layout": ("discover.md", "multibench.workflow.describe_layout"),
     "mtb.cite": ("discover.md", "multibench.discover.cite"),
     "mtb.scan": ("run.md", "multibench.workflow.scan"),
-    "mtb.run_all": ("run.md", "multibench.workflow.run_all"),
+    "mtb.run": ("run.md", "multibench.workflow.run"),
     "mtb.load_batch": ("run.md", "multibench.workflow.load_batch"),
     "mtb.BatchResult": ("run.md", "multibench.workflow.BatchResult"),
     "mtb.evaluate": ("score.md", "multibench.eval.pipeline.evaluate"),
@@ -857,8 +857,8 @@ def test_get_started_pages_keep_the_round2_facts():
     """Quickstart: the laptop tab compares an RNA PCA on 2,000 genes with an
     ADT PCA, says a new run's scores differ a little from the stored ones, links the
     peaks-only section and defines cell order; the unpaired tab lives on
-    tutorials/run only. Installation: the cluster recipe pins the build that
-    has --assume-gpu and asks for a GPU only for the GPU method (M05-M07)."""
+    tutorials/run only. Installation: the cluster recipe checks with
+    assume_gpu=True and asks for a GPU only for the GPU method (M05-M07)."""
     docs = _docs_root()
     quick = (docs / "quickstart.md").read_text()
     for fact in ("highly_variable_genes(pc, n_top_genes=2000)", '"ADT PCA"',
@@ -867,7 +867,7 @@ def test_get_started_pages_keep_the_round2_facts():
     assert re.search(r"^    cell order\n    :   ", quick, re.M)
     assert '=== "Unpaired RNA + ATAC"' not in quick
     install = (docs / "installation.md").read_text()
-    for fact in ("multibench-sc>=0.4.0", "--assume-gpu", "sbatch --gres=gpu:1 job.sh scMoMaT"):
+    for fact in ("multibench-sc>=0.4.0", "assume_gpu=True", "sbatch --gres=gpu:1 job.sh scMoMaT"):
         assert fact in install, fact
     assert "#SBATCH --gres" not in install
 
@@ -1188,16 +1188,16 @@ def test_discover_guide_says_which_rows_scan_lists(tmp_path, monkeypatch):
     every, = re.search(
         r"By default `scan` lists the methods that read the modalities the folder holds, "
         r"and `(modalities=\"\w+\")` lists every method\. "
-        r"`mtb\.run_all\(\"MYDATA\", category, dry_run=True\)` gives one row per method "
+        r"`mtb\.run\(\"MYDATA\", category, dry_run=True\)` gives one row per method "
         r"variant, with its file and environment checks and its command\.", guide).groups()
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     mtb.io.export_dataset(_own_cells(), tmp_path / "MYDATA", adt="obsm:protein",
                           labels="obs:celltype")
-    ns = {"mtb": mtb, "category": "vertical", "root": tmp_path}
-    default = eval('mtb.scan("MYDATA", category, data_path=root, verbose=False)', ns)
-    full = eval(f'mtb.scan("MYDATA", category, data_path=root, verbose=False, {every})', ns)
-    plan = eval('mtb.run_all("MYDATA", category, data_path=root, verbose=False, dry_run=True)',
-                ns)
+    monkeypatch.setattr(mtb.config.DEFAULT, "data_path", tmp_path)
+    ns = {"mtb": mtb, "category": "vertical"}
+    default = eval('mtb.scan("MYDATA", category, verbose=False)', ns)
+    full = eval(f'mtb.scan("MYDATA", category, verbose=False, {every})', ns)
+    plan = eval('mtb.run("MYDATA", category, verbose=False, dry_run=True)', ns)
     # the methods that read the modalities the folder holds, one row each
     assert default["method"].is_unique
     assert {m for mods in default["modalities"] for m in mods.split("+")} == {"rna", "adt"}
@@ -1205,7 +1205,7 @@ def test_discover_guide_says_which_rows_scan_lists(tmp_path, monkeypatch):
     assert set(full["method"]) == set(mtb.find_methods("vertical")) > set(default["method"])
     # one row per variant
     assert set(plan["method"]) == set(default["method"]) and len(plan) >= len(default)
-    assert {"files_ok", "env_ok", "command"} <= set(plan.columns)
+    assert {"runnable", "reason", "command"} <= set(plan.columns)
 
 
 @needs_docs

@@ -6,7 +6,7 @@ the incomplete-matrix warning is short sentences; the na='raise' error does not
 offer to hide itself.
 R4-13: recommend's warning lines, DegenerateRerunWarning, evaluate's
 reordered-dict error, the prepared-file note, the batch= advice and the
-run_all messages are short plain sentences.
+run messages are short plain sentences.
 """
 import os
 import importlib
@@ -139,7 +139,7 @@ def test_reordered_label_dict_error_is_short_sentences(tmp_path):
         "alphabetical.")
 
 
-# --- R4-13 (b): run_all's nothing-runnable error and dry-run count line --------
+# --- R4-13 (b): run's nothing-runnable error and dry-run count line --------
 
 @pytest.fixture
 def no_envs(monkeypatch):
@@ -151,11 +151,11 @@ def test_nothing_runnable_tail_is_plain(no_envs, root):
     # D11 holds no ATAC file: the rows that read one are not listed, and, since
     # c3 (C55), no line says so
     for kw, where in (
-            ({}, "mtb.run_all('D11', 'vertical', dry_run=True) shows the listed rows."),
+            ({}, "mtb.run('D11', 'vertical', dry_run=True) shows the listed rows."),
             ({"methods": ["Matilda"]},
-             "mtb.run_all('D11', 'vertical', methods=['Matilda'], dry_run=True) shows these rows.")):
+             "mtb.run('D11', 'vertical', methods=['Matilda'], dry_run=True) shows these rows.")):
         with pytest.raises(ValueError) as e:
-            mtb.run_all(os.path.join(root / 'data', 'D11'), 'vertical', out_dir='/tmp/unused', verbose=False, **kw)
+            mtb.run(os.path.join(root / 'data', 'D11'), 'vertical', out_dir='/tmp/unused', verbose=False, **kw)
         lines = str(e.value).splitlines()
         assert lines[-1] == (f"{where} Its reason column says which check "
                              f"failed. mtb.env.install(dry_run=True) checks the environments.")
@@ -163,9 +163,9 @@ def test_nothing_runnable_tail_is_plain(no_envs, root):
 
 
 def test_dry_run_count_line_is_plain(no_envs, root, capsys, tmp_path):
-    mtb.run_all(os.path.join(root / 'data', 'D11'), 'vertical', out_dir=tmp_path, dry_run=True, verbose=True)
+    mtb.run(os.path.join(root / 'data', 'D11'), 'vertical', out_dir=tmp_path, dry_run=True, verbose=True)
     (line,) = [ln for ln in capsys.readouterr().out.splitlines()
-               if ln.startswith("[run_all] Dry run:")]
+               if ln.startswith("[run] Dry run:")]
     assert line.endswith(" (vertical); the reason column says why.")    # Z19 (r3)
     assert "doctor" not in line
     _no_log_joins(line)
@@ -179,13 +179,13 @@ def test_prepared_file_note_names_the_method(root):
         sc = full_scan("D28", "diagonal", data_path=root / "data", verbose=False)
     # GLUE's one-batch row; its several-batch row lacks its files in D28
     cav = sc.set_index(["method", "modalities"]).loc[("GLUE", "rna+atac_peak"), "caveat"]
-    assert ("GLUE reads inputs/atac_peak_normpeaks.h5. mtb.run_all writes that file "
-            "first, so start GLUE with mtb.run_all. The printed command alone "
+    assert ("GLUE reads inputs/atac_peak_normpeaks.h5. mtb.run writes that file "
+            "first, so start GLUE with mtb.run. The printed command alone "
             "fails in a job script.") in cav
     assert "shell line" not in cav
 
 
-# --- R4-13 (f): the batch advice names run_all too ----------------------------
+# --- R4-13 (f): the batch advice names run too ----------------------------
 
 def test_batch_with_atac_warning_names_run_all():
     from multibench.engine import ingest
@@ -194,4 +194,4 @@ def test_batch_with_atac_warning_names_run_all():
     assert [str(w.message) for w in rec] == [
         "batch= with atac=: only mosaic methods read numbered ATAC files. For mosaic pass "
         "category='mosaic'; otherwise export without batch= and pass the column itself, as "
-        'run_all(batch=adata.obs["donor"])']
+        'run(batch=adata.obs["donor"])']

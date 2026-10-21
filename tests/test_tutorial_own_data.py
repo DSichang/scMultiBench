@@ -93,12 +93,12 @@ LINKS_OF = {"vertical": ["10x-h5", "labels-csv", "no-labels", "donors"],
 #: cell, and in its collapsed block
 BATCH_ADVICE = (
     "Several donors or samples in the file? Keep them in one folder, without `batch=` in "
-    "`export_dataset`, and give `run_all` the column itself: "
-    "`mtb.run_all(..., batch={obj}.obs[\"donor\"])`. The summary then has the scores for how "
+    "`export_dataset`, and give `run` the column itself: "
+    "`mtb.run(..., batch={obj}.obs[\"donor\"])`. The summary then has the scores for how "
     "well they mix.")
 BATCH_ADVICE_COLLAPSED = (
-    "The donors that `run_all` gets as `batch=` are matched to the cells by barcode, and "
-    "every cell needs a donor. A column name alone is not enough there, because `run_all` "
+    "The donors that `run` gets as `batch=` are matched to the cells by barcode, and "
+    "every cell needs a donor. A column name alone is not enough there, because `run` "
     "reads the folder and the folder holds no `obs` columns.")
 
 
@@ -232,8 +232,8 @@ def test_section_5_has_the_twelve_cells(key):
     assert (first != f'NAME = "{NAMES[key]}"   {NAME_MARK}') == (key == "diagonal_multi")
     # 0.4: the folder path, as the export cell writes it; no data_path=
     assert src[CHECK] == f'mtb.scan("mydata/" + NAME, "{t["cat"]}", methods=METHODS)'
-    assert src[RUN].startswith('mine = mtb.run_all("mydata/" + NAME,')
-    assert src[RUN] == (f'mine = mtb.run_all("mydata/" + NAME, "{t["cat"]}", methods=METHODS,\n'
+    assert src[RUN].startswith('mine = mtb.run("mydata/" + NAME,')
+    assert src[RUN] == (f'mine = mtb.run("mydata/" + NAME, "{t["cat"]}", methods=METHODS,\n'
                         f'                   out_dir="out/" + NAME)\n'
                         f'mine.summary')
     assert src[11] == "mine.plot()"
@@ -497,7 +497,7 @@ def test_one_name_drives_the_three_cells(key, linux, tmp_path, monkeypatch, caps
     _run_cell(src[RUN], ns)
     log = capsys.readouterr().out.splitlines()
     more = [ln for ln in log if "more rows" in ln]
-    assert more == ([f"[run_all] {MORE_ROWS[key]} more rows need files this folder does not "
+    assert more == ([f"[run] {MORE_ROWS[key]} more rows need files this folder does not "
                      f"have. mtb.scan shows them."] if key in MORE_ROWS else [])
     mine = ns["mine"]
     assert (mine.dataset, mine.category) == ("MINE", t["cat"])
@@ -646,7 +646,7 @@ def test_the_documented_batch_call_works(key, linux, tmp_path, monkeypatch):
     ns[obj].obs["donor"] = np.where(np.arange(ns[obj].n_obs) % 2, "donor1", "donor2")
     _run_cell(src[EXPORT], ns)                 # without batch=, as the sentence says
     assert not list((Path("mydata") / NAMES[key]).glob("*[0-9].*"))
-    call = (f'mtb.run_all("mydata/" + NAME, "vertical", methods=METHODS, '
+    call = (f'mtb.run("mydata/" + NAME, "vertical", methods=METHODS, '
             f'batch={obj}.obs["donor"], dry_run=True, verbose=False)')
     plan = eval(call, ns)
     assert set(plan["method"][plan["runnable"]]) == set(GEN.TASKS[key]["methods"])
@@ -675,7 +675,7 @@ def test_the_donor_sentence_is_visible_and_its_call_adds_the_batch_scores(
     monkeypatch.chdir(tmp_path)
     src, ns = _sources(key), _namespace(key)
     visible = _visible(src[0])
-    (arg,) = re.findall(r'`mtb\.run_all\(\.\.\., (batch=\w+\.obs\["donor"\])\)`', visible)
+    (arg,) = re.findall(r'`mtb\.run\(\.\.\., (batch=\w+\.obs\["donor"\])\)`', visible)
     obj = arg[len("batch="):].split(".")[0]
     assert BATCH_ADVICE.format(obj=obj) in visible
     assert visible.rstrip().endswith(f"and [several donors or samples]({RECIPES}donors).")
@@ -730,7 +730,7 @@ CHECK_CROSS = (" With fewer batches than the methods read, such a line names the
 #: the tutorials whose folder holds the ATAC peaks under two names
 TWO_ATAC_NAMES = {"vertical_rna_atac", "vertical_rna_adt_atac"}
 
-SMALL_DATASET_ROW = ("| a method fails on a small dataset | `mtb.run_all(..., dry_run=True)` "
+SMALL_DATASET_ROW = ("| a method fails on a small dataset | `mtb.run(..., dry_run=True)` "
                      "names what the method needs from the data's size in its `caveat` column |")
 WRONG_NAME = ("A wrong name after `obsm:`, `layer:` or `obs:` raises an error that lists the "
               "names the file has.")
@@ -907,7 +907,7 @@ def test_the_small_dataset_row_names_the_scan_that_has_the_column(tmp_path, monk
                                                                   capsys):
     """The Troubleshooting row sends a reader to the ``caveat`` column of the
     full plan. The check cell of the tutorial has no such column, so the row
-    names the call that has it: ``run_all(..., dry_run=True)``."""
+    names the call that has it: ``run(..., dry_run=True)``."""
     for key in KEYS:
         rows = [ln for _, s in _cells(key) for ln in s.splitlines()
                 if ln.startswith("| a method fails on a small dataset |")]
@@ -920,7 +920,7 @@ def test_the_small_dataset_row_names_the_scan_that_has_the_column(tmp_path, monk
         _run_cell(src[i], ns)
     assert list(_run_cell(src[CHECK], ns).columns) == ["method", "modalities", "runnable",
                                                        "reason"]
-    full = _run_cell(src[CHECK].replace("mtb.scan(", "mtb.run_all(").replace(
+    full = _run_cell(src[CHECK].replace("mtb.scan(", "mtb.run(").replace(
         ")", ", dry_run=True)"), ns)
     capsys.readouterr()
     needs = "online_iNMF needs about 5,000 cells in total. On fewer it stops with std::exception."

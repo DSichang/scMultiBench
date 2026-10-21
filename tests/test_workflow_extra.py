@@ -8,8 +8,8 @@ def test_describe_layout_names_files_and_flags_the_atac_trap():
     txt = mtb.describe_layout("vertical")
     assert "rna.h5" in txt and "adt.h5" in txt and "cty.csv" in txt
     # vertical reads atac.h5, and the method decides what it must hold (L34);
-    # 0.4.0: scan and run_all skip a method whose file holds the other one
-    assert "atac.h5" in txt and "mtb.scan and mtb.run_all skip such a method." in txt
+    # 0.4.0: scan and run skip a method whose file holds the other one
+    assert "atac.h5" in txt and "mtb.scan and mtb.run skip such a method." in txt
     # assert the SUBSTANCE of the warning, not one word of its phrasing: the
     # text must say which representation each method needs, and that feeding
     # the wrong one does not raise.
@@ -33,7 +33,7 @@ def test_skip_existing_with_params_is_refused():
     changing a hyperparameter and reusing out_dir would silently return the OLD
     result. Refuse rather than mislead."""
     with pytest.raises(ValueError) as e:
-        mtb.run_all("D11", "vertical", out_dir="/tmp/unused",
+        mtb.run("D11", "vertical", out_dir="/tmp/unused",
                     params={"Matilda": {"epochs": 5}}, skip_existing=True)
     assert "earlier parameters" in str(e.value)
     assert "OLD" not in str(e.value)                  # no emphasis by capitals (L61)
@@ -87,16 +87,16 @@ def test_run_all_raises_when_nothing_can_run(tmp_path, monkeypatch):
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     (tmp_path / "EMPTYDS").mkdir()
     with pytest.raises(ValueError) as e:
-        mtb.run_all(os.path.join(tmp_path, 'EMPTYDS'), 'vertical', out_dir=tmp_path / 'out', verbose=False)
+        mtb.run(os.path.join(tmp_path, 'EMPTYDS'), 'vertical', out_dir=tmp_path / 'out', verbose=False)
     assert str(e.value).startswith("No method can run on EMPTYDS (vertical).\n")
-    assert "mtb.run_all" in str(e.value)       # tells you how to diagnose it
+    assert "mtb.run" in str(e.value)       # tells you how to diagnose it
 
 
 def test_run_all_missing_dataset_folder_is_filenotfound():
     """A typo'd dataset name used to surface as 'nothing is runnable'; now the
     folder check fires first and lists the folders that DO exist."""
     with pytest.raises(FileNotFoundError) as e:
-        mtb.run_all("NO_SUCH_DATASET_XYZ", "vertical",
+        mtb.run("NO_SUCH_DATASET_XYZ", "vertical",
                     out_dir="/tmp/mtb_empty_test", verbose=False)
     assert str(e.value).startswith("The folder ") and "NO_SUCH_DATASET_XYZ does not exist. " \
         in str(e.value)

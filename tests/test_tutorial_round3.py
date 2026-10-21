@@ -2,7 +2,7 @@
 
 R3-02 changed what ``runnable`` means. In a category with ATAC methods,
 ``scan`` marks a variant whose ATAC file holds the other form not runnable,
-even when ``files_ok`` and ``env_ok`` pass, and ``run_all`` skips it. Since
+even when ``files_ok`` and ``env_ok`` pass, and ``run`` skips it. Since
 R4-01 this holds also when ``methods=`` names the method
 (tests/test_tutorial_round4.py checks the named-method calls). Section 5 of
 each generated tutorial says which ATAC form the reader's data needs: these

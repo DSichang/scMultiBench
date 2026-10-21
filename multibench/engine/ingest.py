@@ -684,7 +684,7 @@ def _to_canonical(src, out: Path | str | None = None, modality: str | None = Non
     """Convert one matrix to a canonical ``.h5`` (``matrix/data`` features x
     cells, ``matrix/features``, ``matrix/barcodes``) and return its path; a
     canonical ``.h5`` is returned untouched. ``out`` is a file, or a directory
-    that gets the ``modality`` filename. The inputs ``mtb.run_all`` converts
+    that gets the ``modality`` filename. The inputs ``mtb.run`` converts
     before a method runs go through here."""
     if isinstance(src, (str, Path)) and _is_canonical_h5(Path(src)):
         return Path(src)
@@ -1104,7 +1104,7 @@ def _strip_to_match(longer: list, shorter: list) -> str | None:
 def suffix_fix(what: str, cells: list, given: list) -> str:
     """`` They match after removing '-1' from the batch ids: pass ...`` when a 10x
     suffix (or prefix) on one side only is all that keeps the ids ``given`` from
-    the ``cells``, else ``""``. evaluate, export_dataset and run_all name it."""
+    the ``cells``, else ``""``. evaluate, export_dataset and run name it."""
     cells, given = [str(i) for i in cells], [str(i) for i in given]
     if not cells or not given:
         return ""
@@ -1235,7 +1235,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
 
     Produces the layout ``mtb.describe_layout`` documents (``rna.h5``,
     ``adt.h5``, ATAC files, ``cty.csv``), so ``mtb.scan`` and
-    ``mtb.run_all`` work on your own data. Give raw counts.
+    ``mtb.run`` work on your own data. Give raw counts.
 
     Parameters
     ----------
@@ -1244,7 +1244,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         passed as an object. With a MuData, name each modality (``rna='rna'``).
     dataset_dir : Path | str
         Folder to create; its name is the dataset id for ``mtb.scan`` /
-        ``mtb.run_all``, and its parent their ``data_path``.
+        ``mtb.run``, and its parent their ``data_path``.
     rna : str, AnnData, DataFrame, array or None
         Raw-count matrix for RNA: a selector against ``data`` (``'layer:counts'``,
         ``'X[feature_types=Gene Expression]'``) or an AnnData, DataFrame or

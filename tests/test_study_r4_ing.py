@@ -26,14 +26,7 @@ from tests.conftest import full_scan
 
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 needs_git = pytest.mark.skipif(shutil.which("git") is None, reason="git not installed")
-#: the fix of a folder with other files: the safe action first (review of wp/f4_int)
-FIX = ("an empty or new folder, then run multibench fetch --scripts. If the folder is "
-       "left over from an earlier fetch, you can remove it instead")
-PY_FIX = f"Set MULTIBENCH_REPO_PATH or mtb.config.DEFAULT.repo_path to {FIX}"
-CLI_FIX = f"Set MULTIBENCH_REPO_PATH to {FIX}"
 OTHER = "holds other files and no method scripts."
-MATILDA = ["scan", "D11", "--category", "vertical", "--methods", "Matilda",
-           "--modalities", "rna,adt"]
 
 
 @pytest.fixture

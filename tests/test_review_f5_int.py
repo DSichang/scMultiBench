@@ -69,7 +69,7 @@ def test_a_repeated_barcode_is_named(cite, tmp_path):
     pd.DataFrame({"cell": idx, "x": SAMPLES}).to_csv(named, index=False)
     with pytest.raises(ValueError, match=r"repeats 1 id \(first: \['CELL4-1'\]\)"):
         mtb.evaluate(a, labels="celltype", batch=str(named), metrics=["iLISI"])
-    # run_all reads the file before any method runs
+    # run reads the file before any method runs
     data, batch, _ = cite
     bars = list(BARS)
     bars[5] = bars[4]
@@ -77,7 +77,7 @@ def test_a_repeated_barcode_is_named(cite, tmp_path):
     pd.DataFrame({"sample": batch}, index=bars).to_csv(drep)
     with pytest.raises(ValueError, match=r"^batch: the first column of d_rep\.csv repeats "
                                          r"1 id"):
-        mtb.run_all(str(data / "MYCITE"), "vertical", dry_run=True, batch=drep, **KW)
+        mtb.run(str(data / "MYCITE"), "vertical", dry_run=True, batch=drep, **KW)
     # a file with several columns: the fix names no column= argument (R6-03:
     # it suggests a Series)
     wide = tmp_path / "wide.csv"

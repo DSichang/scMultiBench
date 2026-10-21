@@ -180,7 +180,7 @@ def test_run_all_records_the_provenance(tmp_path, monkeypatch):
     class _Res:
         output = np.zeros((2864, 5))
     monkeypatch.setattr(W, "_run", lambda **kw: _Res())
-    res = mtb.run_all("D11", "vertical", methods=["Matilda"], out_dir=str(tmp_path),
+    res = mtb.run("D11", "vertical", methods=["Matilda"], out_dir=str(tmp_path),
                       evaluate=False, verbose=False)
     rec = res.records[0]
     assert rec["scripts_commit"] == "e" * 40

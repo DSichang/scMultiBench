@@ -58,7 +58,7 @@ def test_evaluate_records_the_configured_backend(monkeypatch):
 
 
 def test_run_all_scoring_labels_its_internal_search_as_search():
-    """run_all hands the screening search's clusters to evaluate(clustering=);
+    """run hands the screening search's clusters to evaluate(clustering=);
     they are not the user's clusters and must not be recorded as such."""
     rng = np.random.default_rng(1)
     emb, lab = _blobs(n_per=50)

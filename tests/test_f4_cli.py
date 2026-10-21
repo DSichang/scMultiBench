@@ -88,11 +88,11 @@ def working(tmp_path, monkeypatch):
 
 
 def _status_line(err):
-    return next(l for l in err.splitlines() if l.startswith("[run_all]   -> "))
+    return next(l for l in err.splitlines() if l.startswith("[run]   -> "))
 
 
 def test_python_run_all_status_line_ends_with_the_error(failing, tmp_path, capsys):
-    res = mtb.run_all(str(failing / "MYCITE"), "vertical", out_dir=tmp_path / "py",
+    res = mtb.run(str(failing / "MYCITE"), "vertical", out_dir=tmp_path / "py",
                       methods=["Matilda"], modalities=["rna", "adt"])
     out = capsys.readouterr().out
     assert len(res.failures) == 1                       # the Python call does not raise

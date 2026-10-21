@@ -69,7 +69,7 @@ def test_method_info_without_repeated_keys():
 
 
 def test_the_dry_run_plan_has_seven_columns():
-    plan = mtb.run_all("D11", "vertical", dry_run=True, verbose=False)
+    plan = mtb.run("D11", "vertical", dry_run=True, verbose=False)
     assert list(plan.columns) == ["method", "modalities", "runnable", "reason", "env",
                                   "caveat", "command"]
 
@@ -85,7 +85,7 @@ def test_skip_existing_scores_a_saved_output_off_linux(tmp_path, monkeypatch):
     from multibench.engine import envs
     monkeypatch.setattr(envs, "host_platform_problem", lambda: "Methods run only on Linux.")
     out = _tree(tmp_path, dims=4).parent / "out"
-    res = mtb.run_all("D11", "vertical", methods=["Matilda"], out_dir=out,
+    res = mtb.run("D11", "vertical", methods=["Matilda"], out_dir=out,
                       skip_existing=True, verbose=False)
     assert res.summary.status.tolist() == ["scored"]
 
@@ -136,7 +136,7 @@ def test_recommend_gives_this_run_rows_their_method_chips():
 
 
 def test_modalities_select_the_variant_spelled_so(capsys):
-    plan = mtb.run_all("D28", "diagonal", methods=["scJoint"], modalities=["rna", "atac_gas"],
+    plan = mtb.run("D28", "diagonal", methods=["scJoint"], modalities=["rna", "atac_gas"],
                        dry_run=True, verbose=False)
     assert plan["modalities"].tolist() == ["rna+atac_gas"]
     # base tokens still reach the numbered variants of another category
@@ -145,7 +145,7 @@ def test_modalities_select_the_variant_spelled_so(capsys):
 
 
 def test_a_folder_method_shows_the_files_it_reads():
-    plan = mtb.run_all("D28", "diagonal", methods=["scBridge"], dry_run=True, verbose=False)
+    plan = mtb.run("D28", "diagonal", methods=["scBridge"], dry_run=True, verbose=False)
     assert plan["modalities"].tolist() == ["rna+atac_gas"]
 
 

@@ -1,12 +1,12 @@
 """Integration of fix round 4: two package defects the docs work packages found.
 
-- The ``-> FAIL`` line of ``run_all`` (R4-03) ended with R's trailing warning
+- The ``-> FAIL`` line of ``run`` (R4-03) ended with R's trailing warning
   or call trace instead of the error, because R prints both after the error.
 - ``BatchResult.rescore`` scored FAIL and TIMEOUT records again, so a method
   that failed to run came back as ``RUN_OK_EVAL_FAILED``, ``CHAIN_OK`` or
   ``RUN_OK_NO_EMBEDDING`` and left ``failures``.
 
-The run_all tests use the stand-in env prefixes of ``tests/test_f4_cli.py``.
+The run tests use the stand-in env prefixes of ``tests/test_f4_cli.py``.
 """
 import textwrap
 

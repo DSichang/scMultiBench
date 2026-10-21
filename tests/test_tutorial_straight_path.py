@@ -5,7 +5,7 @@ The owner asked for tutorials that let a reader install the environments with
 one call and run the methods themselves, also on a new dataset, in code that
 is short and plain. These tests pin that shape: one shared install cell, no
 flags or fallbacks and no function defined in a notebook, the environment
-install and both ``run_all`` calls in every task tutorial, methods that read
+install and both ``run`` calls in every task tutorial, methods that read
 every batch of their dataset, and download sizes that match the package's own
 plans. One dataset serves every method of a task, and the ``_all`` notebook
 of the task runs them all.
@@ -119,23 +119,23 @@ def test_task_tutorial_installs_and_runs(key):
     assert "mtb.env.install(METHODS)\n" in code          # installs by default (X27)
     assert f'mtb.data.fetch("{ds}")' in code
     # one line or wrapped: the call is compared with its whitespace collapsed
-    assert (_flat(f'res = mtb.run_all("{ds}", "{cat}", methods=METHODS, '
+    assert (_flat(f'res = mtb.run("{ds}", "{cat}", methods=METHODS, '
                   f'out_dir="out/{ds}")') in _flat(code))
     # the export cell names the folder once, in NAME; the run takes it from there
     own = GEN.OWN[key]["name"]
     assert f'NAME = "{own}"' in code
     assert '"mydata/" + NAME' in code
-    mine = [c for c in _code(f"tutorial_{key}") if c.startswith("mine = mtb.run_all(")]
+    mine = [c for c in _code(f"tutorial_{key}") if c.startswith("mine = mtb.run(")]
     assert len(mine) == 1
     call = _flat(mine[0])
-    assert call.startswith(_flat(f'mine = mtb.run_all("mydata/" + NAME, "{cat}", '
+    assert call.startswith(_flat(f'mine = mtb.run("mydata/" + NAME, "{cat}", '
                                  f'methods=METHODS, out_dir="out/" + NAME)')), call
-    assert code.index("mtb.env.install") < code.index("mtb.run_all")
+    assert code.index("mtb.env.install") < code.index("mtb.run")
 
 
 @pytest.mark.parametrize("key", ALL_KEYS)
 def test_all_methods_notebook_installs_and_runs_every_method(key):
-    """The ``_all`` notebook: install, ``run_all`` and plot for every method
+    """The ``_all`` notebook: install, ``run`` and plot for every method
     of the task, on the task's dataset."""
     t = GEN.TASKS[key]
     cat, ds = t["cat"], t["ds"]
@@ -146,31 +146,31 @@ def test_all_methods_notebook_installs_and_runs_every_method(key):
     assert ast.literal_eval(assign.value) == GEN.task_methods(key)
     assert "mtb.env.install(METHODS)\n" in code          # installs by default (X27)
     assert f'mtb.data.fetch("{ds}")' in code
-    assert (_flat(f'res = mtb.run_all("{ds}", "{cat}", methods=METHODS, '
+    assert (_flat(f'res = mtb.run("{ds}", "{cat}", methods=METHODS, '
                   f'out_dir="out/{ds}_all")') in _flat(code))
-    assert code.index("mtb.env.install") < code.index("mtb.run_all") < code.index("res.plot()")
-    assert code.count("mtb.run_all(") == 1 and "export_dataset" not in code
+    assert code.index("mtb.env.install") < code.index("mtb.run") < code.index("res.plot()")
+    assert code.count("mtb.run(") == 1 and "export_dataset" not in code
 
 
 def test_no_notebook_names_the_modalities_or_overrides_the_atac_check():
-    """``run_all`` gets the dataset, the category, the methods and the output
+    """``run`` gets the dataset, the category, the methods and the output
     folder. Where the dataset also holds the files of a smaller variant of a
     method (the tasks with RNA, ADT and ATAC; UINMF's two-batch variants on
-    the cross datasets with three), ``run_all`` runs the variant with the
+    the cross datasets with three), ``run`` runs the variant with the
     most modalities, so no call names them. Matilda, scMDC and UnitedNet
     read peaks, so no call passes ``allow_atac_mismatch`` either."""
     for name in ALL:
         text = "\n".join(src for _, src in _cells(name))
-        if name in TUTORIALS + EVERY:          # the other two call no run_all
+        if name in TUTORIALS + EVERY:          # the other two call no run
             assert "modalities=" not in "\n".join(_code(name)), name
         assert "allow_atac_mismatch" not in text, name
-        assert "one more `run_all` argument" not in text, name
+        assert "one more `run` argument" not in text, name
     for key in KEYS:
         for name in [f"tutorial_{key}"] + [f"tutorial_{key}_all"] * GEN.has_all(key):
-            calls = [c for c in _code(name) if "mtb.run_all(" in c]
+            calls = [c for c in _code(name) if "mtb.run(" in c]
             for call in calls:
                 tree = next(n for n in ast.walk(_tree(call)) if isinstance(n, ast.Call)
-                            and ast.unparse(n.func) == "mtb.run_all")
+                            and ast.unparse(n.func) == "mtb.run")
                 assert {k.arg for k in tree.keywords} <= {"methods", "out_dir", "data_path"}, \
                     (name, call)
 
@@ -335,10 +335,10 @@ def test_every_method_of_a_task_has_its_input_files_on_the_dataset(key):
 def test_end_to_end_installs_and_runs_matilda():
     code = "\n".join(_code("tutorial_end_to_end"))
     assert 'mtb.env.install(["Matilda"])' in code        # installs by default (X27)
-    # 0.4.0: one method is run_all(methods=[m]); res.embedding(m) is its embedding
-    assert 'mtb.run_all("D11", "vertical", methods=["Matilda"]' in code
+    # 0.4.0: one method is run(methods=[m]); res.embedding(m) is its embedding
+    assert 'mtb.run("D11", "vertical", methods=["Matilda"]' in code
     assert 'emb = res.embedding("Matilda")' in code
-    assert "mtb.evaluate(emb" in code and "mtb.engine.runner.run(" not in code
+    assert "mtb.evaluate(emb" in code
 
 
 @pytest.mark.parametrize("name", RUNNING)
@@ -377,7 +377,7 @@ def test_quickstart_and_next_steps_link_every_task_tutorial():
 
 def test_colab_quickstart_runs_nothing():
     code = "\n".join(_code("colab_quickstart"))
-    for call in ("env.install", "run_all", "mtb.engine.runner.run(", "data.fetch"):
+    for call in ("env.install", "mtb.run(", "data.fetch"):
         assert call not in code
 
 

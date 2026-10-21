@@ -16,7 +16,7 @@ class AmbiguousVariantError(ValueError, KeyError):
     """Raised when several variants of a method fit and the call must pick one.
 
     Raised by ``mtb.params_for`` and the folder lookup of ``mtb.scan`` /
-    ``mtb.run_all``; the message spells out the call that selects one variant.
+    ``mtb.run``; the message spells out the call that selects one variant.
     ``except ValueError`` catches it.
 
     It is a ``ValueError`` and also a ``KeyError``, so ``except KeyError``

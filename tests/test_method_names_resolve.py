@@ -1,6 +1,6 @@
 """A method can be named by its id in any letter case or by its display name.
 
-``load_results`` and ``recommend`` took ``"totalvi"`` and ``"MOFA+"``; ``run_all``,
+``load_results`` and ``recommend`` took ``"totalvi"`` and ``"MOFA+"``; ``run``,
 ``scan``, ``method_info``, ``cite``, ``params_for``, ``inputs_for``, ``labels_for``,
 ``run`` and the env functions raised "Unknown method". They all resolve the
 name through ``registry.check_method`` now; an unknown name still raises with
@@ -66,6 +66,6 @@ def test_scan_and_run_all_take_any_case(tmp_path):
     df = mtb.scan(os.path.join(tmp_path, 'V'), 'vertical', methods=['totalvi'], verbose=False)
     assert list(df.method) == ["totalVI"]
     with pytest.raises(KeyError, match="totalVI does not accept"):
-        mtb.run_all(os.path.join(tmp_path, 'V'), 'vertical', methods=['TotalVI'], params={'TOTALVI': {'nonsense': 1}}, dry_run=True, verbose=False)
+        mtb.run(os.path.join(tmp_path, 'V'), 'vertical', methods=['TotalVI'], params={'TOTALVI': {'nonsense': 1}}, dry_run=True, verbose=False)
 
 

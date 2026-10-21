@@ -4,7 +4,7 @@ import multibench as mtb
 
 
 def test_uinmf_has_one_row_on_three_batches(capsys):
-    plan = mtb.run_all("D52mini", "cross", methods=["UINMF"], dry_run=True)
+    plan = mtb.run("D52mini", "cross", methods=["UINMF"], dry_run=True)
     assert plan["modalities"].tolist() == ["rna1+rna2+rna3+adt1+adt2+adt3"]
     out = capsys.readouterr().out
     assert "0 of 1 requested method" in out or "1 of 1 requested method" in out
@@ -12,6 +12,6 @@ def test_uinmf_has_one_row_on_three_batches(capsys):
 
 
 def test_named_modalities_keep_the_smaller_row():
-    plan = mtb.run_all("D52mini", "cross", methods=["UINMF"],
+    plan = mtb.run("D52mini", "cross", methods=["UINMF"],
                        modalities=["rna1", "rna2", "adt1", "adt2"], dry_run=True, verbose=False)
     assert plan["modalities"].tolist() == ["rna1+rna2+adt1+adt2"]

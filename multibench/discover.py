@@ -282,7 +282,7 @@ def params_for(method: str, category: str | None = None,
                modalities: list[str] | set[str] | None = None) -> dict:
     """Return the hyperparameters of one method variant.
 
-    Call it before ``run_all(params=...)`` to see what a method accepts and
+    Call it before ``run(params=...)`` to see what a method accepts and
     what it runs with when you pass nothing.
 
     Parameters
@@ -324,7 +324,7 @@ def params_for(method: str, category: str | None = None,
 
     See Also
     --------
-    mtb.run_all : takes these keys as ``params={method: {key: value}}``.
+    mtb.run : takes these keys as ``params={method: {key: value}}``.
     """
     s = registry.get(method)
     method = s.id

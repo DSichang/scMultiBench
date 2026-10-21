@@ -3,7 +3,7 @@
 scMoMaT, Multigrate, MOFA2 and Matilda have ``rna+adt``, ``rna+atac`` and
 ``rna+adt+atac`` under vertical. A folder with all three files has every
 input of all three, so ``inputs_for`` without ``modalities=`` raised
-``AmbiguousVariantError`` and ``run_all`` ran the method once per row, each
+``AmbiguousVariantError`` and ``run`` ran the method once per row, each
 into the same output folder. The rule: of the variants the folder satisfies,
 one whose modality set is a strict subset of another's is dropped. What
 remains, when it is one variant, is used. ``modalities=`` still selects any.
@@ -104,7 +104,7 @@ def test_a_smaller_folder_still_picks_its_own_variant(tmp_path):
     assert set(mtb.engine.resolve.inputs_for("TRI", "vertical", "scMoMaT", data_path=tmp_path)) == {"rna", "adt"}
 
 
-# ------------------------------------------------------------- scan and run_all
+# ------------------------------------------------------------- scan and run
 class _Res:
     def __init__(self, out):
         self.output = out
@@ -128,11 +128,11 @@ def test_run_all_runs_the_largest_variant_once(tmp_path, all_envs, monkeypatch, 
     _tri(tmp_path)
     calls = []
     monkeypatch.setattr(W, "_run", _fake_run(calls))
-    res = mtb.run_all(os.path.join(tmp_path, 'TRI'), 'vertical', methods=list(NESTED), out_dir=str(tmp_path / 'out'), evaluate=False)
+    res = mtb.run(os.path.join(tmp_path, 'TRI'), 'vertical', methods=list(NESTED), out_dir=str(tmp_path / 'out'), evaluate=False)
     assert sorted(calls) == [(m, ["adt", "atac", "rna"]) for m in sorted(NESTED)]
     assert sorted(res.summary["method"]) == sorted(NESTED)
     out = capsys.readouterr().out
-    assert ("[run_all] scMoMaT runs on rna+adt+atac, not on rna+adt and rna+atac, whose "
+    assert ("[run] scMoMaT runs on rna+adt+atac, not on rna+adt and rna+atac, whose "
             "files are part of it. Pass modalities= to run a smaller combination.") in out
 
 
@@ -140,21 +140,21 @@ def test_run_all_with_modalities_runs_the_smaller_variant(tmp_path, all_envs, mo
     _tri(tmp_path)
     calls = []
     monkeypatch.setattr(W, "_run", _fake_run(calls))
-    mtb.run_all(os.path.join(tmp_path, 'TRI'), 'vertical', methods=['scMoMaT'], modalities=['rna', 'adt'], out_dir=str(tmp_path / 'out'), evaluate=False, verbose=False)
+    mtb.run(os.path.join(tmp_path, 'TRI'), 'vertical', methods=['scMoMaT'], modalities=['rna', 'adt'], out_dir=str(tmp_path / 'out'), evaluate=False, verbose=False)
     assert calls == [("scMoMaT", ["adt", "rna"])]
 
 
 def test_dry_run_leaves_out_the_nested_rows_and_names_the_row_that_runs(tmp_path, all_envs,
                                                                          capsys):
     _tri(tmp_path)
-    plan = mtb.run_all(os.path.join(tmp_path, 'TRI'), 'vertical', methods=['scMoMaT', 'VIMCCA'], dry_run=True)
+    plan = mtb.run(os.path.join(tmp_path, 'TRI'), 'vertical', methods=['scMoMaT', 'VIMCCA'], dry_run=True)
     # 0.4.0: scMoMaT's rna+adt and rna+atac rows are left out, as a run leaves them out
     assert plan["runnable"].all()
     assert list(plan.loc[plan.method == "scMoMaT", "modalities"]) == ["rna+adt+atac"]
     assert (plan.method == "VIMCCA").sum() == 2
     out = capsys.readouterr().out
-    assert "[run_all] scMoMaT runs on rna+adt+atac, not on rna+adt and rna+atac" in out
-    assert "[run_all] VIMCCA runs on" not in out       # its two rows are not nested
+    assert "[run] scMoMaT runs on rna+adt+atac, not on rna+adt and rna+atac" in out
+    assert "[run] VIMCCA runs on" not in out       # its two rows are not nested
 
 
 def test_a_blocked_larger_row_leaves_the_smaller_one_running(tmp_path, all_envs, monkeypatch,
@@ -165,7 +165,7 @@ def test_a_blocked_larger_row_leaves_the_smaller_one_running(tmp_path, all_envs,
     _tri(tmp_path)
     calls = []
     monkeypatch.setattr(W, "_run", _fake_run(calls))
-    mtb.run_all(os.path.join(tmp_path, 'TRI'), 'vertical', methods=['Matilda'], out_dir=str(tmp_path / 'out'), evaluate=False, verbose=False)
+    mtb.run(os.path.join(tmp_path, 'TRI'), 'vertical', methods=['Matilda'], out_dir=str(tmp_path / 'out'), evaluate=False, verbose=False)
     assert calls == [("Matilda", ["adt", "cty", "rna"])]
 
 
@@ -210,10 +210,10 @@ def test_run_all_runs_uinmf_once_on_three_batches(tmp_path, all_envs, monkeypatc
     _cross(tmp_path)
     calls = []
     monkeypatch.setattr(W, "_run", _fake_run(calls, n_cells=36))
-    res = mtb.run_all(os.path.join(tmp_path, 'B3'), 'cross', methods=['UINMF'], out_dir=str(tmp_path / 'out'), evaluate=False)
+    res = mtb.run(os.path.join(tmp_path, 'B3'), 'cross', methods=['UINMF'], out_dir=str(tmp_path / 'out'), evaluate=False)
     assert calls == [("UINMF", ["adt1", "adt2", "adt3", "rna1", "rna2", "rna3"])]
     assert list(res.summary["method"]) == ["UINMF"]
-    assert ("[run_all] UINMF runs on rna1+rna2+rna3+adt1+adt2+adt3, not on "
+    assert ("[run] UINMF runs on rna1+rna2+rna3+adt1+adt2+adt3, not on "
             "rna1+rna2+adt1+adt2, whose files are part of it.") in capsys.readouterr().out
 
 

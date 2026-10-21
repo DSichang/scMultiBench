@@ -28,10 +28,6 @@ from multibench.engine import envs, ingest, registry
 
 F = importlib.import_module("multibench.data.fetch")
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
-MATILDA = ["scan", "D11", "--category", "vertical", "--methods", "Matilda",
-           "--modalities", "rna,adt", "--format", "csv"]
-# a sentence with its own subject, as every other reason of the column (R5-10)
-REASON = "The method scripts are not fetched. Run multibench fetch --scripts."
 
 
 def test_raises_tables_list_the_download_error():

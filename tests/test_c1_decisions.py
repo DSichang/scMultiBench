@@ -137,7 +137,7 @@ def test_an_empty_summary_has_the_columns():
 
 
 def _tree(tmp_path, dims=6):
-    """A 0.4.0 run_all folder of D11: one record with the old CHAIN_OK code and a
+    """A 0.4.0 run folder of D11: one record with the old CHAIN_OK code and a
     random embedding."""
     out = tmp_path / "out"
     (out / "Matilda_D11").mkdir(parents=True)

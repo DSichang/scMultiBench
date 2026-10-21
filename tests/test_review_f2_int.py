@@ -168,7 +168,7 @@ def _reused_matilda(tmp_path, monkeypatch, earlier=None):
     if earlier is not None:
         (tmp_path / "batch_result.json").write_text(json.dumps(
             {"dataset": "D11", "category": "vertical", "records": [earlier]}))
-    res = mtb.run_all("D11", "vertical", methods=["Matilda"], out_dir=str(tmp_path),
+    res = mtb.run("D11", "vertical", methods=["Matilda"], out_dir=str(tmp_path),
                       skip_existing=True, evaluate=False, verbose=False)
     return res.records[0]
 
@@ -227,7 +227,7 @@ def test_caveat_clauses_join_as_sentences():
 def test_public_docstrings_say_cell_order():
     import inspect
     from multibench.eval.pipeline import evaluate
-    for obj in (resolve.labels_for, evaluate, runner.RunResult, mtb.run_all):
+    for obj in (resolve.labels_for, evaluate, runner.RunResult, mtb.run):
         doc = inspect.getdoc(obj)
         for old in ("stacking order", "cell-stacking", "stacks its cells", "stacks the cells"):
             assert old not in doc, (obj, old)
@@ -247,7 +247,7 @@ def test_missing_script_in_a_folder_that_is_not_a_git_checkout(tmp_path, monkeyp
     why = W._missing_script(variant, method="GLUE")
     assert "missing from the reference checkout" in why
     assert "git pull" not in why
-    assert "not a git checkout" in why and "multibench fetch --scripts" in why
+    assert "not a git checkout" in why and "git clone --depth 1 https://github.com/PYangLab/scMultiBench.git <folder>" in why
     notes = runner.script_notes(registry.get("GLUE"), variant, tmp_path)
     assert any("not a git checkout" in n for n in notes) and not any(
         "git pull" in n for n in notes)

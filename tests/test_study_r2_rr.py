@@ -251,12 +251,12 @@ def test_scan_caveat_names_the_unused_batch(root):
 
 
 def test_dry_run_prints_the_unused_batch(root, capsys):
-    mtb.run_all(os.path.join(root / 'data', 'D52'), 'cross', methods=['UINMF'], modalities=TWO_BATCHES, dry_run=True)
+    mtb.run(os.path.join(root / 'data', 'D52'), 'cross', methods=['UINMF'], modalities=TWO_BATCHES, dry_run=True)
     out = capsys.readouterr().out
-    assert "[run_all] UINMF reads batches 1-2 of 3. Batch 3 is not used.\n" in out
+    assert "[run] UINMF reads batches 1-2 of 3. Batch 3 is not used.\n" in out
     # without modalities= the three-batch row runs, and the caveat of the
     # two-batch row inside it is not printed
-    mtb.run_all(os.path.join(root / 'data', 'D52'), 'cross', methods=['UINMF', 'StabMap'], dry_run=True)
+    mtb.run(os.path.join(root / 'data', 'D52'), 'cross', methods=['UINMF', 'StabMap'], dry_run=True)
     out = capsys.readouterr().out
     assert "reads batches" not in out
 

@@ -1,4 +1,4 @@
-"""P15: run_all(batch=) override, BatchResult.rescore(), summary batch_source/n_batches.
+"""P15: run(batch=) override, BatchResult.rescore(), summary batch_source/n_batches.
 
 A synthetic 120-cell CITE-seq folder and a fake `_run` that WRITES embedding.h5
 (so rescore can read it back) keep these independent of any conda env.
@@ -57,7 +57,7 @@ def cite(tmp_path, monkeypatch):
 
 def test_run_all_default_batch_is_file_of_origin_or_none(cite, tmp_path):
     data, labels = cite
-    res = mtb.run_all(os.path.join(data, 'MYCITE'), 'vertical', methods=['Matilda'], modalities=['rna', 'adt'], out_dir=tmp_path / 'out', verbose=False)
+    res = mtb.run(os.path.join(data, 'MYCITE'), 'vertical', methods=['Matilda'], modalities=['rna', 'adt'], out_dir=tmp_path / 'out', verbose=False)
     sm = res.summary
     assert sm.loc[0, "status"] == "scored"
     # c1 (C38): the batch fields are in the record
@@ -78,7 +78,7 @@ def test_run_all_default_batch_is_file_of_origin_or_none(cite, tmp_path):
 def test_run_all_batch_override_scores_batch_metrics(cite, tmp_path):
     data, labels = cite
     batch = np.tile([1, 2], N // 2)                 # two batches, orthogonal to the labels
-    res = mtb.run_all(os.path.join(data, 'MYCITE'), 'vertical', methods=['Matilda'], modalities=['rna', 'adt'], out_dir=tmp_path / 'out', verbose=False, batch=batch)
+    res = mtb.run(os.path.join(data, 'MYCITE'), 'vertical', methods=['Matilda'], modalities=['rna', 'adt'], out_dir=tmp_path / 'out', verbose=False, batch=batch)
     sm = res.summary
     assert sm.loc[0, "status"] == "scored"
     assert res.records[0]["batch_source"] == "user" and res.records[0]["n_batches"] == 2
@@ -94,13 +94,13 @@ def test_run_all_batch_wrong_length_is_refused_before_anything_runs(cite, tmp_pa
     data, _ = cite
     with pytest.raises(ValueError, match=rf"^batch has {N - 1} entries for the {N} cells of "
                                          r"MYCITE: give one batch per cell\.$"):
-        mtb.run_all(os.path.join(data, 'MYCITE'), 'vertical', methods=['Matilda'], modalities=['rna', 'adt'], out_dir=tmp_path / 'out', verbose=False, batch=np.ones(N - 1))
+        mtb.run(os.path.join(data, 'MYCITE'), 'vertical', methods=['Matilda'], modalities=['rna', 'adt'], out_dir=tmp_path / 'out', verbose=False, batch=np.ones(N - 1))
     assert not (tmp_path / "out").exists()
 
 
 def test_rescore_with_batch_and_labels(cite, tmp_path):
     data, labels = cite
-    res = mtb.run_all(os.path.join(data, 'MYCITE'), 'vertical', methods=['Matilda'], modalities=['rna', 'adt'], out_dir=tmp_path / 'out', verbose=False)
+    res = mtb.run(os.path.join(data, 'MYCITE'), 'vertical', methods=['Matilda'], modalities=['rna', 'adt'], out_dir=tmp_path / 'out', verbose=False)
     assert res.records[0]["batch_source"] is None
     batch = np.tile([1, 2], N // 2)
     re = res.rescore(batch=batch)
@@ -132,7 +132,7 @@ def test_rescore_with_batch_and_labels(cite, tmp_path):
 
 def test_rescore_handles_missing_output(cite, tmp_path):
     data, _ = cite
-    res = mtb.run_all(os.path.join(data, 'MYCITE'), 'vertical', methods=['Matilda'], modalities=['rna', 'adt'], out_dir=tmp_path / 'out', verbose=False)
+    res = mtb.run(os.path.join(data, 'MYCITE'), 'vertical', methods=['Matilda'], modalities=['rna', 'adt'], out_dir=tmp_path / 'out', verbose=False)
     (tmp_path / "out" / "Matilda_MYCITE" / "embedding.h5").unlink()
     # 0.4: no output to score at all is an error, not a table without scores
     with pytest.raises(FileNotFoundError, match=r"^No output of Matilda in .*out: load the "

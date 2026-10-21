@@ -142,8 +142,8 @@ def test_scan_reports_the_users_env_and_does_not_run_it(fake_root):
     assert not row.env_ok and not row.runnable
     assert row.env_reason == (
         f"Environment matilda was not installed by this version of multibench, so it is "
-        f"not used. Rename or remove {fake_root / 'envs' / 'matilda'}, then run multibench env "
-        f"install --methods Matilda.")
+        f"not used. Rename or remove {fake_root / 'envs' / 'matilda'}, then run "
+        f"mtb.env.install(['Matilda']).")
 
 
 def test_install_does_not_take_the_users_env_as_installed(fake_root, monkeypatch):

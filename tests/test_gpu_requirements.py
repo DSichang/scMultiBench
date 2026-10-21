@@ -9,7 +9,7 @@ script calls CUDA unconditionally (``requires_gpu`` + ``gpu_evidence``, a
 ``torch.cuda.is_available()`` itself). On a host without an NVIDIA GPU
 (``envs.host_has_gpu()`` False - this laptop, a CPU Colab) ``run`` merges the
 ``cpu_params`` unless the caller set the key, and refuses a ``requires_gpu``
-method with ``OSError`` before launching; ``scan`` / ``run_all`` report the
+method with ``OSError`` before launching; ``scan`` / ``run`` report the
 same sentence in the env gate. On a GPU host nothing changes. Every test
 patches ``host_has_gpu`` both ways, so it holds on ANY machine.
 """
@@ -228,14 +228,13 @@ def test_requires_gpu_dry_run_still_previews(tmp_path, no_gpu):
 
 
 def test_run_docstring_documents_the_contract():
-    # mtb.run is deprecated in 0.4.0 (its docstring names run_all); the
-    # contract stays on the implementation it wraps
-    assert "mtb.run_all(" in mtb.engine.runner.run.__doc__
-    doc = mtb.engine.runner.run.__wrapped__.__doc__ or ""
+    # the method runner is internal; mtb.run calls it
+    assert "mtb.run" in mtb.engine.runner.run.__doc__
+    doc = mtb.engine.runner.run.__doc__ or ""
     assert "OSError" in doc and "needs a GPU this host lacks" in " ".join(doc.split())
 
 
-# ------------------------------------------------------------ scan / run_all gate
+# ------------------------------------------------------------ scan / run gate
 
 def test_scan_reports_requires_gpu_in_the_env_gate(tmp_path, no_gpu, all_envs):
     _cite(tmp_path)
@@ -275,12 +274,12 @@ def test_scan_joins_missing_env_and_missing_gpu(tmp_path, no_gpu, monkeypatch):
 def test_run_all_never_dispatches_a_requires_gpu_method(tmp_path, no_gpu, all_envs, monkeypatch):
     _cite(tmp_path)
     monkeypatch.setattr(W, "_run", _must_not_spawn)
-    plan = mtb.run_all(os.path.join(tmp_path, 'CITE'), 'vertical', methods=['moETM'], out_dir=str(tmp_path / 'res'), dry_run=True, verbose=False)
+    plan = mtb.run(os.path.join(tmp_path, 'CITE'), 'vertical', methods=['moETM'], out_dir=str(tmp_path / 'res'), dry_run=True, verbose=False)
     row = plan[plan["modalities"] == "rna+adt"].iloc[0]
     assert not bool(row["runnable"]) and row["reason"] == MOETM_REASON
     with pytest.raises(ValueError, match=r"^None of the requested methods \(moETM\) can "
                                          r"run on CITE \(vertical\)\.") as e:
-        mtb.run_all(os.path.join(tmp_path, 'CITE'), 'vertical', methods=['moETM'], out_dir=str(tmp_path / 'res'), verbose=False)
+        mtb.run(os.path.join(tmp_path, 'CITE'), 'vertical', methods=['moETM'], out_dir=str(tmp_path / 'res'), verbose=False)
     assert "needs an NVIDIA GPU" in str(e.value)
 
 

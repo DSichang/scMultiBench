@@ -10,7 +10,7 @@ Quickstart
 
     mtb.scan("MYDATA")               # which methods can run on it (and why not the rest)
 
-    res = mtb.run_all("MYDATA", "vertical", out_dir="out/")
+    res = mtb.run("MYDATA", "vertical", out_dir="out/")
     print(res.summary)               # per-method status + metrics
     print(res.failures)              # what did not finish, and why
     res.plot().savefig("compare.png")
@@ -30,7 +30,7 @@ from .eval.pipeline import evaluate
 from .engine import ingest as io
 from .engine import envs as env
 from .discover import find_methods, method_info, params_for, cite
-from .workflow import scan, run_all, BatchResult, describe_layout, load_batch
+from .workflow import scan, run, BatchResult, describe_layout, load_batch
 
 # `import multibench.io` / `from multibench.env import install` work as for a
 # real submodule: the three namespaces live elsewhere in the package
@@ -47,7 +47,7 @@ __all__ = [
     # methods
     "find_methods", "method_info", "params_for", "cite",
     # run
-    "scan", "run_all", "load_batch", "BatchResult",
+    "scan", "run", "load_batch", "BatchResult",
     # metrics
     "evaluate", "load_results", "recommend",
     # setup
