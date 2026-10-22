@@ -2116,9 +2116,10 @@ class RunResult:
         -------
         anndata.AnnData
             ``obsm["X_emb"]`` in the method's cell order; ``obs_names`` are
-            the cells' barcodes (``cty2:AAAC...`` where two files share one)
-            and ``obs`` holds each cell's ``label``, and its ``batch`` when
-            the run had more than one batch.
+            the cells' barcodes, each prefixed by its label file
+            (``cty2:AAAC...``) when some barcode is in two files; ``obs``
+            holds each cell's ``label``, and its ``batch`` when the run had
+            more than one batch.
 
         Raises
         ------
