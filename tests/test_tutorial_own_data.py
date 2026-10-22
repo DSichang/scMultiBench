@@ -90,9 +90,9 @@ LINKS_OF = {"vertical": ["10x-h5", "labels-csv", "no-labels", "donors"],
             "diagonal": ["labels-csv", "no-labels"],
             "mosaic": ["10x-h5", "labels-csv", "no-labels"],
             "cross": ["10x-h5", "labels-csv", "no-labels", "donors"]}
-#: a recipe a later cell links: diagonal_multi's batches section, for another
-#: number of donors than its methods read
-LATER_LINKS = {"diagonal_multi": ["donors"]}
+#: a recipe the collapsed block of the first cell links: diagonal_multi's batches,
+#: for another number of donors than its methods read
+DETAILS_LINKS = {"diagonal_multi": ["donors"]}
 
 #: what a vertical tutorial says on donors: in the visible text of the first
 #: cell, and in its collapsed block
@@ -271,9 +271,11 @@ def test_recipe_links(key):
     links = [f"[{text[a]}]({RECIPES}{a})" for a in LINKS_OF[cat]]
     assert (f"Starting from something else? See the recipes for "
             f"{GEN.and_list(links)}.") in visible
-    assert re.findall(r"#(recipe-[a-z0-9-]+)", first) == [f"recipe-{a}" for a in LINKS_OF[cat]]
+    extra = DETAILS_LINKS.get(key, [])
+    assert re.findall(r"#(recipe-[a-z0-9-]+)", first) == \
+        [f"recipe-{a}" for a in LINKS_OF[cat] + extra]
     assert re.findall(r"#recipe-[a-z0-9-]+", "\n".join(s for _, s in _cells(key))) == \
-        [f"#recipe-{a}" for a in LINKS_OF[cat] + LATER_LINKS.get(key, [])]
+        [f"#recipe-{a}" for a in LINKS_OF[cat] + extra]
 
 
 def test_install_cell_asks_for_this_version():
