@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="A benchmark of single-cell multimodal integration methods. The multibench package runs 36 of them from Python or the command line and scores their output.">
+        <meta name="description" content="A benchmark of single-cell multimodal integration methods. The multibench package runs 36 of them from Python and scores their output.">
       
       
         <meta name="author" content="PYangLab">
@@ -1533,93 +1533,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-five-steps" class="md-nav__link">
+  <a href="#1-methods" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The five steps
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="The five steps">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#step-1-discover" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 1: Discover
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-2-prepare-data" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 2: Prepare data
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-3-run" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 3: Run
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-4-score" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 4: Score
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-5-compare" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 5: Compare
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#configuration-and-errors" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configuration and errors
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-same-story-from-the-shell" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The same story from the shell
+        1. Methods
       
     </span>
   </a>
@@ -1627,10 +1544,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#errors-and-warnings" class="md-nav__link">
+  <a href="#2-run-linux" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Errors and warnings
+        2. Run (Linux)
       
     </span>
   </a>
@@ -1638,10 +1555,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-metrics-vocabulary" class="md-nav__link">
+  <a href="#3-metrics" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The metrics= vocabulary
+        3. Metrics
       
     </span>
   </a>
@@ -1649,60 +1566,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#method-environments" class="md-nav__link">
+  <a href="#4-figures" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Method environments
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Method environments">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#run-modes-prefix-and-conda" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Run modes: prefix and conda
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#archive-flavours-cpu-and-gpu" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Archive flavours: cpu and gpu
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#gpu-or-cpu" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        GPU or CPU?
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#runresult" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        RunResult
+        4. Figures
       
     </span>
   </a>
@@ -1710,10 +1577,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#version" class="md-nav__link">
+  <a href="#setup" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Version
+        Setup
       
     </span>
   </a>
@@ -1721,10 +1588,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#see-also" class="md-nav__link">
+  <a href="#the-long-table-and-metrics" class="md-nav__link">
     <span class="md-ellipsis">
       
-        See also
+        The long table and metrics=
       
     </span>
   </a>
@@ -1754,35 +1621,7 @@
   <span class="md-ellipsis">
     
   
-    Discover
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../reference/inputs/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Prepare inputs
+    Methods
   
 
     
@@ -1838,7 +1677,7 @@
   <span class="md-ellipsis">
     
   
-    Score
+    Metrics (evaluate)
   
 
     
@@ -1866,7 +1705,7 @@
   <span class="md-ellipsis">
     
   
-    Compare
+    Metrics (stored results)
   
 
     
@@ -1887,14 +1726,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/env/" class="md-nav__link">
+      <a href="../reference/plot/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Environments (mtb.env)
+    Figures (mtb.plot)
   
 
     
@@ -1923,34 +1762,6 @@
     
   
     Data I/O (mtb.io)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../reference/plot/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Plot (mtb.plot)
   
 
     
@@ -2007,6 +1818,34 @@
     
   
     Catalog (mtb.catalog)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/env/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environments (mtb.env)
   
 
     
@@ -2225,93 +2064,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-five-steps" class="md-nav__link">
+  <a href="#1-methods" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The five steps
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="The five steps">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#step-1-discover" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 1: Discover
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-2-prepare-data" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 2: Prepare data
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-3-run" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 3: Run
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-4-score" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 4: Score
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#step-5-compare" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 5: Compare
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#configuration-and-errors" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configuration and errors
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-same-story-from-the-shell" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The same story from the shell
+        1. Methods
       
     </span>
   </a>
@@ -2319,10 +2075,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#errors-and-warnings" class="md-nav__link">
+  <a href="#2-run-linux" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Errors and warnings
+        2. Run (Linux)
       
     </span>
   </a>
@@ -2330,10 +2086,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-metrics-vocabulary" class="md-nav__link">
+  <a href="#3-metrics" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The metrics= vocabulary
+        3. Metrics
       
     </span>
   </a>
@@ -2341,60 +2097,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#method-environments" class="md-nav__link">
+  <a href="#4-figures" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Method environments
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Method environments">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#run-modes-prefix-and-conda" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Run modes: prefix and conda
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#archive-flavours-cpu-and-gpu" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Archive flavours: cpu and gpu
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#gpu-or-cpu" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        GPU or CPU?
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#runresult" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        RunResult
+        4. Figures
       
     </span>
   </a>
@@ -2402,10 +2108,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#version" class="md-nav__link">
+  <a href="#setup" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Version
+        Setup
       
     </span>
   </a>
@@ -2413,10 +2119,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#see-also" class="md-nav__link">
+  <a href="#the-long-table-and-metrics" class="md-nav__link">
     <span class="md-ellipsis">
       
-        See also
+        The long table and metrics=
       
     </span>
   </a>
@@ -2454,587 +2160,208 @@
 
 
 <h1 id="api-reference">API reference<a class="headerlink" href="#api-reference" title="Anchor link to this section">&para;</a></h1>
-<p>The package is imported as <code>import multibench as mtb</code>. The tables below list
-every public function by step. Each name links to its reference entry, with
-the signature, parameters and examples.</p>
-<h2 id="the-five-steps">The five steps<a class="headerlink" href="#the-five-steps" title="Anchor link to this section">&para;</a></h2>
-<p>A benchmark run has five steps: discover a method, prepare the data, run the
-method, score its output and compare the scores. Only step 3 needs Linux. The
-other steps also work on macOS and Windows.</p>
+<p>The package is imported as <code>import multibench as mtb</code>. Its functions form four
+modules, methods, run, metrics and figures, plus a setup group. Each name links
+to its reference entry, with the parameters and examples.</p>
+<h2 id="1-methods">1. Methods<a class="headerlink" href="#1-methods" title="Anchor link to this section">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>call</th>
+<th>returns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../reference/discover/#multibench.discover.find_methods"><code>mtb.find_methods(category, modalities=, needs_labels=)</code></a></td>
+<td>The method ids that fit.</td>
+</tr>
+<tr>
+<td><a href="../reference/discover/#multibench.discover.method_info"><code>mtb.method_info(method)</code></a></td>
+<td>Its env, <abbr title="Graphics Processing Unit">GPU</abbr> use, labels, <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> form, variants and runtime.</td>
+</tr>
+<tr>
+<td><a href="../reference/discover/#multibench.discover.params_for"><code>mtb.params_for(method, category, modalities)</code></a></td>
+<td>What <code>params=</code> can set, with each default.</td>
+</tr>
+</tbody>
+</table>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># score with the Leiden backend of the stored tables</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">mtb</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">DEFAULT</span><span class="o">.</span><span class="n">leiden_flavor</span> <span class="o">=</span> <span class="s2">"leidenalg"</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="c1"># Step 1: discover</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"rna"</span><span class="p">,</span> <span class="s2">"adt"</span><span class="p">])</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="c1"># Step 2: prepare (raw counts)</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">mdata</span><span class="p">,</span> <span class="s2">"data/MYCITE"</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="s2">"rna"</span><span class="p">,</span> <span class="n">adt</span><span class="o">=</span><span class="s2">"adt"</span><span class="p">,</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>                      <span class="n">labels</span><span class="o">=</span><span class="s2">"rna:celltype"</span><span class="p">)</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="c1"># Step 3: run and score every method (Linux) ...</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="n">batch</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run_all</span><span class="p">(</span><span class="s2">"MYCITE"</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="n">out_dir</span><span class="o">=</span><span class="s2">"runs/MYCITE"</span><span class="p">,</span>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>                    <span class="n">data_path</span><span class="o">=</span><span class="s2">"data"</span><span class="p">)</span>
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="c1"># ... or run one method</span>
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="n">inputs</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">inputs_for</span><span class="p">(</span><span class="s2">"MYCITE"</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="s2">"Matilda"</span><span class="p">,</span> <span class="n">data_path</span><span class="o">=</span><span class="s2">"data"</span><span class="p">)</span>
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">"Matilda"</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span> <span class="n">out_dir</span><span class="o">=</span><span class="s2">"runs/Matilda"</span><span class="p">)</span>
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="c1"># Step 4: score</span>
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="n">labels</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">labels_for</span><span class="p">(</span><span class="s2">"MYCITE"</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="s2">"Matilda"</span><span class="p">,</span> <span class="n">data_path</span><span class="o">=</span><span class="s2">"data"</span><span class="p">)</span>
-</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="n">scores</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">output</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">labels</span><span class="p">)</span>
-</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>
-</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="c1"># Step 5: compare</span>
-</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a><span class="n">stored</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="s2">"vertical"</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">"D11"</span><span class="p">)</span>
-</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">stored</span><span class="p">)</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="s2">"vertical"</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"rna"</span><span class="p">,</span> <span class="s2">"adt"</span><span class="p">],</span> <span class="n">needs_labels</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">mtb</span><span class="o">.</span><span class="n">params_for</span><span class="p">(</span><span class="s2">"Matilda"</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="p">[</span><span class="s2">"rna"</span><span class="p">,</span> <span class="s2">"adt"</span><span class="p">])[</span><span class="s2">"tunable"</span><span class="p">]</span>
 </span></code></pre></div>
-<details class="note">
-<summary>Details</summary>
-<p><a href="../tutorials/evaluate/#are-my-numbers-comparable">Are my numbers comparable?</a>
-explains the <code>leiden_flavor</code> line and its shell flag,
-<code>--leiden-flavor leidenalg</code>.</p>
-<p>To place your method in a stored table, score it on the same demo
-dataset, such as D11 for <abbr title="Cellular Indexing of Transcriptomes and Epitopes by sequencing">CITE-seq</abbr>.
-<a href="../tutorials/plot/#add-your-own-method">Add your own method</a> shows the
-code.</p>
-<p><a href="../reference/score/#multibench.eval.pipeline.to_long"><code>mtb.to_long</code></a>
-turns the scores into a long table, the shape
-<a href="../reference/compare/#multibench.data.results.load_results"><code>mtb.load_results</code></a>
-returns. A long table holds one score per row, with its method, dataset
-and metric. Concatenate the two tables and draw them with
-<a href="../reference/plot/#multibench.plot.bubble.bubble"><code>mtb.plot.bubble</code></a>.</p>
-</details>
-<h3 id="step-1-discover">Step 1: Discover<a class="headerlink" href="#step-1-discover" title="Anchor link to this section">&para;</a></h3>
-<p>Find the methods that fit your data, what each one needs and how to cite it.
-These calls work offline. A method has one variant for each category and set
-of modalities it supports.</p>
-<div class="api-table">
+<h2 id="2-run-linux">2. Run (Linux)<a class="headerlink" href="#2-run-linux" title="Anchor link to this section">&para;</a></h2>
 <table>
 <thead>
 <tr>
-<th>entry point</th>
-<th>what it does</th>
+<th>call</th>
+<th>returns</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><a href="../reference/discover/#multibench.discover.list_methods"><code>mtb.list_methods</code></a></td>
-<td>Method ids, optionally for one category.</td>
+<td><a href="../reference/run/#multibench.workflow.scan"><code>mtb.scan(dataset, category, methods=, params=)</code></a></td>
+<td>The plan, one row per method: can it run here, why not, and its command.</td>
 </tr>
 <tr>
-<td><a href="../reference/discover/#multibench.discover.find_methods"><code>mtb.find_methods</code></a></td>
-<td>Method ids that match every filter you give: category, task, modalities, <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> representation and more.</td>
+<td><a href="../reference/run/#multibench.workflow.run"><code>mtb.run(dataset, category, out_dir, methods=, params=)</code></a></td>
+<td>A <code>RunResult</code>, also saved in <code>out_dir</code>.</td>
 </tr>
 <tr>
-<td><a href="../reference/discover/#multibench.discover.method_info"><code>mtb.method_info</code></a></td>
-<td>What the package knows about one method: environment, variants, runtime, <abbr title="Graphics Processing Unit">GPU</abbr> needs and reference.</td>
+<td><a href="../reference/run/#multibench.workflow.load_run"><code>mtb.load_run(out_dir)</code></a></td>
+<td>The <code>RunResult</code> saved in <code>out_dir</code>.</td>
 </tr>
 <tr>
-<td><a href="../reference/discover/#multibench.discover.params_for"><code>mtb.params_for</code></a></td>
-<td>The hyperparameters a method variant accepts, with their defaults.</td>
-</tr>
-<tr>
-<td><a href="../reference/discover/#multibench.workflow.describe_layout"><code>mtb.describe_layout</code></a></td>
-<td>How to lay out your own dataset folder for a category.</td>
-</tr>
-<tr>
-<td><a href="../reference/discover/#multibench.discover.cite"><code>mtb.cite</code></a></td>
-<td>Citation text or BibTeX for the benchmark and the methods you ran.</td>
-</tr>
-<tr>
-<td><a href="../reference/discover/#multibench.engine.registry.list_tasks"><code>mtb.list_tasks</code></a></td>
-<td>The valid <code>task</code> values.</td>
-</tr>
-<tr>
-<td><a href="../reference/discover/#multibench.workflow.list_categories"><code>mtb.list_categories</code></a></td>
-<td>The valid <code>category</code> values, each with a short description.</td>
+<td><a href="../reference/run/#multibench.workflow.RunResult"><code>mtb.RunResult</code></a></td>
+<td><code>summary</code>, <code>long</code>, <code>embedding(method)</code>, <code>plot()</code>, <code>rescore()</code>, <code>save()</code> and <code>records</code>, one dict per method with its status, parameters, label order and provenance.</td>
 </tr>
 </tbody>
 </table>
-</div>
-<h3 id="step-2-prepare-data">Step 2: Prepare data<a class="headerlink" href="#step-2-prepare-data" title="Anchor link to this section">&para;</a></h3>
-<p>Put your matrices into a dataset folder and find the files a method reads.
-Give raw counts: the methods normalise the data themselves. A role names one
-input of a method, such as <code>rna</code>, <code>adt</code> or <code>cty</code>.</p>
-<p><code>mtb.run</code> takes <code>(method, category)</code>. <code>mtb.inputs_for</code> and <code>mtb.labels_for</code>
-take <code>(dataset, category, method)</code>. <code>mtb.scan</code> takes <code>(dataset, category)</code>.
-In <code>mtb.io</code>, <code>mod</code> names a MuData modality and <code>modality</code> names the role.</p>
-<div class="api-table">
-<table>
-<thead>
-<tr>
-<th>entry point</th>
-<th>what it does</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="../reference/io/#multibench.engine.ingest.export_dataset"><code>mtb.io.export_dataset</code></a></td>
-<td>Write an AnnData, a MuData or loose matrices as a dataset folder.</td>
-</tr>
-<tr>
-<td><a href="../reference/io/#multibench.engine.ingest.to_canonical"><code>mtb.io.to_canonical</code></a></td>
-<td>Convert one matrix to the canonical <code>.h5</code> file, features x cells.</td>
-</tr>
-<tr>
-<td><a href="../reference/io/#multibench.engine.ingest.read_canonical"><code>mtb.io.read_canonical</code></a></td>
-<td>Read a canonical <code>.h5</code> back as an AnnData, cells x features.</td>
-</tr>
-<tr>
-<td><a href="../reference/io/#multibench.engine.ingest.normalize_peak_names"><code>mtb.io.normalize_peak_names</code></a></td>
-<td>Write a copy of a canonical <code>.h5</code> with <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> peak names spelled the way the methods expect.</td>
-</tr>
-<tr>
-<td><a href="../reference/inputs/#multibench.engine.resolve.inputs_for"><code>mtb.inputs_for</code></a></td>
-<td><code>{role: path}</code> of the files a method variant reads from a dataset folder.</td>
-</tr>
-<tr>
-<td><a href="../reference/inputs/#multibench.engine.resolve.labels_for"><code>mtb.labels_for</code></a></td>
-<td><code>{name: path}</code> of a dataset's cell-type label files. With <code>category</code> and <code>method</code>, only the files that method reads, in the method's cell order.</td>
-</tr>
-<tr>
-<td><a href="../reference/data/#multibench.data.fetch.fetch"><code>mtb.data.fetch</code></a></td>
-<td>Download the named reference datasets unless they are already present.</td>
-</tr>
-<tr>
-<td><a href="../reference/data/#multibench.data.fetch.fetch_outputs"><code>mtb.data.fetch_outputs</code></a></td>
-<td>Download precomputed <code>run_all</code> outputs for a tutorial dataset.</td>
-</tr>
-<tr>
-<td><a href="../reference/data/#multibench.data.results.fetchable"><code>mtb.data.fetchable</code></a></td>
-<td>The dataset ids <code>fetch</code> can download.</td>
-</tr>
-<tr>
-<td><a href="../reference/data/#multibench.data.examples.write_example"><code>mtb.data.write_example</code></a></td>
-<td>Write the example files of a tutorial dataset as <code>.h5ad</code> files.</td>
-</tr>
-</tbody>
-</table>
-</div>
-<h3 id="step-3-run">Step 3: Run<a class="headerlink" href="#step-3-run" title="Anchor link to this section">&para;</a></h3>
-<p>Run methods in their own environments, on Linux. <code>mtb.scan</code> shows what can
-run before you start.</p>
-<div class="api-table">
-<table>
-<thead>
-<tr>
-<th>entry point</th>
-<th>what it does</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="../reference/run/#multibench.workflow.scan"><code>mtb.scan</code></a></td>
-<td>Which methods can run on a dataset, why the others cannot, and the command each would run.</td>
-</tr>
-<tr>
-<td><a href="../reference/run/#multibench.engine.runner.run"><code>mtb.run</code></a></td>
-<td>Run one method and load its output, a <a href="#runresult"><code>RunResult</code></a>.</td>
-</tr>
-<tr>
-<td><a href="../reference/run/#multibench.workflow.run_all"><code>mtb.run_all</code></a></td>
-<td>Run and score every applicable method. Returns a <code>BatchResult</code>.</td>
-</tr>
-<tr>
-<td><a href="../reference/run/#multibench.workflow.sweep"><code>mtb.sweep</code></a></td>
-<td>Run one method once per value of one hyperparameter, each in its own <code>out_dir</code>.</td>
-</tr>
-<tr>
-<td><a href="../reference/run/#multibench.workflow.load_batch"><code>mtb.load_batch</code></a></td>
-<td>Reload a saved <code>run_all</code> result.</td>
-</tr>
-<tr>
-<td><a href="../reference/run/#multibench.workflow.BatchResult"><code>mtb.BatchResult</code></a></td>
-<td>What <code>run_all</code> returns: a summary table, a long table, a figure and rescoring.</td>
-</tr>
-<tr>
-<td><a href="../reference/env/#multibench.engine.envs.status"><code>mtb.env.status</code></a></td>
-<td>Which method environments are installed on this machine.</td>
-</tr>
-<tr>
-<td><a href="../reference/env/#multibench.engine.envs.plan"><code>mtb.env.plan</code></a></td>
-<td>Which environments a set of methods needs. <code>multibench env plan</code> also shows their sizes.</td>
-</tr>
-<tr>
-<td><a href="../reference/env/#multibench.engine.envs.install"><code>mtb.env.install</code></a></td>
-<td>Install those environments. A dry run until <code>dry_run=False</code>.</td>
-</tr>
-<tr>
-<td><a href="../reference/env/#multibench.engine.envs.doctor"><code>mtb.env.doctor</code></a></td>
-<td>Which needed environments are installed and which are missing. <code>multibench env doctor</code> also prints the install command.</td>
-</tr>
-<tr>
-<td><a href="../reference/env/#multibench.engine.envs.recipe"><code>mtb.env.recipe</code></a></td>
-<td>The build recipe of one method's environment.</td>
-</tr>
-<tr>
-<td><a href="../reference/env/#multibench.engine.envs.env_prefix"><code>mtb.env.env_prefix</code></a></td>
-<td>The folder of an installed environment, the one <code>mtb.run</code> enters, or <code>None</code>.</td>
-</tr>
-</tbody>
-</table>
-</div>
-<h3 id="step-4-score">Step 4: Score<a class="headerlink" href="#step-4-score" title="Anchor link to this section">&para;</a></h3>
-<p>Compute the benchmark's metrics for a run output.</p>
-<div class="api-table">
-<table>
-<thead>
-<tr>
-<th>entry point</th>
-<th>what it does</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="../reference/score/#multibench.eval.pipeline.evaluate"><code>mtb.evaluate</code></a></td>
-<td>scIB and classification metrics of a run output, scored against cell-type labels and, when given, batch labels.</td>
-</tr>
-<tr>
-<td><a href="../reference/score/#multibench.eval.pipeline.to_long"><code>mtb.to_long</code></a></td>
-<td>Reshape <code>evaluate</code>'s result into the long results table.</td>
-</tr>
-<tr>
-<td><a href="../reference/score/#multibench.eval.classify.classify"><code>mtb.classify</code></a></td>
-<td>Predict the cell type of each query cell from a reference batch.</td>
-</tr>
-<tr>
-<td><a href="../reference/score/#multibench.eval.classify.classification_metrics"><code>mtb.classification_metrics</code></a></td>
-<td>Score the predicted cell types of <code>mtb.classify</code> with the benchmark's metrics.</td>
-</tr>
-</tbody>
-</table>
-</div>
-<h3 id="step-5-compare">Step 5: Compare<a class="headerlink" href="#step-5-compare" title="Anchor link to this section">&para;</a></h3>
-<p>Load the stored metric tables, rank methods and draw figures.</p>
-<div class="api-table">
-<table>
-<thead>
-<tr>
-<th>entry point</th>
-<th>what it does</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="../reference/compare/#multibench.data.results.load_results"><code>mtb.load_results</code></a></td>
-<td>The stored metric tables as one long table.</td>
-</tr>
-<tr>
-<td><a href="../reference/compare/#multibench.data.results.available_datasets"><code>mtb.available_datasets</code></a></td>
-<td>Dataset ids with stored results.</td>
-</tr>
-<tr>
-<td><a href="../reference/compare/#multibench.data.results.results_coverage"><code>mtb.results_coverage</code></a></td>
-<td>Which (category, dataset, method) combinations have results, and from which source.</td>
-</tr>
-<tr>
-<td><a href="../reference/compare/#multibench.data.results.recommend"><code>mtb.recommend</code></a></td>
-<td>Rank methods for a category from the stored results, with the share of datasets each method was scored on.</td>
-</tr>
-<tr>
-<td><a href="../reference/compare/#multibench.data.results.DegenerateRerunWarning"><code>mtb.DegenerateRerunWarning</code></a></td>
-<td>Warning class for a re-run row that most likely failed without an error.</td>
-</tr>
-<tr>
-<td><a href="../reference/plot/#multibench.plot.bubble.bubble"><code>mtb.plot.bubble</code></a></td>
-<td>Bubble table of a long results table.</td>
-</tr>
-<tr>
-<td><a href="../reference/plot/#multibench.plot.bar.bar"><code>mtb.plot.bar</code></a></td>
-<td>Each method's overall score across datasets, as bars.</td>
-</tr>
-<tr>
-<td><a href="../reference/plot/#multibench.plot.bubble.build_table"><code>mtb.plot.build_table</code></a></td>
-<td>The numbers behind a bubble table, without drawing it.</td>
-</tr>
-<tr>
-<td><a href="../reference/plot/#multibench.plot.bubble.BubbleTable"><code>mtb.plot.BubbleTable</code></a></td>
-<td>What <code>build_table</code> returns: per-family matrices, ranks and row order.</td>
-</tr>
-<tr>
-<td><a href="../reference/catalog/#multibench.data.catalog.methods"><code>mtb.catalog.methods</code></a></td>
-<td>The methods table as a DataFrame.</td>
-</tr>
-<tr>
-<td><a href="../reference/catalog/#multibench.data.catalog.datasets"><code>mtb.catalog.datasets</code></a></td>
-<td>The datasets table, including which datasets have stored results.</td>
-</tr>
-<tr>
-<td><a href="../reference/catalog/#multibench.data.catalog.metrics"><code>mtb.catalog.metrics</code></a></td>
-<td>The metrics table, with a description of each metric.</td>
-</tr>
-<tr>
-<td><a href="../reference/catalog/#multibench.data.catalog.canonical_id"><code>mtb.catalog.canonical_id</code></a></td>
-<td>The canonical method id for any known spelling.</td>
-</tr>
-<tr>
-<td><a href="../reference/catalog/#multibench.data.catalog.canonical_metric"><code>mtb.catalog.canonical_metric</code></a></td>
-<td>The canonical metric code for any known spelling, such as <code>"ari"</code> -&gt; <code>"ARI"</code>.</td>
-</tr>
-<tr>
-<td><a href="../reference/catalog/#multibench.data.catalog.known_metrics"><code>mtb.catalog.known_metrics</code></a></td>
-<td>The metric codes, in family order.</td>
-</tr>
-</tbody>
-</table>
-</div>
-<h3 id="configuration-and-errors">Configuration and errors<a class="headerlink" href="#configuration-and-errors" title="Anchor link to this section">&para;</a></h3>
-<p>The <a href="../reference/config/">config page</a> lists the environment variables.</p>
-<div class="api-table">
-<table>
-<thead>
-<tr>
-<th>entry point</th>
-<th>what it does</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="../reference/config/#multibench.config.Config"><code>mtb.config.Config</code></a></td>
-<td>Paths and settings such as <code>data_path</code>, <code>envs_dir</code> and <code>leiden_flavor</code>. Every function reads <code>mtb.config.DEFAULT</code>.</td>
-</tr>
-<tr>
-<td><a href="../reference/config/#multibench.engine.schema.AmbiguousVariantError"><code>mtb.AmbiguousVariantError</code></a></td>
-<td>Raised when a method has several variants and neither <code>modalities=</code> nor the dataset's files select one.</td>
-</tr>
-</tbody>
-</table>
-</div>
-<h2 id="the-same-story-from-the-shell">The same story from the shell<a class="headerlink" href="#the-same-story-from-the-shell" title="Anchor link to this section">&para;</a></h2>
-<p>Each <code>multibench</code> subcommand wraps one Python function and takes the same
-argument names. <code>multibench &lt;command&gt; --help</code> lists the flags. <code>run</code> and
-<code>run-all</code> need Linux.</p>
-<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># how to lay out your data</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>multibench<span class="w"> </span>layout<span class="w"> </span>vertical
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># write your raw counts as a dataset folder, then check it</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>multibench<span class="w"> </span>convert<span class="w"> </span>my.h5ad<span class="w"> </span>data/MYCITE<span class="w"> </span>--rna<span class="w"> </span>X<span class="w"> </span>--adt<span class="w"> </span>obsm:protein<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span>--labels<span class="w"> </span>obs:celltype
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>multibench<span class="w"> </span>scan<span class="w"> </span>MYCITE<span class="w"> </span>--category<span class="w"> </span>vertical<span class="w"> </span>--data-path<span class="w"> </span>data
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="c1"># the hyperparameters --param accepts</span>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>multibench<span class="w"> </span>params<span class="w"> </span>Matilda
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="c1"># run one method and score it, or run and score every method</span>
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>multibench<span class="w"> </span>run<span class="w"> </span>--method<span class="w"> </span>Matilda<span class="w"> </span>--category<span class="w"> </span>vertical<span class="w"> </span>--out-dir<span class="w"> </span>runs/Matilda<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">    </span>--input<span class="w"> </span><span class="nv">rna</span><span class="o">=</span>data/MYCITE/rna.h5<span class="w"> </span>--input<span class="w"> </span><span class="nv">adt</span><span class="o">=</span>data/MYCITE/adt.h5<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">    </span>--input<span class="w"> </span><span class="nv">cty</span><span class="o">=</span>data/MYCITE/cty.csv
-</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>multibench<span class="w"> </span>evaluate<span class="w"> </span>--output<span class="w"> </span>runs/Matilda/embedding.h5<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">    </span>--labels<span class="w"> </span>data/MYCITE/cty.csv<span class="w"> </span>--leiden-flavor<span class="w"> </span>leidenalg<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">    </span>--method<span class="w"> </span>Matilda<span class="w"> </span>--dataset<span class="w"> </span>MYCITE<span class="w"> </span>--category<span class="w"> </span>vertical<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">    </span>--out<span class="w"> </span>runs/Matilda/long.csv
-</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>multibench<span class="w"> </span>run-all<span class="w"> </span>MYCITE<span class="w"> </span>--category<span class="w"> </span>vertical<span class="w"> </span>--data-path<span class="w"> </span>data<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="w">    </span>--out-dir<span class="w"> </span>runs/MYCITE<span class="w"> </span>--leiden-flavor<span class="w"> </span>leidenalg
-</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>
-</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="c1"># your runs, then a stored table</span>
-</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>multibench<span class="w"> </span>plot<span class="w"> </span>bubble<span class="w"> </span>--input<span class="w"> </span>runs/MYCITE<span class="w"> </span>--out<span class="w"> </span>mine.pdf
-</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>multibench<span class="w"> </span>plot<span class="w"> </span>bubble<span class="w"> </span>--category<span class="w"> </span>vertical<span class="w"> </span>--dataset<span class="w"> </span>D11<span class="w"> </span>--out<span class="w"> </span>d11.pdf
-</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>
-</span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>multibench<span class="w"> </span>cite<span class="w"> </span>Matilda<span class="w"> </span>MOFA2
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="s2">"data/MYCITE"</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">)</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">"data/MYCITE"</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="n">out_dir</span><span class="o">=</span><span class="s2">"out/"</span><span class="p">,</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>              <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s2">"Matilda"</span><span class="p">,</span> <span class="s2">"totalVI"</span><span class="p">],</span> <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">"Matilda"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"epochs"</span><span class="p">:</span> <span class="mi">10</span><span class="p">}})</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">res</span><span class="o">.</span><span class="n">summary</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">emb</span> <span class="o">=</span> <span class="n">res</span><span class="o">.</span><span class="n">embedding</span><span class="p">(</span><span class="s2">"Matilda"</span><span class="p">)</span>      <span class="c1"># obsm["X_emb"]; obs: each cell's label (and batch)</span>
 </span></code></pre></div>
-<details class="note">
-<summary>Details</summary>
-<ul>
-<li>Tables, ids and commands go to stdout. Progress, warnings and errors go
-  to stderr, so <code>2&gt;/dev/null</code> hides them.</li>
-<li><code>scan</code> and <code>run-all --dry-run</code> clip long text to 80 characters.
-  <code>--columns all</code> or <code>--format csv|tsv|json</code> prints every column in full,
-  including <code>command</code>.</li>
-<li><code>run --dry-run</code> prints the command without running it.
-  <code>run-all --dry-run</code> needs no <code>--out-dir</code>. Its commands then show
-  <code>&lt;out_dir&gt;</code>.</li>
-<li><code>scan --strict</code> exits with <code>1</code> when no requested row is runnable. With
-  <code>--methods</code>, it exits with <code>1</code> when any named method has no runnable
-  row. It also exits with <code>1</code> while the method scripts are not fetched.
-  <code>--allow-atac-mismatch</code> on <code>scan</code> and <code>run-all</code> counts a method as
-  runnable when its <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file holds the other representation or peak
-  names the method cannot read.</li>
-<li><code>--assume-gpu</code> on <code>scan</code> and <code>run-all --dry-run</code> checks a <abbr title="Graphics Processing Unit">GPU</abbr>-node job
-  from a login node.</li>
-<li><code>params METHOD</code> lists the hyperparameters per variant. Set one with
-  <code>--param KEY=VALUE</code> on <code>run</code>, or <code>--param METHOD:KEY=VALUE</code> on
-  <code>run-all</code>.</li>
-<li><code>evaluate --metrics</code> takes a family (<code>clustering</code>, <code>batch</code>, <code>all</code>) or a
-  comma-separated list of codes. Repeat <code>--labels</code> for several label
-  files: they are stacked in the order given, one batch per file.
-  <code>--batch CSV</code> on <code>evaluate</code> and <code>run-all</code> gives one batch id per cell.</li>
-<li><code>plot --input</code> together with <code>--category</code> adds your rows to the stored
-  table. <code>--dataset</code> filters both, so your rows must be for a dataset the
-  stored table has.</li>
-<li>Pass <code>--category</code> to <code>convert</code>: the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file name depends on the
-  category.</li>
-<li>The <code>env</code> commands are dry runs until <code>--run</code>.</li>
-<li><code>config</code> lists the paths in use and where each one comes from.
-  <code>info METHOD</code> shows what one method needs. <code>fetch</code> downloads demo
-  datasets, their stored outputs (<code>--outputs</code>) or the method scripts
-  (<code>--scripts</code>).</li>
-<li>The exit code is <code>0</code> on success, <code>1</code> on a runtime error, <code>2</code> on a
-  usage error, and <code>3</code> when <code>run-all</code> finished but a method failed, or a
-  method named in <code>--methods</code> was skipped. A line on stderr names those
-  methods. A skipped method that <code>--methods</code> did not name does not set
-  <code>3</code>, and the <code>reason</code> column of <code>summary.csv</code> says why it did not run.
-  <code>MULTIBENCH_DEBUG=1</code> prints the traceback of an error.</li>
-</ul>
-</details>
-<h2 id="errors-and-warnings">Errors and warnings<a class="headerlink" href="#errors-and-warnings" title="Anchor link to this section">&para;</a></h2>
-<p>An invalid argument raises a standard exception whose message names the valid
-values or the fix.</p>
-<details class="note">
-<summary>Details</summary>
-<ul>
-<li><code>KeyError</code>: unknown method id, with a did-you-mean hint.</li>
-<li><code>ValueError</code>: unknown <code>category</code>, <code>task</code>, <code>atac</code> or modality token. The
-  message lists the valid values.</li>
-<li><code>TypeError</code>: a single string where a list is expected, such as
-  <code>methods="StabMap"</code>. The message shows the list form.</li>
-<li><code>FileNotFoundError</code>: missing dataset folder or file. The message lists
-  the folders that exist, or the path and the working directory.</li>
-<li><code>FileExistsError</code>: <code>mtb.io.export_dataset</code> or <code>multibench convert</code>
-  would replace a file, or the folder holds files of other data that
-  the call does not write. For the first, pass <code>overwrite=True</code>, or
-  <code>--overwrite</code> on the command line. For the second, export to a new
-  folder.</li>
-<li><a href="../reference/config/#multibench.engine.schema.AmbiguousVariantError"><code>mtb.AmbiguousVariantError</code></a>:
-  a method with several variants that neither <code>modalities=</code> nor the
-  dataset's files select. It is a <code>ValueError</code> and also a <code>KeyError</code>.</li>
-<li><code>OSError</code>: the method's environment is not installed, the method
-  needs an NVIDIA <abbr title="Graphics Processing Unit">GPU</abbr> and this computer has none, or a download of
-  <code>mtb.data.fetch</code> or <code>fetch_outputs</code> failed.
-  On Linux, a missing environment gets the install command. On macOS
-  and Windows, the message says that methods run only on Linux.</li>
-</ul>
-<p>The package warns with <code>UserWarning</code>, and with <code>DeprecationWarning</code> for
-old spellings.
-<a href="../reference/compare/#multibench.data.results.DegenerateRerunWarning"><code>mtb.DegenerateRerunWarning</code></a>,
-a <code>UserWarning</code> subclass, marks a re-run row that most likely failed
-without an error. You can filter it by class.</p>
-</details>
-<h2 id="the-metrics-vocabulary">The <code>metrics=</code> vocabulary<a class="headerlink" href="#the-metrics-vocabulary" title="Anchor link to this section">&para;</a></h2>
-<p><a href="../reference/score/#multibench.eval.pipeline.evaluate"><code>evaluate</code></a>,
-<a href="../reference/compare/#multibench.data.results.load_results"><code>load_results</code></a>,
-<a href="../reference/compare/#multibench.data.results.recommend"><code>recommend</code></a> and
-<code>BatchResult.rescore</code> take the same selector: <code>"clustering"</code>, <code>"batch"</code>,
-<code>"classification"</code>, <code>"all"</code>, or a list of metric codes such as
-<code>["ARI", "NMI"]</code>.</p>
-<details class="note">
-<summary>Details</summary>
-<p>The family names select these codes:</p>
-<ul>
-<li><code>"clustering"</code>: ARI, NMI, ASW, iASW, iF1, cLISI (<code>mtb.plot.CLUSTERING_METRICS</code>).</li>
-<li><code>"batch"</code>: ASW_batch, GC, iLISI, kBET (<code>mtb.plot.BATCH_METRICS</code>).</li>
-<li><code>"classification"</code>: OCA, ACA, Spec, Sens, F1 (<code>mtb.plot.CLASSIFICATION_METRICS</code>).
-  The stored tables have none.</li>
-<li><code>"all"</code>: the three families. <code>evaluate</code> then needs batch labels.</li>
-</ul>
-<p>With the default <code>None</code>, <code>evaluate</code> computes the clustering family, plus
-ASW_batch, GC and iLISI when batch labels are available, plus the
-classification family when the cells are in two or more batches and the
-category is not vertical. <code>load_results</code> keeps every metric, and
-<code>recommend</code> ranks on the clustering family. <code>evaluate</code> computes kBET only
-when a list names it.</p>
-<p>A single code still goes in a list: <code>metrics=["ARI"]</code>. A task name or an
-unknown code raises <code>ValueError</code> listing the valid values.</p>
-</details>
-<h2 id="method-environments">Method environments<a class="headerlink" href="#method-environments" title="Anchor link to this section">&para;</a></h2>
-<p>Each method runs in a linux-64 environment, installed with <code>mtb.env.install</code>.
-Compatible methods share one environment. <code>mtb.method_info(m)["env"]</code> names
-it. On macOS and Windows, methods do not run: <code>run</code> and <code>install</code> work only
-as dry runs.</p>
-<details class="note">
-<summary>Details</summary>
-<p>The methods' own scripts run unmodified. The package builds the command,
-converts the inputs and loads the output.</p>
-<p><code>mtb.run</code> downloads the method scripts on first use. On a machine without
-network, run <code>multibench fetch --scripts</code> first. Add <code>--ref</code>, or set
-<code>MULTIBENCH_SCRIPTS_REF</code>, to fetch a given commit or tag.
-<code>multibench config</code> prints the commit in use, and every run records it
-as <code>scripts_commit</code>.</p>
-<p>On macOS and Windows, <code>mtb.env.install(..., dry_run=False)</code> raises
-<code>RuntimeError</code> unless <code>force=True</code> (<code>--force</code> on the command line).</p>
-</details>
-<h3 id="run-modes-prefix-and-conda">Run modes: prefix and conda<a class="headerlink" href="#run-modes-prefix-and-conda" title="Anchor link to this section">&para;</a></h3>
-<p><code>mtb.run</code> enters each method's environment directly or through <code>conda run</code>.
-<a href="../tutorials/run/#how-the-environment-is-entered-prefix-and-conda-modes">How the environment is entered</a>
-explains both modes and <code>MULTIBENCH_RUN_MODE=conda|prefix</code>. A <code>cmd_template</code>
-with <code>{cmd}</code> replaces this, and <code>{env_cmd}</code> keeps it.</p>
-<h3 id="archive-flavours-cpu-and-gpu">Archive flavours: cpu and gpu<a class="headerlink" href="#archive-flavours-cpu-and-gpu" title="Anchor link to this section">&para;</a></h3>
-<p>Five torch environments have a CUDA build and a smaller <abbr title="Central Processing Unit">CPU</abbr>-only build.
-<code>mtb.env.install</code> picks the <abbr title="Central Processing Unit">CPU</abbr> build when
-<a href="../reference/env/#multibench.engine.envs.host_has_gpu"><code>mtb.env.host_has_gpu</code></a>
-finds no NVIDIA <abbr title="Graphics Processing Unit">GPU</abbr>.</p>
-<details class="note">
-<summary>Details</summary>
-<p>The five environments are <code>env_sciPENN</code>, <code>matilda</code>, <code>scmb_scjoint</code>,
-<code>scmb_torch</code> and <code>scmb_scmm2</code>. Every other environment has a single
-build, the same archive for <abbr title="Central Processing Unit">CPU</abbr> and <abbr title="Graphics Processing Unit">GPU</abbr> hosts.</p>
-<p><code>flavor="cpu"</code> or <code>flavor="gpu"</code> overrides the default <code>"auto"</code>
-(<code>--flavor</code> on the command line). Both builds install under the
-environment's own name. <code>mtb.env.status()</code> reports the installed build as
-<code>flavor</code>: <code>cpu</code>, <code>gpu</code>, or <code>single</code> for an environment with one build.</p>
-</details>
-<h3 id="gpu-or-cpu"><abbr title="Graphics Processing Unit">GPU</abbr> or <abbr title="Central Processing Unit">CPU</abbr>?<a class="headerlink" href="#gpu-or-cpu" title="Anchor link to this section">&para;</a></h3>
-<p>Six methods need an NVIDIA <abbr title="Graphics Processing Unit">GPU</abbr>. <code>mtb.method_info(m)["requires_gpu"]</code> says
-which. Without a <abbr title="Graphics Processing Unit">GPU</abbr>, <code>mtb.run</code> raises <code>OSError</code> before starting, and
-<code>mtb.scan</code> gives the reason. The other methods run without a <abbr title="Graphics Processing Unit">GPU</abbr>.</p>
-<details class="note">
-<summary>Details</summary>
-<p>The six methods are scBridge, moETM, SMILE, sciCAN, UnitedNet and iPOLNG.</p>
-<p><code>method_info(m)["gpu"]</code> says how a method uses a <abbr title="Graphics Processing Unit">GPU</abbr>: <code>required</code>,
-<code>used when present</code>, <code>not used</code> or <code>unknown</code>. <code>multibench info METHOD</code>
-prints it. Methods marked <code>not used</code>, such as scMM, scMVP and scMSI, run
-on the <abbr title="Central Processing Unit">CPU</abbr> even on a <abbr title="Graphics Processing Unit">GPU</abbr> host.</p>
-<p>Some scripts use CUDA by default. For those, <code>method_info(m)["cpu_params"]</code>
-holds the values that turn it off: scJoint <code>use_cuda=''</code> and scMDC
-<code>device='cpu'</code>. Without a <abbr title="Graphics Processing Unit">GPU</abbr>,
-<a href="../reference/run/#multibench.engine.runner.run"><code>mtb.run</code></a> adds them
-unless you set the key yourself. <code>run(..., dry_run=True)</code> shows the
-command.</p>
-<p>On a login node without a <abbr title="Graphics Processing Unit">GPU</abbr>, <code>mtb.scan(..., assume_gpu=True)</code> checks a
-job that will run on a <abbr title="Graphics Processing Unit">GPU</abbr> node. The caveat of a <abbr title="Graphics Processing Unit">GPU</abbr>-only method then
-says so, and the commands leave out the <abbr title="Central Processing Unit">CPU</abbr> flags. <code>mtb.run_all</code> takes <code>assume_gpu=True</code>
-in a dry run only. In the shell, add <code>--assume-gpu</code> to <code>scan</code> or
-<code>run-all --dry-run</code>.</p>
-</details>
-<h2 id="runresult">RunResult<a class="headerlink" href="#runresult" title="Anchor link to this section">&para;</a></h2>
-<p><a href="../reference/run/#multibench.engine.runner.run"><code>mtb.run</code></a> returns a
-<code>RunResult</code>. Its <code>output</code> is the method's primary output, for example the
-embedding, ready for <code>mtb.evaluate</code>.</p>
-<details class="note">
-<summary>Details</summary>
-<p>A <code>RunResult</code> has these fields:</p>
-<ul>
-<li><code>method</code>: the method id.</li>
-<li><code>out_dir</code>: the working directory of the run.</li>
-<li><code>cmd</code>: the full command that ran, including the environment wrapper.</li>
-<li><code>output</code>: the primary output, loaded. An embedding may be dims x cells.
-  <code>evaluate</code> re-orients it.</li>
-<li><code>extra</code>: <code>{file: loaded output}</code> for the method's extra outputs.</li>
-<li><code>stdout</code>, <code>stderr</code>: the captured streams.</li>
-<li><code>obs_names</code>: the cell barcodes of the output rows, in the method's
-  cell order. It is <code>None</code> when they could not be matched.</li>
-<li><code>scripts_commit</code>: the commit of the method scripts that ran, or <code>None</code>
-  when they are not a git checkout.</li>
-<li><code>env_flavor</code>: <code>cpu</code> or <code>gpu</code>, the build of the method's environment,
-  else <code>unknown</code>.</li>
-<li><code>hostname</code>: the name of the computer that ran the method.</li>
-</ul>
-<p>A non-zero exit raises <code>RuntimeError</code> with the end of the output. A
-missing environment raises <code>OSError</code> before anything is written. On
-Linux with no environment and no conda, the run fails with
-<code>FileNotFoundError</code> for <code>conda</code> instead.</p>
-</details>
-<h2 id="version">Version<a class="headerlink" href="#version" title="Anchor link to this section">&para;</a></h2>
-<p><code>mtb.__version__</code> is the installed version, and <code>multibench --version</code>
-prints it.</p>
-<p><span id="deprecated-in-030"></span><a href="../changes/">Changes</a> lists what each
-release adds and changes, and the old spellings with their replacements.</p>
-<h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Anchor link to this section">&para;</a></h2>
-<ul>
-<li><a href="../tutorials/end_to_end/">End-to-end walkthrough</a></li>
-<li><a href="../tutorials/run/">Run a method</a></li>
-<li><a href="../faq/">FAQ</a></li>
-</ul>
+<p>A <code>dataset</code> is a folder: its path, or its name under
+<code>mtb.config.data_path</code>. One method is <code>methods=["Matilda"]</code>.</p>
+<h2 id="3-metrics">3. Metrics<a class="headerlink" href="#3-metrics" title="Anchor link to this section">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>call</th>
+<th>returns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../reference/score/#multibench.eval.pipeline.evaluate"><code>mtb.evaluate(embedding, labels, method=, dataset=, category=)</code></a></td>
+<td>The scores, as the long table.</td>
+</tr>
+<tr>
+<td><a href="../reference/compare/#multibench._data.results.load_results"><code>mtb.load_results(category, dataset=)</code></a></td>
+<td>The stored results, as the long table.</td>
+</tr>
+<tr>
+<td><a href="../reference/compare/#multibench._data.results.recommend"><code>mtb.recommend(category, long_df=)</code></a></td>
+<td>The overall score and row order of <code>mtb.plot.bubble</code>, best first.</td>
+</tr>
+<tr>
+<td><a href="../reference/catalog/#multibench._data.catalog.metrics"><code>mtb.catalog.metrics()</code></a></td>
+<td>The metric codes and their families.</td>
+</tr>
+</tbody>
+</table>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1"># your run of Matilda on D11, next to the stored results of D11</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">mine</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="s2">"out/Matilda_D11/embedding.h5"</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">"D11"</span><span class="p">,</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>                    <span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">"Matilda (this run)"</span><span class="p">)</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">both</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="s2">"vertical"</span><span class="p">),</span> <span class="n">mine</span><span class="p">])</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="n">mtb</span><span class="o">.</span><span class="n">recommend</span><span class="p">(</span><span class="s2">"vertical"</span><span class="p">,</span> <span class="n">long_df</span><span class="o">=</span><span class="n">both</span><span class="p">)</span>
+</span></code></pre></div>
+<p>Without <code>labels</code>, <code>evaluate</code> reads the label files of <code>dataset</code> and matches
+them to the cells by the barcodes <code>run</code> writes into each <code>embedding.h5</code>. In a
+<code>run</code> folder, the run's record says which method made the file, so <code>method=</code>
+is only the name of the rows. For an embedding without cell names, the label
+order is that of <code>method</code> when it names a package method, also as
+<code>"StabMap (this run)"</code>.
+The stored results are the package's own runs, one dataset per category: D11,
+D28, D45 and D52.</p>
+<h2 id="4-figures">4. Figures<a class="headerlink" href="#4-figures" title="Anchor link to this section">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>call</th>
+<th>returns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../reference/plot/#multibench.plot.bubble.bubble"><code>mtb.plot.bubble(long_df, metrics=, methods=)</code></a></td>
+<td>The article's bubble table.</td>
+</tr>
+<tr>
+<td><a href="../reference/plot/#multibench.plot.bar.bar"><code>mtb.plot.bar(long_df, metrics=, methods=)</code></a></td>
+<td>One bar per method.</td>
+</tr>
+</tbody>
+</table>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">both</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="s2">"clustering"</span><span class="p">,</span> <span class="n">save</span><span class="o">=</span><span class="s2">"vertical.pdf"</span><span class="p">)</span>
+</span></code></pre></div>
+<h2 id="setup">Setup<a class="headerlink" href="#setup" title="Anchor link to this section">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>call</th>
+<th>does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../reference/io/#multibench.engine.ingest.export_dataset"><code>mtb.io.export_dataset(adata, folder, ...)</code></a></td>
+<td>Writes an AnnData or MuData as a dataset folder.</td>
+</tr>
+<tr>
+<td><a href="../reference/io/#multibench.engine.ingest.read_canonical"><code>mtb.io.read_canonical(path)</code></a></td>
+<td>Reads a dataset file or an <code>embedding.h5</code> as an AnnData.</td>
+</tr>
+<tr>
+<td><a href="../reference/data/#multibench._data.fetch.fetch"><code>mtb.data.fetch(*datasets)</code></a></td>
+<td>Downloads demo datasets and returns each dataset's folder.</td>
+</tr>
+<tr>
+<td><a href="../reference/data/#multibench._data.examples.write_example"><code>mtb.data.write_example(dataset)</code></a></td>
+<td>Writes a tutorial's example <code>.h5ad</code> files.</td>
+</tr>
+<tr>
+<td><a href="../reference/catalog/#multibench._data.catalog.datasets"><code>mtb.catalog.datasets()</code></a></td>
+<td>The datasets to fetch or with stored results, with their category.</td>
+</tr>
+<tr>
+<td><a href="../reference/env/#multibench.engine.envs.install"><code>mtb.env.install(methods, dry_run=)</code></a></td>
+<td>Installs the methods' envs. <code>dry_run=True</code> shows each env's state and size.</td>
+</tr>
+<tr>
+<td><a href="../reference/config/"><code>mtb.config</code></a></td>
+<td>The settings: <code>data_path</code>, <code>repo_path</code>, <code>envs_dir</code> and <code>leiden_flavor</code>. <code>print(mtb.config)</code> shows them.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="the-long-table-and-metrics">The long table and <code>metrics=</code><a class="headerlink" href="#the-long-table-and-metrics" title="Anchor link to this section">&para;</a></h2>
+<p><code>evaluate</code>, <code>load_results</code> and <code>RunResult.long</code> return the same columns:
+<code>metric</code>, <code>value</code>, <code>method</code>, <code>dataset</code>, <code>category</code> and <code>source</code> (<code>"stored"</code> or
+<code>"user"</code>) and <code>scored_with</code>. The figures and <code>recommend</code> read any such table.
+Next to stored results, name your rows apart, such as
+<code>mine.assign(method=mine.method + " (this run)")</code>, and score them with <code>dataset=</code>
+of the stored dataset.</p>
+<p><code>metrics=</code> takes a family, a code, or a list of codes and families:</p>
+<table>
+<thead>
+<tr>
+<th>family</th>
+<th>codes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>"clustering"</code></td>
+<td>ARI, NMI, ASW, iASW, iF1, cLISI</td>
+</tr>
+<tr>
+<td><code>"batch"</code></td>
+<td>ASW_batch, ARI_batch, NMI_batch, GC, iLISI, kBET</td>
+</tr>
+<tr>
+<td><code>"classification"</code></td>
+<td>OCA, ACA, Spec, Sens, F1</td>
+</tr>
+</tbody>
+</table>
+<p><code>"all"</code> is the three families, and kBET runs only when named. Higher is better for
+every metric.</p>
+<p><a href="../changes/">Changes</a> lists the names that 0.4 renamed or removed.</p>
 
 
 
@@ -3093,13 +2420,13 @@ release adds and changes, and the old spellings with their replacements.</p>
         
         
           
-          <a href="../reference/discover/" class="md-footer__link md-footer__link--next" aria-label="Next: Discover">
+          <a href="../reference/discover/" class="md-footer__link md-footer__link--next" aria-label="Next: Methods">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Discover
+                Methods
               </div>
             </div>
             <div class="md-footer__button md-icon">

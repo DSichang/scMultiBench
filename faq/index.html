@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="A benchmark of single-cell multimodal integration methods. The multibench package runs 36 of them from Python or the command line and scores their output.">
+        <meta name="description" content="A benchmark of single-cell multimodal integration methods. The multibench package runs 36 of them from Python and scores their output.">
       
       
         <meta name="author" content="PYangLab">
@@ -1503,35 +1503,7 @@
   <span class="md-ellipsis">
     
   
-    Discover
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../reference/inputs/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Prepare inputs
+    Methods
   
 
     
@@ -1587,7 +1559,7 @@
   <span class="md-ellipsis">
     
   
-    Score
+    Metrics (evaluate)
   
 
     
@@ -1615,7 +1587,7 @@
   <span class="md-ellipsis">
     
   
-    Compare
+    Metrics (stored results)
   
 
     
@@ -1636,14 +1608,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/env/" class="md-nav__link">
+      <a href="../reference/plot/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Environments (mtb.env)
+    Figures (mtb.plot)
   
 
     
@@ -1672,34 +1644,6 @@
     
   
     Data I/O (mtb.io)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../reference/plot/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Plot (mtb.plot)
   
 
     
@@ -1756,6 +1700,34 @@
     
   
     Catalog (mtb.catalog)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/env/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environments (mtb.env)
   
 
     
@@ -1950,10 +1922,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#env-install-run-refuses-on-macos-or-windows" class="md-nav__link">
+  <a href="#mtbenvinstall-refuses-on-macos-or-windows" class="md-nav__link">
     <span class="md-ellipsis">
       
-        env install --run refuses on macOS or Windows
+        mtb.env.install refuses on macOS or Windows
       
     </span>
   </a>
@@ -2081,10 +2053,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#env-install-run-refuses-on-macos-or-windows" class="md-nav__link">
+  <a href="#mtbenvinstall-refuses-on-macos-or-windows" class="md-nav__link">
     <span class="md-ellipsis">
       
-        env install --run refuses on macOS or Windows
+        mtb.env.install refuses on macOS or Windows
       
     </span>
   </a>
@@ -2133,15 +2105,11 @@
 <h2 id="clisi-ilisi-are-nan-on-my-mac"><code>cLISI</code> / <code>iLISI</code> are <code>NaN</code> on my Mac<a class="headerlink" href="#clisi-ilisi-are-nan-on-my-mac" title="Anchor link to this section">&para;</a></h2>
 <p>Install a C++ compiler, then run <code>evaluate</code> again in a new Python session.
 On macOS, <code>xcode-select --install</code> installs one.</p>
-<h2 id="env-install-run-refuses-on-macos-or-windows"><code>env install --run</code> refuses on macOS or Windows<a class="headerlink" href="#env-install-run-refuses-on-macos-or-windows" title="Anchor link to this section">&para;</a></h2>
+<h2 id="mtbenvinstall-refuses-on-macos-or-windows"><code>mtb.env.install</code> refuses on macOS or Windows<a class="headerlink" href="#mtbenvinstall-refuses-on-macos-or-windows" title="Anchor link to this section">&para;</a></h2>
 <p>The method environments run only on Linux, so the install refuses here.
 <a href="../installation/">Installation</a> lists what works on macOS and Windows.</p>
-<p>To run on a Linux server, make the commands there. <code>scan</code> and <code>--dry-run</code>
-write the absolute paths of the machine they run on.</p>
-<details class="note">
-<summary>Details</summary>
-<p><code>--force</code> (<code>force=True</code> in Python) attempts the install anyway.</p>
-</details>
+<p>To run on a Linux server, make the commands there: the <code>command</code> column of
+<code>scan</code> holds the absolute paths of the machine it runs on.</p>
 
 
 

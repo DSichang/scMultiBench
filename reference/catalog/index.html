@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="A benchmark of single-cell multimodal integration methods. The multibench package runs 36 of them from Python or the command line and scores their output.">
+        <meta name="description" content="A benchmark of single-cell multimodal integration methods. The multibench package runs 36 of them from Python and scores their output.">
       
       
         <meta name="author" content="PYangLab">
@@ -18,7 +18,7 @@
         <link rel="prev" href="../data/">
       
       
-        <link rel="next" href="../config/">
+        <link rel="next" href="../env/">
       
       
         
@@ -1508,35 +1508,7 @@
   <span class="md-ellipsis">
     
   
-    Discover
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../inputs/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Prepare inputs
+    Methods
   
 
     
@@ -1592,7 +1564,7 @@
   <span class="md-ellipsis">
     
   
-    Score
+    Metrics (evaluate)
   
 
     
@@ -1620,7 +1592,7 @@
   <span class="md-ellipsis">
     
   
-    Compare
+    Metrics (stored results)
   
 
     
@@ -1641,14 +1613,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../env/" class="md-nav__link">
+      <a href="../plot/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Environments (mtb.env)
+    Figures (mtb.plot)
   
 
     
@@ -1677,34 +1649,6 @@
     
   
     Data I/O (mtb.io)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../plot/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Plot (mtb.plot)
   
 
     
@@ -1813,18 +1757,7 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#multibench.data.catalog.methods" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.catalog.methods
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#multibench.data.catalog.datasets" class="md-nav__link">
+  <a href="#multibench._data.catalog.datasets" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.catalog.datasets
@@ -1835,43 +1768,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#multibench.data.catalog.metrics" class="md-nav__link">
+  <a href="#multibench._data.catalog.metrics" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.catalog.metrics
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#multibench.data.catalog.canonical_id" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.catalog.canonical_id
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#multibench.data.catalog.canonical_metric" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.catalog.canonical_metric
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#multibench.data.catalog.known_metrics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.catalog.known_metrics
       
     </span>
   </a>
@@ -1882,6 +1782,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../env/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environments (mtb.env)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -2092,18 +2020,7 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#multibench.data.catalog.methods" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.catalog.methods
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#multibench.data.catalog.datasets" class="md-nav__link">
+  <a href="#multibench._data.catalog.datasets" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.catalog.datasets
@@ -2114,43 +2031,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#multibench.data.catalog.metrics" class="md-nav__link">
+  <a href="#multibench._data.catalog.metrics" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.catalog.metrics
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#multibench.data.catalog.canonical_id" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.catalog.canonical_id
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#multibench.data.catalog.canonical_metric" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.catalog.canonical_metric
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#multibench.data.catalog.known_metrics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.catalog.known_metrics
       
     </span>
   </a>
@@ -2188,9 +2072,7 @@
 
 
 <h1 id="catalog-mtbcatalog">Catalog (<code>mtb.catalog</code>)<a class="headerlink" href="#catalog-mtbcatalog" title="Anchor link to this section">&para;</a></h1>
-<p>The benchmark's methods, datasets and metrics tables as DataFrames.
-<code>canonical_id</code> and <code>canonical_metric</code> turn any known spelling of a method id
-or metric code into the canonical one.</p>
+<p>The datasets and the metrics, as DataFrames.</p>
 <!-- api-summary: generated by tools/gen_reference_tables.py from the docstrings; do not edit by hand -->
 <div class="api-summary">
 <table>
@@ -2202,28 +2084,12 @@ or metric code into the canonical one.</p>
 </thead>
 <tbody>
 <tr>
-<td><a href="#multibench.data.catalog.methods"><code>mtb.catalog.methods</code></a></td>
-<td>Table of the benchmark's methods, one row per method.</td>
+<td><a href="#multibench._data.catalog.datasets"><code>mtb.catalog.datasets</code></a></td>
+<td>The datasets <code>mtb.data.fetch</code> downloads or <code>mtb.load_results</code> holds.</td>
 </tr>
 <tr>
-<td><a href="#multibench.data.catalog.datasets"><code>mtb.catalog.datasets</code></a></td>
-<td>Table of the benchmark's datasets, joined with the stored results.</td>
-</tr>
-<tr>
-<td><a href="#multibench.data.catalog.metrics"><code>mtb.catalog.metrics</code></a></td>
+<td><a href="#multibench._data.catalog.metrics"><code>mtb.catalog.metrics</code></a></td>
 <td>Table describing the metrics: one row per metric code.</td>
-</tr>
-<tr>
-<td><a href="#multibench.data.catalog.canonical_id"><code>mtb.catalog.canonical_id</code></a></td>
-<td>Return the canonical method id for any known spelling.</td>
-</tr>
-<tr>
-<td><a href="#multibench.data.catalog.canonical_metric"><code>mtb.catalog.canonical_metric</code></a></td>
-<td>Return the canonical code for a metric name (<code>"ari"</code> -&gt; <code>"ARI"</code>).</td>
-</tr>
-<tr>
-<td><a href="#multibench.data.catalog.known_metrics"><code>mtb.catalog.known_metrics</code></a></td>
-<td>The canonical metric codes the package knows, in family order.</td>
 </tr>
 </tbody>
 </table>
@@ -2235,131 +2101,17 @@ or metric code into the canonical one.</p>
 <div class="doc doc-object doc-function">
 
 
-<h2 id="multibench.data.catalog.methods" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            mtb.catalog.methods
-
-
-<a href="#multibench.data.catalog.methods" class="headerlink" title="Anchor link to this section">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">methods</span><span class="p">(</span><span class="n">files_dir</span><span class="p">:</span> <span class="n"><span title="pathlib.Path">Path</span></span> <span class="o">|</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="pandas.DataFrame">DataFrame</span></span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents first">
-
-        <p>Table of the benchmark's methods, one row per method.</p>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">PARAMETERS</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>files_dir</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p>Folder holding <code>method.csv</code>; <code>None</code> = the package's shipped <code>files/</code>.</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="pathlib.Path">Path</span> | <span title="str">str</span> | None</code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>None</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">RETURNS</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <span class="doc-returns-annotation">
-                    <code><span title="pandas.DataFrame">DataFrame</span></code>
-                </span>
-            </td>
-            <td class="doc-returns-details">
-              <div class="doc-md-description">
-                <p>One row per method. Read <code>method</code>, <code>needs_labels</code>, <code>atac</code> and
-<code>categories</code>; all columns are listed in Notes.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<p><span class="doc-section-title">Examples</span></p>
-    <div class="language-pycon highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">m</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">methods</span><span class="p">()</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">m</span><span class="p">[</span><span class="n">m</span><span class="o">.</span><span class="n">needs_labels</span><span class="p">][[</span><span class="s2">"method"</span><span class="p">,</span> <span class="s2">"categories"</span><span class="p">]]</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">m</span><span class="p">[</span><span class="n">m</span><span class="o">.</span><span class="n">categories</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">c</span><span class="p">:</span> <span class="s2">"vertical"</span> <span class="ow">in</span> <span class="n">c</span><span class="p">)]</span><span class="o">.</span><span class="n">method</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
-</span></code></pre></div>
-
-
-<details class="note">
-  <summary>Notes</summary>
-  <p><strong>Column reference.</strong></p>
-<ul>
-<li><code>method</code> - the name as spelled in <code>method.csv</code>;</li>
-<li><code>canonical_id</code> - the method id (<code>mtb.catalog.canonical_id</code>);</li>
-<li><code>language</code> - <code>'python'</code> or <code>'r'</code> (lower-cased);</li>
-<li><code>deep_learning</code> - <code>'Yes'</code> / <code>'No'</code>, as in the CSV;</li>
-<li><code>atac</code> - <code>'peak'</code>, <code>'gene_activity'</code> or <code>None</code>;</li>
-<li><code>output</code> - <code>'embedding'</code> or <code>'graph'</code>;</li>
-<li><code>needs_labels</code> - bool, the method needs cell-type labels;</li>
-<li><code>categories</code> / <code>tasks</code> - lists of integration categories and tasks.</li>
-</ul>
-<p><strong>Package values.</strong> For every method id, <code>needs_labels</code>,
-<code>atac</code>, <code>categories</code> and <code>tasks</code> come from the package's method
-definitions, which <code>mtb.method_info</code> and <code>mtb.scan</code> read. A row
-without a method id keeps the CSV values. <code>language</code>, <code>deep_learning</code> and
-<code>output</code> come from <code>method.csv</code>.</p>
-</details>
-
-<details class="see-also">
-  <summary>See Also</summary>
-  <p>mtb.list_methods : the method ids, optionally per category.
-mtb.method_info : everything the package knows about one method.
-mtb.catalog.canonical_id : the normalisation behind the <code>canonical_id</code> column.</p>
-</details>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h2 id="multibench.data.catalog.datasets" class="doc doc-heading">
+<h2 id="multibench._data.catalog.datasets" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            mtb.catalog.datasets
 
 
-<a href="#multibench.data.catalog.datasets" class="headerlink" title="Anchor link to this section">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">datasets</span><span class="p">(</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">files_dir</span><span class="p">:</span> <span class="n"><span title="pathlib.Path">Path</span></span> <span class="o">|</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">category</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="pandas.DataFrame">DataFrame</span></span>
+<a href="#multibench._data.catalog.datasets" class="headerlink" title="Anchor link to this section">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">datasets</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">category</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="pandas.DataFrame">DataFrame</span></span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
 
-        <p>Table of the benchmark's datasets, joined with the stored results.</p>
+        <p>The datasets <code>mtb.data.fetch</code> downloads or <code>mtb.load_results</code> holds.</p>
 
 
 <table>
@@ -2370,34 +2122,14 @@ mtb.catalog.canonical_id : the normalisation behind the <code>canonical_id</code
         </tr>
       </thead>
       <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>files_dir</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p>Folder holding <code>dataset.csv</code>; <code>None</code> = the package's shipped <code>files/</code>.</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="pathlib.Path">Path</span> | <span title="str">str</span> | None</code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>None</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
           <tr class="doc-section-item">
             <td>
                 <code>category</code>
             </td>
             <td class="doc-param-details">
               <div class="doc-md-description">
-                <p>Keep only datasets with stored results in this integration category
-(<code>vertical</code>, <code>diagonal</code>, <code>mosaic</code> or <code>cross</code>); <code>None</code> = all.</p>
+                <p><code>vertical</code>, <code>diagonal</code>, <code>mosaic</code> or <code>cross</code>: only the datasets
+of that category; <code>None</code> = all.</p>
               </div>
               <p>
                   <span class="doc-param-annotation">
@@ -2431,32 +2163,9 @@ mtb.catalog.canonical_id : the normalisation behind the <code>canonical_id</code
             </td>
             <td class="doc-returns-details">
               <div class="doc-md-description">
-                <p>One row per dataset id. Read <code>dataset</code>, <code>category</code> and
-<code>has_results</code>; all columns are listed in Notes.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">RAISES</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-              <span class="doc-raises-annotation">
-                  <code><span title="ValueError">ValueError</span></code>
-              </span>
-            </td>
-            <td class="doc-raises-details">
-              <div class="doc-md-description">
-                <p>Unknown <code>category</code>; the message lists the valid ones.</p>
+                <p>One row per dataset: <code>dataset</code>, <code>category</code> and <code>has_results</code>
+(<code>mtb.load_results</code> has stored results for it). <code>mtb.data.fetch</code>
+downloads every one.</p>
               </div>
             </td>
           </tr>
@@ -2467,48 +2176,10 @@ mtb.catalog.canonical_id : the normalisation behind the <code>canonical_id</code
 <p><span class="doc-section-title">Examples</span></p>
     <div class="language-pycon highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">ds</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">datasets</span><span class="p">()</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">ds</span><span class="p">[</span><span class="n">ds</span><span class="o">.</span><span class="n">has_results</span><span class="p">][[</span><span class="s2">"dataset"</span><span class="p">,</span> <span class="s2">"category"</span><span class="p">]]</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">datasets</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">)</span><span class="o">.</span><span class="n">dataset</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">ds</span><span class="o">.</span><span class="n">dataset</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">ds</span><span class="p">[</span><span class="n">ds</span><span class="o">.</span><span class="n">has_results</span><span class="p">]</span>
 </span></code></pre></div>
 
-
-<details class="note">
-  <summary>Notes</summary>
-  <p><strong>Column reference.</strong></p>
-<ul>
-<li><code>dataset</code> - the id (<code>D11</code>, <code>SD15</code>, ...);</li>
-<li><code>dataset name</code> - a duplicate of <code>dataset</code>, kept for one release
-  for older callers;</li>
-<li><code>simulated</code> - bool, ids starting with <code>SD</code>;</li>
-<li><code>category</code> - the integration categories whose stored results
-  (published or re-run) contain the dataset, <code>";"</code>-joined; <code>None</code>
-  when no stored results exist;</li>
-<li><code>has_results</code> - bool, a stored metric table (<code>mtb.load_results</code>)
-  covers it.</li>
-</ul>
-<p>A <code>dataset.csv</code> passed through <code>files_dir</code> may also fill the
-descriptive columns <code>assay</code>, <code>tissue</code>, <code>n_cells</code>, <code>n_batches</code> and
-<code>source</code>; each one that holds a value is added. The shipped file
-leaves them empty.</p>
-<p><strong>Row set.</strong> The rows are the union of <code>dataset.csv</code> and every id with
-stored results (<code>mtb.available_datasets(source="both")</code>), so
-<code>D11s</code>/<code>D28s</code>/<code>D45s</code>/<code>D52s</code> and <code>D24</code> (published tables only)
-are listed although <code>dataset.csv</code> does not name them. Ids missing from
-the CSV are appended after it, in natural order.</p>
-<p><strong>Subsamples.</strong> D11s, D28s, D45s and D52s are random subsamples of the
-full datasets, used for the second re-run sweep; they cannot be fetched.
-D28s holds 60% of D28's cells.</p>
-<p><strong>When the columns are computed.</strong> <code>category</code> and <code>has_results</code> are
-derived at each call from <code>mtb.available_datasets</code>; a missing or
-unreadable result tree leaves them empty instead of raising.</p>
-</details>
-
-<details class="see-also">
-  <summary>See Also</summary>
-  <p>mtb.available_datasets : dataset ids with stored results, per category.
-mtb.data.fetchable : dataset ids that can be downloaded.
-mtb.load_results : the stored metric tables themselves.</p>
-</details>
 
     </div>
 
@@ -2517,49 +2188,17 @@ mtb.load_results : the stored metric tables themselves.</p>
 <div class="doc doc-object doc-function">
 
 
-<h2 id="multibench.data.catalog.metrics" class="doc doc-heading">
+<h2 id="multibench._data.catalog.metrics" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            mtb.catalog.metrics
 
 
-<a href="#multibench.data.catalog.metrics" class="headerlink" title="Anchor link to this section">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">metrics</span><span class="p">(</span><span class="n">files_dir</span><span class="p">:</span> <span class="n"><span title="pathlib.Path">Path</span></span> <span class="o">|</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="pandas.DataFrame">DataFrame</span></span>
+<a href="#multibench._data.catalog.metrics" class="headerlink" title="Anchor link to this section">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">metrics</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="pandas.DataFrame">DataFrame</span></span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
 
         <p>Table describing the metrics: one row per metric code.</p>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">PARAMETERS</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>files_dir</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p>Folder holding <code>metric_full.csv</code>; <code>None</code> = the package's shipped <code>files/</code>.</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="pathlib.Path">Path</span> | <span title="str">str</span> | None</code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>None</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-      </tbody>
-    </table>
 
 
 <table>
@@ -2578,8 +2217,9 @@ mtb.load_results : the stored metric tables themselves.</p>
             </td>
             <td class="doc-returns-details">
               <div class="doc-md-description">
-                <p>One row per metric, with the CSV's columns (<code>metric</code> and
-<code>description</code> in the shipped file).</p>
+                <p>One row per metric code: <code>metric</code>, <code>family</code> (<code>clustering</code>,
+<code>batch</code> or <code>classification</code>, the families <code>metrics=</code> takes) and
+<code>description</code>.</p>
               </div>
             </td>
           </tr>
@@ -2594,385 +2234,9 @@ mtb.load_results : the stored metric tables themselves.</p>
 </span></code></pre></div>
 
 
-<details class="note">
-  <summary>Notes</summary>
-  <p><strong>Rows.</strong> The ten scIB metrics <code>ARI, NMI, ASW, iASW, iF1, cLISI,
-ASW_batch, GC, iLISI, kBET</code>, then the five classification metrics
-<code>OCA, ACA, Spec, Sens, F1</code>; header whitespace is stripped. The
-canonical code vocabulary, including <code>PCR</code> from the published tables,
-is <code>mtb.catalog.known_metrics</code>.</p>
-</details>
-
 <details class="see-also">
   <summary>See Also</summary>
-  <p>mtb.catalog.known_metrics : the canonical metric codes.
-mtb.evaluate : computes these metrics for an embedding.
-mtb.classification_metrics : the classification metrics of <code>mtb.classify</code>'s predictions.</p>
-</details>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h2 id="multibench.data.catalog.canonical_id" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            mtb.catalog.canonical_id
-
-
-<a href="#multibench.data.catalog.canonical_id" class="headerlink" title="Anchor link to this section">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">canonical_id</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">strict</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="str">str</span></span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents first">
-
-        <p>Return the canonical method id for any known spelling.</p>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">PARAMETERS</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>name</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p>Any spelling of a method name (<code>"MOFA+"</code>, <code>"totalvi"</code>, <code>"Seurat(WNN)"</code>).</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="str">str</span></code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>strict</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p><code>True</code> = raise for a name that is neither an alias nor a method id;
-<code>False</code> = return the folded name.</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="bool">bool</span></code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>False</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">RETURNS</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <span class="doc-returns-annotation">
-                    <code><span title="str">str</span></code>
-                </span>
-            </td>
-            <td class="doc-returns-details">
-              <div class="doc-md-description">
-                <p>The canonical id (an alias target or a method id); for an unknown
-name, the input with spaces and dots collapsed to <code>_</code>.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">RAISES</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-              <span class="doc-raises-annotation">
-                  <code><span title="KeyError">KeyError</span></code>
-              </span>
-            </td>
-            <td class="doc-raises-details">
-              <div class="doc-md-description">
-                <p><code>strict=True</code> and the name is neither an alias nor a method id.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<p><span class="doc-section-title">Examples</span></p>
-    <div class="language-pycon highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">canonical_id</span><span class="p">(</span><span class="s2">"MOFA+"</span><span class="p">),</span> <span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">canonical_id</span><span class="p">(</span><span class="s2">"totalvi"</span><span class="p">)</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="go">('MOFA2', 'totalVI')</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">canonical_id</span><span class="p">(</span><span class="s2">"my method"</span><span class="p">)</span>          <span class="c1"># unknown: separators folded</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="go">'my_method'</span>
-</span></code></pre></div>
-
-
-<details class="note">
-  <summary>Notes</summary>
-  <p><strong>Resolution order.</strong> The first rule that matches wins:</p>
-<ol>
-<li>the alias table, case-insensitive (<code>"MOFA+"</code> -&gt; <code>"MOFA2"</code>,
-   <code>"Seurat(WNN)"</code> -&gt; <code>"Seurat_WNN"</code>);</li>
-<li>a case-folded match against the method ids, after collapsing spaces
-   and dots to <code>_</code> (<code>"totalvi"</code> -&gt; <code>"totalVI"</code>, <code>"scmomat"</code> -&gt;
-   <code>"scMoMaT"</code>);</li>
-<li>for a name the package does not know (a result-directory token, a
-   user's own method name): the input with separators collapsed to
-   <code>_</code>, unchanged in case.</li>
-</ol>
-<p><strong>Strict mode.</strong> The error is the message <code>mtb.method_info</code> and
-<code>mtb.scan</code> give, e.g. <code>"Unknown method Matlida. Did you mean Matilda?
-mtb.list_methods() shows all methods."</code>. An
-alias-table hit is returned without the method-id check, even with
-<code>strict=True</code>: <code>"Seurat v4"</code> -&gt; <code>"Seurat_v4"</code>, which is not a
-method id. The default is lenient: result directories and user
-frames can hold names the package does not know.</p>
-</details>
-
-<details class="see-also">
-  <summary>See Also</summary>
-  <p>mtb.list_methods : the method ids.
-mtb.catalog.canonical_metric : the same normalisation for metric codes.</p>
-</details>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h2 id="multibench.data.catalog.canonical_metric" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            mtb.catalog.canonical_metric
-
-
-<a href="#multibench.data.catalog.canonical_metric" class="headerlink" title="Anchor link to this section">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">canonical_metric</span><span class="p">(</span><span class="n">code</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">strict</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents first">
-
-        <p>Return the canonical code for a metric name (<code>"ari"</code> -&gt; <code>"ARI"</code>).</p>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">PARAMETERS</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>code</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p>A metric name in any spelling the package or scIB uses
-(<code>"kbet"</code>, <code>"isolated_label_f1"</code>).</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="str">str</span></code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>strict</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p><code>True</code> = raise for a code not in <code>known_metrics()</code>; <code>False</code> =
-return an unknown code unchanged (stripped).</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="bool">bool</span></code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>False</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">RETURNS</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <span class="doc-returns-annotation">
-                    <code><span title="str">str</span> or None</code>
-                </span>
-            </td>
-            <td class="doc-returns-details">
-              <div class="doc-md-description">
-                <p>The canonical code; <code>None</code> for <code>None</code>, an empty string or the
-string <code>"nan"</code> (a blank cell, which callers drop).</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">RAISES</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-              <span class="doc-raises-annotation">
-                  <code><span title="ValueError">ValueError</span></code>
-              </span>
-            </td>
-            <td class="doc-raises-details">
-              <div class="doc-md-description">
-                <p><code>strict=True</code> and the code is not a known metric (the message lists them).</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<p><span class="doc-section-title">Examples</span></p>
-    <div class="language-pycon highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">canonical_metric</span><span class="p">(</span><span class="s2">"kbet"</span><span class="p">)</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="go">'kBET'</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">canonical_metric</span><span class="p">(</span><span class="s2">"isolated_label_f1"</span><span class="p">)</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="go">'iF1'</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">canonical_metric</span><span class="p">(</span><span class="s2">"my_score"</span><span class="p">)</span>        <span class="c1"># unknown: kept as given</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="go">'my_score'</span>
-</span></code></pre></div>
-
-
-<details class="note">
-  <summary>Notes</summary>
-  <p><strong>Spellings.</strong> Matching ignores case and surrounding whitespace:
-<code>"iFI"</code>, <code>"if1"</code> and <code>"isolated_label_f1"</code> all give <code>"iF1"</code>. The
-raw scIB long names <code>"ARI_cluster/label"</code>, <code>"NMI_cluster/label"</code>,
-<code>"ASW_label"</code> and <code>"isolated_label_silhouette"</code> map to <code>ARI</code>,
-<code>NMI</code>, <code>ASW</code> and <code>iASW</code>.</p>
-<p><strong>Unknown codes.</strong> The default returns an unknown code stripped but
-otherwise unchanged, so a user frame can carry a metric the package
-does not know. With <code>strict=True</code> the error reads <code>"unknown metric
-'nope'; valid: ['ARI', 'NMI', ...]"</code>.</p>
-</details>
-
-<details class="see-also">
-  <summary>See Also</summary>
-  <p>mtb.catalog.known_metrics : the codes <code>strict=True</code> accepts.
-mtb.catalog.canonical_id : the same normalisation for method names.</p>
-</details>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h2 id="multibench.data.catalog.known_metrics" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            mtb.catalog.known_metrics
-
-
-<a href="#multibench.data.catalog.known_metrics" class="headerlink" title="Anchor link to this section">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">known_metrics</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">]</span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents first">
-
-        <p>The canonical metric codes the package knows, in family order.</p>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">RETURNS</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <span class="doc-returns-annotation">
-                    <code>list of str</code>
-                </span>
-            </td>
-            <td class="doc-returns-details">
-              <div class="doc-md-description">
-                <p>The clustering / bio-conservation codes (<code>mtb.plot.CLUSTERING_METRICS</code>),
-the batch-correction codes (<code>mtb.plot.BATCH_METRICS</code>), the
-classification codes (<code>mtb.plot.CLASSIFICATION_METRICS</code>), then <code>PCR</code>
-(principal-component regression, in some published tables).</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<p><span class="doc-section-title">Examples</span></p>
-    <div class="language-pycon highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">known_metrics</span><span class="p">()</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="go">['ARI', 'NMI', 'ASW', 'iASW', 'iF1', 'cLISI', 'ASW_batch', 'GC', 'iLISI',</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="go"> 'kBET', 'OCA', 'ACA', 'Spec', 'Sens', 'F1', 'PCR']</span>
-</span></code></pre></div>
-
-
-<details class="see-also">
-  <summary>See Also</summary>
-  <p>mtb.catalog.canonical_metric : maps any spelling to these codes; <code>strict=True</code> accepts only them.
-mtb.catalog.metrics : the description of each metric.</p>
+  <p>mtb.evaluate : computes these metrics for an embedding.</p>
 </details>
 
     </div>
@@ -3033,13 +2297,13 @@ mtb.catalog.metrics : the description of each metric.</p>
         
         
           
-          <a href="../config/" class="md-footer__link md-footer__link--next" aria-label="Next: Configuration (mtb.config)">
+          <a href="../env/" class="md-footer__link md-footer__link--next" aria-label="Next: Environments (mtb.env)">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Configuration (mtb.config)
+                Environments (mtb.env)
               </div>
             </div>
             <div class="md-footer__button md-icon">

@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="A benchmark of single-cell multimodal integration methods. The multibench package runs 36 of them from Python or the command line and scores their output.">
+        <meta name="description" content="A benchmark of single-cell multimodal integration methods. The multibench package runs 36 of them from Python and scores their output.">
       
       
         <meta name="author" content="PYangLab">
@@ -1501,35 +1501,7 @@
   <span class="md-ellipsis">
     
   
-    Discover
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../reference/inputs/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Prepare inputs
+    Methods
   
 
     
@@ -1585,7 +1557,7 @@
   <span class="md-ellipsis">
     
   
-    Score
+    Metrics (evaluate)
   
 
     
@@ -1613,7 +1585,7 @@
   <span class="md-ellipsis">
     
   
-    Compare
+    Metrics (stored results)
   
 
     
@@ -1634,14 +1606,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/env/" class="md-nav__link">
+      <a href="../reference/plot/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Environments (mtb.env)
+    Figures (mtb.plot)
   
 
     
@@ -1670,34 +1642,6 @@
     
   
     Data I/O (mtb.io)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../reference/plot/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Plot (mtb.plot)
   
 
     
@@ -1754,6 +1698,34 @@
     
   
     Catalog (mtb.catalog)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/env/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environments (mtb.env)
   
 
     
@@ -1980,6 +1952,39 @@
       Table of contents
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#renamed-or-removed-in-040" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Renamed or removed in 0.4.0
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#new-in-040" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New in 0.4.0
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#behaviour-changes-in-040" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behaviour changes in 0.4.0
+      
+    </span>
+  </a>
+  
+</li>
       
         <li class="md-nav__item">
   <a href="#new-in-039" class="md-nav__link">
@@ -2350,6 +2355,39 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#renamed-or-removed-in-040" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Renamed or removed in 0.4.0
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#new-in-040" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New in 0.4.0
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#behaviour-changes-in-040" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behaviour changes in 0.4.0
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#new-in-039" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2706,9 +2744,440 @@
 
 
 <h1 id="changes">Changes<a class="headerlink" href="#changes" title="Anchor link to this section">&para;</a></h1>
-<p>What each release adds and changes, newest first. A script that uses anything
-listed under <a href="#new-in-032">New in 0.3.2</a> needs <code>multibench-sc&gt;=0.3.2</code>.
-<code>multibench --version</code> prints the version you have.</p>
+<p>What each release adds and changes, newest first. A script written for 0.3
+needs the new names in <a href="#renamed-or-removed-in-040">Renamed or removed in 0.4.0</a>.
+<code>mtb.__version__</code> is the version you have.</p>
+<h2 id="renamed-or-removed-in-040">Renamed or removed in 0.4.0<a class="headerlink" href="#renamed-or-removed-in-040" title="Anchor link to this section">&para;</a></h2>
+<p>The command line is removed: <code>multibench ...</code> and <code>python -m multibench</code>
+no longer exist. Call the Python functions, also from a job script.</p>
+<table>
+<thead>
+<tr>
+<th>0.3</th>
+<th>0.4</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mtb.run_all</code></td>
+<td><code>mtb.run</code></td>
+</tr>
+<tr>
+<td><code>mtb.run_all(..., dry_run=True)</code>, <code>mtb.run(..., dry_run=True)</code></td>
+<td><code>mtb.scan(dataset, category)</code>: the plan, with each command</td>
+</tr>
+<tr>
+<td><code>mtb.BatchResult</code></td>
+<td><code>mtb.RunResult</code></td>
+</tr>
+<tr>
+<td><code>mtb.load_batch</code></td>
+<td><code>mtb.load_run</code></td>
+</tr>
+<tr>
+<td><code>mtb.run(method, category, inputs=)</code>, <code>mtb.inputs_for</code></td>
+<td><code>mtb.run(dataset, category, methods=[method])</code></td>
+</tr>
+<tr>
+<td><code>mtb.plan</code>, <code>mtb.plan_commands</code>, <code>scan(per_method=)</code></td>
+<td><code>mtb.scan</code></td>
+</tr>
+<tr>
+<td><code>mtb.sweep</code></td>
+<td>a loop over <code>mtb.run(params=...)</code> that names each run's rows (<a href="../tutorials/run/">Run a method</a>)</td>
+</tr>
+<tr>
+<td><code>mtb.to_long</code>, <code>mtb.labels_for</code></td>
+<td><code>mtb.evaluate(..., dataset=, method=)</code>, which returns the long table</td>
+</tr>
+<tr>
+<td><code>mtb.classify</code>, <code>mtb.classification_metrics</code></td>
+<td><code>mtb.evaluate(..., metrics="classification")</code></td>
+</tr>
+<tr>
+<td><code>mtb.results_coverage</code></td>
+<td><code>mtb.load_results(category)</code></td>
+</tr>
+<tr>
+<td><code>mtb.available_datasets</code>, <code>mtb.data.fetchable</code></td>
+<td><code>mtb.catalog.datasets()</code></td>
+</tr>
+<tr>
+<td><code>mtb.list_methods</code>, <code>mtb.catalog.methods</code></td>
+<td><code>mtb.find_methods()</code> and <code>mtb.method_info(method)</code></td>
+</tr>
+<tr>
+<td><code>mtb.list_categories</code></td>
+<td><a href="../tutorials/run/#folder-layout">Dataset folder layout</a></td>
+</tr>
+<tr>
+<td><code>mtb.list_tasks</code></td>
+<td><code>category=</code> and <code>metrics=</code></td>
+</tr>
+<tr>
+<td><code>mtb.runtime_hint(m)</code></td>
+<td><code>mtb.method_info(m)["runtime"]</code></td>
+</tr>
+<tr>
+<td><code>mtb.cite(m)</code></td>
+<td><code>mtb.method_info(m)["reference"]</code>, or the paper's method list</td>
+</tr>
+<tr>
+<td><code>mtb.AmbiguousVariantError</code></td>
+<td><code>except ValueError</code></td>
+</tr>
+<tr>
+<td><code>mtb.config.Config</code></td>
+<td><code>mtb.config</code></td>
+</tr>
+<tr>
+<td><code>mtb.io.to_canonical</code></td>
+<td><code>mtb.io.export_dataset</code></td>
+</tr>
+<tr>
+<td><code>mtb.plot.plot_bubble</code></td>
+<td><code>mtb.plot.bubble</code></td>
+</tr>
+<tr>
+<td><code>mtb.plot.build_table</code>, <code>mtb.plot.BubbleTable</code></td>
+<td><code>mtb.recommend(category, long_df=...)</code></td>
+</tr>
+<tr>
+<td><code>catalog.known_metrics</code>, <code>plot.FAMILIES</code> and the other metric lists</td>
+<td><code>mtb.catalog.metrics()</code></td>
+</tr>
+<tr>
+<td><code>mtb.env.doctor</code>, <code>env.status</code>, <code>env.plan</code>, <code>env.recipe</code></td>
+<td><code>mtb.env.install(methods, dry_run=True)</code></td>
+</tr>
+<tr>
+<td><code>BatchResult.results</code></td>
+<td><code>RunResult.records</code></td>
+</tr>
+<tr>
+<td><code>BatchResult.failures</code></td>
+<td><code>res.summary[res.summary.status != "scored"]</code></td>
+</tr>
+<tr>
+<td><code>mtb.describe_layout</code></td>
+<td><a href="../tutorials/run/#folder-layout">Dataset folder layout</a></td>
+</tr>
+<tr>
+<td><code>mtb.config.DEFAULT.data_path</code> and each other field</td>
+<td><code>mtb.config.data_path</code> and each other field</td>
+</tr>
+<tr>
+<td><code>data_path=</code></td>
+<td>the dataset folder's path, or <code>mtb.config.data_path</code></td>
+</tr>
+<tr>
+<td><code>evaluate(output=)</code></td>
+<td><code>embedding=</code></td>
+</tr>
+<tr>
+<td><code>evaluate(task=, family=, only=)</code>, <code>load_results(task=, family=, metric=)</code>, <code>recommend(task=, family=)</code></td>
+<td><code>metrics=</code></td>
+</tr>
+<tr>
+<td><code>load_results(method=)</code></td>
+<td><code>methods=</code></td>
+</tr>
+<tr>
+<td><code>evaluate(label_order=)</code></td>
+<td><code>evaluate(..., dataset=, method=)</code></td>
+</tr>
+<tr>
+<td><code>evaluate(missing_labels=)</code></td>
+<td>the cells that have a label, as <code>adata[adata.obs[col].notna()]</code></td>
+</tr>
+<tr>
+<td><code>evaluate(clustering=)</code></td>
+<td><code>sklearn.metrics.adjusted_rand_score(labels, clusters)</code> for your own clusters</td>
+</tr>
+<tr>
+<td><code>find_methods(tunable=)</code>, <code>method_info(verbose=)</code></td>
+<td><code>mtb.params_for</code></td>
+</tr>
+<tr>
+<td><code>find_methods(runnable=)</code></td>
+<td><code>mtb.scan</code></td>
+</tr>
+<tr>
+<td><code>find_methods(atac=)</code>, <code>recommend(atac=)</code></td>
+<td><code>modalities=["atac_peak"]</code> or <code>["atac_gas"]</code></td>
+</tr>
+<tr>
+<td><code>params_for(dataset=)</code></td>
+<td><code>params_for(method, category, modalities)</code></td>
+</tr>
+<tr>
+<td><code>run_all(assume_gpu=)</code></td>
+<td><code>mtb.scan(..., assume_gpu=True)</code></td>
+</tr>
+<tr>
+<td><code>allow_atac_mismatch=</code> of <code>scan</code> and <code>run_all</code></td>
+<td>an <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file in the form the method reads</td>
+</tr>
+<tr>
+<td><code>plot.bubble(order=, require_complete=)</code>, <code>plot.bar(top=)</code></td>
+<td><code>methods=</code></td>
+</tr>
+<tr>
+<td><code>plot.bubble(aggregate=)</code></td>
+<td><code>mtb.plot.bar</code></td>
+</tr>
+<tr>
+<td><code>plot.bar(group=)</code></td>
+<td><code>metrics=</code></td>
+</tr>
+<tr>
+<td><code>data.fetch(quiet=)</code>, <code>data.write_example(quiet=)</code></td>
+<td><code>verbose=</code></td>
+</tr>
+<tr>
+<td><code>env.install(conda=)</code></td>
+<td>conda on <code>PATH</code></td>
+</tr>
+<tr>
+<td><code>env.install(packed=False)</code></td>
+<td><code>build=True</code></td>
+</tr>
+<tr>
+<td>the UnitedNet inputs key <code>rna_cty</code></td>
+<td><code>cty</code></td>
+</tr>
+<tr>
+<td><code>mtb.data.fetch_outputs</code>, <code>mtb.DegenerateRerunWarning</code>, <code>source=</code> and <code>result_path=</code> of <code>load_results</code> and <code>recommend</code>, <code>load_results(clustering=)</code>, <code>find_methods(task=)</code>, <code>recommend(min_methods=)</code>, <code>scan(out_dir=)</code>, <code>overall=</code>, <code>cmap=</code>, <code>na=</code> and <code>show_language=</code> of <code>plot.bubble</code>, <code>overall=</code>, <code>cmap=</code> and <code>show_datasets=</code> of <code>plot.bar</code>, <code>files_dir=</code> of <code>catalog.datasets</code> and <code>catalog.metrics</code>, <code>dtype=</code>, <code>n_batches=</code> and <code>compression=</code> of <code>io.export_dataset</code>, <code>io.read_canonical(sparse=)</code>, <code>io.normalize_peak_names</code></td>
+<td>removed</td>
+</tr>
+<tr>
+<td>the stored tables of D11s, D28s, D45s and D52s, the Conos rows of D28 and UINMF's rows of D52</td>
+<td>the stored results of D11, D28, D45 and D52</td>
+</tr>
+</tbody>
+</table>
+<h2 id="new-in-040">New in 0.4.0<a class="headerlink" href="#new-in-040" title="Anchor link to this section">&para;</a></h2>
+<ul>
+<li>The public API is four modules: methods (<code>find_methods</code>, <code>method_info</code>,
+  <code>params_for</code>), run (<code>scan</code>, <code>run</code>, <code>load_run</code>,
+  <code>RunResult</code>), metrics (<code>evaluate</code>, <code>load_results</code>, <code>recommend</code>,
+  <code>catalog.metrics</code>) and figures (<code>plot.bubble</code>, <code>plot.bar</code>), plus <code>io</code>,
+  <code>data</code>, <code>catalog.datasets</code>, <code>env.install</code> and <code>config</code>.</li>
+<li><code>mtb.evaluate</code> returns the long table of <code>load_results</code>, with <code>method=</code>
+  and <code>dataset=</code> naming the rows. Without <code>labels</code>, <code>dataset=</code> reads the
+  dataset's label files, in the cell order of <code>method</code> when it names a
+  package method: its id in any case, its display name, or either followed
+  by a space, such as <code>"StabMap (this run)"</code>. A benchmark dataset gives the
+  category; a folder of your own needs <code>category=</code>.
+  Any other name reads the folder's order; a name close to a package method
+  that orders the cells another way gets a did-you-mean warning.</li>
+<li><code>run</code> writes the name of each cell into the method's <code>embedding.h5</code>, as
+  the dataset <code>barcodes</code>. <code>evaluate</code> and <code>mtb.io.read_canonical</code> read them,
+  so the scores of a run's file do not depend on <code>method=</code>. For a file of a
+  <code>run</code> folder without them, the folder's run record names the method and
+  the label files it read.</li>
+<li><code>RunResult.embedding(method)</code> returns a method's embedding as an
+  AnnData: <code>obsm["X_emb"]</code> in the method's cell order, named by the cells'
+  barcodes (with the label file in front where two files share a barcode),
+  with each cell's <code>label</code>, and its <code>batch</code> when the run had more than one
+  batch. <code>run(batch=)</code> and <code>rescore(batch=, labels=)</code> take these names.</li>
+<li><code>mtb.scan</code> returns the plan, one row per method: <code>method</code>, <code>modalities</code>,
+  <code>runnable</code>, <code>reason</code>, <code>env</code>, <code>caveat</code> and <code>command</code>. It takes <code>params=</code>.
+  <code>mtb.run</code> always runs and needs <code>out_dir</code>.</li>
+<li><code>mtb.recommend(category, long_df=...)</code> gives the numbers behind a figure,
+  in its row order: <code>method</code>, <code>grand_score</code>, <code>needs_labels</code>,
+  <code>runtime_tier</code>, <code>worst_sec</code> and <code>env</code>. <code>recommend</code>, <code>plot.bar</code> and
+  <code>plot.bubble</code> share one overall score: on each dataset, each value is
+  ranked against the stored rows, so the stored methods keep their scores
+  and order and a row equal to a stored row gets its score.</li>
+<li><code>mtb.catalog.datasets()</code> lists the demo subsets too, with a <code>has_results</code>
+  column.</li>
+<li><code>metrics=</code> takes one code, such as <code>metrics="ARI"</code>, and families inside
+  a list, such as <code>["clustering", "kBET"]</code>. <code>load_results</code> warns when a
+  code it was given has no stored row.</li>
+<li><code>params=</code> values are checked against the choices the script declares:
+  MIRA's <code>acc="banana"</code> is refused before anything runs.</li>
+<li>A record of <code>run</code> holds <code>scored_by_version</code>, the version that
+  computed its scores, next to <code>multibench_version</code>, the version that ran
+  the method.</li>
+<li>The scores follow the article's protocol. ARI, NMI, ASW, iASW and iF1
+  score Leiden clusters searched to the number of cell types; iASW counts
+  every cluster, and iF1 every cell type, as isolated. The new ARI_batch and NMI_batch
+  score Leiden clusters searched to the number of batches. The Leiden
+  backend is leidenalg by default (<code>mtb.config.leiden_flavor</code>).</li>
+<li>Scores differ from 0.3.x. ARI, NMI and iF1 are usually lower, ASW and
+  iASW higher.</li>
+<li>The stored results were scored again this way. D11, D28, D45 and D52
+  were run again. They now hold ARI_batch and NMI_batch for the datasets
+  with several batches, the classification scores (OCA, ACA, Spec, Sens,
+  F1) of D28, D45 and D52, except for a method that writes a graph, and
+  <code>df.attrs["rerun_version"]</code> is <code>0.4.0</code>.</li>
+<li>The stored results are the package's own runs only. The published
+  tables leave the API, and the package no longer ships them.</li>
+<li>One stored dataset per category: D11, D28, D45 and D52. The subsample
+  tables D11s, D28s, D45s and D52s are removed, and so are the Conos rows of
+  D28, a failed run (ARI 0.001), and UINMF's rows of D52, a run on two of
+  its three batches.</li>
+<li><code>mtb.env.install</code> installs by default. <code>dry_run=True</code> shows each
+  environment's state and size; its total names a shared layer.</li>
+<li>The vertical scMM, scMDC, moETM, UnitedNet and iPOLNG read their peaks
+  under the role <code>atac</code>, as every other vertical method. The 0.3 key
+  <code>atac_gas</code> still selects them.</li>
+<li><code>mtb.load_run</code> warns once for a folder scored before 0.4.0, and the
+  figures and <code>recommend</code> warn for rows of your own scored before 0.4.0 or
+  without <code>scored_with</code>: <code>res.rescore()</code> scores them as 0.4.0 does.</li>
+<li>An env with a method env's name counts only when multibench installed it.
+  An env you made yourself is never used, and neither is one that
+  multibench 0.3.9 or older built from a recipe, or 0.3.0 or older unpacked
+  from an archive: rename or remove it, then install again
+  (<code>mtb.env.install(["M"])</code>).</li>
+<li>An R method reads only the R packages of its env. The personal R library
+  (<code>R_LIBS_USER</code>), <code>R_LIBS</code>, <code>R_LIBS_SITE</code>, <code>~/.Renviron</code> and <code>~/.Rprofile</code>
+  are not read. Before, a package there could load instead of the env's
+  copy: MOFA2 stopped with <code>CXXABI_1.3.15 not found</code>.</li>
+<li><code>mtb.config</code> is a settings object: a misspelt setting raises, and
+  <code>leiden_flavor</code> takes <code>"leidenalg"</code> or <code>"igraph"</code> when it is set.</li>
+<li><code>mtb.io</code>, <code>mtb.env</code>, <code>mtb.catalog</code> and <code>mtb.data</code> hold their public
+  functions only.</li>
+<li>The install cell of the tutorials asks for <code>multibench-sc&gt;=0.4.0</code>.</li>
+</ul>
+<h2 id="behaviour-changes-in-040">Behaviour changes in 0.4.0<a class="headerlink" href="#behaviour-changes-in-040" title="Anchor link to this section">&para;</a></h2>
+<ul>
+<li><code>mtb.evaluate</code> returns the long table, not the wide frame with a <code>Value</code>
+  column.</li>
+<li>The <code>source</code> of the stored results is <code>"stored"</code>. It was <code>"rerun"</code>.</li>
+<li><code>mtb.scan</code> returns one row per method: the row that <code>run</code> runs, which
+  leaves out a row inside a larger one (UINMF's two-batch row next to its
+  three-batch row), or the row that says why the method cannot run.</li>
+<li><code>mtb.scan</code> of a benchmark dataset takes the dataset's category when none
+  is given: <code>mtb.scan("D11")</code> is vertical.</li>
+<li>A <code>dataset</code> argument also takes a folder path, such as <code>"mydata/LUNG"</code>,
+  relative to the working directory.</li>
+<li><code>mtb.io.export_dataset</code> infers <code>atac_kind</code> from the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> feature names
+  when it is not given. It raises only when the names do not tell, and it
+  warns when a <code>labels</code> Series without barcodes is matched by position.</li>
+<li><code>RunResult.rescore</code> raises <code>FileNotFoundError</code> when it finds the output
+  of no method. Before, it returned a table without scores.</li>
+<li><code>RunResult.summary</code> has the columns <code>method</code>, <code>status</code>, the scores,
+  <code>run_sec</code>, <code>caveat</code> and <code>reason</code>. <code>status</code> is
+  <code>scored</code>, <code>ran</code>, <code>failed</code>, <code>skipped</code> or <code>timeout</code>, and <code>reason</code> says why
+  a method has no scores. <code>res.records</code> holds the same statuses (a folder
+  of 0.3 is read with them) and the other fields; <code>reused</code> is <code>True</code> for an
+  output that <code>skip_existing=True</code> reused.</li>
+<li><code>RunResult.rescore(metrics=[...])</code> replaces those scores and keeps the
+  others.</li>
+<li><code>run(skip_existing=True)</code> leaves a saved folder without a <code>skipped</code> row
+  for a method that cannot run on this computer, and <code>save</code> keeps the order
+  of the records it merges with.</li>
+<li><code>mtb.recommend</code> ranks every metric present by default, as <code>plot.bubble</code>
+  and <code>plot.bar</code> do. With <code>long_df=</code> it lists only the methods of
+  <code>long_df</code>, and it no longer warns about methods without scores.</li>
+<li>Batch metrics on one batch are refused, as classification is;
+  <code>metrics=None</code> leaves them out.</li>
+<li>Every route reads an embedding at its own dtype: a float32
+  <code>embedding.h5</code> scores the same from its path, an AnnData,
+  <code>res.embedding(m)</code>, <code>rescore</code> and <code>run</code>.</li>
+<li><code>mtb.evaluate</code> without <code>category=</code> leaves the <code>category</code> column empty.</li>
+<li><code>mtb.io.export_dataset</code> warns when a vertical export holds gene-activity
+  <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>: vertical methods read peaks.</li>
+<li><code>mtb.params_for(method)</code> returns the parameters when the method's
+  variants take the same ones, as Matilda's do.</li>
+<li><code>mtb.catalog.datasets()</code> lists the datasets <code>mtb.data.fetch</code> downloads or
+  <code>load_results</code> holds, each with its category; it has no <code>simulated</code> or
+  <code>fetchable</code> column.</li>
+<li><code>mtb.recommend</code> has no <code>n_datasets</code>, <code>n_datasets_total</code>, <code>coverage</code> and
+  <code>datasets</code> columns.</li>
+<li><code>mtb.plot.bar</code> draws the overall score of <code>recommend</code>.</li>
+<li><code>mtb.run(skip_existing=True)</code> scores a saved run again, as
+  <code>rescore</code> does, and keeps its record (<code>run_sec</code>, <code>multibench_version</code>,
+  <code>started_at</code>). <code>rescore</code> keeps the label order a record was scored with.</li>
+<li><code>mtb.data.fetch(name)</code> returns the dataset's folder.</li>
+<li><code>mtb.load_results</code> has the <code>scored_with</code> column of the other long tables.</li>
+<li>A batch of the wrong length is refused before anything runs.</li>
+<li><code>mtb.io.export_dataset</code> refuses peaks given as <code>rna=</code>.</li>
+<li>On diagonal data, the classification metrics follow the folder's <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and
+  <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> sides whatever <code>batch=</code> is.</li>
+<li>The first metric family of the bubble figure is headed Clustering.</li>
+<li><code>mtb.env.install</code> returns a DataFrame: <code>env</code>, <code>methods</code>, <code>state</code>,
+  <code>flavor</code>, <code>archive_bytes</code> and <code>unpacked_bytes</code>. <code>.to_dict("records")</code>
+  gives a list of dicts. An env with one archive for <abbr title="Central Processing Unit">CPU</abbr> and <abbr title="Graphics Processing Unit">GPU</abbr> hosts has
+  the flavor <code>any</code>.
+  Off Linux <code>install</code> raises an error that is an <code>OSError</code> and a
+  <code>RuntimeError</code>.</li>
+<li><code>mtb.method_info</code> returns the keys a user reads (<code>id</code>, <code>language</code>,
+  <code>notes</code>, <code>categories</code>, <code>env</code>, <code>atac</code>, <code>needs_labels</code>, <code>supports</code>,
+  <code>runtime</code>, <code>gpu</code>, <code>cpu_params</code>, <code>setup_hint</code>, <code>repo_url</code>, <code>reference</code>).
+  <code>method_info</code> has no <code>tasks</code>, no <code>requires_gpu</code> (<code>gpu == "required"</code>) and
+  no <code>n_tunable</code> in <code>supports</code> (<code>params_for</code>).</li>
+<li><code>params_for</code> lists the <code>type</code> and the <code>default</code> a run uses of each
+  hyperparameter: no <code>effective</code> key and no <code>script_default</code>. It leaves out
+  the inputs and the values set from the data (scJoint's <code>cty_path1</code> and
+  <code>input_size</code>, scMDC's <code>nbatch</code>, scMM's <code>model</code> ...), the CUDA switches the
+  package sets per host (<code>device</code>, <code>no_cuda</code>, <code>use_cuda</code>) and arguments the
+  script never reads. <code>params=</code> values are checked against the type the
+  script declares (<code>epochs=2.5</code> or <code>True</code> is refused), and <code>True</code>/<code>False</code>
+  reach the script as it reads them.</li>
+<li><code>recommend</code> and <code>plot.bar</code> refuse rows that repeat a stored method and
+  dataset, as <code>plot.bubble</code> does: rename yours, e.g.
+  <code>rows.assign(method=rows.method + " (this run)")</code>.</li>
+<li>A metric family the stored rows lack, such as classification of your
+  rows, is ranked among your rows and counts in no Overall.</li>
+<li>Your rows on another dataset than the stored rows are refused: score your
+  embedding with <code>dataset=</code> of the stored dataset.</li>
+<li>The bubble columns follow <code>catalog.metrics()</code>: ARI, NMI, ASW, iASW, iF1,
+  cLISI.</li>
+<li>The long tables of <code>evaluate</code>, <code>load_results</code> and <code>RunResult.long</code>
+  have no <code>clustering</code> column.</li>
+<li>A folder of one batch lists no row for numbered batches (<code>modalities="all"</code>
+  lists them), and <code>mtb.io.export_dataset</code> refuses repeated barcodes.</li>
+<li><code>mtb.evaluate(adata)</code> without <code>obsm=</code> takes <code>X_emb</code>; without it, the
+  error names the keys to pass as <code>obsm=</code>.</li>
+<li><code>mtb.io.read_canonical</code> reads a method's <code>embedding.h5</code> into
+  <code>.obsm["X_emb"]</code>.</li>
+<li>When the embedding and the labels or batch both have cell ids, the ids
+  decide. A file or a <code>Series</code> indexed <code>0..n-1</code> without cell ids next to an
+  embedding with barcodes is refused: add the barcodes, or pass
+  <code>.to_numpy()</code> to match by position. Ids none of which is a cell are
+  refused too, and ids of other cells next to every cell are left out. A
+  subset of a dataset folder's cells is matched to the folder's label files
+  by its barcodes.</li>
+<li><code>evaluate(dataset=)</code> follows the cells of a reordered embedding also
+  where barcodes repeat across batches (D45, D52), named <code>cty2:&lt;barcode&gt;</code>
+  as <code>res.embedding(m)</code> names them. With <code>labels=</code>, a benchmark dataset
+  needs all of its cells, and it gives its category whatever <code>method=</code> is:
+  other cells of yours take a dataset name of their own. Next to a package
+  method that orders the cells otherwise than the folder, labels without
+  cell ids are refused, and labels or a batch with ids follow the method's
+  order.</li>
+<li><code>RunResult.rescore(batch=)</code> refuses a batch of the wrong length before
+  anything is scored.</li>
+<li><code>run(skip_existing=True)</code> finds a saved run from any working
+  directory.</li>
+<li>A value of your rows within 1e-6 of the stored value of its own method
+  (<code>"Cobolt (this run)"</code> is Cobolt's) on the same dataset and metric counts
+  as that value in the overall score: re-scoring noise does not move a rank.</li>
+<li>A stored row is a row of the stored results the package ships: a
+  renamed copy that keeps
+  <code>source == "stored"</code> ranks as your row and moves no stored score.</li>
+<li><code>res.embedding(m)</code> of a one-batch dataset has no <code>batch</code> column, so
+  <code>write_h5ad</code> works.</li>
+<li><code>mtb.data.write_example</code> returns <code>None</code>. Its printed lines name the
+  files.</li>
+<li><code>plot.bar</code>'s axis says <code>overall score (D11)</code>: your rows can score above 1
+  or below 0.</li>
+<li><code>res.embedding(m)</code> names the cells by the barcodes of the files the method
+  read: scJoint's <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> cells of D28 by <code>atac_gas.h5</code>. <code>evaluate(dataset=,
+  method=)</code> reads the folder's cells the same way, so such an embedding in
+  any cell order scores as in the method's order. An embedding whose cell
+  ids are not all distinct cells of the folder is refused, not matched by
+  position; the error names the one fix that works.</li>
+<li><code>recommend(category, long_df=)</code> refuses rows of another category.</li>
+<li>An <code>.h5ad</code> that cannot be read is named in one sentence.</li>
+<li><code>run(skip_existing=True)</code> with no saved output of the methods in
+  <code>out_dir</code> says so and names the folder it looked for.</li>
+<li><code>scan</code> and <code>run</code> say nothing of the rows that read a modality the
+  folder lacks.</li>
+</ul>
 <h2 id="new-in-039">New in 0.3.9<a class="headerlink" href="#new-in-039" title="Anchor link to this section">&para;</a></h2>
 <ul>
 <li>The code is simpler inside and about 14% shorter. The functions, their
@@ -3218,7 +3687,7 @@ what 0.3.4 did.</p>
 <h2 id="new-in-032">New in 0.3.2<a class="headerlink" href="#new-in-032" title="Anchor link to this section">&para;</a></h2>
 <h3 id="commands-and-flags">Commands and flags<a class="headerlink" href="#commands-and-flags" title="Anchor link to this section">&para;</a></h3>
 <ul>
-<li><code>multibench fetch D46 D11</code> downloads demo datasets. <code>--outputs</code> downloads
+<li><code>multibench fetch D11 D45</code> downloads demo datasets. <code>--outputs</code> downloads
   their stored <code>run-all</code> outputs instead, <code>--scripts</code> the method scripts, and
   <code>--ref</code> picks a commit or tag of the scripts.</li>
 <li><code>multibench config</code> lists the paths in use and where each one comes from.
@@ -3542,7 +4011,7 @@ same. A script that matches message text may need an update.</p>
   For MultiMAP and Seurat_v3, the text ends
   <code>&lt;method&gt; reads both atac_peak.h5 and atac_gas.h5.</code></li>
 <li>An unknown method id gets
-  <code>Unknown method stabmap. Did you mean StabMap? mtb.list_methods() shows all methods.</code>
+  <code>Unknown method stabmap. Did you mean StabMap? mtb.find_methods() shows all methods.</code>
   A category the method does not run on gets
   <code>SCALEX does not run on vertical data. Its categories: diagonal.</code>
   <code>multibench evaluate</code> adds the <code>--name</code> and <code>--labels</code> flags for your
@@ -3610,7 +4079,7 @@ same. A script that matches message text may need an update.</p>
   <code>The --batch file obs_sheet.csv has several columns after the cell ids: celltype, sample. Choose one with --batch-column.</code>
   A column name that is not in the file gets the same list.</li>
 <li>Missing batch labels get
-  <code>metrics='all' needs batch labels for ASW_batch, GC and iLISI. Pass batch=&lt;vector&gt;, or metrics='clustering'.</code>
+  <code>metrics='all' needs batch labels for ASW_batch, ARI_batch, NMI_batch, GC and iLISI. Pass batch=&lt;vector&gt;, or metrics='clustering'.</code>
   A batch that no chosen metric uses gets
   <code>batch= changes nothing here, because metrics=['ARI', 'NMI'] has no batch metric. ...</code></li>
 <li><code>load_results</code> with a <code>result_path</code> that does not exist raises
@@ -3690,11 +4159,11 @@ will be removed in 0.4. Removed ones raise an error.</p>
 <tbody>
 <tr>
 <td><code>mtb.plan(dataset, category, ...)</code></td>
-<td><code>mtb.scan(dataset, category, ...)</code>. It returns the same frame, with the <code>command</code> column.</td>
+<td><code>mtb.scan(dataset, category, ...)</code>. Since 0.4 <code>scan</code> has one row per method; the frame with the <code>command</code> column is <code>mtb.run_all(dataset, category, dry_run=True)</code>.</td>
 </tr>
 <tr>
 <td><code>mtb.plan_commands(...)</code></td>
-<td><code>mtb.scan(...)</code></td>
+<td><code>mtb.scan(...)</code>; since 0.4 <code>mtb.run_all(..., dry_run=True)</code></td>
 </tr>
 <tr>
 <td><code>mtb.runtime_hint(m)</code></td>

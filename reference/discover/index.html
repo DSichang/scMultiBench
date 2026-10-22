@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="A benchmark of single-cell multimodal integration methods. The multibench package runs 36 of them from Python or the command line and scores their output.">
+        <meta name="description" content="A benchmark of single-cell multimodal integration methods. The multibench package runs 36 of them from Python and scores their output.">
       
       
         <meta name="author" content="PYangLab">
@@ -18,7 +18,7 @@
         <link rel="prev" href="../../api/">
       
       
-        <link rel="next" href="../inputs/">
+        <link rel="next" href="../run/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Discover - scMultiBench</title>
+        <title>Methods - scMultiBench</title>
       
     
     
@@ -130,7 +130,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Discover
+              Methods
             
           </span>
         </div>
@@ -1517,7 +1517,7 @@
   <span class="md-ellipsis">
     
   
-    Discover
+    Methods
   
 
     
@@ -1535,7 +1535,7 @@
   <span class="md-ellipsis">
     
   
-    Discover
+    Methods
   
 
     
@@ -1559,17 +1559,6 @@
       Table of contents
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#multibench.discover.list_methods" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.list_methods
-      
-    </span>
-  </a>
-  
-</li>
       
         <li class="md-nav__item">
   <a href="#multibench.discover.find_methods" class="md-nav__link">
@@ -1604,82 +1593,10 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#multibench.workflow.describe_layout" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.describe_layout
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#multibench.discover.cite" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.cite
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#multibench.engine.registry.list_tasks" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.list_tasks
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#multibench.workflow.list_categories" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.list_categories
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../inputs/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Prepare inputs
-  
-
-    
-  </span>
-  
-  
-
-      </a>
     </li>
   
 
@@ -1727,7 +1644,7 @@
   <span class="md-ellipsis">
     
   
-    Score
+    Metrics (evaluate)
   
 
     
@@ -1755,7 +1672,7 @@
   <span class="md-ellipsis">
     
   
-    Compare
+    Metrics (stored results)
   
 
     
@@ -1776,14 +1693,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../env/" class="md-nav__link">
+      <a href="../plot/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Environments (mtb.env)
+    Figures (mtb.plot)
   
 
     
@@ -1812,34 +1729,6 @@
     
   
     Data I/O (mtb.io)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../plot/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Plot (mtb.plot)
   
 
     
@@ -1896,6 +1785,34 @@
     
   
     Catalog (mtb.catalog)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../env/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environments (mtb.env)
   
 
     
@@ -2114,17 +2031,6 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#multibench.discover.list_methods" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.list_methods
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#multibench.discover.find_methods" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2151,50 +2057,6 @@
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.params_for
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#multibench.workflow.describe_layout" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.describe_layout
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#multibench.discover.cite" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.cite
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#multibench.engine.registry.list_tasks" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.list_tasks
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#multibench.workflow.list_categories" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.list_categories
       
     </span>
   </a>
@@ -2232,7 +2094,7 @@
 
 
 <h1 id="discover">Discover<a class="headerlink" href="#discover" title="Anchor link to this section">&para;</a></h1>
-<p>Find methods, see what each one needs and cite them. Every call works
+<p>Find methods and see what each one needs. Every call works
 offline.</p>
 <!-- api-summary: generated by tools/gen_reference_tables.py from the docstrings; do not edit by hand -->
 <div class="api-summary">
@@ -2245,10 +2107,6 @@ offline.</p>
 </thead>
 <tbody>
 <tr>
-<td><a href="#multibench.discover.list_methods"><code>mtb.list_methods</code></a></td>
-<td>Return the method ids, optionally restricted to one category.</td>
-</tr>
-<tr>
 <td><a href="#multibench.discover.find_methods"><code>mtb.find_methods</code></a></td>
 <td>Return the method ids that match every filter you pass.</td>
 </tr>
@@ -2260,162 +2118,12 @@ offline.</p>
 <td><a href="#multibench.discover.params_for"><code>mtb.params_for</code></a></td>
 <td>Return the hyperparameters of one method variant.</td>
 </tr>
-<tr>
-<td><a href="#multibench.workflow.describe_layout"><code>mtb.describe_layout</code></a></td>
-<td>Return the directory layout the package expects for your own dataset.</td>
-</tr>
-<tr>
-<td><a href="#multibench.discover.cite"><code>mtb.cite</code></a></td>
-<td>Return citation text for the benchmark and, optionally, the methods you ran.</td>
-</tr>
-<tr>
-<td><a href="#multibench.engine.registry.list_tasks"><code>mtb.list_tasks</code></a></td>
-<td>List the task names that methods declare, sorted.</td>
-</tr>
-<tr>
-<td><a href="#multibench.workflow.list_categories"><code>mtb.list_categories</code></a></td>
-<td>Return the valid <code>category</code> values with a plain-language description of each.</td>
-</tr>
 </tbody>
 </table>
 </div>
 <!-- /api-summary -->
 
 
-
-<div class="doc doc-object doc-function">
-
-
-<h2 id="multibench.discover.list_methods" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            mtb.list_methods
-
-
-<a href="#multibench.discover.list_methods" class="headerlink" title="Anchor link to this section">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">list_methods</span><span class="p">(</span><span class="n">category</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">]</span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents first">
-
-        <p>Return the method ids, optionally restricted to one category.</p>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">PARAMETERS</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>category</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p>Integration category: <code>vertical</code>, <code>diagonal</code>, <code>mosaic</code> or
-<code>cross</code>; <code>None</code> = every method.</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="str">str</span> | None</code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>None</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">RETURNS</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <span class="doc-returns-annotation">
-                    <code><span title="list">list</span>[<span title="str">str</span>]</code>
-                </span>
-            </td>
-            <td class="doc-returns-details">
-              <div class="doc-md-description">
-                <p>Method ids in the package's order.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">RAISES</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-              <span class="doc-raises-annotation">
-                  <code><span title="ValueError">ValueError</span></code>
-              </span>
-            </td>
-            <td class="doc-raises-details">
-              <div class="doc-md-description">
-                <p>Unknown <code>category</code>; the message lists the valid ones.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-              <span class="doc-raises-annotation">
-                  <code><span title="TypeError">TypeError</span></code>
-              </span>
-            </td>
-            <td class="doc-raises-details">
-              <div class="doc-md-description">
-                <p>A keyword other than <code>category</code>. For a <code>find_methods</code> filter such as
-<code>task=</code> the message names the call to use: <code>find_methods(category, task=...)</code>.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<p><span class="doc-section-title">Examples</span></p>
-    <div class="language-pycon highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">list_methods</span><span class="p">()</span>                 <span class="c1"># every method id</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">list_methods</span><span class="p">(</span><span class="s2">"vertical"</span><span class="p">)</span>       <span class="c1"># ids with a vertical variant</span>
-</span></code></pre></div>
-
-
-<details class="note">
-  <summary>Notes</summary>
-  <p>A method is listed under a category when it has a variant for that
-category - the same set <code>scan</code>, <code>run_all</code> and
-<code>find_methods(category=)</code> dispatch.</p>
-</details>
-
-<details class="see-also">
-  <summary>See Also</summary>
-  <p>mtb.find_methods : filter by task, modalities, labels, <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> representation and more.</p>
-<p>mtb.list_categories : the four category tokens with a description of each.</p>
-</details>
-
-    </div>
-
-</div>
 
 <div class="doc doc-object doc-function">
 
@@ -2428,20 +2136,16 @@ category - the same set <code>scan</code>, <code>run_all</code> and
 <div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">find_methods</span><span class="p">(</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">category</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="o">*</span><span class="p">,</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">task</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">modalities</span><span class="p">:</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">]</span> <span class="o">|</span> <span class="n"><span title="set">set</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">needs_labels</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">atac</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">modalities</span><span class="p">:</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">]</span> <span class="o">|</span> <span class="n"><span title="set">set</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">runnable</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">tunable</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">]</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">]</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
 
         <p>Return the method ids that match every filter you pass.</p>
 <p>A method matches when one of its variants meets <code>category</code>,
-<code>modalities</code>, <code>needs_labels</code> and <code>atac</code> together.</p>
+<code>modalities</code> and <code>needs_labels</code> together.</p>
 
 
 <table>
@@ -2460,68 +2164,6 @@ category - the same set <code>scan</code>, <code>run_all</code> and
               <div class="doc-md-description">
                 <p>Integration category: <code>vertical</code>, <code>diagonal</code>, <code>mosaic</code> or
 <code>cross</code>; <code>None</code> = any.</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="str">str</span> | None</code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>None</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>task</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p>A task from <code>mtb.list_tasks()</code>, e.g. <code>"clustering"</code>; <code>None</code> = any.</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="str">str</span> | None</code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>None</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>needs_labels</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p><code>True</code> = a matching variant needs cell-type labels; <code>False</code> = one
-runs without them; <code>None</code> = no filter.</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="bool">bool</span> | None</code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>None</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>atac</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p><abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> representation the script expects: <code>"peak"</code> or
-<code>"gene_activity"</code>; <code>None</code> = no filter.</p>
               </div>
               <p>
                   <span class="doc-param-annotation">
@@ -2559,35 +2201,12 @@ runs without them; <code>None</code> = no filter.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>runnable</code>
+                <code>needs_labels</code>
             </td>
             <td class="doc-param-details">
               <div class="doc-md-description">
-                <p><code>True</code> = methods with a variant the package runs (not a check of
-your host: see <code>mtb.scan</code>); <code>False</code> = declared stubs; <code>None</code> =
-both.</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="bool">bool</span> | None</code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>None</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>tunable</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p><code>True</code> = methods with command-line hyperparameters that
-<code>run(params=...)</code> can set; <code>False</code> = the rest (settings fixed in
-the script); <code>None</code> = both.</p>
+                <p><code>True</code> = a matching variant needs cell-type labels; <code>False</code> = one
+runs without them; <code>None</code> = no filter.</p>
               </div>
               <p>
                   <span class="doc-param-annotation">
@@ -2645,8 +2264,7 @@ the script); <code>None</code> = both.</p>
             </td>
             <td class="doc-raises-details">
               <div class="doc-md-description">
-                <p>Unknown <code>category</code>, <code>task</code>, <code>atac</code> or modality token, or a
-token that contradicts <code>atac</code>.</p>
+                <p>Unknown <code>category</code> or modality token.</p>
               </div>
             </td>
           </tr>
@@ -2670,62 +2288,13 @@ token that contradicts <code>atac</code>.</p>
     <div class="language-pycon highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="s2">"vertical"</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"rna"</span><span class="p">,</span> <span class="s2">"adt"</span><span class="p">])</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="s2">"vertical"</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"rna"</span><span class="p">,</span> <span class="s2">"adt"</span><span class="p">],</span> <span class="n">needs_labels</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="s2">"diagonal"</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"rna"</span><span class="p">,</span> <span class="s2">"atac_peak"</span><span class="p">])</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="n">atac</span><span class="o">=</span><span class="s2">"gene_activity"</span><span class="p">)</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="n">tunable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </span></code></pre></div>
 
 
-<details class="note">
-  <summary>Notes</summary>
-  <p><strong>Per-variant matching.</strong> <code>task</code>, <code>runnable</code> and <code>tunable</code> are
-method-level; the other four filters hold per variant. Two consequences:</p>
-<ul>
-<li><code>find_methods('vertical', modalities=['rna', 'adt'], needs_labels=False)</code>
-  looks at the label need of the vertical rna+adt variant alone, not at
-  the method's other variants.</li>
-<li><code>find_methods('vertical', modalities=['rna', 'atac'])</code> drops
-  Multigrate: rna+atac exists only as a mosaic variant, so
-  <code>inputs_for(..., 'vertical', modalities=['rna', 'atac'])</code> would raise.</li>
-</ul>
-<p><strong>Modality tokens.</strong> A method matches when one variant reads at least
-the named modalities. <code>mtb.scan</code> and <code>mtb.run_all</code> use a stricter
-rule: a row's modalities must be exactly the named combination.</p>
-<p>A base token matches every role of its type: <code>atac</code> matches the
-<code>atac</code>, <code>atac_gas</code> and <code>atac_peak</code> roles, <code>rna</code> matches <code>rna1</code>,
-and <code>protein</code> is <code>adt</code>.</p>
-<p>A representation token selects by what the method reads. <code>atac_peak</code>
-(also <code>peak</code>) is <code>atac</code> plus <code>atac='peak'</code>; <code>atac_gas</code> (also
-<code>gas</code>, <code>gene_activity</code>) is <code>atac</code> plus <code>atac='gene_activity'</code>.
-Both tokens together select the variants that read both files
-(MultiMAP, Seurat_v3). A representation that contradicts <code>atac=</code>
-raises <code>ValueError</code>.</p>
-<p><strong>Directory-fed methods.</strong> scBridge is fed a directory and is judged by
-the bare filenames its variant names: <code>rna.h5</code> / <code>atac_gas.h5</code> make it
-an rna+atac method.</p>
-<p><strong><abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> representation.</strong> <code>atac</code> is what the upstream script reads,
-which is not always what its role name suggests: moETM, scMM and iPOLNG
-take the role <code>atac_gas</code> but read peaks. MultiMAP and Seurat_v3 read
-peaks and gene activity; they are listed under <code>peak</code>.</p>
-<p>Only a variant with an <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> input satisfies <code>atac</code>: Multigrate reads
-peaks only in its mosaic rna+atac variant, so
-<code>find_methods('vertical', atac='peak')</code> omits it. Accepted spellings:
-<code>peak</code> / <code>peaks</code> and <code>gene_activity</code> / <code>gene-activity</code> / <code>gas</code>,
-in any case.</p>
-<p><strong>Labels.</strong> <code>method_info(m)['needs_labels']</code> is the method-level flag (any variant
-needs labels); the per-variant answer is
-<code>method_info(m)['supports'][i]['needs_labels']</code>.</p>
-<p><strong>Stubs.</strong> A declared stub (a method with no variant) is dropped by any
-filter that asks something of a variant: <code>category</code>, <code>modalities</code>,
-<code>atac</code>, <code>needs_labels=True</code> or <code>tunable=True</code>.</p>
-</details>
-
 <details class="see-also">
   <summary>See Also</summary>
-  <p>mtb.list_methods : the same ids filtered by <code>category</code> only.</p>
-<p>mtb.list_tasks : the vocabulary of <code>task=</code>.</p>
-<p>mtb.method_info : the per-variant <code>supports</code> table these filters are read from.</p>
-<p>mtb.scan : which of these methods can actually run on a given dataset.</p>
+  <p>mtb.method_info : the per-variant <code>supports</code> table these filters are read from.
+mtb.scan : which of these methods can actually run on a given dataset.</p>
 </details>
 
     </div>
@@ -2740,7 +2309,7 @@ filter that asks something of a variant: <code>category</code>, <code>modalities
 
 
 <a href="#multibench.discover.method_info" class="headerlink" title="Anchor link to this section">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">method_info</span><span class="p">(</span><span class="n">method</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="dict">dict</span></span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">method_info</span><span class="p">(</span><span class="n">method</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="dict">dict</span></span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -2762,32 +2331,12 @@ filter that asks something of a variant: <code>category</code>, <code>modalities
             </td>
             <td class="doc-param-details">
               <div class="doc-md-description">
-                <p>Method id, e.g. <code>"Matilda"</code>; see <code>mtb.list_methods()</code>.</p>
+                <p>Method id, e.g. <code>"Matilda"</code>; see <code>mtb.find_methods()</code>.</p>
               </div>
               <p>
                   <span class="doc-param-annotation">
                     <b>type</b>
                       <code><span title="str">str</span></code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>verbose</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p><code>True</code> adds <code>notes_long</code>, the long upstream-audit notes.</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="bool">bool</span></code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>False</code>
                   </span>
               </p>
             </td>
@@ -2812,8 +2361,22 @@ filter that asks something of a variant: <code>category</code>, <code>modalities
             </td>
             <td class="doc-returns-details">
               <div class="doc-md-description">
-                <p>One flat record. Start with <code>supports</code>, <code>params</code>, <code>runtime</code> and
-<code>needs_labels</code>. Notes describes every key.</p>
+                <p>One flat record:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>id, language, notes     the method id, 'python' or 'R', a summary
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>categories              the integration categories it runs in
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>env                     the conda env run executes it in
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>atac                    'peak' / 'gene_activity' / None
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>needs_labels            any variant reads cell-type labels
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>supports                one entry per variant: category, modalities,
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>                        output_kind, needs_labels, labels,
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>                        reference_batch
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>runtime                 tier, worst_sec, observed, host, note
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>gpu                     'required' / 'used when present' / 'not used'
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>cpu_params              the flags that turn CUDA off on a CPU host
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>setup_hint              a step to take before the first run, or ''
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>repo_url                the upstream code the benchmark ran
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>reference               {doi, title, authors, journal, year}
+</span></code></pre></div>
               </div>
             </td>
           </tr>
@@ -2850,112 +2413,13 @@ filter that asks something of a variant: <code>category</code>, <code>modalities
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">info</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="s2">"Matilda"</span><span class="p">)</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="gp">&gt;&gt;&gt; </span><span class="c1"># one entry per variant: category, modalities, labels ...</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">info</span><span class="p">[</span><span class="s2">"supports"</span><span class="p">]</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">info</span><span class="p">[</span><span class="s2">"runtime"</span><span class="p">][</span><span class="s2">"tier"</span><span class="p">],</span> <span class="n">info</span><span class="p">[</span><span class="s2">"runtime"</span><span class="p">][</span><span class="s2">"worst_sec"</span><span class="p">]</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">info</span><span class="p">[</span><span class="s2">"params"</span><span class="p">][</span><span class="s2">"vertical:rna+adt"</span><span class="p">][</span><span class="s2">"tunable"</span><span class="p">]</span>
 </span></code></pre></div>
 
 
-<details class="note">
-  <summary>Notes</summary>
-  <p><strong>Key reference.</strong> The dict merges the method definition, the provenance
-record (repository, version, paper) and the observed runtime.</p>
-<ul>
-<li><code>id</code> - the method id.</li>
-<li><code>language</code> - <code>'python'</code> or <code>'R'</code>.</li>
-<li><code>categories</code> / <code>tasks</code> - the categories it has a variant for and
-  the tasks it serves.</li>
-<li><code>env</code> - the conda env <code>run</code> executes it in (a shared group env or
-  the method's own).</li>
-<li><code>atac</code> - the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> representation the script expects (<code>'peak'</code> /
-  <code>'gene_activity'</code>), or <code>None</code>.</li>
-<li><code>needs_labels</code> - method-level label flag; see <strong>Labels</strong> below.</li>
-<li><code>status</code> - see <strong>Status</strong>.</li>
-<li><code>setup_hint</code> - free-text setup advice, or <code>''</code> when there is none.</li>
-<li><code>variants</code> - the distinct upstream entrypoints, in order.</li>
-<li><code>driver</code> - the package-side wrapper actually executed, or <code>None</code>
-  when the upstream script runs directly.</li>
-<li><code>scripts_url</code> - the method's <code>tools_scripts</code> folder in the
-  scMultiBench repository, percent-encoded.</li>
-<li><code>repo_url</code> / <code>version</code> - the upstream repository and the version
-  the benchmark ran.</li>
-<li><code>reference</code> - <code>{doi, title, authors, journal, year}</code> or <code>None</code>;
-  <code>mtb.cite</code> formats it.</li>
-<li><code>notes</code> - a short summary of the method.</li>
-<li><code>supports</code> - the category and modality combinations the method
-  runs, one entry per variant: <code>category</code>, <code>modalities</code>,
-  <code>output_kind</code>, <code>n_tunable</code>, <code>needs_labels</code>, <code>labels</code> (the
-  label roles the variant reads, e.g. <code>['cty']</code> / <code>['rna_cty']</code> /
-  <code>[]</code>) and <code>reference_batch</code> (the batch a variant uses as its fixed
-  reference, e.g. 3 for StabMap in cross; <code>None</code> elsewhere).</li>
-<li><code>params</code> - what <code>run(params=...)</code> can change, keyed per variant
-  as <code>'category:mods'</code>, each with <code>defaults</code>, <code>tunable</code> and
-  <code>effective</code> (see <code>mtb.params_for</code>).</li>
-<li><code>fixed_in_script</code> / <code>upstream_knobs</code> / <code>upstream_url</code> - what the
-  script pins and what its library documents (see <code>mtb.params_for</code>).</li>
-<li><code>runtime</code> - observed cost, to size a sweep; see <strong>Runtime</strong>.</li>
-<li><code>gpu</code> / <code>cpu_params</code> / <code>requires_gpu</code> / <code>gpu_evidence</code> - see
-  <strong><abbr title="Graphics Processing Unit">GPU</abbr> and <abbr title="Central Processing Unit">CPU</abbr></strong>.</li>
-<li><code>notes_long</code> (<code>verbose=True</code> only) - the raw upstream-knob audit
-  prose, <code>None</code> for methods outside the audit.</li>
-<li>Not in this dict: the paper-only catalog columns (<code>deep_learning</code>,
-  <code>output</code>); read them from <code>mtb.catalog.methods()</code>.</li>
-</ul>
-<p><strong>Runtime.</strong> <code>runtime</code> is <code>{"tier", "worst_sec", "observed", "host",
-"note"}</code>, what this method has been observed to cost:</p>
-<ul>
-<li><code>tier</code> - <code>fast</code> (&lt;5 min), <code>medium</code> (5-30 min), <code>slow</code>
-  (30 min-2 h), <code>very_slow</code> (&gt;2 h) or <code>unknown</code> (never measured:
-  <code>worst_sec</code> is <code>None</code>, <code>observed</code> empty).</li>
-<li><code>worst_sec</code> - the slowest observation, in seconds.</li>
-<li><code>observed</code> - one <code>{dataset, cells, sec, source}</code> per measurement;
-  <code>cells</code> is <code>None</code> when not recorded; <code>source</code> is <code>manual</code>,
-  <code>summary_csv</code> (the shipped re-run sweeps) or <code>recorded</code> (the
-  recorded end-to-end runs).</li>
-<li><code>host</code> / <code>note</code> - <code>'gpu'</code> and a sentence saying the times come
-  from the <abbr title="Graphics Processing Unit">GPU</abbr> benchmark host; for a method that uses a <abbr title="Graphics Processing Unit">GPU</abbr> it adds that
-  a <abbr title="Central Processing Unit">CPU</abbr>-only host takes longer.</li>
-</ul>
-<p>Use them to set <code>run_all(timeout=...)</code>.</p>
-<p><strong>Labels.</strong> <code>needs_labels</code> is the method-level flag: <code>True</code> when
-any variant takes a cell-type-label (<code>cty</code>) role as a required input.
-It is not per category. For
-the per-variant answer read <code>supports[i]['needs_labels']</code>;
-<code>find_methods(needs_labels=...)</code> filters per variant.</p>
-<p><strong>Status.</strong> <code>status</code> says how the method was checked. <code>'verified'</code>
-means the command template was cross-checked against the upstream entrypoint
-and the method was executed end to end on a reference dataset;
-<code>'declared'</code> = available but not run end to end. A method listed but
-not yet runnable raises <code>KeyError</code>.</p>
-<p><strong><abbr title="Graphics Processing Unit">GPU</abbr> and <abbr title="Central Processing Unit">CPU</abbr>.</strong> <code>gpu</code>, <code>cpu_params</code>, <code>requires_gpu</code> and
-<code>gpu_evidence</code> are the <abbr title="Graphics Processing Unit">GPU</abbr>/<abbr title="Central Processing Unit">CPU</abbr> contract of the upstream script, read
-from its source:</p>
-<ul>
-<li><code>gpu</code> - how the method uses an NVIDIA <abbr title="Graphics Processing Unit">GPU</abbr>: <code>'required'</code> (see
-  <code>requires_gpu</code>), <code>'used when present'</code> (it runs on the <abbr title="Central Processing Unit">CPU</abbr>
-  otherwise), <code>'not used'</code>, or <code>'unknown'</code> (not checked yet).</li>
-<li><code>cpu_params</code> - the command-line values that turn CUDA off in a script
-  that has it on by default (<code>{}</code> for most methods): <code>{'use_cuda': ''}</code>
-  for scJoint (its argparse <code>--use_cuda</code> is <code>type=bool</code>, so only the
-  empty string is false), <code>{'device': 'cpu'}</code> for scMDC. On a host
-  without an NVIDIA <abbr title="Graphics Processing Unit">GPU</abbr> (<code>mtb.env.host_has_gpu()</code> False) <code>run</code> merges
-  them into <code>params</code> unless the caller set the key.</li>
-<li><code>requires_gpu</code> - <code>True</code> for a script that calls CUDA
-  unconditionally (no flag, no <code>torch.cuda.is_available()</code> fallback).
-  On a <abbr title="Graphics Processing Unit">GPU</abbr>-less host <code>run</code> refuses such a method with <code>OSError</code>
-  before launching and <code>scan</code> reports it <code>env_ok=False</code>.</li>
-<li><code>gpu_evidence</code> - the <code>file:line</code> of that CUDA call (one per script,
-  joined by <code>', '</code>), else <code>None</code>.</li>
-</ul>
-<p>None of the three says anything about the <abbr title="Central Processing Unit">CPU</abbr> archive of the method's env
-(<code>mtb.env.install(..., flavor=...)</code>).</p>
-</details>
-
 <details class="see-also">
   <summary>See Also</summary>
-  <p>mtb.params_for : the hyperparameters of one variant, with upstream defaults.</p>
-<p>mtb.find_methods : filter methods by category, modalities, labels, <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> representation.</p>
-<p>mtb.cite : the paper to cite for a method.</p>
-<p>mtb.env.recipe : the hand-written environment recipe of a method.</p>
+  <p>mtb.params_for : the hyperparameters of one variant, with upstream defaults.
+mtb.find_methods : filter methods by category, modalities, labels, <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> representation.</p>
 </details>
 
     </div>
@@ -2974,17 +2438,14 @@ from its source:</p>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">method</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">,</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">category</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">modalities</span><span class="p">:</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">]</span> <span class="o">|</span> <span class="n"><span title="set">set</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="o">*</span><span class="p">,</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">dataset</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">data_path</span><span class="p">:</span> <span class="n"><span title="pathlib.Path">Path</span></span> <span class="o">|</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="dict">dict</span></span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="dict">dict</span></span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
 
         <p>Return the hyperparameters of one method variant.</p>
-<p>Call it before <code>run(params=...)</code>, <code>run_all(params=...)</code> or <code>sweep</code> to
-see what a method accepts and what it runs with when you pass nothing.</p>
+<p>Call it before <code>run(params=...)</code> to see what a method accepts and
+what it runs with when you pass nothing.</p>
 
 
 <table>
@@ -3001,7 +2462,7 @@ see what a method accepts and what it runs with when you pass nothing.</p>
             </td>
             <td class="doc-param-details">
               <div class="doc-md-description">
-                <p>Method id, e.g. <code>"Matilda"</code>; see <code>mtb.list_methods()</code>.</p>
+                <p>Method id, e.g. <code>"Matilda"</code>; see <code>mtb.find_methods()</code>.</p>
               </div>
               <p>
                   <span class="doc-param-annotation">
@@ -3053,48 +2514,6 @@ infer it from the other arguments.</p>
               </p>
             </td>
           </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>dataset</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p>Dataset folder that settles an ambiguous selection: the one variant
-whose input files it holds.</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="str">str</span> | None</code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>None</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>data_path</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p>Data root that holds the dataset folders; <code>None</code> =
-<code>mtb.config.DEFAULT.data_path</code>.</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="pathlib.Path">Path</span> | <span title="str">str</span> | None</code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>None</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
       </tbody>
     </table>
 
@@ -3115,9 +2534,12 @@ whose input files it holds.</p>
             </td>
             <td class="doc-returns-details">
               <div class="doc-md-description">
-                <p><code>method</code>, <code>variant</code> and the hyperparameters. Read <code>tunable</code> (what
-the script accepts) and <code>effective</code> (what a run uses); all keys are
-listed in Notes.</p>
+                <p><code>method</code>, <code>variant</code> (<code>'category:mods'</code>, or several that take
+the same parameters), <code>tunable</code> (what
+<code>params=</code> can set, <code>{name: {"type", "default"}}</code>; <code>default</code> is
+what a run uses when you pass nothing), <code>fixed_in_script</code> (what the
+script pins, with <code>file:line</code>), <code>upstream_knobs</code> (what its library
+documents but the script does not expose) and <code>upstream_url</code>.</p>
               </div>
             </td>
           </tr>
@@ -3149,24 +2571,13 @@ listed in Notes.</p>
           <tr class="doc-section-item">
             <td>
               <span class="doc-raises-annotation">
-                  <code><a class="autorefs autorefs-internal" title="            mtb.AmbiguousVariantError (multibench.engine.schema.AmbiguousVariantError)" href="../config/#multibench.engine.schema.AmbiguousVariantError">AmbiguousVariantError</a></code>
-              </span>
-            </td>
-            <td class="doc-raises-details">
-              <div class="doc-md-description">
-                <p>Several variants fit; the message spells out the call that selects one.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-              <span class="doc-raises-annotation">
                   <code><span title="ValueError">ValueError</span></code>
               </span>
             </td>
             <td class="doc-raises-details">
               <div class="doc-md-description">
-                <p>Unknown <code>category</code> or modality token.</p>
+                <p>Unknown <code>category</code> or modality token, or several variants with other
+parameters fit (the message spells out the call that selects one).</p>
               </div>
             </td>
           </tr>
@@ -3177,499 +2588,14 @@ listed in Notes.</p>
 <p><span class="doc-section-title">Examples</span></p>
     <div class="language-pycon highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">p</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">params_for</span><span class="p">(</span><span class="s2">"Matilda"</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="p">[</span><span class="s2">"rna"</span><span class="p">,</span> <span class="s2">"adt"</span><span class="p">])</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="gp">&gt;&gt;&gt; </span><span class="c1"># upstream default vs what a run uses</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">p</span><span class="p">[</span><span class="s2">"tunable"</span><span class="p">][</span><span class="s2">"device"</span><span class="p">][</span><span class="s2">"default"</span><span class="p">],</span> <span class="n">p</span><span class="p">[</span><span class="s2">"effective"</span><span class="p">][</span><span class="s2">"device"</span><span class="p">]</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">params_for</span><span class="p">(</span><span class="s2">"Matilda"</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">"D11"</span><span class="p">)</span>  <span class="c1"># the folder picks the variant</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">params_for</span><span class="p">(</span><span class="s2">"scBridge"</span><span class="p">,</span> <span class="s2">"diagonal"</span><span class="p">)</span>  <span class="c1"># a data_dir variant: no modalities</span>
-</span></code></pre></div>
-
-
-<details class="note">
-  <summary>Notes</summary>
-  <p><strong>Key reference.</strong></p>
-<ul>
-<li><code>method</code> / <code>variant</code> - the method id and the selected variant as
-  <code>'category:mods'</code> (<code>mods</code> is <code>-</code> for a <code>data_dir</code> variant,
-  e.g. <code>'diagonal:-'</code>).</li>
-<li><code>defaults</code> - parameters the package emits on every run. Override them
-  with <code>run(..., params={...})</code>; the override is merged over these.</li>
-<li><code>tunable</code> - the parameters the upstream script accepts on its command
-  line, as <code>{name: {"default": ..., "type": ...}}</code>. The <code>default</code> here
-  is the upstream argparse default, not necessarily what a wrapper run
-  uses.</li>
-<li><code>effective</code> - <code>tunable</code> defaults overlaid with <code>defaults</code>: the
-  value each knob really takes when you pass no <code>params</code>.</li>
-<li><code>fixed_in_script</code> - the values the script pins, each with the
-  <code>file:line</code> that pins it.</li>
-<li><code>upstream_knobs</code> - what the wrapped library documents (with its own
-  defaults), unreachable without editing the script.</li>
-<li><code>upstream_url</code> - the upstream source or docs page those knobs were
-  read from, or <code>None</code>.</li>
-</ul>
-<p><strong>Methods with nothing to tune.</strong> An empty <code>tunable</code> means the upstream
-script exposes no hyperparameters on its command line. The package runs
-each script unchanged, so such a method cannot be tuned through the
-wrapper. Its settings are reported under <code>fixed_in_script</code> and
-<code>upstream_knobs</code> (both empty for methods outside the upstream audit).</p>
-<p><strong>Variant selection.</strong> <code>category</code> and <code>modalities</code> select the variant
-exactly like <code>run</code>. Either may be omitted when the rest leaves one
-variant. A <code>data_dir</code> variant (scBridge's) has no modality
-tokens: leave <code>modalities</code> out and select it by <code>category</code>, or by
-nothing when it is the method's only variant.</p>
-<p><strong>Dataset tie-break.</strong> When the selection is still ambiguous, <code>dataset</code>
-picks the one variant whose input files are all present in
-<code>&lt;data_path&gt;/&lt;dataset&gt;</code>: <code>params_for('Matilda', dataset='D11')</code> is the
-rna+adt variant. When the folder holds the files of several variants of
-one category and their modality sets are nested, the one with the most
-modalities is picked, as <code>mtb.inputs_for</code> does. A folder that settles
-nothing changes nothing, and the ambiguity error is raised as usual.</p>
-<p><strong>Modality spellings.</strong> <code>protein</code> is accepted for <code>adt</code>, and <code>atac</code>
-for either <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> representation role (<code>atac_gas</code> / <code>atac_peak</code>).</p>
-<p><strong>Ambiguity error.</strong> <code>mtb.AmbiguousVariantError</code> derives from both
-<code>ValueError</code> and <code>KeyError</code>. Its message spells out the selecting
-call, e.g. <code>params_for('Matilda', 'vertical', ['rna', 'adt'])</code>.</p>
-</details>
-
-<details class="see-also">
-  <summary>See Also</summary>
-  <p>mtb.method_info : the same <code>params</code> block for every variant at once.</p>
-<p>mtb.sweep : run one method over a range of one of these hyperparameters.</p>
-<p>mtb.AmbiguousVariantError : raised when several variants fit the selection.</p>
-</details>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h2 id="multibench.workflow.describe_layout" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            mtb.describe_layout
-
-
-<a href="#multibench.workflow.describe_layout" class="headerlink" title="Anchor link to this section">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">describe_layout</span><span class="p">(</span><span class="n">category</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="str">str</span></span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents first">
-
-        <p>Return the directory layout the package expects for your own dataset.</p>
-<p>Start here when bringing your own data, then check the folder with
-<code>mtb.scan</code>.</p>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">PARAMETERS</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>category</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p>Integration category to describe; <code>None</code> = an overview of all four
-and the full file table.</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="str">str</span> | None</code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>None</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">RETURNS</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <span class="doc-returns-annotation">
-                    <code><span title="str">str</span></code>
-                </span>
-            </td>
-            <td class="doc-returns-details">
-              <div class="doc-md-description">
-                <p>The layout description, ready to <code>print</code>.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">RAISES</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-              <span class="doc-raises-annotation">
-                  <code><span title="ValueError">ValueError</span></code>
-              </span>
-            </td>
-            <td class="doc-raises-details">
-              <div class="doc-md-description">
-                <p>Unknown <code>category</code>.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<p><span class="doc-section-title">Examples</span></p>
-    <div class="language-pycon highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">describe_layout</span><span class="p">(</span><span class="s2">"vertical"</span><span class="p">))</span>  <span class="c1"># CITE-seq or multiome</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">describe_layout</span><span class="p">(</span><span class="s2">"mosaic"</span><span class="p">))</span>    <span class="c1"># batch patterns methods accept</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">describe_layout</span><span class="p">())</span>            <span class="c1"># every category</span>
-</span></code></pre></div>
-
-
-<details class="note">
-  <summary>Notes</summary>
-  <p>For one category the text gives the files its methods read, as
-<code>mtb.io.export_dataset</code> writes them, the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> representation each
-method needs, the <code>.h5</code> and label formats, the install command and, for
-mosaic and cross, each batch pattern the methods accept. The lists are
-read from the method registry at call time. <code>multibench layout</code> prints
-the same text with <code>multibench</code> commands.</p>
-<p>Vertical reads <code>atac.h5</code>; <code>method_info(m)["atac"]</code> says whether it
-must hold peaks or gene activity. Diagonal reads <code>atac_peak.h5</code> (peaks)
-and <code>atac_gas.h5</code> (gene activity). Mosaic reads <code>atac&lt;i&gt;.h5</code> (peaks).
-<code>peak.h5</code>, and <code>atac.h5</code> for gene activity, are accepted as older names.</p>
-<p>Mosaic and cross use one numbered file per batch in one folder, not
-sub-folders or one concatenated matrix. The file number is the batch:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>&lt;data_path&gt;/COREBATCH/
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    rna1.h5   adt1.h5   cty1.csv     # batch 1
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    rna2.h5   adt2.h5   cty2.csv     # batch 2
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    rna3.h5   adt3.h5   cty3.csv     # batch 3
-</span></code></pre></div>
-</details>
-
-<details class="see-also">
-  <summary>See Also</summary>
-  <p>mtb.list_categories : the four categories with a description of each.</p>
-<p>mtb.scan : checks a laid-out folder (<code>files_ok</code> / <code>files_reason</code> per method).</p>
-<p>mtb.io.export_dataset : writes a whole dataset in this layout from an AnnData.</p>
-</details>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h2 id="multibench.discover.cite" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            mtb.cite
-
-
-<a href="#multibench.discover.cite" class="headerlink" title="Anchor link to this section">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">cite</span><span class="p">(</span><span class="o">*</span><span class="n">methods</span><span class="p">,</span> <span class="n">fmt</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">=</span> <span class="s1">'text'</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="str">str</span></span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents first">
-
-        <p>Return citation text for the benchmark and, optionally, the methods you ran.</p>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">PARAMETERS</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>*methods</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p>Method ids, one per argument or as one list; <code>"all"</code> = every
-method; none = the benchmark only.</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="str">str</span> | <span title="list">list</span>[<span title="str">str</span>]</code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>()</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>fmt</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p><code>"text"</code> (one line per entry) or <code>"bibtex"</code> (one <code>@article</code> per
-entry).</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="str">str</span></code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>&#39;text&#39;</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">RETURNS</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <span class="doc-returns-annotation">
-                    <code><span title="str">str</span></code>
-                </span>
-            </td>
-            <td class="doc-returns-details">
-              <div class="doc-md-description">
-                <p>The benchmark entry first, then one entry per method in the order
-given.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">RAISES</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-              <span class="doc-raises-annotation">
-                  <code><span title="ValueError">ValueError</span></code>
-              </span>
-            </td>
-            <td class="doc-raises-details">
-              <div class="doc-md-description">
-                <p><code>fmt</code> is neither <code>"text"</code> nor <code>"bibtex"</code>; the message lists both.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-              <span class="doc-raises-annotation">
-                  <code><span title="KeyError">KeyError</span></code>
-              </span>
-            </td>
-            <td class="doc-raises-details">
-              <div class="doc-md-description">
-                <p>Unknown method id; the message suggests a close match, if any.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-              <span class="doc-raises-annotation">
-                  <code><span title="TypeError">TypeError</span></code>
-              </span>
-            </td>
-            <td class="doc-raises-details">
-              <div class="doc-md-description">
-                <p>Several ids are given and one is not a string.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<p><span class="doc-section-title">Examples</span></p>
-    <div class="language-pycon highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">cite</span><span class="p">())</span>                                  <span class="c1"># the benchmark only</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">cite</span><span class="p">(</span><span class="s2">"Matilda"</span><span class="p">,</span> <span class="s2">"MOFA2"</span><span class="p">))</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_batch</span><span class="p">(</span><span class="s2">"out/"</span><span class="p">)</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">ran</span> <span class="o">=</span> <span class="n">res</span><span class="o">.</span><span class="n">summary</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s2">"status not in ['SKIPPED', 'FAIL', 'TIMEOUT']"</span><span class="p">)</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">cite</span><span class="p">(</span><span class="n">ran</span><span class="o">.</span><span class="n">method</span><span class="p">,</span> <span class="n">fmt</span><span class="o">=</span><span class="s2">"bibtex"</span><span class="p">))</span>      <span class="c1"># methods that finished</span>
-</span></code></pre></div>
-
-
-<details class="note">
-  <summary>Notes</summary>
-  <p><strong>Two spellings.</strong> Both forms return the same text, and <code>cite(None)</code> is
-<code>cite()</code>:</p>
-<ul>
-<li><code>cite('Matilda', 'MOFA2')</code> - one id per argument, like the CLI
-  <code>multibench cite Matilda MOFA2</code>.</li>
-<li><code>cite(['Matilda', 'MOFA2'])</code> - one list or tuple.</li>
-</ul>
-<p><strong>Formats.</strong></p>
-<ul>
-<li><code>"text"</code> - one <code>Authors. Title. Journal (year). https://doi.org/...</code>
-  line per entry.</li>
-<li><code>"bibtex"</code> - one <code>@article{&lt;id&gt;_&lt;year&gt;, ...}</code> per entry, separated
-  by a blank line; the benchmark's key is <code>scMultiBench_&lt;year&gt;</code>.</li>
-</ul>
-<p><strong>Methods without a reference.</strong> A method without a verified reference
-is emitted as a <code>% &lt;id&gt;: no verified reference; see &lt;repo_url&gt;</code>
-comment (bibtex) or the same line without <code>%</code> (text).</p>
-</details>
-
-<details class="see-also">
-  <summary>See Also</summary>
-  <p>mtb.method_info : carries the same <code>reference</code>, <code>repo_url</code> and <code>version</code> per method.</p>
-</details>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h2 id="multibench.engine.registry.list_tasks" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            mtb.list_tasks
-
-
-<a href="#multibench.engine.registry.list_tasks" class="headerlink" title="Anchor link to this section">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">list_tasks</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="list">list</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">]</span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents first">
-
-        <p>List the task names that methods declare, sorted.</p>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">RETURNS</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <span class="doc-returns-annotation">
-                    <code><span title="list">list</span>[<span title="str">str</span>]</code>
-                </span>
-            </td>
-            <td class="doc-returns-details">
-              <div class="doc-md-description">
-                <p>Sorted task names, the values <code>mtb.find_methods(task=...)</code> accepts.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<p><span class="doc-section-title">Examples</span></p>
-    <div class="language-pycon highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">list_tasks</span><span class="p">()</span>  <span class="c1"># ['batch', 'clustering', 'dimension_reduction']</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="n">task</span><span class="o">=</span><span class="s2">"dimension_reduction"</span><span class="p">)</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">p</span><span class="p">[</span><span class="s2">"tunable"</span><span class="p">][</span><span class="s2">"epochs"</span><span class="p">][</span><span class="s2">"default"</span><span class="p">]</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="go">30</span>
 </span></code></pre></div>
 
 
 <details class="see-also">
   <summary>See Also</summary>
-  <p>mtb.find_methods : filter methods by one of these tasks.</p>
-</details>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h2 id="multibench.workflow.list_categories" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            mtb.list_categories
-
-
-<a href="#multibench.workflow.list_categories" class="headerlink" title="Anchor link to this section">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">list_categories</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n"><span title="dict">dict</span></span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents first">
-
-        <p>Return the valid <code>category</code> values with a plain-language description of each.</p>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">RETURNS</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <span class="doc-returns-annotation">
-                    <code><span title="dict">dict</span></code>
-                </span>
-            </td>
-            <td class="doc-returns-details">
-              <div class="doc-md-description">
-                <p><code>{category: description}</code> for <code>vertical</code>, <code>diagonal</code>, <code>mosaic</code>
-and <code>cross</code>: the values <code>mtb.run_all</code> requires as <code>category</code>.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<p><span class="doc-section-title">Examples</span></p>
-    <div class="language-pycon highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">list_categories</span><span class="p">()[</span><span class="s2">"vertical"</span><span class="p">]</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="go">'Several modalities measured in the same cells ...'</span>
-</span></code></pre></div>
-
-
-<details class="see-also">
-  <summary>See Also</summary>
-  <p>mtb.describe_layout : the file layout each category expects.</p>
+  <p>mtb.run : takes these keys as <code>params={method: {key: value}}</code>.</p>
 </details>
 
     </div>
@@ -3730,13 +2656,13 @@ and <code>cross</code>: the values <code>mtb.run_all</code> requires as <code>ca
         
         
           
-          <a href="../inputs/" class="md-footer__link md-footer__link--next" aria-label="Next: Prepare inputs">
+          <a href="../run/" class="md-footer__link md-footer__link--next" aria-label="Next: Run">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Prepare inputs
+                Run
               </div>
             </div>
             <div class="md-footer__button md-icon">

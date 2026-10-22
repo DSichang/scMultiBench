@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="A benchmark of single-cell multimodal integration methods. The multibench package runs 36 of them from Python or the command line and scores their output.">
+        <meta name="description" content="A benchmark of single-cell multimodal integration methods. The multibench package runs 36 of them from Python and scores their output.">
       
       
         <meta name="author" content="PYangLab">
@@ -1583,35 +1583,7 @@
   <span class="md-ellipsis">
     
   
-    Discover
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../reference/inputs/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Prepare inputs
+    Methods
   
 
     
@@ -1667,7 +1639,7 @@
   <span class="md-ellipsis">
     
   
-    Score
+    Metrics (evaluate)
   
 
     
@@ -1695,7 +1667,7 @@
   <span class="md-ellipsis">
     
   
-    Compare
+    Metrics (stored results)
   
 
     
@@ -1716,14 +1688,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/env/" class="md-nav__link">
+      <a href="../reference/plot/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Environments (mtb.env)
+    Figures (mtb.plot)
   
 
     
@@ -1752,34 +1724,6 @@
     
   
     Data I/O (mtb.io)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../reference/plot/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Plot (mtb.plot)
   
 
     
@@ -1836,6 +1780,34 @@
     
   
     Catalog (mtb.catalog)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/env/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environments (mtb.env)
   
 
     
@@ -2131,7 +2103,7 @@ measured. Each scenario is a <code>category</code> value in the API:</p>
 <details class="note">
 <summary>Details</summary>
 <p>The benchmark evaluates dimension reduction, batch correction,
-clustering, classification and feature selection.</p>
+clustering and classification.</p>
 <p>Its datasets are real and simulated, and cover <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>, <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>.</p>
 </details>
 <h2 id="how-it-evaluates">How it evaluates<a class="headerlink" href="#how-it-evaluates" title="Anchor link to this section">&para;</a></h2>
@@ -2143,9 +2115,8 @@ rank scores. For the full ranking per scenario, see the paper's decision tree
 <p>The metric panels are:</p>
 <ul>
 <li>Dimension reduction, batch correction and clustering: scIB metrics
-  such as kBET, iLISI, ASW, graph connectivity, PCR, ARI and NMI.</li>
+  such as kBET, iLISI, ASW, graph connectivity, ARI and NMI.</li>
 <li>Classification: OCA, ACA, Spec, Sens and F1.</li>
-<li>Feature selection: marker overlap and correlation.</li>
 <li>Every task: runtime and peak memory.</li>
 </ul>
 <p>In the package, <code>mtb.evaluate</code> computes the scIB metrics and the

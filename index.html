@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="A benchmark of single-cell multimodal integration methods. The multibench package runs 36 of them from Python or the command line and scores their output.">
+        <meta name="description" content="A benchmark of single-cell multimodal integration methods. The multibench package runs 36 of them from Python and scores their output.">
       
       
         <meta name="author" content="PYangLab">
@@ -1513,35 +1513,7 @@
   <span class="md-ellipsis">
     
   
-    Discover
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="reference/inputs/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Prepare inputs
+    Methods
   
 
     
@@ -1597,7 +1569,7 @@
   <span class="md-ellipsis">
     
   
-    Score
+    Metrics (evaluate)
   
 
     
@@ -1625,7 +1597,7 @@
   <span class="md-ellipsis">
     
   
-    Compare
+    Metrics (stored results)
   
 
     
@@ -1646,14 +1618,14 @@
   
   
     <li class="md-nav__item">
-      <a href="reference/env/" class="md-nav__link">
+      <a href="reference/plot/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Environments (mtb.env)
+    Figures (mtb.plot)
   
 
     
@@ -1682,34 +1654,6 @@
     
   
     Data I/O (mtb.io)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="reference/plot/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Plot (mtb.plot)
   
 
     
@@ -1766,6 +1710,34 @@
     
   
     Catalog (mtb.catalog)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="reference/env/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environments (mtb.env)
   
 
     
@@ -2016,8 +1988,8 @@
 <h1 id="scmultibench">scMultiBench<a class="headerlink" href="#scmultibench" title="Anchor link to this section">&para;</a></h1>
 <p class="lp-sub">
   scMultiBench is a benchmark of single-cell multimodal integration methods.
-  The <code>multibench</code> package runs 36 of them from Python or the
-  command line and scores their output with the benchmark's metrics.
+  The <code>multibench</code> package runs 36 of them from Python and
+  scores their output with the benchmark's metrics.
 </p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>multibench-sc
 </span></code></pre></div>
@@ -2067,7 +2039,7 @@
 <a class="lp-card-cover" href="tutorials/evaluate/">
 <span class="lp-card-kicker">Evaluate</span>
 <span class="lp-card-title">Evaluate a run</span>
-<span class="lp-card-desc">Score a run output with scIB batch-correction and bio-conservation metrics.</span>
+<span class="lp-card-desc">Score a run output with clustering, batch-correction and classification metrics.</span>
 </a>
 </div>
 <div class="lp-card lp-card-link">
@@ -2097,7 +2069,7 @@
 <div class="lp-feat">
 <span class="lp-feat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><rect x="7" y="11" width="3" height="6" rx="1"/><rect x="12" y="7" width="3" height="10" rx="1"/><rect x="17" y="4" width="3" height="13" rx="1"/></svg></span>
 <span class="lp-feat-title">scIB metrics</span>
-<span class="lp-feat-desc">Bio-conservation scores (ARI, NMI, ASW, iASW, iF1, cLISI) and batch-correction scores (ASW_batch, GC, iLISI, kBET), combined into rank scores per method.</span>
+<span class="lp-feat-desc">Clustering scores (ARI, NMI, ASW, iASW, iF1, cLISI), batch-correction scores (ASW_batch, ARI_batch, NMI_batch, GC, iLISI, kBET) and classification scores (OCA, ACA, Spec, Sens, F1), combined into rank scores per method.</span>
 </div>
 <div class="lp-feat">
 <span class="lp-feat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M19.5 19.5l-4.6-4.6"/><path d="M8.5 12v-1.5M10.5 12V8.5M12.5 12v-2.5"/></svg></span>

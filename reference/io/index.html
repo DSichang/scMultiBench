@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="A benchmark of single-cell multimodal integration methods. The multibench package runs 36 of them from Python or the command line and scores their output.">
+        <meta name="description" content="A benchmark of single-cell multimodal integration methods. The multibench package runs 36 of them from Python and scores their output.">
       
       
         <meta name="author" content="PYangLab">
@@ -15,10 +15,10 @@
         <link rel="canonical" href="https://dsichang.github.io/scMultiBench/reference/io/">
       
       
-        <link rel="prev" href="../env/">
+        <link rel="prev" href="../plot/">
       
       
-        <link rel="next" href="../plot/">
+        <link rel="next" href="../data/">
       
       
         
@@ -1508,35 +1508,7 @@
   <span class="md-ellipsis">
     
   
-    Discover
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../inputs/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Prepare inputs
+    Methods
   
 
     
@@ -1592,7 +1564,7 @@
   <span class="md-ellipsis">
     
   
-    Score
+    Metrics (evaluate)
   
 
     
@@ -1620,7 +1592,7 @@
   <span class="md-ellipsis">
     
   
-    Compare
+    Metrics (stored results)
   
 
     
@@ -1641,14 +1613,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../env/" class="md-nav__link">
+      <a href="../plot/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Environments (mtb.env)
+    Figures (mtb.plot)
   
 
     
@@ -1740,17 +1712,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#multibench.engine.ingest.to_canonical" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.io.to_canonical
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#multibench.engine.ingest.read_canonical" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1761,49 +1722,10 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#multibench.engine.ingest.normalize_peak_names" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.io.normalize_peak_names
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../plot/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Plot (mtb.plot)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
     </li>
   
 
@@ -1852,6 +1774,34 @@
     
   
     Catalog (mtb.catalog)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../env/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environments (mtb.env)
   
 
     
@@ -2081,32 +2031,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#multibench.engine.ingest.to_canonical" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.io.to_canonical
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#multibench.engine.ingest.read_canonical" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.io.read_canonical
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#multibench.engine.ingest.normalize_peak_names" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;mtb.io.normalize_peak_names
       
     </span>
   </a>
@@ -2144,10 +2072,10 @@
 
 
 <h1 id="data-io-mtbio">Data I/O (<code>mtb.io</code>)<a class="headerlink" href="#data-io-mtbio" title="Anchor link to this section">&para;</a></h1>
-<p>Write your data as a dataset folder the methods can read, or convert single
-matrices to and from the canonical <code>.h5</code> format. Give raw counts: the methods
-normalise the data themselves. A canonical <code>.h5</code> holds one matrix as features
-x cells, the layout the methods read.</p>
+<p>Write your data as a dataset folder the methods can read, and read its
+canonical <code>.h5</code> files back. Give raw counts: the methods normalise the data
+themselves. A canonical <code>.h5</code> holds one matrix as features x cells, the layout
+the methods read.</p>
 <!-- api-summary: generated by tools/gen_reference_tables.py from the docstrings; do not edit by hand -->
 <div class="api-summary">
 <table>
@@ -2163,16 +2091,8 @@ x cells, the layout the methods read.</p>
 <td>Write an AnnData / MuData (or loose objects) as a canonical dataset folder.</td>
 </tr>
 <tr>
-<td><a href="#multibench.engine.ingest.to_canonical"><code>mtb.io.to_canonical</code></a></td>
-<td>Convert one matrix to a canonical scMultiBench <code>.h5</code> and return its path.</td>
-</tr>
-<tr>
 <td><a href="#multibench.engine.ingest.read_canonical"><code>mtb.io.read_canonical</code></a></td>
-<td>Read a canonical <code>.h5</code> back into an AnnData (cells x features).</td>
-</tr>
-<tr>
-<td><a href="#multibench.engine.ingest.normalize_peak_names"><code>mtb.io.normalize_peak_names</code></a></td>
-<td>Copy a canonical <code>.h5</code>, rewriting <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> peak names to <code>chr:start-end</code>.</td>
+<td>Read a canonical <code>.h5</code> (a dataset file or an <code>embedding.h5</code>) as an AnnData.</td>
 </tr>
 </tbody>
 </table>
@@ -2199,22 +2119,20 @@ x cells, the layout the methods read.</p>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">atac_kind</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">batch</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">dtype</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">=</span> <span class="s2">"float64"</span><span class="p">,</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">compression</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">"gzip"</span><span class="p">,</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="n">category</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    <span class="n">adt_names</span><span class="p">:</span> <span class="n"><span title="list">list</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    <span class="n">batch_index</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    <span class="n">overwrite</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    <span class="n">n_batches</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="pathlib.Path">Path</span></span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">category</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">adt_names</span><span class="p">:</span> <span class="n"><span title="list">list</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="n">batch_index</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    <span class="n">overwrite</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="pathlib.Path">Path</span></span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
 
         <p>Write an AnnData / MuData (or loose objects) as a canonical dataset folder.</p>
-<p>Produces the layout <code>mtb.describe_layout</code> documents (<code>rna.h5</code>,
-<code>adt.h5</code>, <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> files, <code>cty.csv</code>), so <code>mtb.scan</code> and
-<code>mtb.run_all</code> work on your own data. Give raw counts.</p>
+<p>Produces the dataset folder layout (<code>rna.h5</code>, <code>adt.h5</code>, <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> files,
+<code>cty.csv</code>), so <code>mtb.scan</code> and <code>mtb.run</code> work on your own data. Give
+raw counts. The files of each category are listed at
+https://dsichang.github.io/scMultiBench/tutorials/run/#folder-layout.</p>
 
 
 <table>
@@ -2249,7 +2167,7 @@ passed as an object. With a MuData, name each modality (<code>rna='rna'</code>).
             <td class="doc-param-details">
               <div class="doc-md-description">
                 <p>Folder to create; its name is the dataset id for <code>mtb.scan</code> /
-<code>mtb.run_all</code>, and its parent their <code>data_path</code>.</p>
+<code>mtb.run</code>, and its parent their <code>data_path</code>.</p>
               </div>
               <p>
                   <span class="doc-param-annotation">
@@ -2266,7 +2184,8 @@ passed as an object. With a MuData, name each modality (<code>rna='rna'</code>).
             <td class="doc-param-details">
               <div class="doc-md-description">
                 <p>Raw-count matrix for <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>: a selector against <code>data</code> (<code>'layer:counts'</code>,
-<code>'X[feature_types=Gene Expression]'</code>) or an object (Notes); <code>None</code> = no <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>.</p>
+<code>'X[feature_types=Gene Expression]'</code>) or an AnnData, DataFrame or
+array; <code>None</code> = no <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>.</p>
               </div>
               <p>
                   <span class="doc-param-annotation">
@@ -2308,7 +2227,7 @@ passed as an object. With a MuData, name each modality (<code>rna='rna'</code>).
             <td class="doc-param-details">
               <div class="doc-md-description">
                 <p><abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> matrix, same forms as <code>rna</code> (e.g. <code>'X[feature_types=Peaks]'</code>);
-needs <code>atac_kind</code>. <code>None</code> = no <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>.</p>
+<code>None</code> = no <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>.</p>
               </div>
               <p>
                   <span class="doc-param-annotation">
@@ -2329,7 +2248,8 @@ needs <code>atac_kind</code>. <code>None</code> = no <abbr title="Assay for Tran
             <td class="doc-param-details">
               <div class="doc-md-description">
                 <p>What <code>atac</code> holds: <code>'peak'</code> or <code>'gene_activity'</code>; decides the
-<abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> filename.</p>
+<abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> filename. <code>None</code> = read from the feature names: peaks
+(<code>chr1:100-200</code>) or the <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>'s gene names.</p>
               </div>
               <p>
                   <span class="doc-param-annotation">
@@ -2389,52 +2309,12 @@ needs a batch.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>dtype</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p>Stored dtype of <code>matrix/data</code>, forwarded to <code>mtb.io.to_canonical</code>.</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="str">str</span></code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>&#39;float64&#39;</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>compression</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p>h5py compression filter, forwarded to <code>mtb.io.to_canonical</code>.</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="str">str</span> or None</code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>&#39;gzip&#39;</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
                 <code>category</code>
             </td>
             <td class="doc-param-details">
               <div class="doc-md-description">
                 <p>Integration category the folder is for (<code>vertical</code>, <code>diagonal</code>,
-<code>mosaic</code> or <code>cross</code>); sets the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> and label filenames (Notes).</p>
+<code>mosaic</code> or <code>cross</code>); sets the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> and label filenames.</p>
               </div>
               <p>
                   <span class="doc-param-annotation">
@@ -2511,27 +2391,6 @@ before writing anything.</p>
               </p>
             </td>
           </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>n_batches</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p>With <code>batch_index</code>: how many batches the calls write in total.
-Files of a higher batch number in <code>dataset_dir</code> are refused.</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="int">int</span> or None</code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>None</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
       </tbody>
     </table>
 
@@ -2576,7 +2435,8 @@ Files of a higher batch number in <code>dataset_dir</code> are refused.</p>
             </td>
             <td class="doc-raises-details">
               <div class="doc-md-description">
-                <p>Missing or conflicting arguments, or cells that do not pair across modalities (Notes).</p>
+                <p>Missing or conflicting arguments, a missing label or batch, or cells
+that do not pair across modalities.</p>
               </div>
             </td>
           </tr>
@@ -2624,7 +2484,8 @@ Files of a higher batch number in <code>dataset_dir</code> are refused.</p>
             </td>
             <td class="doc-warns-details">
               <div class="doc-md-description">
-                <p>Values that are not whole numbers, feature-name problems, and the other cases in Notes.</p>
+                <p>Values that are not whole numbers, or feature names that are
+missing, repeated or contradict <code>atac_kind</code>.</p>
               </div>
             </td>
           </tr>
@@ -2639,710 +2500,12 @@ Files of a higher batch number in <code>dataset_dir</code> are refused.</p>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">mdata</span><span class="p">,</span> <span class="s2">"data/MYMULTIOME"</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="s2">"rna"</span><span class="p">,</span> <span class="n">atac</span><span class="o">=</span><span class="s2">"atac"</span><span class="p">,</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="gp">... </span>                      <span class="n">atac_kind</span><span class="o">=</span><span class="s2">"peak"</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="s2">"obs:celltype"</span><span class="p">,</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="gp">... </span>                      <span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">)</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">rna</span><span class="p">,</span> <span class="s2">"data/LUNG"</span><span class="p">,</span> <span class="n">atac</span><span class="o">=</span><span class="n">atac</span><span class="p">,</span> <span class="n">atac_kind</span><span class="o">=</span><span class="s2">"peak"</span><span class="p">,</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="gp">... </span>                      <span class="n">labels</span><span class="o">=</span><span class="s2">"obs:cell_type"</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">"diagonal"</span><span class="p">)</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="s2">"MYCITE"</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="n">data_path</span><span class="o">=</span><span class="s2">"data"</span><span class="p">)</span>
 </span></code></pre></div>
 
-
-<details class="note">
-  <summary>Notes</summary>
-  <p><strong>Modality arguments.</strong> <code>rna</code>, <code>adt</code> and <code>atac</code> each accept:</p>
-<ul>
-<li>a selector string against <code>data</code>: <code>'X'</code>, <code>'obsm:&lt;key&gt;'</code>,
-  <code>'layer:&lt;key&gt;'</code>, <code>'mod:&lt;name&gt;'</code>, <code>'mod:&lt;name&gt;.obsm:&lt;key&gt;'</code> or
-  <code>'mod:&lt;name&gt;.layer:&lt;key&gt;'</code>;</li>
-<li>an AnnData (its <code>.X</code> is written);</li>
-<li>a DataFrame (index = cell barcodes, columns = features);</li>
-<li>a 2-D array or sparse matrix already in the master cell order.</li>
-</ul>
-<p>An <code>obsm</code> matrix takes its feature names as <code>mtb.io.to_canonical</code>
-does; for the <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr>, <code>adt_names</code> comes first (it applies to no other
-modality).</p>
-<p>All matrices are cells x features and are written transposed. With
-<code>data=None</code> the default <code>rna='X'</code> means "no <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>": pass
-<code>rna=&lt;AnnData&gt;</code>. Separate objects are paired by barcode:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">rna_adata</span><span class="p">,</span> <span class="s2">"data/MYMULTI"</span><span class="p">,</span> <span class="n">atac</span><span class="o">=</span><span class="n">atac_adata</span><span class="p">,</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>                      <span class="n">atac_kind</span><span class="o">=</span><span class="s2">"peak"</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">rna_adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s2">"celltype"</span><span class="p">])</span>
-</span></code></pre></div>
-<p><strong>Feature filter.</strong> A selector may end with <code>[&lt;var column&gt;=&lt;value&gt;]</code>.
-Only the features whose <code>adata.var</code> column equals the value are
-written. A 10x Multiome AnnData read with <code>gex_only=False</code> holds genes
-and peaks in one <code>X</code>:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="s2">"data/MYARC"</span><span class="p">,</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>                      <span class="n">rna</span><span class="o">=</span><span class="s2">"X[feature_types=Gene Expression]"</span><span class="p">,</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>                      <span class="n">atac</span><span class="o">=</span><span class="s2">"X[feature_types=Peaks]"</span><span class="p">,</span> <span class="n">atac_kind</span><span class="o">=</span><span class="s2">"peak"</span><span class="p">,</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>                      <span class="n">labels</span><span class="o">=</span><span class="s2">"obs:celltype"</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">)</span>
-</span></code></pre></div>
-<p><strong>Raw counts.</strong> Methods normalise the data themselves. <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>, <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> and peak
-values that are not whole numbers warn; <code>rna='layer:counts'</code> usually
-selects the counts. A selector reads <code>data</code>: for a modality passed as
-its own object, put the counts into its <code>X</code> first
-(<code>adt.X = adt.layers["counts"]</code>). Gene-activity scores are not checked.</p>
-<p><strong>MuData.</strong> A bare modality name selects <code>mdata.mod[name].X</code>
-(<code>rna='rna'</code>); a full <code>'mod:&lt;name&gt;'</code> selector works too. The default
-<code>rna='X'</code> raises for a MuData: pass <code>rna=&lt;mod name&gt;</code> or <code>rna=None</code>.</p>
-<p><code>labels</code> / <code>batch</code> read <code>'obs:&lt;col&gt;'</code> from the global <code>mdata.obs</code>.
-<code>'&lt;mod&gt;:&lt;col&gt;'</code> reads <code>mdata[mod].obs</code>, then muon's copy
-<code>mdata.obs['&lt;mod&gt;:&lt;col&gt;']</code>; <code>'mod:&lt;mod&gt;.obs:&lt;col&gt;'</code> works too.</p>
-<p><strong>Column names.</strong> <code>"obs:&lt;column&gt;"</code> and <code>"&lt;column&gt;"</code> name a column of
-the object you pass. <code>export_dataset</code> and <code>evaluate</code> take both.
-<code>run_all</code> and <code>rescore</code> are given a folder, not the object, so they
-take the column itself, for example <code>batch=adata.obs["donor"]</code>.</p>
-<p><strong>Master cell order.</strong> Every modality is re-indexed by barcode to one
-order: <code>data.obs_names</code>, or the first modality's <code>obs_names</code> when
-<code>data</code> is not given. A call that writes labels only and is given no
-object takes its cells from the index of the <code>labels</code> / <code>batch</code>
-Series. An index of numbers that names no cell of the folder is taken
-as row numbers: the values are written row by row, as a list is.</p>
-<p>The same barcodes in another order are reordered. Non-unique barcodes
-cannot be matched by name, so the cells are paired by position (a
-different cell count still raises). A bare
-array has no barcodes, so the order cannot be checked: pass a DataFrame
-or AnnData when you are not sure of the order.</p>
-<p><strong>Labels.</strong> <code>cty.csv</code> holds a header <code>x</code> and one label per line;
-<code>mtb.labels_for</code> finds these files again. A <code>labels</code> / <code>batch</code>
-Series is aligned by index to the master barcodes; a plain
-<code>RangeIndex</code> of the right length is taken positionally. A column of an
-<code>obs</code> whose cell names repeat is taken positionally only when its
-cells are in the master order; in another order it raises.</p>
-<p><strong>Diagonal.</strong> <code>category='diagonal'</code> pairs no barcodes: <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> may
-come from different cells. <code>rna</code> is written as <code>rna.h5</code> and <code>atac</code>
-as <code>atac_peak.h5</code> or <code>atac_gas.h5</code>. <code>labels</code> is read from each
-object's own <code>.obs</code> into <code>rna_cty.csv</code> and <code>atac_cty.csv</code>. A call
-that writes one modality writes only that modality's label file.</p>
-<p>Each side keeps the row order of its own object. When <code>rna</code> and
-<code>atac</code> hold the same cells in two orders, a later paired export of
-these cells into the same folder (<code>category='vertical'</code>, or no
-<code>category</code>) raises <code>ValueError</code>: write the paired files first, or
-use another folder.</p>
-<p>Diagonal data in several batches is one call per batch with
-<code>batch_index=N</code>: <code>rna&lt;N&gt;.h5</code>, <code>atac_gas&lt;N&gt;.h5</code> or
-<code>atac_peak&lt;N&gt;.h5</code>, <code>rna_cty&lt;N&gt;.csv</code> and <code>atac_cty&lt;N&gt;.csv</code>.</p>
-<p>For a MuData, <code>labels='&lt;col&gt;'</code> or <code>'&lt;mod&gt;:&lt;col&gt;'</code> reads <code>&lt;col&gt;</code>
-from each modality's own <code>.obs</code> (<code>mdata['rna'].obs</code> for the <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>
-cells, <code>mdata['atac'].obs</code> for the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> cells). When the two columns
-have different names, export <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> in two calls.</p>
-<p><strong>Batches.</strong> With <code>batch</code>, cells are split per batch value (sorted)
-and numbered files are written: <code>rna1.h5</code>, <code>rna2.h5</code> ...,
-<code>adt1.h5</code> ..., <code>cty1.csv</code> ... (the layout of the shipped D52). Only
-cross and mosaic methods read numbered files. For a vertical folder,
-export without <code>batch</code> and pass the batch column itself, such as
-<code>adata.obs["donor"]</code>, to <code>mtb.run_all(batch=...)</code> or
-<code>mtb.evaluate(batch=...)</code>.</p>
-<p><code>batch_index=N</code> writes the whole object as batch <code>N</code>. A mosaic
-delivery of one file per batch (the D46 pattern: <abbr title="Cellular Indexing of Transcriptomes and Epitopes by sequencing">CITE-seq</abbr>, Multiome,
-<abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> only) is one call per file:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">kw</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">labels</span><span class="o">=</span><span class="s2">"obs:cell_type"</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">"mosaic"</span><span class="p">)</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">cite</span><span class="p">,</span> <span class="s2">"data/LAB"</span><span class="p">,</span> <span class="n">adt</span><span class="o">=</span><span class="s2">"obsm:protein"</span><span class="p">,</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>                      <span class="n">batch_index</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">multiome</span><span class="p">,</span> <span class="s2">"data/LAB"</span><span class="p">,</span> <span class="n">atac</span><span class="o">=</span><span class="s2">"obsm:atac"</span><span class="p">,</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>                      <span class="n">atac_kind</span><span class="o">=</span><span class="s2">"peak"</span><span class="p">,</span> <span class="n">batch_index</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">rna_only</span><span class="p">,</span> <span class="s2">"data/LAB"</span><span class="p">,</span> <span class="n">batch_index</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span>
-</span></code></pre></div>
-<p><code>mtb.describe_layout('mosaic')</code> lists the batch patterns the methods
-read. <code>n_batches=3</code> in these calls says that the data has three
-batches: a file of batch 4 in the folder is then refused (<em>Existing
-files</em>).</p>
-<p><strong><abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> filenames.</strong> By <code>category</code> (<code>mtb.describe_layout</code> lists what
-each category reads):</p>
-<ul>
-<li><code>'vertical'</code>: <code>atac.h5</code> for both kinds;</li>
-<li><code>'diagonal'</code>: <code>atac_peak.h5</code> or <code>atac_gas.h5</code>;</li>
-<li><code>'mosaic'</code>: <code>atac&lt;i&gt;.h5</code>;</li>
-<li>no <code>category</code>: <code>atac_peak.h5</code> plus a hard-linked <code>atac.h5</code> (a
-  copy when the file system refuses links), or <code>atac_gas.h5</code> only.
-  Editing a hard-linked file edits both.</li>
-</ul>
-<p>The representation is not recorded on disk: check that
-<code>method_info(m)['atac']</code> is the kind exported. <code>mtb.scan</code> and
-<code>run_all</code> skip a method whose file holds the other representation,
-unless <code>allow_atac_mismatch=True</code>. <code>mtb.run</code> only warns, and the
-method gives a wrong embedding.</p>
-<p><strong>Existing files.</strong> Every check runs before <code>dataset_dir</code> is created;
-a failed call writes nothing. When a file the call would write already
-exists, <code>FileExistsError</code> lists it; pass <code>overwrite=True</code> to replace
-it. A call also raises <code>FileExistsError</code> when the folder holds files of
-other data that it does not write: files with other cells, files of
-other batch numbers after <code>batch=</code>, and with <code>batch_index=</code> files of
-a batch number above <code>n_batches</code>. <code>overwrite=True</code> does not remove
-them. Files that are not part of the dataset layout are never touched. A
-file written for cells that the folder already holds follows the cell
-order of the files in the folder.</p>
-<p><strong>Errors.</strong> <code>ValueError</code> is raised for:</p>
-<ul>
-<li>nothing to export (<code>rna</code>, <code>adt</code>, <code>atac</code> and <code>labels</code> all <code>None</code>);</li>
-<li><code>atac</code> without a valid <code>atac_kind</code>, or <code>atac_kind</code> without <code>atac</code>;</li>
-<li>an unknown <code>category</code>;</li>
-<li>a selector string with <code>data=None</code>, a malformed selector, or a
-  feature filter that matches nothing;</li>
-<li><code>X</code> or a layer with several values in <code>var['feature_types']</code> and
-  no filter that keeps one;</li>
-<li><code>adt</code> taking <code>X</code> of an object that also holds an <code>obsm</code> matrix
-  under a key that does not start with <code>X_</code>;</li>
-<li>two modalities that name the same matrix of the same object
-  (<code>rna='X', adt='X'</code>): one file holds one modality;</li>
-<li><code>adt_names</code> given as a string instead of a list;</li>
-<li>data with 0 cells, or a matrix with 0 features;</li>
-<li>a bare array whose cell order cannot be checked (no barcodes anywhere)
-  or with the wrong row count;</li>
-<li>a modality whose barcodes differ from the master order (the message
-  names the strays);</li>
-<li>a <code>labels</code> / <code>batch</code> Series missing cells, or a sequence of the
-  wrong length;</li>
-<li><code>labels</code> / <code>batch</code> naming a file or a column the object does not
-  have;</li>
-<li>a label that is missing (NaN, None, <code>''</code> or text that a label file
-  reads as missing, such as <code>'NA'</code>): <code>mtb.evaluate</code> does not score a
-  missing label;</li>
-<li>a batch that is missing, by the same definition;</li>
-<li><code>batch</code> with <code>category='vertical'</code> or <code>'diagonal'</code>, or together
-  with <code>batch_index</code>;</li>
-<li><code>batch_index</code> that is not a positive integer, or without
-  <code>category='mosaic'</code> / <code>'cross'</code> / <code>'diagonal'</code>;</li>
-<li><code>n_batches</code> without <code>batch_index</code>, not a positive integer, or
-  smaller than <code>batch_index</code>;</li>
-<li>cells that the folder already holds in two different row orders;</li>
-<li><code>category='diagonal'</code> with labels but no matrix, or with a plain
-  label sequence for both <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>.</li>
-</ul>
-<p>The <code>KeyError</code> message lists the names the object does have.</p>
-<p><strong>Warnings.</strong> <code>UserWarning</code> is emitted for:</p>
-<ul>
-<li><abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>, <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> or peak values that are not whole numbers;</li>
-<li>feature names that contradict <code>atac_kind</code>, or none at all
-  (<code>feature_0..</code> is written; for <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> pass <code>adt_names</code>);</li>
-<li>feature names that occur more than once in one matrix: they are
-  written as they are, and the message says how to make them unique;</li>
-<li>a <code>batch</code> Series whose index is the row numbers <code>0..n-1</code> while the
-  cells have barcodes: it is matched by position;</li>
-<li>non-unique barcodes (paired positionally);</li>
-<li>a dense <code>matrix/data</code> over 1 GB;</li>
-<li><code>batch</code> with <code>atac</code> and no <code>category</code>: only mosaic methods read
-  numbered <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> files;</li>
-<li><code>category='mosaic'</code> with <code>atac_kind='gene_activity'</code>: every mosaic
-  method reads peaks;</li>
-<li><code>category='mosaic'</code> or <code>'cross'</code> without <code>batch</code> or
-  <code>batch_index</code>.</li>
-</ul>
-</details>
 
 <details class="see-also">
   <summary>See Also</summary>
-  <p>mtb.io.to_canonical : one matrix -&gt; one canonical file.
-mtb.describe_layout : the layout being produced and the role -&gt; filename mapping.
-mtb.scan : confirm the folder is found and which methods can run on it.</p>
-</details>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h2 id="multibench.engine.ingest.to_canonical" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            mtb.io.to_canonical
-
-
-<a href="#multibench.engine.ingest.to_canonical" class="headerlink" title="Anchor link to this section">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">to_canonical</span><span class="p">(</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">src</span><span class="p">,</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">out</span><span class="p">:</span> <span class="n"><span title="pathlib.Path">Path</span></span> <span class="o">|</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">modality</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">convert</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="o">*</span><span class="p">,</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">layer</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">obsm</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">mod</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">dtype</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">=</span> <span class="s2">"float64"</span><span class="p">,</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">compression</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">"gzip"</span><span class="p">,</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">block</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">=</span> <span class="mi">1024</span><span class="p">,</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="n">category</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    <span class="n">feature_names</span><span class="p">:</span> <span class="n"><span title="list">list</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="pathlib.Path">Path</span></span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents first">
-
-        <p>Convert one matrix to a canonical scMultiBench <code>.h5</code> and return its path.</p>
-<p>The canonical layout is <code>matrix/data</code> (features x cells),
-<code>matrix/features</code> and <code>matrix/barcodes</code>. A path that is already a
-canonical <code>.h5</code> is returned untouched, whatever the other arguments.</p>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">PARAMETERS</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>src</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p>Matrix to convert: an AnnData, a MuData (with <code>mod</code>), or a path to
-<code>.h5ad</code> / <code>.h5mu</code> / <code>.csv</code> / <code>.tsv</code> (cells x features) /
-<code>.loom</code> / canonical <code>.h5</code>.</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code>(<span title="AnnData">AnnData</span>, <span title="MuData">MuData</span>, <span title="pathlib.Path">Path</span> or <span title="str">str</span>)</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>out</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p>Output file, or a directory (existing or ending in <code>/</code>) that gets
-the <code>modality</code> filename; <code>None</code> = that filename in the current
-directory (needs <code>modality</code>).</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="pathlib.Path">Path</span> | <span title="str">str</span> | None</code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>None</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>modality</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p><code>'rna'</code>, <code>'adt'</code>, <code>'atac'</code>, <code>'atac_peak'</code> or <code>'atac_gas'</code>;
-names the file when <code>out</code> is a directory or <code>None</code>, and enables
-the <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> / <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> checks (Notes).</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="str">str</span> | None</code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>None</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>convert</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p><code>False</code> = never write: pass a canonical <code>.h5</code> through, raise for
-anything else.</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="bool">bool</span></code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>True</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>layer</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p>Take the matrix from <code>adata.layers[layer]</code> instead of <code>adata.X</code>.</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="str">str</span> | None</code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>None</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>obsm</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p>Take the matrix from <code>adata.obsm[obsm]</code> (e.g. <code>'protein'</code> for <abbr title="Cellular Indexing of Transcriptomes and Epitopes by sequencing">CITE-seq</abbr>).</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="str">str</span> | None</code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>None</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>mod</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p>MuData modality to convert (<code>mdata.mod[mod]</code>); required for a MuData.</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="str">str</span> | None</code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>None</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>dtype</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p>Stored dtype of <code>matrix/data</code>; <code>'float32'</code> halves the file (see Notes).</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="str">str</span></code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>&#39;float64&#39;</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>compression</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p>h5py compression filter; <code>None</code> = uncompressed.</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="str">str</span> | None</code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>&#39;gzip&#39;</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>block</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p>Number of features written per streaming step.</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="int">int</span></code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>1024</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>category</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p>Integration category the file is for (<code>vertical</code>, <code>diagonal</code>,
-<code>mosaic</code> or <code>cross</code>); only changes <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> filenames (Notes).</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="str">str</span> | None</code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>None</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>feature_names</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p>Feature names that override <code>var_names</code> / <code>uns</code> / DataFrame
-columns; the way to name a bare <code>obsm</code> array.</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="list">list</span> | None</code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>None</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">RETURNS</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <span class="doc-returns-annotation">
-                    <code><span title="pathlib.Path">Path</span></code>
-                </span>
-            </td>
-            <td class="doc-returns-details">
-              <div class="doc-md-description">
-                <p>The canonical <code>.h5</code> written, or <code>src</code> itself on passthrough.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">RAISES</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-              <span class="doc-raises-annotation">
-                  <code><span title="FileNotFoundError">FileNotFoundError</span></code>
-              </span>
-            </td>
-            <td class="doc-raises-details">
-              <div class="doc-md-description">
-                <p><code>src</code> is a path that does not exist.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-              <span class="doc-raises-annotation">
-                  <code><span title="ValueError">ValueError</span></code>
-              </span>
-            </td>
-            <td class="doc-raises-details">
-              <div class="doc-md-description">
-                <p>Invalid or conflicting arguments, a non-canonical <code>.h5</code>, or features of several types (full list in Notes).</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-              <span class="doc-raises-annotation">
-                  <code><span title="KeyError">KeyError</span></code>
-              </span>
-            </td>
-            <td class="doc-raises-details">
-              <div class="doc-md-description">
-                <p><code>layer</code>, <code>obsm</code> or <code>mod</code> names an entry the object does not have.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-              <span class="doc-raises-annotation">
-                  <code><span title="ImportError">ImportError</span></code>
-              </span>
-            </td>
-            <td class="doc-raises-details">
-              <div class="doc-md-description">
-                <p><code>.h5mu</code> without <code>mudata</code>, or <code>.loom</code> without <code>loompy</code>.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">WARNS</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-              <span class="doc-warns-annotation">
-                  <code><span title="UserWarning">UserWarning</span></code>
-              </span>
-            </td>
-            <td class="doc-warns-details">
-              <div class="doc-md-description">
-                <p>Values not whole numbers; feature names missing or contradicting <code>modality</code>; size over 1 GB.</p>
-              </div>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-              <span class="doc-warns-annotation">
-                  <code><span title="UserWarning">UserWarning</span></code>
-              </span>
-            </td>
-            <td class="doc-warns-details">
-              <div class="doc-md-description">
-                <p><code>modality='gas'</code> for other cells than the <code>atac_peak.h5</code> next to <code>out</code>.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<p><span class="doc-section-title">Examples</span></p>
-    <div class="language-pycon highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">&gt;&gt;&gt; </span><span class="c1"># writes data/MYCITE/rna.h5</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">to_canonical</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="s2">"data/MYCITE/"</span><span class="p">,</span> <span class="n">modality</span><span class="o">=</span><span class="s2">"rna"</span><span class="p">)</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">to_canonical</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="s2">"data/MYCITE/"</span><span class="p">,</span> <span class="n">modality</span><span class="o">=</span><span class="s2">"adt"</span><span class="p">,</span> <span class="n">obsm</span><span class="o">=</span><span class="s2">"protein"</span><span class="p">)</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">to_canonical</span><span class="p">(</span><span class="s2">"counts.csv"</span><span class="p">,</span> <span class="s2">"rna.h5"</span><span class="p">)</span>  <span class="c1"># explicit file name</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">to_canonical</span><span class="p">(</span><span class="n">atac</span><span class="p">,</span> <span class="s2">"data/MYMULTI/"</span><span class="p">,</span> <span class="n">modality</span><span class="o">=</span><span class="s2">"peak"</span><span class="p">,</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="gp">... </span>                    <span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">)</span>
-</span></code></pre></div>
-
-
-<details class="note">
-  <summary>Notes</summary>
-  <p><strong>Modality aliases and checks.</strong> <code>'protein'</code> -&gt; <code>'adt'</code>,
-<code>'peak'</code> -&gt; <code>'atac_peak'</code>, <code>'gas'</code> / <code>'gene_activity'</code> -&gt;
-<code>'atac_gas'</code>. <code>'atac_peak'</code> warns when fewer than half of the feature
-names look like peaks (<code>chr1:100-200</code>, <code>chr1_100_200</code>,
-<code>chr1-100-200</code>), <code>'atac_gas'</code> when more than half do; plain
-<code>'atac'</code> is not checked.</p>
-<p><strong><abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> matrices.</strong> With <code>modality='adt'</code> on an AnnData that has
-<code>obsm</code> keys, <code>obsm=</code> or <code>layer=</code> must say where the protein matrix
-is; otherwise <code>adata.X</code> (usually the <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>) would be written as
-<code>adt.h5</code>, so it raises. Keys that start with <code>X_</code> (<code>X_pca</code>,
-<code>X_umap</code>) hold embeddings and do not count.
-The feature names of an <code>obsm</code> matrix come from the first of:</p>
-<ol>
-<li><code>feature_names</code>;</li>
-<li>the columns, when the <code>obsm</code> entry is a DataFrame;</li>
-<li><code>adata.uns[f'{obsm}_names']</code>, when its length matches;</li>
-<li><code>feature_0..</code>, with a <code>UserWarning</code>: pass <code>feature_names</code> to
-   keep the protein names.</li>
-</ol>
-<p><strong><abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> filenames.</strong> With <code>out</code> a directory, <code>category='vertical'</code>
-writes <code>atac.h5</code> for either representation, the file vertical methods
-read. Any other <code>category</code>, or none, names the file after the
-representation: <code>atac_peak.h5</code>, <code>atac_gas.h5</code>, or <code>atac.h5</code> for
-the plain <code>'atac'</code> role. So <code>to_canonical(atac, d, modality='peak')</code>
-without <code>category='vertical'</code> writes <code>atac_peak.h5</code>, and
-<code>mtb.scan(d, 'vertical')</code> then finds no <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> method runnable. A file
-path given as <code>out</code> is not renamed; for a mosaic batch, pass the
-numbered file (<code>'data/MYMOSAIC/atac2.h5'</code>).
-The representation is not recorded on disk: <code>method_info(m)['atac']</code>
-says which kind a method expects.</p>
-<p><strong>Gene activity next to peaks.</strong> With <code>modality='gas'</code> (no
-<code>category</code>, or <code>'diagonal'</code>) and an <code>atac_peak.h5</code> in the output
-folder, the rows are written in that file's cell order, because
-<code>atac_cty.csv</code> follows it. One line on stderr says so. Gene activity
-for other cells gives a <code>UserWarning</code>.
-A canonical <code>.h5</code> is returned untouched: to reorder an existing
-<code>atac_gas.h5</code>, pass <code>mtb.io.read_canonical(path)</code> as <code>src</code>.</p>
-<p><strong>Raw counts.</strong> Methods normalise the data themselves; give raw counts.
-For <code>modality</code> <code>'rna'</code>, <code>'adt'</code> or <code>'atac_peak'</code>, a
-<code>UserWarning</code> says when sampled values are not whole numbers
-(log-normalised data); <code>layer='counts'</code> usually holds the counts, and
-for an <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> matrix taken with <code>obsm=</code>, another <code>obsm</code> key.</p>
-<p><strong>One feature type.</strong> One file holds one modality. When
-<code>var['feature_types']</code> of the object names several types, as in a 10x
-Genomics file read with <code>gex_only=False</code>, <code>X</code> or a layer would be
-written with genes and peaks together, so it raises. Pass the features
-of one type, or use <code>mtb.io.export_dataset</code>, whose selectors take a
-filter.</p>
-<p><strong>Storage.</strong> Sparse matrices (in memory or inside an <code>.h5ad</code> /
-<code>.h5mu</code>) are written <code>block</code> features at a time, without densifying
-the whole matrix. <code>matrix/data</code> is stored dense (features x cells x
-itemsize): gzip shrinks the file, but every reader densifies it.
-<code>dtype='float32'</code> halves it, and h5py, rhdf5 and hdf5r read it (as
-double in R). The defaults (gzip, <code>'float64'</code>) match the shipped
-benchmark files. A <code>.csv</code> / <code>.tsv</code> is read as cells x features, and
-a non-numeric first column is used as the cell barcodes.</p>
-<p><strong>Errors.</strong> <code>ValueError</code> is raised for:</p>
-<ul>
-<li><code>out=None</code> without <code>modality</code>;</li>
-<li>an unknown <code>modality</code> or <code>category</code>;</li>
-<li><code>convert=False</code> on a non-canonical input;</li>
-<li>an <code>.h5</code> without <code>matrix/data</code> (the message lists the keys it does
-  hold - a top-level <code>data</code> dataset is a method output, not an input);</li>
-<li>a 10x Genomics <code>.h5</code> file;</li>
-<li>an unsupported suffix;</li>
-<li><code>mod</code> missing for a MuData, or given for anything else;</li>
-<li><code>layer</code> and <code>obsm</code> together;</li>
-<li><code>modality='adt'</code> on an AnnData with <code>obsm</code> keys but no <code>obsm=</code> /
-  <code>layer=</code>;</li>
-<li><code>X</code> or a layer with several values in <code>var['feature_types']</code>;</li>
-<li>a matrix with 0 features;</li>
-<li>a feature-name or barcode count that does not match the matrix.</li>
-</ul>
-<p>The <code>FileNotFoundError</code> message names the path and the current
-directory; the <code>KeyError</code> message lists the entries the object has.</p>
-</details>
-
-<details class="see-also">
-  <summary>See Also</summary>
-  <p>mtb.io.export_dataset : a whole dataset folder (all modalities, labels, batches) in one call.
-mtb.io.read_canonical : the inverse, canonical <code>.h5</code> -&gt; AnnData.
-mtb.describe_layout : the folder layout and the role -&gt; filename mapping.</p>
+  <p>mtb.scan : confirm the folder is found and which methods can run on it.</p>
 </details>
 
     </div>
@@ -3357,15 +2520,16 @@ mtb.describe_layout : the folder layout and the role -&gt; filename mapping.</p>
 
 
 <a href="#multibench.engine.ingest.read_canonical" class="headerlink" title="Anchor link to this section">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">read_canonical</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n"><span title="pathlib.Path">Path</span></span> <span class="o">|</span> <span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n">sparse</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">read_canonical</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n"><span title="pathlib.Path">Path</span></span> <span class="o">|</span> <span class="n"><span title="str">str</span></span><span class="p">)</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
 
-        <p>Read a canonical <code>.h5</code> back into an AnnData (cells x features).</p>
-<p>The inverse of <code>mtb.io.to_canonical</code>: <code>matrix/data</code> is transposed
-back to cells x features, <code>matrix/features</code> become <code>var_names</code> and
-<code>matrix/barcodes</code> become <code>obs_names</code>.</p>
+        <p>Read a canonical <code>.h5</code> (a dataset file or an <code>embedding.h5</code>) as an AnnData.</p>
+<p><code>matrix/data</code> (features x cells) becomes <code>.X</code> (cells x features, CSR
+when fewer than half of the entries are non-zero), <code>matrix/features</code>
+the <code>var_names</code> and <code>matrix/barcodes</code> the <code>obs_names</code>. A method's
+<code>embedding.h5</code> goes to <code>.obsm["X_emb"]</code> of an AnnData without features.</p>
 
 
 <table>
@@ -3392,27 +2556,6 @@ back to cells x features, <code>matrix/features</code> become <code>var_names</c
               </p>
             </td>
           </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>sparse</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p><code>True</code> = CSR <code>.X</code>; <code>False</code> = dense ndarray; <code>None</code> = CSR when
-fewer than half of the entries are non-zero.</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="bool">bool</span> | None</code>
-                  </span>
-                  <span class="doc-param-default">
-                    <b>default</b>
-                      <code>None</code>
-                  </span>
-              </p>
-            </td>
-          </tr>
       </tbody>
     </table>
 
@@ -3433,8 +2576,7 @@ fewer than half of the entries are non-zero.</p>
             </td>
             <td class="doc-returns-details">
               <div class="doc-md-description">
-                <p><code>.X</code> as float, cells x features; names taken from the file when it
-has them.</p>
+                
               </div>
             </td>
           </tr>
@@ -3458,7 +2600,7 @@ has them.</p>
             </td>
             <td class="doc-raises-details">
               <div class="doc-md-description">
-                <p><code>path</code> does not exist; the message names <code>mtb.config.DEFAULT.data_path</code>.</p>
+                <p><code>path</code> does not exist.</p>
               </div>
             </td>
           </tr>
@@ -3480,145 +2622,9 @@ has them.</p>
 
 <p><span class="doc-section-title">Examples</span></p>
     <div class="language-pycon highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">d</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">DEFAULT</span><span class="o">.</span><span class="n">data_path</span> <span class="o">/</span> <span class="s2">"D11"</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">rna</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">read_canonical</span><span class="p">(</span><span class="n">d</span> <span class="o">/</span> <span class="s2">"rna.h5"</span><span class="p">)</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">rna</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">rna</span><span class="o">.</span><span class="n">var_names</span><span class="p">[:</span><span class="mi">3</span><span class="p">]</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">adt</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">read_canonical</span><span class="p">(</span><span class="n">d</span> <span class="o">/</span> <span class="s2">"adt.h5"</span><span class="p">,</span> <span class="n">sparse</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">rna</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">read_canonical</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">data_path</span> <span class="o">/</span> <span class="s2">"D11"</span> <span class="o">/</span> <span class="s2">"rna.h5"</span><span class="p">)</span>
 </span></code></pre></div>
 
-
-<details class="note">
-  <summary>Notes</summary>
-  <p><code>mtb.data.fetch("D11")</code> downloads a demo dataset into
-<code>mtb.config.DEFAULT.data_path</code>, not into the current directory.</p>
-<p>The whole matrix is read densely, so memory peaks at the dense size
-(features x cells x 8 bytes) even when the result is CSR: it is meant
-for the shipped benchmark inputs and for what <code>to_canonical</code> writes,
-not for a 100k-cell peak matrix.</p>
-<p>A file without <code>matrix/data</code> raises h5py's <code>KeyError</code>.
-<code>matrix/features</code> and <code>matrix/barcodes</code> are optional; without them
-AnnData's default names (<code>'0'</code>, <code>'1'</code>, ...) are kept.</p>
-</details>
-
-<details class="see-also">
-  <summary>See Also</summary>
-  <p>mtb.io.to_canonical : write a canonical file from an AnnData / path.</p>
-</details>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h2 id="multibench.engine.ingest.normalize_peak_names" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            mtb.io.normalize_peak_names
-
-
-<a href="#multibench.engine.ingest.normalize_peak_names" class="headerlink" title="Anchor link to this section">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">normalize_peak_names</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">dst</span><span class="p">)</span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents first">
-
-        <p>Copy a canonical <code>.h5</code>, rewriting <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> peak names to <code>chr:start-end</code>.</p>
-<p>Signac's <code>CreateChromatinAssay(sep=c(":","-"))</code> (Seurat v3 and the
-other Signac-based methods) expects that spelling. The source file is
-never modified.</p>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">PARAMETERS</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>src</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p>Canonical <code>.h5</code> whose <code>matrix/features</code> holds the peak ids.</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="pathlib.Path">Path</span> | <span title="str">str</span></code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-          <tr class="doc-section-item">
-            <td>
-                <code>dst</code>
-            </td>
-            <td class="doc-param-details">
-              <div class="doc-md-description">
-                <p>Path of the copy; parent folders are created, an existing file is overwritten.</p>
-              </div>
-              <p>
-                  <span class="doc-param-annotation">
-                    <b>type</b>
-                      <code><span title="pathlib.Path">Path</span> | <span title="str">str</span></code>
-                  </span>
-              </p>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<table>
-      <thead>
-        <tr>
-          <th><span class="doc-section-title">RETURNS</span></th>
-          <th><span>DESCRIPTION</span></th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <span class="doc-returns-annotation">
-                    <code><span title="pathlib.Path">Path</span></code>
-                </span>
-            </td>
-            <td class="doc-returns-details">
-              <div class="doc-md-description">
-                <p><code>dst</code>.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<p><span class="doc-section-title">Examples</span></p>
-    <div class="language-pycon highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">normalize_peak_names</span><span class="p">(</span><span class="s2">"data/MYMULTI/atac.h5"</span><span class="p">,</span> <span class="s2">"tmp/atac.h5"</span><span class="p">)</span>
-</span></code></pre></div>
-
-
-<details class="note">
-  <summary>Notes</summary>
-  <p><strong>Recognised peaks.</strong> A feature reading <code>&lt;chr&gt;&lt;sep&gt;&lt;start&gt;&lt;sep&gt;&lt;end&gt;</code>
-with two integers, the first separator one of <code>_</code>, <code>-</code>, <code>:</code> and the
-second <code>_</code> or <code>-</code>, is rewritten as <code>&lt;chr&gt;:&lt;start&gt;-&lt;end&gt;</code>. Other
-features (gene symbols) pass through unchanged, and only
-<code>matrix/features</code> is replaced.</p>
-<p><strong>Inside <code>mtb.run</code>.</strong> <code>mtb.run</code> applies this itself for GLUE and
-Seurat_v3, writing a per-run <code>&lt;role&gt;_normpeaks.h5</code> copy next to the
-converted inputs. Call it by hand only to prepare a file for a script
-you run outside the wrapper.</p>
-</details>
-
-<details class="see-also">
-  <summary>See Also</summary>
-  <p>mtb.io.to_canonical : write the canonical file in the first place.</p>
-</details>
 
     </div>
 
@@ -3661,7 +2667,7 @@ you run outside the wrapper.</p>
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../env/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Environments (mtb.env)">
+          <a href="../plot/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Figures (mtb.plot)">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -3671,20 +2677,20 @@ you run outside the wrapper.</p>
                 Previous
               </span>
               <div class="md-ellipsis">
-                Environments (mtb.env)
+                Figures (mtb.plot)
               </div>
             </div>
           </a>
         
         
           
-          <a href="../plot/" class="md-footer__link md-footer__link--next" aria-label="Next: Plot (mtb.plot)">
+          <a href="../data/" class="md-footer__link md-footer__link--next" aria-label="Next: Datasets (mtb.data)">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Plot (mtb.plot)
+                Datasets (mtb.data)
               </div>
             </div>
             <div class="md-footer__button md-icon">
