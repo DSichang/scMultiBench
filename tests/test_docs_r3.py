@@ -85,7 +85,7 @@ def test_step1_names_both_routes_for_citeseq_donors():
     assert "CITE-seq donors: use `vertical` in the same way." in step1
     assert ("The `cross` category integrates the donors as batches and reads a fixed number "
             "of them, three for RNA + ADT: see the "
-            "[One file per batch](tutorials/run.md#one-file-per-batch) tab. With another "
+            "[One file per batch](tutorials/run.md#your-own-data-as-a-dataset-folder) tab. With another "
             "number of donors, use `vertical`, as in the recipe "
             "[Another number of donors](tutorials/run.md#recipe-donors).") in step1
     assert f"the `vertical` category has {n_v} RNA + ADT methods and stored results on D11" in whole

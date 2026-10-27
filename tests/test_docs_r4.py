@@ -118,7 +118,7 @@ def test_step1_donor_block_is_two_plain_bullets():
             "For `run`, `batch=` takes the donor column itself, such as "
             "`batch=adata.obs[\"donor\"]`, not its name. The `cross` category integrates the "
             "donors as batches and reads a fixed number of them, three for RNA + ADT: see "
-            "the [One file per batch](tutorials/run.md#one-file-per-batch) tab. With "
+            "the [One file per batch](tutorials/run.md#your-own-data-as-a-dataset-folder) tab. With "
             "another number of donors, use `vertical`, as in the recipe "
             "[Another number of donors](tutorials/run.md#recipe-donors).") in step1
     block = step1.split("For several samples or donors:", 1)[1]
