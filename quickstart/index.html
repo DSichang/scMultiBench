@@ -51,6 +51,16 @@
        clickable. Same pattern as the M3 / Matilda sites. */
     .md-typeset a.colab-button { position: absolute; top: 0.2rem; right: 0; z-index: 3; margin: 0; line-height: 0; }
     .md-typeset a.colab-button img { height: 1.55rem; width: auto; display: block; }
+    /* a notebook page's title wraps before the button instead of running
+       under it (a markdown page's title is kept clear by extra.css); on a
+       narrow screen the button sits on its own line above the title */
+    .md-typeset:has(> a.colab-button) > .jupyter-wrapper h1 { padding-right: 9.5rem; }
+    @media screen and (max-width: 59.9375em) {
+      .md-typeset a.colab-button { position: static; display: inline-block; margin-bottom: 0.6rem; }
+      .md-typeset:has(> a.colab-button) > .jupyter-wrapper h1 { padding-right: 0; }
+      /* a notebook page indents its cells: the button lines up with the title */
+      .md-typeset:has(> .jupyter-wrapper) > a.colab-button { margin-left: 15px; }
+    }
   </style>
 
     
@@ -2199,7 +2209,6 @@
 
 
 <h1 id="quickstart">Quickstart<a class="headerlink" href="#quickstart" title="Anchor link to this section">&para;</a></h1>
-<p><a href="https://colab.research.google.com/github/DSichang/scMultiBench/blob/main/notebooks/colab_quickstart.ipynb"><img alt="Open in Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></p>
 <p>Five steps take you from finding methods to plotting your run next to the
 stored results. Only step 3 runs a method. It needs Linux and a
 <a href="../installation/#method-environments">method environment</a>. The other steps

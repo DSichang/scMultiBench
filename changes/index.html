@@ -49,6 +49,16 @@
        clickable. Same pattern as the M3 / Matilda sites. */
     .md-typeset a.colab-button { position: absolute; top: 0.2rem; right: 0; z-index: 3; margin: 0; line-height: 0; }
     .md-typeset a.colab-button img { height: 1.55rem; width: auto; display: block; }
+    /* a notebook page's title wraps before the button instead of running
+       under it (a markdown page's title is kept clear by extra.css); on a
+       narrow screen the button sits on its own line above the title */
+    .md-typeset:has(> a.colab-button) > .jupyter-wrapper h1 { padding-right: 9.5rem; }
+    @media screen and (max-width: 59.9375em) {
+      .md-typeset a.colab-button { position: static; display: inline-block; margin-bottom: 0.6rem; }
+      .md-typeset:has(> a.colab-button) > .jupyter-wrapper h1 { padding-right: 0; }
+      /* a notebook page indents its cells: the button lines up with the title */
+      .md-typeset:has(> .jupyter-wrapper) > a.colab-button { margin-left: 15px; }
+    }
   </style>
 
     
