@@ -458,22 +458,7 @@ def rank(
     table_noun = "stored results" if stored else "long_df frame"
     label = "the stored results" if stored else "long_df"
 
-    # a package method not run for the category (scMSI in a cross table) must not
-    # shape the ranks; a name the registry does not know (the user's own) is kept
-    df = long_df.copy()
-    listed = set(registry.list_methods(category=category))
-    registry_ids = set(catalog._registry_ids())
-    canon = df["method"].map(catalog._canonical_id)
-    foreign = sorted({m for m, c in zip(df["method"], canon)
-                      if c in registry_ids and c not in listed}, key=str.lower)
-    if foreign:
-        df = df[~canon.isin({catalog._canonical_id(m) for m in foreign})]
-        if df.empty:
-            raise ValueError(
-                f"every row in {label} belongs to a method this package does "
-                f"not run for {category} ({', '.join(foreign)}); "
-                f"mtb.find_methods(category={category!r}) lists the rankable "
-                f"ones")
+    df, foreign = _drop_unrun(long_df.copy(), category, label)
     want_ids: set[str] | None = None
     if methods is not None:
         wanted = _as_list(methods)
@@ -590,6 +575,26 @@ def _refuse_other_categories(long_df, category) -> None:
             + (f" next to {category} ones" if category in cats else "")
             + f": rank one category at a time, as rank({one!r}, "
             f"long_df=long_df[long_df['category'] == {one!r}]).")
+
+
+def _drop_unrun(df, category, label) -> tuple[pd.DataFrame, list]:
+    """``df`` without the rows of package methods not run for ``category``
+    (scMSI in a cross table), which must not shape the ranks, and their names;
+    a name the registry does not know (the user's own) is kept."""
+    listed = set(registry.list_methods(category=category))
+    registry_ids = set(catalog._registry_ids())
+    canon = df["method"].map(catalog._canonical_id)
+    foreign = sorted({m for m, c in zip(df["method"], canon)
+                      if c in registry_ids and c not in listed}, key=str.lower)
+    if foreign:
+        df = df[~canon.isin({catalog._canonical_id(m) for m in foreign})]
+        if df.empty:
+            raise ValueError(
+                f"every row in {label} belongs to a method this package does "
+                f"not run for {category} ({', '.join(foreign)}); "
+                f"mtb.find_methods(category={category!r}) lists the rankable "
+                f"ones")
+    return df, foreign
 
 
 def _no_metric_rows(category, metrics, sel, long_df, stored: bool) -> str:
