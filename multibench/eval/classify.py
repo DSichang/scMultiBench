@@ -173,9 +173,8 @@ _NOT_EMBEDDING = ("classify needs an embedding; {what} is not one. "
 def _graph_text(who: str) -> str:
     """What is wrong with the output of a graph method: ``who`` is the method,
     or ``"output"`` when the method is not known."""
-    if who == "output":
-        return "output is a graph, not an embedding, so it has no classification scores."
-    return f"{who} writes a graph, not an embedding, so it has no classification scores."
+    who = "output is" if who == "output" else f"{who} writes"
+    return f"{who} a graph, not an embedding, so it has no classification scores."
 
 
 def _check_embedding(output) -> None:
