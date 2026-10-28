@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import functools
 import warnings
+from collections import Counter
 
 import numpy as np
 import pandas as pd
@@ -64,9 +65,7 @@ def per_dataset_ranks(long_df: pd.DataFrame, metrics=None) -> dict:
     is treated as one dataset named ``"all"``. Datasets whose pivot is empty
     are skipped.
     """
-    rows = long_df.copy()
-    if metrics:
-        rows = rows[rows["metric"].isin(metrics)]
+    rows = long_df[long_df["metric"].isin(metrics)] if metrics else long_df
     if rows.empty:
         raise ValueError("no rows left after filtering to metrics=%r" % (metrics,))
     if "dataset" not in rows.columns:
@@ -111,10 +110,7 @@ def lone_message(lone: dict) -> str | None:
 
 def coverage(parts: dict) -> pd.Series:
     """Number of datasets (keys of ``parts``) each method appears in."""
-    counts: dict = {}
-    for mat in parts.values():
-        for m in mat.index:
-            counts[m] = counts.get(m, 0) + 1
+    counts = Counter(m for mat in parts.values() for m in mat.index)
     return pd.Series(counts, dtype=int).sort_index()
 
 
@@ -238,13 +234,11 @@ def coverage_warnings(parts: dict, *, basis: str, incomplete_fix: str) -> list:
     One message when no method spans two datasets, else one when a method
     misses a dataset; plus one per dataset that holds a single method.
     """
-    out = []
     n = len(parts)
     per_method = coverage(parts)
     none_shared = _no_overlap_message(parts)
-    if none_shared:
-        out.append(none_shared)
-    elif n > 1 and (per_method < n).any():
+    out = [none_shared] if none_shared else []
+    if not none_shared and n > 1 and (per_method < n).any():
         partial = per_method[per_method < n].sort_values()
         by_count: dict = {}
         for m, c in partial.items():
@@ -276,14 +270,10 @@ def dataset_mode_warnings(parts: dict) -> list:
     none_shared = _no_overlap_message(parts)
     if none_shared:
         return [none_shared] + lone
-    msg = (f"This figure averages each method over {n} datasets, {_and_list(parts)}. "
-           "Its rows mix datasets. ")
-    if (coverage(parts) >= 2).all() and not lone:
-        msg += ("mtb.plot.bar ranks the methods within each dataset; or filter to one "
-            "dataset.")
-    else:
-        msg += "Plot each dataset on its own."
-    return [msg] + lone
+    fix = ("mtb.plot.bar ranks the methods within each dataset; or filter to one dataset."
+           if (coverage(parts) >= 2).all() and not lone else "Plot each dataset on its own.")
+    return [f"This figure averages each method over {n} datasets, {_and_list(parts)}. "
+            f"Its rows mix datasets. {fix}"] + lone
 
 
 def constant_columns(mat: pd.DataFrame) -> dict:
@@ -396,8 +386,8 @@ def backend_warning(df: pd.DataFrame) -> str | None:
     names = ", ".join(sorted(map(str, df.loc[hit, "method"].unique())))
     return (f"The rows for {names} were clustered with the igraph Leiden backend. "
             f"The stored results used leidenalg, which can move ARI by up to "
-            f"about 0.1. " + ("Set mtb.config.leiden_flavor = 'leidenalg' before "
-                "evaluate to compare them."))
+            f"about 0.1. Set mtb.config.leiden_flavor = 'leidenalg' before "
+            f"evaluate to compare them.")
 
 
 #: colour ramp names the package defines itself, on top of matplotlib's
