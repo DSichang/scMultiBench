@@ -183,7 +183,7 @@ def method_info(method: str) -> dict:
         supports                one entry per variant: category, modalities,
                                 output_kind, needs_labels, labels,
                                 reference_batch
-        runtime                 tier, worst_sec, observed, host, note
+        runtime                 measured_sec, tier, worst_sec, observed, host, note
         gpu                     'required' / 'used when present' / 'not used' / 'unknown'
         cpu_params              the flags that turn CUDA off on a CPU host
         setup_hint              a step to take before the first run, or ''

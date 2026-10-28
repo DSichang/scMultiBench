@@ -124,7 +124,8 @@ def test_method_info_files_dir_is_gone_and_runtime_is_there():
     with pytest.raises(TypeError):
         mtb.method_info("Matilda", True)                  # verbose is keyword-only
     info = mtb.method_info("Matilda")
-    assert set(info["runtime"]) == {"tier", "worst_sec", "observed", "host", "note"}
+    assert set(info["runtime"]) == {"measured_sec", "tier", "worst_sec", "observed", "host",
+                                    "note"}
     assert "deep_learning" not in info and "output" not in info
 
 

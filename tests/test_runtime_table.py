@@ -49,9 +49,11 @@ def test_no_placeholder_observations_and_worst_is_max():
             assert o["source"] in {"manual", "summary_csv", "recorded"}, (m, o)
 
 
-def test_tier_matches_worst_sec_and_docstring_thresholds():
+def test_tier_follows_the_measured_run_else_the_worst_one():
     for m, rec in _runtimes().items():
-        assert rec["tier"] == _tier(rec["worst_sec"]), (m, rec["tier"], rec["worst_sec"])
+        sec = rec.get("measured_sec", rec["worst_sec"])
+        assert rec["tier"] == _tier(sec), (m, rec["tier"], sec)
+        assert rec.get("measured_sec", 0) <= rec["worst_sec"], m
 
 
 def test_summary_csv_run_sec_is_not_understated():

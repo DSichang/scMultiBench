@@ -5,7 +5,11 @@
 # is rounded up, so a listed time is never shorter than the run took. Use it to
 # size run(timeout=...), with headroom.
 #
-# tier:   fast < 5 min | medium 5-30 min | slow 30 min-2 h | very_slow > 2 h
+# measured_sec: the longest of the package's own runs on the full stored datasets
+#         (the runs behind the stored results; same machine), when there is one.
+# tier:   fast < 5 min | medium 5-30 min | slow 30 min-2 h | very_slow > 2 h, of
+#         measured_sec when there is one, else of worst_sec. worst_sec stays the
+#         figure to size run(timeout=) with.
 # source: manual (hand-kept row) | summary_csv (run_sec in
 #         notebooks/results/summary_D*.csv) | recorded (wall time of a recorded
 #         end-to-end run). The longest time per (method, dataset) is kept.
@@ -18,6 +22,7 @@ Cobolt:
     dataset: D45
     sec: 3637
     source: manual
+  measured_sec: 2028
   tier: slow
   worst_sec: 3637
 Concerto:
@@ -30,7 +35,8 @@ Concerto:
     dataset: D52
     sec: 8798
     source: manual
-  tier: very_slow
+  measured_sec: 2810
+  tier: slow
   worst_sec: 8798
 Conos:
   observed:
@@ -38,7 +44,8 @@ Conos:
     dataset: D28
     sec: 713
     source: manual
-  tier: medium
+  measured_sec: 102
+  tier: fast
   worst_sec: 713
 GLUE:
   observed:
@@ -66,7 +73,8 @@ MOFA2:
     dataset: D11
     sec: 869
     source: manual
-  tier: medium
+  measured_sec: 53
+  tier: fast
   worst_sec: 869
 Matilda:
   observed:
@@ -74,6 +82,7 @@ Matilda:
     dataset: D11
     sec: 190
     source: manual
+  measured_sec: 17
   tier: fast
   worst_sec: 190
 MultiMAP:
@@ -82,7 +91,8 @@ MultiMAP:
     dataset: D28
     sec: 2041
     source: manual
-  tier: slow
+  measured_sec: 55
+  tier: fast
   worst_sec: 2041
 MultiVI:
   observed:
@@ -118,7 +128,8 @@ SCALEX:
     dataset: D28
     sec: 2233
     source: manual
-  tier: slow
+  measured_sec: 301
+  tier: medium
   worst_sec: 2233
 SMILE:
   observed:
@@ -126,7 +137,8 @@ SMILE:
     dataset: D45
     sec: 1916
     source: manual
-  tier: slow
+  measured_sec: 535
+  tier: medium
   worst_sec: 1916
 Seurat_WNN:
   observed:
@@ -142,7 +154,8 @@ Seurat_v3:
     dataset: D28
     sec: 3365
     source: manual
-  tier: slow
+  measured_sec: 195
+  tier: fast
   worst_sec: 3365
 Seurat_v5:
   observed:
@@ -162,6 +175,7 @@ StabMap:
     dataset: D52
     sec: 69
     source: manual
+  measured_sec: 42
   tier: fast
   worst_sec: 209
 UINMF:
@@ -174,6 +188,7 @@ UINMF:
     dataset: D52
     sec: 63
     source: manual
+  measured_sec: 41
   tier: fast
   worst_sec: 262
 UnitedNet:
@@ -190,7 +205,8 @@ VIMCCA:
     dataset: D11
     sec: 549
     source: manual
-  tier: medium
+  measured_sec: 21
+  tier: fast
   worst_sec: 549
 VIPCCA:
   observed:
@@ -198,7 +214,8 @@ VIPCCA:
     dataset: D28
     sec: 335
     source: manual
-  tier: medium
+  measured_sec: 25
+  tier: fast
   worst_sec: 335
 iNMF:
   observed:
@@ -206,6 +223,7 @@ iNMF:
     dataset: D28
     sec: 136
     source: recorded
+  measured_sec: 57
   tier: fast
   worst_sec: 136
 iPOLNG:
@@ -226,7 +244,8 @@ moETM:
     dataset: D11
     sec: 429
     source: manual
-  tier: medium
+  measured_sec: 11
+  tier: fast
   worst_sec: 429
 online_iNMF:
   observed:
@@ -234,6 +253,7 @@ online_iNMF:
     dataset: D28
     sec: 99
     source: recorded
+  measured_sec: 21
   tier: fast
   worst_sec: 99
 scBridge:
@@ -250,6 +270,7 @@ scJoint:
     dataset: D28
     sec: 209
     source: manual
+  measured_sec: 70
   tier: fast
   worst_sec: 209
 scMDC:
@@ -262,6 +283,7 @@ scMDC:
     dataset: D52
     sec: 2702
     source: manual
+  measured_sec: 1943
   tier: slow
   worst_sec: 2702
 scMM:
@@ -274,6 +296,7 @@ scMM:
     dataset: D52
     sec: 628
     source: manual
+  measured_sec: 380
   tier: medium
   worst_sec: 628
 scMSI:
@@ -282,7 +305,8 @@ scMSI:
     dataset: D11
     sec: 8164
     source: manual
-  tier: very_slow
+  measured_sec: 1347
+  tier: medium
   worst_sec: 8164
 scMVP:
   observed:
@@ -302,7 +326,8 @@ scMoMaT:
     dataset: D52
     sec: 1023
     source: manual
-  tier: medium
+  measured_sec: 160
+  tier: fast
   worst_sec: 1023
 sciCAN:
   observed:
@@ -310,7 +335,8 @@ sciCAN:
     dataset: D28
     sec: 15735
     source: manual
-  tier: very_slow
+  measured_sec: 453
+  tier: medium
   worst_sec: 15735
 sciPENN:
   observed:
@@ -322,6 +348,7 @@ sciPENN:
     dataset: D52
     sec: 65
     source: manual
+  measured_sec: 38
   tier: fast
   worst_sec: 144
 totalVI:
@@ -334,7 +361,8 @@ totalVI:
     dataset: D52
     sec: 2840
     source: manual
-  tier: slow
+  measured_sec: 518
+  tier: medium
   worst_sec: 2840
 uniPort:
   observed:
