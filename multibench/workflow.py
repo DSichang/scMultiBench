@@ -11,6 +11,7 @@ length alone cannot tell: every candidate order is scored and the best is kept.
 """
 from __future__ import annotations
 
+import contextlib
 import itertools
 import json
 import os
@@ -671,8 +672,10 @@ def _no_variant_error(category, methods, modalities) -> ValueError:
                      f"{mods} in {where}." if dropped else
                      f"No method reads {mods} in {where}.")
         one = dropped[0] if len(dropped) == 1 else None
-        parts.append(_representation_note(category, dropped, modalities) or (f"mtb.method_info({one!r})['supports'] lists what {one} reads." if one else
-            "mtb.method_info(m)['supports'] lists what each method reads."))
+        parts.append(_representation_note(category, dropped, modalities)
+                     or (f"mtb.method_info({one!r})['supports'] lists what {one} reads."
+                         if one else
+                         "mtb.method_info(m)['supports'] lists what each method reads."))
     return ValueError(" ".join(parts) or f"No method runs on {where}.")
 
 
@@ -817,7 +820,8 @@ def _tenx_files(ds_dir: Path, files: dict) -> list:
 
     def order(name):
         stem = name.rsplit(".", 1)[0]
-        return int(stem[len(stem.rstrip("0123456789")):] or 0), registry._BASE_MODALITIES.index(files[name])
+        return (int(stem[len(stem.rstrip("0123456789")):] or 0),
+                registry._BASE_MODALITIES.index(files[name]))
     return sorted((n for n in files if not _is_canonical_h5(ds_dir / n)
                    and _is_tenx_h5(ds_dir / n)), key=order)
 
@@ -1329,34 +1333,28 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
     for note in dict.fromkeys(private.loc[would, "_folder_caveat"]):
         if note:
             print(f"[scan] {note}", flush=True)
-    gaps = _label_gaps(dataset, data_path)
-    unlabelled = gaps and _missing_labels_problem(
-        dataset, gaps, _label_readers(df.loc[would], private, gaps), evaluate=True)
+    unlabelled = _missing_labels_problem(dataset, data_path, df.loc[would], private,
+                                         evaluate=True)
     if unlabelled:
         print(f"[scan] {unlabelled}", flush=True)
     return out
 
 
-# ------------------------------------------------------------------- label order
-#: "no deadline armed"; not None, which signal.signal returns for a handler
-#: that was not installed from Python
-_NOT_ARMED = object()
-
-
-def _arm_deadline(seconds):
-    """Start a SIGALRM deadline over a whole per-method step (run and scoring);
-    return the previous handler, or ``_NOT_ARMED``."""
-    if not seconds:
-        return _NOT_ARMED
+@contextlib.contextmanager
+def _deadline(seconds):
+    """A SIGALRM deadline over a whole per-method step (run and scoring)."""
     import math
     import signal
     import threading
-
+    if not seconds:
+        yield
+        return
     if threading.current_thread() is not threading.main_thread():
         # signal.signal raises off the main thread
         _text.warn("timeout= is unavailable off the main thread; "
-                     "running without a deadline")
-        return _NOT_ARMED
+                   "running without a deadline")
+        yield
+        return
 
     def _fire(signum, frame):
         raise TimeoutError(f"exceeded timeout of {seconds}s")
@@ -1364,17 +1362,14 @@ def _arm_deadline(seconds):
     prev = signal.signal(signal.SIGALRM, _fire)
     # ceil, not int(): truncating timeout=0.5 gives alarm(0), which sets no alarm
     signal.alarm(max(1, math.ceil(seconds)))
-    return prev
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, prev)
 
 
-def _disarm_deadline(prev):
-    if prev is _NOT_ARMED:
-        return
-    import signal
-    signal.alarm(0)
-    signal.signal(signal.SIGALRM, prev)
-
-
+# ------------------------------------------------------------------- label order
 def _label_files(dataset, data_path=None) -> list:
     """The label files of a dataset folder, sorted by name: every
     ``*cty*.csv`` except the tool-specific ``*scjoint*`` reformats."""
@@ -2881,20 +2876,16 @@ def _label_gaps(dataset, data_path) -> dict:
     return gaps
 
 
-def _label_readers(rows: "pd.DataFrame", private: "pd.DataFrame", gaps: dict) -> dict:
-    """``{method: the label files with a gap it reads as inputs}`` for ``rows``."""
-    readers: dict = {}
+def _missing_labels_problem(dataset: str, data_path, rows: "pd.DataFrame",
+                            private: "pd.DataFrame", *, evaluate: bool) -> str:
+    """Why ``run`` does not start on label files with a missing label, or "".
+    Without ``evaluate`` only the ``rows`` that read such a file as an input stop it."""
+    gaps = _label_gaps(dataset, data_path)
+    readers: dict = {}            # method -> the label files with a gap it reads
     for i, m in rows["method"].items():
         read = [n for n in private.at[i, "_label_inputs"] if n in gaps]
         if read:
             readers.setdefault(m, set()).update(read)
-    return readers
-
-
-def _missing_labels_problem(dataset: str, gaps: dict, readers: dict, *,
-                            evaluate: bool) -> str:
-    """Why ``run`` does not start on label files with a missing label, or "".
-    Without ``evaluate`` only the methods that read such a file as an input stop it."""
     if not gaps or not (evaluate or readers):
         return ""
     if not evaluate:
@@ -3230,9 +3221,10 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
     methods, every, modalities, params = _checked_args(category, methods, modalities,
                                                        params, "run")
     if skip_existing and params:
-        raise ValueError("skip_existing=True with params=... would return results computed with the "
-            "earlier parameters (reuse is keyed on the output file, not on params). "
-            "Use a fresh out_dir per parameter setting, or skip_existing=False.")
+        raise ValueError("skip_existing=True with params=... would return results computed "
+                         "with the earlier parameters (reuse is keyed on the output file, not "
+                         "on params). Use a fresh out_dir per parameter setting, or "
+                         "skip_existing=False.")
     root = Path(data_path) if data_path is not None else config.data_path
     # the on-disk spelling, once, so out_dir names and records agree (one warning)
     dataset = _resolve.canonical_dataset(root, dataset)
@@ -3282,9 +3274,8 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
                 print(f"[run] {note}", flush=True)
     # the scores would count a missing label as a cell type, and a method that
     # reads the file would train on it: stop before out_dir is made
-    gaps = _label_gaps(dataset, data_path)
-    unlabelled = _missing_labels_problem(
-        dataset, gaps, _label_readers(plan_df, private, gaps), evaluate=evaluate)
+    unlabelled = _missing_labels_problem(dataset, data_path, plan_df, private,
+                                         evaluate=evaluate)
     if unlabelled:
         raise ValueError(unlabelled)
 
@@ -3344,54 +3335,53 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
             print(f"[run] {method} ({category}/{dataset}) ...", flush=True)
             if rec["caveat"]:              # it starts with the method name
                 print(f"[run]   {rec['caveat']}", flush=True)
-        deadline = _NOT_ARMED
         try:
-            deadline = _arm_deadline(timeout)
-            inputs = _resolve.inputs_for(dataset, category, method, modalities=mods or None,
-                                         data_path=data_path, check=True)
-            reused = skip_existing and output.exists()
-            # on every path, also a reuse: an unknown key must fail, not be dropped
-            overrides = params.get(method)
-            if overrides:
-                _runner.check_params(method, variant, overrides)
-            if reused:
-                if verbose:
-                    print(f"[run]   reusing existing output in {method_dir}", flush=True)
-                res = None
-            else:
-                with warnings.catch_warnings():
-                    # an allowed ATAC caveat is already in the log and the record
-                    warnings.filterwarnings(
-                        "ignore", category=UserWarning,
-                        message=re.escape(f"{method} ") + rf"({_WRONG_ATAC_BODY}"
-                                rf"|{re.escape(PEAK_NAMES_REASON)})")
-                    res = _run(method=method, category=category, inputs=inputs,
-                               out_dir=str(method_dir), params=overrides)
-            rec["reused"] = bool(reused)
-            rec["run_sec"] = round(time.time() - start, 1)
-            emb = (_cells_first(np.asarray(res.output))
-                   if variant.output.kind == "embedding" and res is not None
-                   else _load_embedding(method_dir, variant))
-            if emb is None:
-                rec["status"], rec["note"] = "ran", _RAN_REASON["RUN_OK_NO_EMBEDDING"]
-            else:
-                rec["emb_shape"] = list(emb.shape)
-                if not evaluate:
-                    rec["status"] = "ran"
+            with _deadline(timeout):
+                inputs = _resolve.inputs_for(dataset, category, method, modalities=mods or None,
+                                             data_path=data_path, check=True)
+                reused = skip_existing and output.exists()
+                # on every path, also a reuse: an unknown key must fail, not be dropped
+                overrides = params.get(method)
+                if overrides:
+                    _runner.check_params(method, variant, overrides)
+                if reused:
+                    if verbose:
+                        print(f"[run]   reusing existing output in {method_dir}", flush=True)
+                    res = None
                 else:
-                    if batch_file:
-                        rec["batch_file"] = batch_file[0]
-                    try:
-                        _score_record(rec, emb, dataset, category, data_path, variant,
-                                      batch=batch_vec)
-                    except TimeoutError:
-                        raise
-                    except Exception as e:      # the run itself succeeded
+                    with warnings.catch_warnings():
+                        # an allowed ATAC caveat is already in the log and the record
+                        warnings.filterwarnings(
+                            "ignore", category=UserWarning,
+                            message=re.escape(f"{method} ") + rf"({_WRONG_ATAC_BODY}"
+                                    rf"|{re.escape(PEAK_NAMES_REASON)})")
+                        res = _run(method=method, category=category, inputs=inputs,
+                                   out_dir=str(method_dir), params=overrides)
+                rec["reused"] = bool(reused)
+                rec["run_sec"] = round(time.time() - start, 1)
+                emb = (_cells_first(np.asarray(res.output))
+                       if variant.output.kind == "embedding" and res is not None
+                       else _load_embedding(method_dir, variant))
+                if emb is None:
+                    rec["status"], rec["note"] = "ran", _RAN_REASON["RUN_OK_NO_EMBEDDING"]
+                else:
+                    rec["emb_shape"] = list(emb.shape)
+                    if not evaluate:
                         rec["status"] = "ran"
-                        rec["error"] = f"{type(e).__name__}: {e}"
-                if variant.output.kind == "embedding":
-                    # evaluate on the file then finds each cell by its name
-                    _write_cell_names(rec, output, dataset, category, data_path)
+                    else:
+                        if batch_file:
+                            rec["batch_file"] = batch_file[0]
+                        try:
+                            _score_record(rec, emb, dataset, category, data_path, variant,
+                                          batch=batch_vec)
+                        except TimeoutError:
+                            raise
+                        except Exception as e:      # the run itself succeeded
+                            rec["status"] = "ran"
+                            rec["error"] = f"{type(e).__name__}: {e}"
+                    if variant.output.kind == "embedding":
+                        # evaluate on the file then finds each cell by its name
+                        _write_cell_names(rec, output, dataset, category, data_path)
         except TimeoutError as e:
             rec["status"] = "timeout"
             rec["error"] = str(e)
@@ -3401,8 +3391,6 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
             rec["error"] = _clip_error(f"{type(e).__name__}: {e}")
             rec["traceback"] = traceback.format_exc()[-1200:]
             rec["run_sec"] = round(time.time() - start, 1)
-        finally:
-            _disarm_deadline(deadline)
         if verbose:
             tail = _error_tail(rec["error"]) if rec.get("error") else _ari_tail(rec)
             print(f"[run]   -> {_status(rec['status'])} ({rec.get('run_sec')}s) {tail}".rstrip(),
