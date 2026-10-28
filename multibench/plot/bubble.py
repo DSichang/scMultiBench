@@ -519,36 +519,29 @@ def _figure_class():
     return BubbleFigure
 
 
+#: row height; circle max radius = row/2
+ROW_H, R_MAX = 1.0, 0.5
+#: the Score ramp of each family under the table: first x, step, width
+RAMP_X0, RAMP_STEP, RAMP_W = 1.2, 4.6, 40 * 0.07
+#: room for the "High" label after a ramp: about 0.5 units in a tall figure, up
+#: to 0.7 in a one-row figure with a title
+HIGH_W = 0.7
+#: x of the first Rank legend circle; the next ones are 1.0 apart
+RANK_X0 = 1.5
+
+
 def _draw(tbl, title, gaps):
     """The body of :func:`render`; ``gaps`` widens the space between families
     (one data-unit amount per pair of neighbouring families)."""
-    Figure = _figure_class()
-    from matplotlib.patches import Circle, FancyBboxPatch, Rectangle
     from matplotlib import cm, colors
+    from matplotlib.patches import Rectangle
 
     methods = tbl.methods
     n_rows = len(methods)
-    ROW_H, R_MAX = 1.0, 0.5          # row height; circle max radius = row/2
-
-    # x layout: per family [overall][metrics...], with a gap between families
-    x_next, layout = 0.0, []
-    for fi, b in enumerate(tbl.blocks):
-        if fi:
-            x_next += 0.5 + gaps[fi - 1]
-        layout.append((x_next, fi, "overall", "Overall"))
-        x_next += 1.5                                 # bar column is wider
-        for mname in b.raw.columns:
-            layout.append((x_next, fi, "metric", mname))
-            x_next += 1.1
-    total_w = x_next
+    layout, total_w = _x_layout(tbl.blocks, gaps)
 
     # the legends under a table of few metrics are wider than the table, so the
     # axes end at the right edge of the widest one
-    RAMP_X0, RAMP_STEP, RAMP_W = 1.2, 4.6, 40 * 0.07   # Score ramp per family
-    # room for the "High" label after a ramp: about 0.5 units in a tall
-    # figure, up to 0.7 in a one-row figure with a title
-    HIGH_W = 0.7
-    RANK_X0 = 1.5                    # first Rank circle; the next ones 1.0 apart
     legend_right = RAMP_X0 + (len(tbl.blocks) - 1) * RAMP_STEP + RAMP_W + 0.12 + HIGH_W
     # at most 5 legend circles, sized as the plot's own: 0.85 * sqrt(rank / n)
     n_legend = min(5, n_rows)
@@ -559,145 +552,29 @@ def _draw(tbl, title, gaps):
     x_right = max(total_w + 0.45, legend_right)
 
     # the width follows the x-range: 0.6 inch per unit past the table's own
-    fig = Figure(figsize=(0.6 * (x_right - 0.45) + 2.8, 0.42 * n_rows + 2.9))
+    fig = _figure_class()(figsize=(0.6 * (x_right - 0.45) + 2.8, 0.42 * n_rows + 2.9))
     ax = fig.subplots()
     norm01 = colors.Normalize(vmin=0.0, vmax=1.0)
-    mappers = {fi: cm.ScalarMappable(norm=norm01, cmap=style.colormap(b.cmap))
-               for fi, b in enumerate(tbl.blocks)}
+    mappers = [cm.ScalarMappable(norm=norm01, cmap=style.colormap(b.cmap))
+               for b in tbl.blocks]
 
     # alternating row stripes, like the Shiny output
-    for i in range(n_rows):
-        if i % 2 == 0:
-            ax.add_patch(Rectangle((-1.3, n_rows - i - 1), total_w + 1.8, ROW_H,
-                                   facecolor="#DDDDDD", edgecolor="none", zorder=0))
-
-    for i, m in enumerate(methods):
-        lang = _method_language(m)
-        if not lang:
-            label, colour = "?", "#aaaaaa"
-        elif lang.startswith("py"):
-            label, colour = "Py", "#3572A5"
-        else:
-            label, colour = "R", "#777777"
-        y = n_rows - i - 0.5
-        ax.add_patch(Circle((-0.85, y), 0.24, facecolor=colour,
-                            edgecolor="none", zorder=3))
-        ax.text(-0.85, y, label, ha="center", va="center", zorder=4,
-                fontsize=6.4, fontweight="bold", color="white")
-
-    def rank_radius(colvals):
-        """radius = 0.85 * sqrt(rank / n), n = methods scored in the column."""
-        n = colvals.notna().sum()
-        r = style.rank_max(colvals.to_numpy()) / n
-        radii = 0.85 * np.sqrt(r)
-        return pd.Series(np.maximum(radii, 0.12), index=colvals.index)
-
-    # a column whose rows all hold one value gets the neutral fill
-    constant = style.constant_columns(pd.concat([b.raw for b in tbl.blocks], axis=1))
-    flat_overall = {fi for fi, b in enumerate(tbl.blocks)
-                    if style.constant_columns(b.overall.to_frame("o"))}
-
-    def _fill(mapper, value, flat):
-        return colors.to_rgba(CONSTANT_FILL) if flat else mapper.to_rgba(value)
-
-    floor = min(0.30, 1.2 / n_rows)      # shortest bar, visible with few methods
-
-    for x, fi, kind, name in layout:
-        b, mapper = tbl.blocks[fi], mappers[fi]
-        if kind == "overall":
-            vals = b.overall
-            # bar length: family Overall min-max scaled across the rows
-            length = style.minmax(vals.to_numpy())
-            for i, m in enumerate(methods):
-                v = vals.loc[m]
-                if pd.isna(v):
-                    continue
-                y0 = n_rows - i - 1
-                bar_len = 1.24 * max(floor, float(length[i]))
-                ax.add_patch(Rectangle((x + 0.08, y0 + 0.12), bar_len, ROW_H - 0.24,
-                                       facecolor=_fill(mapper, float(v), fi in flat_overall),
-                                       edgecolor="#333333", linewidth=0.5, zorder=3))
-        else:
-            vals, scaled_values = b.raw[name], b.norm[name]
-            radii = rank_radius(vals)
-            for i, m in enumerate(methods):
-                v = vals.loc[m]
-                if pd.isna(v):
-                    ax.text(x + 0.55, n_rows - i - 0.5, NA_MARK, color="#999999",
-                            ha="center", va="center", fontsize=7, zorder=3)
-                    continue
-                y = n_rows - i - 0.5
-                ax.add_patch(Circle((x + 0.55, y), R_MAX * float(radii.loc[m]) * 0.9,
-                                    facecolor=_fill(mapper, float(scaled_values.loc[m]),
-                                                    name in constant),
-                                    edgecolor="#333333", linewidth=0.4, zorder=3))
-
-    for x, fi, kind, name in layout:
-        tick_x = x + (0.7 if kind == "overall" else 0.55)
-        ax.plot([tick_x, tick_x], [n_rows + 0.05, n_rows + 0.22], color="#333333",
-                linewidth=0.6, zorder=2)
-        ax.text(tick_x - 0.05, n_rows + 0.30, name, rotation=30, ha="left",
-                va="bottom", fontsize=8, rotation_mode="anchor")
-
+    for i in range(0, n_rows, 2):
+        ax.add_patch(Rectangle((-1.3, n_rows - i - 1), total_w + 1.8, ROW_H,
+                               facecolor="#DDDDDD", edgecolor="none", zorder=0))
+    langs = [_method_language(m) for m in methods]
+    _draw_chips(ax, langs)
+    _draw_cells(ax, tbl, layout, mappers)
     band_y = n_rows + 2.05
-    for fi, b in enumerate(tbl.blocks):
-        family_xs = [x for x, f, k, _ in layout if f == fi]
-        x0, x1 = family_xs[0], family_xs[-1] + 1.1
-        # gid="family": _fit_pills finds the pill and its header
-        ax.add_patch(FancyBboxPatch((x0 + 0.05, band_y), x1 - x0 - 0.35, 0.6,
-                                    boxstyle=f"round,pad={PILL_BOX_PAD},rounding_size=0.18",
-                                    facecolor=mappers[fi].to_rgba(0.30),
-                                    edgecolor="none", zorder=2, gid="family",
-                                    clip_on=False))
-        ax.text((x0 + x1 - 0.3) / 2, band_y + 0.3, b.label, ha="center",
-                va="center", fontsize=8.6, color="#1a1a1a", zorder=3, gid="family")
-
-    # Score ramps and Rank sizes under the table, as in the scIB layout
-    # gid="legend" marks every artist of the Score and Rank legends
-    score_y = -1.1
-    ax.text(-0.9, score_y, "Score", fontsize=8, fontweight="bold", va="center",
-            gid="legend")
-    ax.text(-0.9, score_y - 0.5, SCORE_SCALE_NOTE, fontsize=6.4, va="center",
-            gid="legend")
-    for fi, b in enumerate(tbl.blocks):
-        xoff = RAMP_X0 + fi * RAMP_STEP
-        for k in range(40):
-            ax.add_patch(Rectangle((xoff + k * 0.07, score_y - 0.28), 0.07, 0.56,
-                                   facecolor=mappers[fi].to_rgba(k / 39),
-                                   edgecolor="none", zorder=2, gid="legend"))
-        ax.text(xoff - 0.12, score_y, "Low", fontsize=6.6, ha="right", va="center",
-                gid="legend")
-        ax.text(xoff + RAMP_W + 0.12, score_y, "High", fontsize=6.6, ha="left",
-                va="center", gid="legend")
-    rank_y = score_y - 1.35
-    ax.text(-0.9, rank_y, "Rank", fontsize=8, fontweight="bold", va="center",
-            gid="legend")
-    xoff = RANK_X0
-    for k, r in enumerate(legend_radii):
-        ax.add_patch(Circle((xoff + k * 1.0, rank_y), R_MAX * r * 0.9,
-                            facecolor="#bbbbbb", edgecolor="#333333",
-                            linewidth=0.4, zorder=2, gid="legend"))
-    if n_legend > 1:
-        ax.text(xoff, rank_y - 0.62, "worst", fontsize=6.6,
-                ha="center", gid="legend")
-    ax.text(xoff + (n_legend - 1) * 1.0, rank_y - 0.62, "best", fontsize=6.6,
-            ha="center", gid="legend")
-
-    # room under the legends: the Rank labels, or the Score legend's note
-    y_bottom = -3.4
-    # what the chips left of the rows mean
-    unknown = any(not _method_language(m) for m in methods)
-    ax.text(-0.9, y_bottom - 0.05, LANGUAGE_NOTE + ("; ?: not a package method"
-                                                    if unknown else ""),
-            fontsize=6.4, va="center", gid="legend")
-    y_bottom -= 0.6
+    _draw_headers(ax, tbl, layout, mappers, band_y)
+    y_bottom = _draw_legends(ax, mappers, legend_radii, unknown=not all(langs))
 
     # a figure that mixes datasets gets a dataset cue in each row label
     labels = list(methods)
     if len(tbl.datasets) > 1:
         datasets_of = tbl.method_datasets
-        labels = [f"{m} \u00b7 {datasets_of[m][0]}" if len(datasets_of[m]) == 1
-                  else f"{m} \u00b7 {len(datasets_of[m])} ds" for m in methods]
+        labels = [f"{m} · {datasets_of[m][0]}" if len(datasets_of[m]) == 1
+                  else f"{m} · {len(datasets_of[m])} ds" for m in methods]
 
     ax.set_xlim(-1.35, x_right)
     ax.set_ylim(y_bottom, band_y + 1.0)
@@ -713,6 +590,154 @@ def _draw(tbl, title, gaps):
     fig.tight_layout()
     _fit_width(fig, ax)
     return fig
+
+
+def _x_layout(blocks, gaps):
+    """``[(x, family index, "overall" or "metric", column name)]`` and the
+    table width: per family [overall][metrics...], with a gap between families."""
+    x_next, layout = 0.0, []
+    for fi, b in enumerate(blocks):
+        if fi:
+            x_next += 0.5 + gaps[fi - 1]
+        layout.append((x_next, fi, "overall", "Overall"))
+        x_next += 1.5                                 # bar column is wider
+        for mname in b.raw.columns:
+            layout.append((x_next, fi, "metric", mname))
+            x_next += 1.1
+    return layout, x_next
+
+
+def _draw_chips(ax, langs):
+    """The language chip left of each row (``langs``: :func:`_method_language` per row)."""
+    from matplotlib.patches import Circle
+
+    n_rows = len(langs)
+    for i, lang in enumerate(langs):
+        label, colour = (("?", "#aaaaaa") if not lang else ("Py", "#3572A5")
+                         if lang.startswith("py") else ("R", "#777777"))
+        y = n_rows - i - 0.5
+        ax.add_patch(Circle((-0.85, y), 0.24, facecolor=colour,
+                            edgecolor="none", zorder=3))
+        ax.text(-0.85, y, label, ha="center", va="center", zorder=4,
+                fontsize=6.4, fontweight="bold", color="white")
+
+
+def _draw_cells(ax, tbl, layout, mappers):
+    """The Overall bars and the metric circles (a dash for a missing value)."""
+    from matplotlib import colors
+    from matplotlib.patches import Circle, Rectangle
+
+    methods = tbl.methods
+    n_rows = len(methods)
+
+    def rank_radius(colvals):
+        """radius = 0.85 * sqrt(rank / n), n = methods scored in the column."""
+        r = style.rank_max(colvals.to_numpy()) / colvals.notna().sum()
+        return pd.Series(np.maximum(0.85 * np.sqrt(r), 0.12), index=colvals.index)
+
+    # a column whose rows all hold one value gets the neutral fill
+    constant = style.constant_columns(pd.concat([b.raw for b in tbl.blocks], axis=1))
+    flat_overall = {fi for fi, b in enumerate(tbl.blocks)
+                    if style.constant_columns(b.overall.to_frame("o"))}
+
+    def fill(mapper, value, flat):
+        return colors.to_rgba(CONSTANT_FILL) if flat else mapper.to_rgba(value)
+
+    floor = min(0.30, 1.2 / n_rows)      # shortest bar, visible with few methods
+
+    for x, fi, kind, name in layout:
+        b, mapper = tbl.blocks[fi], mappers[fi]
+        if kind == "overall":
+            # bar length: family Overall min-max scaled across the rows
+            length = style.minmax(b.overall.to_numpy())
+            for i, m in enumerate(methods):
+                v = b.overall.loc[m]
+                if pd.isna(v):
+                    continue
+                bar_len = 1.24 * max(floor, float(length[i]))
+                ax.add_patch(Rectangle((x + 0.08, n_rows - i - 1 + 0.12), bar_len, ROW_H - 0.24,
+                                       facecolor=fill(mapper, float(v), fi in flat_overall),
+                                       edgecolor="#333333", linewidth=0.5, zorder=3))
+            continue
+        vals, scaled_values = b.raw[name], b.norm[name]
+        radii = rank_radius(vals)
+        for i, m in enumerate(methods):
+            y = n_rows - i - 0.5
+            if pd.isna(vals.loc[m]):
+                ax.text(x + 0.55, y, NA_MARK, color="#999999",
+                        ha="center", va="center", fontsize=7, zorder=3)
+                continue
+            ax.add_patch(Circle((x + 0.55, y), R_MAX * float(radii.loc[m]) * 0.9,
+                                facecolor=fill(mapper, float(scaled_values.loc[m]),
+                                               name in constant),
+                                edgecolor="#333333", linewidth=0.4, zorder=3))
+
+
+def _draw_headers(ax, tbl, layout, mappers, band_y):
+    """The column names over the table and a family pill over each block."""
+    from matplotlib.patches import FancyBboxPatch
+
+    n_rows = len(tbl.methods)
+    for x, fi, kind, name in layout:
+        tick_x = x + (0.7 if kind == "overall" else 0.55)
+        ax.plot([tick_x, tick_x], [n_rows + 0.05, n_rows + 0.22], color="#333333",
+                linewidth=0.6, zorder=2)
+        ax.text(tick_x - 0.05, n_rows + 0.30, name, rotation=30, ha="left",
+                va="bottom", fontsize=8, rotation_mode="anchor")
+    for fi, b in enumerate(tbl.blocks):
+        family_xs = [x for x, f, _, _ in layout if f == fi]
+        x0, x1 = family_xs[0], family_xs[-1] + 1.1
+        # gid="family": _fit_pills finds the pill and its header
+        ax.add_patch(FancyBboxPatch((x0 + 0.05, band_y), x1 - x0 - 0.35, 0.6,
+                                    boxstyle=f"round,pad={PILL_BOX_PAD},rounding_size=0.18",
+                                    facecolor=mappers[fi].to_rgba(0.30),
+                                    edgecolor="none", zorder=2, gid="family",
+                                    clip_on=False))
+        ax.text((x0 + x1 - 0.3) / 2, band_y + 0.3, b.label, ha="center",
+                va="center", fontsize=8.6, color="#1a1a1a", zorder=3, gid="family")
+
+
+def _draw_legends(ax, mappers, legend_radii, *, unknown) -> float:
+    """The Score ramps, the Rank sizes and the language note under the table,
+    as in the scIB layout (each artist with gid="legend"); returns the lowest y."""
+    from matplotlib.patches import Circle, Rectangle
+
+    score_y = -1.1
+    ax.text(-0.9, score_y, "Score", fontsize=8, fontweight="bold", va="center",
+            gid="legend")
+    ax.text(-0.9, score_y - 0.5, SCORE_SCALE_NOTE, fontsize=6.4, va="center",
+            gid="legend")
+    for fi, mapper in enumerate(mappers):
+        xoff = RAMP_X0 + fi * RAMP_STEP
+        for k in range(40):
+            ax.add_patch(Rectangle((xoff + k * 0.07, score_y - 0.28), 0.07, 0.56,
+                                   facecolor=mapper.to_rgba(k / 39),
+                                   edgecolor="none", zorder=2, gid="legend"))
+        ax.text(xoff - 0.12, score_y, "Low", fontsize=6.6, ha="right", va="center",
+                gid="legend")
+        ax.text(xoff + RAMP_W + 0.12, score_y, "High", fontsize=6.6, ha="left",
+                va="center", gid="legend")
+    rank_y = score_y - 1.35
+    ax.text(-0.9, rank_y, "Rank", fontsize=8, fontweight="bold", va="center",
+            gid="legend")
+    n_legend = len(legend_radii)
+    for k, r in enumerate(legend_radii):
+        ax.add_patch(Circle((RANK_X0 + k * 1.0, rank_y), R_MAX * r * 0.9,
+                            facecolor="#bbbbbb", edgecolor="#333333",
+                            linewidth=0.4, zorder=2, gid="legend"))
+    if n_legend > 1:
+        ax.text(RANK_X0, rank_y - 0.62, "worst", fontsize=6.6,
+                ha="center", gid="legend")
+    ax.text(RANK_X0 + (n_legend - 1) * 1.0, rank_y - 0.62, "best", fontsize=6.6,
+            ha="center", gid="legend")
+
+    # room under the legends: the Rank labels, or the Score legend's note
+    y_bottom = -3.4
+    # what the chips left of the rows mean
+    ax.text(-0.9, y_bottom - 0.05, LANGUAGE_NOTE + ("; ?: not a package method"
+                                                    if unknown else ""),
+            fontsize=6.4, va="center", gid="legend")
+    return y_bottom - 0.6
 
 
 #: data units the rounded box of a family pill reaches past its bounds
