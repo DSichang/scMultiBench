@@ -216,9 +216,9 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
         col = _obs_column_name(x, adata)
         if col is not None:
             return np.asarray(pd.Series(adata.obs[col]).to_numpy())
-        in_mod = _mod_obs_column(x, adata)
+        in_mod = _mod_obs_column(x, adata)            # already an array
         if in_mod is not None:
-            return np.asarray(in_mod)
+            return in_mod
         if not Path(x).is_file():
             from ..engine.ingest import _case_hint
             choices = _obs_choices(adata)

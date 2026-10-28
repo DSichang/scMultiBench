@@ -106,7 +106,7 @@ def _lisi_fallback_message(name: str, problem: str) -> str:
     return (f"scib metric {name!r} needs scib's LISI helper binary, which "
             f"cannot run here: {problem}. Recording NaN. To fix it, rebuild the "
             f"binary from the source scib ships (needs a C++ compiler):\n"
-            f"    g++ -std=c++11 -O3 -o {kg / 'knn_graph.o'} {kg / 'knn_graph.cpp'}")
+            f"    g++ {' '.join(_CXX_FLAGS)} -o {kg / 'knn_graph.o'} {kg / 'knn_graph.cpp'}")
 
 
 @functools.lru_cache(maxsize=1)
