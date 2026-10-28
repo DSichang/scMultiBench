@@ -179,12 +179,13 @@ def overall(df: pd.DataFrame, metrics=None, *, stored=None) -> pd.Series:
     alone = sorted(set(df["dataset"]) - set(have))
     fix = " or ".join(f"dataset={d!r}" for d in have)
     if have and alone == ["user"]:
-        raise ValueError(f"Your rows were scored without a dataset: score your embedding "
-                         f"with {fix} to compare it with the stored results.")
+        raise ValueError(f"Your rows were scored without a dataset. If they hold the cells "
+                         f"of {_and_list(have, 'or')}, score your embedding with {fix}; "
+                         f"else plot them apart.")
     if have and alone:
         raise ValueError(
             f"Your rows are on {_and_list(alone)}, the stored results on {_and_list(have)}: "
-            f"plot them apart, or score your embedding with {fix}.")
+            f"plot them apart.")
     per_ds = {}
     for ds, g in df.groupby("dataset"):
         m = g.pivot_table(index="method", columns="metric", values="value").round(TIE_DECIMALS)

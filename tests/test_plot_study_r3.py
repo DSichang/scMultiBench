@@ -22,8 +22,7 @@ B = importlib.import_module("multibench.plot.bubble")
 
 matplotlib.use("Agg")
 
-REFUSAL = ("Your rows are on MYCITE, the stored results on D11: plot them apart, or "
-           "score your embedding with dataset='D11'.")
+REFUSAL = "Your rows are on MYCITE, the stored results on D11: plot them apart."
 
 
 def _messages(fn, *args, **kw):

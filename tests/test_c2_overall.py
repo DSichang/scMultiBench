@@ -124,10 +124,10 @@ def _mine(dataset):
 def test_your_rows_on_another_dataset_are_refused(dataset):
     st, mine = _mine(dataset)
     both = pd.concat([st, mine])
-    text = (f"Your rows are on {dataset}, the stored results on D11: plot them apart, "
-            "or score your embedding with dataset='D11'." if dataset != "user" else
-            "Your rows were scored without a dataset: score your embedding with "
-            "dataset='D11' to compare it with the stored results.")
+    text = (f"Your rows are on {dataset}, the stored results on D11: plot them apart."
+            if dataset != "user" else
+            "Your rows were scored without a dataset. If they hold the cells of D11, "
+            "score your embedding with dataset='D11'; else plot them apart.")
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         for call in (lambda: mtb.recommend("vertical", long_df=both),
