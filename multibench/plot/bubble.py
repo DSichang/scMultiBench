@@ -248,7 +248,7 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None) -> Bubble
                          else "The table has no rows.")
 
     keys = ["method", "metric"] + (["dataset"] if "dataset" in df.columns else [])
-    repeated = df.duplicated(keys, keep=False)
+    repeated = _user_repeats(df, keys)
     if repeated.any():
         raise ValueError(_duplicate_rows_message(df[repeated], keys))
     score = style.overall(df)       # refuses your rows on another dataset
@@ -430,10 +430,24 @@ def _na_message(missing: list, df: pd.DataFrame) -> str:
     return " ".join(sentences)
 
 
+def _by_id(df):
+    """``df`` with each method name that is a package method's id or alias in
+    that id (``"cobolt"`` is Cobolt), so a repeat is found whatever its case."""
+    from ..engine import registry
+
+    def canonical(name):
+        try:
+            return registry.check_method(str(name))
+        except KeyError:
+            return name
+    return df.assign(method=df["method"].map(canonical)) if "method" in df.columns else df
+
+
 def _user_repeats(df, keys):
     """Rows that repeat ``keys`` where one of the repeats is not a stored row
     (your rows next to the stored table, or your rows twice); repeats among
     stored rows are left alone."""
+    df = _by_id(df)
     repeated = df.duplicated(keys, keep=False)
     if not repeated.any() or "source" not in df.columns:
         return repeated
@@ -445,6 +459,7 @@ def _user_repeats(df, keys):
 def _duplicate_rows_message(dup, keys) -> str:
     """The error for rows that repeat ``keys``: the fix when your rows collide
     with stored ones, else one example repeat."""
+    dup = _by_id(dup)
     stored = (dup["source"].isin(style.STORED_SOURCES)
               if "source" in dup.columns else pd.Series(False, index=dup.index))
     mixed = dup.assign(_st=stored.to_numpy()).groupby(keys)["_st"].agg(

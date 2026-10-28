@@ -128,3 +128,17 @@ def test_evaluate_of_a_run_file_reads_the_label_files_the_run_read(tmp_path):
                            metrics=["ARI"], verbose=False)
         want = mtb.evaluate(emb, labels=lab, metrics=["ARI"], verbose=False)
     assert got.value.tolist() == want.value.tolist()
+
+
+@pytest.mark.parametrize("draw", ["recommend", "bubble", "bar"])
+def test_a_stored_method_in_another_case_is_a_clash(draw):
+    """Rows named 'cobolt' would get Cobolt's chip and runtime next to the stored
+    Cobolt: they are refused as rows named 'Cobolt' are."""
+    bench = mtb.load_results("mosaic", dataset="D45")
+    both = pd.concat([bench, bench[bench.method == "SMILE"].assign(method="cobolt",
+                                                                    source="user")])
+    call = {"recommend": lambda: mtb.recommend("mosaic", long_df=both),
+            "bubble": lambda: mtb.plot.bubble(both), "bar": lambda: mtb.plot.bar(both)}[draw]
+    with pytest.raises(ValueError, match=r"^Your rows and the stored results both have "
+                                         r"Cobolt on D45\."):
+        call()
