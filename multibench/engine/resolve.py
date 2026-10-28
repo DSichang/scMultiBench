@@ -48,7 +48,7 @@ def _resolve_role(ds_dir: Path, role: str) -> Path:
     """The file of ``role`` in ``ds_dir`` (:func:`_role_stems`; ``.csv`` first
     for a label role). An unnumbered role also takes ``<stem>1`` when there
     is no ``<stem>2``. Nothing found: the canonical name, which does not exist."""
-    is_label = ("cty" in role) or ("label" in role)
+    is_label = is_label_role(role)
     stems, numbered = _role_stems(role)
     if role == "cty" and (ds_dir / "atac_cty.csv").exists():
         # rna_cty.csv next to atac_cty.csv labels the RNA cells of diagonal data
@@ -70,8 +70,7 @@ def _resolve_role(ds_dir: Path, role: str) -> Path:
 
 def _batch_column_advice() -> str:
     """Export without per-batch files, then where the batch column goes."""
-    return ('export without batch= and pass the column itself, as '
-                       'run(batch=adata.obs["donor"])')
+    return 'export without batch= and pass the column itself, as run(batch=adata.obs["donor"])'
 
 
 def _one_file_advice(category: str, *, stem: str = "rna", has_adt: bool = False) -> str:
@@ -82,12 +81,10 @@ def _one_file_advice(category: str, *, stem: str = "rna", has_adt: bool = False)
         several = _several_batch_diagonal_methods()
         n = f"exactly {_diagonal_batch_count()}"
         also = (f" {_and_list(several)} also read {n} numbered RNA and ATAC batches, "
-                "written one batch per call with "
-                + "batch_index=." if several else "")
+                "written one batch per call with batch_index=." if several else "")
         return "Diagonal methods read one rna.h5 and one ATAC file. " + advice + also
-    cross = 'category="cross"'
     return (f"{category.capitalize()} methods read one {stem}.h5. " + advice
-            + (f" For RNA+ADT batches, use {cross}." if has_adt else ""))
+            + (' For RNA+ADT batches, use category="cross".' if has_adt else ""))
 
 
 #: modality file stems whose numbered copies (rna1.h5, rna2.h5) mark a per-batch folder
@@ -121,10 +118,8 @@ def _per_batch_hint(ds_dir: Path, category: str | None, stems=None) -> str | Non
 def _diagonal_batch_count() -> int:
     """How many numbered RNA (and ATAC) batches the several-batch diagonal
     variants read."""
-    counts = {len(_variant_batches(v.when.get("modalities") or []))
-              for spec in registry.load() for v in spec.variants
-              if v.when.get("category") == "diagonal"} - {0}
-    (n,) = counts            # one number: the messages say "exactly n"
+    (n,) = {len(_variant_batches(v.when["modalities"]))   # the messages say "exactly n"
+            for _, v in _diagonal_batch_variants()}
     return n
 
 
@@ -146,23 +141,24 @@ def _numbered_diagonal_hint(ds_dir: Path, numbered) -> str:
             f'as run(batch=adata.obs["donor"]).')
 
 
+def _diagonal_batch_variants() -> list:
+    """``(spec, variant)`` of the diagonal variants of numbered roles (several
+    RNA and several ATAC batches), in registry order."""
+    return [(spec, v) for spec in registry.load() for v in spec.variants
+            if v.when.get("category") == "diagonal"
+            and _variant_batches(v.when.get("modalities") or [])]
+
+
 def _several_batch_diagonal_methods() -> list[str]:
-    """The methods with a diagonal variant of numbered roles (several RNA and
-    several ATAC batches), in registry order."""
-    return [spec.id for spec in registry.load()
-            if any(v.when.get("category") == "diagonal"
-                   and _variant_batches(v.when.get("modalities") or [])
-                   for v in spec.variants)]
+    """The methods with a diagonal variant of numbered roles, in registry order."""
+    return list(dict.fromkeys(spec.id for spec, _ in _diagonal_batch_variants()))
 
 
 def _per_batch_diagonal_methods(ds_dir: Path) -> list[str]:
     """:func:`_several_batch_diagonal_methods` whose input files are all in
     ``ds_dir``."""
-    return [spec.id for spec in registry.load()
-            if any(v.when.get("category") == "diagonal"
-                   and _variant_batches(v.when.get("modalities") or [])
-                   and _variant_satisfiable(v, Path(ds_dir), spec.id)
-                   for v in spec.variants)]
+    return list(dict.fromkeys(spec.id for spec, v in _diagonal_batch_variants()
+                              if _variant_satisfiable(v, Path(ds_dir), spec.id)))
 
 
 def _resolve_data_dir(ds_dir: Path) -> str:
@@ -309,15 +305,14 @@ def missing_dataset_message(base, dataset: str) -> str:
     near = next((p for p in (here, Path("data") / here) if p.is_dir()), None)
     if len(here.parts) == 1 and near is not None and Path(os.path.abspath(base)) == default:
         path = f"./{near}" if near == here else str(near)
-        return (f"The folder {base / dataset} does not exist. {path} exists here: pass "
-                + f"{path!r}.")
+        return f"The folder {base / dataset} does not exist. {path} exists here: pass {path!r}."
     dirs = sorted(p.name for p in base.iterdir() if p.is_dir()) if base.is_dir() else []
     holds = (f"{base} holds {_and_list(dirs)}." if dirs else
              f"{base} holds no folders." if base.is_dir() else
              f"{base} does not exist either.")
-    return (f"The folder {base / dataset} does not exist. {holds} "
-            + "dataset= is the folder's path, or its name under "
-            + f"mtb.config.data_path. The folder layout is at {LAYOUT_URL}.")
+    return (f"The folder {base / dataset} does not exist. {holds} dataset= is the "
+            f"folder's path, or its name under mtb.config.data_path. The folder layout "
+            f"is at {LAYOUT_URL}.")
 
 
 def _note_local_folder(base: Path, name: str) -> None:
@@ -342,8 +337,8 @@ def _note_local_folder(base: Path, name: str) -> None:
         return
     _NOTED[:] = [outer, key]
     path = f"./{name}"
-    _text.warn(f"Using {base / name}; {path} also exists: pass "
-                 + f"{path!r} for it.", UserWarning)
+    _text.warn(f"Using {base / name}; {path} also exists: pass {path!r} for it.",
+               UserWarning)
 
 
 #: the call that last got the note of :func:`_note_local_folder`
@@ -549,8 +544,7 @@ def _near_miss_hints(ds_dir: Path, missing: dict, category: str,
             # every vertical ATAC role reads atac.h5, also the peak methods' atac_gas
             hints.append(
                 f"Vertical methods read atac.h5. Rename {same[0]} to atac.h5, or write "
-                f"it with " + 'category="vertical"'
-                + ".")
+                f'it with category="vertical".')
             continue
         who = method or "the method"
         if m:
@@ -603,11 +597,10 @@ def _check_matrix_files(method, dataset, resolved):
                 f'See the recipe "A 10x .h5 file" in the docs.')
         sniff = _sniff_h5(str(p), p.stat().st_mtime_ns)
         if sniff is not None and 0 in sniff[1:]:
-            again = "mtb.io.export_dataset"
             raise ValueError(
                 f"{method} reads {p.name} of {dataset}, which holds 0 "
                 f"{'features' if sniff[1] == 0 else 'cells'}. Write the folder again "
-                f"with {again}.")
+                f"with mtb.io.export_dataset.")
 
 
 def _check_orientation(method, dataset, resolved):
@@ -628,10 +621,8 @@ def _check_orientation(method, dataset, resolved):
                 f"{method} reads {p.name} of {dataset}, which stores matrix/data as "
                 f"cells x features, shape {shape}. The file lists {n_feat} features "
                 f"and {n_cell} cells. Its matrix/data needs features x cells, shape "
-                f"({n_feat}, {n_cell}). Export it again with "
-                + "mtb.io.export_dataset"
-                + ", or transpose matrix/data."
-            )
+                f"({n_feat}, {n_cell}). Export it again with mtb.io.export_dataset, or "
+                f"transpose matrix/data.")
 
 
 def _read_features(path: str, n: int | None = None) -> tuple:
@@ -647,7 +638,8 @@ def _read_features(path: str, n: int | None = None) -> tuple:
             raw = feats[:n]
     except OSError:
         return ()
-    return tuple(x.decode() if isinstance(x, (bytes, bytearray)) else str(x) for x in raw)
+    from .ingest import _strings
+    return tuple(_strings(raw))
 
 
 @functools.lru_cache(maxsize=512)
@@ -856,14 +848,12 @@ def _h5_has_fraction(path: str, mtime_ns: int) -> bool | None:
 def _peak_fraction_of(path: Path) -> float | None:
     """Share of the first 50 feature names that look like ``chr:start-end``;
     ``None`` when the file is not a readable canonical ``.h5``."""
-    from .ingest import _PEAK_RE
+    from .ingest import _peak_fraction
 
     if path.suffix != ".h5" or not path.is_file():
         return None
     feats = _sniff_features(str(path), path.stat().st_mtime_ns)
-    if not feats:
-        return None
-    return sum(1 for x in feats if _PEAK_RE.match(x)) / len(feats)
+    return _peak_fraction(feats) if feats else None
 
 
 @functools.lru_cache(maxsize=64)
@@ -955,7 +945,8 @@ def _sniff_barcode_list(path: str, mtime_ns: int) -> tuple | None:
             raw = f["matrix/barcodes"][:]
     except OSError:
         return None
-    return tuple(x.decode() if isinstance(x, (bytes, bytearray)) else str(x) for x in raw)
+    from .ingest import _strings
+    return tuple(_strings(raw))
 
 
 def _barcodes_of(path) -> tuple | None:
@@ -1104,38 +1095,60 @@ def _preflight_caveats(resolved, *, atac: str | None = None,
             out.append(PEAK_NAMES_CAVEAT.format(
                 method=who, file=Path(resolved[role]).name, example=bad,
                 action=GENES_AS_PEAKS if genes else RENAME_PEAKS))
+    out += _atac_form_caveats(resolved, atac, renamed, who)
+    counts = _not_counts_caveat(resolved, who)
+    if counts:
+        out.append(counts)
+    if category == "diagonal" and resolved:
+        ds_dir = next(Path(v) if k == "data_dir" else Path(v).parent
+                      for k, v in resolved.items())
+        if (ds_dir / "cty.csv").is_file() \
+                and not (ds_dir / "rna_cty.csv").is_file() \
+                and not (ds_dir / "atac_cty.csv").is_file():
+            out.append(DIAGONAL_CTY_CAVEAT.format(method=who))
+    return out
+
+
+def _atac_form_caveats(resolved, atac, renamed, who: str) -> list[str]:
+    """The caveats of :func:`_preflight_caveats` on the ATAC representation of
+    the roles not in ``renamed``."""
+    out: list[str] = []
     if atac is None:
         p = Path(resolved.get("atac_gas", ""))
         if p.name and p.stem != "atac_gas":
             frac = _peak_fraction_of(p)
             if frac is not None and frac >= 0.9:
                 out.append(PEAK_IN_GAS_CAVEAT.format(method=who))
-    else:
-        stems = {r.rstrip("0123456789") for r in resolved}
-        both = {"atac_peak", "atac_gas"} <= stems
-        for role, path in resolved.items():
-            if is_label_role(role) or base_modality(role) != "atac" or role in renamed:
-                continue
-            frac = _peak_fraction_of(Path(path))
-            if frac is None:
-                continue
-            want = atac
-            if both and role.rstrip("0123456789") in ("atac_peak", "atac_gas"):
-                want = "peak" if role.startswith("atac_peak") else "gene_activity"
-            if want == "gene_activity" and frac >= 0.9:
-                out.append(PEAK_FED_TO_GAS_CAVEAT.format(method=who, file=Path(path).name))
-            elif frac <= 0.1:
-                # gene activity only when the names are the folder's genes
-                genes = _names_are_genes(Path(path))
-                if genes is False:
-                    first = _sniff_features(str(path), Path(path).stat().st_mtime_ns)
-                    unknown = (PEAK_NAMES_UNKNOWN_CAVEAT if want == "peak"
-                               else GAS_NAMES_UNKNOWN_CAVEAT)
-                    out.append(unknown.format(method=who, file=Path(path).name,
-                                              example=first[0]))
-                elif want == "peak":
-                    out.append(GAS_FED_TO_PEAK_CAVEAT.format(method=who,
-                                                             file=Path(path).name))
+        return out
+    stems = {r.rstrip("0123456789") for r in resolved}
+    both = {"atac_peak", "atac_gas"} <= stems
+    for role, path in resolved.items():
+        if is_label_role(role) or base_modality(role) != "atac" or role in renamed:
+            continue
+        frac = _peak_fraction_of(Path(path))
+        if frac is None:
+            continue
+        want = atac
+        if both and role.rstrip("0123456789") in ("atac_peak", "atac_gas"):
+            want = "peak" if role.startswith("atac_peak") else "gene_activity"
+        if want == "gene_activity" and frac >= 0.9:
+            out.append(PEAK_FED_TO_GAS_CAVEAT.format(method=who, file=Path(path).name))
+        elif frac <= 0.1:
+            # gene activity only when the names are the folder's genes
+            genes = _names_are_genes(Path(path))
+            if genes is False:
+                first = _sniff_features(str(path), Path(path).stat().st_mtime_ns)
+                unknown = (PEAK_NAMES_UNKNOWN_CAVEAT if want == "peak"
+                           else GAS_NAMES_UNKNOWN_CAVEAT)
+                out.append(unknown.format(method=who, file=Path(path).name,
+                                          example=first[0]))
+            elif want == "peak":
+                out.append(GAS_FED_TO_PEAK_CAVEAT.format(method=who, file=Path(path).name))
+    return out
+
+
+def _not_counts_caveat(resolved, who: str) -> str | None:
+    """:data:`NOT_COUNTS_CAVEAT` for the count files whose values are not whole numbers."""
     seen, fractions = set(), []
     for role, path in resolved.items():
         p = Path(path)
@@ -1146,18 +1159,11 @@ def _preflight_caveats(resolved, *, atac: str | None = None,
             continue
         if _h5_has_fraction(str(p), p.stat().st_mtime_ns):
             fractions.append(p.name)
-    if fractions:
-        # one sentence for the files of several batches
-        out.append(NOT_COUNTS_CAVEAT.format(method=who, file=_and_list(fractions)).replace(
-            " holds ", " hold " if len(fractions) > 1 else " holds "))
-    if category == "diagonal" and resolved:
-        ds_dir = next(Path(v) if k == "data_dir" else Path(v).parent
-                      for k, v in resolved.items())
-        if (ds_dir / "cty.csv").is_file() \
-                and not (ds_dir / "rna_cty.csv").is_file() \
-                and not (ds_dir / "atac_cty.csv").is_file():
-            out.append(DIAGONAL_CTY_CAVEAT.format(method=who))
-    return out
+    if not fractions:
+        return None
+    # one sentence for the files of several batches
+    return NOT_COUNTS_CAVEAT.format(method=who, file=_and_list(fractions)).replace(
+        " holds ", " hold " if len(fractions) > 1 else " holds ")
 
 
 _LABEL_MODALITY_ORDER = {"rna": 0, "adt": 1, "atac": 2}
@@ -1209,8 +1215,7 @@ def _agreed_label_order(spec, category: str, stems: list[str]) -> list[str] | No
     for v in spec.variants:
         if v.when.get("category") != category:
             continue
-        roles = {r for a in v.args for r in (a.roles or [a.role]) if r}
-        if _variant_batches(roles) != batches:
+        if _variant_batches(v.roles()) != batches:
             continue
         rank = _variant_label_rank(stems, v)
         orders.add(tuple(stems) if rank is None
@@ -1237,8 +1242,7 @@ def _reordering_methods(stems: list[str], category: str | None, dataset: str,
             cat = v.when.get("category")
             if category is not None and cat != category:
                 continue
-            roles = {r for a in v.args for r in (a.roles or [a.role]) if r}
-            used = _variant_batches(roles)
+            used = _variant_batches(v.roles())
             if batches and used and used != batches:
                 continue
             rank = _variant_label_rank(stems, v)
@@ -1453,7 +1457,7 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
             variant = None
             stems = _agreed_label_order(spec, category, stems) or stems
         if variant is not None:
-            roles = {r for a in variant.args for r in (a.roles or [a.role]) if r}
+            roles = variant.roles()
             # an older paired folder's rna_cty.csv goes under the key cty, as in inputs_for
             if "cty" in roles and "cty" not in files \
                     and _resolve_role(ds_dir, "cty").name == "rna_cty.csv":
