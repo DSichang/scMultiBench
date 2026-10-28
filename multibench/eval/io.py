@@ -147,12 +147,6 @@ def _read_table(src, sep):
     return pd.read_csv(src, sep=sep)
 
 
-def _read_text(src, sep):
-    """The same table as text: nothing read as missing, no number parsed. For
-    messages only."""
-    return pd.read_csv(src, sep=sep, dtype=str, na_filter=False)
-
-
 def _null_and_text(values):
     """``(null, text)``: where pandas holds a missing value, and every value as
     stripped text."""
@@ -221,7 +215,7 @@ def _as_written(col: pd.Series, d: pd.DataFrame, path: Path) -> np.ndarray:
     vals, null = col.to_numpy(), col.isna().to_numpy()
     if not null.any():
         return vals
-    text = _read_text(path, _sep_for(path))
+    text = pd.read_csv(path, sep=_sep_for(path), dtype=str, na_filter=False)  # nothing parsed
     if text.shape != d.shape:
         return vals
     text = text.iloc[:, d.columns.get_loc(col.name)].str.strip()
@@ -303,11 +297,9 @@ def read_labels_ids(path: Path | str, column: str | None = None, *,
     ``as_written=True`` returns each value read as missing (``NA``, ``None``,
     ...) as the word the file holds, for messages only.
     """
-    path = _require_file(path, f"{what} file"
-                         if what else "labels file")
+    path = _require_file(path, f"{what} file" if what else "labels file")
     d = _read_table(path, _sep_for(path))
-    head = (f"The {what} file {path.name}"
-            if what else str(path))
+    head = f"The {what} file {path.name}" if what else str(path)
     first = d.iloc[:, 0] if d.shape[1] > 1 else None
 
     def values(col):
@@ -479,20 +471,21 @@ def by_id_column(values, first, ids, *, what: str, name: str, target: str,
         raise ValueError(
             f"{what}: the first column of {name} repeats {_n_ids(len(dup))} (first: "
             f"{_first(dup, 3)}). Give each cell one row.")
+    # unique ids, all cells of the target: some cell has no row
     missing = ids.difference(keys, sort=False)
-    if len(missing):
-        mark = ""
-        raise ValueError(
-            f"{what}: {name} has no row for {len(missing):,} of the {len(ids):,} "
-            f"cells of {target} (first: {_first(missing, 3)}). Give a row for every "
-            f"cell.{mark}")
-    return np.asarray(pd.Series(vals, index=keys).reindex(ids).to_numpy()), True
+    raise ValueError(
+        f"{what}: {name} has no row for {len(missing):,} of the {len(ids):,} "
+        f"cells of {target} (first: {_first(missing, 3)}). Give a row for every cell.")
 
 
 def _is_label_file(e) -> bool:
     if isinstance(e, Path):
         return True
     return isinstance(e, str) and Path(e).suffix.lower() in _LABEL_FILE_SUFFIXES
+
+
+def _is_label_path_list(x) -> bool:
+    return isinstance(x, (list, tuple)) and len(x) > 0 and all(_is_label_file(e) for e in x)
 
 
 def _is_anndata(x) -> bool:
@@ -542,22 +535,11 @@ def as_vector(x, *, what: str = "labels", column: str | None = None,
             return np.asarray(read_labels(next(iter(x.values())), column=column,
                                           as_written=as_written))
         raise ValueError(_multi_dict_message(what, x))
-    if isinstance(x, (list, tuple)) and len(x) > 0 and all(_is_label_file(e) for e in x):
+    if _is_label_path_list(x):
         return np.concatenate([np.asarray(read_labels(p, column=column,
                                                       as_written=as_written)) for p in x])
     if isinstance(x, pd.DataFrame):
-        if column is not None:
-            if column not in x.columns:
-                raise ValueError(
-                    f"{what}: DataFrame has no column {column!r}; columns are "
-                    f"{[str(c) for c in x.columns]}")
-            return np.asarray(x[column].to_numpy())
-        if x.shape[1] == 1:
-            return np.asarray(x.iloc[:, 0].to_numpy())
-        raise ValueError(
-            f"{what}: DataFrame has {x.shape[1]} columns "
-            f"{[str(c) for c in x.columns]}; pass one column (e.g. df['celltype']) "
-            f"or column=<name>")
+        return np.asarray(_one_column(x, what, column).to_numpy())
     if isinstance(x, np.ndarray):
         arr = x
         if arr.ndim == 2 and arr.shape[1] == 1:
@@ -590,24 +572,27 @@ def _first(ix, n: int = 5) -> list:
     return [str(v) for v in list(ix[:n])]
 
 
+def _one_column(x: pd.DataFrame, what: str, column: str | None) -> pd.Series:
+    """Column ``column`` of ``x``, or its only column."""
+    if column is not None:
+        if column not in x.columns:
+            raise ValueError(
+                f"{what}: DataFrame has no column {column!r}; columns are "
+                f"{[str(c) for c in x.columns]}")
+        return x[column]
+    if x.shape[1] == 1:
+        return x.iloc[:, 0]
+    raise ValueError(
+        f"{what}: DataFrame has {x.shape[1]} columns "
+        f"{[str(c) for c in x.columns]}; pass one column (e.g. df['celltype']) "
+        f"or column=<name>")
+
+
 def _align_vector(x, ids, *, what: str, column: str | None, cells: str | None):
     """``x`` (an indexed Series or DataFrame) reordered to the output's cell
-    ``ids``, for ``evaluate``. ``cells`` is the expression for
-    the output's cell ids (``adata.obs_names``), ``None`` when there is none."""
+    ``ids``, for ``evaluate``. ``cells`` is not used."""
     if isinstance(x, pd.DataFrame):
-        if column is not None:
-            if column not in x.columns:
-                raise ValueError(
-                    f"{what}: DataFrame has no column {column!r}; columns are "
-                    f"{[str(c) for c in x.columns]}")
-            x = x[column]
-        elif x.shape[1] == 1:
-            x = x.iloc[:, 0]
-        else:
-            raise ValueError(
-                f"{what}: DataFrame has {x.shape[1]} columns "
-                f"{[str(c) for c in x.columns]}; pass one column (e.g. "
-                f"df['celltype']) or column=<name>")
+        x = _one_column(x, what, column)
     ids = pd.Index(ids)
     if len(x.index) == len(ids) and x.index.equals(ids):
         return np.asarray(pd.Series(x).to_numpy())
@@ -704,9 +689,8 @@ def _anndata_matrix(adata, obsm: str | None) -> np.ndarray:
         raise ValueError(f"The {kind} has no obsm['X_pca']. Make the PCA first, as "
                          f"sc.pp.pca(adata).")
     keys = sorted(map(str, adata.obsm.keys()))
-    picks = [f"obsm={k!r}" for k in keys[:1] if len(keys) == 1]
-    picks = picks or (["obsm= with one of them"]
-                      if keys else [])
+    picks = ([f"obsm={keys[0]!r}"] if len(keys) == 1 else
+             ["obsm= with one of them"] if keys else [])
     picks += ["obsm='X' for .X"] if has_x and obsm != "X" else []
     what = "no X" if obsm == "X" else f"no obsm[{key!r}]"
     raise ValueError(f"The {kind} has {what}; its obsm keys are {', '.join(keys) or 'none'}"
