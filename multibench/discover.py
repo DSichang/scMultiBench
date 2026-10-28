@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import functools
 from pathlib import Path
-from urllib.parse import quote as _quote
 
 from ._text import _and_list
 from .engine import registry, upstream, envs
@@ -114,15 +113,12 @@ def find_methods(category: str | None = None, *,
         # atac is declared per method, but only a variant with an ATAC input honours it
         if atac and s.atac != atac:
             continue
-        cands = s.variants or [None]
-        hits = [v for v in cands
-                if _variant_matches(v, category, want, needs_labels, atac)
-                and (not atac or v is None or v.consumes_atac)
-                and (not both or v is not None and _BOTH_FILES <= {
-                    r.rstrip("0123456789") for r in v.when.get("modalities") or []})]
-        if not hits:
-            continue
-        out.append(s.id)
+        if any(_variant_matches(v, category, want, needs_labels, atac)
+               and (not atac or v is None or v.consumes_atac)
+               and (not both or v is not None and _BOTH_FILES <= {
+                   r.rstrip("0123456789") for r in v.when.get("modalities") or []})
+               for v in s.variants or [None]):
+            out.append(s.id)
     return out
 
 
@@ -143,12 +139,6 @@ def _reference_batch(variant):
     ref = next((a.const for a in variant.args if a.role == "reference" and a.const), None)
     ref = str(ref) if ref is not None else ""
     return int(ref[4:]) if ref.startswith("data") and ref[4:].isdigit() else None
-
-
-#: the keys ``method_info`` returns by default: what a user reads before a run
-_INFO_KEYS = ("id", "language", "notes", "categories", "env", "atac", "needs_labels",
-              "supports", "runtime", "gpu", "cpu_params",
-              "setup_hint", "repo_url", "reference")
 
 
 class _Info(dict):
@@ -209,44 +199,24 @@ def method_info(method: str) -> dict:
     mtb.find_methods : filter methods by category, modalities, labels, ATAC representation.
     """
     s = registry.get(method)
-    method = s.id
     if not s.variants:
-        raise KeyError(f"{method}: no variants (declared stub)")
+        raise KeyError(f"{s.id}: no variants (declared stub)")
     ref = s.reference
-    info = {
-        "id": s.id, "language": s.language, "categories": s.categories,
-        "env": envs.group_for(s.id), "atac": s.atac,
-        "needs_labels": s.needs_labels, "status": s.status,
-        "setup_hint": s.setup_hint,
-        "variants": list(dict.fromkeys(v.entrypoint for v in s.variants)),
-        "driver": next((v.driver for v in s.variants if v.driver), None),
-        # percent-encoded: 'online iNMF' has a space
-        "scripts_url": ("https://github.com/PYangLab/scMultiBench/tree/main/"
-                        + _quote("/".join(s.variants[0].entrypoint.split("/")[:2]),
-                                 safe="/")),
-        "repo_url": ref.get("repo_url") or upstream.knobs_for(s.id)["upstream_url"],
-        "version": ref.get("version"),
-        "reference": dict(ref["reference"]) if ref.get("reference") else None,
-        "supports": [{"category": v.when.get("category"),
-                      "modalities": v.shown_modalities,
-                      "output_kind": v.output.kind,
-                      "needs_labels": v.needs_labels,
-                      "labels": [r for r in v.roles() if is_label_role(r)],
-                      "reference_batch": _reference_batch(v)}
-                     for v in s.variants],
-        "params": {_variant_key(v): {"tunable": _tunable(v)} for v in s.variants},
-    }
-    up = upstream.knobs_for(s.id)
-    info["fixed_in_script"] = up["fixed_in_script"]
-    info["upstream_knobs"] = up["upstream_knobs"]
-    info["upstream_url"] = up["upstream_url"]
-    info["notes"] = ref.get("summary") or None
-    info["runtime"] = _runtime_hint(s.id)
-    info["gpu"] = s.gpu
-    info["cpu_params"] = dict(s.cpu_params)
-    info["gpu_evidence"] = s.gpu_evidence or None
-    info["notes_long"] = up["notes"]
-    return _Info((k, info[k]) for k in _INFO_KEYS)
+    return _Info(
+        id=s.id, language=s.language, notes=ref.get("summary") or None,
+        categories=s.categories, env=envs.group_for(s.id), atac=s.atac,
+        needs_labels=s.needs_labels,
+        supports=[{"category": v.when.get("category"),
+                   "modalities": v.shown_modalities,
+                   "output_kind": v.output.kind,
+                   "needs_labels": v.needs_labels,
+                   "labels": [r for r in v.roles() if is_label_role(r)],
+                   "reference_batch": _reference_batch(v)}
+                  for v in s.variants],
+        runtime=_runtime_hint(s.id), gpu=s.gpu, cpu_params=dict(s.cpu_params),
+        setup_hint=s.setup_hint,
+        repo_url=ref.get("repo_url") or upstream.knobs_for(s.id)["upstream_url"],
+        reference=dict(ref["reference"]) if ref.get("reference") else None)
 
 
 # ------------------------------------------------------------ observed runtimes
@@ -332,62 +302,42 @@ def params_for(method: str, category: str | None = None,
     if not s.variants:
         raise KeyError(f"{method}: no variants (declared stub); nothing to tune")
 
-    def _example(v):
+    def example(v):
         mods = list(v.when.get("modalities", []))
         return f"params_for({method!r}, {v.when.get('category')!r}, {mods})"
 
+    def mods_of(vs):
+        return _and_list("+".join(x.when.get("modalities", [])) for x in vs)
+
     if category is None and modalities is None:
-        if len(s.variants) > 1:
-            v = _agreed(s.variants)
-            if v is None:
-                keys = _and_list(_variant_key(x) for x in s.variants)
-                raise AmbiguousVariantError(
-                    f"{method} has {len(s.variants)} variants, {keys}. Pass the "
-                    f"category and modalities of one, for example "
-                    f"{_example(s.variants[0])}.")
-        else:
-            v = s.variants[0]
+        v = _one(s.variants,
+                 f"{method} has {len(s.variants)} variants, "
+                 f"{_and_list(_variant_key(x) for x in s.variants)}. Pass the "
+                 f"category and modalities of one, for example {example(s.variants[0])}.")
     elif modalities is None:
         # the only way to reach a data_dir variant (scBridge), which has no modalities
         cands = [x for x in s.variants if x.when.get("category") == category]
         if not cands:
             from .engine.schema import no_category_message
             raise KeyError(no_category_message(method, s.wired_categories, category))
-        if len(cands) > 1:
-            v = _agreed(cands)
-            if v is None:
-                mods = _and_list("+".join(x.when.get("modalities", []))
-                                          for x in cands)
-                raise AmbiguousVariantError(
-                    f"{method} has {len(cands)} {category} variants, {mods}. Pass the "
-                    f"modalities too, for example {_example(cands[0])}.")
-        else:
-            v = cands[0]
+        v = _one(cands, f"{method} has {len(cands)} {category} variants, {mods_of(cands)}. "
+                        f"Pass the modalities too, for example {example(cands[0])}.")
     elif category is None:
         from .engine.schema import modality_family
         want = {modality_family(m) for m in modalities}
-        cands = [x for x in s.variants
-                 if set(x.when.get("modalities", [])) == set(modalities)]
-        if not cands:
-            cands = [x for x in s.variants
+        cands = ([x for x in s.variants if set(x.when.get("modalities", [])) == set(modalities)]
+                 or [x for x in s.variants
                      if {modality_family(m) for m in x.when.get("modalities", [])} == want]
-        if not cands:
-            cands = _same_types(s.variants, modalities)
+                 or _same_types(s.variants, modalities))
         if not cands:
             keys = _and_list(_variant_key(x) for x in s.variants)
             raise KeyError(
                 f"No variant of {method} takes the modalities "
                 f"{_and_list(sorted(modalities))}. Its variants: {keys}.")
-        if len(cands) > 1:
-            v = _agreed(cands)
-            if v is None:
-                keys = _and_list(_variant_key(x) for x in cands)
-                raise AmbiguousVariantError(
-                    f"The modalities {_and_list(sorted(modalities))} match "
-                    f"{len(cands)} variants of {method}, {keys}. Pass the category "
-                    f"too, for example {_example(cands[0])}.")
-        else:
-            v = cands[0]
+        v = _one(cands, f"The modalities {_and_list(sorted(modalities))} match "
+                        f"{len(cands)} variants of {method}, "
+                        f"{_and_list(_variant_key(x) for x in cands)}. Pass the category "
+                        f"too, for example {example(cands[0])}.")
     else:
         try:
             v = s.select(category, set(modalities), loose=True)
@@ -397,18 +347,11 @@ def params_for(method: str, category: str | None = None,
             # base tokens, as find_methods takes them: rna + atac for rna1..3 + atac1..3
             cands = _same_types([x for x in s.variants
                                  if x.when.get("category") == category], modalities)
-            if len(cands) > 1:
-                v = _agreed(cands)
-                if v is None:
-                    keys = _and_list("+".join(x.when.get("modalities", [])) for x in cands)
-                    raise AmbiguousVariantError(
-                        f"{method} has {len(cands)} {category} variants of "
-                        f"{_and_list(sorted(modalities))}, {keys}. Pass the modalities "
-                        f"of one, for example {_example(cands[0])}.") from None
-            elif cands:
-                v = cands[0]
-            else:
+            if not cands:
                 raise
+            v = _one(cands, f"{method} has {len(cands)} {category} variants of "
+                            f"{_and_list(sorted(modalities))}, {mods_of(cands)}. Pass the "
+                            f"modalities of one, for example {example(cands[0])}.")
     up = upstream.knobs_for(s.id)
     vs = v if isinstance(v, list) else [v]
     return {"method": s.id, "variant": _and_list(_variant_key(x) for x in vs),
@@ -416,6 +359,17 @@ def params_for(method: str, category: str | None = None,
             "fixed_in_script": up["fixed_in_script"],
             "upstream_knobs": up["upstream_knobs"],
             "upstream_url": up["upstream_url"]}
+
+
+def _one(cands, ambiguous: str):
+    """The one variant of ``cands``, or all of them when they take the same
+    parameters; else ``AmbiguousVariantError(ambiguous)``."""
+    if len(cands) == 1:
+        return cands[0]
+    v = _agreed(cands)
+    if v is None:
+        raise AmbiguousVariantError(ambiguous) from None
+    return v
 
 
 def _agreed(variants) -> list | None:
