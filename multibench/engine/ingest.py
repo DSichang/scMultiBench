@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import re
 import shutil
+import sys
 from pathlib import Path
 
 import h5py
@@ -178,18 +179,24 @@ def _check_one_matrix_each(data, specs, given) -> None:
 _BARCODE_SUFFIX_RE = re.compile(r"-\d+$")
 
 
+def _comparable(names, ref):
+    """``(names, ref)`` as written, then without a trailing ``-<n>``; a pair
+    with a repeated barcode is left out."""
+    names, ref = [str(x) for x in names], [str(x) for x in ref]
+    for key in (None, _BARCODE_SUFFIX_RE):
+        a = names if key is None else [key.sub("", x) for x in names]
+        b = ref if key is None else [key.sub("", x) for x in ref]
+        if len(set(a)) == len(a) and len(set(b)) == len(b):
+            yield a, b
+
+
 def _cell_order(names, ref):
     """``("same", None)``, ``("order", idx)`` (``names[idx]`` is in ``ref``
     order), ``("other", None)`` or ``("unknown", None)`` (non-unique
     barcodes). A trailing ``-<n>`` does not count when the names stay unique
     without it."""
-    names, ref = [str(x) for x in names], [str(x) for x in ref]
     judged = False
-    for key in (None, _BARCODE_SUFFIX_RE):
-        a = names if key is None else [key.sub("", x) for x in names]
-        b = ref if key is None else [key.sub("", x) for x in ref]
-        if len(set(a)) != len(a) or len(set(b)) != len(b):
-            continue
+    for a, b in _comparable(names, ref):
         judged = True
         if a == b:
             return "same", None
@@ -203,8 +210,6 @@ def _follow_peak_order(out: Path, X, bars):
     """``(X, bars)`` of a gene-activity matrix in the cell order of the
     ``atac_peak.h5`` next to ``out``, which ``atac_cty.csv`` follows; other
     cells warn."""
-    import sys
-
     import scipy.sparse as sp
 
     folder = Path(out).parent
@@ -212,8 +217,7 @@ def _follow_peak_order(out: Path, X, bars):
     if Path(out).name == peak.name or not _is_canonical_h5(peak):
         return X, bars
     with h5py.File(peak, "r") as f:
-        ref = [x.decode() if isinstance(x, bytes) else str(x)
-               for x in f["matrix/barcodes"][:]] if "matrix/barcodes" in f else None
+        ref = _strings(f["matrix/barcodes"][:]) if "matrix/barcodes" in f else None
     if ref is None:
         return X, bars
     kind, idx = _cell_order(bars, ref)
@@ -305,6 +309,17 @@ def _tenx_message(path) -> str:
     return f'{path} is a 10x Genomics file. See the recipe "A 10x .h5 file" in the docs.'
 
 
+#: the error for a ``.loom`` input without loompy
+_LOOM_MISSING = ("reading .loom requires the optional 'loompy' package "
+                "(pip install 'multibench-sc[loom]' or pip install loompy); "
+                "alternatively convert the input to .h5ad/.csv first.")
+
+
+def _strings(raw) -> list[str]:
+    """The names an h5 string dataset holds, as ``str``."""
+    return [x.decode() if isinstance(x, bytes) else str(x) for x in raw]
+
+
 def _is_mudata(obj) -> bool:
     # duck-typed: mudata is an optional import
     return isinstance(getattr(obj, "mod", None), dict) and type(obj).__name__ == "MuData"
@@ -369,11 +384,7 @@ def _to_anndata(src):
         try:
             import loompy  # noqa: F401  (anndata.read_loom needs it)
         except ModuleNotFoundError as exc:
-            raise ImportError(
-                "reading .loom requires the optional 'loompy' package "
-                "(pip install 'multibench-sc[loom]' or pip install loompy); "
-                "alternatively convert the input to .h5ad/.csv first."
-            ) from exc
+            raise ImportError(_LOOM_MISSING) from exc
         return ad.read_loom(p)
     raise ValueError(f"unsupported input format: {p.name}")
 
@@ -429,26 +440,22 @@ def _check_one_feature_type(adata, *, arg, spec, role=None) -> None:
     if example not in counts.index or role == "atac_gas":
         example = None                          # a 10x file has no gene-activity type
     one = example or "<type>"
-    subset = "adata[:, adata.var['feature_types'] == " + repr(one) + "]"
+    subset = f"adata[:, adata.var['feature_types'] == {one!r}]"
+    shown = repr(spec) if spec is not None else type(adata).__name__
+    selects = spec is not None and _split_var_filter(spec)[1] is None
     if not set(counts.index) & set(_TENX_TYPE.values()):
         kind = f"{family.upper()} features" if family else "features of one modality"
-        where = (f"{arg}={_shown(spec) if spec is not None else type(adata).__name__}" + (" selects" if spec is not None and
-                                                   _split_var_filter(spec)[1] is None
-                                                   else " holds")
-                 if arg is not None else "The matrix holds")
-        own = arg is not None and spec is None
-        raise ValueError(f"{where} {head} If all are {kind}, " + (f"run del {arg}.var['feature_types'] first." if own else
-            "delete the column var['feature_types'] first."))
+        where = (f"{arg}={shown} {'selects' if selects else 'holds'}" if arg is not None
+                 else "The matrix holds")
+        fix = (f"run del {arg}.var['feature_types'] first." if arg is not None and spec is None
+               else "delete the column var['feature_types'] first.")
+        raise ValueError(f"{where} {head} If all are {kind}, {fix}")
     if arg is None:                             # to_canonical, and what mtb.run converts
         raise ValueError(f"The matrix holds {head} Pass one type, as {subset}.")
-    if spec is not None and _split_var_filter(spec)[1] is None:
-        filtered = f"{spec}[feature_types={one}]"
-        filtered = f"{arg}='{filtered}'"
-        raise ValueError(f"{arg}={spec!r}"
-                         + f" selects {head} Add a filter, as {filtered}.")
-    shown = repr(spec) if spec is not None else type(adata).__name__
-    raise ValueError(
-        f"{arg}={shown}" + f" holds {head} " + f"Pass one type, as {arg}={subset}.")
+    if selects:
+        raise ValueError(f"{arg}={shown} selects {head} Add a filter, as "
+                         f"{arg}='{spec}[feature_types={one}]'.")
+    raise ValueError(f"{arg}={shown} holds {head} Pass one type, as {arg}={subset}.")
 
 
 def _pick_matrix(adata, *, layer=None, obsm=None, feature_names=None, what=None,
@@ -518,16 +525,13 @@ def _duplicate_names_warning(feats, *, arg, spec, role, obsm=None,
     dup = names[names.duplicated()].unique()
     if not len(dup):
         return None
-    selector = spec if isinstance(spec, str) else None
-    where = f"{arg}={spec!r}" if isinstance(spec, str) else f"{arg}={type(spec).__name__}"
     kind = "peak" if role == "atac_peak" else "feature"
-    head = (f"{where} has {len(dup):,} repeated {kind} {'name' if len(dup) == 1 else 'names'}"
-            f", for example {dup[0]}.")
-    when = "before the export"
+    head = (f"{arg}={_shown(spec)} has {len(dup):,} repeated {kind} "
+            f"{'name' if len(dup) == 1 else 'names'}, for example {dup[0]}.")
     if role == "atac_peak":
         # a peak name is a region: no advice that renames one
         return f"{head} Keep one column for each peak."
-    mod, base, var_filter = (_parse_selector(selector) if isinstance(selector, str)
+    mod, base, var_filter = (_parse_selector(spec) if isinstance(spec, str)
                              else (None, None, None))
     obj = "the object"
     if mod is not None:
@@ -539,7 +543,7 @@ def _duplicate_names_warning(feats, *, arg, spec, role, obsm=None,
             or not (isinstance(spec, str) or _is_anndata(spec)):
         return f"{head} Give each column its own name."
     if not isinstance(spec, str):
-        return f"{head} Run {arg}.var_names_make_unique() {when}."
+        return f"{head} Run {arg}.var_names_make_unique() before the export."
     if var_filter is None:
         return f"{head} Run var_names_make_unique() on {obj} you export."
     # on the whole object the call also renames a feature of another type
@@ -591,12 +595,8 @@ def _check_peak_names(modality, feats, *, rna_feats=None, kind_arg=False):
     if modality not in ("atac_gas", "atac_peak"):
         return
     frac = _peak_fraction(feats)
-    if kind_arg:
-        as_peak = "atac_kind='peak'"
-        as_gas = "atac_kind='gene_activity'"
-    else:
-        as_peak = "modality='atac_peak'"
-        as_gas = "modality='atac_gas'"
+    as_peak, as_gas = (("atac_kind='peak'", "atac_kind='gene_activity'") if kind_arg
+                       else ("modality='atac_peak'", "modality='atac_gas'"))
     if modality == "atac_gas" and frac > 0.5:
         _text.warn(
             f"{frac:.0%} of the ATAC feature names look like peaks such as "
@@ -607,7 +607,7 @@ def _check_peak_names(modality, feats, *, rna_feats=None, kind_arg=False):
                 "chr1:100-200")
         rename = (". If they are peaks, rename them to chr:start-end. Some methods read "
                   "the peak positions from the names, and "
-                  f"{'mtb.scan'} names these methods.")
+                  "mtb.scan names these methods.")
         gas = f" If the matrix holds gene activity, pass {as_gas}."
         genes = set(rna_feats or ())
         share = sum(1 for x in feats if x in genes) / len(feats) if len(feats) else 0.0
@@ -798,11 +798,9 @@ def read(path: Path | str):
         sparse = X.size > 0 and np.count_nonzero(X) / X.size < 0.5
         a = ad.AnnData(sp.csr_matrix(X) if sparse else X)
         if "matrix/features" in f:
-            a.var_names = [x.decode() if isinstance(x, bytes) else str(x)
-                           for x in np.array(f["matrix/features"])]
+            a.var_names = _strings(np.array(f["matrix/features"]))
         if "matrix/barcodes" in f:
-            a.obs_names = [x.decode() if isinstance(x, bytes) else str(x)
-                           for x in np.array(f["matrix/barcodes"])]
+            a.obs_names = _strings(np.array(f["matrix/barcodes"]))
     return a
 
 
@@ -816,12 +814,9 @@ def _normalize_peak_names(src, dst):
     dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(src, dst)
     with h5py.File(dst, "r+") as f:
-        feats = f["matrix/features"][:]
-        def _colon_form(b):
-            x = b.decode() if isinstance(b, bytes) else str(b)
-            m = _PEAK_RE.match(x)
-            return f"{m.group(1)}:{m.group(2)}-{m.group(3)}" if m else x
-        new = np.array([_colon_form(v) for v in feats], dtype="S")
+        new = np.array([f"{m.group(1)}:{m.group(2)}-{m.group(3)}"
+                        if (m := _PEAK_RE.match(x)) else x
+                        for x in _strings(f["matrix/features"][:])], dtype="S")
         del f["matrix/features"]
         f.create_dataset("matrix/features", data=new)
     return dst
@@ -938,9 +933,7 @@ _ADATA_OBS = "the AnnData's obs"
 
 def _obs_column(obs, col, *, what, spec, where):
     if col not in obs.columns:
-        head = f"{what}={spec!r}"
-        where = where if where == _ADATA_OBS else where
-        raise KeyError(f"{head}: column {col!r} not in obs: searched {where}; "
+        raise KeyError(f"{what}={spec!r}: column {col!r} not in obs: searched {where}; "
                        f"available: {list(obs.columns)}"
                        + (f".{hint}" if (hint := _case_hint(col, obs.columns)) else ""))
     return obs[col]
@@ -1197,8 +1190,8 @@ def _as_obs_vector(data, spec, *, what, master):
             if set(src_names) == set(master):
                 ser = ser.reindex([str(x) for x in master]) if ser.index.dtype == object \
                     else ser.iloc[[src_names.index(str(x)) for x in master]]
-        return np.asarray(ser)
-    if isinstance(spec, pd.Series):
+        vals = np.asarray(ser)
+    elif isinstance(spec, pd.Series):
         if master is None:
             return np.asarray(spec)
         idx = [str(x) for x in spec.index]
@@ -1219,9 +1212,10 @@ def _as_obs_vector(data, spec, *, what, master):
             f"{what}= Series index does not match the cell barcodes: {len(lack)} of "
             f"{len(m)} cells have no entry ({lack[:5]}{'...' if len(lack) > 5 else ''})."
             + (fix or " Index it by obs_names, or pass a plain list in cell order."))
-    vals = np.asarray(spec)
-    if vals.ndim != 1:
-        raise ValueError(f"{what}= must be 1-D, got shape {vals.shape}")
+    else:
+        vals = np.asarray(spec)
+        if vals.ndim != 1:
+            raise ValueError(f"{what}= must be 1-D, got shape {vals.shape}")
     if master is not None and len(vals) != len(master):
         raise ValueError(f"{what} has {len(vals)} entries for {len(master)} cells: give one "
                          f"{'label' if what == 'labels' else what} per cell.")
@@ -1323,16 +1317,57 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     if isinstance(data, (str, os.PathLike)):
         raise TypeError("export_dataset takes an AnnData or MuData object, not a path: "
                         "read the file first, e.g. anndata.read_h5ad(path).")
-    dtype = "float64"
     out = Path(dataset_dir).expanduser()
     category = _check_category(category)
     if data is None and isinstance(rna, str) and rna == "X":
         rna = None                      # no data to select from: no RNA
     given = {"rna": rna, "adt": adt, "atac": atac}      # as written, for messages
-    if _is_mudata(data):
-        # a bare modality name selects mdata.mod[name].X; full
-        # 'mod:<name>[...]' selectors pass through
-        rna, adt, atac = (_mudata_selector(data, x) for x in (rna, adt, atac))
+    # a bare modality name of a MuData selects mdata.mod[name].X; full
+    # 'mod:<name>[...]' selectors pass through
+    specs = ({what: _mudata_selector(data, x) for what, x in given.items()}
+             if _is_mudata(data) else dict(given))
+    _check_export_args(data, specs, given, atac_kind=atac_kind, labels=labels, batch=batch,
+                       batch_index=batch_index, category=category, adt_names=adt_names)
+    diagonal = category == "diagonal"
+    sides, masters, master = _modality_sides(data, specs, atac_kind=atac_kind,
+                                             adt_names=adt_names, category=category)
+    if not masters:                     # labels only
+        if master is None:
+            # no object names the cells: a Series indexed by barcode does
+            labels, batch = (_rows_numbered(out, x) for x in (labels, batch))
+            master = _series_cells(labels, batch)
+        if master is not None:
+            masters["rna"] = master
+    if any(len(m) == 0 for m in masters.values()):
+        raise ValueError(_NO_CELLS)
+    labels_by_side = _labels_by_side(data, labels, sides, masters, diagonal=diagonal)
+    groups = _batch_groups(data, batch, batch_index, masters.get("rna"))
+    # every matrix is selected and checked before any write
+    prepared = _prepare_matrices(data, sides, specs, given, adt_names=adt_names,
+                                 category=category)
+    plan, units = _plan_files(out, prepared, labels_by_side, masters, groups, category)
+    existing = [pth.name for pth, _, _, _ in plan if pth.exists() or pth.is_symlink()]
+    found = _leftovers(out, {pth.name for pth, _, _, _ in plan}, units, diagonal=diagonal,
+                       by_column=batch is not None, batch_index=batch_index)
+    if any(found):
+        held = []
+        if not prepared and category is None and batch_index is None:
+            # labels alone, for a folder that may be written with a category
+            held = _matrices_of(out, masters.get("rna"), len(labels_by_side["rna"]),
+                                skip={name for names in found for name in names})
+        raise FileExistsError(_leftover_message(out, found, held=held))
+    if existing and not overwrite:
+        raise FileExistsError(
+            f"{out} already holds {_text._and_list(existing)}. Pass overwrite=True to "
+            f"replace {'it' if len(existing) == 1 else 'them'}.")
+    _write_plan(out, plan, _row_order(out, units, diagonal=diagonal))
+    return out
+
+
+def _check_export_args(data, specs, given, *, atac_kind, labels, batch, batch_index,
+                       category, adt_names) -> None:
+    """The checks of :func:`export_dataset` that need no matrix."""
+    rna, adt, atac = specs["rna"], specs["adt"], specs["atac"]
     if atac_kind is not None and atac_kind not in _ATAC_KINDS:
         raise ValueError(
             f"atac_kind= must be one of {list(_ATAC_KINDS)} (got {atac_kind!r}): "
@@ -1352,28 +1387,35 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         raise ValueError(
             f"adt_names={adt_names!r} is one string. Pass a list of names, as "
             f"adt_names=list(adata.uns[{key}]).")
-    _check_one_matrix_each(data, {"rna": rna, "adt": adt, "atac": atac}, given)
-    diagonal = category == "diagonal"
-    if diagonal and labels is not None and rna is None and adt is None and atac is None:
+    _check_one_matrix_each(data, specs, given)
+    if category == "diagonal" and labels is not None and rna is None and adt is None \
+            and atac is None:
         raise ValueError(
             "category='diagonal' names the label file after the modality it labels "
             "(rna_cty.csv, atac_cty.csv): pass rna= or atac= together with labels=")
     if category in ("mosaic", "cross") and batch is None and batch_index is None:
         _text.warn(f"category={category!r} methods read numbered files (rna1.h5, "
-                     f"cty1.csv, ...): pass batch_index= (this object is one batch) "
-                     f"or batch= (a column that splits it)", UserWarning)
+                   f"cty1.csv, ...): pass batch_index= (this object is one batch) "
+                   f"or batch= (a column that splits it)", UserWarning)
 
-    # --- the modality matrices, each re-indexed to its side's cell order.
-    # Paired categories have one side; diagonal keeps the ATAC cells apart.
-    sides = {"rna": [], "atac": []}     # side -> [(role, adata, kw, what, source)]
-    master, master_name = _first_master(data, [("rna", rna), ("adt", adt)]
-                                        + ([] if diagonal else [("atac", atac)]),
-                                        diagonal=diagonal)
-    for what, spec in (("rna", rna), ("adt", adt)):
+
+def _modality_sides(data, specs, *, atac_kind, adt_names, category):
+    """``(sides, masters, master)``: ``sides`` maps a side (``'rna'``, and
+    ``'atac'`` for the ATAC cells of diagonal data) to its modalities as
+    ``(role, adata, kw, what, source)``, each in the side's cell order, and
+    ``masters`` maps a side to that order. ``master`` is the paired cell order."""
+    diagonal = category == "diagonal"
+    sides = {"rna": [], "atac": []}
+    master, master_name = _first_master(
+        data, [("rna", specs["rna"]), ("adt", specs["adt"])]
+        + ([] if diagonal else [("atac", specs["atac"])]), diagonal=diagonal)
+    for what in ("rna", "adt"):
+        spec = specs[what]
         if spec is not None:
             a, kw = _as_modality(data, spec, what=what, master=master,
                                  feature_names=adt_names if what == "adt" else None)
             sides["rna"].append((what, a, kw, what, _source_name(spec, what)))
+    atac = specs["atac"]
     if atac is not None:
         atac_master = master
         if diagonal:
@@ -1397,51 +1439,40 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         sides[side] = [(role, _align_cells(a, master=order, master_name=order_name, role=what,
                                               category=category),
                         kw, what, src) for role, a, kw, what, src in mats]
-    if not masters:                     # labels only
-        if master is None:
-            # no object names the cells: a Series indexed by barcode does
-            labels, batch = (_rows_numbered(out, x) for x in (labels, batch))
-            master = _series_cells(labels, batch)
-        if master is not None:
-            masters["rna"] = master
-    if any(len(m) == 0 for m in masters.values()):
-        raise ValueError(_NO_CELLS)
+    return sides, masters, master
 
-    # --- labels: one vector per side (diagonal) or one for the paired cells
-    labels_by_side = {}
-    if labels is not None:
-        if diagonal:
-            labels_by_side = _diagonal_labels(data, labels, sides)
-        else:
-            m = masters.get("rna")
-            vec = _as_obs_vector(data, labels, what="labels", master=m)
-            if m is not None and len(vec) != len(m):
-                raise ValueError(f"labels has {len(vec)} entries for {len(m)} cells: give "
-                                 f"one label per cell.")
-            if len(vec) == 0:
-                raise ValueError(_NO_CELLS)     # labels alone, and none of them
-            _check_labels_complete(
-                vec, spec=labels, where=f"the cells ({_labels_where(data, labels)})",
-                advice=_keep_labelled_advice(data, labels, vec))
-            labels_by_side["rna"] = vec
 
-    # --- batches
+def _labels_by_side(data, labels, sides, masters, *, diagonal) -> dict:
+    """``{side: labels}``: one vector per side (diagonal) or one for the paired cells."""
+    if labels is None:
+        return {}
+    if diagonal:
+        return _diagonal_labels(data, labels, sides)
+    vec = _as_obs_vector(data, labels, what="labels", master=masters.get("rna"))
+    if len(vec) == 0:
+        raise ValueError(_NO_CELLS)     # labels alone, and none of them
+    _check_labels_complete(
+        vec, spec=labels, where=f"the cells ({_labels_where(data, labels)})",
+        advice=_keep_labelled_advice(data, labels, vec))
+    return {"rna": vec}
+
+
+def _batch_groups(data, batch, batch_index, master) -> list:
+    """``[(batch number or '', row indices or None)]``, one per batch the call writes."""
     if batch is not None:
-        m = masters.get("rna")
-        batch_values = _as_obs_vector(data, batch, what="batch", master=m)
-        if m is not None and len(batch_values) != len(m):
-            raise ValueError(f"batch has {len(batch_values)} entries for {len(m)} cells: "
-                             f"give one batch per cell.")
-        _check_batch_complete(batch_values, spec=batch)
-        keys = sorted(set(batch_values.tolist()), key=lambda v: str(v))
-        groups = [(str(i + 1), np.flatnonzero(batch_values == k)) for i, k in enumerate(keys)]
-    elif batch_index is not None:
-        groups = [(str(int(batch_index)), None)]
-    else:
-        groups = [("", None)]
+        values = _as_obs_vector(data, batch, what="batch", master=master)
+        _check_batch_complete(values, spec=batch)
+        keys = sorted(set(values.tolist()), key=str)
+        return [(str(i + 1), np.flatnonzero(values == k)) for i, k in enumerate(keys)]
+    if batch_index is not None:
+        return [(str(int(batch_index)), None)]
+    return [("", None)]
 
-    # --- select every matrix and run the content checks, before any write
-    prepared = []                       # (side, role, X, feats, bars, what)
+
+def _prepare_matrices(data, sides, specs, given, *, adt_names, category) -> list:
+    """``[(side, role, X, feats, bars, what)]``: each matrix selected, with
+    the content checks run and the ATAC role settled."""
+    prepared = []
     for side, mats in sides.items():
         for role, a, kw, what, src in mats:
             if role == "adt" and not kw and _adt_obsm_keys(a):
@@ -1477,17 +1508,21 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
                 _check_peak_names(role, feats, rna_feats=rna_feats, kind_arg=True)
                 if category == "mosaic" and role == "atac_gas":
                     _text.warn("Every mosaic method reads peak ATAC. Export the ATAC as "
-                                 "peaks (atac_kind='peak').", UserWarning)
+                               "peaks (atac_kind='peak').", UserWarning)
             if role in _COUNT_ROLES:
-                selector = {"rna": rna, "adt": adt, "atac": atac}[what]
-                hint, how = _raw_count_hint(what, selector)
+                hint, how = _raw_count_hint(what, specs[what])
                 _warn_not_counts(X, what, hint,
                                  how=_counts_of_object_advice(what, given[what]) or how)
             prepared.append((side, role, X, feats, [str(x) for x in a.obs_names], what))
+    return prepared
 
-    # --- the files this call writes, each with its unit: (side, batch number or '')
-    plan = []                           # (path, kind, payload, unit)
-    units = {}                          # unit -> (barcodes or None, number of cells)
+
+def _plan_files(out: Path, prepared, labels_by_side, masters, groups, category):
+    """``(plan, units)``: the files the call writes, as ``(path, kind,
+    payload, unit)``, and ``{unit: (barcodes or None, number of cells)}``;
+    a unit is ``(side, batch number or '')``."""
+    diagonal = category == "diagonal"
+    plan, units = [], {}
     for number, mask in groups:
         for side, role, X, feats, bars, what in prepared:
             sub = X if mask is None else X[mask]
@@ -1512,29 +1547,18 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
             else:
                 units[(side, number)] = (m if mask is None else [m[i] for i in mask],
                                          len(m) if mask is None else len(mask))
-    existing = [pth.name for pth, _, _, _ in plan if pth.exists() or pth.is_symlink()]
-    found = _leftovers(out, {pth.name for pth, _, _, _ in plan}, units, diagonal=diagonal,
-                       by_column=batch is not None, batch_index=batch_index)
-    if any(found):
-        held = []
-        if not prepared and category is None and batch_index is None:
-            # labels alone, for a folder that may be written with a category
-            held = _matrices_of(out, masters.get("rna"), len(labels_by_side["rna"]),
-                                skip={name for names in found for name in names})
-        raise FileExistsError(_leftover_message(out, found, held=held))
-    if existing and not overwrite:
-        raise FileExistsError(
-            f"{out} already holds {_text._and_list(existing)}. Pass "
-            f"{'overwrite=True'} to replace "
-            f"{'it' if len(existing) == 1 else 'them'}.")
-    # --- cells that the folder already holds keep the row order of its files
-    follow = _row_order(out, units, diagonal=diagonal)
+    return plan, units
+
+
+def _write_plan(out: Path, plan, follow) -> None:
+    """Write the planned files; the rows of a unit in ``follow`` (:func:`_row_order`)
+    keep the order the folder already holds them in."""
+    dtype = "float64"
     plan = [(pth, kind, _in_order(kind, payload, follow[unit][0]) if unit in follow
              else payload, unit) for pth, kind, payload, unit in plan]
     for pth, kind, payload, _ in plan:
         if kind == "matrix":
             _warn_dense_size(pth, payload[0].shape[1], payload[0].shape[0], dtype)
-
     out.mkdir(parents=True, exist_ok=True)
     for pth, kind, payload, _ in plan:
         if pth.exists() or pth.is_symlink():
@@ -1547,18 +1571,14 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
             _link_or_copy(payload, pth)
         else:
             _write_labels(payload, pth)
-    if follow:
-        import sys
-
-        for unit, (_, refs) in follow.items():
-            files = [pth.name for pth, _, _, u in plan if u == unit]
-            # a file this call replaced is no file that the new one follows
-            ref = next((name for name in refs if name not in files), None)
-            names = files[0] + (f" and {len(files) - 1} more" if len(files) > 1 else "")
-            print(f"export_dataset: wrote {names} in the cell order "
-                  + (f"{refs[0]} had before." if ref is None else f"of {ref}."),
-                  file=sys.stderr, flush=True)
-    return out
+    for unit, (_, refs) in follow.items():
+        files = [pth.name for pth, _, _, u in plan if u == unit]
+        # a file this call replaced is no file that the new one follows
+        ref = next((name for name in refs if name not in files), None)
+        names = files[0] + (f" and {len(files) - 1} more" if len(files) > 1 else "")
+        print(f"export_dataset: wrote {names} in the cell order "
+              + (f"{refs[0]} had before." if ref is None else f"of {ref}."),
+              file=sys.stderr, flush=True)
 
 
 def _has_feature_types(adata, spec) -> bool:
@@ -1635,6 +1655,14 @@ def _layout_unit(name: str, diagonal: bool):
     return None, number, matrix
 
 
+def _layout_files(out: Path, diagonal: bool):
+    """``(path, unit)`` of each layout file in ``out``, by name (:func:`_layout_unit`)."""
+    for p in sorted(out.iterdir(), key=lambda p: p.name):
+        unit = _layout_unit(p.name, diagonal)
+        if unit is not None and p.is_file():
+            yield p, unit
+
+
 def _layout_order(name: str):
     """Sort key of a layout file name: by batch number, then by
     :data:`_LAYOUT_STEMS`."""
@@ -1646,13 +1674,8 @@ def _layout_order(name: str):
 def _holds_other_cells(names, mine) -> bool:
     """True when ``names`` hold a cell not among ``mine``, compared as
     :func:`_cell_order` compares; ``False`` for non-unique barcodes."""
-    names, mine = [str(x) for x in names], [str(x) for x in mine]
     judged = False
-    for key in (None, _BARCODE_SUFFIX_RE):
-        a = names if key is None else [key.sub("", x) for x in names]
-        b = mine if key is None else [key.sub("", x) for x in mine]
-        if len(set(a)) != len(a) or len(set(b)) != len(b):
-            continue
+    for a, b in _comparable(names, mine):
         judged = True
         if set(a) <= set(b):
             return False
@@ -1684,11 +1707,9 @@ def _leftovers(out: Path, planned, units, *, diagonal, by_column, batch_index):
         side_n[side] = side_n.get(side, 0) + n
         if bars is not None:
             side_cells.setdefault(side, []).extend(bars)
-    for p in sorted(out.iterdir(), key=lambda p: p.name):
-        unit = _layout_unit(p.name, diagonal)
-        if unit is None or unit[0] is None or p.name in planned or not p.is_file():
+    for p, (side, number, matrix) in _layout_files(out, diagonal):
+        if side is None or p.name in planned:
             continue
-        side, number, matrix = unit
         if (side, number) in units:     # a unit the call writes: other cells or rows
             bars, n = units[(side, number)]
             if matrix:
@@ -1722,9 +1743,8 @@ def _matrices_of(out: Path, cells, n: int, *, skip) -> list:
     barcodes_of, _ = _folder_readers()
     named = cells is not None and len(set(cells)) == len(cells)
     held = []
-    for p in sorted(out.iterdir(), key=lambda p: p.name):
-        unit = _layout_unit(p.name, False)
-        if unit is None or not unit[2] or p.name in skip or not p.is_file():
+    for p, unit in _layout_files(out, False):
+        if not unit[2] or p.name in skip:
             continue
         old = barcodes_of(p)
         if old is not None and ((_cell_order(old, cells)[0] in ("same", "order")) if named
@@ -1773,9 +1793,8 @@ def _row_order(out: Path, units, *, diagonal) -> dict:
         return follow
     barcodes_of, _ = _folder_readers()
     held = {}                           # unit -> [(file name, barcodes)]
-    for p in sorted(out.iterdir(), key=lambda p: p.name):
-        unit = _layout_unit(p.name, diagonal)
-        if unit is None or not unit[2] or unit[:2] not in units or not p.is_file():
+    for p, unit in _layout_files(out, diagonal):
+        if not unit[2] or unit[:2] not in units:
             continue
         bars, old = units[unit[:2]][0], barcodes_of(p)
         if bars is not None and old is not None \
@@ -1884,9 +1903,8 @@ def _holds_a_cell(out: Path, names) -> bool:
         return False
     barcodes_of, _ = _folder_readers()
     names = {str(x) for x in names}
-    for p in sorted(out.iterdir(), key=lambda p: p.name):
-        unit = _layout_unit(p.name, False)
-        if unit is None or not unit[2] or not p.is_file():
+    for p, unit in _layout_files(out, False):
+        if not unit[2]:
             continue
         old = barcodes_of(p) or ()
         if not names.isdisjoint(old) \
@@ -1955,36 +1973,31 @@ def _diagonal_labels(data, spec, sides) -> dict:
         bars = [str(x) for x in a.obs_names]
         if col_each is not None and col_each in a.obs.columns:
             out[side] = np.asarray(a.obs[col_each])
-            _check_labels_complete(out[side], spec=spec, where=f"the {side.upper()} cells "
-                                   f"({src})", advice=_diagonal_label_advice(data, spec, sides),
-                                   when_none=_no_cell_types_advice(side))
-            continue
-        if col_each is not None:
-            if spec.startswith("obs:") and mu and col_each in data.obs.columns:
+        else:
+            if col_each is not None:
+                if not (spec.startswith("obs:") and mu and col_each in data.obs.columns):
+                    raise KeyError(
+                        f"labels={spec!r}: column {col_each!r} not in obs of the "
+                        f"{side.upper()} object ({src}); available: {list(a.obs.columns)}. "
+                        + (_other_column_advice(col_each, side, sides)
+                           or _no_cell_types_advice(side)))
                 ser = data.obs[col_each]
+            elif isinstance(spec, str):
+                ser = _select_obs(data, spec, what="labels")
             else:
-                raise KeyError(
-                    f"labels={spec!r}"
-                    + f": column {col_each!r} not in obs of the "
-                    f"{side.upper()} object ({src}); available: {list(a.obs.columns)}. "
-                    + (_other_column_advice(col_each, side, sides)
-                       or _no_cell_types_advice(side)))
-        elif isinstance(spec, str):
-            ser = _select_obs(data, spec, what="labels")
-        else:
-            ser = spec
-        if isinstance(ser, pd.Series):
-            idx = {str(k): i for i, k in enumerate(ser.index)}
-            lack = [b for b in bars if b not in idx]
-            if lack:
-                raise ValueError(
-                    f"labels={repr(spec) if isinstance(spec, str) else 'Series'}: "
-                    f"{len(lack)} of the {len(bars)} {side.upper()} cells have no label "
-                    f"({lack[:5]}{'...' if len(lack) > 5 else ''}); "
-                    + _diagonal_label_advice(data, spec, sides))
-            out[side] = np.asarray(ser)[[idx[b] for b in bars]]
-        else:
-            out[side] = _as_obs_vector(None, ser, what="labels", master=bars)
+                ser = spec
+            if isinstance(ser, pd.Series):
+                idx = {str(k): i for i, k in enumerate(ser.index)}
+                lack = [b for b in bars if b not in idx]
+                if lack:
+                    raise ValueError(
+                        f"labels={repr(spec) if isinstance(spec, str) else 'Series'}: "
+                        f"{len(lack)} of the {len(bars)} {side.upper()} cells have no label "
+                        f"({lack[:5]}{'...' if len(lack) > 5 else ''}); "
+                        + _diagonal_label_advice(data, spec, sides))
+                out[side] = np.asarray(ser)[[idx[b] for b in bars]]
+            else:
+                out[side] = _as_obs_vector(None, ser, what="labels", master=bars)
         _check_labels_complete(out[side], spec=spec, where=f"the {side.upper()} cells ({src})",
                                advice=_diagonal_label_advice(data, spec, sides),
                                when_none=_no_cell_types_advice(side))
