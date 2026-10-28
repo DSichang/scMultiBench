@@ -68,9 +68,20 @@ def test_dataset_barcodes_still_match(d28_like):
     assert by_cell and list(vec) == list(v)
 
 
-def test_repeated_raw_barcodes_are_still_refused(d28_like):
+def test_repeated_barcodes_in_the_label_files_order_are_aligned(d28_like):
+    """run.md's donor recipe, pd.concat([rna.obs.donor, atac.obs.donor]), on two
+    10x runs: the order says which cell each repeated barcode is."""
     folder, rna_bars, gas = d28_like
-    s = pd.Series("x", index=rna_bars + gas)
+    v = np.arange(len(rna_bars) + len(gas)).astype(str)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        vec, by_cell = W._cell_vector(pd.Series(v, index=rna_bars + gas), "DD", folder.parent)
+    assert by_cell and list(vec) == list(v)
+
+
+def test_repeated_barcodes_in_another_order_are_refused(d28_like):
+    folder, rna_bars, gas = d28_like
+    s = pd.Series("x", index=gas + rna_bars)
     with pytest.raises(ValueError, match=r"the index repeats 3 ids"):
         W._cell_vector(s, "DD", folder.parent)
 

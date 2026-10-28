@@ -2734,9 +2734,10 @@ def _dataset_cell_ids(dataset, data_path) -> list | None:
 
 
 def _embedding_cell_ids(dataset, data_path) -> list:
-    """The other names :meth:`RunResult.embedding` can give the same cells, in
-    the same order: with each ATAC file's barcodes (D28's ``atac_gas.h5`` and
-    ``atac_peak.h5`` differ in suffix), prefixed by label file when they repeat."""
+    """The other names of the same cells, in the same order: with each ATAC
+    file's barcodes (D28's ``atac_gas.h5`` and ``atac_peak.h5`` differ in
+    suffix), as they are and, when they repeat, prefixed by label file as
+    :meth:`RunResult.embedding` names them."""
     folder = _dataset_folder(dataset, data_path)
     try:
         with warnings.catch_warnings():
@@ -2753,10 +2754,9 @@ def _embedding_cell_ids(dataset, data_path) -> list:
         if any(b is None for b in bars):
             continue
         ids = [str(i) for b in bars for i in b]
-        if len(set(ids)) != len(ids):
-            ids = [f"{p.stem}:{i}" for p, b in zip(files, bars) for i in b]
-        if ids not in out:
-            out.append(ids)
+        named = ids if len(set(ids)) == len(ids) else \
+            [f"{p.stem}:{i}" for p, b in zip(files, bars) for i in b]
+        out += [x for x in (ids, named) if x not in out]
     return out
 
 
@@ -2798,10 +2798,13 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
         return vals, False
     ids = _dataset_cell_ids(dataset, data_path)
     index = pd.Index([str(i) for i in x.index])
-    if index.is_unique and (ids is None or set(index) != set(ids)):
+    if ids is None or set(index) != set(ids):
+        names = _embedding_cell_ids(dataset, data_path)
+        if not index.is_unique and list(index) in names:
+            # repeated barcodes in the label files' order: each value has its cell
+            return vals, True
         # the cell names res.embedding(m) gave
-        named = next((c for c in _embedding_cell_ids(dataset, data_path)
-                      if set(c) == set(index)), None)
+        named = next((c for c in names if index.is_unique and set(c) == set(index)), None)
         if named is not None:
             return np.asarray(pd.Series(vals, index=index).reindex(named).to_numpy()), True
     if ids is None:
