@@ -214,20 +214,20 @@ def test_labels_series_with_default_index_is_positional_and_silent():
 def test_align_vector_unit():
     ids = pd.Index(["a", "b", "c"])
     s = pd.Series([1, 2, 3], index=["c", "a", "b"])
-    assert io._align_vector(s, ids, what="labels", cells="adata.obs_names", column=None).tolist() == [2, 3, 1]
+    assert io._align_vector(s, ids, what="labels", column=None).tolist() == [2, 3, 1]
     # same order already -> no-op, even with duplicated ids
     dup = pd.Index(["a", "a", "b"])
-    assert io._align_vector(pd.Series([1, 2, 3], index=dup), dup, what="labels", cells="adata.obs_names", column=None).tolist() == [1, 2, 3]
+    assert io._align_vector(pd.Series([1, 2, 3], index=dup), dup, what="labels", column=None).tolist() == [1, 2, 3]
     with pytest.raises(ValueError, match="duplicated id"):
-        io._align_vector(pd.Series([1, 2, 3], index=["a", "a", "b"]), ids, what="labels", cells="adata.obs_names", column=None)
+        io._align_vector(pd.Series([1, 2, 3], index=["a", "a", "b"]), ids, what="labels", column=None)
     with pytest.raises(ValueError, match="output carries 1 duplicated cell id"):
-        io._align_vector(s, dup, what="labels", cells="adata.obs_names", column=None)
+        io._align_vector(s, dup, what="labels", column=None)
     # DataFrame forms
     frame = pd.DataFrame({"ct": [1, 2, 3], "other": [0, 0, 0]}, index=["c", "a", "b"])
-    assert io._align_vector(frame, ids, column="ct", what="labels", cells="adata.obs_names").tolist() == [2, 3, 1]
-    assert io._align_vector(frame[["ct"]], ids, what="labels", cells="adata.obs_names", column=None).tolist() == [2, 3, 1]
+    assert io._align_vector(frame, ids, column="ct", what="labels").tolist() == [2, 3, 1]
+    assert io._align_vector(frame[["ct"]], ids, what="labels", column=None).tolist() == [2, 3, 1]
     with pytest.raises(ValueError, match="pass one column"):
-        io._align_vector(frame, ids, what="labels", cells="adata.obs_names", column=None)
+        io._align_vector(frame, ids, what="labels", column=None)
 
 
 # ------------------------------------------------ I3: dict + label_order

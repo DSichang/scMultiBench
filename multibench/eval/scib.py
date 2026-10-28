@@ -315,9 +315,9 @@ def _search_n_clusters(adata, n: int, key: str, flavor: str) -> None:
                 return
 
 
-def _n_clusters(graph, n: int, flavor: str, per: str | None = None) -> np.ndarray:
+def _n_clusters(graph, n: int, flavor: str) -> np.ndarray:
     """The searched clusters of ``graph`` as strings: those of the last step when no
-    resolution gave ``n``, as the article's search. ``per`` is kept for callers."""
+    resolution gave ``n``, as the article's search."""
     key = "_mb_search"
     _search_n_clusters(graph, n, key, flavor)
     out = np.asarray(graph.obs[key].astype(str))
@@ -486,10 +486,10 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
         graph = _clustering_graph(emb)
         if search_ct:
             adata.obs["cluster"] = pd.Categorical(_n_clusters(
-                graph, adata.obs["celltype"].nunique(), flavor, "cell type"))
+                graph, adata.obs["celltype"].nunique(), flavor))
         if search_bat:
             adata.obs["batch_cluster"] = pd.Categorical(_n_clusters(
-                graph, n_batches, flavor, "batch"))
+                graph, n_batches, flavor))
     out: dict[str, float] = {}
 
     def _safe(name, fn):

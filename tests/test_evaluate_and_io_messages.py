@@ -140,7 +140,7 @@ def test_x72_batch_leiden_warning_says_what_it_affects(monkeypatch):
     with warnings.catch_warnings():
         warnings.simplefilter("error", UserWarning)
         got = S._n_clusters(S._clustering_graph(np.random.default_rng(4).normal(size=(40, 5))),
-                            3, "leidenalg", "batch")
+                            3, "leidenalg")
     assert sorted(set(got)) == ["a", "b"]
 
 
@@ -242,7 +242,7 @@ def test_rescore_leiden_warning_names_the_method(monkeypatch):
     # Y11 (r3): no warning at all, so nothing names a method
     with warnings.catch_warnings():
         warnings.simplefilter("error", UserWarning)
-        scib._n_clusters(G(), 13, "leidenalg", per="cell type")
+        scib._n_clusters(G(), 13, "leidenalg")
     assert not hasattr(workflow, "_named_leiden_warnings") and not hasattr(scib, "FOR_METHOD")
 
 

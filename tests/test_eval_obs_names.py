@@ -139,13 +139,13 @@ def test_a_10x_suffix_on_one_side_names_its_fix():
     lab = pd.Series(list("abab"), index=[f"AAAC{i}" for i in range(4)])
     with pytest.raises(ValueError, match=r"They match after adding '-1' to the labels ids: "
                                          r"pass labels\.set_axis\(labels\.index \+ '-1'\)\.$"):
-        io._align_vector(lab, ids, what="labels", column=None, cells=None)
+        io._align_vector(lab, ids, what="labels", column=None)
     fixed = lab.set_axis(lab.index + "-1")
-    assert list(io._align_vector(fixed, ids, what="labels", column=None, cells=None)) == \
+    assert list(io._align_vector(fixed, ids, what="labels", column=None)) == \
         list("abab")
     back = pd.Series(list("abab"), index=ids)
     with pytest.raises(ValueError, match=r"removesuffix\('-1'\)"):
-        io._align_vector(back, [i[:-2] for i in ids], what="labels", column=None, cells=None)
+        io._align_vector(back, [i[:-2] for i in ids], what="labels", column=None)
 
 
 def test_a_label_column_spelled_another_way_gets_a_did_you_mean():

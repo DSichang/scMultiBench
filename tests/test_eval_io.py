@@ -395,6 +395,6 @@ def test_align_vector_matches_as_evaluate_does():
     from multibench.eval import pipeline
     ids = pd.Index([f"c{i}" for i in range(6)])
     x = pd.Series([f"t{i}" for i in range(6)], index=ids).iloc[[3, 0, 5, 1, 4, 2]]
-    mine = io._align_vector(x, ids, what="labels", column=None, cells=None)
+    mine = io._align_vector(x, ids, what="labels", column=None)
     assert list(mine) == [f"t{i}" for i in range(6)]
     assert list(pipeline._obs_or_vector(x, None, what="labels", ids=ids)) == list(mine)

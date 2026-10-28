@@ -248,7 +248,7 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
                     and _same_cells(x.index, ids, what=what, name=name, table=table,
                                     fix=f"Pass {what} for the cells of {table.name}."):
                 table.moved.append(name)
-            return io._align_vector(x, ids, what=what, column=column, cells=None)
+            return io._align_vector(x, ids, what=what, column=column)
         _text.warn(
             f"The {what} {type(x).__name__} is matched by position, because the embedding "
             f"has no cell ids. Check that it follows the embedding rows, or pass an AnnData "

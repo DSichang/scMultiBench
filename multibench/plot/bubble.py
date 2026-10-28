@@ -216,17 +216,21 @@ def _expand_families(metrics, available) -> list:
     return list(dict.fromkeys(out))
 
 
-def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None) -> BubbleTable:
-    """The :class:`BubbleTable` of ``long_df``, as :func:`bubble` draws it."""
-    from .._data import catalog
-
+def _need_long(long_df: pd.DataFrame, fn: str) -> None:
+    """``ValueError`` when ``long_df`` is not a long table (method, metric, value)."""
     absent = sorted({"method", "metric", "value"} - set(long_df.columns))
     if absent:
         hint = (" mtb.evaluate returns the long table this function takes."
                 if "Value" in long_df.columns or long_df.index.name == "metric" else "")
-        raise ValueError(
-            f"bubble() needs a long table with columns "
-            f"['method', 'metric', 'value']; missing {absent}.{hint}")
+        raise ValueError(f"{fn}() needs a long table with columns "
+                         f"['method', 'metric', 'value']; missing {absent}.{hint}")
+
+
+def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None) -> BubbleTable:
+    """The :class:`BubbleTable` of ``long_df``, as :func:`bubble` draws it."""
+    from .._data import catalog
+
+    _need_long(long_df, "bubble")
     df = long_df.dropna(subset=["metric"])
     if methods is not None:
         methods = _resolve(methods, df["method"].unique().tolist(), "method",

@@ -589,9 +589,9 @@ def _one_column(x: pd.DataFrame, what: str, column: str | None) -> pd.Series:
         f"or column=<name>")
 
 
-def _align_vector(x, ids, *, what: str, column: str | None, cells: str | None):
+def _align_vector(x, ids, *, what: str, column: str | None):
     """``x`` (an indexed Series or DataFrame) reordered to the output's cell
-    ``ids``, for ``evaluate``. ``cells`` is not used."""
+    ``ids``, for ``evaluate``."""
     if isinstance(x, pd.DataFrame):
         x = _one_column(x, what, column)
     ids = pd.Index(ids)

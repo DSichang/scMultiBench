@@ -67,14 +67,10 @@ def bar(long_df: pd.DataFrame, *, metrics=None, methods=None, title: str | None 
     >>> fig = mtb.plot.bar(df, metrics="clustering", save="clustering.png")
     """
     import matplotlib.pyplot as plt
-    from .bubble import _expand_families, _refuse_repeats, _resolve
+    from .bubble import _expand_families, _need_long, _refuse_repeats, _resolve
     from .._data import catalog
 
-    missing = sorted({"method", "metric", "value"} - set(long_df.columns))
-    if missing:
-        raise ValueError(
-            f"bar() needs a long table with columns ['method', 'metric', "
-            f"'value']; missing {missing}")
+    _need_long(long_df, "bar")
     if len(long_df) == 0:
         raise ValueError(
             "long_df has no rows to plot. If it came from load_results, its "
