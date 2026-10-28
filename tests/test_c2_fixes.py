@@ -144,12 +144,12 @@ def test_a_batch_of_the_wrong_length_is_refused_before_anything_runs(tmp_path, m
     monkeypatch.setattr(workflow, "_installed_envs",
                         lambda: frozenset({envs.group_for("Matilda")}))
     monkeypatch.setattr(workflow._runner, "linux_only_sentence", lambda: None)
-    with pytest.raises(ValueError) as e:
+    # e2: D11 is a benchmark dataset, its batches are its label files
+    with pytest.raises(ValueError, match=r"^D11 is a benchmark dataset: its batches are "
+                                         r"its label files\."):
         mtb.run("D11", "vertical", tmp_path / "out", methods=["Matilda"], verbose=False,
                 batch=["a"] * 100)
     assert not (tmp_path / "out").exists()
-    assert str(e.value) == ("batch has 100 entries for the 2,864 cells of D11: give one "
-                            "batch per cell.")
 
 
 # --------------------------------------------------------------- D07, D08, D10-D13
@@ -206,9 +206,10 @@ def test_diagonal_classification_follows_the_folders_sides_whatever_batch_is():
     e, donor = _emb(n), np.random.default_rng(1).choice(["d1", "d2"], n)
     kw = dict(dataset="D28", category="diagonal", method="PCA", metrics="classification",
               verbose=False)
-    a = mtb.evaluate(e, **kw)
-    b = mtb.evaluate(e, batch=donor, **kw)
-    assert a["value"].tolist() == b["value"].tolist()
+    assert len(mtb.evaluate(e, **kw))
+    # e2: one batch label per dataset - D28's are its sides
+    with pytest.raises(ValueError, match=r"^D28 is a benchmark dataset"):
+        mtb.evaluate(e, batch=donor, **kw)
 
 
 def test_a_package_method_on_the_wrong_category():

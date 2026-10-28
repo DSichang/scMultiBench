@@ -369,7 +369,7 @@ def test_files_without_an_id_column_are_read_as_before(tmp_path, cite):
                 pytest.skip(f"demo file {p} not present")
             vals, first = eio.read_labels_ids(p)
             assert first is None and list(vals) == list(eio.read_labels(p))
-            vec, aligned = W._cell_vector(p, ds, root)
+            vec, aligned = W._cell_vector(p, ds, root, what="labels")
             assert not aligned and list(vec) == list(vals)
     assert not _order_warnings(rec)
 

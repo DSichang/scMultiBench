@@ -179,11 +179,14 @@ def test_embedding_obs_names_are_raw_barcodes_unless_they_repeat(host, tmp_path,
 
 
 def test_a_batch_column_for_the_batches_of_run(host, tmp_path):
-    """One label file, two donors passed as batch=: obs gets the batch column."""
+    """One label file, two donors passed as batch=: obs gets the batch column (on a
+    copy of D11, a dataset of your own: a benchmark dataset's batches are fixed)."""
     _on_disk("D11")
-    n = len(pd.read_csv(Path(config.data_path) / "D11" / "cty.csv"))
+    own = tmp_path / "data" / "MYD11"
+    shutil.copytree(Path(config.data_path) / "D11", own)
+    n = len(pd.read_csv(own / "cty.csv"))
     donors = np.where(np.arange(n) % 2, "P01", "P02")
-    res = _quiet(mtb.run, "D11", "vertical", tmp_path / "out", methods=["Matilda"],
+    res = _quiet(mtb.run, str(own), "vertical", tmp_path / "out", methods=["Matilda"],
                  batch=donors, verbose=False)
     obs = res.embedding("Matilda").obs
     assert obs["batch"].tolist() == donors.tolist()

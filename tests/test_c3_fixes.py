@@ -98,8 +98,8 @@ def test_rescore_refuses_a_batch_of_the_wrong_length_before_scoring(tmp_path, mo
     scored = []
     monkeypatch.setattr(workflow, "_score_record", lambda *a, **k: scored.append(a))
     res = mtb.load_run(_saved_tree(tmp_path))
-    with pytest.raises(ValueError, match=r"^batch has 2,000 entries for the 2,864 cells of "
-                                         r"D11: give one batch per cell\.$"):
+    with pytest.raises(ValueError, match=r"^D11 is a benchmark dataset: its batches are "
+                                         r"its label files\."):
         _quiet(res.rescore, batch=np.repeat(["a", "b"], 1000))
     assert not scored
 

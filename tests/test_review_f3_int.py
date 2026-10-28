@@ -444,7 +444,7 @@ def test_run_all_dry_run_checks_the_batch_length(tmp_path, pinned, capsys):
     argv = ['run-all', 'D11', '--category', 'vertical', '--methods', 'totalVI', '--dry-run', '--batch']
     full = tmp_path / 'full.csv'
     pd.DataFrame({'b': np.tile(['s1', 's2'], 1432)}).to_csv(full, index=False)
-    with pytest.raises(ValueError, match='^batch has 3 entries for the 2,864 cells of D11'):
+    with pytest.raises(ValueError, match='^D11 is a benchmark dataset'):
         _quiet(mtb.run, 'D11', 'vertical', tmp_path / 'out', methods=['totalVI'],
                batch=str(short))
     assert not (tmp_path / 'out').exists()

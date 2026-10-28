@@ -29,5 +29,5 @@ def test_export_names_the_barcode_suffix_fix(tmp_path):
 def test_run_all_batch_names_the_barcode_suffix_fix():
     ids = workflow._dataset_cell_ids("D11", None)
     batch = pd.Series(["a"] * len(ids), index=[i + "-9" for i in ids])
-    with pytest.raises(ValueError, match="They match after removing '-9' from the batch ids"):
-        workflow._cell_vector(batch, "D11", None)
+    with pytest.raises(ValueError, match="They match after removing '-9' from the labels ids"):
+        workflow._cell_vector(batch, "D11", None, what="labels")

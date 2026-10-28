@@ -77,14 +77,18 @@ def test_labels_with_ids_or_in_the_method_order_score_as_the_dataset_route():
     assert _value(mtb.evaluate(a, labels="ct", **KW)) == pytest.approx(want)
 
 
-def test_a_batch_with_ids_follows_the_method_order():
+def test_a_batch_with_ids_follows_the_method_order(tmp_path):
+    """On a copy of D52mini (a dataset of your own: benchmark batches are fixed)."""
+    import shutil
     st, fo, lab_folder, keys, emb = _d52mini()
+    own = tmp_path / "MYD52"
+    shutil.copytree(Path(next(iter(fo.values()))).parent, own)
     sizes = [len(pd.read_csv(p)) for p in fo.values()]
     folder_batch = np.repeat(["b1", "b2", "b3"], sizes)
     by_id = pd.Series(folder_batch, index=keys.to_numpy())
     in_stabmap_order = np.concatenate([folder_batch[sum(sizes[:2]):],
                                        folder_batch[:sum(sizes[:2])]])
-    kw = {**KW, "metrics": ["iLISI"]}
+    kw = {**KW, "dataset": str(own), "metrics": ["iLISI"]}
     got = _value(mtb.evaluate(emb, batch=by_id, **kw), "iLISI")
     want = _value(mtb.evaluate(emb, batch=in_stabmap_order, **kw), "iLISI")
     assert got == pytest.approx(want)
