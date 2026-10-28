@@ -699,6 +699,8 @@ def plan_totals(rows, sizes: dict | None = None, *, layers: dict | None = None
 def _ensure_layer(name: str, info: dict, envs_root: Path) -> Path:
     """``<envs_root>/.layers/<name>``, downloaded and unpacked on first use;
     ``RuntimeError`` when its digest is not the one ``info`` names."""
+    import tarfile
+    from .._data.fetch import safe_extract
     dest = envs_root / LAYERS_DIR / name
     if not (dest / LAYER_INFO).is_file():
         entry = packed_layers().get(name)
@@ -711,8 +713,11 @@ def _ensure_layer(name: str, info: dict, envs_root: Path) -> Path:
             download_archive(list(entry["urls"]), tgz, label=f"{name} (shared layer)",
                              total=entry.get("archive_bytes"))
             print(f"[env] unpacking {name} -> {dest} ...", flush=True)
+            shutil.rmtree(part, ignore_errors=True)
             shutil.rmtree(dest, ignore_errors=True)
-            _extract(tgz, part)
+            part.mkdir(parents=True)
+            with tarfile.open(tgz) as t:
+                safe_extract(t, part)
             part.rename(dest)
         finally:
             tgz.unlink(missing_ok=True)
@@ -722,16 +727,6 @@ def _ensure_layer(name: str, info: dict, envs_root: Path) -> Path:
         raise RuntimeError(f"the layer {name} on disk is not the one this archive was "
                            f"packed with; delete {dest} and install again")
     return dest
-
-
-def _extract(tgz: Path, part: Path) -> None:
-    """Unpack the archive ``tgz`` into a new, empty folder ``part``."""
-    import tarfile
-    from .._data.fetch import safe_extract
-    shutil.rmtree(part, ignore_errors=True)
-    part.mkdir(parents=True)
-    with tarfile.open(tgz) as t:
-        safe_extract(t, part)
 
 
 def _link_layer(layer: Path, prefix: Path, info: dict) -> None:
@@ -776,6 +771,7 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
         archive is published or the unpack failed (the caller then builds
         from the lockfile).
     """
+    import tarfile
     import urllib.error
 
     check_flavor(flavor)                  # a typo fails before the platform check
@@ -809,9 +805,13 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
         tgz.unlink(missing_ok=True)
         raise
     print(f"[env] unpacking {env} -> {dest} ...", flush=True)
+    from .._data.fetch import safe_extract
     part = dest.with_name(dest.name + ".partial")
     try:
-        _extract(tgz, part)
+        shutil.rmtree(part, ignore_errors=True)
+        part.mkdir(parents=True)
+        with tarfile.open(tgz) as t:
+            safe_extract(t, part)
         if not (part / "bin").is_dir():
             raise RuntimeError("archive did not contain bin/")
         # the files this env shares with others: one download, hard links
