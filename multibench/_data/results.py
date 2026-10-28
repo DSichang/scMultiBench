@@ -19,7 +19,6 @@ from ..engine import registry
 from .._text import _and_list
 from .. import _text
 from . import catalog
-from ..engine.registry import _BASE_MODALITIES
 
 __all__ = ["load_results", "rank"]
 
@@ -184,6 +183,12 @@ def _check_methods(wanted: list, present) -> None:
                            ) from None
 
 
+def _of_methods(df, wanted) -> pd.DataFrame:
+    """The rows of ``df`` whose method is one of ``wanted``, in any spelling."""
+    want = {catalog._canonical_id(m).lower() for m in wanted}
+    return df[df["method"].map(lambda m: catalog._canonical_id(m).lower()).isin(want)]
+
+
 def load_results(
     category: str | None = None,
     *,
@@ -267,8 +272,7 @@ def _load_results(
     # against the codes the frame holds too
     sel = catalog.metric_selection(metrics) if metrics is None or isinstance(metrics, str) \
         else None
-    if category is not None:
-        registry.check_category(category)      # validates
+    registry.check_category(category)
     datasets = _as_list(dataset)
     wanted_methods = _as_list(methods)
 
@@ -306,8 +310,7 @@ def _load_results(
     if wanted_methods is not None:
         avail = sorted(out["method"].unique())
         _check_methods(wanted_methods, avail)
-        want = {catalog._canonical_id(m).lower() for m in wanted_methods}
-        out = out[out["method"].map(lambda m: catalog._canonical_id(m).lower()).isin(want)]
+        out = _of_methods(out, wanted_methods)
         if out.empty:
             shown = wanted_methods if len(wanted_methods) > 1 else wanted_methods[0]
             _text.warn(
@@ -358,14 +361,14 @@ def _unmeasured_note(category: str, datasets, wanted: set[str], stored: bool) ->
     if not datasets or any(d not in _STORED_DATASET_MODALITIES for d in datasets):
         return ""
     measured = set().union(*(_STORED_DATASET_MODALITIES[d] for d in datasets))
-    missing = [m for m in _BASE_MODALITIES if m in wanted and m not in measured]
+    missing = [m for m in registry._BASE_MODALITIES if m in wanted and m not in measured]
     if not missing:
         return ""
     groups: dict[tuple, list[str]] = {}
     for d in sorted(datasets, key=catalog._dataset_sort_key):
         groups.setdefault(_STORED_DATASET_MODALITIES[d], []).append(d)
     where = "; ".join(f"{', '.join(ds)} ({'+'.join(mods)})" for mods, ds in groups.items())
-    data = "+".join(m.upper() for m in _BASE_MODALITIES if m in wanted)
+    data = "+".join(m.upper() for m in registry._BASE_MODALITIES if m in wanted)
     head = f"The stored results of {category}" if stored else f"The {category} scores in long_df"
     return (f"{head} come from {where}. None of these datasets measured "
             f"{' or '.join(missing)}, so they cannot rank methods for {data} data. "
@@ -436,44 +439,29 @@ def rank(
     >>> both = pd.concat([mtb.load_results("vertical"), mine])
     >>> mtb.rank("vertical", long_df=both)
     """
+    from ..discover import _modality_filter, find_methods
     from ..plot import style
+    from ..plot.bubble import _refuse_repeats
 
     registry.check_category(category)
-    from ..discover import find_methods, _modality_filter
-
-    min_methods = 2
     want_mods, atac = _modality_filter(modalities)
     filtered = want_mods is not None or atac is not None
     if want_mods is None and atac is not None:
         want_mods = {"atac"}
     sel = catalog.metric_selection(metrics)
-    long_df_was_none = long_df is None
-    if long_df is None:
+    stored = long_df is None
+    if stored:
         # every metric: the "metrics present" error names what the frame holds
         long_df = _load_results(category)
-    df = long_df.copy()
-    table_noun = "stored results" if long_df_was_none else "long_df frame"
-    label = f"the {table_noun}" if long_df_was_none else "long_df"
-    if not long_df_was_none and "category" in df.columns:
-        # rows scored as another category would be ranked against this one's
-        cats = {str(c) for c in df["category"].dropna()}
-        other = sorted(cats - {category})
-        if len(other) == 1 and category not in cats:
-            raise ValueError(f"long_df holds {other[0]} rows: pass "
-                             f"rank({other[0]!r}, long_df=...).")
-        if other:
-            one = category if category in cats else other[0]
-            raise ValueError(
-                f"long_df holds {_and_list(other)} rows"
-                + (f" next to {category} ones" if category in cats else "")
-                + f": rank one category at a time, as rank({one!r}, "
-                f"long_df=long_df[long_df['category'] == {one!r}]).")
-
-    from ..engine.registry import list_methods
+    elif "category" in long_df.columns:
+        _refuse_other_categories(long_df, category)
+    table_noun = "stored results" if stored else "long_df frame"
+    label = "the stored results" if stored else "long_df"
 
     # a package method not run for the category (scMSI in a cross table) must not
     # shape the ranks; a name the registry does not know (the user's own) is kept
-    listed = set(list_methods(category=category))
+    df = long_df.copy()
+    listed = set(registry.list_methods(category=category))
     registry_ids = set(catalog._registry_ids())
     canon = df["method"].map(catalog._canonical_id)
     foreign = sorted({m for m, c in zip(df["method"], canon)
@@ -491,8 +479,7 @@ def rank(
         wanted = _as_list(methods)
         _check_methods(wanted, sorted(df["method"].astype(str).unique()))
         want_ids = {catalog._canonical_id(m) for m in wanted}
-        want_lower = {w.lower() for w in want_ids}
-        df = df[df["method"].map(lambda m: catalog._canonical_id(m).lower()).isin(want_lower)]
+        df = _of_methods(df, wanted)
         if df.empty:
             raise ValueError(
                 f"none of methods={list(wanted)} has rows in {label} for "
@@ -504,58 +491,26 @@ def rank(
     if sel.codes is not None:
         df = df[df["metric"].isin(sel.codes)]
         if df.empty:
-            from ..plot.bar import CLASSIFICATION_METRICS
-            if long_df_was_none and set(sel.codes) <= set(CLASSIFICATION_METRICS):
-                raise ValueError(
-                    f"The stored results of {category} have no classification scores. "
-                    f"Score your runs with mtb.evaluate and pass them as long_df=.")
-            if long_df_was_none and not sel.explicit and sel.family == "batch":
-                one = ", ".join(sorted(map(str, long_df["dataset"].unique())))
-                raise ValueError(
-                    f"The {category} tables have no batch scores ({one} has one "
-                    f"batch). Use metrics=\"clustering\".")
-            raise ValueError(
-                f"no {metrics!r} metrics ({sel.codes}) in the frame; metrics present: "
-                f"{sorted(long_df['metric'].unique())}")
+            raise ValueError(_no_metric_rows(category, metrics, sel, long_df, stored))
     if "dataset" not in df.columns:
         df["dataset"] = "all"
-    keys = ["method", "metric", "dataset"]
-    from ..plot.bubble import _duplicate_rows_message, _user_repeats
-    repeated = _user_repeats(df, keys)
-    if repeated.any():
-        raise ValueError(_duplicate_rows_message(df[repeated], keys))
+    _refuse_repeats(df)
 
-    # the methods with a score on each dataset
-    scored = df[df["value"].notna()]
-    per_ds = {ds: sorted(set(g["method"])) for ds, g in scored.groupby("dataset")}
-    degenerate = sorted(ds for ds, ms in per_ds.items() if len(ms) < min_methods)
-    kept = {ds: ms for ds, ms in per_ds.items() if ds not in degenerate}
-    if not kept:
-        lone = sorted({m for ms in per_ds.values() for m in ms}, key=str)
-        what = f"{metrics} scores" if isinstance(metrics, str) else "scores"
-        on = _and_list(sorted(map(str, per_ds))) or category
-        fix = ("Pass long_df= with the scores of more methods." if long_df_was_none
-               else "Add the scores of more methods to long_df.")
-        who = (f"Only {_and_list(lone)} {'has' if len(lone) == 1 else 'have'}" if lone
-               else "No method has")
-        raise ValueError(f"{who} {what} on {on}: a ranking needs {min_methods} or more "
-                         f"methods. {fix}")
+    kept, degenerate = _rankable(df, category, metrics, stored)
     # igraph-scored rows ranked against leidenalg-scored stored rows
     backend = style.backend_warning(df[df["dataset"].isin(list(kept))])
     n_ds = pd.Series([m for ms in kept.values() for m in ms]).value_counts()
-    n_total = len(kept)
     codes = sel.codes if sel.explicit else None
-    stored = style.stored_pairs()
-    grand = style.overall(df, codes, stored=stored)   # refuses your rows on another dataset
+    pairs = style.stored_pairs()
+    grand = style.overall(df, codes, stored=pairs)   # refuses your rows on another dataset
     if degenerate:
-        grand = style.overall(df[df["dataset"].isin(list(kept))], codes, stored=stored)
+        grand = style.overall(df[df["dataset"].isin(list(kept))], codes, stored=pairs)
     keep_methods = list(grand.index) + sorted(
         {m for ms in kept.values() for m in ms} - set(grand.index), key=str)
     if filtered:
         allowed = set(find_methods(category=category, modalities=modalities))
         # your own methods are not package methods: the filter leaves them
-        from ..engine.registry import method_of
-        keep_methods = [m for m in keep_methods if method_of(m) in allowed | {None}]
+        keep_methods = [m for m in keep_methods if registry.method_of(m) in allowed | {None}]
         if not keep_methods:
             asked = " and ".join(
                 ([f"consumes modalities {list(modalities)}"] if modalities is not None
@@ -568,60 +523,28 @@ def rank(
     # methods run for the category without scores; of long_df's methods only
     in_frame = {catalog._canonical_id(m) for m in df["method"].unique()}
     wired = [m for m in find_methods(category=category, modalities=modalities)
-             if long_df_was_none or m in in_frame]
-    if want_ids is not None:
-        wired = [m for m in wired if m in want_ids]
+             if (stored or m in in_frame) and (want_ids is None or m in want_ids)]
     scored_ids = {catalog._canonical_id(m) for m in keep_methods}
     missing = sorted((m for m in wired if m not in scored_ids), key=str.lower)
-    # rows only in dropped datasets is another reason than no rows
-    only_dropped = [m for m in missing if m in in_frame]
 
-    from ..engine import envs
-    from ..discover import method_info
-
-    rows = []
-    for m in keep_methods + missing:
-        scored = m in grand.index
-        # '<id> (this run)' takes the chips of its method
-        own = registry.method_of(m)
-        spec = registry.get(own) if own else None
-        if spec is not None:
-            in_category = [v for v in spec.variants if v.when.get("category") == category]
-            env = envs.group_for(spec.id)
-            # a method may be supervised in one category only
-            needs = any(v.needs_labels for v in in_category) if in_category \
-                else bool(spec.needs_labels)
-            runtime = method_info(spec.id)["runtime"]
-            # the observed times are the package's runs: none for a run of yours
-            tier, worst = ((runtime.get("tier"), runtime.get("worst_sec"))
-                           if catalog._canonical_id(m) == spec.id else (None, None))
-        else:
-            env, needs, tier, worst = None, None, None, None
-        rows.append({
-            "method": m,
-            "grand_score": float(grand.loc[m]) if scored else float("nan"),
-            "needs_labels": needs,
-            "runtime_tier": tier,
-            "worst_sec": worst,
-            "env": env,
-        })
-    out = pd.DataFrame(rows)
+    out = pd.DataFrame([{"method": m,
+                         "grand_score": float(grand.loc[m]) if m in grand.index else float("nan"),
+                         **_chips(m, category)} for m in keep_methods + missing])
     out.attrs["metrics"] = list(sel.codes) if sel.explicit else sel.family
-    out.attrs["source"] = "rerun" if long_df_was_none else "long_df"
+    out.attrs["source"] = "rerun" if stored else "long_df"
     out.attrs["missing"] = list(missing)
     out.attrs["dropped_methods"] = list(foreign)
 
-    notes = []
     if filtered:
-        unmeasured = _unmeasured_note(category, list(kept), want_mods,
-                                      long_df_was_none)
+        unmeasured = _unmeasured_note(category, list(kept), want_mods, stored)
         if unmeasured:
             raise ValueError(unmeasured)
+    notes = []
     if degenerate:
         one = len(degenerate) == 1
         notes.append(
             f"{'Dataset' if one else 'Datasets'} {_and_list(degenerate)} "
-            f"{'has' if one else 'have'} fewer than {min_methods} methods and "
+            f"{'has' if one else 'have'} fewer than {_MIN_METHODS} methods and "
             f"{'is' if one else 'are'} left out of the ranking. A min-max score "
             f"over one method is always 1.0.")
     if foreign:
@@ -632,13 +555,15 @@ def rank(
             f"{table_noun}, but this package does not run {it} for {category}, "
             f"so {they} left out of the ranking. "
             f"mtb.find_methods(category={category!r}) does not list {it}.")
-    partial = [m for m in out["method"] if m in n_ds.index and n_ds.loc[m] < n_total]
+    partial = [m for m in out["method"] if m in n_ds.index and n_ds.loc[m] < len(kept)]
     if partial:
         notes.append(
             "Some methods have scores on only part of the datasets: "
-            + ", ".join(f"{m} {int(n_ds.loc[m])} of {n_total}" for m in partial) + ".")
+            + ", ".join(f"{m} {int(n_ds.loc[m])} of {len(kept)}" for m in partial) + ".")
     if backend:
         notes.append(backend)
+    # rows only in dropped datasets is another reason than no rows
+    only_dropped = [m for m in missing if m in in_frame]
     if only_dropped:
         one = len(only_dropped) == 1
         notes.append(
@@ -646,6 +571,83 @@ def rank(
             f"datasets left out of the ranking, so {'it is' if one else 'they are'} "
             f"listed last.")
     if notes:
-        _text.warn(f"rank({category!r}):\n  - " + "\n  - ".join(notes),
-                     UserWarning)
+        _text.warn(f"rank({category!r}):\n  - " + "\n  - ".join(notes), UserWarning)
     return out
+
+
+def _refuse_other_categories(long_df, category) -> None:
+    """Raise when ``long_df`` holds rows of another category: they would be
+    ranked against this one's."""
+    cats = {str(c) for c in long_df["category"].dropna()}
+    other = sorted(cats - {category})
+    if len(other) == 1 and category not in cats:
+        raise ValueError(f"long_df holds {other[0]} rows: pass "
+                         f"rank({other[0]!r}, long_df=...).")
+    if other:
+        one = category if category in cats else other[0]
+        raise ValueError(
+            f"long_df holds {_and_list(other)} rows"
+            + (f" next to {category} ones" if category in cats else "")
+            + f": rank one category at a time, as rank({one!r}, "
+            f"long_df=long_df[long_df['category'] == {one!r}]).")
+
+
+def _no_metric_rows(category, metrics, sel, long_df, stored: bool) -> str:
+    """rank()'s error when ``metrics=`` leaves no row."""
+    if stored and set(sel.codes) <= set(catalog.FAMILY_METRICS["classification"]):
+        return (f"The stored results of {category} have no classification scores. "
+                f"Score your runs with mtb.evaluate and pass them as long_df=.")
+    if stored and not sel.explicit and sel.family == "batch":
+        one = ", ".join(sorted(map(str, long_df["dataset"].unique())))
+        return (f"The {category} tables have no batch scores ({one} has one "
+                f"batch). Use metrics=\"clustering\".")
+    return (f"no {metrics!r} metrics ({sel.codes}) in the frame; metrics present: "
+            f"{sorted(long_df['metric'].unique())}")
+
+
+#: the fewest methods a dataset needs to count in the ranking
+_MIN_METHODS = 2
+
+
+def _rankable(df, category, metrics, stored: bool) -> tuple[dict, list]:
+    """``({dataset: its scored methods}, [datasets left out])``: a dataset with
+    fewer than :data:`_MIN_METHODS` scored methods is left out; none left raises."""
+    scored = df[df["value"].notna()]
+    per_ds = {ds: sorted(set(g["method"])) for ds, g in scored.groupby("dataset")}
+    degenerate = sorted(ds for ds, ms in per_ds.items() if len(ms) < _MIN_METHODS)
+    kept = {ds: ms for ds, ms in per_ds.items() if ds not in degenerate}
+    if kept:
+        return kept, degenerate
+    lone = sorted({m for ms in per_ds.values() for m in ms}, key=str)
+    what = f"{metrics} scores" if isinstance(metrics, str) else "scores"
+    on = _and_list(sorted(map(str, per_ds))) or category
+    fix = ("Pass long_df= with the scores of more methods." if stored
+           else "Add the scores of more methods to long_df.")
+    who = (f"Only {_and_list(lone)} {'has' if len(lone) == 1 else 'have'}" if lone
+           else "No method has")
+    raise ValueError(f"{who} {what} on {on}: a ranking needs {_MIN_METHODS} or more "
+                     f"methods. {fix}")
+
+
+def _chips(name, category) -> dict:
+    """``needs_labels``, ``runtime_tier``, ``worst_sec`` and ``env`` of a ranked
+    row; ``'<id> (this run)'`` takes its method's, but not the observed times
+    (they are the package's runs)."""
+    from ..discover import method_info
+    from ..engine import envs
+
+    own = registry.method_of(name)
+    if not own:
+        return {"needs_labels": None, "runtime_tier": None, "worst_sec": None, "env": None}
+    spec = registry.get(own)
+    in_category = [v for v in spec.variants if v.when.get("category") == category]
+    env = envs.group_for(spec.id)
+    # a method may be supervised in one category only
+    needs = (any(v.needs_labels for v in in_category) if in_category
+             else bool(spec.needs_labels))
+    runtime = method_info(spec.id)["runtime"]
+    own_run = catalog._canonical_id(name) == spec.id
+    return {"needs_labels": needs,
+            "runtime_tier": runtime.get("tier") if own_run else None,
+            "worst_sec": runtime.get("worst_sec") if own_run else None,
+            "env": env}
