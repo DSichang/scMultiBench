@@ -54,8 +54,7 @@ def _long_table(value_df, *, method: str, dataset: str | None = None,
     leaves the column empty."""
     if category is not None:
         registry.check_category(category)        # "verticall" is refused here
-    out = value_df.rename(columns={"Value": "value"}).copy()
-    out = out.reset_index()
+    out = value_df.rename(columns={"Value": "value"}).reset_index()
     out = out.rename(columns={out.columns[0]: "metric"})   # the index, whatever its name
     out["metric"] = out["metric"].map(catalog._canonical_metric)
     out = out.dropna(subset=["metric"])
@@ -74,9 +73,8 @@ def _long_table(value_df, *, method: str, dataset: str | None = None,
     out = out[LONG_COLUMNS + ["scored_with"]].reset_index(drop=True)
     if stamp is not None:
         out.attrs = {k: value_df.attrs.get(k) for k in PROVENANCE_ATTRS}
-        for k in ("scib_version",):
-            if k in value_df.attrs:
-                out.attrs[k] = value_df.attrs[k]
+        if "scib_version" in value_df.attrs:
+            out.attrs["scib_version"] = value_df.attrs["scib_version"]
     return out
 
 
@@ -199,8 +197,8 @@ def _same_cells(keys, ids, *, what: str, name: str, table: _Table, fix: str) -> 
     if len(extra) or len(missing):
         ix, a, b = (missing, table.name, name) if len(missing) else (extra, name, table.name)
         raise ValueError(
-            f"{what}: {len(ix):,} {'cell' if len(ix) == 1 else 'cells'} of {a} "
-            f"{'is' if len(ix) == 1 else 'are'} not in {b}, for example {ix[0]}. {fix}")
+            f"{what}: {_n(len(ix), 'cell')} of {a} {'is' if len(ix) == 1 else 'are'} "
+            f"not in {b}, for example {ix[0]}. {fix}")
     return not keys.equals(ids)
 
 
@@ -273,9 +271,7 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
         _text.warn(
             f"The {what} {type(x).__name__} is matched by position, because the embedding "
             f"has no cell ids. Check that it follows the embedding rows, or pass an AnnData "
-            f"whose obs_names are the barcodes.",
-            # _obs_or_vector <- evaluate <- its keyword wrapper <- the caller
-            UserWarning)
+            f"whose obs_names are the barcodes.", UserWarning)
     if io._numbers_rows(x, ids) and _has_cell_ids(ids):
         raise ValueError(f"{what} is a Series without cell ids, and the embedding has: index "
                          f"it by the barcodes, or pass {what}.to_numpy() to match by position.")
@@ -285,12 +281,8 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
 def _pick(what: str):
     """The ``pick`` of ``io.read_labels_ids``: how to choose one column of a
     per-cell file."""
-    def fix(example: str) -> str:
-        py = f"Pass one column, for example {example}"
-        if what == "labels":
-            return f"{py}, or name the label column x."
-        return f"{py}."
-    return fix
+    tail = ", or name the label column x." if what == "labels" else "."
+    return lambda example: f"Pass one column, for example {example}{tail}"
 
 
 def _has_cell_ids(ids) -> bool:
@@ -370,12 +362,8 @@ def _folder_ids_error(files, counts, ids, reads, found, others) -> str:
     array when the cells are in the folder's order, else the folder's names."""
     names = _and_list([Path(f).name for f in files])
     have = set().union(*map(set, found))
-    seen, dup = set(), None
-    for i in ids:
-        if i in seen:
-            dup = i
-            break
-        seen.add(i)
+    repeats = pd.Index(ids)[pd.Index(ids).duplicated()]
+    dup = repeats[0] if len(repeats) else None
     miss = [i for i in ids if i not in have]
     if dup is not None:
         head = f"The embedding repeats cell ids, such as {dup!r}"
@@ -394,13 +382,14 @@ def _folder_ids_error(files, counts, ids, reads, found, others) -> str:
             named = (f"{m}'s output" if len(made) == 1 else
                      f"the output of {_and_list(made, 'or')}" if len(made) <= 3 else
                      f"the output of {', '.join(made[:3])} or {len(made) - 3} more")
-            return (f"{head}. These cells are named as {named}: " + (f"pass method= the method that made it, such as method={m!r} "
-                f"(or '{m} (this run)')."))
+            return (f"{head}. These cells are named as {named}: pass method= the method "
+                    f"that made it, such as method={m!r} (or '{m} (this run)').")
     for read in dict.fromkeys([*reads, *other]):
         raw = _raw_barcodes(files, counts, read)
         if raw is not None and len(raw[0]) == len(ids) and list(raw[0]) == ids:
-            return (f"{head}. The cells are in the folder's order: " + ("pass the embedding as an array, as np.asarray(adata.obsm[key]) or "
-                "adata.X, to match them by position."))
+            return (f"{head}. The cells are in the folder's order: pass the embedding as "
+                    f"an array, as np.asarray(adata.obsm[key]) or adata.X, to match them "
+                    f"by position.")
     return f"{head}. Name the embedding's cells as the folder does, such as {found[0].iloc[0]!r}."
 
 
@@ -432,11 +421,9 @@ def _stack_label_files(files, ids, as_written=False, table=None, read=(), others
                     dict(name=name, fix=_file_fix()) if len(names) == 1 else
                     dict(name="the label files", fix=_file_fix(plural=True)))):
             table.moved.extend(names)
-        # a caller of evaluate is 5 frames up: by_id_column, this, evaluate, its wrapper
-        pos, _ = io.by_id_column(np.arange(len(vals)), pd.concat(
-            [first for _, first in rows], ignore_index=True), ids if unique else None,
-            what="labels", name=name, target="the embedding", order=order,
-            no_ids=_no_ids(ids), n_files=len(names))
+        pos, _ = io.by_id_column(np.arange(len(vals)), keys, ids if unique else None,
+                                 what="labels", name=name, target="the embedding",
+                                 order=order, no_ids=_no_ids(ids), n_files=len(names))
         return vals[pos], origin[pos]
     if all(first is None for _, first in rows) and _has_cell_ids(ids):
         # no ids: the dataset folder's matrices name the cells; without them, by position
@@ -466,9 +453,8 @@ def _labels_from_dict(d: dict) -> list:
         return [next(iter(d.values()))]
     from ..engine.resolve import LabelFiles, _label_sort_key
     keys = list(d)
-    if isinstance(d, LabelFiles) and d.in_stacking_order():
-        return [d[k] for k in keys]
-    if keys == sorted(keys, key=_label_sort_key):
+    if (isinstance(d, LabelFiles) and d.in_stacking_order()) \
+            or keys == sorted(keys, key=_label_sort_key):
         return [d[k] for k in keys]
     # name the method's cell order only for a reordered labels_for dict that had one
     if isinstance(d, LabelFiles) and \
@@ -481,7 +467,6 @@ def _labels_from_dict(d: dict) -> list:
         f"cell order, or dataset=, category= and method=. The default order is "
         f"cty1, cty2, ... by number, with rna before adt before atac. It is "
         f"not alphabetical.")
-
 
 
 #: the keys of a labels dict, in the order of its files (label_order's spelling)
@@ -558,17 +543,16 @@ def _as_written(given, adata, ids, *, what, read=(), others=None):
 def _measured_warning(given, adata, reason: str, distinct: int, cells: int) -> str:
     """The warning for labels that look like a measured number per cell, such as
     ``nCount_RNA``; names the column, Series or file(s) when known."""
-    arg = "labels"
     files = [f.name for f in _label_files(given)]
     if adata is not None and isinstance(given, str) \
             and _obs_column_name(given, adata) is not None:
         src = f"labels={given!r}"
     elif files:
-        src = f"{arg} ({files[0]}" + (f" and {len(files) - 1} more)" if len(files) > 1 else ")")
+        src = f"labels ({files[0]}" + (f" and {len(files) - 1} more)" if len(files) > 1 else ")")
     elif isinstance(given, pd.Series) and given.name is not None:
         src = f"The labels Series {str(given.name)!r}"
     else:
-        src = arg
+        src = "labels"
     why = ("holds numbers that are not whole numbers" if reason == "fraction"
            else f"has {distinct:,} different labels for {cells:,} cells")
     return f"{src} {why}. Check that it holds the cell types."
@@ -583,8 +567,8 @@ def _no_label_error(shown, miss, given) -> str:
     if n == n_cells:
         return (f"{head}: none of the {n_cells:,} cells has a label{example}. Pass the "
                 f"column or file that holds the cell types.")
-    keep = "Score the other cells only, as adata[adata.obs[col].notna()]."
-    return (f"{head}: {n:,} of the {n_cells:,} cells have no label{example}. {keep}")
+    return (f"{head}: {n:,} of the {n_cells:,} cells have no label{example}. Score the "
+            f"other cells only, as adata[adata.obs[col].notna()].")
 
 
 def _no_batch_error(shown, miss, given) -> str:
@@ -672,7 +656,7 @@ def _count_error(what: str, n: int, n_cells: int, given, category=None,
     if cells is not None and what == "labels":
         dataset = cells.dataset
         head = (f"The label files of {dataset}{names} hold {_n(n, 'cell')}; the "
-                           f"embedding has {_n(n_cells, 'row')}.")
+                f"embedding has {_n(n_cells, 'row')}.")
         if side and category == "diagonal":
             return (f'{head} {dataset} labels the {side[0]} cells only, see the recipe '
                     f'"No labels" in the docs.')
@@ -684,9 +668,9 @@ def _count_error(what: str, n: int, n_cells: int, given, category=None,
     fact = f"{what} has {_n(n, 'entry', 'entries')} for {_n(n_cells, 'cell')} in the embedding"
     if what == "labels" and n > n_cells and len(files) > 1:
         fit = _files_that_fit(files, n_cells)
-        names = _LABEL_KEYS.get()
+        given_keys = _LABEL_KEYS.get()
         if fit:
-            keys = (names[:len(fit)] if names and len(names) == len(files)
+            keys = (given_keys[:len(fit)] if given_keys and len(given_keys) == len(files)
                     else [f.stem for f in fit])
             return (f"The embedding has {_n(n_cells, 'cell')} = {'+'.join(keys)}. "
                     f"Pass the label files {_and_list(f.name for f in fit)} only.")
@@ -697,10 +681,15 @@ def _count_error(what: str, n: int, n_cells: int, given, category=None,
     if side and not batches:
         return (f'{fact}. {files[0].name} labels the {side[0]} cells only, see the recipe '
                 f'"No labels" in the docs.')
-    return (f"{fact}. For a folder with one label file per batch, pass dataset=, category= "
-        f"and method=." if files else
-        f"labels has {_n(n, 'entry', 'entries')} for {_n(n_cells, 'embedding row')}: "
-        f"give one label per row.")
+    if files:
+        return (f"{fact}. For a folder with one label file per batch, pass dataset=, "
+                f"category= and method=.")
+    return (f"labels has {_n(n, 'entry', 'entries')} for {_n(n_cells, 'embedding row')}: "
+            f"give one label per row.")
+
+
+#: the fix for batch metrics without a batch
+_FILES_FIX = "Pass batch=<vector>, or labels as a list of two or more files."
 
 
 def _plan_metrics(metrics, *, has_batch: bool):
@@ -715,6 +704,11 @@ def _plan_metrics(metrics, *, has_batch: bool):
     clu, bat, cls = _metric_families()
     # a family token computes kBET only when it is named
     family_bat = [c for c in bat if c != "kBET"]
+
+    def needs_batch(codes, fix):
+        return ValueError(f"{_metrics_spelling(metrics)} needs batch labels for "
+                          f"{_and_list(codes)}. {fix}")
+
     sel = catalog.metric_selection(metrics)
     want_cls = None
     if sel.explicit:
@@ -726,11 +720,7 @@ def _plan_metrics(metrics, *, has_batch: bool):
         want_bat = [c for c in sel.codes if c in bat]
         want_clu = [c for c in sel.codes if c in clu]
         if want_bat and not has_batch:
-            raise ValueError(
-                f"{_metrics_spelling(metrics)} needs batch labels for "
-                f"{_and_list(want_bat)}. "
-                + ("Pass batch=<vector>, or labels as a list of two or more "
-                              "files. Each file then counts as one batch."))
+            raise needs_batch(want_bat, _FILES_FIX + " Each file then counts as one batch.")
         codes = [c for c in cls if c in sel.codes]        # in family order, as scIB's
         if codes:
             want_cls = ("explicit", codes)
@@ -744,19 +734,12 @@ def _plan_metrics(metrics, *, has_batch: bool):
             want_cls = ("default", cls) if has_batch else None
         else:
             if not has_batch:
-                raise ValueError(
-                    f"{_metrics_spelling(metrics)} needs batch labels for "
-                    f"{_and_list(family_bat)}. "
-                    + "Pass batch=<vector>, or metrics='clustering'.")
+                raise needs_batch(family_bat, "Pass batch=<vector>, or metrics='clustering'.")
             group, want_cls = "all", ("all", cls)
         only, slow = None, False
     elif sel.family == "batch":
         if not has_batch:
-            raise ValueError(
-                f"{_metrics_spelling(metrics)} needs batch labels for "
-                f"{_and_list(family_bat)}. "
-                + ("Pass batch=<vector>, or labels as a list of two or "
-                              "more files."))
+            raise needs_batch(family_bat, _FILES_FIX)
         group, only, slow = "batch", None, False
     elif sel.family == "classification":
         group, only, slow, want_cls = None, None, False, ("explicit", cls)
@@ -769,12 +752,9 @@ def _plan_metrics(metrics, *, has_batch: bool):
 
 def _unused_batch_warning(metrics) -> None:
     """The warning for a batch that no selected metric uses."""
-    _text.warn(
-        "batch= changes nothing here, because "
-        + f"{_metrics_spelling(metrics)} has no batch metric. Add "
-        + _and_list([c for c in _metric_families()[1] if c != "kBET"], "or")
-        + ", or pass metrics='all'.",
-        UserWarning)
+    codes = _and_list([c for c in _metric_families()[1] if c != "kBET"], "or")
+    _text.warn(f"batch= changes nothing here, because {_metrics_spelling(metrics)} has no "
+               f"batch metric. Add {codes}, or pass metrics='all'.", UserWarning)
 
 
 def _classification_error(metrics, why: str, what: str = "output") -> str:
@@ -790,10 +770,9 @@ def _classification_error(metrics, why: str, what: str = "output") -> str:
     if why == "none scored":
         return (f"{head} found no batch to learn from: each needs two cell types that "
                 f"another batch has. Check labels and batch.")
-    fix = "Pass batch=<vector>, or labels as a list of two or more files."
     if why == "one batch":
-        return f"{head} needs two or more batches; every cell is in one batch. {fix}"
-    return f"{head} needs two or more batches. {fix}"
+        return f"{head} needs two or more batches; every cell is in one batch. {_FILES_FIX}"
+    return f"{head} needs two or more batches. {_FILES_FIX}"
 
 
 def _classification_warning(why: str, what: str = "output") -> str:
@@ -802,8 +781,8 @@ def _classification_warning(why: str, what: str = "output") -> str:
     head = "OCA, ACA, Spec, Sens and F1 are NaN"
     if why == "graph":
         who = "output is a graph" if what == "output" else f"{what} writes a graph"
-        return (f"{who}, not an embedding, so OCA, ACA, Spec, Sens and F1 are NaN. "
-                + "Pass metrics='clustering' to leave them out.")
+        return (f"{who}, not an embedding, so OCA, ACA, Spec, Sens and F1 are NaN. Pass "
+                f"metrics='clustering' to leave them out.")
     if why == "not embedding":
         return f"{head}: {what} is not an embedding. Pass the method's embedding file."
     if why == "none scored":
@@ -852,9 +831,7 @@ def _classification_scores(request, emb, ct, cb, *, category, not_embedding, gra
     if why is not None:
         if how == "explicit":
             raise ValueError(_classification_error(metrics, why, what))
-        # evaluate <- its keyword wrapper <- the caller
-        _text.warn(_classification_warning(why, what),
-                     UserWarning)
+        _text.warn(_classification_warning(why, what), UserWarning)
         return {c: float("nan") for c in codes}
     return {c: float(mean[c]) for c in codes}
 
@@ -872,8 +849,7 @@ def _origin_names(labels, origin, names=None):
 def _metrics_spelling(metrics) -> str:
     """``metrics=['ARI', 'NMI']``."""
     if metrics is not None and not isinstance(metrics, str):
-        codes = [str(m) for m in metrics]
-        return f"metrics={codes!r}"
+        metrics = [str(m) for m in metrics]
     return f"metrics={metrics!r}"
 
 
@@ -1086,16 +1062,16 @@ def _dataset_labels(dataset, category, method, data_path):
     own = registry.method_of(method)
     cats = registry.get(own).categories if own is not None else []
     if own is not None and category is None:
-        raise ValueError((f"evaluate(dataset={dataset!r}, method={method!r}) needs category= to read "
-            f"{own}'s cell order")
-            + f": {_and_list(cats, 'or')}.")
+        raise ValueError(f"evaluate(dataset={dataset!r}, method={method!r}) needs category= "
+                         f"to read {own}'s cell order: {_and_list(cats, 'or')}.")
+    own_fix = " For your own embedding, pass the label files as labels=."
     if own is not None and category not in cats:
         from ..engine.schema import no_category_message
         known = known_category(dataset)
         if known in cats:
             raise ValueError(f"{own} does not run on {category} data; {dataset} is {known}: "
-                             + f"pass category={known!r}.")
-        raise ValueError(no_category_message(own, cats, category) + " For your own embedding, pass the label files as labels=.")
+                             f"pass category={known!r}.")
+        raise ValueError(no_category_message(own, cats, category) + own_fix)
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message=resolve.DEFAULT_ORDER_WARNING)
         try:
@@ -1103,10 +1079,9 @@ def _dataset_labels(dataset, category, method, data_path):
         except KeyError as e:
             if own is None or not e.args:
                 raise
-            raise KeyError(str(e.args[0]) + " For your own embedding, pass the label files as labels=.") from None
+            raise KeyError(str(e.args[0]) + own_fix) from None
     if not labels:
-        raise ValueError(f"{dataset} has no label file. "
-                         + "Pass labels=.")
+        raise ValueError(f"{dataset} has no label file. Pass labels=.")
     near = registry.closest_method(method) if own is None and category else None
     if near:
         with warnings.catch_warnings():
@@ -1117,9 +1092,8 @@ def _dataset_labels(dataset, category, method, data_path):
             except Exception:  # noqa: BLE001 - no variant here: nothing to suggest
                 theirs = list(labels)
         if theirs != list(labels):
-            _text.warn(f"Did you mean method={near!r}? "
-                         + f"{near} puts the cells of {dataset} in another order; "
-                         f"{method!r} reads the folder's order.", UserWarning)
+            _text.warn(f"Did you mean method={near!r}? {near} puts the cells of {dataset} "
+                       f"in another order; {method!r} reads the folder's order.", UserWarning)
     return labels
 
 
@@ -1161,9 +1135,8 @@ def _scores(
             "labels is an empty dict. Pass the cell types, as "
             "labels=adata.obs['celltype'].")
     # a dict becomes a list of paths first, for the file-of-origin batch rule
-    _LABEL_KEYS.set(None)
+    _LABEL_KEYS.set([str(k) for k in labels] if isinstance(labels, dict) else None)
     if isinstance(labels, dict):
-        _LABEL_KEYS.set([str(k) for k in labels])
         labels = _labels_from_dict(labels)
     batch_from_files = batch is None and io._is_label_path_list(labels) and len(labels) > 1
     group, only, slow, want_cls = _plan_metrics(
@@ -1228,7 +1201,6 @@ def _scores(
         print(f"evaluate: matched {moved} to the rows of {table.name} by barcode.",
               file=sys.stderr, flush=True)
 
-    from . import scib as escib
     n_cells = emb.shape[0]
     if cells is not None and cells.whole:
         n_held = sum(len(io.read_labels(f)) for f in cells.files)
@@ -1261,27 +1233,23 @@ def _scores(
         group = "clustering"
     odd = io._labels_look_measured(ct)
     if odd:
-        # evaluate <- its keyword wrapper <- the caller
         _text.warn(_measured_warning(labels, adata, *odd), UserWarning)
     if group is None:           # classification only: no scIB metric
         out = pd.DataFrame(columns=["Value"], dtype=float)
-        out.attrs = {"leiden_flavor": None, "clustering": None}
     else:
-        out = escib.compute(emb, ct, cl, ba, group=group, slow_metrics=slow, only=only,
-                            verbose=None if verbose else False)
+        from .scib import compute
+        out = compute(emb, ct, cl, ba, group=group, slow_metrics=slow, only=only,
+                      verbose=None if verbose else False)
+    attrs = {k: out.attrs.get(k) for k in PROVENANCE_ATTRS[:-1]}
     if want_cls:
         rows = _classification_scores(want_cls, emb, ct, cb, category=category,
                                       not_embedding=not_embedding, graph=graph,
                                       metrics=metrics)
         if rows:
-            attrs = out.attrs
             out = pd.concat([out, pd.DataFrame({"Value": rows})]) if len(out) \
                 else pd.DataFrame({"Value": rows})
-            out.attrs = attrs
     from .. import __version__
-    out.attrs = {k: out.attrs.get(k) for k in PROVENANCE_ATTRS[:-1]}
-    out.attrs["multibench_version"] = __version__
-    out.attrs["scib_version"] = _scib_version()
+    out.attrs = {**attrs, "multibench_version": __version__, "scib_version": _scib_version()}
     if out.empty:
         # unreachable while every family code is one compute() scores; loud if not
         raise ValueError(
