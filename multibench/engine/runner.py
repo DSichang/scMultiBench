@@ -12,7 +12,6 @@ from pathlib import Path
 
 from .. import _text
 
-from .. import _settings
 from .._settings import config
 from . import builder, io, ingest, registry, envs, scripts
 from .schema import _batch_of, base_modality, is_label_role
@@ -152,10 +151,12 @@ def normalize_paths(inputs: dict, out_dir) -> tuple[dict, str]:
     and a file name (``data_path + "rna.h5"``). ``os.path.abspath`` keeps
     symlinked data roots as written. Values that are not paths pass through.
     """
+    from ..workflow import OUT_DIR_PLACEHOLDER      # workflow imports this module
+
     def absolute(path):
-        # a preview's "<out_dir>" placeholder stays as written
+        # a preview's placeholder stays as written
         path = os.fspath(path)
-        return path if path.startswith("<out_dir>") else os.path.abspath(path)
+        return path if path.startswith(OUT_DIR_PLACEHOLDER) else os.path.abspath(path)
     out = os.path.join(absolute(out_dir), "")
     vals: dict = {}
     for role, v in inputs.items():
@@ -194,13 +195,7 @@ def _check_input_cells(method: str, category: str, inputs: dict) -> None:
 def _repo_root_no_fetch() -> Path:
     """Where :func:`run` finds ``tools_scripts/``, in ``scripts.ensure_repo``'s
     order, without fetching; else the configured path, where a real run puts them."""
-    p = Path(config.repo_path)
-    if (p / "tools_scripts").is_dir():
-        return p
-    root = _settings._ROOT
-    if (root / "tools_scripts").is_dir():
-        return root
-    return p
+    return scripts._scripts_checkout() or Path(config.repo_path)
 
 
 #: The command that fetches the method scripts by hand, ahead of a run.
@@ -384,10 +379,7 @@ def _check_input(role: str, val, *, real: bool) -> str:
     if suffix == ".loom":
         import importlib.util
         if importlib.util.find_spec("loompy") is None:
-            raise ImportError(
-                "reading .loom requires the optional 'loompy' package "
-                "(pip install 'multibench-sc[loom]' or pip install loompy); "
-                "alternatively convert the input to .h5ad/.csv first.")
+            raise ImportError(ingest._LOOM_MISSING)
         return "convert"
     raise ValueError(f"unsupported input format: {path.name}")
 
@@ -443,8 +435,7 @@ def _cell_group_roles(variant) -> list[list[str]]:
 def _read_barcodes(path) -> list[str]:
     import h5py
     with h5py.File(path, "r") as f:
-        return [b.decode() if isinstance(b, bytes) else str(b)
-                for b in f["matrix/barcodes"][:]]
+        return ingest._strings(f["matrix/barcodes"][:])
 
 
 def _obs_names(method: str, variant, values: dict, output) -> list[str] | None:
@@ -681,8 +672,9 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
 
     """
     method = registry.check_method(method)
-    check_params(method, registry.get(method).select(category, _modality_roles(inputs)),
-                 params)
+    spec = registry.get(method)
+    variant = spec.select(category, _modality_roles(inputs))
+    check_params(method, variant, params)
     _check_input_cells(method, category, inputs)
     from ..workflow import _atac_mismatch_caveats     # workflow imports this module
     mismatch = _atac_mismatch_caveats(method, category, inputs)
@@ -690,19 +682,49 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
         # one sentence per file: the peak-name caveat already ends with its fix
         _text.warn(" ".join(m if m.endswith(".") else m + "." for m in mismatch),
                      UserWarning)
-
-    spec = registry.get(method)
-    variant = spec.select(category, _modality_roles(inputs))
     params, applied = cpu_params_for(spec, params)
     check_gpu_requirement(spec)
     if applied:
         print(f"[run] no GPU on this host: applying {method} cpu_params {applied}",
               file=sys.stderr, flush=True)
-
-    # the env check of scan, before anything is written: off Linux always; on
-    # Linux when the probe finds some env (else the subprocess reports the
-    # failure) or an env of that name multibench did not install
     env_name = envs.group_for(method)
+    _check_env(method, env_name)
+
+    inputs, out_str = normalize_paths(inputs, out_dir)
+    out = Path(out_str)
+    inputs_dir = out / "inputs"
+    # every input-format check before anything is written or fetched
+    plan = _plan_inputs(variant, inputs, inputs_dir, convert=True, real=True)
+    repo = _fetch_scripts()
+    provide_script_files(spec, variant, repo)
+    out.mkdir(parents=True, exist_ok=True)
+    if _modality_roles(inputs):
+        inputs_dir.mkdir(parents=True, exist_ok=True)
+
+    values: dict = {}
+    for role, step in plan.items():
+        if step["convert"]:
+            ingest._to_canonical(step["src"], out=inputs_dir / f"{role}.h5",
+                                **_convert_kw(role))
+        if step["normpeaks_from"] is not None:
+            ingest._normalize_peak_names(step["normpeaks_from"], step["value"])
+        values[role] = step["value"]
+    cmd = _argv(variant, method, values, out_str, repo, params)
+    provenance = scripts.run_provenance(env_name, repo)
+    cwd = (repo / variant.entrypoint).parent if variant.cwd_at_script else out
+    stdout, stderr = _execute(method, cmd, str(cwd), variant.run_env)
+    primary = io.load_output(out, variant.output)
+    extra = {o.file: io.load_output(out, o) for o in variant.extra_outputs}
+    return RunResult(method=method, out_dir=out, cmd=cmd, output=primary, extra=extra,
+                     stdout=stdout, stderr=stderr,
+                     obs_names=_obs_names(method, variant, values, primary),
+                     **provenance)
+
+
+def _check_env(method: str, env_name: str) -> None:
+    """The env check of scan, before anything is written: off Linux always; on
+    Linux when the probe finds some env (else the subprocess reports the
+    failure) or an env of that name multibench did not install."""
     linux_only = linux_only_sentence()
     if linux_only:
         raise envs.LinuxOnlyError(
@@ -723,40 +745,21 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
             f"Environment {env_name} of {method} is not installed. Run "
             f"mtb.env.install([{method!r}]).")
 
-    inputs, out_str = normalize_paths(inputs, out_dir)
-    out = Path(out_str)
-    inputs_dir = out / "inputs"
-    # every input-format check before anything is written or fetched
-    plan = _plan_inputs(variant, inputs, inputs_dir, convert=True, real=True)
-    repo = _fetch_scripts(None)
-    provide_script_files(spec, variant, repo)
-    out.mkdir(parents=True, exist_ok=True)
-    if _modality_roles(inputs):
-        inputs_dir.mkdir(parents=True, exist_ok=True)
 
-    values: dict = {}
-    for role, step in plan.items():
-        if step["convert"]:
-            ingest._to_canonical(step["src"], out=inputs_dir / f"{role}.h5",
-                                **_convert_kw(role))
-        if step["normpeaks_from"] is not None:
-            ingest._normalize_peak_names(step["normpeaks_from"], step["value"])
-        values[role] = step["value"]
-    cmd = _argv(variant, method, values, out_str, repo, params)
-    provenance = scripts.run_provenance(env_name, repo)
-
+def _execute(method: str, cmd: list[str], cwd: str, run_env: dict | None) -> tuple[str, str]:
+    """``(stdout, stderr)`` of the method's ``cmd`` run in ``cwd``; a non-zero
+    exit raises ``RuntimeError`` with the tails of both."""
     # user site-packages (~/.local) can shadow the env's packages, and so can
     # the user's personal R library: our env holds every package it needs
-    base_env = envs.without_user_r_library(os.environ)
-    run_env = {**base_env, "PYTHONNOUSERSITE": "1", **_host_run_env(variant.run_env)}
+    env = {**envs.without_user_r_library(os.environ), "PYTHONNOUSERSITE": "1",
+           **_host_run_env(run_env)}
     # a Jupyter kernel's MPLBACKEND (matplotlib_inline) does not exist in the env
-    if "MPLBACKEND" not in (variant.run_env or {}):
-        run_env["MPLBACKEND"] = "Agg"
-    exec_cwd = str((repo / variant.entrypoint).parent) if variant.cwd_at_script else str(out)
+    if "MPLBACKEND" not in (run_env or {}):
+        env["MPLBACKEND"] = "Agg"
     # the method may be a grandchild (under conda run): its own session lets
     # one killpg end the whole tree
-    popen = subprocess.Popen(cmd, cwd=exec_cwd, stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE, text=True, env=run_env,
+    popen = subprocess.Popen(cmd, cwd=cwd, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE, text=True, env=env,
                              start_new_session=True)
     try:
         stdout, stderr = popen.communicate()
@@ -774,13 +777,7 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
             f"stdout tail:\n{stdout[-1500:]}\n"
             f"stderr tail:\n{stderr[-2500:]}"
         )
-
-    primary = io.load_output(out, variant.output)
-    extra = {o.file: io.load_output(out, o) for o in variant.extra_outputs}
-    return RunResult(method=method, out_dir=out, cmd=cmd, output=primary, extra=extra,
-                     stdout=stdout, stderr=stderr,
-                     obs_names=_obs_names(method, variant, values, primary),
-                     **provenance)
+    return stdout, stderr
 
 
 def preview(method: str, category: str, *, inputs: dict, out_dir, params=None,
@@ -836,15 +833,14 @@ def _prepared_note(plan: dict, out_str: str, method: str) -> str | None:
             f"script.")
 
 
-def _fetch_scripts(repo_path) -> Path:
+def _fetch_scripts() -> Path:
     """``scripts.ensure_repo``; a failed clone raises ``RuntimeError`` naming
     the offline route."""
     try:
-        return Path(scripts.ensure_repo(repo_path))
+        return Path(scripts.ensure_repo())
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        target = Path(repo_path) if repo_path else Path(config.repo_path)
         raise RuntimeError(
             f"could not clone the method scripts (PYangLab/scMultiBench) into "
-            f"{target}: {e}. On a host without network, fetch them first on a "
+            f"{Path(config.repo_path)}: {e}. On a host without network, fetch them first on a "
             f"connected machine with {FETCH_SCRIPTS_CMD} and copy the folder, or "
             f"point repo_path at an existing checkout") from e
