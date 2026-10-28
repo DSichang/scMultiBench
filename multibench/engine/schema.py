@@ -407,10 +407,7 @@ class MethodSpec:
     @property
     def modality_types(self) -> set[str]:
         """Union of base modality types consumed across all variants."""
-        out: set[str] = set()
-        for v in self.variants:
-            out |= v.modality_types
-        return out
+        return set().union(*(v.modality_types for v in self.variants))
 
     @property
     def consumes_atac(self) -> bool:

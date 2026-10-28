@@ -10,9 +10,7 @@ def build_command(variant: Variant, values: dict, out_dir: str,
                   params: dict | None = None) -> list[str]:
     """Return argv: [interpreter, entrypoint, *args, *params]."""
     cmd: list[str] = [_INTERPRETER[variant.language], variant.entrypoint]
-    by_role = dict(values)
-    by_role["out_dir"] = out_dir
-
+    by_role = {**values, "out_dir": out_dir}
     for arg in variant.args:
         if arg.const is not None:
             items = [arg.const]
@@ -39,9 +37,8 @@ def build_command(variant: Variant, values: dict, out_dir: str,
             cmd.append(arg.flag)
             cmd.extend(items)
 
-    merged = {**variant.params, **(params or {})}
-    for k, v in merged.items():
-        cmd.extend(_param_tokens(k, v, (variant.tunable.get(k) or {})))
+    for k, v in {**variant.params, **(params or {})}.items():
+        cmd.extend(_param_tokens(k, v, variant.tunable.get(k) or {}))
     return cmd
 
 

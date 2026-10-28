@@ -93,10 +93,8 @@ def _parse_method(d: dict) -> MethodSpec:
     # another (scMDC, scMM cross): it takes that variant's tunables
     for v in variants:
         if not v.tunable:
-            for other in variants:
-                if other.tunable and other.entrypoint == v.entrypoint:
-                    v.tunable = dict(other.tunable)
-                    break
+            v.tunable = next((dict(o.tunable) for o in variants
+                              if o.tunable and o.entrypoint == v.entrypoint), v.tunable)
     spec = MethodSpec(
         id=d["id"], language=d.get("language", "python"),
         tasks=d.get("tasks", []),
@@ -132,7 +130,6 @@ def _references() -> dict:
             f"{_REFERENCES} is missing - the package data is incomplete "
             f"(engine/references.yaml must ship with multibench)")
     return yaml.safe_load(_REFERENCES.read_text()) or {}
-
 
 
 @functools.lru_cache(maxsize=1)
