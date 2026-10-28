@@ -1893,7 +1893,7 @@ class RunResult:
         Notes
         -----
         **Keywords.** ``metrics=`` sets the column order and ``methods=`` a
-        subset. There is no default title: pass ``title=`` when one is wanted.
+        subset.
 
         **Reading the figure.** Size and colour are relative to the methods
         in this figure, so with few methods a small gap fills the whole colour

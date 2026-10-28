@@ -12,7 +12,7 @@ from multibench.engine import registry
 # Methods with no Crossref-verified DOI yet. Shrink this list as references are
 # verified; a method appearing here WITH a reference, or missing from here
 # WITHOUT one, fails loudly.
-UNREFERENCED = {"VIMCCA", "VIPCCA", "scMSI"}
+UNREFERENCED = {"VIPCCA", "scMSI"}
 
 DOI_RE = re.compile(r"10\.\d{4,9}/\S+")
 

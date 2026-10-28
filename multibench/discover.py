@@ -162,7 +162,7 @@ class _Info(dict):
 
 
 def method_info(method: str) -> dict:
-    """Return everything known about one method as a flat dict.
+    """Return everything known about one method as a dict.
 
     Parameters
     ----------
@@ -184,11 +184,11 @@ def method_info(method: str) -> dict:
                                 output_kind, needs_labels, labels,
                                 reference_batch
         runtime                 tier, worst_sec, observed, host, note
-        gpu                     'required' / 'used when present' / 'not used'
+        gpu                     'required' / 'used when present' / 'not used' / 'unknown'
         cpu_params              the flags that turn CUDA off on a CPU host
         setup_hint              a step to take before the first run, or ''
         repo_url                the upstream code the benchmark ran
-        reference               {doi, title, authors, journal, year}
+        reference               {doi, title, authors, journal, year}, or None
         ```
 
     Raises

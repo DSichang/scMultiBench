@@ -233,8 +233,8 @@ def load_results(
     Warns
     -----
     UserWarning
-        The selection leaves no rows, for example ``metrics="classification"``:
-        the stored results have none.
+        The selection leaves no rows, for example ``metrics="classification"``
+        on vertical, whose stored results have none.
 
     Examples
     --------

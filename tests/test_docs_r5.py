@@ -35,7 +35,9 @@ def test_evaluate_page_comparability_sentence_is_plain():
     visible = " ".join(_visible(_read("tutorials/evaluate.md")).split())
     assert "compare ranks, not decimals" not in visible
     # Y07 (r3): no "Compare ranks."; one true sentence on why the same embedding moves
-    assert "most methods give a slightly different embedding on each run." in visible
+    # e1: the run-to-run difference is named where it was measured (sciPENN, VIMCCA)
+    assert ("some methods, such as sciPENN and VIMCCA, give a slightly different "
+            "embedding on each run.") in visible
     assert "Compare ranks." not in visible and "4,096" not in visible
     # v1 (u4#6): what holds, in one sentence and without a number (D45 Cobolt's
     # ARI moved 0.118 across shuffles)

@@ -180,6 +180,12 @@ VIMCCA:
   repo_url: https://github.com/jhu99/scbean
   version: "0.5.6"
   summary: "Variational-inference multimodal CCA (scbean) for paired RNA + ADT / RNA + ATAC; vertical integration into a shared latent space."
+  reference:
+    doi: 10.1093/bioinformatics/btad005
+    title: A multi-view latent variable model reveals cellular heterogeneity in complex tissues for paired multimodal single-cell data
+    authors: Wang Y, Lian B, Zhang H, Zhong Y, He J, Wu F, Reinert K, Shang X, Yang H, Hu J
+    journal: Bioinformatics
+    year: 2023
 
 VIPCCA:
   repo_url: https://github.com/jhu99/vipcca
