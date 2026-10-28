@@ -49,11 +49,7 @@ _BATCH_CLUSTER_METRICS = ("ARI_batch", "NMI_batch")
 def _find_cxx() -> str | None:
     """Path of the first C++ compiler on PATH, or None."""
     import shutil
-    for name in _CXX_CANDIDATES:
-        found = shutil.which(name)
-        if found:
-            return found
-    return None
+    return next(filter(None, map(shutil.which, _CXX_CANDIDATES)), None)
 
 
 def _probe_lisi_binary(exe) -> str | None:
@@ -300,10 +296,10 @@ def _clustering_graph(emb):
     return adata
 
 
-def _search_n_clusters(adata, n: int, key: str, flavor: str) -> bool:
+def _search_n_clusters(adata, n: int, key: str, flavor: str) -> None:
     """Leiden into ``adata.obs[key]`` at the resolution that gives ``n`` clusters,
-    bisected as ``sinfonia.get_N_clusters`` does. False when no step gave ``n``:
-    the last step's clustering is then kept."""
+    bisected as ``sinfonia.get_N_clusters`` does; the last step's clustering
+    when no step gave ``n``."""
     lo, hi = _SEARCH_RANGE
     with contextlib.redirect_stdout(io.StringIO()), warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -316,8 +312,7 @@ def _search_n_clusters(adata, n: int, key: str, flavor: str) -> bool:
             elif found < n:
                 lo = res
             else:
-                return True
-    return False
+                return
 
 
 def _n_clusters(graph, n: int, flavor: str, per: str | None = None) -> np.ndarray:
@@ -486,10 +481,8 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
             import sys
             needs = ((wanted(_CLUSTER_METRICS) if search_ct else [])
                      + (wanted(_BATCH_CLUSTER_METRICS) if search_bat else []))
-            names = _text._and_list(needs)
-            print(f"Clustering {n:,} cells for {names} with the {flavor} Leiden "
-                  f"backend.", file=sys.stderr, flush=True)
-    if search_ct or search_bat:
+            print(f"Clustering {n:,} cells for {_text._and_list(needs)} with the {flavor} "
+                  f"Leiden backend.", file=sys.stderr, flush=True)
         graph = _clustering_graph(emb)
         if search_ct:
             adata.obs["cluster"] = pd.Categorical(_n_clusters(
