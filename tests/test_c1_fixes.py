@@ -130,11 +130,11 @@ def test_a_shared_barcode_gets_its_batch_and_one_batch_names_none():
     assert "batch" not in one.embedding(m).obs                     # c3 (E02)
 
 
-def test_recommend_gives_this_run_rows_their_method_chips():
+def test_rank_gives_this_run_rows_their_method_chips():
     stored = mtb.load_results("vertical")
     mine = stored[stored.method == "Matilda"].assign(method="Matilda (this run)",
                                                      source="user")
-    out = mtb.recommend("vertical", long_df=pd.concat([stored, mine])).set_index("method")
+    out = mtb.rank("vertical", long_df=pd.concat([stored, mine])).set_index("method")
     assert out.loc["Matilda (this run)", "env"] == out.loc["Matilda", "env"] is not None
 
 

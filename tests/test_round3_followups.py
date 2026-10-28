@@ -11,7 +11,7 @@ import multibench as mtb
 def test_io_dir_hides_leaked_imports():
     names = dir(mtb.io)
     assert "to_canonical" not in names      # deprecated: hidden from dir()
-    assert "export_dataset" in names and "read_canonical" in names
+    assert "export_dataset" in names and "read" in names
     for leaked in ("annotations", "np", "os", "re", "Path"):
         assert leaked not in names
     assert not hasattr(mtb.io, "annotations")  # d1: a facade, no module internals

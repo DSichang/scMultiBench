@@ -61,7 +61,7 @@ def test_one_dataset_frame_needs_no_cross_dataset_warning():
     assert msgs == []                              # no two-method warning (Z15, r3)
 
 
-# plot.build_table is deprecated in 0.4.0: its docstring names mtb.recommend only
+# plot.build_table is deprecated in 0.4.0: its docstring names mtb.rank only
 @pytest.mark.parametrize("fn, said", [
     (mtb.plot.bar, "a method missing from some datasets, a dataset with one method")])
 def test_docstrings_list_the_warnings(fn, said):

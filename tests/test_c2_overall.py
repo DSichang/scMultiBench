@@ -1,4 +1,4 @@
-"""Core round c2 (0.4.0): one overall score, style.overall, for recommend, plot.bar and
+"""Core round c2 (0.4.0): one overall score, style.overall, for rank, plot.bar and
 plot.bubble (D01), its refusal of your rows on another dataset (C18), and the
 classification-only family of your rows (D02).
 
@@ -73,13 +73,13 @@ def test_the_proof_has_42_cases():
 
 
 @pytest.mark.parametrize("category", CATEGORIES)
-def test_recommend_bar_and_bubble_use_the_one_score(category):
+def test_rank_bar_and_bubble_use_the_one_score(category):
     st, tables = _tables(category)
     for df in (st, tables["+run"]):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             want = style.overall(df)
-            rec = mtb.recommend(category, long_df=df)
+            rec = mtb.rank(category, long_df=df)
             fig = bar_module.bar(df)
             tbl = _build_table(df)
         rec = rec[rec["grand_score"].notna()]
@@ -130,7 +130,7 @@ def test_your_rows_on_another_dataset_are_refused(dataset):
             "score your embedding with dataset='D11'; else plot them apart.")
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        for call in (lambda: mtb.recommend("vertical", long_df=both),
+        for call in (lambda: mtb.rank("vertical", long_df=both),
                      lambda: mtb.plot.bubble(both), lambda: mtb.plot.bar(both)):
             with pytest.raises(ValueError) as e:
                 call()

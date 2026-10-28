@@ -94,7 +94,7 @@ def test_a_mudata_modality_name(tmp_path):
                    f"rna='rna[feature_types=Gene Expression]'.")
     out = ingest.export_dataset(mdata, tmp_path / "MU",
                                 rna="rna[feature_types=Gene Expression]")
-    assert ingest.read_canonical(out / "rna.h5").n_vars == GENES
+    assert ingest.read(out / "rna.h5").n_vars == GENES
 
 
 # ------------------------------------------- F2: another filter, or an object
@@ -130,7 +130,7 @@ def test_the_example_in_the_message_works(tmp_path):
         assert arg == role
         out = ingest.export_dataset(data, tmp_path / f"OK_{role}", **{**kw, arg: selector},
                                     category="vertical")
-        written = ingest.read_canonical(out / f"{role}.h5")
+        written = ingest.read(out / f"{role}.h5")
         wanted = data.var_names[data.var["feature_types"] == ingest._TENX_TYPE[role]]
         assert written.n_vars == n_feat and list(written.var_names) == list(wanted)
 
@@ -196,8 +196,8 @@ def test_calls_that_pass(tmp_path):
                                                 categories=["Gene Expression", "Peaks"])
     two = ingest.export_dataset(genes, tmp_path / "SPLIT", atac=peaks, **kw)
     for d in (one, two):
-        assert ingest.read_canonical(d / "rna.h5").n_vars == GENES
-        assert ingest.read_canonical(d / "atac.h5").n_vars == PEAKS
+        assert ingest.read(d / "rna.h5").n_vars == GENES
+        assert ingest.read(d / "atac.h5").n_vars == PEAKS
     # one value in the column, and no column
     plain = genes.copy()
     ingest.export_dataset(plain, tmp_path / "ONE", rna="X")

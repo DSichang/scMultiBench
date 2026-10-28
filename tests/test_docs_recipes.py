@@ -323,7 +323,7 @@ def test_the_anchors_exist_once(tmp_path):
     src = tmp_path / "filtered_feature_bc_matrix.h5"
     _tenx(src, GENES, PEAKS, "atac", n_cells=20)
     with pytest.raises(ValueError) as e:
-        mtb.io.read_canonical(src)
+        mtb.io.read(src)
     assert str(e.value) == f'{src} is a 10x Genomics file. See the recipe "A 10x .h5 file" in the docs.'
     assert not (tmp_path / "out").exists()
 

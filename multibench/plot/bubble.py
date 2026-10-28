@@ -64,7 +64,7 @@ class FamilyBlock:
 @dataclass
 class BubbleTable:
     """The numbers behind a bubble figure (internal: ``mtb.plot.bubble`` builds
-    and draws it; ``mtb.recommend(category, long_df=...)`` gives its row order).
+    and draws it; ``mtb.rank(category, long_df=...)`` gives its row order).
 
     Rows are ``methods``; the per-family matrices live in ``blocks``.
 
@@ -84,7 +84,7 @@ class BubbleTable:
     raw : pandas.DataFrame
         Unscaled matrix (method x metric) in figure order: metric means.
     overall : pandas.Series
-        The overall score per method, as ``mtb.recommend`` gives it; it sets
+        The overall score per method, as ``mtb.rank`` gives it; it sets
         the row order.
     datasets : tuple of str
         Dataset ids in the frame, sorted; ``()`` without a ``dataset`` column.
@@ -791,7 +791,7 @@ def bubble(long_df, *, metrics=None, methods=None, title=None, save=None):
     """Draw the article's bubble table: methods as rows, metrics as columns.
 
     Metrics are grouped into families, each led by an *Overall* bar. Rows run
-    best first, in the order of ``mtb.recommend(category, long_df=long_df,
+    best first, in the order of ``mtb.rank(category, long_df=long_df,
     metrics=...)`` with the same metrics.
 
     Parameters

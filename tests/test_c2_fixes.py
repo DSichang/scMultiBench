@@ -88,17 +88,17 @@ def test_the_labels_recipe_reads_a_folder_in_its_order():
 
 
 # --------------------------------------------------------------- D09, C41
-def test_recommend_modalities_keeps_your_own_methods():
+def test_rank_modalities_keeps_your_own_methods():
     rows = pd.DataFrame([{"method": m, "metric": c, "value": v + k / 10, "dataset": "MULTI",
                           "source": "user"}
                          for k, m in enumerate(["RNA PCA", "joint PCA", "random"])
                          for c, v in (("ARI", 0.3), ("NMI", 0.4))])
-    out = mtb.recommend("vertical", long_df=rows, modalities=["rna", "atac"])
+    out = mtb.rank("vertical", long_df=rows, modalities=["rna", "atac"])
     assert out["method"].tolist() == ["random", "joint PCA", "RNA PCA"]
 
 
-def test_recommend_leads_with_the_overall_score():
-    assert mtb.recommend.__doc__.splitlines()[0] == (
+def test_rank_leads_with_the_overall_score():
+    assert mtb.rank.__doc__.splitlines()[0] == (
         "The overall score and row order of ``mtb.plot.bubble``, best first.")
 
 

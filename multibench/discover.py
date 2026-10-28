@@ -25,7 +25,7 @@ _BOTH_FILES = frozenset(_REPRESENTATION_TOKENS)
 
 def _modality_filter(modalities) -> tuple[set[str] | None, str | None]:
     """``(base types every matching variant must consume, ATAC representation)``:
-    the modality rule of ``find_methods`` and ``recommend`` (see the
+    the modality rule of ``find_methods`` and ``rank`` (see the
     ``find_methods`` Notes)."""
     if isinstance(modalities, str):
         import re

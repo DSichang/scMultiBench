@@ -67,7 +67,7 @@ def test_export_dataset_vertical_writes_plain_atac_only(tmp_path):
     out = ingest.export_dataset(g, tmp_path / "VG", rna=None, atac="X", atac_kind="gene_activity",
                                 labels="obs:ct", category="vertical")
     assert sorted(p.name for p in out.iterdir()) == ["atac.h5", "cty.csv"]
-    assert list(ingest.read_canonical(out / "atac.h5").var_names) == list(g.var_names)
+    assert list(ingest.read(out / "atac.h5").var_names) == list(g.var_names)
     # per-batch files are what no vertical method reads: refused before any write
     g.obs["b"] = ["x"] * 3 + ["y"] * 3
     with pytest.raises(ValueError, match="Vertical methods read one rna.h5. Export "

@@ -276,7 +276,7 @@ def write_example(dataset: str, folder: Path | str = ".", *, verbose: bool = Tru
     mtb.io.export_dataset : write the objects read from the files as a dataset folder.
     """
     from .. import __version__, config
-    from ..engine.ingest import read_canonical
+    from ..engine.ingest import read
 
     if dataset not in EXAMPLES:
         raise ValueError(f"No example is defined for {dataset!r}. Examples exist for "
@@ -299,7 +299,7 @@ def write_example(dataset: str, folder: Path | str = ".", *, verbose: bool = Tru
     built = {}
     if "write" in state.values():
         build, kw = _BUILD[dataset]
-        made = build(root / dataset, read_canonical, **kw)
+        made = build(root / dataset, read, **kw)
         if tuple(name for name, _, _ in made) != EXAMPLES[dataset]:
             raise RuntimeError(f"The example of {dataset} is built as "
                                f"{[name for name, _, _ in made]}, and EXAMPLES lists "

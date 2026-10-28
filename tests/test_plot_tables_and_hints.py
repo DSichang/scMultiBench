@@ -90,9 +90,9 @@ def test_x94_rows_scored_before_040_warn_next_to_stored_rows(fn, scored_with, ex
             "The rows for Mine "), msgs
 
 
-def test_x94_recommend_warns_for_old_rows_too():
+def test_x94_rank_warns_for_old_rows_too():
     d11 = _d11()
-    _, msgs = _messages(mtb.recommend, "vertical",
+    _, msgs = _messages(mtb.rank, "vertical",
                         long_df=pd.concat([d11, _mine(d11, scored_with="igraph/sweep/0.3.1")]))
     assert any("The rows for Mine were scored before multibench 0.4.0." in m for m in msgs)
 

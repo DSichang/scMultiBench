@@ -1,4 +1,4 @@
-"""v1 leftovers: an unreadable .h5ad in one sentence, "1 cell", recommend on
+"""v1 leftovers: an unreadable .h5ad in one sentence, "1 cell", rank on
 rows of another category, and the quickstart's lines for counts in a layer."""
 from __future__ import annotations
 
@@ -19,25 +19,25 @@ def _quiet(fn, *a, **kw):
 
 
 # ---------------------------------------------------------------- u5 #6
-def test_recommend_refuses_rows_of_another_category():
+def test_rank_refuses_rows_of_another_category():
     vertical = _quiet(mtb.load_results, "vertical")
     cross = _quiet(mtb.load_results, "cross")
     with pytest.raises(ValueError) as e:
-        _quiet(mtb.recommend, "cross", long_df=vertical)
-    assert str(e.value) == ("long_df holds vertical rows: pass recommend('vertical', "
+        _quiet(mtb.rank, "cross", long_df=vertical)
+    assert str(e.value) == ("long_df holds vertical rows: pass rank('vertical', "
                             "long_df=...).")
     both = pd.concat([cross, vertical])
     with pytest.raises(ValueError) as e:
-        _quiet(mtb.recommend, "cross", long_df=both)
+        _quiet(mtb.rank, "cross", long_df=both)
     assert str(e.value) == (
         "long_df holds vertical rows next to cross ones: rank one category at a time, as "
-        "recommend('cross', long_df=long_df[long_df['category'] == 'cross']).")
+        "rank('cross', long_df=long_df[long_df['category'] == 'cross']).")
     with pytest.raises(ValueError, match=r"^long_df holds cross and vertical rows: rank one "
-                                         r"category at a time, as recommend\('cross', "):
-        _quiet(mtb.recommend, "mosaic", long_df=both)
+                                         r"category at a time, as rank\('cross', "):
+        _quiet(mtb.rank, "mosaic", long_df=both)
     # rows of your own without a category rank next to the stored ones
     mine = cross[cross["method"] == "StabMap"].assign(method="mine", category=None)
-    out = _quiet(mtb.recommend, "cross", long_df=pd.concat([cross, mine]))
+    out = _quiet(mtb.rank, "cross", long_df=pd.concat([cross, mine]))
     assert "mine" in set(out["method"])
 
 

@@ -65,7 +65,7 @@ def _on_disk(ds):
 
 
 def _names(path):
-    return list(mtb.io.read_canonical(path).obs_names)
+    return list(mtb.io.read(path).obs_names)
 
 
 # ------------------------------------------------------------------ one check, one run
@@ -300,14 +300,14 @@ def test_the_missing_label_code_of_export_works(tmp_path):
                               overwrite=True)
 
 
-def test_recommend_says_which_methods_have_the_scores():
+def test_rank_says_which_methods_have_the_scores():
     one = pd.DataFrame({"metric": ["OCA", "ACA"], "value": [0.5, 0.6],
                         "method": "Mine", "dataset": "D28", "category": "diagonal",
                         "source": "user"})
     with pytest.raises(ValueError, match=r"^Only Mine has classification scores on D28: a "
                                          r"ranking needs 2 or more methods\. Add the scores "
                                          r"of more methods to long_df\.$"):
-        mtb.recommend("diagonal", long_df=one, metrics="classification")
+        mtb.rank("diagonal", long_df=one, metrics="classification")
 
 
 def test_the_install_preview_off_linux_has_no_gpu_node_note(monkeypatch, capsys):
@@ -326,12 +326,12 @@ def test_a_nan_in_the_embedding_is_one_sentence():
         mtb.evaluate(x, labels=["a", "b"] * 20, metrics=["ARI"])
 
 
-def test_read_canonical_of_another_file_is_one_sentence(tmp_path):
+def test_read_of_another_file_is_one_sentence(tmp_path):
     (tmp_path / "cty.csv").write_text("x\nA\n")
     with pytest.raises(ValueError, match=r"^cty\.csv is not an \.h5 file\."):
-        mtb.io.read_canonical(tmp_path / "cty.csv")
+        mtb.io.read(tmp_path / "cty.csv")
     with pytest.raises(ValueError, match=r"is a folder: pass one of its \.h5 files"):
-        mtb.io.read_canonical(tmp_path)
+        mtb.io.read(tmp_path)
 
 
 def test_a_tilde_is_expanded(tmp_path, monkeypatch):

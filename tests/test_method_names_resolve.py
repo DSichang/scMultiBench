@@ -1,6 +1,6 @@
 """A method can be named by its id in any letter case or by its display name.
 
-``load_results`` and ``recommend`` took ``"totalvi"`` and ``"MOFA+"``; ``run``,
+``load_results`` and ``rank`` took ``"totalvi"`` and ``"MOFA+"``; ``run``,
 ``scan``, ``method_info``, ``params_for``, ``inputs_for``, ``labels_for``,
 ``run`` and the env functions raised "Unknown method". They all resolve the
 name through ``registry.check_method`` now; an unknown name still raises with

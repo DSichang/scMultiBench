@@ -9,8 +9,8 @@ import multibench as mtb
 
 TOP = {"config", "plot", "catalog", "io", "env", "data", "find_methods", "method_info",
        "params_for", "scan", "run", "load_run", "RunResult", "evaluate",
-       "load_results", "recommend", "__version__"}
-MEMBERS = {"io": ["export_dataset", "read_canonical"], "env": ["install"],
+       "load_results", "rank", "__version__"}
+MEMBERS = {"io": ["export_dataset", "read"], "env": ["install"],
            "plot": ["bubble", "bar"], "data": ["fetch", "write_example"],
            "catalog": ["datasets", "metrics"], "config": ["data_path", "repo_path", "envs_dir", "leiden_flavor"]}
 COMMANDS = ["find", "params", "info", "fetch", "config", "scan", "layout", "export",

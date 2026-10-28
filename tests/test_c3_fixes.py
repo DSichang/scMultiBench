@@ -251,7 +251,7 @@ def test_e13_e14_a_benchmark_dataset_gives_its_category_and_its_cells():
 
 def test_c20_your_rows_have_no_runtime_of_the_package():
     df = pd.concat([mtb.load_results("vertical"), _this_run("vertical")])
-    r = _quiet(mtb.recommend, "vertical", long_df=df).set_index("method")
+    r = _quiet(mtb.rank, "vertical", long_df=df).set_index("method")
     own = [m for m in r.index if m.endswith("(this run)")]
     assert own and r.loc[own, "worst_sec"].isna().all()
     assert r.loc[own[0].removesuffix(" (this run)"), "worst_sec"] > 0

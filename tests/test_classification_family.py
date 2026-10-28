@@ -290,10 +290,10 @@ def test_rescore_carries_the_codes(three, tmp_path):
     assert new.long["metric"].tolist() == CODES
 
 
-def test_recommend_without_classification_scores():
+def test_rank_without_classification_scores():
     # D11 (vertical, one batch) has none; D28, D45 and D52 have them
     with pytest.raises(ValueError) as e:
-        _quiet(mtb.recommend, "vertical", metrics="classification")
+        _quiet(mtb.rank, "vertical", metrics="classification")
     assert str(e.value) == ("The stored results of vertical have no classification "
                             "scores. Score your runs with mtb.evaluate and pass them as "
                             "long_df=.")
@@ -303,7 +303,7 @@ def test_recommend_without_classification_scores():
 def test_the_stored_results_rank_on_classification(category, tmp_path):
     stored = mtb.load_results(category)
     assert set(CODES) <= set(stored.metric)
-    ranked = _quiet(mtb.recommend, category, metrics="classification")
+    ranked = _quiet(mtb.rank, category, metrics="classification")
     scored = ranked[ranked.grand_score.notna()]
     assert scored.grand_score.iloc[0] == 1.0 and scored.grand_score.iloc[-1] == 0.0
     # a graph method (scMoMaT on D52) has no classification row, and no grand_score

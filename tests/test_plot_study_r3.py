@@ -3,7 +3,7 @@
 R3-06: the Leiden-backend warning counts an igraph-scored row only when the
 frame holds stored rows of the same dataset. Rows from the user's own
 dataset get the no-overlap warning alone.
-R3-07: recommend(long_df=...) gives the same backend line in its warning.
+R3-07: rank(long_df=...) gives the same backend line in its warning.
 R3-08: the n/a warning names the row and its source in short sentences.
 """
 import importlib
@@ -45,9 +45,9 @@ def _mine(method, dataset, scored_with="igraph/search/0.4.0",
 
 # --- R3-07 -------------------------------------------------------------------
 
-def test_recommend_documents_the_backend_line():
-    doc = " ".join(mtb.recommend.__doc__.split())
-    assert "Warns" in mtb.recommend.__doc__
+def test_rank_documents_the_backend_line():
+    doc = " ".join(mtb.rank.__doc__.split())
+    assert "Warns" in mtb.rank.__doc__
     assert "One message: partial coverage, methods left out and why." in doc
 
 
@@ -102,30 +102,30 @@ def test_backend_rule_without_a_dataset_column_is_unchanged():
     assert msg and msg.startswith("The rows for PriyaNet were clustered")
 
 
-def test_recommend_long_df_warns_about_igraph_rows_of_a_stored_dataset():
+def test_rank_long_df_warns_about_igraph_rows_of_a_stored_dataset():
     # S4: her method, scored with the default backend, ranked against the re-run tables
     long_df = pd.concat([_stored(None), _mine("PriyaNet_ig", "D11", base=0.9)],
                         ignore_index=True)
-    r, msgs = _messages(mtb.recommend, "vertical", long_df=long_df)
+    r, msgs = _messages(mtb.rank, "vertical", long_df=long_df)
     assert "PriyaNet_ig" in set(r["method"])
-    (msg,) = [m for m in msgs if m.startswith("recommend('vertical'):")]
+    (msg,) = [m for m in msgs if m.startswith("rank('vertical'):")]
     assert ("\n  - The rows for PriyaNet_ig were clustered with the igraph Leiden backend. "
             "The stored results used leidenalg") in msg
     assert "mtb.config.leiden_flavor = 'leidenalg'" in msg
 
 
-def test_recommend_backend_line_needs_igraph_rows_a_stored_dataset_and_a_sweep_metric():
+def test_rank_backend_line_needs_igraph_rows_a_stored_dataset_and_a_sweep_metric():
     stored = _stored(None)
     cases = {
         "leidenalg": pd.concat([stored, _mine("P", "D11", scored_with="leidenalg/search/0.4.0")]),
         "stored only": stored,
     }
     for what, df in cases.items():
-        _, msgs = _messages(mtb.recommend, "vertical", long_df=df.reset_index(drop=True))
+        _, msgs = _messages(mtb.rank, "vertical", long_df=df.reset_index(drop=True))
         assert not any("igraph Leiden backend" in m for m in msgs), (what, msgs)
     # cLISI does not depend on the Leiden backend (ASW does under the 0.4.0 search)
     df = pd.concat([stored, _mine("P", "D11")], ignore_index=True)
-    _, msgs = _messages(mtb.recommend, "vertical", long_df=df, metrics=["cLISI"])
+    _, msgs = _messages(mtb.rank, "vertical", long_df=df, metrics=["cLISI"])
     assert not any("igraph Leiden backend" in m for m in msgs), msgs
 
 

@@ -192,7 +192,7 @@ def test_tutorials_use_the_public_api_not_raw_csv_reads():
         assert reads, key
         for arg in reads:
             assert re.fullmatch(r'"my_\w+\.h5ad"', arg), (key, arg)
-        assert "read_csv(" not in src and "read_canonical(" not in src and "h5py" not in src, key
+        assert "read_csv(" not in src and "io.read(" not in src and "h5py" not in src, key
         assert "read_csv(RESULTS" not in src and "results/" not in src
         assert "from multibench.engine import registry" not in src
 
@@ -296,10 +296,10 @@ REFERENCE = {
     "mtb.RunResult": ("run.md", "multibench.workflow.RunResult"),
     "mtb.evaluate": ("score.md", "multibench.eval.pipeline.evaluate"),
     "mtb.load_results": ("compare.md", "multibench._data.results.load_results"),
-    "mtb.recommend": ("compare.md", "multibench._data.results.recommend"),
+    "mtb.rank": ("compare.md", "multibench._data.results.rank"),
     "mtb.env.install": ("env.md", "multibench.engine.envs.install"),
     "mtb.io.export_dataset": ("io.md", "multibench.engine.ingest.export_dataset"),
-    "mtb.io.read_canonical": ("io.md", "multibench.engine.ingest.read_canonical"),
+    "mtb.io.read": ("io.md", "multibench.engine.ingest.read"),
     "mtb.plot.bubble": ("plot.md", "multibench.plot.bubble.bubble"),
     "mtb.plot.bar": ("plot.md", "multibench.plot.bar.bar"),
     "mtb.data.fetch": ("data.md", "multibench._data.fetch.fetch"),

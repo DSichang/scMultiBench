@@ -1,7 +1,7 @@
 """``load_results`` warns when a family selection leaves no rows.
 
 ``load_results("vertical", metrics="classification")`` returned an empty frame
-without a word (``recommend`` raises for the same selection)."""
+without a word (``rank`` raises for the same selection)."""
 import warnings
 
 import pytest

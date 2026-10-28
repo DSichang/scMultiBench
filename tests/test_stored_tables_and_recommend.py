@@ -1,4 +1,4 @@
-"""The stored results and recommend: what they hold and how they rank."""
+"""The stored results and rank: what they hold and how they rank."""
 from __future__ import annotations
 
 import warnings
@@ -28,7 +28,7 @@ def _mine(base, name="Mine", scored_with="leidenalg/search/0.4.0"):
 def test_x03_conos_rows_left_the_d28_table():
     d28 = mtb.load_results("diagonal", dataset="D28")
     assert "Conos" not in set(d28.method)
-    r, msgs = _messages(mtb.recommend, "diagonal")
+    r, msgs = _messages(mtb.rank, "diagonal")
     assert pd.isna(r.set_index("method").loc["Conos", "grand_score"])
     assert not any("ARI below" in m for m in msgs)
 
@@ -39,32 +39,32 @@ def test_x04_one_stored_table_per_category():
     assert stored.groupby("category").dataset.nunique().to_dict() == {
         "cross": 1, "diagonal": 1, "mosaic": 1, "vertical": 1}
     assert not stored.dataset.str.endswith("s").any()
-    # recommend's n_datasets column left in 0.4.0: the stored results hold one dataset
+    # rank's n_datasets column left in 0.4.0: the stored results hold one dataset
     assert set(mtb.load_results("diagonal").dataset) == {"D28"}
 
 
 def test_x69_uinmf_two_batch_rows_left_the_d52_table():
     # owner, round 3: the rows of a run the package no longer makes are removed
     assert "UINMF" not in set(mtb.load_results("cross", dataset="D52").method)
-    r, msgs = _messages(mtb.recommend, "cross")
+    r, msgs = _messages(mtb.rank, "cross")
     assert pd.isna(r.set_index("method").loc["UINMF", "grand_score"])
     assert not any("batches 1-2" in m for m in msgs)
 
 
-# --- recommend: X05, X14, X89 ------------------------------------------------
+# --- rank: X05, X14, X89 ------------------------------------------------
 
-def test_x05_recommend_docstring_names_the_min_max_scaling():
-    doc = " ".join(mtb.recommend.__doc__.split())
+def test_x05_rank_docstring_names_the_min_max_scaling():
+    doc = " ".join(mtb.rank.__doc__.split())
     # c2 (D01): the stored methods set the scale
     assert ("each per-dataset score is the mean rank over the metrics, min-max scaled "
             "so that the best stored method scores 1 and the worst 0") in doc
 
 
-@pytest.mark.parametrize("fn", ["recommend", "bar"])
+@pytest.mark.parametrize("fn", ["rank", "bar"])
 def test_x14_rows_repeating_stored_rows_are_refused(fn):
     d28 = mtb.load_results("diagonal", dataset="D28")
     both = pd.concat([d28, d28[d28.method == "iNMF"].assign(source="user")])
-    call = (lambda: mtb.recommend("diagonal", long_df=both)) if fn == "recommend" \
+    call = (lambda: mtb.rank("diagonal", long_df=both)) if fn == "rank" \
         else (lambda: mtb.plot.bar(both))
     with pytest.raises(ValueError, match=r"Your rows and the stored results both have iNMF "
                                          r"on D28\. Give your rows another name, e\.g\. "
@@ -76,4 +76,4 @@ def test_x14_rows_repeating_stored_rows_are_refused(fn):
 def test_x89_batch_family_on_vertical_says_why():
     with pytest.raises(ValueError, match=r'^The vertical tables have no batch scores '
                                          r'\(D11 has one batch\)\. Use metrics="clustering"\.$'):
-        mtb.recommend("vertical", metrics="batch")
+        mtb.rank("vertical", metrics="batch")

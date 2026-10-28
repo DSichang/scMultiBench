@@ -21,7 +21,7 @@ from .. import _text
 from . import catalog
 from ..engine.registry import _BASE_MODALITIES
 
-__all__ = ["load_results", "recommend"]
+__all__ = ["load_results", "rank"]
 
 #: the four integration categories
 _CATEGORIES = registry.CATEGORIES
@@ -344,7 +344,7 @@ def _list_datasets(category, base: Path) -> list[str]:
     return sorted(found)
 
 
-#: the modalities each shipped stored dataset measured, for recommend's error
+#: the modalities each shipped stored dataset measured, for rank's error
 _STORED_DATASET_MODALITIES = {
     "D11": ("rna", "adt"), "D24": ("rna", "atac"), "D25": ("rna", "atac"),
     "D28": ("rna", "atac"), "D45": ("rna", "atac"), "D52": ("rna", "adt"),
@@ -352,7 +352,7 @@ _STORED_DATASET_MODALITIES = {
 
 
 def _unmeasured_note(category: str, datasets, wanted: set[str], stored: bool) -> str:
-    """The recommend() error when no ranked dataset measured a requested
+    """The rank() error when no ranked dataset measured a requested
     modality; ``""`` otherwise, or for a dataset that is not shipped."""
     datasets = [str(d) for d in datasets]
     if not datasets or any(d not in _STORED_DATASET_MODALITIES for d in datasets):
@@ -372,7 +372,7 @@ def _unmeasured_note(category: str, datasets, wanted: set[str], stored: bool) ->
             f"Pass scores on such data as long_df=.")
 
 
-def recommend(
+def rank(
     category: str,
     *,
     modalities: list[str] | None = None,
@@ -430,11 +430,11 @@ def recommend(
     Examples
     --------
     >>> import multibench as mtb
-    >>> mtb.recommend("vertical", modalities=["rna", "adt"])
+    >>> mtb.rank("vertical", modalities=["rna", "adt"])
     >>> free = mtb.find_methods("vertical", needs_labels=False)
-    >>> mtb.recommend("vertical", methods=free)
+    >>> mtb.rank("vertical", methods=free)
     >>> both = pd.concat([mtb.load_results("vertical"), mine])
-    >>> mtb.recommend("vertical", long_df=both)
+    >>> mtb.rank("vertical", long_df=both)
     """
     from ..plot import style
 
@@ -460,13 +460,13 @@ def recommend(
         other = sorted(cats - {category})
         if len(other) == 1 and category not in cats:
             raise ValueError(f"long_df holds {other[0]} rows: pass "
-                             f"recommend({other[0]!r}, long_df=...).")
+                             f"rank({other[0]!r}, long_df=...).")
         if other:
             one = category if category in cats else other[0]
             raise ValueError(
                 f"long_df holds {_and_list(other)} rows"
                 + (f" next to {category} ones" if category in cats else "")
-                + f": rank one category at a time, as recommend({one!r}, "
+                + f": rank one category at a time, as rank({one!r}, "
                 f"long_df=long_df[long_df['category'] == {one!r}]).")
 
     from ..engine.registry import list_methods
@@ -646,6 +646,6 @@ def recommend(
             f"datasets left out of the ranking, so {'it is' if one else 'they are'} "
             f"listed last.")
     if notes:
-        _text.warn(f"recommend({category!r}):\n  - " + "\n  - ".join(notes),
+        _text.warn(f"rank({category!r}):\n  - " + "\n  - ".join(notes),
                      UserWarning)
     return out

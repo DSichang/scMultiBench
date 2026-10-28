@@ -19,7 +19,7 @@ https://dsichang.github.io/scMultiBench/tutorials/run/#folder-layout.
 
 from ._settings import config
 from . import plot, catalog, io, env, data
-from ._data.results import load_results, recommend
+from ._data.results import load_results, rank
 from .eval.pipeline import evaluate
 from .discover import find_methods, method_info, params_for
 from .workflow import scan, run, RunResult, load_run
@@ -34,7 +34,7 @@ __all__ = [
     # run
     "scan", "run", "load_run", "RunResult",
     # metrics
-    "evaluate", "load_results", "recommend",
+    "evaluate", "load_results", "rank",
     # version
     "__version__",
 ]

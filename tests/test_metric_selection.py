@@ -27,9 +27,9 @@ def test_an_unknown_token_names_the_valid_ones():
         metric_selection("ARX")
 
 
-def test_load_results_and_recommend_take_one_code():
+def test_load_results_and_rank_take_one_code():
     assert set(mtb.load_results("vertical", metrics="ARI")["metric"]) == {"ARI"}
-    assert len(mtb.recommend("vertical", metrics="NMI"))
+    assert len(mtb.rank("vertical", metrics="NMI"))
 
 
 def test_load_results_names_a_code_it_has_no_row_for():

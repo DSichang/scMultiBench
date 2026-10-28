@@ -261,19 +261,19 @@ def test_scan_says_the_unused_batch(root, capsys):
     assert not plan.caveat.str.contains("reads batches").any()
 
 
-# --- M36: read_canonical after pip install ------------------------------------
-def test_read_canonical_missing_path_names_the_data_path(tmp_path, monkeypatch):
+# --- M36: read after pip install ------------------------------------
+def test_read_missing_path_names_the_data_path(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     with pytest.raises(FileNotFoundError) as e:
-        mtb.io.read_canonical("data/D11/rna.h5")
+        mtb.io.read("data/D11/rna.h5")
     assert str(e.value) == (
         f"data/D11/rna.h5 not found. Demo datasets are under mtb.config.data_path "
         f"({config.data_path}).")
 
 
-def test_read_canonical_example_builds_the_path_from_data_path():
-    doc = mtb.io.read_canonical.__doc__
-    assert 'rna = mtb.io.read_canonical(mtb.config.data_path / "D11" / "rna.h5")' \
+def test_read_example_builds_the_path_from_data_path():
+    doc = mtb.io.read.__doc__
+    assert 'rna = mtb.io.read(mtb.config.data_path / "D11" / "rna.h5")' \
         in doc
     assert "sparse=" not in doc                    # deprecated in 0.4.0
     assert '"data/D11/rna.h5"' not in doc
@@ -366,7 +366,7 @@ def test_to_canonical_gas_follows_the_peak_order(tmp_path, capsys):
         out = ingest._to_canonical(gas, d, modality="gas")   # io.to_canonical, deprecated
     assert out == d / "atac_gas.h5"
     assert _barcodes(out) == atac
-    back = mtb.io.read_canonical(out)
+    back = mtb.io.read(out)
     import scipy.sparse as sp
     if sp.issparse(back.X):
         back.X = back.X.toarray()

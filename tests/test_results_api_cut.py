@@ -1,4 +1,4 @@
-"""The compare side's public surface: ``load_results`` / ``recommend`` share
+"""The compare side's public surface: ``load_results`` / ``rank`` share
 ``evaluate``'s ``metrics=`` vocabulary; ``method=`` / ``metric=`` / ``task=`` /
 ``family=`` (0.4) and ``metric_set`` (0.3.0) are removed, with a TypeError
 naming the replacement; ``available_datasets`` lost ``metric_set`` and
@@ -62,7 +62,7 @@ def test_load_results_and_evaluate_share_the_vocabulary(result_dir):
                          "method": ["M", "M"], "dataset": ["D", "D"],
                          "category": ["vertical", "vertical"]})
     with pytest.raises(ValueError, match="Unknown metrics= token Nope"):
-        results.recommend("vertical", long_df=long, metrics=["Nope"])
+        results.rank("vertical", long_df=long, metrics=["Nope"])
 
 
 def test_load_results_positional_selectors_fail_loudly(result_dir):
@@ -70,13 +70,13 @@ def test_load_results_positional_selectors_fail_loudly(result_dir):
     with pytest.raises(TypeError):
         results.load_results("diagonal", None, "scib", "D28")
     with pytest.raises(TypeError):
-        results.recommend("diagonal", ["rna", "atac"])
+        results.rank("diagonal", ["rna", "atac"])
 
 
 # ---------------------------------------------------------------- callers inside the package
-def test_recommend_default_scores_every_metric_present(result_dir):
+def test_rank_default_scores_every_metric_present(result_dir):
     # c1 (C04): the default of the figures
-    r = _quiet(results.recommend, "diagonal")
+    r = _quiet(results.rank, "diagonal")
     assert r.attrs["metrics"] == "all" and "family" not in r.attrs
     assert "task" not in r.attrs
     assert "runtime_tier" in r.columns and r.runtime_tier.notna().any()

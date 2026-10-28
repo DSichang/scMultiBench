@@ -206,7 +206,7 @@ def test_the_changes_page_says_what_is_refused_and_what_is_not(tmp_path):
                                     atac_kind="gene_activity")
     assert np.array_equal(_dense(out / "adt.h5"), rna.layers["counts"])
     assert np.array_equal(_dense(gas / "atac_gas.h5"), rna.layers["counts"])
-    assert list(ingest.read_canonical(out / "adt.h5").var_names) == list(rna.var_names)
+    assert list(ingest.read(out / "adt.h5").var_names) == list(rna.var_names)
     with pytest.warns(UserWarning, match="look like peaks"):
         ingest.export_dataset(rna, tmp_path / "PEAK", rna="X", atac="layer:counts",
                               atac_kind="peak")

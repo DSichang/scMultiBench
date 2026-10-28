@@ -22,11 +22,11 @@ MTB_ALL = {                                       # the 0.4.0 core API (TARGET.t
     "config", "plot", "catalog", "io", "env", "data",
     "find_methods", "method_info", "params_for",
     "scan", "run", "load_run", "RunResult",
-    "evaluate", "load_results", "recommend",
+    "evaluate", "load_results", "rank",
     "__version__",
 }
 PLOT_ALL = {"bubble", "bar"}
-IO_ALL = {"export_dataset", "read_canonical"}
+IO_ALL = {"export_dataset", "read"}
 ENV_ALL = {"install"}                    # recipe left __all__ in 0.4.0 (X34)
 CONFIG_ALL = {"data_path", "repo_path", "envs_dir", "leiden_flavor"}
 CATALOG_ALL = {"datasets", "metrics"}

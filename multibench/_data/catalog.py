@@ -139,7 +139,7 @@ def _unknown_metrics(kw: str, what: str) -> str:
 
 
 def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelection:
-    """Resolve the ``metrics=`` knob shared by ``evaluate``, ``load_results`` and ``recommend``.
+    """Resolve the ``metrics=`` knob shared by ``evaluate``, ``load_results`` and ``rank``.
 
     Parameters
     ----------

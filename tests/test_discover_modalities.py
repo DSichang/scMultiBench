@@ -28,9 +28,9 @@ def test_find_methods_modalities_never_warns():
             discover.find_methods(category=cat, modalities=["rna"])
 
 
-def test_recommend_modalities_keeps_scbridge(result_dir):
-    a = mtb.recommend("diagonal", modalities=["rna", "atac"])
-    b = mtb.recommend("diagonal")
+def test_rank_modalities_keeps_scbridge(result_dir):
+    a = mtb.rank("diagonal", modalities=["rna", "atac"])
+    b = mtb.rank("diagonal")
     assert a.method.tolist() == b.method.tolist()
     assert "scBridge" in a.method.tolist()
 

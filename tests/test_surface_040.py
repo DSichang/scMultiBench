@@ -14,11 +14,11 @@ ROOT = Path(__file__).resolve().parents[1]
 TOP = ["config", "plot", "catalog", "io", "env", "data",
        "find_methods", "method_info", "params_for",
        "scan", "run", "load_run", "RunResult",
-       "evaluate", "load_results", "recommend",
+       "evaluate", "load_results", "rank",
        "__version__"]
 
 NAMESPACES = {"config": ["data_path", "repo_path", "envs_dir", "leiden_flavor"], "plot": ["bubble", "bar"],
-              "catalog": ["datasets", "metrics"], "io": ["export_dataset", "read_canonical"],
+              "catalog": ["datasets", "metrics"], "io": ["export_dataset", "read"],
               "env": ["install"], "data": ["fetch", "write_example"]}
 
 #: every public function and its parameters, in order
@@ -34,7 +34,7 @@ SIGNATURES = {
     "evaluate": ["embedding", "labels", "dataset", "method", "category", "batch",
                  "metrics", "obsm", "verbose"],
     "load_results": ["category", "dataset", "methods", "metrics"],
-    "recommend": ["category", "modalities", "methods", "metrics", "long_df"],
+    "rank": ["category", "modalities", "methods", "metrics", "long_df"],
     "plot.bubble": ["long_df", "metrics", "methods", "title", "save"],
     "plot.bar": ["long_df", "metrics", "methods", "title", "save"],
     "catalog.datasets": ["category"],
@@ -42,7 +42,7 @@ SIGNATURES = {
     "io.export_dataset": ["data", "dataset_dir", "rna", "adt", "atac", "atac_kind",
                           "labels", "batch", "category", "adt_names", "batch_index",
                           "overwrite"],
-    "io.read_canonical": ["path"],
+    "io.read": ["path"],
     "env.install": ["methods", "category", "dry_run", "flavor", "build"],
     "data.fetch": ["datasets", "verbose"],
     "data.write_example": ["dataset", "folder", "verbose"],
@@ -129,8 +129,8 @@ def test_public_calls_emit_no_future_warning(tmp_path):
         mtb.catalog.datasets()
         mtb.catalog.metrics()
         long = mtb.load_results("vertical", dataset="D11")
-        mtb.recommend("vertical")
-        mtb.recommend("vertical", long_df=long)
+        mtb.rank("vertical")
+        mtb.rank("vertical", long_df=long)
         mtb.plot.bubble(long, save=tmp_path / "b.png")
         mtb.plot.bar(long, save=tmp_path / "a.png")
         mtb.evaluate(emb, labels=lab, metrics=["ARI", "NMI"], verbose=False)

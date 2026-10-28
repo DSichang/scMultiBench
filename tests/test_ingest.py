@@ -21,12 +21,12 @@ def test_from_anndata_writes_features_by_cells(tmp_path):
     assert bars == ["c0", "c1"]
 
 
-def test_roundtrip_read_canonical(tmp_path):
+def test_roundtrip_read(tmp_path):
     ad = pytest.importorskip("anndata")
     import numpy as np
     a = ad.AnnData(np.arange(6, dtype=float).reshape(2, 3))
     out = ingest._to_canonical(a, out=tmp_path / 'c.h5')
-    back = ingest.read_canonical(out)
+    back = ingest.read(out)
     assert back.shape == (2, 3)              # cells x genes restored
 
 
@@ -46,7 +46,7 @@ def test_from_csv_labeled_roundtrip(tmp_path):
     p = tmp_path / "labeled.csv"
     pd.DataFrame(np.ones((3, 2)), index=["cellA", "cellB", "cellC"],
                  columns=["geneX", "geneY"]).to_csv(p)
-    back = ingest.read_canonical(ingest._to_canonical(p, out=tmp_path / 'c.h5'))
+    back = ingest.read(ingest._to_canonical(p, out=tmp_path / 'c.h5'))
     assert back.shape == (3, 2)
     assert list(back.obs_names) == ["cellA", "cellB", "cellC"]
     assert list(back.var_names) == ["geneX", "geneY"]
@@ -183,7 +183,7 @@ def test_the_layer_error_lists_layers_only(tmp_path):
     assert not out.exists()
     # the layer that is there is written
     ingest.export_dataset(a, out, rna="layer:raw")
-    assert ingest.read_canonical(out / "rna.h5").shape == (3, 4)
+    assert ingest.read(out / "rna.h5").shape == (3, 4)
 
 
 def test_1d_matrix_raises(tmp_path):

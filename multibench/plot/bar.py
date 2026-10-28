@@ -21,7 +21,7 @@ def bar(long_df: pd.DataFrame, *, metrics=None, methods=None, title: str | None 
     """Draw each method's overall score as a horizontal bar, best on top.
 
     Within each dataset the methods are ranked on each metric; the bar is the
-    across-dataset score, in the order of ``mtb.recommend(category,
+    across-dataset score, in the order of ``mtb.rank(category,
     long_df=long_df, metrics=...)`` with the same metrics.
 
     Parameters

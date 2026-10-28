@@ -1,5 +1,5 @@
 """Write your data as a dataset folder (:func:`export_dataset`); read one of its
-files (:func:`read_canonical`).
+files (:func:`read`).
 
 Canonical layout: matrix/data (features x cells), matrix/features, matrix/barcodes.
 Label files are single-column CSVs: a header ``x``, then one label per cell.
@@ -733,7 +733,7 @@ def _to_canonical(src, out: Path | str | None = None, modality: str | None = Non
                             block=1024)
 
 
-def read_canonical(path: Path | str):
+def read(path: Path | str):
     """Read a canonical ``.h5`` (a dataset file or an ``embedding.h5``) as an AnnData.
 
     ``matrix/data`` (features x cells) becomes ``.X`` (cells x features, CSR
@@ -760,7 +760,7 @@ def read_canonical(path: Path | str):
     Examples
     --------
     >>> import multibench as mtb
-    >>> rna = mtb.io.read_canonical(mtb.config.data_path / "D11" / "rna.h5")
+    >>> rna = mtb.io.read(mtb.config.data_path / "D11" / "rna.h5")
     """
     import anndata as ad
     import scipy.sparse as sp
@@ -773,7 +773,7 @@ def read_canonical(path: Path | str):
         raise ValueError(f"{path.name} is a folder: pass one of its .h5 files, such as "
                          f"{path.name}/rna.h5.")
     if not h5py.is_hdf5(path):
-        raise ValueError(f"{path.name} is not an .h5 file. read_canonical reads the .h5 "
+        raise ValueError(f"{path.name} is not an .h5 file. mtb.io.read reads the .h5 "
                          f"files of a dataset folder and a run's embedding.h5; read a "
                          f"table with pandas.read_csv.")
     if not _is_canonical_h5(path) and _is_tenx_h5(path):

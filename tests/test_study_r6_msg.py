@@ -333,7 +333,7 @@ def test_positional_warning_is_plural_for_several_files(tmp_path):
 def test_notes_passages_have_no_dash_insertions():
     flat = {fn: " ".join(inspect.getdoc(fn).split()) for fn in (
         mtb.RunResult, mtb.engine.runner.run, mtb.io.export_dataset,
-        mtb.RunResult.rescore, mtb.recommend)}
+        mtb.RunResult.rescore, mtb.rank)}
     assert "``labels_used`` (the label files in the cell order scored)" in flat[mtb.RunResult]
     assert "Batch ids in the order of the dataset's label files" in \
         flat[mtb.RunResult.rescore]

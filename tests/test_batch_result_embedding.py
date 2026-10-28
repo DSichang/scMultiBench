@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench.engine.ingest import read_canonical
+from multibench.engine.ingest import read
 
 
 def _result(tmp_path, status="CHAIN_OK", method="Matilda"):
@@ -26,7 +26,7 @@ def test_embedding_is_an_anndata_with_barcodes_labels_and_batch(tmp_path):
     emb = res.embedding("matilda")                      # any letter case
     d11 = mtb.config.data_path / "D11"
     assert emb.obsm["X_emb"].shape == (n, 3)
-    assert list(emb.obs_names) == list(read_canonical(d11 / "rna.h5").obs_names)
+    assert list(emb.obs_names) == list(read(d11 / "rna.h5").obs_names)
     assert emb.obs["label"].tolist() == pd.read_csv(d11 / "cty.csv").iloc[:, -1].tolist()
     assert "batch" not in emb.obs                       # c3 (E02): one label file
     assert emb.obsm["X_emb"][1, 0] == 3.0                # the method's row order

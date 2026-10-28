@@ -1,6 +1,6 @@
 """Numeric helpers ported from the R bubble-plot code (helpers.R / scIB_knit_table.R).
 
-:func:`overall` is the one overall score of ``mtb.recommend``, ``plot.bar``
+:func:`overall` is the one overall score of ``mtb.rank``, ``plot.bar``
 and ``plot.bubble``.
 """
 from __future__ import annotations
@@ -78,7 +78,7 @@ def per_dataset_ranks(long_df: pd.DataFrame, metrics=None) -> dict:
         mat = mat.dropna(axis=1, how="all")
         if mat.empty:
             continue
-        # a metric only one method has ranks nothing, as recommend's min-max rule
+        # a metric only one method has ranks nothing, as rank's min-max rule
         lone = lone_columns(mat)
         mat = mat.drop(columns=lone)
         ranked = mat.apply(lambda col: rank_max(col.to_numpy()), axis=0)
@@ -150,7 +150,7 @@ def _pairs_under(base: str, stamp: tuple) -> frozenset:
 
 def overall(df: pd.DataFrame, metrics=None, *, stored=None) -> pd.Series:
     """The overall score per method, best first (ties by name), of
-    ``mtb.recommend``, ``plot.bar`` and ``plot.bubble``.
+    ``mtb.rank``, ``plot.bar`` and ``plot.bubble``.
 
     Per dataset, each value is ranked against the stored rows (all rows when
     the table has none): the number of stored values it reaches, plus 0.5 when

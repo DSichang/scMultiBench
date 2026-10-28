@@ -72,8 +72,8 @@ def test_a_feature_filter(tmp_path):
                         adt="X[feature_types=Antibody Capture]")
     assert said == [f"rna='X[feature_types=Gene Expression]' {TWO} {SPLIT}"]
     # the names are written as they are, as before
-    assert list(ingest.read_canonical(out / "rna.h5").var_names) == GENES
-    assert list(ingest.read_canonical(out / "adt.h5").var_names) == PROTEINS
+    assert list(ingest.read(out / "rna.h5").var_names) == GENES
+    assert list(ingest.read(out / "adt.h5").var_names) == PROTEINS
 
 
 def test_the_advice_for_a_feature_filter_works(tmp_path):
@@ -83,10 +83,10 @@ def test_the_advice_for_a_feature_filter_works(tmp_path):
     part.var_names_make_unique()
     out, said = _export(tmp_path, adata, rna=part, adt="X[feature_types=Antibody Capture]")
     assert said == []
-    assert list(ingest.read_canonical(out / "rna.h5").var_names) == [
+    assert list(ingest.read(out / "rna.h5").var_names) == [
         "G1", "G2", "G2-1", "G3", "G3-1", "G4"]
     # the antibody G1 keeps its name; on the whole object it would be G1-1
-    assert list(ingest.read_canonical(out / "adt.h5").var_names) == PROTEINS
+    assert list(ingest.read(out / "adt.h5").var_names) == PROTEINS
     adata.var_names_make_unique()
     assert list(adata.var_names[len(GENES):]) == ["P1", "P2", "G1-1", "P3"]
 
@@ -101,7 +101,7 @@ def test_x_and_a_layer(tmp_path, selector):
     out, said = _export(tmp_path, _genes(), rna=selector)
     assert said == [f"rna={selector!r} {TWO} {RUN}"]
     assert "adata" not in said[0]                        # no variable name is guessed
-    assert list(ingest.read_canonical(out / "rna.h5").var_names) == GENES
+    assert list(ingest.read(out / "rna.h5").var_names) == GENES
     adata = _genes()
     adata.var_names_make_unique()
     assert _export(tmp_path, adata, rna=selector)[1] == []
@@ -126,9 +126,9 @@ def test_the_advice_after_a_split_is_for_the_object_that_is_exported(tmp_path):
     rna.var_names_make_unique()                          # the object that is exported
     out, said = _export(tmp_path, rna, rna="X", adt=adt)
     assert said == []
-    assert list(ingest.read_canonical(out / "rna.h5").var_names) == [
+    assert list(ingest.read(out / "rna.h5").var_names) == [
         "G1", "G2", "G2-1", "G3", "G3-1", "G4"]
-    assert list(ingest.read_canonical(out / "adt.h5").var_names) == PROTEINS
+    assert list(ingest.read(out / "adt.h5").var_names) == PROTEINS
 
 
 def test_an_object(tmp_path):
@@ -152,9 +152,9 @@ def test_an_object_next_to_another_modality_keeps_the_names_of_that_one(tmp_path
     rna.var_names_make_unique()
     out, said = _export(tmp_path, adt, rna=rna, adt="X")
     assert said == []
-    assert list(ingest.read_canonical(out / "rna.h5").var_names) == [
+    assert list(ingest.read(out / "rna.h5").var_names) == [
         "G1", "G2", "G2-1", "G3", "G3-1", "G4"]
-    assert list(ingest.read_canonical(out / "adt.h5").var_names) == PROTEINS
+    assert list(ingest.read(out / "adt.h5").var_names) == PROTEINS
 
 
 def test_a_mudata_modality(tmp_path):
@@ -179,7 +179,7 @@ def test_an_obsm_entry_a_dataframe_and_adt_names(tmp_path):
                                        columns=["CD3", "CD3", "CD4"])
     out, said = _export(tmp_path, rna, rna="X", adt="obsm:protein")
     assert said == [f"adt='obsm:protein' {one}"]
-    assert list(ingest.read_canonical(out / "adt.h5").var_names) == ["CD3", "CD3", "CD4"]
+    assert list(ingest.read(out / "adt.h5").var_names) == ["CD3", "CD3", "CD4"]
     frame = pd.DataFrame(values, index=rna.obs_names, columns=["CD3", "CD3", "CD4"])
     del rna.obsm["protein"]
     assert _export(tmp_path, rna, rna="X", adt=frame)[1] == [f"adt=DataFrame {one}"]

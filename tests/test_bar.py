@@ -46,10 +46,10 @@ def test_bar_methods_selects_the_bars():
     assert [t.get_text() for t in fig.axes[0].get_yticklabels()] == ["B", "C"]
 
 
-def test_bar_doc_names_the_recommend_order():
+def test_bar_doc_names_the_rank_order():
     # 0.4.0: the overall= text left the docstring with the keyword; the bars
-    # are in recommend's order
+    # are in rank's order
     import inspect
     assert "overall" not in inspect.signature(mtb.plot.bar).parameters
     norm = " ".join(mtb.plot.bar.__doc__.split())
-    assert "in the order of ``mtb.recommend(category, long_df=long_df, metrics=...)``" in norm
+    assert "in the order of ``mtb.rank(category, long_df=long_df, metrics=...)``" in norm

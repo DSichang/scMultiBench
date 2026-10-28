@@ -148,10 +148,10 @@ def _():
     return f"{v.shape}"
 
 # ---------------- plot ----------------
-@check("recommend(long_df=)")
+@check("rank(long_df=)")
 def _():
     lng = pd.read_csv(f"{RESULTS}/long_all_D11.csv")
-    return list(mtb.recommend("vertical", long_df=lng).method[:3])
+    return list(mtb.rank("vertical", long_df=lng).method[:3])
 
 @check("plot.__all__ / dir (render, FamilyBlock importable but unlisted)")
 def _():

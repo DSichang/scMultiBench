@@ -1,4 +1,4 @@
-"""recommend(long_df=) gives the numbers behind a figure, in its row order (core040 M7)."""
+"""rank(long_df=) gives the numbers behind a figure, in its row order (core040 M7)."""
 import warnings
 
 import pandas as pd
@@ -11,7 +11,7 @@ COLUMNS = ["method", "grand_score", "needs_labels", "runtime_tier", "worst_sec",
 
 
 def test_the_six_columns():
-    assert list(mtb.recommend("vertical").columns) == COLUMNS
+    assert list(mtb.rank("vertical").columns) == COLUMNS
 
 
 @pytest.mark.parametrize("category", ["vertical", "diagonal", "mosaic", "cross"])
@@ -22,7 +22,7 @@ def test_the_order_is_the_bubble_order_for_the_same_metrics(category, metrics):
         pytest.skip("one batch: no batch scores")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
-        ranked = mtb.recommend(category, long_df=df, metrics=metrics)
+        ranked = mtb.rank(category, long_df=df, metrics=metrics)
         drawn = _build_table(df, metrics=metrics).methods
     assert list(ranked.dropna(subset=["grand_score"])["method"]) == drawn
 

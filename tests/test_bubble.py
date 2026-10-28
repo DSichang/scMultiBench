@@ -4,7 +4,7 @@ import pandas as pd
 
 # the module: mtb.plot.bubble is the function, without the 0.2 attribute paths.
 # The table tests call its internal _build_table: the public build_table is
-# deprecated in 0.4.0 (mtb.recommend(category, long_df=...)) and forwards to it.
+# deprecated in 0.4.0 (mtb.rank(category, long_df=...)) and forwards to it.
 bubble = importlib.import_module("multibench.plot.bubble")
 
 

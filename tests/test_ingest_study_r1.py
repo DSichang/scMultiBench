@@ -268,8 +268,8 @@ def test_var_filter_splits_genes_and_peaks(tmp_path):
                               atac="X[feature_types=Peaks]", atac_kind="peak",
                               labels="obs:ct", category="vertical")
     assert sorted(os.listdir(d)) == ["atac.h5", "cty.csv", "rna.h5"]
-    assert list(ingest.read_canonical(d / "rna.h5").var_names) == GENES
-    assert list(ingest.read_canonical(d / "atac.h5").var_names) == PEAKS
+    assert list(ingest.read(d / "rna.h5").var_names) == GENES
+    assert list(ingest.read(d / "atac.h5").var_names) == PEAKS
     with pytest.raises(ValueError, match=r"no feature has var\['feature_types'\] == 'Genes'; "
                                          r"the values of var\['feature_types'\] are "
                                          r"\['Gene Expression', 'Peaks'\]"):

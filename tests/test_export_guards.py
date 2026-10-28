@@ -107,7 +107,7 @@ def test_the_advice_for_a_wrong_type_name_works(tmp_path):
     names = sorted(set(a.var["feature_types"]))          # of the whole object
     assert names == ["Gene Expression", "Peaks"]
     out = ingest.export_dataset(rna, tmp_path / "OK", atac=a[:, kind == names[1]].copy(), **kw)
-    assert ingest.read_canonical(out / "atac.h5").n_vars == 8
+    assert ingest.read(out / "atac.h5").n_vars == 8
 
 
 def test_an_object_without_feature_types_keeps_the_advice_for_a_10x_file(tmp_path):
@@ -168,7 +168,7 @@ def test_a_complete_batch_column_writes_every_cell(tmp_path):
     a = _cite()
     out = ingest.export_dataset(a, tmp_path / "OK", rna="X", labels="obs:ct",
                                 batch="obs:donor", category="cross")
-    cells = [ingest.read_canonical(out / f"rna{b}.h5").n_obs for b in (1, 2)]
+    cells = [ingest.read(out / f"rna{b}.h5").n_obs for b in (1, 2)]
     assert cells == [30, 30] and sorted(p.name for p in out.iterdir()) == [
         "cty1.csv", "cty2.csv", "rna1.h5", "rna2.h5"]
 
@@ -320,10 +320,10 @@ def test_adt_in_x_next_to_a_protein_matrix(tmp_path):
         "matrix, run del adt.obsm['totalvi'] first.")
     del adt.obsm['totalvi']
     own = ingest.export_dataset(_cite(), tmp_path / "OWN", rna="X", adt=adt)
-    assert ingest.read_canonical(own / "adt.h5").n_vars == 20
+    assert ingest.read(own / "adt.h5").n_vars == 20
     ingest.export_dataset(a, tmp_path / "X", rna=None, adt="X")
-    assert ingest.read_canonical(tmp_path / "KEY" / "adt.h5").n_vars == 4
-    assert ingest.read_canonical(tmp_path / "X" / "adt.h5").n_vars == 20
+    assert ingest.read(tmp_path / "KEY" / "adt.h5").n_vars == 4
+    assert ingest.read(tmp_path / "X" / "adt.h5").n_vars == 20
 
 
 def test_to_canonical_keeps_its_text_and_ignores_embeddings(tmp_path):

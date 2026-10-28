@@ -45,8 +45,8 @@ STALE = {
     r"list_methods\([^)]*\b(task|runnable)=": "find_methods(category, task=/runnable=)",
     r"needs_labels=True": "to_long() lost needs_labels; add the column to the frame",
     # 0.4.0: evaluate(method=) names the rows again, so only the other calls refuse it
-    r"\b(evaluate|load_results|recommend|rescore)\([^)]*\b(task|family|only|metric)=": "metrics= / methods=",
-    r"\b(load_results|recommend|rescore)\([^)]*\bmethod=": "methods=",
+    r"\b(evaluate|load_results|rank|rescore)\([^)]*\b(task|family|only|metric)=": "metrics= / methods=",
+    r"\b(load_results|rank|rescore)\([^)]*\bmethod=": "methods=",
     r"\b(inputs_for|labels_for)\(\s*(\"D\d+s?\"|DATASET)\s*,\s*\"(?!vertical|diagonal|mosaic|cross)\w+\"":
         "(dataset, category, method) order",
     r"17 columns|18 columns\b(?! - )|plan_commands adds": "scan's frame is SCAN_COLUMNS + command",
@@ -56,7 +56,7 @@ STALE = {
     r"\bmtb\.(run_all|inputs_for|labels_for|to_long|sweep|classify|classification_metrics|"
     r"results_coverage|available_datasets|cite)\(": "run(methods=[m]) / evaluate(dataset=, method=) / catalog.datasets() / method_info(m)['reference']",
     r"\bmtb\.(env\.(doctor|status)|io\.to_canonical|plot\.(build_table|BubbleTable)|"
-    r"config\.Config|catalog\.methods|data\.fetchable)\b": "env.install(dry_run=True) / io.export_dataset / recommend(long_df=) / config",
+    r"config\.Config|catalog\.methods|data\.fetchable)\b": "env.install(dry_run=True) / io.export_dataset / rank(long_df=) / config",
     r"\bmultibench (convert|export|run-all|scan|env|fetch|plot|evaluate)\b": "the Python call (0.4.0: no command line)",
     # 0.4.0: mtb.config is the settings object, and two names left the API
     r"\bconfig\.DEFAULT\b": "mtb.config.<setting>",

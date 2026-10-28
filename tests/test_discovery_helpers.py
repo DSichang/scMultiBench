@@ -63,40 +63,40 @@ def test_inputs_for_default_no_warning_when_present(tmp_path):
         warnings.simplefilter("error")
         got = resolve.inputs_for("D27", "diagonal", "Seurat_v5", data_path=tmp_path)
     assert got["atac_peak"].endswith("/D27/peak.h5")
-def test_recommend_unknown_result_id_and_modalities(result_dir):
+def test_rank_unknown_result_id_and_modalities(result_dir):
     import pandas as pd
-    from multibench._data.results import recommend
+    from multibench._data.results import rank
     # a non-registry id (e.g. a result-dir token or the user's own method) gets
     # None metadata, no KeyError
     long = mtb.load_results("vertical", dataset="D11")
     mine = long[long.method == "scMM"].assign(method="Concerto_louvain")
     mine = mine.assign(value=mine.value * 0.5)
-    r = recommend("vertical", long_df=pd.concat([long, mine]))
+    r = rank("vertical", long_df=pd.concat([long, mine]))
     row = r[r.method == "Concerto_louvain"].iloc[0]
     assert row.needs_labels is None and row.env is None and row.runtime_tier is None
     # modalities filter goes through find_methods
-    r2 = recommend("vertical", long_df=long, modalities=["rna", "adt"])
+    r2 = rank("vertical", long_df=long, modalities=["rna", "adt"])
     assert set(r2.method) <= set(mtb.find_methods(category="vertical", modalities=["rna", "adt"]))
     # sciPENN / scMSI are RNA+ADT methods: asking for RNA+ATAC leaves nothing
     sub = long[long.method.isin(["sciPENN", "scMSI"])]
     with pytest.raises(ValueError, match="consumes modalities"):
-        recommend("vertical", long_df=sub, modalities=["rna", "atac"])
+        rank("vertical", long_df=sub, modalities=["rna", "atac"])
     with pytest.raises(ValueError, match=r"Unknown metrics= token bogus\."):
-        recommend("vertical", long_df=long, metrics="bogus")
+        rank("vertical", long_df=long, metrics="bogus")
 
 
 # --- P04: unscored methods are named, source/family recorded on the frame ---
 
-def test_recommend_task_error_names_real_metrics(result_dir):
-    from multibench._data.results import recommend
+def test_rank_task_error_names_real_metrics(result_dir):
+    from multibench._data.results import rank
     # vertical ships no batch metrics; the error must list what IS there,
     # not "metrics present: []" (the loader used to pre-filter by task)
     # the family on a single-batch category says so (X89)
     with pytest.raises(ValueError, match=r'^The vertical tables have no batch scores '
                                          r'\(D11 has one batch\)\. Use metrics="clustering"\.$'):
-        recommend("vertical", metrics="batch")
+        rank("vertical", metrics="batch")
     with pytest.raises(ValueError, match=r"metrics present: \['ARI'"):
-        recommend("vertical", metrics=["GC", "iLISI"])
+        rank("vertical", metrics=["GC", "iLISI"])
 
 
 def test_namespace_all_hygiene():
@@ -104,21 +104,21 @@ def test_namespace_all_hygiene():
     # internals are not reachable through them
     assert mtb.env.__all__ == ["install"] and not hasattr(mtb.env, "recipe")
     assert mtb.config.FIELDS == ("data_path", "repo_path", "envs_dir", "leiden_flavor")
-    assert sorted(mtb.io.__all__) == ["export_dataset", "read_canonical"]
+    assert sorted(mtb.io.__all__) == ["export_dataset", "read"]
 
 
 def _rec(*a, **k):
     import warnings
-    from multibench._data.results import recommend
+    from multibench._data.results import rank
     with warnings.catch_warnings(record=True) as rec:
         warnings.simplefilter("always")
-        r = recommend(*a, **k)
-    msgs = [str(w.message) for w in rec if "recommend(" in str(w.message)
+        r = rank(*a, **k)
+    msgs = [str(w.message) for w in rec if str(w.message).startswith("rank(")
             and not issubclass(w.category, FutureWarning)]
     return r, (msgs[0] if msgs else "")
 
 
-def test_recommend_rerun_missing_only_seurat_wnn(result_dir):
+def test_rank_rerun_missing_only_seurat_wnn(result_dir):
     r, msg = _rec("vertical", modalities=["rna", "adt"])
     assert set(r[r.grand_score.isna()].method) == {"Seurat_WNN"}
     assert r.attrs["source"] == "rerun" and r.attrs["missing"] == ["Seurat_WNN"]
@@ -126,7 +126,7 @@ def test_recommend_rerun_missing_only_seurat_wnn(result_dir):
     assert 'Try source="rerun"' not in msg
 
 
-def test_recommend_long_df_records_source_and_family(result_dir):
+def test_rank_long_df_records_source_and_family(result_dir):
     long = mtb.load_results("vertical", dataset="D11")
     r, _ = _rec("vertical", long_df=long, metrics="clustering")
     assert r.attrs["source"] == "long_df" and r.attrs["metrics"] == "clustering"
@@ -134,7 +134,7 @@ def test_recommend_long_df_records_source_and_family(result_dir):
     assert r2.attrs["metrics"] == ["ARI", "NMI"]
 
 
-def test_recommend_metrics_batch_on_diagonal_rerun(result_dir):
+def test_rank_metrics_batch_on_diagonal_rerun(result_dir):
     r, _ = _rec("diagonal", metrics="batch")
     assert r.attrs["metrics"] == "batch" and r.grand_score.notna().any()
     # the explicit list of the same family scores the same

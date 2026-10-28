@@ -161,13 +161,13 @@ def test_x76_tokens_ignore_letter_case():
     assert "ARI" in set(got["metric"])
 
 
-def test_x83_read_canonical_reads_an_embedding_file(tmp_path):
+def test_x83_read_reads_an_embedding_file(tmp_path):
     import h5py
     import numpy as np
     p = tmp_path / "embedding.h5"
     with h5py.File(p, "w") as f:
         f["data"] = np.arange(30.0).reshape(10, 3)
-    a = mtb.io.read_canonical(p)
+    a = mtb.io.read(p)
     assert a.n_obs == 10 and a.obsm["X_emb"].shape == (10, 3)
 
 

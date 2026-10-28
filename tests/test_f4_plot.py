@@ -4,7 +4,7 @@ R4-12: the chip key says what '?' and 'DR' mean without the word 'registry';
 two own datasets that share no method get one action (c4);
 the incomplete-matrix warning is short sentences; the na='raise' error does not
 offer to hide itself.
-R4-13: recommend's warning lines, DegenerateRerunWarning, evaluate's
+R4-13: rank's warning lines, DegenerateRerunWarning, evaluate's
 reordered-dict error, the prepared-file note, the batch= advice and the
 run messages are short plain sentences.
 """
@@ -89,20 +89,20 @@ def test_incomplete_matrix_groups_methods_by_count():
 
 # --- R4-12 (e): extended summaries --------------------------------------------
 
-# --- R4-13 (a): recommend's warning lines -------------------------------------
+# --- R4-13 (a): rank's warning lines -------------------------------------
 
-def _recommend(*a, **kw):
+def _rank(*a, **kw):
     with warnings.catch_warnings(record=True) as rec:
         warnings.simplefilter("always")
-        r = mtb.recommend(*a, **kw)
-    msgs = [str(w.message) for w in rec if str(w.message).startswith("recommend(")
+        r = mtb.rank(*a, **kw)
+    msgs = [str(w.message) for w in rec if str(w.message).startswith("rank(")
             and "is deprecated" not in str(w.message)]
     return r, (msgs[0] if msgs else "")
 
 
 def _no_log_joins(msg):
     """No clause joined with ' - ', no ';' inside parentheses (a line's own
-    bullet marker, as in recommend's list, is not a join)."""
+    bullet marker, as in rank's list, is not a join)."""
     import re
     for line in msg.splitlines():
         body = re.sub(r"^\s*- ", "", line)
@@ -110,12 +110,12 @@ def _no_log_joins(msg):
         assert not re.search(r"\([^)]*;[^)]*\)", body), line
 
 
-def test_recommend_unscored_methods_line_is_plain(result_dir):
+def test_rank_unscored_methods_line_is_plain(result_dir):
     # c1 (C17): the unscored rows are last, without a line every call
-    r, msg = _recommend("vertical")
+    r, msg = _rank("vertical")
     assert r.grand_score.isna().any() and r.grand_score.iloc[-1:].isna().all()
     assert "listed last" not in msg
-    _, msg = _recommend("vertical", modalities=["rna", "adt"])
+    _, msg = _rank("vertical", modalities=["rna", "adt"])
     assert "listed last" not in msg
 
 

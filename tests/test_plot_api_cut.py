@@ -1,6 +1,6 @@
 """The plot side's public surface: ``mtb.plot.__all__`` is ``bubble`` and
 ``bar`` (0.4.0; ``build_table`` / ``BubbleTable`` are deprecated for
-``mtb.recommend(category, long_df=...)``), ``plot_bubble`` is removed (0.4) with
+``mtb.rank(category, long_df=...)``), ``plot_bubble`` is removed (0.4) with
 an error naming ``bubble``, ``render`` / ``FamilyBlock`` stay importable but
 leave the listing, and ``bubble`` / ``bar`` take the same keyword-only
 selectors after ``long_df``.

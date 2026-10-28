@@ -29,7 +29,7 @@ def _added(stored):
     """Rows of three methods not in ``stored``: a copy of its best method, a copy of
     its worst and random values, on its datasets."""
     rng = np.random.default_rng(3)
-    order = list(mtb.recommend(stored["category"].iloc[0], long_df=stored).method)
+    order = list(mtb.rank(stored["category"].iloc[0], long_df=stored).method)
     best = stored[stored.method == order[0]].assign(method="Best copy", source="user")
     worst = stored[stored.method == order[-1]].assign(method="Worst copy", source="user")
     rand = stored[stored.method == order[1]].assign(
@@ -59,8 +59,8 @@ def test_added_rows_keep_the_stored_order(category, family):
         both = pd.concat([stored, added], ignore_index=True)
         names = set(stored["method"])
         orders = {
-            "recommend": (list(mtb.recommend(category, metrics=family, long_df=stored).method),
-                          list(mtb.recommend(category, metrics=family, long_df=both).method)),
+            "rank": (list(mtb.rank(category, metrics=family, long_df=stored).method),
+                          list(mtb.rank(category, metrics=family, long_df=both).method)),
             "bubble": (_build_table(stored, metrics=family).methods,
                        _build_table(both, metrics=family).methods),
             "bar": (_bar_order(stored, family), _bar_order(both, family)),
@@ -68,7 +68,7 @@ def test_added_rows_keep_the_stored_order(category, family):
     for name, (alone, mixed) in orders.items():
         assert [m for m in mixed if m in names] == alone, name
     # the three agree on where the added rows go
-    assert orders["recommend"][1] == orders["bubble"][1] == orders["bar"][1]
+    assert orders["rank"][1] == orders["bubble"][1] == orders["bar"][1]
     # a copy of a stored method lands next to it
     mixed = orders["bubble"][1]
     if family is None:
@@ -78,7 +78,7 @@ def test_added_rows_keep_the_stored_order(category, family):
 
 def test_an_added_row_is_placed_by_its_rank_against_the_stored_rows_only():
     stored = mtb.load_results("vertical")
-    first = list(mtb.recommend("vertical", long_df=stored).method)[0]
+    first = list(mtb.rank("vertical", long_df=stored).method)[0]
     top = stored[stored.method == first].assign(method="Top", source="user",
                                                 value=lambda d: d.value + 1)
     other = stored[stored.method == first].assign(method="Other", source="user",
@@ -91,22 +91,22 @@ def test_an_added_row_is_placed_by_its_rank_against_the_stored_rows_only():
 
 # --------------------------------------------------------------- C04 and C17
 @pytest.mark.parametrize("category", list(_LAB))
-def test_recommend_and_the_figures_share_one_default(category):
+def test_rank_and_the_figures_share_one_default(category):
     stored = mtb.load_results(category)
-    rec = [m for m in mtb.recommend(category).method if m in set(stored.method)]
+    rec = [m for m in mtb.rank(category).method if m in set(stored.method)]
     assert rec == _build_table(stored).methods
 
 
-def test_recommend_says_nothing_about_methods_without_scores():
+def test_rank_says_nothing_about_methods_without_scores():
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        out = mtb.recommend("vertical")
+        out = mtb.rank("vertical")
     assert out["grand_score"].isna().any()             # still listed, last
 
 
-def test_recommend_with_long_df_ranks_its_methods_only():
+def test_rank_with_long_df_ranks_its_methods_only():
     stored = mtb.load_results("vertical")
-    out = mtb.recommend("vertical", long_df=stored)
+    out = mtb.rank("vertical", long_df=stored)
     assert set(out.method) == set(stored.method)
 
 

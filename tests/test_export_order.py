@@ -201,7 +201,7 @@ def test_an_index_of_integers_follows_the_matrix_whose_cells_it_names(tmp_path, 
 # ---- restored from before the 0.4 cut: kept behaviour
 def _matrix(path):
     import scipy.sparse as sp
-    a = ingest.read_canonical(path)
+    a = ingest.read(path)
     if sp.issparse(a.X):
         a.X = a.X.toarray()
     return a

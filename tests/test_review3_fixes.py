@@ -77,7 +77,7 @@ def _warned(fn, *a, **kw):
 
 
 def _dense(path):
-    x = ingest.read_canonical(path).X
+    x = ingest.read(path).X
     return np.asarray(x.toarray() if hasattr(x, "toarray") else x)
 
 
@@ -149,7 +149,7 @@ def test_following_the_advice_writes_the_counts_of_that_object(tmp_path):
     assert np.array_equal(_dense(out / "rna.h5"), rna.layers["counts"])
     assert np.array_equal(_dense(out / "adt.h5"), _adt().layers["counts"])
     assert np.array_equal(_dense(out / "atac.h5"), _atac().layers["counts"])
-    assert list(ingest.read_canonical(out / "adt.h5").var_names) == list(adt.var_names)
+    assert list(ingest.read(out / "adt.h5").var_names) == list(adt.var_names)
 
 
 # --------------------------------------- 1(b): one matrix for two modalities
@@ -353,7 +353,7 @@ def test_the_other_column_name_is_the_first_advice(tmp_path):
                                                      "rna_cty.csv"]
     assert pd.read_csv(out / "rna_cty.csv")["x"].tolist() == rna.obs["cell_type"].tolist()
     assert pd.read_csv(out / "atac_cty.csv")["x"].tolist() == atac.obs["predicted.id"].tolist()
-    assert list(ingest.read_canonical(out / "atac_gas.h5").obs_names) == list(atac.obs_names)
+    assert list(ingest.read(out / "atac_gas.h5").obs_names) == list(atac.obs_names)
 
 
 def test_the_rna_side_without_the_column(tmp_path):
@@ -389,7 +389,7 @@ def test_a_file_written_again_is_not_said_to_follow_itself(tmp_path, capsys):
     rna, atac = _rna(log=False), _atac(log=False, cells=[f"a{i:03d}" for i in range(N)])
     out = ingest.export_dataset(rna, tmp_path / "D", rna="X", atac=atac, atac_kind="peak",
                                 labels="obs:celltype", category="diagonal")
-    order = list(ingest.read_canonical(out / "atac_peak.h5").obs_names)
+    order = list(ingest.read(out / "atac_peak.h5").obs_names)
     labels = (out / "atac_cty.csv").read_bytes()
     shuffled = atac[np.random.default_rng(1).permutation(N)].copy()
     capsys.readouterr()
@@ -397,7 +397,7 @@ def test_a_file_written_again_is_not_said_to_follow_itself(tmp_path, capsys):
                           category="diagonal", overwrite=True)
     assert capsys.readouterr().err == (
         "export_dataset: wrote atac_peak.h5 in the cell order atac_peak.h5 had before.\n")
-    assert list(ingest.read_canonical(out / "atac_peak.h5").obs_names) == order
+    assert list(ingest.read(out / "atac_peak.h5").obs_names) == order
     assert np.array_equal(_dense(out / "atac_peak.h5"), atac.X)
     ingest.export_dataset(shuffled, out, rna=None, atac="X", atac_kind="peak",
                           labels="obs:celltype", category="diagonal", overwrite=True)
@@ -415,7 +415,7 @@ def test_a_file_written_again_is_not_said_to_follow_itself(tmp_path, capsys):
     ingest.export_dataset(gas, out, rna=None, atac="X", atac_kind="gene_activity",
                           category="diagonal", overwrite=True)
     assert capsys.readouterr().err == follows
-    assert list(ingest.read_canonical(out / "atac_gas.h5").obs_names) == order
+    assert list(ingest.read(out / "atac_gas.h5").obs_names) == order
 
 
 # ---------------------------------------------------------- 6(b): no cell left
@@ -444,10 +444,10 @@ def test_adt_names_as_a_string_is_refused(tmp_path):
     # the example of the message, and a list as before
     out = ingest.export_dataset(cite, tmp_path / "LIST", adt="obsm:protein",
                                 adt_names=list(cite.uns["protein_ids"]))
-    assert list(ingest.read_canonical(out / "adt.h5").var_names) == cite.uns["protein_ids"]
+    assert list(ingest.read(out / "adt.h5").var_names) == cite.uns["protein_ids"]
     out = ingest.export_dataset(cite, tmp_path / "TUPLE", adt="obsm:protein",
                                 adt_names=tuple("ABCDEFGH"))
-    assert list(ingest.read_canonical(out / "adt.h5").var_names) == list("ABCDEFGH")
+    assert list(ingest.read(out / "adt.h5").var_names) == list("ABCDEFGH")
 
 
 # ------------------------------------- 5: the same features in every batch
