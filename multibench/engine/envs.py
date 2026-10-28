@@ -28,6 +28,7 @@ from .. import _text
 from .._settings import config
 from . import registry
 
+
 class LinuxOnlyError(OSError, RuntimeError):
     """The refusal of a method run or an env install off Linux. Both an
     ``OSError`` (what ``mtb.run`` raised) and a ``RuntimeError`` (what
@@ -318,24 +319,19 @@ def _conda_bin(prefer: str = "mamba") -> str:
 
 # --- shared group environments --------------------------------------------
 @functools.lru_cache(maxsize=1)
-def _merged_groups() -> dict:
-    return (yaml.safe_load(_GROUPS_YAML.read_text()) or {}).get("groups", {})
-
-
-@functools.lru_cache(maxsize=1)
-def _method_env() -> dict:
-    """``{method: conda env}`` overrides from ``env_groups.yaml``; they win
-    over group membership."""
-    return (yaml.safe_load(_GROUPS_YAML.read_text()) or {}).get("method_env", {}) or {}
+def _env_groups() -> dict:
+    """``env_groups.yaml``: ``groups`` (shared envs and their members) and
+    ``method_env`` (``{method: env}`` overrides, which win over membership)."""
+    return yaml.safe_load(_GROUPS_YAML.read_text()) or {}
 
 
 def group_for(method: str) -> str:
     """The env that serves this method: its override, its shared group, or
     its own ``scmb_<method>`` env."""
-    override = _method_env()
+    override = _env_groups().get("method_env", {}) or {}
     if method in override:
         return override[method]
-    for name, g in _merged_groups().items():
+    for name, g in _env_groups().get("groups", {}).items():
         if method in g.get("members", []):
             return name
     return own_env_name(method)
@@ -590,6 +586,18 @@ def download_archive(urls: list[str], target: Path, *, label: str,
     size = f" {fmt(total)}" if total else ""
     print(f"[env] downloading {label}{size} ...", flush=True)
     done, mark, t0 = 0, step, time.monotonic()
+
+    def copy(resp, out):
+        nonlocal done, mark
+        while chunk := resp.read(1 << 20):
+            out.write(chunk)
+            done += len(chunk)
+            if done >= mark:
+                rate = done / max(time.monotonic() - t0, 1e-3) / 1e6
+                print(f"[env]   {fmt(done)}" + (f" of {fmt(total)}" if total else "")
+                      + f" ({rate:.0f} MB/s)", flush=True)
+                mark = (done // step + 1) * step
+
     with open(target, "wb") as out:
         for url in urls:
             start = done
@@ -604,15 +612,7 @@ def download_archive(urls: list[str], target: Path, *, label: str,
                             out.seek(start)
                             out.truncate()
                             done = start
-                        while chunk := resp.read(1 << 20):
-                            out.write(chunk)
-                            done += len(chunk)
-                            if done >= mark:
-                                rate = done / max(time.monotonic() - t0, 1e-3) / 1e6
-                                print(f"[env]   {fmt(done)}" + (f" of {fmt(total)}" if total else "")
-                                      + f" ({rate:.0f} MB/s)", flush=True)
-                                while mark <= done:
-                                    mark += step
+                        copy(resp, out)
                     break
                 except (OSError, TimeoutError) as e:
                     final = isinstance(e, urllib.error.HTTPError) and e.code < 500
@@ -699,8 +699,6 @@ def plan_totals(rows, sizes: dict | None = None, *, layers: dict | None = None
 def _ensure_layer(name: str, info: dict, envs_root: Path) -> Path:
     """``<envs_root>/.layers/<name>``, downloaded and unpacked on first use;
     ``RuntimeError`` when its digest is not the one ``info`` names."""
-    import tarfile
-    from .._data.fetch import safe_extract
     dest = envs_root / LAYERS_DIR / name
     if not (dest / LAYER_INFO).is_file():
         entry = packed_layers().get(name)
@@ -713,11 +711,8 @@ def _ensure_layer(name: str, info: dict, envs_root: Path) -> Path:
             download_archive(list(entry["urls"]), tgz, label=f"{name} (shared layer)",
                              total=entry.get("archive_bytes"))
             print(f"[env] unpacking {name} -> {dest} ...", flush=True)
-            shutil.rmtree(part, ignore_errors=True)
             shutil.rmtree(dest, ignore_errors=True)
-            part.mkdir(parents=True)
-            with tarfile.open(tgz) as t:
-                safe_extract(t, part)
+            _extract(tgz, part)
             part.rename(dest)
         finally:
             tgz.unlink(missing_ok=True)
@@ -727,6 +722,16 @@ def _ensure_layer(name: str, info: dict, envs_root: Path) -> Path:
         raise RuntimeError(f"the layer {name} on disk is not the one this archive was "
                            f"packed with; delete {dest} and install again")
     return dest
+
+
+def _extract(tgz: Path, part: Path) -> None:
+    """Unpack the archive ``tgz`` into a new, empty folder ``part``."""
+    import tarfile
+    from .._data.fetch import safe_extract
+    shutil.rmtree(part, ignore_errors=True)
+    part.mkdir(parents=True)
+    with tarfile.open(tgz) as t:
+        safe_extract(t, part)
 
 
 def _link_layer(layer: Path, prefix: Path, info: dict) -> None:
@@ -771,9 +776,7 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
         archive is published or the unpack failed (the caller then builds
         from the lockfile).
     """
-    import tarfile
     import urllib.error
-    import urllib.request
 
     check_flavor(flavor)                  # a typo fails before the platform check
     _require_linux(force)                 # fail closed before any bytes land
@@ -806,13 +809,9 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
         tgz.unlink(missing_ok=True)
         raise
     print(f"[env] unpacking {env} -> {dest} ...", flush=True)
-    from .._data.fetch import safe_extract
     part = dest.with_name(dest.name + ".partial")
     try:
-        shutil.rmtree(part, ignore_errors=True)
-        part.mkdir(parents=True)
-        with tarfile.open(tgz) as t:
-            safe_extract(t, part)
+        _extract(tgz, part)
         if not (part / "bin").is_dir():
             raise RuntimeError("archive did not contain bin/")
         # the files this env shares with others: one download, hard links
@@ -1007,13 +1006,8 @@ def create_all(category: str | None = None, methods: list[str] | None = None,
     if not dry_run:
         _require_linux(force)             # before conda is even asked anything
     have = set(installed_envs(conda))
-    if methods is None:
-        methods = registry.list_methods(category=category)
-    by_env: dict[str, list[str]] = {}
-    for m in methods:
-        by_env.setdefault(group_for(m), []).append(m)
     out = []
-    for env, ms in sorted(by_env.items(), key=lambda kv: (-len(kv[1]), kv[0])):
+    for env, ms in _envs_needed(category, methods):
         lock = lockfile(env)
         exists = env in have
         cmds: list[list[str]] = []
@@ -1021,7 +1015,7 @@ def create_all(category: str | None = None, methods: list[str] | None = None,
             cmds = create_env(env, conda=conda, dry_run=True)
             if not dry_run:
                 _build(env, cmds, conda, "lockfile")
-        out.append({"env": env, "methods": sorted(ms), "exists": exists,
+        out.append({"env": env, "methods": ms, "exists": exists,
                     "has_lock": lock is not None, "cmds": cmds})
     return out
 
@@ -1040,9 +1034,10 @@ def packed_manifest() -> dict:
     return _json.loads(_PACKED_MANIFEST.read_text())
 
 
-#: the first columns of install's and doctor's frames
 #: The columns of :func:`install`'s table; the rows hold more, for the package.
 INSTALL_COLUMNS = ("env", "methods", "state", "flavor", "archive_bytes", "unpacked_bytes")
+
+
 def _frame(rows: list[dict], first: tuple):
     """``rows`` as a DataFrame, ``first`` columns first."""
     import pandas as pd
@@ -1130,66 +1125,24 @@ def _install_rows(methods: list[str] | None = None, *, category: str | None = No
     methods = _check_methods(methods)
     manifest = packed_manifest() if packed else {}
     sizes = packed_sizes() if packed else {}
-    unpacked: set[str] = set()
-    if not dry_run:
-        _require_linux(force)             # before conda is even asked anything
-        missing = [r for r in _doctor_rows(category=category, methods=methods, conda=conda)
-                   if not r["exists"]]
-        for r in missing:          # before any download or build
-            if r.get("other_env"):
-                raise RuntimeError(other_env_text(r["env"], r["other_env"],
-                                                  "install again."))
-        if (conda or _find_conda()) is None:
-            # only the packed path works: refuse before any download
-            for r in missing:
-                if packed and r["env"] in manifest:
-                    continue
-                if r["env"] in packed_manifest():
-                    raise RuntimeError(
-                        f"{NO_CONDA} Environment {r['env']} has a packed archive. "
-                        + "Leave out build=True to install it.")
-                raise RuntimeError(
-                    f"{NO_CONDA} Environment {r['env']} has no packed archive. Install "
-                    f"conda first.")
-        if packed:
-            # said only when a CPU build is taken
-            note = auto_flavor_note(flavor) if any(
-                archive_for(r["env"], flavor, manifest=manifest, sizes=sizes)[1] == "cpu"
-                for r in missing) else None
-            if note:
-                print(note, file=sys.stderr, flush=True)
-            for r in missing:
-                if install_packed(r["env"], conda=conda, force=force, flavor=flavor):
-                    unpacked.add(r["env"])
+    unpacked = set() if dry_run else _install_missing(
+        category, methods, packed=packed, manifest=manifest, sizes=sizes, conda=conda,
+        force=force, flavor=flavor)
     rows = create_all(category=category, methods=methods, conda=conda,
                       dry_run=dry_run, force=force)
     out = []
     for r in rows:
         env = r["env"]
-        if env in unpacked:
-            state = "PACKED"
-        elif r["exists"]:
-            state = "have"
-        elif dry_run and other_env_prefix(env, conda) is not None:
-            state = "name taken"
-        elif not dry_run:
-            state = "BUILD" if r["has_lock"] else "NO-LOCK"
-        elif packed:
-            if env in manifest:
-                state = "packed archive published"
-            else:
-                state = ("no archive - lockfile build" if r["has_lock"]
-                         else "no archive - NO-LOCK")
-        else:
-            state = "build(dry-run)" if r["has_lock"] else "NO-LOCK"
+        state = _row_state(r, unpacked=unpacked, dry_run=dry_run, packed=packed,
+                           manifest=manifest, conda=conda)
         # URL and sizes of the archive this host would fetch
         if packed:
             key, would_install = archive_for(env, flavor, manifest=manifest, sizes=sizes)
         else:
             key, would_install = env, None
-        installed = installed_flavor(env, conda) if (r["exists"] or env in unpacked) else None
         size = sizes.get(key) or {}
-        flav = installed if (r["exists"] or env in unpacked) else would_install
+        flav = (installed_flavor(env, conda) if (r["exists"] or env in unpacked)
+                else would_install)
         if flav == "gpu" and packed and _single_build(env, manifest=manifest):
             flav = "any"            # one archive for CPU and GPU hosts
         # what runs: the archive is unpacked, so the lockfile build is the fallback
@@ -1209,6 +1162,59 @@ def _install_rows(methods: list[str] | None = None, *, category: str | None = No
     return out
 
 
+def _install_missing(category, methods, *, packed, manifest, sizes, conda, force,
+                     flavor) -> set:
+    """Refuse before any download or build (off Linux, an env name taken, no
+    conda where needed), then unpack the published archives (``packed``) of
+    the envs not installed; the names of the envs unpacked."""
+    _require_linux(force)             # before conda is even asked anything
+    missing = [r for r in _doctor_rows(category=category, methods=methods, conda=conda)
+               if not r["exists"]]
+    for r in missing:
+        if r.get("other_env"):
+            raise RuntimeError(other_env_text(r["env"], r["other_env"], "install again."))
+    if (conda or _find_conda()) is None:
+        # only the packed path works: refuse before any download
+        for r in missing:
+            if packed and r["env"] in manifest:
+                continue
+            if r["env"] in packed_manifest():
+                raise RuntimeError(
+                    f"{NO_CONDA} Environment {r['env']} has a packed archive. "
+                    + "Leave out build=True to install it.")
+            raise RuntimeError(
+                f"{NO_CONDA} Environment {r['env']} has no packed archive. Install "
+                f"conda first.")
+    if not packed:
+        return set()
+    # said only when a CPU build is taken
+    if any(archive_for(r["env"], flavor, manifest=manifest, sizes=sizes)[1] == "cpu"
+           for r in missing):
+        note = auto_flavor_note(flavor)
+        if note:
+            print(note, file=sys.stderr, flush=True)
+    return {r["env"] for r in missing
+            if install_packed(r["env"], conda=conda, force=force, flavor=flavor)}
+
+
+def _row_state(r: dict, *, unpacked, dry_run, packed, manifest, conda) -> str:
+    """The ``state`` of one row of :func:`install`'s table."""
+    env = r["env"]
+    if env in unpacked:
+        return "PACKED"
+    if r["exists"]:
+        return "have"
+    if dry_run and other_env_prefix(env, conda) is not None:
+        return "name taken"
+    if not dry_run:
+        return "BUILD" if r["has_lock"] else "NO-LOCK"
+    if packed and env in manifest:
+        return "packed archive published"
+    if packed:
+        return "no archive - lockfile build" if r["has_lock"] else "no archive - NO-LOCK"
+    return "build(dry-run)" if r["has_lock"] else "NO-LOCK"
+
+
 def _doctor_rows(category: str | None = None,
                  methods: list[str] | None = None,
                  conda: str | None = None) -> list[dict]:
@@ -1216,16 +1222,23 @@ def _doctor_rows(category: str | None = None,
     ``has_lock``, ``flavor`` and ``other_env``."""
     methods = _check_methods(methods)
     have = set(installed_envs(conda))
+    return [{"env": env, "methods": ms, "exists": env in have,
+             "has_lock": lockfile(env) is not None,
+             "flavor": installed_flavor(env, conda) if env in have else None,
+             "other_env": (None if env in have
+                           else _str_or_none(other_env_prefix(env, conda)))}
+            for env, ms in _envs_needed(category, methods)]
+
+
+def _envs_needed(category: str | None, methods: list[str] | None) -> list:
+    """``[(env, sorted method ids)]`` of the envs the methods (else those of
+    ``category``) need, the env serving the most methods first."""
     if methods is None:
         methods = registry.list_methods(category=category)
     by_env: dict[str, list[str]] = {}
     for m in methods:
         by_env.setdefault(group_for(m), []).append(m)
-    return [{"env": env, "methods": sorted(ms), "exists": env in have,
-             "has_lock": lockfile(env) is not None,
-             "flavor": installed_flavor(env, conda) if env in have else None,
-             "other_env": (None if env in have
-                           else _str_or_none(other_env_prefix(env, conda)))}
+    return [(env, sorted(ms))
             for env, ms in sorted(by_env.items(), key=lambda kv: (-len(kv[1]), kv[0]))]
 
 
