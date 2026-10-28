@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import http.client
+import os
+import shutil
 import tarfile
+import tempfile
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -17,7 +20,6 @@ def safe_extract(tar: tarfile.TarFile, dest) -> None:
     the extraction filters (PEP 706) the ``'data'`` filter is passed too: the
     bare call warns on 3.12/3.13 and changes behaviour on 3.14.
     """
-    import os
     dest = Path(dest).resolve()
     for m in tar.getmembers():
         target = (dest / m.name).resolve()
@@ -51,6 +53,7 @@ DEMO_CATEGORIES = {"D46": "mosaic", "D27mini_vertical": "vertical",
                    "D49mini": "mosaic", "D52mini": "cross", "D56mini": "cross",
                    "D58mini": "cross", "D59mini": "cross"}
 
+
 def _download(url: str) -> Path:
     """Fetch ``url`` to a temporary file; the module's one network call."""
     tgz, _ = urllib.request.urlretrieve(url)
@@ -62,16 +65,13 @@ def _download_or_explain(url: str, what: str, by_hand: str) -> Path:
     ``url`` and ``by_hand``, the sentence that says how to get it by hand."""
     try:
         return _download(url)
-    except urllib.error.HTTPError as e:
-        why = f"HTTP {e.code}"
-        err = e
     except (OSError, http.client.HTTPException) as e:
         # URLError keeps the cause in .reason
-        why = str(getattr(e, "reason", None) or e) or type(e).__name__
-        err = e
-    raise OSError(
-        f"Could not download {what} from {url} ({why}). Check the network or "
-        f"proxy, or {by_hand}") from err
+        why = (f"HTTP {e.code}" if isinstance(e, urllib.error.HTTPError)
+               else str(getattr(e, "reason", None) or e) or type(e).__name__)
+        raise OSError(
+            f"Could not download {what} from {url} ({why}). Check the network or "
+            f"proxy, or {by_hand}") from e
 
 
 def fetch(*datasets: str, verbose: bool = True) -> "Path | list[Path]":
@@ -109,9 +109,6 @@ def fetch(*datasets: str, verbose: bool = True) -> "Path | list[Path]":
     alone. Each archive is unpacked into a temporary folder under the data
     root and then moved into place.
     """
-    import shutil as _shutil
-    import tempfile as _tempfile
-
     root = Path(config.data_path)
     for ds in datasets:
         d = root / ds
@@ -131,7 +128,7 @@ def fetch(*datasets: str, verbose: bool = True) -> "Path | list[Path]":
                      "under 'Get the data' in the installation guide.")
         root.mkdir(parents=True, exist_ok=True)
         # into place in one move: an interrupted extract never looks complete
-        tmp = Path(_tempfile.mkdtemp(dir=root, prefix=f".{ds}-"))
+        tmp = Path(tempfile.mkdtemp(dir=root, prefix=f".{ds}-"))
         try:
             with tarfile.open(tgz) as t:
                 safe_extract(t, tmp)
@@ -139,6 +136,6 @@ def fetch(*datasets: str, verbose: bool = True) -> "Path | list[Path]":
                 raise RuntimeError(f"downloaded archive did not contain {ds}/")
             (tmp / ds).rename(root / ds)
         finally:
-            _shutil.rmtree(tmp, ignore_errors=True)
+            shutil.rmtree(tmp, ignore_errors=True)
     folders = [root / ds for ds in datasets]
     return folders[0] if len(folders) == 1 else folders
