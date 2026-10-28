@@ -939,9 +939,11 @@ def evaluate(embedding, labels=None, *, dataset: str | None = None,
     name = cells = None
     if dataset is not None:
         from ..engine import resolve
-        from ..workflow import known_category, _run_record_for, _dataset_folder
+        from ..workflow import known_category, own_batches_only, _run_record_for, _dataset_folder
         name, data_path = resolve.split_dataset(dataset, None)
         bench = known_category(name)             # a benchmark dataset has one
+        if batch is not None:
+            own_batches_only(name)
         # a file of a run folder: its record says whose cell order it has
         record = _run_record_for(embedding, name)
         order = record["method"] if record else method

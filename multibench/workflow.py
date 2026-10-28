@@ -987,6 +987,16 @@ def known_category(dataset) -> str | None:
     return cats.iloc[0] if len(cats) == 1 and ";" not in cats.iloc[0] else None
 
 
+def own_batches_only(dataset) -> None:
+    """``ValueError`` for ``batch=`` on a benchmark dataset: a dataset has one
+    batch label, and a benchmark dataset's is its label files."""
+    if known_category(dataset) is not None:
+        name = _resolve.split_dataset(dataset, None)[0]
+        raise ValueError(f"{name} is a benchmark dataset: its batches are its label files. "
+                         f"For other batches, export your cells as a dataset folder of your "
+                         f"own and pass batch= there.")
+
+
 def _scan(dataset: str, category: str | None = None, *, methods=None, modalities=None,
           data_path=None, out_dir=OUT_DIR_PLACEHOLDER, params: dict | None = None,
           verbose: bool = True, assume_gpu: bool = False) -> "tuple[pd.DataFrame, pd.DataFrame]":
@@ -2773,6 +2783,8 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
     """``(x per cell, aligned by id)``: an id-carrying Series, DataFrame or CSV in
     ``labels_for`` order."""
     from .eval.pipeline import _carries_ids, _pick
+    if what == "batch":
+        own_batches_only(dataset)
     if _eio._names_no_file(x):
         raise FileNotFoundError(_column_name_error(what, x))
     order = order or f"the order of the label files of {dataset}"
