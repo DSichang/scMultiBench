@@ -37,8 +37,9 @@ def test_rows_scored_without_a_dataset_are_told_to_score_with_one():
     mine = st[st["method"] == "Matilda"].assign(method="PCA", dataset="user", source="user")
     with pytest.raises(ValueError) as e:
         _quiet(mtb.plot.bubble, pd.concat([st, mine]))
-    assert str(e.value) == ("Your rows were scored without a dataset: score your embedding "
-                            "with dataset='D11' to compare it with the stored results.")
+    assert str(e.value) == ("Your rows were scored without a dataset. If they hold the cells "
+                            "of D11, score your embedding with dataset='D11'; else plot them "
+                            "apart.")
 
 
 # --------------------------------------------------------------- E03
