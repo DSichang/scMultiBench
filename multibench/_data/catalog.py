@@ -10,26 +10,14 @@ import pandas as pd
 from .. import _settings
 from ..engine import registry
 
-#: display and result-folder spellings -> method id
+#: display and result-folder spellings -> method id, for those the folding of
+#: :func:`_canonical_id` does not reach (Seurat v4 is no method id)
 _ALIASES = {
-    "seurat v3": "Seurat_v3",
-    "seurat_v3": "Seurat_v3",
-    "seurat.v3": "Seurat_v3",
     "seurat v4": "Seurat_v4",
     "seurat_v4": "Seurat_v4",
     "seurat.v4": "Seurat_v4",
-    "seurat v5": "Seurat_v5",
-    "seurat_v5": "Seurat_v5",
-    "seurat.v5": "Seurat_v5",
     "seurat(wnn)": "Seurat_WNN",
-    "seurat_wnn": "Seurat_WNN",
-    "seurat.wnn": "Seurat_WNN",
     "mofa+": "MOFA2",
-    "mofa2": "MOFA2",
-    "online inmf": "online_iNMF",
-    "online_inmf": "online_iNMF",
-    "online.inmf": "online_iNMF",
-    "ipolng": "iPOLNG",
 }
 
 
@@ -69,26 +57,10 @@ FAMILY_METRICS = {
     "classification": ["OCA", "ACA", "Spec", "Sens", "F1"],
 }
 
-_METRIC_CANON = {
-    "kbet": "kBET",
+#: metric names in lower case -> code: each code, and the spellings of some
+#: published metric.csv (scIB's long names)
+_METRIC_CANON = {c.lower(): c for codes in FAMILY_METRICS.values() for c in codes} | {
     "ifi": "iF1",
-    "if1": "iF1",
-    "ari": "ARI",
-    "nmi": "NMI",
-    "asw": "ASW",
-    "iasw": "iASW",
-    "clisi": "cLISI",
-    "ilisi": "iLISI",
-    "gc": "GC",
-    "asw_batch": "ASW_batch",
-    "ari_batch": "ARI_batch",
-    "nmi_batch": "NMI_batch",
-    "oca": "OCA",
-    "aca": "ACA",
-    "spec": "Spec",
-    "sens": "Sens",
-    "f1": "F1",
-    # scIB's long names, in some published metric.csv
     "ari_cluster/label": "ARI",
     "nmi_cluster/label": "NMI",
     "asw_label": "ASW",
@@ -107,10 +79,8 @@ def _canonical_metric(code: str, *, strict: bool = False) -> str | None:
     (``"kbet"`` -> ``"kBET"``, ``"isolated_label_f1"`` -> ``"iF1"``); ``None``
     for a blank; an unknown code comes back stripped, or with ``strict=True``
     raises ``ValueError``."""
-    if code is None:
-        return None
-    key = str(code).strip().lower()
-    if key == "" or key == "nan":
+    key = "" if code is None else str(code).strip().lower()
+    if key in ("", "nan"):
         return None
     out = _METRIC_CANON.get(key, str(code).strip())
     if strict and out not in _METRIC_CANON.values():
@@ -170,14 +140,16 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
     TypeError
         Anything that is neither ``None``, a string nor a collection.
     """
-    fams = {k: list(v) for k, v in FAMILY_METRICS.items()}
-    if isinstance(metrics, str) and metrics.lower() in (*fams, "all"):
+    def family_word(m) -> bool:
+        return isinstance(m, str) and m.lower() in (*FAMILY_METRICS, "all")
+
+    if family_word(metrics):
         metrics = metrics.lower()          # "Clustering" names the family too
     if metrics is None or (isinstance(metrics, str) and metrics == "all"):
         return MetricSelection("all", None, False)
     if isinstance(metrics, str):
-        if metrics in fams:
-            return MetricSelection(metrics, fams[metrics], False)
+        if metrics in FAMILY_METRICS:
+            return MetricSelection(metrics, list(FAMILY_METRICS[metrics]), False)
         code = _canonical_metric(metrics)
         if code in _known_metrics() or code in set(map(str, extra)):
             metrics = [code]               # one code: a list of one
@@ -195,14 +167,15 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
             f"or a non-empty list of codes.")
     valid = _known_metrics()
     present = sorted(set(map(str, extra)))
-    codes, unknown = [], []
+    codes, named, unknown = [], [], []
     for m in wanted:
-        if isinstance(m, str) and m.lower() in (*fams, "all"):
+        if family_word(m):
             # a family in the list: its codes (kBET only when named, as for the token)
-            family = valid if m.lower() == "all" else fams[m.lower()]
+            family = valid if m.lower() == "all" else FAMILY_METRICS[m.lower()]
             codes += [c for c in family if c != "kBET" and c not in codes]
             continue
         c = _canonical_metric(m)
+        named.append(c)
         if c is None or (c not in valid and c not in present):
             unknown.append(m)
         else:
@@ -211,14 +184,12 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
         raise ValueError(_unknown_metrics(kw, f"token{'s' if len(unknown) > 1 else ''} "
                                               f"{', '.join(map(str, unknown))}")
                          + (f" This frame also has {', '.join(present)}." if present else ""))
-    named = [_canonical_metric(m) for m in wanted
-             if not (isinstance(m, str) and m.lower() in (*fams, "all"))]
     dup = sorted({c for c in named if named.count(c) > 1})
     codes = list(dict.fromkeys(codes))
     if dup:
         raise ValueError(
             f"{kw}= names the same metric twice after canonicalisation: {dup}")
-    holding = [f for f, members in fams.items() if all(c in members for c in codes)]
+    holding = [f for f, members in FAMILY_METRICS.items() if all(c in members for c in codes)]
     return MetricSelection(holding[0] if holding else "all", codes, True)
 
 
