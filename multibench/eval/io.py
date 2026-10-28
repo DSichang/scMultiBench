@@ -541,7 +541,7 @@ def as_vector(x, *, what: str = "labels", column: str | None = None,
         if len(x) == 1:
             return np.asarray(read_labels(next(iter(x.values())), column=column,
                                           as_written=as_written))
-        raise ValueError(_multi_dict_message(what, x, label_order_hint=(what == "labels")))
+        raise ValueError(_multi_dict_message(what, x))
     if isinstance(x, (list, tuple)) and len(x) > 0 and all(_is_label_file(e) for e in x):
         return np.concatenate([np.asarray(read_labels(p, column=column,
                                                       as_written=as_written)) for p in x])
@@ -573,7 +573,7 @@ def as_vector(x, *, what: str = "labels", column: str | None = None,
         f"n_cells; got {type(x).__name__}")
 
 
-def _multi_dict_message(what: str, d: dict, *, label_order_hint: bool) -> str:
+def _multi_dict_message(what: str, d: dict) -> str:
     """The error for a ``{name: path}`` dict with several entries: a dict fixes
     no cell order, and a wrong order invalidates every score without an error."""
     keys = [str(k) for k in d]

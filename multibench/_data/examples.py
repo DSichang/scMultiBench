@@ -64,29 +64,20 @@ def _with_obs_of(a, main):
     return a
 
 
-def _cite(d, read):
-    """RNA and protein of the same cells in one object (D11)."""
+def _cite(d, read, *, atac=False):
+    """RNA and protein of the same cells in one object (D11); with ``atac``,
+    their peaks in another (D22mini)."""
     import scanpy as sc
 
     adata = read(d / "rna.h5")
     adata.obsm["protein"] = read(d / "adt.h5").to_df()
     adata.obs["celltype"] = _labels(d / "cty.csv")
     adata = sc.pp.subsample(adata, fraction=0.6, random_state=0, copy=True)
-    return [("my_file.h5ad", adata, _RNA_ADT)]
-
-
-def _cite_atac(d, read):
-    """RNA and protein in one object, peaks of the same cells in another (D22mini)."""
-    import scanpy as sc
-
-    adata = read(d / "rna.h5")
-    adata.obsm["protein"] = read(d / "adt.h5").to_df()
-    adata.obs["celltype"] = _labels(d / "cty.csv")
-    atac = read(d / "atac.h5")
-    adata = sc.pp.subsample(adata, fraction=0.6, random_state=0, copy=True)
-    atac = atac[adata.obs_names].copy()
-    return [("my_file.h5ad", adata, _RNA_ADT),
-            ("my_atac.h5ad", _with_obs_of(atac, adata), _PEAK)]
+    out = [("my_file.h5ad", adata, _RNA_ADT)]
+    if atac:
+        peaks = read(d / "atac.h5")[adata.obs_names].copy()
+        out.append(("my_atac.h5ad", _with_obs_of(peaks, adata), _PEAK))
+    return out
 
 
 def _rna_peaks(d, read):
@@ -188,7 +179,7 @@ def _cross_pair(d, read, *, keys, stem, what):
 
 _BUILD = {
     "D11": (_cite, {}),
-    "D22mini": (_cite_atac, {}),
+    "D22mini": (_cite, dict(atac=True)),
     "D27mini": (_unpaired, {}),
     "D27mini_vertical": (_rna_peaks, {}),
     "D37mini": (_unpaired_batches, {}),

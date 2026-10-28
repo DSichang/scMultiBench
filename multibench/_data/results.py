@@ -24,7 +24,7 @@ from ..engine.registry import _BASE_MODALITIES
 __all__ = ["load_results", "recommend"]
 
 #: the four integration categories
-_CATEGORIES = ("cross", "diagonal", "mosaic", "vertical")
+_CATEGORIES = registry.CATEGORIES
 
 #: fixed column order of every frame ``load_results`` returns
 COLUMNS = ["metric", "value", "method", "dataset", "category", "source"]

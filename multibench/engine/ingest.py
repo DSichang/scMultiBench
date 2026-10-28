@@ -1967,7 +1967,7 @@ def _diagonal_labels(data, spec, sides) -> dict:
                     f"labels={spec!r}"
                     + f": column {col_each!r} not in obs of the "
                     f"{side.upper()} object ({src}); available: {list(a.obs.columns)}. "
-                    + (_other_column_advice(data, col_each, side, sides)
+                    + (_other_column_advice(col_each, side, sides)
                        or _no_cell_types_advice(side)))
         elif isinstance(spec, str):
             ser = _select_obs(data, spec, what="labels")
@@ -1991,7 +1991,7 @@ def _diagonal_labels(data, spec, sides) -> dict:
     return out
 
 
-def _other_column_advice(data, col: str, side: str, sides) -> str:
+def _other_column_advice(col: str, side: str, sides) -> str:
     """Advice for a side whose object lacks the label column ``col`` but has
     others, where its cell types may be; ``""`` when there is no way out."""
     role, a, _kw, _what, src = sides[side][0]

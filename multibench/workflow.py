@@ -988,7 +988,7 @@ def known_category(dataset) -> str | None:
 
 
 def _scan(dataset: str, category: str | None = None, *, methods=None, modalities=None,
-          data_path=None, out_dir="<out_dir>", params: dict | None = None,
+          data_path=None, out_dir=OUT_DIR_PLACEHOLDER, params: dict | None = None,
           verbose: bool = True, assume_gpu: bool = False) -> "tuple[pd.DataFrame, pd.DataFrame]":
     """The full plan (every column of :data:`PLAN_COLUMNS`), and a second frame
     aligned with it: ``_other`` (the

@@ -561,9 +561,9 @@ def _measured_warning(given, adata, reason: str, distinct: int, cells: int) -> s
     return f"{src} {why}. Check that it holds the cell types."
 
 
-def _no_label_error(shown, miss, given, dataset=None) -> str:
+def _no_label_error(shown, miss, given) -> str:
     """evaluate()'s error for labels missing where ``miss`` is true. ``shown``
-    are the labels as written; ``dataset`` the dataset whose label files they are."""
+    are the labels as written."""
     n, n_cells = int(miss.sum()), len(miss)
     head = "labels" + _named_files(given)
     example = io._missing_example(shown)
@@ -1247,9 +1247,7 @@ def _scores(
     if miss.any():
         shown = _as_written(labels, adata, lab_ids, what="labels", read=read,
                             others=others)
-        raise ValueError(_no_label_error(
-            ct if shown is None else shown, miss, labels,
-            from_files and from_files.dataset))
+        raise ValueError(_no_label_error(ct if shown is None else shown, miss, labels))
     if batch is not None:
         no_batch = io.missing_mask(ba)
         if no_batch.any():
