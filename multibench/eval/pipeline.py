@@ -668,8 +668,8 @@ def _count_error(what: str, n: int, n_cells: int, given, category=None,
     fact = f"{what} has {_n(n, 'entry', 'entries')} for {_n(n_cells, 'cell')} in the embedding"
     if what == "labels" and n > n_cells and len(files) > 1:
         fit = _files_that_fit(files, n_cells)
-        given_keys = _LABEL_KEYS.get()
         if fit:
+            given_keys = _LABEL_KEYS.get()
             keys = (given_keys[:len(fit)] if given_keys and len(given_keys) == len(files)
                     else [f.stem for f in fit])
             return (f"The embedding has {_n(n_cells, 'cell')} = {'+'.join(keys)}. "

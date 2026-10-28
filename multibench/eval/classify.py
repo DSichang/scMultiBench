@@ -80,11 +80,9 @@ def classify(output, labels=None, *, batch=None, reference=None,
     mtb.evaluate : scores the same embedding with the scIB metrics.
     """
     if labels is None:
-        raise ValueError(
-            "classify needs labels, one cell type per cell.")
+        raise ValueError("classify needs labels, one cell type per cell.")
     if isinstance(labels, dict) and not labels:
-        raise ValueError(
-            "labels is an empty dict. Pass one cell type per cell.")
+        raise ValueError("labels is an empty dict. Pass one cell type per cell.")
     names = None
     if isinstance(labels, dict):
         names = [str(k) for k in labels]
@@ -111,8 +109,7 @@ def classify(output, labels=None, *, batch=None, reference=None,
     elif origin is not None:
         ba = _origin_names(labels, origin, names)
     else:
-        raise ValueError(
-            "classify needs the batch of each cell. Pass batch=.")
+        raise ValueError("classify needs the batch of each cell. Pass batch=.")
 
     miss = io.missing_mask(ct)
     if miss.all():
