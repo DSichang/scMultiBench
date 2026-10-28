@@ -79,8 +79,7 @@ def _long_table(value_df, *, method: str, dataset: str | None = None,
 
 
 def _metric_families() -> tuple[list, list, list]:
-    """``(CLUSTERING_METRICS, BATCH_METRICS, CLASSIFICATION_METRICS)``, the
-    families evaluate() can produce."""
+    """The clustering, batch and classification codes evaluate() can produce."""
     # the plotting layer owns the metric families
     from ..plot.bar import BATCH_METRICS, CLASSIFICATION_METRICS, CLUSTERING_METRICS
     return list(CLUSTERING_METRICS), list(BATCH_METRICS), list(CLASSIFICATION_METRICS)
@@ -143,17 +142,6 @@ def _obs_choices(adata) -> list[str]:
     for mod, a in (getattr(adata, "mod", None) or {}).items():
         names += [f"{mod}:{c}" for c in map(str, a.obs.columns)]
     return names
-
-
-def _column_without_obs(x, adata) -> bool:
-    """``x`` can only be an obs column name, and the output has no obs."""
-    return adata is None and io._names_no_file(x)
-
-
-def _no_column_error(what: str, x: str) -> str:
-    col = x[4:] if x.startswith("obs:") else x
-    return (f"{what}={x!r} is not a file, and the embedding has no obs. Pass the values, as "
-            f"{what}=adata.obs[{col!r}].")
 
 
 class _Table:
@@ -233,13 +221,15 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
             return np.asarray(in_mod)
         if not Path(x).is_file():
             from ..engine.ingest import _case_hint
+            choices = _obs_choices(adata)
             raise ValueError(
-                f"{what}={x!r} is neither an obs "
-                f"column of the {type(adata).__name__} (obs columns: {_obs_choices(adata)}) "
-                f"nor an existing file." + _case_hint(x.removeprefix("obs:"),
-                                                      _obs_choices(adata)))
-    if _column_without_obs(x, adata):
-        raise FileNotFoundError(_no_column_error(what, x))
+                f"{what}={x!r} is neither an obs column of the {type(adata).__name__} "
+                f"(obs columns: {choices}) nor an existing file."
+                + _case_hint(x.removeprefix("obs:"), choices))
+    if adata is None and io._names_no_file(x):    # an obs column name, and no obs
+        raise FileNotFoundError(
+            f"{what}={x!r} is not a file, and the embedding has no obs. Pass the values, as "
+            f"{what}=adata.obs[{x.removeprefix('obs:')!r}].")
     if isinstance(x, (str, Path)) and column is None:
         vals, first = io.read_labels_ids(x, what=what, pick=_pick(what),
                                          as_written=as_written)
