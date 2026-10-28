@@ -19,6 +19,7 @@ import shlex
 import time
 import traceback
 import warnings
+from collections import Counter
 from pathlib import Path
 
 import numpy as np
@@ -2579,20 +2580,19 @@ def _load_embedding(mdir: Path, variant):
         with h5py.File(path) as h:
             return np.array(h[key or ("data" if "data" in h else list(h.keys())[0])])
 
-    emb = None
     if variant.output.kind == "embedding":
         p = mdir / variant.output.file
         if not p.exists():
             raise FileNotFoundError(f"{p} is missing: run the method again.")
-        emb = read(p, variant.output.dataset)
-    else:
-        extra = [mdir / o.file for o in variant.extra_outputs if o.kind == "embedding"]
-        found = next((p for p in extra if p.exists()), None)
-        if found is not None:
-            emb = read(found)
-    if emb is not None and emb.ndim == 2 and emb.shape[0] < emb.shape[1]:
-        emb = emb.T
-    return emb
+        return _cells_first(read(p, variant.output.dataset))
+    extra = [mdir / o.file for o in variant.extra_outputs if o.kind == "embedding"]
+    found = next((p for p in extra if p.exists()), None)
+    return None if found is None else _cells_first(read(found))
+
+
+def _cells_first(emb):
+    """``emb`` as cells x dims: a matrix wider than tall is transposed."""
+    return emb.T if emb.ndim == 2 and emb.shape[0] < emb.shape[1] else emb
 
 
 def _label_file_sizes(dataset, category=None, method=None, *, modalities=None,
@@ -2994,17 +2994,23 @@ def _skipped_records(shown, attempted, methods, *, category, dataset, data_path,
     for r, on_disk in sorted(shown, key=lambda t: not t[1]):
         if r["method"] not in attempted:
             first.setdefault(r["method"], r)
-    return [{"method": m, "category": category, "dataset": dataset,
-             "modalities": _row_modalities(r["modalities"]),
-             "output_kind": r["output_kind"], "env": r["env"],
-             "status": "skipped",
-             "error": r["reason"], "requested": m in named, "_long": None,
-             "caveat": _run_caveat(r["caveat"]),
-             "data_path": str(data_path) if data_path else None,
-             "data_root": data_root,
-             "multibench_version": version,
-             "started_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
+    return [_record(r, "skipped", category=category, dataset=dataset, data_path=data_path,
+                    data_root=data_root, version=version, error=r["reason"],
+                    requested=m in named, _long=None, caveat=_run_caveat(r["caveat"]))
             for m, r in first.items()]
+
+
+def _record(row, status, *, category, dataset, data_path, data_root, version,
+            **fields) -> dict:
+    """The record ``run`` starts for a plan row; ``fields`` go after ``status``."""
+    return {"method": row["method"], "category": category, "dataset": dataset,
+            "modalities": _row_modalities(row["modalities"]),
+            "output_kind": row["output_kind"], "env": row["env"], "status": status,
+            **fields,
+            "data_path": str(data_path) if data_path else None,
+            "data_root": data_root,
+            "multibench_version": version,
+            "started_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
 
 
 def _nested_rows(plan: "pd.DataFrame") -> tuple[list, list[str]]:
@@ -3282,7 +3288,7 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
         raise ValueError(bad)
     if skip_existing:
         # a saved output is only scored: it needs no environment
-        saved = [(Path(out_dir) / f"{r['method']}_{dataset}" / registry.get(r["method"]).select(
+        saved = [(out_dir / f"{r['method']}_{dataset}" / registry.get(r["method"]).select(
             r["category"], set(_row_modalities(r["modalities"]))).output.file).exists()
             for _, r in plan_df.iterrows()]
         plan_df = plan_df.assign(runnable=plan_df["runnable"].to_numpy(bool) | saved)
@@ -3292,7 +3298,7 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
         first = blocked.iloc[0]["method"]
         raise ValueError(
             f"No saved output of {_and_list(dict.fromkeys(blocked['method']))} in {out_dir} "
-            f"(it would be {Path(out_dir) / f'{first}_{dataset}'}). Pass the "
+            f"(it would be {out_dir / f'{first}_{dataset}'}). Pass the "
             + "out_dir of the earlier run.")
     if plan_df.empty:
         # not one method could start: the request is wrong, and an empty result
@@ -3326,9 +3332,9 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
     attempted = set(plan_df["method"])
     shown, others = _skipped_rows(blocked, attempted, methods, dataset, data_path)
     if verbose:
-        several = pd.Series([r["method"] for r, _ in shown]).value_counts()
+        several = Counter(r["method"] for r, _ in shown)
         for r, _ in shown:
-            mods = f" ({r['modalities']})" if several.get(r["method"], 0) > 1 else ""
+            mods = f" ({r['modalities']})" if several[r["method"]] > 1 else ""
             print(f"[run] skipping {r['method']}{mods}: {r['reason']}", flush=True)
         if others:
             rows = "row needs" if others == 1 else "rows need"
@@ -3342,23 +3348,18 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
 
     for _, row in plan_df.iterrows():
         method = row["method"]
-        mods = _row_modalities(row["modalities"])
         method_dir = out_dir / f"{method}_{dataset}"
-        rec = {"method": method, "category": category, "dataset": dataset,
-               "modalities": mods, "output_kind": row["output_kind"],
-               "env": row["env"], "status": "?", "_long": None,
-               "caveat": _run_caveat(row["caveat"]),
-               "params_used": dict(params.get(method) or {}),
-               "out_dir": str(method_dir),
-               "data_path": str(data_path) if data_path else None,
-               "data_root": data_root,
-               "multibench_version": _pkg_version,
-               "started_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
+        rec = _record(row, "?", category=category, dataset=dataset, data_path=data_path,
+                      data_root=data_root, version=_pkg_version, _long=None,
+                      caveat=_run_caveat(row["caveat"]),
+                      params_used=dict(params.get(method) or {}), out_dir=str(method_dir))
+        mods = rec["modalities"]
+        # a plan row's own (category, modalities): select cannot fail
+        variant = registry.get(method).select(category, set(mods))
+        output = method_dir / variant.output.file
         start = time.time()
         saved = earlier.get(method)
-        if saved is not None and _status(saved.get("status")) in ("scored", "ran") and (
-                method_dir / registry.get(method).select(category, set(mods)).output.file
-        ).exists():
+        if saved is not None and _scorable(saved) and output.exists():
             # a saved run is scored again, as rescore does: its record is kept,
             # with its folder as found from here
             rec = (RunResult([dict(saved, out_dir=str(method_dir))], dataset, category,
@@ -3366,10 +3367,8 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
                 batch=batch, labels=None, metrics=None, verbose=False).records[0]
                 if evaluate else dict(saved))
             rec["reused"] = True
-            variant = registry.get(method).select(category, set(mods))
             if variant.output.kind == "embedding" and rec.get("emb_shape"):
-                _write_cell_names(rec, method_dir / variant.output.file, dataset,
-                                  category, data_path)
+                _write_cell_names(rec, output, dataset, category, data_path)
             if verbose:
                 print(f"[run] {method} ({category}/{dataset}): reusing the saved run "
                       f"-> {_status(rec['status'])} {_ari_tail(rec)}".rstrip(), flush=True)
@@ -3384,8 +3383,7 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
             deadline = _arm_deadline(timeout)
             inputs = _resolve.inputs_for(dataset, category, method, modalities=mods or None,
                                          data_path=data_path, check=True)
-            variant = registry.get(method).select(category, set(mods))
-            reused = skip_existing and (method_dir / variant.output.file).exists()
+            reused = skip_existing and output.exists()
             # on every path, also a reuse: an unknown key must fail, not be dropped
             overrides = params.get(method)
             if overrides:
@@ -3405,12 +3403,9 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
                                out_dir=str(method_dir), params=overrides)
             rec["reused"] = bool(reused)
             rec["run_sec"] = round(time.time() - start, 1)
-            if variant.output.kind == "embedding" and res is not None:
-                emb = np.asarray(res.output)
-                if emb.ndim == 2 and emb.shape[0] < emb.shape[1]:
-                    emb = emb.T
-            else:
-                emb = _load_embedding(method_dir, variant)
+            emb = (_cells_first(np.asarray(res.output))
+                   if variant.output.kind == "embedding" and res is not None
+                   else _load_embedding(method_dir, variant))
             if emb is None:
                 rec["status"], rec["note"] = "ran", _RAN_REASON["RUN_OK_NO_EMBEDDING"]
             else:
@@ -3430,8 +3425,7 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
                         rec["error"] = f"{type(e).__name__}: {e}"
                 if variant.output.kind == "embedding":
                     # evaluate on the file then finds each cell by its name
-                    _write_cell_names(rec, method_dir / variant.output.file, dataset,
-                                      category, data_path)
+                    _write_cell_names(rec, output, dataset, category, data_path)
         except TimeoutError as e:
             rec["status"] = "timeout"
             rec["error"] = str(e)
@@ -3447,10 +3441,9 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
             tail = _error_tail(rec["error"]) if rec.get("error") else _ari_tail(rec)
             print(f"[run]   -> {_status(rec['status'])} ({rec.get('run_sec')}s) {tail}".rstrip(),
                   flush=True)
-        if rec.get("reused"):
-            rec.update(_UNKNOWN_PROVENANCE)
-        else:
-            rec.update(scripts.run_provenance(row["env"]))   # scripts_commit, env_flavor, hostname
+        # scripts_commit, env_flavor, hostname
+        rec.update(_UNKNOWN_PROVENANCE if rec.get("reused")
+                   else scripts.run_provenance(row["env"]))
         records.append(rec)
     records += _skipped_records(shown, attempted, methods, category=category,
                                 dataset=dataset, data_path=data_path,
