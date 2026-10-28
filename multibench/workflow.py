@@ -2972,19 +2972,18 @@ def _skipped_records(shown, attempted, methods, *, category, dataset, data_path,
     for r, on_disk in sorted(shown, key=lambda t: not t[1]):
         if r["method"] not in attempted:
             first.setdefault(r["method"], r)
-    return [_record(r, "skipped", category=category, dataset=dataset, data_path=data_path,
-                    data_root=data_root, version=version, error=r["reason"],
-                    requested=m in named, _long=None, caveat=_run_caveat(r["caveat"]))
+    return [_record(r, {"status": "skipped", "error": r["reason"], "requested": m in named,
+                        "_long": None, "caveat": _run_caveat(r["caveat"])},
+                    category=category, dataset=dataset, data_path=data_path,
+                    data_root=data_root, version=version)
             for m, r in first.items()]
 
 
-def _record(row, status, *, category, dataset, data_path, data_root, version,
-            **fields) -> dict:
-    """The record ``run`` starts for a plan row; ``fields`` go after ``status``."""
+def _record(row, fields: dict, *, category, dataset, data_path, data_root, version) -> dict:
+    """The record ``run`` starts for a plan row; ``fields`` go after its ``env``."""
     return {"method": row["method"], "category": category, "dataset": dataset,
             "modalities": _row_modalities(row["modalities"]),
-            "output_kind": row["output_kind"], "env": row["env"], "status": status,
-            **fields,
+            "output_kind": row["output_kind"], "env": row["env"], **fields,
             "data_path": str(data_path) if data_path else None,
             "data_root": data_root,
             "multibench_version": version,
@@ -3323,10 +3322,11 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
     for _, row in plan_df.iterrows():
         method = row["method"]
         method_dir = out_dir / f"{method}_{dataset}"
-        rec = _record(row, "?", category=category, dataset=dataset, data_path=data_path,
-                      data_root=data_root, version=_pkg_version, _long=None,
-                      caveat=_run_caveat(row["caveat"]),
-                      params_used=dict(params.get(method) or {}), out_dir=str(method_dir))
+        rec = _record(row, {"status": "?", "_long": None, "caveat": _run_caveat(row["caveat"]),
+                            "params_used": dict(params.get(method) or {}),
+                            "out_dir": str(method_dir)},
+                      category=category, dataset=dataset, data_path=data_path,
+                      data_root=data_root, version=_pkg_version)
         mods = rec["modalities"]
         # a plan row's own (category, modalities): select cannot fail
         variant = registry.get(method).select(category, set(mods))
