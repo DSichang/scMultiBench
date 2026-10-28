@@ -1,7 +1,6 @@
 """Summary bar chart: one bar per method, aggregated across datasets."""
 from __future__ import annotations
 
-
 import pandas as pd
 
 from . import style
@@ -68,23 +67,21 @@ def bar(long_df: pd.DataFrame, *, metrics=None, methods=None, title: str | None 
     >>> fig = mtb.plot.bar(df, metrics="clustering", save="clustering.png")
     """
     import matplotlib.pyplot as plt
-    from .bubble import _resolve
+    from .bubble import _expand_families, _refuse_repeats, _resolve
     from .._data import catalog
 
-    need = {"method", "metric", "value"}
-    have = set(long_df.columns)
-    if not need.issubset(have):
+    missing = sorted({"method", "metric", "value"} - set(long_df.columns))
+    if missing:
         raise ValueError(
             f"bar() needs a long table with columns ['method', 'metric', "
-            f"'value']; missing {sorted(need - have)}")
+            f"'value']; missing {missing}")
     if len(long_df) == 0:
         raise ValueError(
             "long_df has no rows to plot. If it came from load_results, its "
             "UserWarning says why.")
     if methods is not None:
-        from .._data import catalog as _catalog
         methods = _resolve(methods, long_df["method"].unique().tolist(), "method",
-                           _catalog._canonical_id)
+                           catalog._canonical_id)
         long_df = long_df[long_df["method"].isin(methods)]
     family = (metrics.lower() if isinstance(metrics, str)
               and metrics.lower() in FAMILY_METRICS else None)
@@ -98,17 +95,12 @@ def bar(long_df: pd.DataFrame, *, metrics=None, methods=None, title: str | None 
                    "has none to compute.")
             raise ValueError(f"no {family!r} metrics present. Found {sorted(present)}. {why}")
     elif metrics is not None:
-        from .bubble import _expand_families
-        metrics = _expand_families(metrics, long_df["metric"].dropna().unique().tolist())
-        metrics = _resolve(metrics, long_df["metric"].dropna().unique().tolist(),
-                           "metric", catalog._canonical_metric)
+        names = long_df["metric"].dropna().unique().tolist()
+        metrics = _resolve(_expand_families(metrics, names), names, "metric",
+                           catalog._canonical_metric)
 
-    from .bubble import _duplicate_rows_message, _user_repeats
-    keys = ["method", "metric"] + (["dataset"] if "dataset" in long_df.columns else [])
     picked = long_df if not metrics else long_df[long_df["metric"].isin(metrics)]
-    repeated = _user_repeats(picked, keys)
-    if repeated.any():
-        raise ValueError(_duplicate_rows_message(picked[repeated], keys))
+    _refuse_repeats(picked)
     mean = style.overall(long_df, metrics)       # refuses your rows on another dataset
     # the methods and metrics of each dataset, for the warnings
     groups = picked.groupby("dataset") if "dataset" in picked.columns else [("all", picked)]
@@ -125,33 +117,30 @@ def bar(long_df: pd.DataFrame, *, metrics=None, methods=None, title: str | None 
     backend = style.backend_warning(picked)
     if backend:
         _text.warn(backend, UserWarning)
-    datasets = list(parts)
     mean = mean[::-1]                       # the best method is drawn on top
+    values = mean.to_numpy()
 
     n = len(mean)
+    datasets = list(parts)
     # matplotlib's own defaults, whatever the session's rcParams are:
     # importing scib (mtb.evaluate) switches them to seaborn's "talk" sizes
     with plt.style.context("default"):
         fig, ax = plt.subplots(figsize=(7.2, max(2.2, 0.34 * n + 1.1)))
-        colors = style.colormap(FAMILY_CMAPS.get(family, "Blues"))(
-            0.35 + 0.55 * minmax(mean.to_numpy()))
-        ax.barh(range(n), mean.to_numpy(), color=colors, edgecolor="#333",
+        colors = style.colormap(FAMILY_CMAPS.get(family, "Blues"))(0.35 + 0.55 * minmax(values))
+        ax.barh(range(n), values, color=colors, edgecolor="#333",
                 linewidth=0.6, zorder=2)
 
         ax.set_yticks(range(n)); ax.set_yticklabels(mean.index, fontsize=9)
-        n_datasets = len(datasets)
-        if n_datasets == 1:
-            xlabel = f"overall score ({datasets[0]})"
-        else:
-            xlabel = f"overall score (mean of per-dataset overall, {n_datasets} datasets)"
-        ax.set_xlabel(xlabel, fontsize=9)
-        # the stored scores lie in [0, 1]; your rows can reach past either end
-        ax.set_xlim(min(0, mean.to_numpy().min() - 0.02), max(1, mean.to_numpy().max()) + 0.02)
+        one = len(datasets) == 1
+        ax.set_xlabel(f"overall score ({datasets[0]})" if one else
+                      f"overall score (mean of per-dataset overall, {len(datasets)} datasets)",
+                      fontsize=9)
+        ax.set_xlim(min(0, values.min() - 0.02), max(1, values.max()) + 0.02)
         ax.grid(axis="x", color="#e8e8e8", zorder=0)
         for side in ("top", "right", "left"):
             ax.spines[side].set_visible(False)
-        heading = title or (f"overall — {datasets[0]}" if n_datasets == 1
-                            else f"overall — {n_datasets} datasets")
+        heading = title or (f"overall — {datasets[0]}" if one
+                            else f"overall — {len(datasets)} datasets")
         if family:
             heading += f"  ({family} metrics)"
         ax.set_title(heading, fontsize=11, loc="left")

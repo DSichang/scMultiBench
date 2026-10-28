@@ -189,7 +189,6 @@ def _expand_families(metrics, available) -> list:
     the frame's codes of that family, in the figure's column order; other
     names are kept for ``_resolve``. A family the frame has no code of
     raises ``ValueError``."""
-    from .bar import FAMILY_METRICS
     from .._data import catalog
     paper = [c for _, codes, _ in FAMILIES for c in codes]
 
@@ -205,8 +204,8 @@ def _expand_families(metrics, available) -> list:
         word = str(r).strip().lower()
         if word == "all":
             out += in_figure_order(available)
-        elif word in FAMILY_METRICS:
-            codes = FAMILY_METRICS[word]
+        elif word in _FAMILY_METRICS:
+            codes = _FAMILY_METRICS[word]
             got = [a for a in available if catalog._canonical_metric(a) in codes]
             if not got:
                 raise ValueError(f"The table has no {word} metrics. It has "
@@ -221,25 +220,21 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None) -> Bubble
     """The :class:`BubbleTable` of ``long_df``, as :func:`bubble` draws it."""
     from .._data import catalog
 
-    need = {"method", "metric", "value"}
-    have = set(long_df.columns)
-    if not need.issubset(have):
-        missing = sorted(need - have)
-        hint = ""
-        if "Value" in have or long_df.index.name == "metric":
-            hint = " mtb.evaluate returns the long table this function takes."
+    absent = sorted({"method", "metric", "value"} - set(long_df.columns))
+    if absent:
+        hint = (" mtb.evaluate returns the long table this function takes."
+                if "Value" in long_df.columns or long_df.index.name == "metric" else "")
         raise ValueError(
             f"bubble() needs a long table with columns "
-            f"['method', 'metric', 'value']; missing {missing}.{hint}")
-    df = long_df.copy()
-    df = df.dropna(subset=["metric"])
+            f"['method', 'metric', 'value']; missing {absent}.{hint}")
+    df = long_df.dropna(subset=["metric"])
     if methods is not None:
         methods = _resolve(methods, df["method"].unique().tolist(), "method",
                            catalog._canonical_id)
         df = df[df["method"].isin(methods)]
     if metrics is not None:
-        metrics = _expand_families(metrics, df["metric"].unique().tolist())
-        metrics = _resolve(metrics, df["metric"].unique().tolist(), "metric",
+        names = df["metric"].unique().tolist()
+        metrics = _resolve(_expand_families(metrics, names), names, "metric",
                            catalog._canonical_metric)
         df = df[df["metric"].isin(metrics)]
     if df.empty:
@@ -247,19 +242,13 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None) -> Bubble
                          if methods is not None or metrics is not None
                          else "The table has no rows.")
 
-    keys = ["method", "metric"] + (["dataset"] if "dataset" in df.columns else [])
-    repeated = _user_repeats(df, keys)
-    if repeated.any():
-        raise ValueError(_duplicate_rows_message(df[repeated], keys))
+    _refuse_repeats(df)
     score = style.overall(df)       # refuses your rows on another dataset
 
-    datasets = (tuple(sorted(map(str, df["dataset"].dropna().unique())))
-                if "dataset" in df.columns else ())
-    method_datasets = None
-    if "dataset" in df.columns:
-        method_datasets = {m: sorted(map(str, g["dataset"].dropna().unique()))
-                           for m, g in df.groupby("method")}
-
+    has_ds = "dataset" in df.columns
+    datasets = tuple(sorted(map(str, df["dataset"].dropna().unique()))) if has_ds else ()
+    method_datasets = ({m: sorted(map(str, g["dataset"].dropna().unique()))
+                        for m, g in df.groupby("method")} if has_ds else None)
     if len(datasets) > 1:
         # the per-dataset view, only to see which datasets share methods; the
         # figure itself shows raw values
@@ -270,65 +259,50 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None) -> Bubble
     backend = style.backend_warning(df)
     if backend:
         _text.warn(backend, UserWarning)
+    # rows without a score (no metric the ranking uses) come last
+    rows = list(score.index) + sorted(set(raw_all.index) - set(score.index), key=str)
 
-    def _block(label, cmap, raw):
-        family_overall = style.overall(df, list(raw.columns)).reindex(raw.index)
+    def block(label, cmap, cols):
+        raw = raw_all[cols].reindex(rows)
         return FamilyBlock(
             label=label, cmap=cmap, raw=raw,
             norm=raw.apply(lambda col: style.minmax(col.to_numpy()), axis=0),
             ranks=raw.apply(lambda col: style.rank_max(col.to_numpy()), axis=0),
-            overall=family_overall,
-        )
+            overall=style.overall(df, cols).reindex(rows))
 
     blocks = []
-    known = {m for f in FAMILIES for m in f[1]}
-    for label, fam_metrics, cmap in FAMILIES:
-        if metrics is not None:
-            cols = [m for m in metrics if m in fam_metrics and m in raw_all.columns]
-        else:
-            cols = [m for m in fam_metrics if m in raw_all.columns]
-        if not cols:
-            continue
-        blocks.append(_block(label, cmap, raw_all[cols]))
-    if metrics is not None:
-        leftover = [c for c in metrics if c not in known and c in raw_all.columns]
-    else:
-        leftover = [c for c in raw_all.columns if c not in known]
+    for label, codes, cmap in FAMILIES:
+        cols = [m for m in (codes if metrics is None else metrics)
+                if m in codes and m in raw_all.columns]
+        if cols:
+            blocks.append(block(label, cmap, cols))
+    known = {m for _, codes, _ in FAMILIES for m in codes}
+    leftover = [c for c in (raw_all.columns if metrics is None else metrics)
+                if c not in known and c in raw_all.columns]
     if leftover:
-        blocks.append(_block("Other", "Purples", raw_all[leftover]))
+        blocks.append(block("Other", "Purples", leftover))
     if not blocks:
         raise ValueError("no known metrics found in long_df")
 
-    # a family some rows lack (classification of your rows next to stored rows
-    # without it) is drawn, but counts in no row's Overall
-    counted = [b for b in blocks if b.raw.notna().any(axis=1).all()] or blocks
-    # rows without a score (no metric the ranking uses) come last
-    rows = list(score.index) + sorted(set(raw_all.index) - set(score.index), key=str)
-    combined = score.reindex(rows)
-
-    for b in blocks:
-        b.raw = b.raw.reindex(rows)
-        b.norm = b.norm.reindex(rows)
-        b.ranks = b.ranks.reindex(rows)
-        b.overall = b.overall.reindex(rows)
-
     na_cells = _na_report(blocks)
-    # the n/a cells of a family that counts in no Overall need no words
-    missing = _na_missing(counted)
+    # a family some rows lack (classification of your rows next to stored rows
+    # without it) is drawn, but counts in no row's Overall; its n/a cells need
+    # no words
+    missing = _na_missing([b for b in blocks if b.raw.notna().any(axis=1).all()] or blocks)
     if na_cells and missing:
         _text.warn(_na_message(missing, df), UserWarning)
 
-    drawn = pd.concat([b.raw for b in blocks], axis=1)
-    msg = _no_comparison_message(rows, style.constant_columns(drawn),
-                                 partial=set(drawn.columns[drawn.isna().any()]))
+    raw = pd.concat([b.raw for b in blocks], axis=1)
+    msg = _no_comparison_message(rows, style.constant_columns(raw),
+                                 partial=set(raw.columns[raw.isna().any()]))
     if msg:
         _text.warn(msg, UserWarning)
 
     return BubbleTable(
         methods=rows, blocks=blocks,
         norm=pd.concat([b.norm for b in blocks], axis=1),
-        raw=pd.concat([b.raw for b in blocks], axis=1),
-        overall=combined.loc[rows],
+        raw=raw,
+        overall=score.reindex(rows),
         datasets=datasets,
         method_datasets=method_datasets,
         na_cells=na_cells,
@@ -454,6 +428,14 @@ def _user_repeats(df, keys):
     stored = df["source"].isin(style.STORED_SOURCES)
     all_stored = stored.groupby([df[k] for k in keys]).transform("all")
     return repeated & ~all_stored
+
+
+def _refuse_repeats(df) -> None:
+    """Raise for rows that repeat a method, metric and dataset (:func:`_user_repeats`)."""
+    keys = ["method", "metric"] + (["dataset"] if "dataset" in df.columns else [])
+    repeated = _user_repeats(df, keys)
+    if repeated.any():
+        raise ValueError(_duplicate_rows_message(df[repeated], keys))
 
 
 def _duplicate_rows_message(dup, keys) -> str:
