@@ -184,7 +184,7 @@ def test_run_refuses_off_linux_also_when_the_env_is_installed(fake_root, tmp_pat
     assert envs.env_prefix("env_sciPENN") is not None
     inputs = mtb.engine.resolve.inputs_for("D11", "vertical", "sciPENN")
     with pytest.raises(OSError, match=r"^Methods run only on Linux, and this computer "
-                                      r"runs macOS\. Run this call on a Linux machine\."):
+                                      r"runs macOS\. Run this call on a Linux machine, such as Colab\."):
         mtb.engine.runner.run("sciPENN", "vertical", inputs=inputs, out_dir=str(tmp_path / "out"))
     assert not (tmp_path / "out").exists()
 

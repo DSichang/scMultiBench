@@ -73,7 +73,7 @@ def test_runtime_note_mentions_the_cpu_only_for_gpu_methods():
 
 # ====================================================================== M26
 PLAIN_REFUSAL = ("Method environments run only on Linux, and this computer runs macOS. "
-                 "Run the install on a Linux machine. {force} tries anyway.")
+                 "Run the install on a Linux machine, such as Colab. {force} tries anyway.")
 
 
 def test_install_refusal_is_plain_in_python(off_linux, monkeypatch):

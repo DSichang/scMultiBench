@@ -112,7 +112,7 @@ def test_off_linux_messages_say_to_make_the_commands_on_the_linux_machine(
         mtb.engine.runner.run("totalVI", "vertical", inputs=mtb.engine.resolve.inputs_for("D11", "vertical", "totalVI"),
                 out_dir=str(tmp_path / "out"))
     msg = str(e.value)
-    assert ("Run this call on a Linux machine. mtb.scan shows the method's "
+    assert ("Run this call on a Linux machine, such as Colab. mtb.scan shows the method's "
             "command here.") in msg
     assert "run it on a Linux machine" not in msg
 

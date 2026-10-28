@@ -107,7 +107,7 @@ def test_platform_line_is_two_sentences(monkeypatch, tmp_path):
         mtb.run("D11", "vertical", out_dir=tmp_path, verbose=False)
     assert str(e.value).splitlines()[1] == (
         "Methods run only on Linux, and this computer runs macOS. On this computer you "
-        "can check files, score embeddings and plot. Run the methods on a Linux machine.")
+        "can check files, score embeddings and plot. Run the methods on a Linux machine, such as Colab.")
 
 
 def test_env_plan_size_lines_name_the_envs():

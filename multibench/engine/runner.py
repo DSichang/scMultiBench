@@ -706,7 +706,7 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     linux_only = linux_only_sentence()
     if linux_only:
         raise envs.LinuxOnlyError(
-            f"{linux_only} Run this call on a Linux machine. mtb.scan shows the "
+            f"{linux_only} Run this call on a Linux machine, such as Colab. mtb.scan shows the "
             f"method's command here.")
     have = envs.installed_envs()
     if env_name not in have:

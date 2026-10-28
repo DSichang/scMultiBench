@@ -81,7 +81,7 @@ def _require_linux(force: bool) -> None:
     problem = None if force else host_platform_problem()
     if problem:
         raise LinuxOnlyError(
-            f"{linux_only_text(problem)} Run the install on a Linux machine.")
+            f"{linux_only_text(problem)} Run the install on a Linux machine, such as Colab.")
 
 
 #: The first sentence of the install error without conda (the docs quote it).

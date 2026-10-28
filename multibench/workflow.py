@@ -2505,7 +2505,7 @@ def _platform_line(blocked: pd.DataFrame) -> str:
     if not linux_only or blocked["env_ok"].all():
         return ""
     return (f"{linux_only} On this computer you can check files, score embeddings and "
-            f"plot. Run the methods on a Linux machine.\n")
+            f"plot. Run the methods on a Linux machine, such as Colab.\n")
 
 
 _unknown_params_error = _runner.unknown_params_error

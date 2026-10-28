@@ -163,7 +163,7 @@ def test_nothing_runnable_message_names_the_platform_off_linux(no_envs, monkeypa
         assert msg.splitlines()[1].startswith(
             "Methods run only on Linux, and this computer runs macOS.")
         assert ("On this computer you can check files, score embeddings and plot. Run "
-                "the methods on a Linux machine.") in msg
+                "the methods on a Linux machine, such as Colab.") in msg
         assert not re.search(r"\n  Methods", msg)       # never looks like a variant line
     monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
     with pytest.raises(ValueError) as e:
