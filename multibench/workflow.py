@@ -329,6 +329,15 @@ LINUX_ONLY_CHECK = ("Method environments run only on Linux. On this computer you
 #: What the scan summary line adds off Linux, after the counts.
 LINUX_ONLY_SUMMARY = (f"{LINUX_ONLY_CHECK} The commands use this computer's paths, so "
                       "run scan again on the Linux machine.")
+_DOCTOR = "mtb.env.install(dry_run=True) checks the environments."
+
+
+def _env_tail(df: "pd.DataFrame", installed, off_linux: str) -> str:
+    """The end of a scan summary line: ``off_linux`` off Linux, else the env
+    check when a row's env is not installed."""
+    if _runner.linux_only_sentence():
+        return f" {off_linux}"
+    return f" {_DOCTOR}" if any(e and e not in installed for e in df["env"]) else ""
 
 
 def _first_sentence(text: str) -> str:
@@ -413,7 +422,7 @@ def _missing_files_reason(spec, category: str, mods: list, dataset: str,
         if same and category == "vertical":
             atac_parts.append(
                 f"{spec.id} reads {want_file} for vertical. Rename {same[0].name} to "
-                f"{want_file}, or write it with " + 'category="vertical"')
+                f'{want_file}, or write it with category="vertical"')
         elif same:
             atac_parts.append(f"{spec.id} reads {want_file}: rename {same[0].name} to "
                               f"{want_file}")
@@ -639,7 +648,8 @@ def _representation_note(category, methods, modalities) -> str:
         via = f" through its {other} input" if other else ""
         fixed = [_TOKEN_OF_REP[spec.atac] if rep(t) else t for t in tokens]
         base = ["atac" if rep(t) else t for t in tokens]
-        notes.append(f"{spec.id} reads {_resolve._READS[spec.atac]}{via}. Pass " + f"modalities={fixed!r} or {base!r}.")
+        notes.append(f"{spec.id} reads {_resolve._READS[spec.atac]}{via}. Pass "
+                     f"modalities={fixed!r} or {base!r}.")
     return " ".join(notes)
 
 
@@ -839,11 +849,6 @@ def _holds_sentence(dataset: str, ds_dir: Path, held, category: str | None = Non
             + is_tenx)
 
 
-def _all_spelling() -> str:
-    """How a caller asks for every combination."""
-    return 'modalities="all"'
-
-
 def _not_listed_note(df: "pd.DataFrame", dataset: str, ds_dir: Path,
                      category: str | None = None) -> str:
     """What the folder holds when that has a fix (10x files under dataset names,
@@ -855,7 +860,7 @@ def _not_listed_note(df: "pd.DataFrame", dataset: str, ds_dir: Path,
     if not batch and not _tenx_files(ds_dir, _role_files(ds_dir, category)):
         return ""
     return (_holds_sentence(dataset, ds_dir, df.attrs["held"], category) + (
-        f" Variants for numbered batches are not listed. {_all_spelling()} lists them."
+        ' Variants for numbered batches are not listed. modalities="all" lists them.'
         if batch else ""))
 
 
@@ -890,8 +895,7 @@ def _category_hint(df: "pd.DataFrame", category: str | None) -> str:
     if len(fit) != 1 or df["category"].nunique() < 2:
         return ""
     (cat,) = fit
-    return (f"The files fit {cat}: pass "
-            + f'category="{cat}"' + ".")
+    return f'The files fit {cat}: pass category="{cat}".'
 
 
 def scan(dataset: str, category: str | None = None, *,
@@ -1156,12 +1160,7 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
         note = (left_out or n_batch_out) and _not_listed_note(df, dataset, ds_dir, category)
         if note:
             line += " " + note
-        if _runner.linux_only_sentence():
-            line += f" {LINUX_ONLY_SUMMARY}"
-        elif any(e and e not in installed for e in df["env"]):
-            doctor = "mtb.env.install(dry_run=True)"
-            line += f" {doctor} checks the environments."
-        print(line, flush=True)
+        print(line + _env_tail(df, installed, LINUX_ONLY_SUMMARY), flush=True)
     return df, private
 
 
@@ -1311,13 +1310,7 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
     fit = _category_hint(df, private.attrs["category"])
     if fit:
         line += f" {fit}"
-    installed = _installed_envs()
-    if _runner.linux_only_sentence():
-        line += f" {LINUX_ONLY_CHECK}"
-    elif any(e and e not in installed for e in df["env"]):
-        doctor = "mtb.env.install(dry_run=True)"
-        line += f" {doctor} checks the environments."
-    print(line, flush=True)
+    print(line + _env_tail(df, _installed_envs(), LINUX_ONLY_CHECK), flush=True)
     if cells:
         print(f"[scan] {_cells_line(cells)}", flush=True)
     renumber = "" if n_files else _renumber_hint(ds_dir, private.attrs["category"])
@@ -2423,7 +2416,6 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
     blocked = blocked.assign(_files=~blocked["files_ok"].astype(bool)).sort_values(
         ["_files", "method"], kind="stable").drop(columns="_files")
     platform = _platform_line(blocked)
-    doctor = "mtb.env.install(dry_run=True)"
     where = _scan_hint(dataset, category, data_path=data_path, methods=methods,
                        modalities=modalities, every=every)
     lacking = ""
@@ -2445,32 +2437,24 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
     # off Linux with nothing else in the way: the plan is the one thing to look at
     only_platform = bool(platform) and others is not None and not lacking and not any(
         others.reindex(blocked.index).fillna(""))
+    head = (f"None of the requested methods ({', '.join(methods)}) can run on "
+            if methods else "No method can run on ") + f"{dataset} ({category})."
     if only_platform:
-        head = (f"None of the requested methods ({', '.join(methods)}) can run on "
-                if methods else "No method can run on ") + f"{dataset} ({category})."
-        where = _scan_hint(dataset, category, data_path=data_path, methods=methods,
-                           modalities=modalities, every=every)
         return f"{head}\n{platform}" + (f"{note}\n" if note else "") + f"{where} shows the plan."
-    if methods:
-        head = (f"None of the requested methods ({', '.join(methods)}) can run on "
-                f"{dataset} ({category})")
-        listing = ((_other_blocks(blocked, others, requested=True) + lacking).lstrip("\n")
-                   if platform and others is not None else
-                   f"Blocked, one line per requested {_rows_word(blocked, 1)}:\n"
-                   + "\n".join(_line(r) for _, r in blocked.iterrows()) + lacking)
-        return (f"{head}.\n{platform}{listing}"
-                f"\n{where} says why. {doctor} checks the environments.")
-    head = f"No method can run on {dataset} ({category})"
     if platform and others is not None:
-        listing = (_other_blocks(blocked, others, requested=False) + lacking).lstrip("\n")
+        listing = (_other_blocks(blocked, others, requested=bool(methods))
+                   + lacking).lstrip("\n")
+    elif methods:
+        listing = (f"Blocked, one line per requested {_rows_word(blocked, 1)}:\n"
+                   + "\n".join(_line(r) for _, r in blocked.iterrows()) + lacking)
     else:
         n, k = len(blocked), min(3, len(blocked))
         rows = _rows_word(blocked, n)
         shown = (f"The first {k} of {n} blocked {rows}" if n > k
                  else f"The blocked {rows}" if n == 1 else f"The {n} blocked {rows}")
         listing = f"{shown}:\n" + "\n".join(_line(r) for _, r in blocked.head(k).iterrows())
-    return (f"{head}.\n{platform}{listing}" + (f"\n{note}" if note else "") +
-            f"\n{where} says why. {doctor} checks the environments.")
+    return (f"{head}\n{platform}{listing}" + (f"\n{note}" if note else "")
+            + f"\n{where} says why. {_DOCTOR}")
 
 
 def _other_blocks(blocked: pd.DataFrame, others: pd.Series, *, requested: bool) -> str:
@@ -2503,9 +2487,6 @@ def _platform_line(blocked: pd.DataFrame) -> str:
         return ""
     return (f"{linux_only} On this computer you can check files, score embeddings and "
             f"plot. Run the methods on a Linux machine, such as Colab.\n")
-
-
-_unknown_params_error = _runner.unknown_params_error
 
 
 def _check_params_shape(params, methods, fn: str) -> None:
@@ -2558,17 +2539,14 @@ def _check_param_keys(plan_df: pd.DataFrame, params: dict) -> None:
         rows = plan_df[plan_df["method"] == method]
         if rows.empty or not overrides:
             continue
-        allowed: set = set()
-        for _, r in rows.iterrows():
-            variant = registry.get(method).select(r["category"],
-                                                  set(_row_modalities(r["modalities"])))
-            allowed |= set(variant.tunable)
+        variants = [registry.get(method).select(c, set(_row_modalities(m)))
+                    for c, m in zip(rows["category"], rows["modalities"])]
+        allowed = set().union(*(v.tunable for v in variants))
         unknown = [k for k in overrides if k not in allowed]
         if unknown:
-            raise _unknown_params_error(method, unknown, allowed)
-        for _, r in rows.iterrows():
-            _runner.check_param_types(method, registry.get(method).select(
-                r["category"], set(_row_modalities(r["modalities"]))), overrides)
+            raise _runner.unknown_params_error(method, unknown, allowed)
+        for variant in variants:
+            _runner.check_param_types(method, variant, overrides)
 
 
 def _load_embedding(mdir: Path, variant):
@@ -3030,8 +3008,7 @@ def _nested_rows(plan: "pd.DataFrame") -> tuple[list, list[str]]:
         left = [rows.at[i, "modalities"] for i in inside]
         notes.append(f"{method} runs on {_and_list(kept)}, not on "
                      f"{_and_list(left)}, whose files are part of it. Pass "
-                     + "modalities="
-                     + " to run a smaller combination.")
+                     "modalities= to run a smaller combination.")
     return drop, notes
 
 
@@ -3046,8 +3023,8 @@ def _batch_length_problem(runs, batch, dataset, category, data_path) -> str:
            for m, mods in {(m, tuple(x or ())) for m, x in runs})
     if all(n in (0, len(batch)) for n in own):
         return ""
-    return (f"batch has {len(batch):,} entries"
-            + f" for the {total:,} cells of {dataset}: give one batch per cell.")
+    return (f"batch has {len(batch):,} entries for the {total:,} cells of {dataset}: "
+            "give one batch per cell.")
 
 
 #: what scoring writes into a record
@@ -3074,8 +3051,7 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
     embedding = variant.output.kind == "embedding"
     if not embedding and _without_classification(metrics, True) is None:
         from .eval.classify import _graph_text
-        raise ValueError(_graph_text(rec.get("method")) + " "
-                         + "Pass metrics='clustering'.")
+        raise ValueError(_graph_text(rec.get("method")) + " Pass metrics='clustering'.")
     n = emb.shape[0]
     rows = labels is not None and not labels_by_cell      # labels in embedding row order
     segments = None
@@ -3266,9 +3242,9 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
         raise ValueError("skip_existing=True with params=... would return results computed with the "
             "earlier parameters (reuse is keyed on the output file, not on params). "
             "Use a fresh out_dir per parameter setting, or skip_existing=False.")
+    root = Path(data_path) if data_path is not None else config.data_path
     # the on-disk spelling, once, so out_dir names and records agree (one warning)
-    dataset = _resolve.canonical_dataset(
-        Path(data_path) if data_path is not None else config.data_path, dataset)
+    dataset = _resolve.canonical_dataset(root, dataset)
     # a real run checks params per method and records a bad key as FAIL
     plan_df, private = _scan(dataset, category, data_path=data_path, methods=methods,
                              modalities="all" if every else modalities, verbose=False,
@@ -3298,8 +3274,8 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
         first = blocked.iloc[0]["method"]
         raise ValueError(
             f"No saved output of {_and_list(dict.fromkeys(blocked['method']))} in {out_dir} "
-            f"(it would be {out_dir / f'{first}_{dataset}'}). Pass the "
-            + "out_dir of the earlier run.")
+            f"(it would be {out_dir / f'{first}_{dataset}'}). Pass the out_dir of the "
+            "earlier run.")
     if plan_df.empty:
         # not one method could start: the request is wrong, and an empty result
         # would read "0 failed", as success
@@ -3325,8 +3301,7 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
     batch_file = (_batch_csv(batch_vec, dataset, data_path)
                   if batch_vec is not None and evaluate else None)
     # absolute: a saved result read from another directory still finds the data
-    data_root = os.path.abspath(config.data_path if data_path is None
-                                else data_path)
+    data_root = os.path.abspath(root)
     # the save after the run would refuse this folder: refuse it now
     _check_save_target(out_dir, dataset, category)
     attempted = set(plan_df["method"])
@@ -3339,8 +3314,7 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
         if others:
             rows = "row needs" if others == 1 else "rows need"
             print(f"[run] {others} more {rows} files this folder does not have. "
-                  + "mtb.scan"
-                  + f" shows {'it' if others == 1 else 'them'}.", flush=True)
+                  f"mtb.scan shows {'it' if others == 1 else 'them'}.", flush=True)
     out_dir.mkdir(parents=True, exist_ok=True)
     records = []
     earlier = _saved_records(out_dir) if skip_existing else {}
