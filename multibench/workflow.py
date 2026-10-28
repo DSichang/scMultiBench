@@ -1021,11 +1021,10 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
     dropped_dirs: list[str] = []
     off_linux = bool(_runner.linux_only_sentence())
     others: dict = {}          # env -> a same-named env multibench did not install
-    reps = _token_reps(modalities) if modalities is not None else set()
+    reps = _token_reps(modalities)
     for spec, v, cat, mods in _variant_rows(category):
         if methods is not None and spec.id not in methods:
             continue
-        mod_str = "+".join(mods) or "(data_dir)"
         if wanted is not None and not wanted(spec, mods):
             # one representation token already excludes a method that reads the other
             other_rep = len(reps) == 1 and spec.atac and spec.atac not in reps
@@ -1033,7 +1032,7 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
                 dropped_dirs.append(spec.id)
             continue
         runtime = _runtimes().get(spec.id, {})
-        rec = {"method": spec.id, "category": cat, "modalities": mod_str,
+        rec = {"method": spec.id, "category": cat, "modalities": "+".join(mods) or "(data_dir)",
                "env": envs.group_for(spec.id), "output_kind": v.output.kind,
                "n_tunable": len(v.tunable),
                "runtime_tier": runtime.get("tier", "unknown"),
@@ -1329,7 +1328,8 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
                 print(f"[scan] {method}: {reason}", flush=True)
     would = [i for i, r in df.iterrows() if _would_run(r)]
     if nested:
-        would = [i for i in would if i not in set(_nested_rows(df.loc[would])[0])]
+        inside = set(_nested_rows(df.loc[would])[0])
+        would = [i for i in would if i not in inside]
     for note in dict.fromkeys(private.loc[would, "_folder_caveat"]):
         if note:
             print(f"[scan] {note}", flush=True)
