@@ -13,9 +13,8 @@ from . import io
 from .. import _text
 from .._text import _and_list
 from ..plot.bar import CLASSIFICATION_METRICS as _CLASSIFICATION_METRICS
-from .pipeline import (_Table, _as_written, _cell_ids, _count_error,
-                       _is_label_path_list, _labels_from_dict, _n_values,
-                       _no_batch_error, _no_label_error, _obs_or_vector,
+from .pipeline import (_as_written, _count_error, _labels_from_dict, _no_batch_error,
+                       _no_label_error, _obs_or_vector, _origin_names, _read_output,
                        _stack_label_files)
 
 #: the columns of the frame classify() returns
@@ -90,34 +89,14 @@ def classify(output, labels=None, *, batch=None, reference=None,
     if isinstance(labels, dict):
         names = [str(k) for k in labels]
         labels = _labels_from_dict(labels)
-    if _is_label_path_list(labels) and names is None:
-        stems = [Path(p).stem for p in labels]
-        names = stems if len(set(stems)) == len(stems) else \
-            [str(i + 1) for i in range(len(labels))]
     _check_embedding(output)
-
-    cells = "adata.obs_names" if io._is_anndata(output) else None
-    if isinstance(output, (str, Path)) and Path(output).suffix.lower() == ".h5ad":
-        output = io._read_h5ad(output, "output")
-    adata = output if io._is_anndata(output) else None
-    table = None
-    if isinstance(output, (str, Path)) and Path(output).suffix.lower() in {".csv", ".tsv"}:
-        file = io._require_file(output, "output")
-        emb, ids = io._read_csv_embedding(file)
-        if ids is not None and emb.shape[0] != emb.shape[1] \
-                and _n_values(labels, adata) == emb.shape[1]:
-            ids = None           # dims x cells: the first column names the dimensions
-        table = None if ids is None else _Table(file.name)
-    else:
-        ids = _cell_ids(output)
-        emb = np.asarray(io.as_matrix(output, obsm=obsm))
+    emb, ids, adata, table = _read_output(output, labels, obsm, "output")
     if emb.ndim != 2:
         raise ValueError(_NOT_EMBEDDING.format(what="output"))
-    if _is_label_path_list(labels):
+    if io._is_label_path_list(labels):
         ct, origin = _stack_label_files(labels, ids, table=table)
     else:
-        ct, origin = _obs_or_vector(labels, adata, what="labels", ids=ids,
-                                    table=table, cells=cells), None
+        ct, origin = _obs_or_vector(labels, adata, what="labels", ids=ids, table=table), None
     if emb.shape[0] != len(ct) and emb.shape[1] == len(ct):
         emb = emb.T                    # dims x cells, as evaluate orients it
     n_cells = emb.shape[0]
@@ -126,11 +105,11 @@ def classify(output, labels=None, *, batch=None, reference=None,
     if emb.shape[1] == n_cells or _is_neighbour_index(emb):
         raise ValueError(_graph_error("output"))     # cells x cells, or a kNN index
     if batch is not None:
-        ba = _obs_or_vector(batch, adata, what="batch", ids=ids, table=table, cells=cells)
+        ba = _obs_or_vector(batch, adata, what="batch", ids=ids, table=table)
         if len(ba) != n_cells:
             raise ValueError(_count_error("batch", len(ba), n_cells, batch))
     elif origin is not None:
-        ba = np.asarray(names, dtype=object)[np.asarray(origin) - 1]
+        ba = _origin_names(labels, origin, names)
     else:
         raise ValueError(
             "classify needs the batch of each cell. Pass batch=.")

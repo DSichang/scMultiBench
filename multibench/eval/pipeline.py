@@ -97,11 +97,6 @@ def _validate_category(category):
             f"unknown category {category!r}; valid: {sorted(valid)}")
 
 
-def _is_label_path_list(x) -> bool:
-    return (isinstance(x, (list, tuple)) and len(x) > 0
-            and all(io._is_label_file(e) for e in x))
-
-
 def _cell_ids(output):
     """Cell ids of ``output``: AnnData ``obs_names``, a DataFrame's index unless
     a ``RangeIndex``, the ``barcodes`` a run wrote into an ``.h5`` file;
@@ -171,6 +166,24 @@ class _Table:
         self.name, self.moved = name, []
 
 
+def _read_output(output, labels, obsm, what: str):
+    """``(emb, ids, adata, table)`` of an embedding argument: the matrix, its
+    cell ids, the AnnData it is (else ``None``) and the :class:`_Table` of a
+    ``.csv`` / ``.tsv`` with ids. ``what`` names a missing file."""
+    if isinstance(output, (str, Path)) and Path(output).suffix.lower() == ".h5ad":
+        output = io._read_h5ad(output, what)   # once; keeps obs_names, obs
+    adata = output if io._is_anndata(output) else None
+    if not (isinstance(output, (str, Path)) and Path(output).suffix.lower() in {".csv", ".tsv"}):
+        ids = _cell_ids(output)
+        return np.asarray(io.as_matrix(output, obsm=obsm)), ids, adata, None
+    file = io._require_file(output, what)
+    emb, ids = io._read_csv_embedding(file)
+    if ids is not None and emb.shape[0] != emb.shape[1] \
+            and _n_values(labels, adata) == emb.shape[1]:
+        ids = None           # dims x cells: the first column names the dimensions
+    return emb, ids, adata, None if ids is None else _Table(file.name)
+
+
 def _same_cells(keys, ids, *, what: str, name: str, table: _Table, fix: str) -> bool:
     """Whether the cell ids ``keys`` of an argument are in another order than
     ``ids``, the barcodes of ``table``; ``ValueError`` when they name other cells.
@@ -204,14 +217,14 @@ def _file_carries_ids(first, ids) -> bool:
 
 
 def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
-                   table=None, cells=None, read=(), others=None):
+                   table=None, read=(), others=None):
     """One label-like argument as a 1-D array in the output's cell order: an obs
     column, a Series aligned by id, a file aligned by its id column, else by position.
 
     ``as_written`` reads files for a message naming the missing words;
     ``table`` (a ``.csv`` embedding's barcodes) collects the arguments put in
-    its row order; ``cells`` words the error of ``io._align_vector``; ``read``
-    and ``others`` name the files whose barcodes name the cells (:func:`_folder_ids`).
+    its row order; ``read`` and ``others`` name the files whose barcodes name
+    the cells (:func:`_folder_ids`).
     """
     if adata is not None and isinstance(x, str):
         col = _obs_column_name(x, adata)
@@ -256,7 +269,7 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
                     and _same_cells(x.index, ids, what=what, name=name, table=table,
                                     fix=f"Pass {what} for the cells of {table.name}."):
                 table.moved.append(name)
-            return io._align_vector(x, ids, what=what, column=column, cells=cells)
+            return io._align_vector(x, ids, what=what, column=column, cells=None)
         _text.warn(
             f"The {what} {type(x).__name__} is matched by position, because the embedding "
             f"has no cell ids. Check that it follows the embedding rows, or pass an AnnData "
@@ -502,7 +515,7 @@ def _label_files(given) -> list:
     if isinstance(given, (str, Path)) and io._is_label_file(Path(given)) \
             and Path(given).is_file():
         return [Path(given)]
-    if _is_label_path_list(given):
+    if io._is_label_path_list(given):
         return [Path(p) for p in given]
     return []
 
@@ -520,7 +533,7 @@ def _n_values(labels, adata) -> int | None:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         try:
-            if _is_label_path_list(labels):
+            if io._is_label_path_list(labels):
                 return len(_stack_label_files(labels, None)[0])
             return len(_obs_or_vector(labels, adata, what="labels"))
         except Exception:  # noqa: BLE001 - the second read says what is wrong
@@ -535,7 +548,7 @@ def _as_written(given, adata, ids, *, what, read=(), others=None):
         return None
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")           # the first read said them
-        if what == "labels" and _is_label_path_list(given):
+        if what == "labels" and io._is_label_path_list(given):
             return _stack_label_files(given, ids, as_written=True, read=read,
                                       others=others)[0]
         return _obs_or_vector(given, adata, what=what, ids=ids, as_written=True, read=read,
@@ -846,12 +859,13 @@ def _classification_scores(request, emb, ct, cb, *, category, not_embedding, gra
     return {c: float(mean[c]) for c in codes}
 
 
-def _origin_names(labels, origin):
-    """The batch of each cell when several label files give it: the file's stem,
-    as ``classify`` names it, else its number."""
-    stems = [Path(p).stem for p in labels]
-    names = stems if len(set(stems)) == len(stems) else \
-        [str(i + 1) for i in range(len(labels))]
+def _origin_names(labels, origin, names=None):
+    """The batch of each cell when several label files give it: ``names[i]``
+    for file ``i + 1``, by default the file's stem, else its number."""
+    if names is None:
+        stems = [Path(p).stem for p in labels]
+        names = stems if len(set(stems)) == len(stems) else \
+            [str(i + 1) for i in range(len(labels))]
     return np.asarray(names, dtype=object)[np.asarray(origin) - 1]
 
 
@@ -1151,30 +1165,14 @@ def _scores(
     if isinstance(labels, dict):
         _LABEL_KEYS.set([str(k) for k in labels])
         labels = _labels_from_dict(labels)
-    batch_from_files = batch is None and _is_label_path_list(labels) and len(labels) > 1
+    batch_from_files = batch is None and io._is_label_path_list(labels) and len(labels) > 1
     group, only, slow, want_cls = _plan_metrics(
         metrics, has_batch=batch is not None or batch_from_files)
     if want_cls:
         from .classify import _graph_writer, _not_embedding
         not_embedding = _not_embedding(embedding)  # a label file or a list
         graph = _graph_writer(embedding)           # a file only graph methods write
-
-    # named in the error for a Series that lacks some cells
-    obs_ids = "adata.obs_names" if io._is_anndata(embedding) else None
-    if isinstance(embedding, (str, Path)) and Path(embedding).suffix.lower() == ".h5ad":
-        embedding = io._read_h5ad(embedding, "embedding")   # once; keeps obs_names, obs
-    adata = embedding if io._is_anndata(embedding) else None
-    table = None
-    if isinstance(embedding, (str, Path)) and Path(embedding).suffix.lower() in {".csv", ".tsv"}:
-        file = io._require_file(embedding, "embedding")
-        emb, ids = io._read_csv_embedding(file)
-        if ids is not None and emb.shape[0] != emb.shape[1] \
-                and _n_values(labels, adata) == emb.shape[1]:
-            ids = None           # dims x cells: the first column names the dimensions
-        table = None if ids is None else _Table(file.name)
-    else:
-        ids = _cell_ids(embedding)
-        emb = np.asarray(io.as_matrix(embedding, obsm=obsm))
+    emb, ids, adata, table = _read_output(embedding, labels, obsm, "embedding")
     if cells is not None and cells.moved and not _follows_cells(labels, adata, cells):
         stems = ", ".join(cells.moved)
         raise ValueError(
@@ -1189,13 +1187,12 @@ def _scores(
         # an embedding without ids holds the dataset's cells in the method's order
         lab_ids, ba_ids = (_cells_ids(cells, emb.shape) if _gives_ids(x, adata) else None
                            for x in (labels, batch))
-    if _is_label_path_list(labels):
+    if io._is_label_path_list(labels):
         ct, origin = _stack_label_files(labels, lab_ids, table=table, read=read,
                                         others=others)
     else:
         ct, origin = _obs_or_vector(labels, adata, what="labels", ids=lab_ids,
-                                    table=table, cells=obs_ids, read=read,
-                                    others=others), None
+                                    table=table, read=read, others=others), None
     # many run outputs are dims x cells; the label count says which axis holds the cells
     if emb.ndim == 2 and emb.shape[0] != len(ct) and emb.shape[1] == len(ct):
         emb = emb.T
@@ -1208,7 +1205,7 @@ def _scores(
     cl = None if clusters is None else np.asarray(clusters)
     if batch is not None:
         ba = _obs_or_vector(batch, adata, what="batch", ids=ba_ids, table=table,
-                            cells=obs_ids, read=read)
+                            read=read)
         if group == "clustering" and not want_cls:
             # after the batch is read: a wrong column gets its error alone
             _unused_batch_warning(metrics)
