@@ -17,6 +17,7 @@ methods:
 
   - id: Multigrate
     language: python
+    gpu_use: used when present   # model.train() without use_gpu; scvi-tools 0.19 picks the GPU when present (_utils.py:49)
     tasks: [clustering, batch]
     atac: peak
     status: verified
@@ -220,6 +221,7 @@ methods:
 
   - id: totalVI
     language: python
+    gpu_use: used when present   # main_totalVI.py:78 vae.train(); scvi-tools 1.3 accelerator='auto'
     tasks: [batch, clustering]
     status: verified
     variants:
@@ -241,6 +243,7 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: MultiVI
     language: python
+    gpu_use: used when present   # util.py:191 leaves accelerator to scvi-tools 0.20 (use_gpu=None picks the GPU when present)
     tasks: [batch, clustering]
     atac: peak
     status: verified
@@ -262,6 +265,7 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: Cobolt
     language: python
+    gpu_use: used when present   # cobolt/model/cobolt.py:64 torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     tasks: [batch, clustering]
     atac: peak
     status: verified
@@ -568,6 +572,7 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: MIRA
     language: python
+    gpu_use: used when present   # mira-multiome 2.1 base.py:671 use_cuda = torch.cuda.is_available() and ...
     tasks: [clustering]
     atac: peak
     status: verified
@@ -592,6 +597,7 @@ methods:
           - {kind: graph, file: connectivities.h5, dataset: data}
   - id: Concerto
     language: python
+    gpu_use: not used   # concerto_GPU() is an empty stub; the env's TF 2.8 has no CUDA libraries
     tasks: [batch, clustering]
     status: verified
     variants:
@@ -671,6 +677,7 @@ methods:
 
   - id: VIMCCA
     language: python
+    gpu_use: not used   # scbean 0.5.6 visgp.py:18 sets CUDA_VISIBLE_DEVICES='-1'
     tasks: [clustering]
     atac: peak
     status: verified
@@ -693,6 +700,7 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: VIPCCA
     language: python
+    gpu_use: not used   # no device code; the env's TF 2.4 has no CUDA libraries
     tasks: [batch, clustering]
     atac: gene_activity
     status: verified
@@ -736,6 +744,7 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: Portal
     language: python
+    gpu_use: used when present   # portal/model.py:20 torch.device('cuda') if torch.cuda.is_available() else cpu
     tasks: [batch, clustering]
     atac: gene_activity
     status: verified
@@ -838,6 +847,7 @@ methods:
 
   - id: GLUE
     language: python
+    gpu_use: used when present   # scglue 0.3.2 glue.py:232 autodevice() picks a GPU through NVML
     tasks: [batch, clustering]
     atac: peak
     status: verified
