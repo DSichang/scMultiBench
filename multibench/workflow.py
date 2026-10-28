@@ -687,14 +687,6 @@ _PRIVATE_COLUMNS = ["_other", "_label_inputs", "_folder_caveat"]
 _FAMILY_WORDS = {"rna": "RNA", "adt": "ADT", "atac": "ATAC"}
 
 
-def _every_combination(modalities) -> tuple:
-    """``(every, modalities)``: ``"all"`` becomes ``(True, None)``; another bare
-    string is left for the id-list check to reject."""
-    if isinstance(modalities, str) and modalities == "all":
-        return True, None
-    return False, modalities
-
-
 def _shown_modalities(df: "pd.DataFrame") -> "pd.DataFrame":
     """``df`` with a folder-reading row's ``(data_dir)`` shown as the files it
     reads (scBridge: ``rna+atac_gas``)."""
@@ -1004,14 +996,8 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
     aligned with it: ``_other`` (the
     reason without the off-Linux sentence), ``_label_inputs`` and ``_folder_caveat``."""
     dataset, data_path = _resolve.split_dataset(dataset, data_path)
-    registry.check_category(category)
-    registry.check_id_list(methods, "methods")
-    every, modalities = _every_combination(modalities)
-    registry.check_id_list(modalities, "modalities")
-    if methods is not None:
-        methods = [registry.check_method(m) for m in methods]
-    # did-you-mean KeyError before any I/O; ids in any case or display names
-    params = _params_by_method(params, methods, "scan")
+    methods, every, modalities, params = _checked_args(category, methods, modalities,
+                                                       params, "scan")
     wanted = _modality_matcher(modalities, methods) if modalities is not None else None
     base = Path(data_path) if data_path is not None else config.data_path
     dataset = _resolve.canonical_dataset(base, dataset)
@@ -2542,16 +2528,26 @@ def _check_params_shape(params, methods, fn: str) -> None:
                     f"params={example!r}.")
 
 
-def _params_by_method(params, methods, fn: str) -> dict:
-    """``params`` keyed by method id; raises for a flat dict and for a method
-    that is not in ``methods`` (ids already checked)."""
+def _checked_args(category, methods, modalities, params, fn: str) -> tuple:
+    """``(methods, every, modalities, params)`` of a ``scan`` / ``run`` call, checked
+    before any I/O: method ids in any case or display names, ``"all"`` as
+    ``every``, ``params`` keyed by method id (did-you-mean ``KeyError``)."""
+    registry.check_category(category)
+    registry.check_id_list(methods, "methods")
+    every = isinstance(modalities, str) and modalities == "all"
+    if every:
+        modalities = None
+    # another bare string is left for the id-list check to reject
+    registry.check_id_list(modalities, "modalities")
+    if methods is not None:
+        methods = [registry.check_method(m) for m in methods]
     _check_params_shape(params, methods, fn)
     params = {registry.check_method(m): v for m, v in (params or {}).items()}
     stray = [m for m in params if methods is not None and m not in methods]
     if stray:
         raise ValueError(f"params names {_and_list(stray)}, which "
                          f"{'is' if len(stray) == 1 else 'are'} not in methods=.")
-    return params
+    return methods, every, modalities, params
 
 
 def _check_param_keys(plan_df: pd.DataFrame, params: dict) -> None:
@@ -3258,13 +3254,8 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
                         f"out_dir='out/'; got {out_dir!r}.")
     out_dir = Path(out_dir).expanduser()
     # the arguments first, so a bad combination is not reported as an I/O error
-    registry.check_category(category)
-    registry.check_id_list(methods, "methods")
-    every, modalities = _every_combination(modalities)
-    registry.check_id_list(modalities, "modalities")
-    if methods is not None:
-        methods = [registry.check_method(m) for m in methods]
-    params = _params_by_method(params, methods, "run")
+    methods, every, modalities, params = _checked_args(category, methods, modalities,
+                                                       params, "run")
     if skip_existing and params:
         raise ValueError("skip_existing=True with params=... would return results computed with the "
             "earlier parameters (reuse is keyed on the output file, not on params). "
