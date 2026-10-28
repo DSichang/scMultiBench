@@ -111,6 +111,8 @@ def load_run(out_dir, *, methods=None) -> "RunResult":
             raise KeyError(f"no record for {unknown} in {folder}; methods in the "
                            f"tree: {have}")
         records = [r for r in records if r.get("method") in set(methods)]
+    long_path = folder / "long.csv"
+    long_table = pd.read_csv(long_path) if long_path.exists() else None
     for r in records:
         # a tree copied from another host: the output folder sits next to the JSON;
         # an older record without out_dir: the folder run names
@@ -125,13 +127,10 @@ def load_run(out_dir, *, methods=None) -> "RunResult":
         root, found = _dataset_root(r, blob["dataset"])
         if found and root is not None:
             r["data_path"] = r["data_root"] = root
-    long_path = folder / "long.csv"
-    long_table = pd.read_csv(long_path) if long_path.exists() else None
-    if _scored_before_040(long_table, records):
-        _text.warn(OLD_TREE, UserWarning)
-    for r in records:
         rows = [] if long_table is None else long_table[long_table["method"] == r.get("method")]
         r["_long"] = rows if len(rows) else None
+    if _scored_before_040(long_table, records):
+        _text.warn(OLD_TREE, UserWarning)
     res = RunResult(records, blob["dataset"], blob["category"], out_dir=folder)
     for r in records:
         res._batch_text(r.get("batch_file"))       # loads the saved batch, when present
@@ -3065,45 +3064,40 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
             batch = None
         elif len(batch) != n and segments is None:
             raise ValueError(f"batch has {len(batch)} entries, embedding has {n} cells")
-    if rows:
+    cands = [] if rows else _label_candidates(dataset, n, data_path)
+    if labels is not None:
         labels = np.asarray(labels)
-        if len(labels) != n:
-            raise ValueError(f"labels has {len(labels)} entries, embedding has {n} cells")
-        cands = [(["(user labels)"], labels, np.ones(n, dtype=int))]
-    else:
-        cands = _label_candidates(dataset, n, data_path)
-    if labels is not None and not rows:
-        # the user's labels, in the dataset's cell order, replace each
-        # candidate's file labels; the cells form one batch
-        labels = np.asarray(labels)
-        by_file = _batch_segments(dataset, data_path, labels)
-        cands = [(names, np.concatenate([by_file[k] for k in names]), np.ones(n, dtype=int))
-                 for names, _, _ in cands
-                 if by_file is not None and all(k in by_file for k in names)]
+        if not rows:
+            # the user's labels, in the dataset's cell order, replace each
+            # candidate's file labels; the cells form one batch
+            by_file = _batch_segments(dataset, data_path, labels)
+            cands = [(names, np.concatenate([by_file[k] for k in names]),
+                      np.ones(n, dtype=int))
+                     for names, _, _ in cands
+                     if by_file is not None and all(k in by_file for k in names)]
         if not cands:
             if len(labels) != n:
-                raise ValueError(f"labels has {len(labels)} entries, embedding has "
-                                 f"{n} cells")
+                raise ValueError(f"labels has {len(labels)} entries, embedding has {n} cells")
             cands = [(["(user labels)"], labels, np.ones(n, dtype=int))]
     if batch is not None:
         # the user's ids replace each candidate's file-of-origin batch, in that
         # candidate's order. With labels in embedding rows: the stored label order
         # when its files hold the embedding's cells, else the variant's own order;
         # a vector as long as the embedding is kept as given
+        def covers(keys):
+            return (segments is not None and bool(keys) and all(k in segments for k in keys)
+                    and sum(len(segments[k]) for k in keys) == n)
         own = None
         if rows and segments is not None:
             stored_order = list(stored_used or ())
-            fits = (stored_order and all(k in segments for k in stored_order)
-                    and sum(len(segments[k]) for k in stored_order) == n)
-            own = (stored_order if fits else
+            own = (stored_order if covers(stored_order) else
                    [k for k, _ in _label_file_sizes(dataset, category, rec.get("method"),
                                                     modalities=rec.get("modalities") or None,
                                                     data_path=data_path)])
         placed = []
         for names, lab, _ in cands:
             keys = own if rows else names
-            if segments is not None and keys and all(k in segments for k in keys) \
-                    and sum(len(segments[k]) for k in keys) == n:
+            if covers(keys):
                 placed.append((names, lab, np.concatenate([segments[k] for k in keys])))
             elif len(batch) == n:
                 placed.append((names, lab, batch))
@@ -3148,11 +3142,9 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
         rec["label_order_candidates"] = spread if len(spread) > 1 else stored_cands
     # the batch vector the batch metrics saw
     winning_batch = next(b for order, _, b in cands if order == names)
-    n_batches = int(len(set(np.asarray(winning_batch).tolist())))
-    if batch is not None:
-        rec["batch_source"] = "user"
-    else:
-        rec["batch_source"] = "file_of_origin" if n_batches > 1 else None
+    n_batches = len(set(np.asarray(winning_batch).tolist()))
+    rec["batch_source"] = ("user" if batch is not None
+                           else "file_of_origin" if n_batches > 1 else None)
     rec["n_batches"] = n_batches
     rec["_long"] = _to_long(val, method=rec["method"], dataset=dataset, category=category)
     if len(rec["_long"]):
