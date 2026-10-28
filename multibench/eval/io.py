@@ -319,23 +319,24 @@ def read_labels_ids(path: Path | str, column: str | None = None, *,
         return values(d["x"]), (first if extra else None)
     if d.shape[1] == 1:
         return values(d.iloc[:, 0]), None
-    no_header = _no_header(d.columns[0])
-    if d.shape[1] == 2 and first.is_unique:
-        return values(d.iloc[:, -1]), first
-    # barcodes with a repeat, not a sample or batch column: an index written
-    # without a header (pandas' and R's to_csv), or text that is 90% distinct
-    index_like = no_header or (len(first) >= 10 and first.nunique() >= 0.9 * len(first))
-    if d.shape[1] == 2 and _looks_like_ids(first) and index_like:
-        dup = pd.Index(first[first.duplicated()].astype(str)).unique()
-        raise ValueError(
-            f"{what or path}: the first column of {path.name} repeats "
-            f"{_n_ids(len(dup))} (first: {_first(dup, 3)}). Give each cell one row.")
-    if d.shape[1] == 2 and no_header and _stacked_row_numbers(first):
-        return values(d.iloc[:, -1]), first
-    if d.shape[1] == 2 and no_header and pd.api.types.is_integer_dtype(first):
-        # stacked row numbers, reordered after the concat
-        raise ValueError(f"{head} has row numbers that repeat out of order, so its rows "
-                         f"may not follow the cells. Save it in cell order.")
+    if d.shape[1] == 2:
+        if first.is_unique:
+            return values(d.iloc[:, -1]), first
+        no_header = _no_header(d.columns[0])
+        # barcodes with a repeat, not a sample or batch column: an index written
+        # without a header (pandas' and R's to_csv), or text that is 90% distinct
+        if _looks_like_ids(first) and (no_header or (
+                len(first) >= 10 and first.nunique() >= 0.9 * len(first))):
+            dup = pd.Index(first[first.duplicated()].astype(str)).unique()
+            raise ValueError(
+                f"{what or path}: the first column of {path.name} repeats "
+                f"{_n_ids(len(dup))} (first: {_first(dup, 3)}). Give each cell one row.")
+        if no_header and _stacked_row_numbers(first):
+            return values(d.iloc[:, -1]), first
+        if no_header and pd.api.types.is_integer_dtype(first):
+            # stacked row numbers, reordered after the concat
+            raise ValueError(f"{head} has row numbers that repeat out of order, so its "
+                             f"rows may not follow the cells. Save it in cell order.")
     kind, names = _data_columns(d)
     if callable(pick):
         # barcodes become the Series index; row numbers would not match any cell
