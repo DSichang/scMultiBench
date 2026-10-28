@@ -177,9 +177,6 @@ def ensure_repo(path=None):
     must be at it (``RuntimeError`` otherwise). A failed fetch raises
     ``RuntimeError`` naming the offline route, and leaves nothing behind.
     """
-    import subprocess
-    import shutil as _sh
-
     ref = os.environ.get(SCRIPTS_REF_VAR) or None
     p = Path(path) if path else config.repo_path
     for have in (p, _settings._ROOT):
@@ -198,7 +195,23 @@ def ensure_repo(path=None):
     # writable (a folder made for the user on shared storage)
     inside = p.is_dir()
     part = p / _PARTIAL if inside else p.with_name(p.name + ".partial")
-    _sh.rmtree(part, ignore_errors=True)
+    _clone(part, ref)
+    if inside:
+        for entry in part.iterdir():
+            entry.rename(p / entry.name)
+        part.rmdir()
+    else:
+        part.rename(p)
+    return p
+
+
+def _clone(part: Path, ref: str | None) -> None:
+    """Fetch the method scripts (at ``ref``, else the default branch) into
+    ``part``; a failure removes ``part`` and raises ``RuntimeError``."""
+    import shutil
+    import subprocess
+
+    shutil.rmtree(part, ignore_errors=True)
     try:
         if ref is None:
             # -q: in a notebook, git's per-file progress fills the cell
@@ -214,7 +227,7 @@ def ensure_repo(path=None):
             if (part / ".git").is_dir():
                 (part / ".git" / _REF_RECORD).write_text(ref + "\n")
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        _sh.rmtree(part, ignore_errors=True)
+        shutil.rmtree(part, ignore_errors=True)
         # run's FAIL line shows the last 200 characters of an error: each
         # text keeps its subject within them ("RuntimeError: " in front, and
         # with a ref of up to 40 characters, a full commit SHA)
@@ -229,10 +242,3 @@ def ensure_repo(path=None):
         raise RuntimeError(
             f"{first} On a host without network, run {FETCH_SCRIPTS} "
             f"on a connected machine, copy the folder and set {REPO_PATH_VAR}.") from e
-    if inside:
-        for entry in part.iterdir():
-            entry.rename(p / entry.name)
-        part.rmdir()
-    else:
-        part.rename(p)
-    return p
