@@ -17,6 +17,7 @@ The four ``category`` values are ``vertical``, ``diagonal``, ``mosaic`` and
 https://dsichang.github.io/scMultiBench/tutorials/run/#folder-layout.
 """
 
+from . import _text
 from ._settings import config
 from . import plot, catalog, io, env, data
 from ._data.results import load_results, rank
@@ -39,7 +40,4 @@ __all__ = [
     "__version__",
 ]
 
-
-def __dir__() -> list[str]:
-    """``dir(mtb)`` lists ``__all__`` and the dunders only (PEP 562)."""
-    return sorted(set(__all__) | {n for n in globals() if n.startswith("__")})
+__dir__ = _text.public_dir(globals())
