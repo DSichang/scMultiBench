@@ -114,8 +114,9 @@ def test_rescore_with_batch_and_labels(cite, tmp_path):
     shuffled = labels[::-1]
     re2 = res.rescore(labels=shuffled, metrics=["ARI", "NMI"])
     assert "+".join(re2.records[0]["labels_used"]) == "(user labels)"
-    # c1 (C10): the named metrics replace theirs, the other scores stay
-    assert set(re2.long["metric"]) == set(res.long["metric"])
+    # e1: with new labels only the named metrics stay; the others were scored
+    # with the old labels
+    assert set(re2.long["metric"]) == {"ARI", "NMI"}
     # a batch CSV path is accepted too (read like a label file)
     bp = tmp_path / "batch.csv"
     pd.DataFrame({"x": batch}).to_csv(bp, index=False)

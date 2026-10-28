@@ -383,9 +383,8 @@ def test_a_dims_by_cells_table_is_still_transposed(tmp_path, capsys, seen):
     pd.DataFrame(EMB.T, index=[f"dim{i}" for i in range(5)], columns=BARS).to_csv(path)
     with pytest.warns(UserWarning) as rec:
         mtb.evaluate(str(path), labels=_labels(tmp_path, order=PERM), metrics=["ARI"])
-    assert [str(w.message) for w in rec] == [
-        NO_IDS.format("labels.csv"),
-        "embedding was (dims x cells) (5, 60); transposed to (cells x dims)"]
+    # the label count says which axis holds the cells: transposed without a word
+    assert [str(w.message) for w in rec] == [NO_IDS.format("labels.csv")]
     assert seen["emb"].shape == (CELLS, 5) and seen["labels"] == list(TYPES[PERM])
     assert capsys.readouterr().err == ""
 

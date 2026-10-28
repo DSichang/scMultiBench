@@ -1196,8 +1196,6 @@ def _scores(
                                     others=others), None
     # many run outputs are dims x cells; the label count says which axis holds the cells
     if emb.ndim == 2 and emb.shape[0] != len(ct) and emb.shape[1] == len(ct):
-        _text.warn(
-            f"embedding was (dims x cells) {emb.shape}; transposed to (cells x dims)")
         emb = emb.T
     _check_finite(emb)
     if want_cls and not (graph or not_embedding):

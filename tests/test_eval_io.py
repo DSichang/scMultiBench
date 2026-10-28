@@ -362,19 +362,17 @@ def test_evaluate_rejects_unknown_category_and_allows_none():
         pytest.approx(1.0)
 
 
-def test_evaluate_warns_on_transpose():
+def test_evaluate_transposes_dims_by_cells_silently():
+    """The label count says which axis holds the cells: nothing to tell."""
     pytest.importorskip("scib")
     from multibench.eval.pipeline import evaluate
     emb, ct, _ = _toy()
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
-        evaluate(emb.T, labels=ct, metrics=["ASW"])
-    hits = [str(x.message) for x in w if "transposed" in str(x.message)]
-    assert hits and "dims x cells" in hits[0]
-    with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
-        evaluate(emb, labels=ct, metrics=["ASW"])
+        wide = evaluate(emb.T, labels=ct, metrics=["ASW"], verbose=False)
     assert not [x for x in w if "transposed" in str(x.message)]
+    assert wide["value"].tolist() == evaluate(emb, labels=ct, metrics=["ASW"],
+                                              verbose=False)["value"].tolist()
 
 
 def test_read_labels_reads_benchmark_style_files(tmp_path):
