@@ -61,6 +61,19 @@ def test_rescore_with_the_saved_batch_and_no_batch_metric_does_not_warn(cite, tm
         back.rescore(batch=batch, metrics=["ARI"])
 
 
+def test_rescore_with_new_batches_keeps_only_the_metrics_it_scored(cite, tmp_path):
+    """The other saved scores were scored with the old batches: none stays next
+    to a GC of the new ones."""
+    data, batch, shuffled = cite
+    mtb.config.data_path = data
+    _quiet(mtb.run, 'MYCITE', 'vertical', tmp_path / 'out', batch=shuffled, **_KW)
+    back = mtb.load_run(tmp_path / "out")
+    assert {"GC", "iLISI"} <= set(back.records[0]["metrics"])
+    new = _quiet(back.rescore, batch=batch, metrics=["GC"])
+    assert set(new.records[0]["metrics"]) == {"GC"}
+    assert list(new.long["metric"]) == ["GC"]
+
+
 def test_the_batch_label_errors_name_only_metrics_the_family_computes():
     import numpy as np
     rng = np.random.default_rng(0)

@@ -1933,7 +1933,8 @@ class RunResult:
         metrics : str | list[str] | None
             Metric family (``"clustering"``, ``"batch"``, ``"classification"``,
             ``"all"``) or metric codes, which replace those scores and keep the
-            others; ``None`` = every metric the batch structure allows, as in
+            others (with new ``batch`` or ``labels``, only these are kept);
+            ``None`` = every metric the batch structure allows, as in
             ``mtb.evaluate``.
         verbose : bool
             Print one line per method, and one before each label-order ranking.
@@ -2078,8 +2079,10 @@ class RunResult:
             if verbose and method not in no_output:      # its error says what is missing
                 print(f"[rescore] {method} -> {_status(rec['status'])} {_ari_tail(rec)}".rstrip(),
                       flush=True)
-            if metrics is not None and rec.get("metrics") and r.get("metrics"):
-                # the named metrics replace theirs; the other scores stay
+            if metrics is not None and batch is None and labels is None \
+                    and rec.get("metrics") and r.get("metrics"):
+                # the named metrics replace theirs; the other scores stay (not
+                # after new batches or labels: they were scored with the old ones)
                 rec["metrics"] = {**r["metrics"], **rec["metrics"]}
                 both = pd.concat([RunResult([r], self.dataset, self.category).long,
                                   rec["_long"]], ignore_index=True)
