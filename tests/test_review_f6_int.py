@@ -206,9 +206,8 @@ def test_scan_count_line_for_one_method_without_files(tmp_path, pinned, capsys):
     d = tmp_path / "data" / "CITE"
     d.mkdir(parents=True)
     _h5(d / "rna.h5", [f"g{i}" for i in range(30)], [f"c{i}" for i in range(20)])
-    full_scan("CITE", "vertical", methods=["MIRA"], data_path=tmp_path / "data")
-    assert capsys.readouterr().out.startswith(
-        "[scan] 0 of 1 method has its input files. 1 of 1 has its environment installed.")
+    df = full_scan("CITE", "vertical", methods=["MIRA"], data_path=tmp_path / "data")
+    assert not df["files_ok"].any() and df["env_ok"].all()
     assert W._have_their(0, 14) == "have their" and W._have_their(1, 14) == "has its"
 
 

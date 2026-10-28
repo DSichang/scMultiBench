@@ -16,6 +16,7 @@ import pytest
 
 from multibench.engine import ingest
 from multibench.engine import resolve
+from multibench.engine import registry
 
 ad = pytest.importorskip("anndata")
 
@@ -520,7 +521,7 @@ def test_the_rule_uses_the_resolver_names():
     a batch number the layout pattern and the resolver's batch pattern agree."""
     roles = ("rna", "adt", "atac_peak", "atac_gas")
     names = {ingest._export_filename(role, suf, cat) for role in roles
-             for suf in ("", "1", "2", "12") for cat in (None, *ingest._CATEGORIES)}
+             for suf in ("", "1", "2", "12") for cat in (None, *registry.CATEGORIES)}
     names |= {f"{stem}{suf}" for stem in ("atac",) for suf in (".h5", "3.h5")}      # the link
     names |= {f"{side}cty{suf}.csv" for side in ("", "rna_", "atac_") for suf in ("", "1", "12")}
     for name in sorted(names):

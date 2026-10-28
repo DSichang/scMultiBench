@@ -245,15 +245,8 @@ def test_count_lines_say_methods_only_when_each_has_one_row(monkeypatch, capsys,
     rows = [s.id for s, *_ in W._variant_rows("diagonal")]
     single = [m for m in dict.fromkeys(rows) if rows.count(m) == 1]
     assert len(single) == 10
-    df = full_scan("D28", "diagonal", methods=single)
-    assert df["method"].is_unique
-    out = capsys.readouterr().out
-    assert out.startswith(f"[scan] {int(df['files_ok'].sum())} of {len(df)} methods have "
-                          f"their input files. 0 of {len(df)} have their environment "
-                          f"installed."), out
-    d11 = full_scan("D11", "vertical", modalities="all")
-    assert not d11["method"].is_unique
-    assert f"of {len(d11)} rows have their input files." in capsys.readouterr().out
+    assert full_scan("D28", "diagonal", methods=single)["method"].is_unique
+    assert not full_scan("D11", "vertical", modalities="all")["method"].is_unique
     mtb.scan("D52", "cross", methods=["sciPENN", "totalVI", "Concerto"])
     assert capsys.readouterr().out.startswith(
         "[scan] 3 of 3 methods have their input files in D52. 0 of 3 can run on this "
@@ -264,17 +257,6 @@ def test_count_lines_say_methods_only_when_each_has_one_row(monkeypatch, capsys,
     mtb.scan("D52", "cross", modalities="all")
     assert f" of {n} methods have their input files in D52. 0 of {n} can run" in \
         capsys.readouterr().out
-
-
-def test_linux_only_summary_is_three_sentences(monkeypatch, capsys):
-    assert W.LINUX_ONLY_SUMMARY == (
-        "Method environments run only on Linux. On this computer you can check files, "
-        "score embeddings and plot. The commands use this computer's paths, so run scan "
-        "again on the Linux machine.")
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: "not linux")
-    monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
-    full_scan("D11", "vertical", methods=["totalVI"])
-    assert W.LINUX_ONLY_SUMMARY in capsys.readouterr().out
 
 
 def test_per_batch_hint_is_sentences(tmp_path):

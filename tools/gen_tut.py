@@ -340,7 +340,7 @@ def would_run(key, methods, dataset=None, **where):
         warnings.simplefilter("ignore")
         # the full plan behind scan: its file and env checks too
         plan, _ = workflow._scan(dataset or t["ds"], t["cat"], methods=methods,
-                                 verbose=False, assume_gpu=True, **where)
+                                 assume_gpu=True, **where)
     other = [str(r).replace(str(e), "").strip() for r, e in zip(plan.reason, plan.env_reason)]
     rows = plan[[bool(f) and o == "" for f, o in zip(plan.files_ok, other)]]
     return rows.drop(index=workflow._nested_rows(rows)[0])
@@ -950,7 +950,7 @@ def check_own(key):
                 exec(compile(own["export"], f"tutorial_{key}: export cell", "exec"), ns)
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                frame, _ = workflow._scan("mydata/" + own["name"], t["cat"], verbose=False)
+                frame, _ = workflow._scan("mydata/" + own["name"], t["cat"])
         finally:
             os.chdir(here)
     warned = [str(w.message) for w in seen if issubclass(w.category, UserWarning)]

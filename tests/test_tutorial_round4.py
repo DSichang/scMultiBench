@@ -255,8 +255,7 @@ def test_runnable_sentence_holds_for_the_named_method_calls_of_the_run_cells(
     sc = _quiet(full_scan, "MYMOSAIC", "mosaic", methods=trio, data_path=tmp_path,
                 verbose=False)
     # the plan of scan, from a run's out_dir, with its file and env checks
-    plan = _quiet(W._scan, str(folder), "mosaic", methods=trio, out_dir=tmp_path / "out",
-                  verbose=False)[0]
+    plan = _quiet(W._scan, str(folder), "mosaic", methods=trio, out_dir=tmp_path / "out")[0]
     for df in (sc, plan):
         # a method has one row per mosaic pattern: the row of this pattern
         df = df[df.modalities == mods].set_index("method")

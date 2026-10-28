@@ -112,6 +112,7 @@ def full_scan(*args, **kwargs):
     """The plan behind ``scan``, one row per method variant with every check
     column (``workflow._scan``); ``mtb.scan`` returns one row per method."""
     from multibench import workflow
+    kwargs.pop("verbose", None)          # the plan prints nothing
     return workflow._scan(*args, **kwargs)[0]
 
 

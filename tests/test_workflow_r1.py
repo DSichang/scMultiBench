@@ -151,12 +151,9 @@ def test_preview_names_the_setup_hint_once(capsys):
 
 # ----------------------------------------------------------------- L18: off Linux
 def test_scan_off_linux_keeps_env_reason_short_and_says_what_works(off_linux, no_envs, capsys):
-    df = full_scan("D11", "vertical", methods=["totalVI"])
-    out = capsys.readouterr().out
-    r = df.iloc[0]
+    r = full_scan("D11", "vertical", methods=["totalVI"]).iloc[0]
     assert r["env_reason"] == f"Environment {r['env']} runs only on Linux, not on this computer."
     assert "mtb.env.install" not in r["reason"]
-    assert out.count("[scan]") == 1 and W.LINUX_ONLY_SUMMARY in out
 
 
 def test_scan_on_linux_keeps_the_install_command(no_envs, capsys):

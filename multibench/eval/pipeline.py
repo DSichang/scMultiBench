@@ -85,15 +85,6 @@ def _metric_families() -> tuple[list, list, list]:
     return list(CLUSTERING_METRICS), list(BATCH_METRICS), list(CLASSIFICATION_METRICS)
 
 
-def _validate_category(category):
-    if category is None:
-        return
-    from ..workflow import CATEGORIES as valid  # lazy: workflow imports this module
-    if category not in valid:
-        raise ValueError(
-            f"unknown category {category!r}; valid: {sorted(valid)}")
-
-
 def _cell_ids(output):
     """Cell ids of ``output``: AnnData ``obs_names``, a DataFrame's index unless
     a ``RangeIndex``, the ``barcodes`` a run wrote into an ``.h5`` file;
@@ -1117,7 +1108,7 @@ def _scores(
     column ``Value``; ``attrs`` records how they were scored. ``clusters``
     replaces the Leiden clusters of ARI, NMI, ASW, iASW and iF1; ``cells`` are
     the cells of ``evaluate(dataset=)``."""
-    _validate_category(category)
+    registry.check_category(category)
     if labels is None:
         raise ValueError("metrics require `labels` (cty / ground-truth cell types).")
     if isinstance(labels, dict) and not labels:

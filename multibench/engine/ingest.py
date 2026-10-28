@@ -18,22 +18,18 @@ import numpy as np
 from .. import _text
 
 from .._settings import config
-from .registry import ATAC_VALUES as _ATAC_KINDS
+from .registry import ATAC_VALUES as _ATAC_KINDS, MODALITY_ALIASES, check_category
 
 # peak ids come as chr_start_end, chr-start-end or chr:start-end; Signac needs the last
 _PEAK_RE = re.compile(r"^(.+?)[-_:](\d+)[-_](\d+)$")
 
 # the file names are the ones resolve._ROLE_FILE_CANDIDATES looks up
 _MODALITIES = ("rna", "adt", "atac", "atac_peak", "atac_gas")
-_ALIASES = {"protein": "adt", "peak": "atac_peak", "gas": "atac_gas",
-            "gene_activity": "atac_gas"}
 _MOD_FILE = {"rna": "rna.h5", "adt": "adt.h5", "atac": "atac.h5",
              "atac_peak": "atac_peak.h5", "atac_gas": "atac_gas.h5"}
 #: :func:`to_canonical` warns when ``matrix/data`` (stored dense, features x
 #: cells) would exceed this many bytes uncompressed on disk.
 DENSE_WARN_BYTES = 10 ** 9
-#: ``category=`` values accepted by to_canonical / export_dataset.
-_CATEGORIES = ("vertical", "diagonal", "mosaic", "cross")
 #: Roles whose matrix must hold raw counts. Gene-activity scores (atac_gas)
 #: and the representation-free ``atac`` role are not checked.
 _COUNT_ROLES = ("rna", "adt", "atac_peak")
@@ -270,14 +266,6 @@ def _filter_var(adata, var_filter, *, what, spec):
     return adata[:, mask]
 
 
-def _check_category(category):
-    if category is None:
-        return None
-    if category not in _CATEGORIES:
-        raise ValueError(f"unknown category {category!r}; valid: {list(_CATEGORIES)}")
-    return category
-
-
 def _atac_filename(modality: str, category: str | None) -> str:
     """On-disk name of a modality file: every vertical variant reads its ATAC,
     of either representation, from ``atac.h5``."""
@@ -393,9 +381,9 @@ def _norm_modality(modality):
     """Resolve aliases and validate; ``None`` passes through."""
     if modality is None:
         return None
-    m = _ALIASES.get(str(modality), str(modality))
+    m = MODALITY_ALIASES.get(str(modality), str(modality))
     if m not in _MODALITIES:
-        alias = {m: [a for a, t in _ALIASES.items() if t == m] for m in _MODALITIES}
+        alias = {m: [a for a, t in MODALITY_ALIASES.items() if t == m] for m in _MODALITIES}
         valid = [m + (f" (or {', '.join(alias[m])})" if alias[m] else "")
                  for m in _MODALITIES]
         raise ValueError(f"Unknown modality {modality}. The modalities are "
@@ -687,7 +675,7 @@ def _to_canonical(src, out: Path | str | None = None, modality: str | None = Non
         # before the checks of the other arguments, which would ask for an out path
         raise ValueError(_tenx_message(Path(src)))
     modality = _norm_modality(modality)
-    category = _check_category(category)
+    category = check_category(category)
     if out is None:
         if modality is None:
             raise ValueError("out path required to write a canonical .h5 "
@@ -1318,7 +1306,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
         raise TypeError("export_dataset takes an AnnData or MuData object, not a path: "
                         "read the file first, e.g. anndata.read_h5ad(path).")
     out = Path(dataset_dir).expanduser()
-    category = _check_category(category)
+    category = check_category(category)
     if data is None and isinstance(rna, str) and rna == "X":
         rna = None                      # no data to select from: no RNA
     given = {"rna": rna, "adt": adt, "atac": atac}      # as written, for messages

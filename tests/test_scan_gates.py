@@ -156,16 +156,8 @@ def test_scan_modalities_filter_accepts_protein_alias():
     pd.testing.assert_frame_equal(a, b)
 
 
-def test_scan_verbose_prints_one_summary_line(capsys, no_envs):
-    df = full_scan("D11", "vertical", modalities="all")  # verbose=True is the default
-    out = capsys.readouterr().out
-    n = len(df)
-    k = int(df["files_ok"].sum())
-    assert (f"[scan] {k} of {n} rows have their input files. 0 of {n} have their "
-            f"environment installed.") in out
-    assert out.count("[scan]") == 1
-    # verbose=False is silent (run(verbose=False) passes it through)
-    full_scan("D11", "vertical", verbose=False)
+def test_the_plan_is_silent_and_scan_verbose_false_too(capsys, no_envs):
+    full_scan("D11", "vertical", modalities="all")
     assert capsys.readouterr().out == ""
     mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False)
     assert capsys.readouterr().out == ""

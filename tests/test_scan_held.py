@@ -23,7 +23,6 @@ from multibench import _settings
 from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, registry
-from multibench.engine import runner as R
 from tests.conftest import full_scan
 
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
@@ -271,9 +270,6 @@ def test_nothing_held_means_no_filter(tmp_path, no_envs, capsys):
     (tmp_path / "EMPTY").mkdir()
     df = full_scan("EMPTY", "vertical", data_path=tmp_path)
     assert len(df) == 33 and _core(df.attrs) == {"held": [], "not_listed": 0, "not_held": []}
-    assert capsys.readouterr().out == (
-        "[scan] 0 of 33 rows have their input files. 0 of 33 have their environment "
-        "installed. mtb.env.install(dry_run=True) checks the environments.\n")
     # five batches scanned as vertical: rna.h5 is not there, rna1.h5 ... are
     _donors(tmp_path, "FIVE", 5)
     df = _quiet(full_scan, "FIVE", "vertical", data_path=tmp_path, verbose=False)
@@ -322,17 +318,6 @@ def test_params_keys_are_checked_before_the_filter(monkeypatch):
         full_scan("D11", "vertical", params={"Matilda": {"no_such_key": 1}}, verbose=False)
 
 
-def test_count_line_off_linux_and_with_batches(monkeypatch, capsys):
-    monkeypatch.setattr(R, "linux_only_sentence",
-                        lambda: "Methods run only on Linux, and this computer runs macOS.")
-    monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
-    _on_disk("D52mini")
-    full_scan("D52mini", "cross")
-    assert capsys.readouterr().out == (
-        "[scan] 11 of 11 rows have their input files. 0 of 11 have their environment "
-        f"installed. {W.LINUX_ONLY_SUMMARY}\n")
-
-
 def test_two_families_can_be_lacking(tmp_path, no_envs, capsys):
     # RNA alone, every category: no row reads RNA alone, so none is left out by its
     # families (c2, C55: scBridge reads ATAC too); the numbered-batch rows are
@@ -340,10 +325,8 @@ def test_two_families_can_be_lacking(tmp_path, no_envs, capsys):
     d.mkdir()
     _h5(d / "rna.h5", GENES[:30], [f"c{i}" for i in range(20)])
     df = full_scan("RNA_ONLY", data_path=tmp_path)
-    line = capsys.readouterr().out
     assert len(df) == 47 and "(data_dir)" in set(df["modalities"])
     assert _core(df.attrs) == {"held": ["rna"], "not_listed": 0, "not_held": []}
-    assert line.startswith("[scan] 0 of 47 rows have their input files.")
 
 
 def test_attrs():

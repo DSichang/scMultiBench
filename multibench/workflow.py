@@ -180,19 +180,6 @@ def _scored_before_040(long_table, records) -> bool:
     return any(v and v < (0, 4, 0) for v in versions)
 
 
-#: The four integration scenarios, and what each one's data looks like.
-CATEGORIES = {
-    "vertical": "Several modalities measured in the same cells (e.g. CITE-seq "
-                "RNA+ADT, or 10x multiome RNA+ATAC). Cells are already matched.",
-    "diagonal": "Modalities measured in different cells, with no pairing "
-                "(e.g. an RNA experiment and a separate ATAC experiment).",
-    "mosaic":   "Several batches where only some share a modality. A paired batch "
-                "bridges the others.",
-    "cross":    "Several batches that all measure the same modalities, for example "
-                "one CITE-seq assay (RNA+ADT) from several donors. The task is "
-                "removing batch effects.",
-}
-
 
 def batch_patterns(category: str) -> list[tuple[tuple, list[str]]]:
     """The batch patterns a category's variants accept, with their methods.
@@ -326,9 +313,6 @@ GPU_NODE_CAVEAT = ("{method} needs an NVIDIA GPU. This check assumes the job run
 #: What the first line of ``scan`` adds off Linux.
 LINUX_ONLY_CHECK = ("Method environments run only on Linux. On this computer you can "
                     "check files, score embeddings and plot.")
-#: What the scan summary line adds off Linux, after the counts.
-LINUX_ONLY_SUMMARY = (f"{LINUX_ONLY_CHECK} The commands use this computer's paths, so "
-                      "run scan again on the Linux machine.")
 _DOCTOR = "mtb.env.install(dry_run=True) checks the environments."
 
 
@@ -970,7 +954,7 @@ def scan(dataset: str, category: str | None = None, *,
     if category is None:
         category = known_category(dataset)
     df, private = _scan(dataset, category, methods=methods, modalities=modalities,
-                        params=params, verbose=False, assume_gpu=assume_gpu)
+                        params=params, assume_gpu=assume_gpu)
     return _per_method(df, private, verbose=verbose,
                        nested=not isinstance(modalities, (list, tuple)))
 
@@ -999,7 +983,7 @@ def own_batches_only(dataset) -> None:
 
 def _scan(dataset: str, category: str | None = None, *, methods=None, modalities=None,
           data_path=None, out_dir=OUT_DIR_PLACEHOLDER, params: dict | None = None,
-          verbose: bool = True, assume_gpu: bool = False) -> "tuple[pd.DataFrame, pd.DataFrame]":
+          assume_gpu: bool = False) -> "tuple[pd.DataFrame, pd.DataFrame]":
     """The full plan (every column of :data:`PLAN_COLUMNS`), and a second frame
     aligned with it: ``_other`` (the
     reason without the off-Linux sentence), ``_label_inputs`` and ``_folder_caveat``."""
@@ -1154,15 +1138,6 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
                     not_held=[f for f in registry._BASE_MODALITIES
                               if any(f in lack for _, lack in left_out)])
     private.attrs.update(dataset=dataset, folder=ds_dir, category=category)
-    if verbose:
-        n, k_files, k_env = len(df), int(df["files_ok"].sum()), int(df["env_ok"].sum())
-        rows = _rows_word(df, n)
-        line = (f"[scan] {k_files} of {n} {rows} {_have_their(k_files, n)} input files. "
-                f"{k_env} of {n} {_have_their(k_env, n)} environment installed.")
-        note = (left_out or n_batch_out) and _not_listed_note(df, dataset, ds_dir, category)
-        if note:
-            line += " " + note
-        print(line + _env_tail(df, installed, LINUX_ONLY_SUMMARY), flush=True)
     return df, private
 
 
@@ -1641,7 +1616,7 @@ def _plan_caveats(dataset, category, data_path, methods) -> dict | None:
         return {}
     try:
         plan, _ = _scan(dataset, category, methods=methods, modalities="all",
-                        data_path=data_path, verbose=False)
+                        data_path=data_path)
     except Exception:  # noqa: BLE001 - no plan: the record keeps its caveat
         return None
     return {(r["method"], tuple(_row_modalities(r["modalities"]))): _run_caveat(r["caveat"])
@@ -3230,8 +3205,7 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
     dataset = _resolve.canonical_dataset(root, dataset)
     # a real run checks params per method and records a bad key as FAIL
     plan_df, private = _scan(dataset, category, data_path=data_path, methods=methods,
-                             modalities="all" if every else modalities, verbose=False,
-                             out_dir=out_dir)
+                             modalities="all" if every else modalities, out_dir=out_dir)
     not_listed = (_not_listed_note(plan_df, dataset, private.attrs["folder"], category)
                   if plan_df.attrs["not_listed"] or plan_df.attrs.get("not_listed_batch")
                   else "")

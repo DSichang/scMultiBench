@@ -204,7 +204,7 @@ def test_the_way_out_follows_the_methods(cite, tmp_path, host):
     assert "evaluate=False" not in M1 and "Matilda" not in M1
     assert host == []
     plan, private = W._scan("MYCITE", "vertical", methods=["Matilda", "sciPENN"],
-                            data_path=cite, verbose=False)
+                            data_path=cite)
     assert dict(zip(plan["method"], private["_label_inputs"])) == {
         "Matilda": ("cty.csv",), "sciPENN": ()}
     # the answer is read from the inputs, not from needs_labels alone
@@ -282,7 +282,7 @@ def test_a_method_that_is_fed_the_folder_reads_its_label_files(tmp_path, host):
     _write(d / "atac_cty.csv", ["A", "B"] * 30)
     mtb.config.data_path = tmp_path / "data"
     kw = dict(methods=['scBridge'], verbose=False)
-    plan, private = _quiet(W._scan, "UNPAIRED", "diagonal", **kw)
+    plan, private = _quiet(W._scan, "UNPAIRED", "diagonal", methods=kw["methods"])
     assert list(plan["modalities"]) == ["(data_dir)"] and plan["runnable"].all()
     assert list(private["_label_inputs"]) == [("rna_cty.csv", "atac_cty.csv")]
     with pytest.raises(ValueError) as e:
@@ -436,6 +436,5 @@ def test_label_files_are_one_list(cite, tmp_path, host, monkeypatch):
     assert W._label_candidates("MYCITE", N, cite) == []
     assert [names for names, _, _ in W._label_candidates("MYCITE", 10, cite)] == [
         ["cty2.csv"]]
-    _, private = W._scan("MYCITE", "vertical", methods=["Matilda"], data_path=cite,
-                         verbose=False)
+    _, private = W._scan("MYCITE", "vertical", methods=["Matilda"], data_path=cite)
     assert list(private["_label_inputs"]) == [()]      # cty.csv is not in the list now
