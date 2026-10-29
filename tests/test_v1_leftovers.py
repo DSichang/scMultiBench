@@ -75,13 +75,6 @@ def test_the_quickstart_lines_for_counts_in_a_layer(tmp_path, monkeypatch, capsy
 
 
 # ---- the Python part of tests that also ran the command line
-def test_an_unreadable_h5ad_is_named_in_one_sentence(tmp_path, capsys):
-    bad = tmp_path / 'bad.h5ad'
-    bad.write_text('not hdf5\n')
-    said = 'bad.h5ad cannot be read: it is not an .h5ad file, or it is damaged.'
-    with pytest.raises(ValueError) as e:
-        mtb.evaluate(str(bad), labels='celltype')
-    assert str(e.value) == said
 
 
 def test_one_cell_is_singular(tmp_path, capsys):

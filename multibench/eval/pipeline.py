@@ -145,7 +145,7 @@ def _read_output(output, obsm, what: str):
     adata = output if io._is_anndata(output) else None
     if not (isinstance(output, (str, Path)) and Path(output).suffix.lower() in {".csv", ".tsv"}):
         ids = _cell_ids(output)
-        return np.asarray(io.as_matrix(output, obsm=obsm)), ids, adata, None
+        return np.asarray(io.as_matrix(output, obsm=obsm, what=what)), ids, adata, None
     file = io._require_file(output, what)
     emb, ids = io._read_csv_embedding(file)
     return emb, ids, adata, None if ids is None else _Table(file.name)
@@ -348,7 +348,7 @@ def _stack_label_files(files, ids, table=None, read=(), others=None):
             table.moved.extend(names)
         pos, _ = io.by_id_column(np.arange(len(vals)), keys, ids if unique else None,
                                  what="labels", name=name, target="the embedding",
-                                 order=order, no_ids=_no_ids(ids), n_files=len(names))
+                                 order=order, no_ids=_no_ids(ids))
         return vals[pos], origin[pos]
     if all(first is None for _, first in rows) and _has_cell_ids(ids):
         # no ids: the dataset folder's matrices name the cells; without them, by position
@@ -356,8 +356,7 @@ def _stack_label_files(files, ids, table=None, read=(), others=None):
         if keys is not None:
             pos, _ = io.by_id_column(np.arange(len(vals)), keys, ids, what="labels",
                                      name=_and_list(names), target="the embedding",
-                                     order=order, no_ids=_no_ids(ids),
-                                     n_files=len(names))
+                                     order=order, no_ids=_no_ids(ids))
             return vals[pos], origin[pos]
     for (v, first), name in zip(rows, names):
         io.by_id_column(v, first, None, what="labels", name=name, target="the embedding",
@@ -425,12 +424,11 @@ def _named_files(given) -> str:
     return f" ({', '.join(f.name for f in files)})" if files else ""
 
 
-def _measured_warning(reason: str, distinct: int, cells: int) -> str:
+def _measured_warning(distinct: int, cells: int) -> str:
     """The warning for labels that look like a measured number per cell, such as
     ``nCount_RNA``."""
-    why = ("hold numbers that are not whole numbers" if reason == "fraction"
-           else f"have {distinct:,} different values for {cells:,} cells")
-    return f"The labels {why}. Check that they are the cell types."
+    return (f"The labels have {distinct:,} different values for {cells:,} cells. Check "
+            f"that they are the cell types.")
 
 
 def _no_label_error(shown, miss, given) -> str:

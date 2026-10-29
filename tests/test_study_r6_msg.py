@@ -304,8 +304,8 @@ def test_positional_warning_is_plural_for_several_files(tmp_path):
     msgs = [str(w.message) for w in rec if "matched by position" in str(w.message)]
     assert msgs == [
         "The first column of lab_atac.csv and lab_rna.csv looks like cell ids, but the "
-        "embedding has no cell ids. These files are matched by position. Check that their "
-        "rows follow the rows of the embedding."], msgs
+        "embedding has no cell ids. The rows are matched by position. Check that they "
+        "follow the rows of the embedding."], msgs
 
 
 # ======================================================================= R6-14

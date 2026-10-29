@@ -1,11 +1,8 @@
 """evaluate warns when the labels look like a number measured for each cell.
 
 A count column such as ``nCount_RNA`` passed where the cell types belong was
-scored without a word. The warning fires on either sign
-(``multibench.eval.io._labels_look_measured``):
-
-- at least 20 cells, and more distinct labels than half of the cells;
-- labels that are numbers, some of them not whole numbers.
+scored without a word. The warning fires for at least 20 cells with more
+distinct labels than half of them (``multibench.eval.io._labels_look_measured``).
 
 It does not fire on whole-number cluster ids, and on no label file of a
 dataset the package ships.
@@ -49,7 +46,6 @@ def _adata():
     a.obsm["X_emb"] = EMB
     a.obs["celltype"] = TYPES
     a.obs["nCount_RNA"] = COUNTS
-    a.obs["percent_mt"] = np.tile([0.5, 1.5, 2.5], N // 3)
     a.obs["leiden"] = pd.Categorical(np.tile(np.arange(6), N // 6).astype(str))
     a.obs["cluster"] = np.tile(np.arange(6), N // 6)
     return a
@@ -58,12 +54,11 @@ def _adata():
 # ------------------------------------------------------------------ the rule
 def test_the_rule():
     look = io._labels_look_measured
-    assert look(COUNTS) == ("distinct", 60, 60)
-    assert look(np.arange(31).tolist() + [0] * 29) == ("distinct", 31, 60)
+    assert look(COUNTS) == (60, 60)
+    assert look(np.arange(31).tolist() + [0] * 29) == (31, 60)
     assert look(np.arange(30).tolist() + [0] * 30) is None           # exactly half
     assert look(np.arange(19)) is None                               # fewer than 20 cells
-    assert look(np.array([0.5, 1.5] * 30)) == ("fraction", 2, 60)
-    assert look(np.array([0.5, 1.0, 2.0])) == ("fraction", 3, 3)     # any number of cells
+    assert look(np.array([0.5, 1.5] * 30)) is None                   # few values
     assert look(np.array([0.0, 1.0, 2.0] * 20)) is None              # whole numbers as floats
     assert look(np.array([0.0, 1.0, np.nan] * 20)) is None
     assert look(np.tile(np.arange(12), 5)) is None                   # cluster ids 0..11
@@ -74,16 +69,11 @@ def test_the_rule():
 
 # -------------------------------------------------------------------- Python
 COUNT = f"The labels have 60 different values for 60 cells. {CHECK}"
-FRACTION = f"The labels hold numbers that are not whole numbers. {CHECK}"
 
 
 def test_an_obs_column_of_counts():
     assert _warned(_adata(), labels="nCount_RNA") == [COUNT]
     assert _warned(_adata(), labels="obs:nCount_RNA") == [COUNT]
-
-
-def test_an_obs_column_of_numbers_that_are_not_whole():
-    assert _warned(_adata(), labels="percent_mt") == [FRACTION]
 
 
 def test_a_series_an_array_and_a_file(tmp_path):
@@ -96,7 +86,7 @@ def test_a_series_an_array_and_a_file(tmp_path):
     two = tmp_path / "more.csv"
     pd.DataFrame({"x": COUNTS[:30] + 0.5}).to_csv(two, index=False)
     pd.DataFrame({"x": COUNTS[:30]}).to_csv(one, index=False)
-    assert _warned(EMB, labels=[str(one), str(two)]) == [FRACTION]
+    assert _warned(EMB, labels=[str(one), str(two)]) == [COUNT]
 
 
 def test_cell_types_and_cluster_ids_do_not_warn(tmp_path):

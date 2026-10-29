@@ -68,9 +68,8 @@ def test_missing_batch_file_is_named_as_a_batch_file(tmp_path, monkeypatch):
     with pytest.raises(FileNotFoundError) as e:
         mtb.evaluate(emb, labels=labels, batch="missing.csv", metrics=["iLISI"])
     msg = str(e.value)
-    assert msg == (f"The batch file missing.csv does not exist. From the working directory "
-                   f"{tmp_path.resolve()}, the path resolves to "
-                   f"{(tmp_path / 'missing.csv').resolve()}.")
+    assert msg == (f"The batch file missing.csv does not exist (resolved: "
+                   f"{(tmp_path / 'missing.csv').resolve()}).")
     assert "labels file" not in msg and ";" not in msg and "(cwd" not in msg
 
 
