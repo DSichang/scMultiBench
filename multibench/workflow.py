@@ -2105,35 +2105,15 @@ def _error_tail(error, width: int = 200) -> str:
     return "..." + tail
 
 
-def _scan_hint(dataset: str, category: str, *, data_path=None, methods=None,
-               modalities=None, every: bool = False) -> str:
-    """The ``mtb.scan`` call that checks the rows of a ``run`` call, with every
-    non-default argument as the caller gave it. A folder outside the default
-    data path is named by its path, as the docs teach (relative to the working
-    directory when inside it)."""
-    if data_path is not None and (os.path.realpath(data_path)
-                                  != os.path.realpath(config.data_path)):
-        folder = os.path.join(os.fspath(data_path), str(dataset))
-        rel = os.path.relpath(folder)
-        dataset = folder if rel.startswith("..") else rel
-    py = [repr(dataset), repr(category)]
-    if methods:
-        py.append(f"methods={list(methods)}")
-    if modalities:
-        py.append(f"modalities={list(modalities)}")
-    elif every:
-        py.append('modalities="all"')
-    return f"mtb.scan({', '.join(py)})"
-
-
 def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame,
-                              methods, *, data_path=None, modalities=None, others=None,
+                              methods, *, given, modalities=None, others=None,
                               every: bool = False, note: str = "") -> str:
     """The ``ValueError`` text when no requested row can start (run's Notes): one
     line per blocked method with its reason (every named method, else the first 3
-    whose files are in place). Off Linux the platform blocks every row, so a method
-    is listed only for what else blocks it (``others``: each row's blocks besides
-    the platform)."""
+    whose files are in place), then the ``mtb.scan`` call of these arguments
+    (``given``: the dataset as the caller wrote it). Off Linux the platform blocks
+    every row, so a method is listed only for what else blocks it (``others``: each
+    row's blocks besides the platform)."""
     linux_only = envs.linux_only_text()
     platform = bool(linux_only) and not blocked["env_ok"].all()
     why = (others.reindex(blocked.index).fillna("") if platform and others is not None
@@ -2155,9 +2135,14 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
         lines += [f"  {_row_label(r)}: {r['_why']}" for r in shown]
     if note:
         lines.append(note)
-    where = _scan_hint(dataset, category, data_path=data_path, methods=methods,
-                       modalities=modalities, every=every)
-    lines.append(f"{where} says why." + ("" if platform else f" {_DOCTOR}"))
+    py = [repr(os.fspath(given)), repr(category)]
+    if methods:
+        py.append(f"methods={list(methods)}")
+    if modalities:
+        py.append(f"modalities={list(modalities)}")
+    elif every:
+        py.append('modalities="all"')
+    lines.append(f"mtb.scan({', '.join(py)}) says why." + ("" if platform else f" {_DOCTOR}"))
     return "\n".join(lines)
 
 
@@ -2190,10 +2175,6 @@ def _checked_args(category, methods, modalities, params, fn: str) -> tuple:
         methods = [registry.check_method(m) for m in methods]
     _check_params_shape(params, fn)
     params = {registry.check_method(m): v for m, v in (params or {}).items()}
-    stray = [m for m in params if methods is not None and m not in methods]
-    if stray:
-        raise ValueError(f"params names {_and_list(stray)}, which "
-                         f"{'is' if len(stray) == 1 else 'are'} not in methods=.")
     return methods, every, modalities, params
 
 
@@ -2832,7 +2813,8 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
         of another dataset or category, or a ``batch`` that does not fit the
         cells; checked before anything runs.
     KeyError
-        Unknown method id, or a ``params`` key the method does not accept.
+        Unknown method id. A ``params`` key the method does not accept fails
+        that method (status ``failed``).
 
     Examples
     --------
@@ -2841,10 +2823,8 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
     >>> res = mtb.run("D11", "vertical", out_dir="out/", methods=["Matilda"],
     ...               params={"Matilda": {"epochs": 10}})
     """
+    given = dataset
     dataset, data_path = _resolve.split_dataset(dataset, None)
-    if not isinstance(out_dir, (str, os.PathLike)):
-        raise TypeError(f"out_dir must be a folder path, such as out_dir='out/'; "
-                        f"got {out_dir!r}.")
     out_dir = Path(out_dir).expanduser()
     # the arguments first, so a bad combination is not reported as an I/O error
     methods, every, modalities, params = _checked_args(category, methods, modalities,
@@ -2878,16 +2858,12 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
     blocked = plan_df[~plan_df["runnable"]]
     plan_df = plan_df[plan_df["runnable"]]
     if plan_df.empty and skip_existing:
-        first = blocked.iloc[0]["method"]
-        raise ValueError(
-            f"No saved output of {_and_list(dict.fromkeys(blocked['method']))} in {out_dir} "
-            f"(it would be {out_dir / f'{first}_{dataset}'}). Pass the out_dir of the "
-            "earlier run.")
+        raise ValueError(f"No saved output in {out_dir}. Pass the out_dir of the earlier run.")
     if plan_df.empty:
         # not one method could start: the request is wrong, and an empty result
         # would read "0 failed", as success
         raise ValueError(_nothing_runnable_message(
-            dataset, category, blocked, methods, data_path=data_path,
+            dataset, category, blocked, methods, given=given,
             modalities=modalities, others=private["_other"], every=every,
             note="" if methods else not_listed))
     if modalities is None:
@@ -2963,10 +2939,7 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
                 inputs = _resolve.inputs_for(dataset, category, method, modalities=mods or None,
                                              data_path=data_path, check=True)
                 reused = skip_existing and output.exists()
-                # on every path, also a reuse: an unknown key must fail, not be dropped
                 overrides = params.get(method)
-                if overrides:
-                    _runner.check_params(method, variant, overrides)
                 if reused:
                     if verbose:
                         print(f"[run]   reusing existing output in {method_dir}", flush=True)

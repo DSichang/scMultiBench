@@ -252,8 +252,7 @@ def test_skip_existing_without_a_saved_run_says_so(tmp_path):
         mtb.run("D11", "vertical", out_dir=str(tmp_path / "outs"), methods=["Matilda"],
                     skip_existing=True, verbose=False)
     assert str(e.value) == (
-        f"No saved output of Matilda in {tmp_path / 'outs'} (it would be "
-        f"{tmp_path / 'outs' / 'Matilda_D11'}). Pass the out_dir of the earlier run.")
+        f"No saved output in {tmp_path / 'outs'}. Pass the out_dir of the earlier run.")
 
 
 def test_a_renamed_run_keeps_its_language_chip():
