@@ -1203,22 +1203,16 @@ def _evaluate_best_order(emb, category, cands, *, metrics=None, user_batch=False
 
     def _full(lab, batch, clusters=None):
         several = len(set(np.asarray(batch).tolist())) > 1
-        if user_batch and batch_given and not several and metrics is not None \
-                and _names_batch_metric(metrics):
-            # evaluate would ask for the batch that was passed
-            raise ValueError(
-                f"The batch has one value among the {len(batch):,} cells this method "
-                f"embedded, so the batch metrics cannot be computed. Pass a batch "
-                f"that splits these cells.")
         multi = use_batch and several
         chosen = metrics if embedding else _without_classification(metrics, multi)
         if not embedding:
             # the batches go only with a selection that still uses them
             multi = several and ((user_batch and batch_given)
                                  or _names_batch_metric(chosen))
-        return _scores(emb, category=category, labels=lab,
-                         verbose=False, batch=(batch if multi else None),
-                         clusters=clusters, metrics=chosen)
+        # a batch the caller passed goes to evaluate even with one value here: it says so
+        return _scores(emb, category=category, labels=lab, verbose=False,
+                       batch=(batch if multi or (user_batch and batch_given) else None),
+                       clusters=clusters, metrics=chosen)
 
     if len(cands) == 1:
         names, lab, batch = cands[0]

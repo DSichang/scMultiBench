@@ -4,7 +4,7 @@
   (about 1,700 characters); it lists the rows the folder can feed and counts
   the rest.
 - rescore with a batch that has one value among a method's cells said "Pass
-  batch=" although a batch was passed; it names the cause.
+  batch=" as if none was passed; evaluate now gets that batch and names the cause.
 - bubble(methods=[...]) with package methods absent from the table said "Did
   you mean Matilda and totalVI?" for Matilda and totalVI.
 """
@@ -40,9 +40,7 @@ def test_one_batch_value_names_the_cause():
     names, val, spread = workflow._evaluate_best_order(
         emb, "cross", cands, metrics=["iLISI"], user_batch=True, batch_given=True)
     assert val is None
-    assert spread[0]["error"] == (
-        "ValueError: The batch has one value among the 50 cells this method embedded, "
-        "so the batch metrics cannot be computed. Pass a batch that splits these cells.")
+    assert "every cell is in one batch" in spread[0]["error"]
 
 
 def test_bubble_does_not_suggest_the_name_it_was_given():
