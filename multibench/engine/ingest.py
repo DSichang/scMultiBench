@@ -18,16 +18,12 @@ import numpy as np
 from .. import _text
 
 from .._settings import config
-from .registry import ATAC_VALUES as _ATAC_KINDS, MODALITY_ALIASES, check_category
+from .registry import ATAC_VALUES as _ATAC_KINDS, check_category
 
 # peak ids come as chr_start_end, chr-start-end or chr:start-end; Signac needs the last
 _PEAK_RE = re.compile(r"^(.+?)[-_:](\d+)[-_](\d+)$")
 
-# the file names are the ones resolve._ROLE_FILE_CANDIDATES looks up
-_MODALITIES = ("rna", "adt", "atac", "atac_peak", "atac_gas")
-_MOD_FILE = {"rna": "rna.h5", "adt": "adt.h5", "atac": "atac.h5",
-             "atac_peak": "atac_peak.h5", "atac_gas": "atac_gas.h5"}
-#: :func:`to_canonical` warns when ``matrix/data`` (stored dense, features x
+#: :func:`export_dataset` warns when ``matrix/data`` (stored dense, features x
 #: cells) would exceed this many bytes uncompressed on disk.
 DENSE_WARN_BYTES = 10 ** 9
 #: Roles whose matrix must hold raw counts. Gene-activity scores (atac_gas)
@@ -96,24 +92,18 @@ def _counts_of_object_advice(what: str, spec) -> str | None:
     return f"Pass the raw counts as {what}=."
 
 
-def _raw_count_hint(arg: str, spec, *, to_canonical: bool = False):
+def _raw_count_hint(arg: str, spec):
     """``(hint, how)`` of :func:`_warn_not_counts`: the selector of the raw
-    counts of the matrix ``spec`` reads, else a sentence. With
-    ``to_canonical``, ``spec`` is the ``obsm=`` key and ``arg`` the modality.
-    A matrix in ``obsm`` has no layer, so its counts are named as an
-    ``obsm`` entry (``protein_counts`` for the ADT)."""
-    if to_canonical:
-        key, pre, var_filter = spec, "", None
-        shown = lambda k: f"obsm='{k}'"     # noqa: E731
-        layer = "layer='counts'"
-    else:
-        mod, base, var_filter = _parse_selector(spec if isinstance(spec, str) else "")
-        pre = f"mod:{mod}." if mod else ""
-        key = base[5:] if base.startswith("obsm:") else None
-        shown = lambda k: f"{arg}='{pre}obsm:{k}'"
-        counts = f"{pre}layer:counts" + (f"[{var_filter[0]}={var_filter[1]}]"
-                                         if var_filter else "")
-        layer = f"{arg}='{counts}'"
+    counts of the matrix ``spec`` reads, else a sentence. A matrix in
+    ``obsm`` has no layer, so its counts are named as an ``obsm`` entry
+    (``protein_counts`` for the ADT)."""
+    mod, base, var_filter = _parse_selector(spec if isinstance(spec, str) else "")
+    pre = f"mod:{mod}." if mod else ""
+    key = base[5:] if base.startswith("obsm:") else None
+    shown = lambda k: f"{arg}='{pre}obsm:{k}'"     # noqa: E731
+    counts = f"{pre}layer:counts" + (f"[{var_filter[0]}={var_filter[1]}]"
+                                     if var_filter else "")
+    layer = f"{arg}='{counts}'"
     if key is None:
         return layer, None
     if arg == "adt" and key != "protein_counts":
@@ -202,35 +192,6 @@ def _cell_order(names, ref):
     return ("other" if judged else "unknown"), None
 
 
-def _follow_peak_order(out: Path, X, bars):
-    """``(X, bars)`` of a gene-activity matrix in the cell order of the
-    ``atac_peak.h5`` next to ``out``, which ``atac_cty.csv`` follows; other
-    cells warn."""
-    import scipy.sparse as sp
-
-    folder = Path(out).parent
-    peak = folder / "atac_peak.h5"
-    if Path(out).name == peak.name or not _is_canonical_h5(peak):
-        return X, bars
-    with h5py.File(peak, "r") as f:
-        ref = _strings(f["matrix/barcodes"][:]) if "matrix/barcodes" in f else None
-    if ref is None:
-        return X, bars
-    kind, idx = _cell_order(bars, ref)
-    if kind == "order":
-        X = X.tocsr()[idx] if sp.issparse(X) else np.asarray(X)[idx]
-        bars = [bars[i] for i in idx]
-        print(f"to_canonical: wrote the rows of {Path(out).name} in the cell order of "
-              f"{peak}, which atac_cty.csv follows", file=sys.stderr, flush=True)
-    elif kind == "other":
-        shared = len(set(bars) & set(ref))
-        _text.warn(
-            f"{Path(out).name} holds different cells than {peak} ({len(bars):,} and "
-            f"{len(ref):,}, {shared:,} shared). Diagonal methods need gene activity for "
-            f"the ATAC cells of atac_peak.h5.", UserWarning)
-    return X, bars
-
-
 def _split_var_filter(spec: str):
     """``'X[feature_types=Peaks]'`` -> ``('X', ('feature_types', 'Peaks'))``;
     a selector without a filter -> ``(spec, None)``."""
@@ -266,14 +227,6 @@ def _filter_var(adata, var_filter, *, what, spec):
     return adata[:, mask]
 
 
-def _atac_filename(modality: str, category: str | None) -> str:
-    """On-disk name of a modality file: every vertical variant reads its ATAC,
-    of either representation, from ``atac.h5``."""
-    if category == "vertical" and modality in ("atac", "atac_peak", "atac_gas"):
-        return "atac.h5"
-    return _MOD_FILE[modality]
-
-
 def _is_canonical_h5(path: Path) -> bool:
     """``matrix/data`` is a 2-D dataset; a 10x Genomics ``.h5`` has a 1-D one."""
     try:
@@ -297,12 +250,6 @@ def _tenx_message(path) -> str:
     return f'{path} is a 10x Genomics file. See the recipe "A 10x .h5 file" in the docs.'
 
 
-#: the error for a ``.loom`` input without loompy
-_LOOM_MISSING = ("reading .loom requires the optional 'loompy' package "
-                "(pip install 'multibench-sc[loom]' or pip install loompy); "
-                "alternatively convert the input to .h5ad/.csv first.")
-
-
 def _strings(raw) -> list[str]:
     """The names an h5 string dataset holds, as ``str``."""
     return [x.decode() if isinstance(x, bytes) else str(x) for x in raw]
@@ -313,82 +260,15 @@ def _is_mudata(obj) -> bool:
     return isinstance(getattr(obj, "mod", None), dict) and type(obj).__name__ == "MuData"
 
 
-def _to_anndata(src):
-    """Load ``src`` into an AnnData (a MuData for ``.h5mu``); an in-memory
-    object is returned as is."""
-    import anndata as ad
-    import pandas as pd
-
-    if hasattr(src, "X") and hasattr(src, "obs"):
-        return src
-    p = Path(src)
-    if not p.exists():
-        # h5py's own error neither reads like a missing file nor names the cwd
-        raise FileNotFoundError(
-            f"input file does not exist: {p} (cwd {os.getcwd()})")
-    suffix = p.suffix.lower()
-    if suffix == ".h5":
-        # to_canonical returns a canonical .h5 before this: say what the file holds
-        try:
-            with h5py.File(p, "r") as f:
-                keys = sorted(f.keys())
-                d = f.get("matrix/data")
-                flat = d is not None and not (isinstance(d, h5py.Dataset) and d.ndim == 2)
-        except OSError as exc:
-            raise ValueError(f"{p} is not a readable HDF5 file: {exc}") from exc
-        if _is_tenx_h5(p):
-            raise ValueError(_tenx_message(p))
-        raise ValueError(
-            f"{p} has no {'2-D ' if flat else ''}dataset 'matrix/data'; found keys {keys} "
-            f"- a canonical input .h5 holds matrix/data (features x cells), "
-            f"matrix/features and matrix/barcodes"
-            + (" (a top-level 'data' dataset is a method output such as "
-               "out/<method>/embedding.h5, which mtb.evaluate reads)" if "data" in keys else "")
-            + "; pass an AnnData / .h5ad / .csv to convert instead")
-    if suffix == ".h5ad":
-        from ..eval.io import _read_h5ad
-        return _read_h5ad(p, "input file")
-    if suffix == ".h5mu":
-        try:
-            import mudata
-        except ModuleNotFoundError as exc:
-            raise ImportError(
-                "reading .h5mu requires the optional 'mudata' package "
-                "(pip install mudata); alternatively pass the modality's "
-                ".h5ad / AnnData directly."
-            ) from exc
-        return mudata.read_h5mu(p)
-    if suffix in (".csv", ".tsv"):
-        sep = "," if suffix == ".csv" else "\t"
-        df = pd.read_csv(p, sep=sep)
-        # a leading non-numeric column holds the cell barcodes
-        if df.shape[1] > 1 and not pd.api.types.is_numeric_dtype(df.iloc[:, 0]):
-            df = df.set_index(df.columns[0])
-        a = ad.AnnData(df.to_numpy(dtype=float))
-        a.obs_names = [str(x) for x in df.index]
-        a.var_names = [str(c) for c in df.columns]
-        return a
-    if suffix == ".loom":
-        try:
-            import loompy  # noqa: F401  (anndata.read_loom needs it)
-        except ModuleNotFoundError as exc:
-            raise ImportError(_LOOM_MISSING) from exc
-        return ad.read_loom(p)
-    raise ValueError(f"unsupported input format: {p.name}")
-
-
-def _norm_modality(modality):
-    """Resolve aliases and validate; ``None`` passes through."""
-    if modality is None:
-        return None
-    m = MODALITY_ALIASES.get(str(modality), str(modality))
-    if m not in _MODALITIES:
-        alias = {m: [a for a, t in MODALITY_ALIASES.items() if t == m] for m in _MODALITIES}
-        valid = [m + (f" (or {', '.join(alias[m])})" if alias[m] else "")
-                 for m in _MODALITIES]
-        raise ValueError(f"Unknown modality {modality}. The modalities are "
-                         f"{_text._and_list(valid)}.")
-    return m
+def _check_canonical(path) -> None:
+    """``ValueError`` unless ``path`` is a canonical ``.h5``."""
+    p = Path(path)
+    if _is_canonical_h5(p):
+        return
+    if _is_tenx_h5(p):
+        raise ValueError(_tenx_message(p))
+    raise ValueError(f"{p} is not a canonical .h5: it has no 2-D matrix/data (features x "
+                     f"cells). Write the folder with mtb.io.export_dataset.")
 
 
 def _no_names_message(what: str, source: str, n_feat: int, fix: str) -> str:
@@ -545,16 +425,6 @@ def _adt_obsm_keys(adata) -> list:
     return [k for k in getattr(adata, "obsm", {}) if not str(k).startswith("X_")]
 
 
-def _layout_family(name: str) -> str | None:
-    """``'rna'``, ``'adt'`` or ``'atac'`` for a matrix file name of the
-    dataset layout (``rna2.h5``, ``atac_peak.h5``), else ``None``."""
-    from .resolve import _LAYOUT_FILE_RE
-    m = _LAYOUT_FILE_RE.match(name)
-    if not m or m.group(1) is None:
-        return None
-    return "atac" if name.startswith("atac") else name[:3]
-
-
 def _warn_dense_size(out: Path, n_feat: int, n_cell: int, dtype) -> None:
     """Warn when the dense ``matrix/data`` exceeds :data:`DENSE_WARN_BYTES`:
     every reader densifies it, however well gzip shrinks the file."""
@@ -657,68 +527,6 @@ def _write_canonical(out: Path, X, feats, bars, *, dtype, compression, block):
         f.create_dataset("matrix/features", data=np.array(feats, dtype="S"))
         f.create_dataset("matrix/barcodes", data=np.array(bars, dtype="S"))
     return out
-
-
-def _to_canonical(src, out: Path | str | None = None, modality: str | None = None, *,
-                  layer: str | None = None, obsm: str | None = None,
-                  dtype: str = "float64", category: str | None = None,
-                  feature_names: list | None = None) -> Path:
-    """Convert one matrix to a canonical ``.h5`` (``matrix/data`` features x
-    cells, ``matrix/features``, ``matrix/barcodes``) and return its path; a
-    canonical ``.h5`` is returned untouched. ``out`` is a file, or a directory
-    that gets the ``modality`` filename. The inputs ``mtb.run`` converts
-    before a method runs go through here."""
-    if isinstance(src, (str, Path)) and _is_canonical_h5(Path(src)):
-        return Path(src)
-    if isinstance(src, (str, Path)) and Path(src).suffix.lower() == ".h5" \
-            and _is_tenx_h5(Path(src)):
-        # before the checks of the other arguments, which would ask for an out path
-        raise ValueError(_tenx_message(Path(src)))
-    modality = _norm_modality(modality)
-    category = check_category(category)
-    if out is None:
-        if modality is None:
-            raise ValueError("out path required to write a canonical .h5 "
-                             "(or pass modality= to use the canonical filename)")
-        out = Path(".") / _atac_filename(modality, category)
-    else:
-        is_dir_like = Path(out).is_dir() or str(out).endswith(("/", os.sep))
-        out = Path(out)
-        if modality is not None and is_dir_like:
-            out = out / _atac_filename(modality, category)
-
-    adata = _to_anndata(src)
-    if _is_mudata(adata):
-        first = next(iter(adata.mod), "rna")
-        raise ValueError(
-            f"A MuData holds the modalities {list(adata.mod)}: pass one, "
-            f"e.g. mdata[{first!r}].")
-
-    if modality == "adt" and obsm is None and layer is None and _adt_obsm_keys(adata):
-        raise ValueError(
-            f"adt requested but obsm= not given; found obsm keys {list(adata.obsm)} - "
-            "pass obsm='<key>' (or layer=) to select the protein matrix, otherwise "
-            "adata.X (usually the RNA) would be written as adt.h5")
-
-    # without modality=, the file name (mtb.run writes inputs/<role>.h5) names it
-    X, feats = _pick_matrix(adata, layer=layer, obsm=obsm,
-                            feature_names=feature_names, what=modality,
-                            names_arg="feature_names",
-                            role=modality or _layout_family(out.name))
-    if feats is not None and len(feats) == 0:
-        raise ValueError(_no_features_message(
-            len(adata.obs_names), typed=obsm is None and _has_feature_types(adata, None)))
-    bars = [str(v) for v in adata.obs_names]
-    _check_peak_names(modality, feats)
-    if modality in _COUNT_ROLES:
-        hint, how = _raw_count_hint(modality, obsm, to_canonical=True)
-        _warn_not_counts(X, modality, hint, how=how)
-    if modality == "atac_gas" and category in (None, "diagonal"):
-        X, bars = _follow_peak_order(out, X, bars)
-    if getattr(X, "ndim", 0) == 2:      # X=None: _write_canonical raises
-        _warn_dense_size(out, X.shape[1], X.shape[0], dtype)
-    return _write_canonical(out, X, feats, bars, dtype=dtype, compression="gzip",
-                            block=1024)
 
 
 def read(path: Path | str):

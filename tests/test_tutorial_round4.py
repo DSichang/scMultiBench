@@ -178,9 +178,10 @@ def test_a_dry_run_command_alone_can_fail():
     """The package fact behind both rewrites: for a method that reads a file
     ``mtb.run`` writes first, the dry-run note says the command alone fails."""
     from multibench.engine import runner as R
-    plan = {"rna": {"value": "/o/inputs/rna.h5", "convert": True, "normpeaks_from": None}}
+    plan = {"atac_peak": {"value": "/o/inputs/atac_peak_normpeaks.h5",
+                          "normpeaks_from": "/d/atac_peak.h5"}}
     note = R._prepared_note(plan, "/o", "X")
-    assert note.startswith("X reads inputs/rna.h5.")
+    assert note.startswith("X reads inputs/atac_peak_normpeaks.h5.")
     assert "The printed command alone fails in a job script." in note
 
 

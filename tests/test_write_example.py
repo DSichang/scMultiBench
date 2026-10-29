@@ -134,7 +134,7 @@ def _canonical(path, n_cells, feats, seed=0):
     rng = np.random.default_rng(seed)
     a = ad.AnnData(rng.poisson(1.0, (n_cells, len(feats))).astype(float))
     a.var_names, a.obs_names = feats, [f"cell{i}-1" for i in range(n_cells)]
-    ingest._to_canonical(a, path)
+    ingest._write_canonical(path, a.X, list(a.var_names), list(a.obs_names), dtype="float64", compression=None, block=1024)
 
 
 @pytest.fixture

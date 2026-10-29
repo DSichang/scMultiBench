@@ -3,9 +3,8 @@
 A 10x Genomics file read with ``gex_only=False`` holds genes and peaks (or
 genes and antibodies) in one ``X``, told apart by ``var['feature_types']``.
 0.3.4 wrote such an ``X`` as ``rna.h5`` when no filter was given, and
-``scan`` reported the folder as complete. ``export_dataset``,
-``to_canonical`` and the conversion inside ``mtb.run`` now raise, and the
-10x ``.h5`` file itself is named as what it is instead of being taken for a
+``scan`` reported the folder as complete. ``export_dataset`` now raises,
+and the 10x ``.h5`` file itself is named as what it is instead of being taken for a
 dataset file.
 """
 import re
@@ -203,12 +202,10 @@ def test_calls_that_pass(tmp_path):
     ingest.export_dataset(plain, tmp_path / "ONE", rna="X")
     del plain.var["feature_types"]
     ingest.export_dataset(plain, tmp_path / "NONE", rna="X")
-    ingest._to_canonical(genes, tmp_path / 'rna.h5', modality='rna')
     # an obsm matrix has no var axis, so the column says nothing about it
     arc.obsm["protein"] = pd.DataFrame(np.ones((arc.n_obs, 3)), index=arc.obs_names,
                                        columns=["CD3", "CD4", "CD8"])
     ingest.export_dataset(arc, tmp_path / "OBSM", rna=None, adt="obsm:protein")
-    ingest._to_canonical(arc, tmp_path / 'adt.h5', modality='adt', obsm='protein')
 
 
 def test_a_missing_type_is_a_type(tmp_path):
@@ -219,67 +216,24 @@ def test_a_missing_type_is_a_type(tmp_path):
                    "filter, as rna='X[feature_types=Gene Expression]'.")
 
 
-# ------------------------------------------------- F3: to_canonical and mtb.run
-def _f3(example):
-    return (f"The matrix holds {HEAD} Pass one type, as adata[:, "
-            f"adata.var['feature_types'] == {example!r}].")
-
-
-F3 = _f3("Gene Expression")
-
-
-def test_to_canonical(tmp_path):
-    arc = _arc()
-    for kw in (dict(modality="rna"), dict(modality="rna", layer="counts")):
-        with pytest.raises(ValueError) as e:
-            ingest._to_canonical(arc, f'{tmp_path}/DIR/', **kw)
-        assert str(e.value) == F3
-    assert not (tmp_path / "DIR").exists()
-    # the file name says the modality when modality= does not
-    with pytest.raises(ValueError) as e:
-        ingest._to_canonical(arc, tmp_path / 'DIR' / 'rna2.h5')
-    assert str(e.value) == F3
-    with pytest.raises(ValueError) as e:
-        ingest._to_canonical(arc, tmp_path / 'DIR' / 'atac_peak.h5')
-    assert str(e.value) == _f3("Peaks")
-    # neither: no type is offered
-    with pytest.raises(ValueError) as e:
-        ingest._to_canonical(arc, tmp_path / 'DIR' / 'matrix.h5')
-    assert str(e.value) == _f3("<type>")
-    assert not (tmp_path / "DIR").exists()
-
-
 def test_other_h5_files_keep_their_message(tmp_path):
-    """Not canonical and not 10x: the keys are listed, as before."""
+    """Not canonical and not 10x: the file is named, and what it lacks."""
     p = tmp_path / "embedding.h5"
     with h5py.File(p, "w") as f:
         f.create_dataset("data", data=np.zeros((3, 4)))
-    with pytest.raises(ValueError) as e:
-        ingest._to_canonical(p, tmp_path / 'x.h5')
-    assert str(e.value) == (
-        f"{p} has no dataset 'matrix/data'; found keys ['data'] - a canonical input .h5 "
-        f"holds matrix/data (features x cells), matrix/features and matrix/barcodes (a "
-        f"top-level 'data' dataset is a method output such as out/<method>/embedding.h5, "
-        f"which mtb.evaluate reads); pass an AnnData / .h5ad / .csv to convert instead")
-    # a matrix group whose data is not a dataset is no dataset file either
     q = tmp_path / "group.h5"
     with h5py.File(q, "w") as f:
         f.create_group("matrix/data")
-    assert ingest._is_canonical_h5(q) is False
-    # nor is one whose matrix/data has one dimension and no indptr next to
-    # it. The message says what is missed: matrix/data is there
     r = tmp_path / "flat.h5"
     with h5py.File(r, "w") as f:
         f.create_dataset("matrix/data", data=np.ones(4))
-    assert ingest._is_canonical_h5(r) is False
-    for path in (q, r):
+    for path in (p, q, r):
+        assert ingest._is_canonical_h5(path) is False
         with pytest.raises(ValueError) as e:
-            ingest._to_canonical(path, tmp_path / 'OUT' / 'rna.h5', modality='rna')
+            ingest._check_canonical(path)
         assert str(e.value) == (
-            f"{path} has no 2-D dataset 'matrix/data'; found keys ['matrix'] - a canonical "
-            f"input .h5 holds matrix/data (features x cells), matrix/features and "
-            f"matrix/barcodes; pass an AnnData / .h5ad / .csv to convert instead")
-    assert not (tmp_path / "OUT").exists()
+            f"{path} is not a canonical .h5: it has no 2-D matrix/data (features x cells). "
+            f"Write the folder with mtb.io.export_dataset.")
 
 
 def _demo_h5_files():
@@ -291,17 +245,16 @@ def _demo_h5_files():
 
 def test_canonical_files_still_pass(tmp_path):
     """Every .h5 of the demo datasets on disk is a dataset file as before, and
-    so is what to_canonical writes."""
+    so is what export_dataset writes."""
     files = _demo_h5_files()
     if not files:
         pytest.skip("no demo dataset on disk")
     not_canonical = [str(p) for p in files if not ingest._is_canonical_h5(p)]
     assert not not_canonical
     for p in files[:3]:
-        assert ingest._to_canonical(p, tmp_path / 'copy.h5') == p         # passed through
-    assert not (tmp_path / "copy.h5").exists()
-    made = ingest._to_canonical(_mixed([('Gene Expression', 5, 'G')]), tmp_path / 'rna.h5')
-    assert ingest._is_canonical_h5(made) and ingest._to_canonical(made) == made
+        ingest._check_canonical(p)
+    made = ingest.export_dataset(_mixed([('Gene Expression', 5, 'G')]), tmp_path / "M")
+    ingest._check_canonical(made / "rna.h5")
 
 
 def test_the_10x_names_leave_out_the_advice_to_delete_the_column(tmp_path, capsys):
@@ -312,9 +265,6 @@ def test_the_10x_names_leave_out_the_advice_to_delete_the_column(tmp_path, capsy
     src = tmp_path / 'arc.h5ad'
     arc.write_h5ad(src)
     texts = [_raises(tmp_path, arc, rna='X'), _raises(tmp_path, arc, rna='X[genome=GRCh38]'), _raises(tmp_path, None, rna=arc), _raises(tmp_path, cite, rna='X'), _raises(tmp_path, cite, rna=None, adt='X')]
-    with pytest.raises(ValueError) as e:
-        ingest._to_canonical(arc, tmp_path / 'DIR' / 'rna.h5')
-    texts.append(str(e.value))
     for text in texts:
         assert 'delete' not in text and 'If all of them' not in text
     mixed = _mixed([('Gene Expression', 30, 'GENE'), ('lncRNA', 50, 'LNC')])
@@ -330,12 +280,6 @@ def test_other_type_names_get_the_advice_to_delete_the_column(tmp_path, capsys):
     head = "features of 2 types, 'lncRNA' and 'protein_coding'."
     texts = [_raises(tmp_path, a, rna='X'), _raises(tmp_path, a, rna='X[genome=GRCh38]'), _raises(tmp_path, None, rna=a), _raises(tmp_path, _mixed([('Gene Expression', 5, 'G')]), adt=a), _raises(tmp_path, _mixed([('Gene Expression', 5, 'G')]), atac=a, atac_kind='gene_activity')]
     assert texts == [f"rna='X' selects {head} If all are RNA features, {DELETE}", f"rna='X[genome=GRCh38]' holds {head} If all are RNA features, {DELETE}", f"rna=AnnData holds {head} If all are RNA features, run del rna.var['feature_types'] first.", f"adt=AnnData holds {head} If all are ADT features, run del adt.var['feature_types'] first.", f"atac=AnnData holds {head} If all are ATAC features, run del atac.var['feature_types'] first."]
-    with pytest.raises(ValueError) as e:
-        ingest._to_canonical(a, tmp_path / 'DIR' / 'rna.h5')
-    assert str(e.value) == f'The matrix holds {head} If all are RNA features, {DELETE}'
-    with pytest.raises(ValueError) as e:
-        ingest._to_canonical(a, tmp_path / 'DIR' / 'matrix.h5')
-    assert str(e.value) == f'The matrix holds {head} If all are features of one modality, {DELETE}'
     src = tmp_path / 'typed.h5ad'
     a.write_h5ad(src)
     saved = 'delete the var column feature_types in Python and save the file again.'

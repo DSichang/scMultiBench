@@ -138,7 +138,7 @@ def wrap_prefix(cmd: list[str], env: str, prefix: Path | str) -> list[str]:
     return ["bash", "-c", f"{prefix_activation(env, prefix)}; exec \"$@\"", "--", *cmd]
 
 
-# roles passed through as given: never converted, never select the variant
+# roles passed through as given: never checked as .h5, never select the variant
 _AUX_ROLES = {"data_dir", "source_data", "target_data", "cty", "source_cty", "target_cty",
               "out_dir"}
 
@@ -171,7 +171,7 @@ def normalize_paths(inputs: dict, out_dir) -> tuple[dict, str]:
 
 
 def _is_modality_role(role: str) -> bool:
-    """A role that selects the variant and is converted to a canonical ``.h5``."""
+    """A role that selects the variant and must be a canonical ``.h5``."""
     return role not in _AUX_ROLES and not is_label_role(role)
 
 
@@ -304,107 +304,31 @@ def script_notes(spec, variant, repo: Path) -> list[str]:
     return notes
 
 
-def _convert_kw(role: str) -> dict:
-    """The keywords the conversion of ``role`` passes ``ingest._to_canonical``.
-
-    Only the ATAC roles pass a modality hint (for the peak-name warning):
-    ``modality='adt'`` would refuse an AnnData that has obsm keys.
-    """
-    hint = role.rstrip("0123456789")
-    return {"modality": hint} if hint in ("atac_gas", "atac_peak") else {}
-
-
-def _h5ad_var(path):
-    """``var`` of an ``.h5ad`` file alone (``read_h5ad`` loads every layer,
-    even backed), or ``None``; the conversion then says what is wrong."""
-    import h5py
-    try:
-        try:
-            from anndata.io import read_elem
-        except ImportError:                 # anndata < 0.11
-            from anndata.experimental import read_elem
-        with h5py.File(path, "r") as f:
-            var = read_elem(f["var"])
-    except (ImportError, OSError, KeyError):
-        return None
-    return var if hasattr(var, "columns") else None
-
-
-def _check_feature_types(role: str, var) -> None:
-    """The conversion's one-feature-type check, on the ``var`` table alone."""
-    from types import SimpleNamespace
-    ingest._check_one_feature_type(
-        SimpleNamespace(var=var), arg=None, spec=None,
-        role=_convert_kw(role).get("modality") or ingest._layout_family(f"{role}.h5"))
-
-
-def _check_input(role: str, val, *, real: bool) -> str:
-    """``"pass"`` for a canonical ``.h5``, else ``"convert"``; raises the error
-    the conversion would raise, without reading the matrix.
-
-    A missing path raises ``FileNotFoundError`` when ``real``; a preview may
-    name the files of another host.
-    """
+def _check_input(role: str, val, *, real: bool) -> None:
+    """Refuse a modality input that is not a canonical ``.h5`` file. A missing
+    path raises ``FileNotFoundError`` when ``real``; a preview may name the
+    files of another host."""
     if not isinstance(val, (str, os.PathLike)):
-        if ingest._is_mudata(val):
-            mods = list(getattr(val, "mod", {}) or {})
-            raise ValueError(
-                f"inputs[{role!r}] is a MuData; pass one modality, e.g. "
-                f"inputs={{{role!r}: mdata.mod[{(mods or [role])[0]!r}]}} (modalities: "
-                f"{mods}), or write a dataset folder with mtb.io.export_dataset")
-        if hasattr(val, "X") and hasattr(val, "obs"):
-            _check_feature_types(role, getattr(val, "var", None))
-            return "convert"
-        raise TypeError(f"inputs[{role!r}] must be a file path or an AnnData, "
-                        f"got {type(val).__name__}")
+        raise TypeError(f"inputs[{role!r}] must be a file path, got {type(val).__name__}")
     path = Path(val)
-    suffix = path.suffix.lower()
-    if suffix == ".h5mu":
-        raise ValueError(
-            f"inputs[{role!r}] is a MuData file ({path.name}); pass one modality as an "
-            f".h5ad or AnnData (mdata.mod[{role!r}]), or write a dataset folder with "
-            f"mtb.io.export_dataset")
     if not path.exists():
         if real:
             raise FileNotFoundError(f"input file does not exist: {path} (cwd {os.getcwd()})")
-        return "pass" if suffix == ".h5" else "convert"
-    if suffix == ".h5":
-        if ingest._is_canonical_h5(path):
-            return "pass"
-        ingest._to_anndata(path)          # raises the "no dataset 'matrix/data'" error
-    if suffix == ".h5ad":
-        _check_feature_types(role, _h5ad_var(path))
-    if suffix in (".h5ad", ".csv", ".tsv"):
-        return "convert"
-    if suffix == ".loom":
-        import importlib.util
-        if importlib.util.find_spec("loompy") is None:
-            raise ImportError(ingest._LOOM_MISSING)
-        return "convert"
-    raise ValueError(f"unsupported input format: {path.name}")
+        return
+    ingest._check_canonical(path)
 
 
-def _plan_inputs(variant, inputs: dict, inputs_dir: Path, *, convert: bool,
-                 real: bool) -> dict:
-    """``{role: {"value", "src", "convert", "normpeaks_from"}}``: the file each
-    role hands the script and how it gets there, for the run and scan.
-
-    A canonical ``.h5`` passes as is, anything else becomes
-    ``inputs/<role>.h5``, a ``normalize_peaks`` role
+def _plan_inputs(variant, inputs: dict, inputs_dir: Path, *, real: bool) -> dict:
+    """``{role: {"value", "normpeaks_from"}}``: the file each role hands the
+    script, for the run and scan. A ``normalize_peaks`` role reads
     ``inputs/<role>_normpeaks.h5``. Nothing is written; the format checks run.
     """
     plan: dict = {}
     for role, val in inputs.items():
-        step = {"value": val, "src": val, "convert": False, "normpeaks_from": None}
+        step = {"value": val, "normpeaks_from": None}
         if _is_modality_role(role):
-            if convert:
-                if _check_input(role, val, real=real) == "convert":
-                    step["value"], step["convert"] = str(inputs_dir / f"{role}.h5"), True
-                else:
-                    step["value"] = str(val)
-            elif not isinstance(val, (str, os.PathLike)):
-                raise ValueError(f"convert=False needs file paths; inputs[{role!r}] is "
-                                 f"a {type(val).__name__}")
+            _check_input(role, val, real=real)
+            step["value"] = str(val)
         plan[role] = step
     for role in variant.normalize_peaks:
         if role in plan:
@@ -632,7 +556,7 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
         Integration category of the variant: ``vertical``, ``diagonal``,
         ``mosaic`` or ``cross``.
     inputs : dict
-        ``{role: path or AnnData}``, from ``resolve.inputs_for``; its
+        ``{role: path}``, from ``resolve.inputs_for``; its
         modality roles select the variant.
     out_dir : str
         Folder the method writes into; created if missing.
@@ -652,7 +576,7 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
         Unknown method, no variant fits ``category`` and the input roles, or
         a ``params`` key the variant does not accept.
     ValueError
-        An input the run cannot convert, such as an ``.h5mu`` file or a MuData.
+        A modality input that is not a canonical ``.h5`` file.
     ValueError
         Input files that must hold the same cells, in one order, do not.
     ValueError
@@ -694,7 +618,7 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     out = Path(out_str)
     inputs_dir = out / "inputs"
     # every input-format check before anything is written or fetched
-    plan = _plan_inputs(variant, inputs, inputs_dir, convert=True, real=True)
+    plan = _plan_inputs(variant, inputs, inputs_dir, real=True)
     repo = _fetch_scripts()
     provide_script_files(spec, variant, repo)
     out.mkdir(parents=True, exist_ok=True)
@@ -703,9 +627,6 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
 
     values: dict = {}
     for role, step in plan.items():
-        if step["convert"]:
-            ingest._to_canonical(step["src"], out=inputs_dir / f"{role}.h5",
-                                **_convert_kw(role))
         if step["normpeaks_from"] is not None:
             ingest._normalize_peak_names(step["normpeaks_from"], step["value"])
         values[role] = step["value"]
@@ -781,7 +702,7 @@ def _execute(method: str, cmd: list[str], cwd: str, run_env: dict | None) -> tup
 
 
 def preview(method: str, category: str, *, inputs: dict, out_dir, params=None,
-            convert: bool = True, repo_path=None,
+            repo_path=None,
             gpu: bool | None = None) -> tuple[list[str], list[str]]:
     """``(argv, notes)`` a run would execute and show, for ``mtb.scan``;
     nothing is written, fetched or launched.
@@ -795,8 +716,7 @@ def preview(method: str, category: str, *, inputs: dict, out_dir, params=None,
     check_params(method, variant, params)            # as the run checks them
     params, _ = cpu_params_for(spec, params, gpu=gpu)
     values, out_str = normalize_paths(inputs, out_dir)
-    plan = _plan_inputs(variant, values, Path(out_str) / "inputs", convert=convert,
-                        real=False)
+    plan = _plan_inputs(variant, values, Path(out_str) / "inputs", real=False)
     values = {role: step["value"] for role, step in plan.items()}
     repo = Path(repo_path) if repo_path else _repo_root_no_fetch()
     argv = _argv(variant, method, values, out_str, repo, params)
@@ -822,9 +742,9 @@ def _prepared_at(text) -> int:
 
 def _prepared_note(plan: dict, out_str: str, method: str) -> str | None:
     """The note for a command that reads files :func:`run` writes first
-    (converted inputs, renamed peak files), or ``None``."""
+    (renamed peak files), or ``None``."""
     files = [os.path.relpath(step["value"], out_str) for step in plan.values()
-             if step["convert"] or step["normpeaks_from"]]
+             if step["normpeaks_from"]]
     if not files:
         return None
     that = "that file" if len(files) == 1 else "those files"

@@ -118,13 +118,6 @@ def _names_warning(fn, *args, **kw):
     return [str(w.message) for w in rec if "feature names" in str(w.message)]
 
 
-def test_missing_feature_names_of_to_canonical_name_its_argument(tmp_path):
-    msgs = _names_warning(ingest._to_canonical, _citeseq(), tmp_path / "adt.h5",
-                          modality="adt", obsm="protein")
-    assert len(msgs) == 1 and "Pass feature_names=, store obsm['protein'] as a " \
-        "DataFrame" in msgs[0], msgs
-
-
 def test_missing_feature_names_of_a_bare_array(tmp_path):
     a = _citeseq()
     msgs = _names_warning(ingest.export_dataset, a, tmp_path / "ARR", rna="X",

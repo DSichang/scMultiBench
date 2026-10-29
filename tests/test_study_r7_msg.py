@@ -162,8 +162,6 @@ def test_raw_counts_warning_of_an_anndata_export(tmp_path):
                    "The methods normalise raw counts themselves. Export raw counts, for "
                    "example with rna='layer:counts'.")
     assert "(log-normalised?)" not in msg and "e.g." not in msg and "MuData" not in msg
-    (msg,) = _count_warnings(ingest._to_canonical, a, tmp_path / "x.h5", modality="rna")
-    assert msg.endswith("Export raw counts, for example with layer='counts'.")
 
 
 def test_raw_counts_warning_names_the_mudata_form_for_a_mudata_selector(tmp_path):

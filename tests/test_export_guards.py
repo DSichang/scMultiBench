@@ -117,9 +117,6 @@ def test_an_object_without_feature_types_keeps_the_advice_for_a_10x_file(tmp_pat
     none = rna[:, :0].copy()
     assert _value_error(tmp_path, rna, rna="X", atac=none, atac_kind="peak") \
         == NO_FEATURES.format(what="atac ") + WHY
-    with pytest.raises(ValueError) as e:
-        ingest._to_canonical(none, tmp_path / 'OUT' / 'atac_peak.h5')
-    assert str(e.value) == NO_FEATURES.format(what="") + WHY
     # a matrix in obsm has no var: the column of the object says nothing about it
     rna.var["feature_types"] = "Gene Expression"
     rna.obsm["protein"] = np.zeros((60, 0))
@@ -326,16 +323,6 @@ def test_adt_in_x_next_to_a_protein_matrix(tmp_path):
     assert ingest.read(tmp_path / "X" / "adt.h5").n_vars == 20
 
 
-def test_to_canonical_keeps_its_text_and_ignores_embeddings(tmp_path):
-    a = _cite()
-    a.obsm["X_umap"] = np.zeros((a.n_obs, 2))
-    a.obsm["protein"] = np.ones((a.n_obs, 4))
-    with pytest.raises(ValueError) as e:
-        ingest._to_canonical(a, tmp_path / 'adt.h5', modality='adt')
-    assert str(e.value) == (
-        "adt requested but obsm= not given; found obsm keys ['X_umap', 'protein'] - pass "
-        "obsm='<key>' (or layer=) to select the protein matrix, otherwise adata.X (usually "
-        "the RNA) would be written as adt.h5")
-    assert not (tmp_path / "adt.h5").exists()
+
 
 

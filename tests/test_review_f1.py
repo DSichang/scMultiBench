@@ -137,32 +137,6 @@ def test_batchresult_plot_reads_the_fill_as_scaled_per_column():
     assert "the lightest is the lowest in this figure, not zero." in doc
 
 
-# ------------------------------------------------------------------ .loom extra
-def test_the_loom_hint_names_the_distribution(tmp_path, monkeypatch):
-    import builtins
-    import sys
-    from multibench.engine import ingest
-
-    real_import = builtins.__import__
-
-    def no_loompy(name, *a, **k):
-        if name == "loompy":
-            raise ModuleNotFoundError("No module named 'loompy'")
-        return real_import(name, *a, **k)
-
-    monkeypatch.setitem(sys.modules, "loompy", None)
-    monkeypatch.setattr(builtins, "__import__", no_loompy)
-    (tmp_path / "x.loom").write_bytes(b"")
-    with pytest.raises(ImportError) as ei:
-        ingest._to_canonical(tmp_path / 'x.loom', tmp_path / 'x.h5', modality='rna')
-    assert "pip install 'multibench-sc[loom]'" in str(ei.value)
-    assert "'multibench[loom]'" not in str(ei.value)
-    from multibench.engine import runner
-    monkeypatch.setattr("importlib.util.find_spec", lambda name, *a: None)
-    with pytest.raises(ImportError, match=r"pip install 'multibench-sc\[loom\]'"):
-        runner._check_input("rna", str(tmp_path / "x.loom"), real=False)
-
-
 # ------------------------------------------------------------------ plain vocabulary
 def _contract_objects():
     """The reference objects of the docs (the docstring contract), with the

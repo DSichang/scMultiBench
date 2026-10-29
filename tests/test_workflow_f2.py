@@ -62,8 +62,8 @@ def _mu_tc(root):
     atac.var_names = [f"chr1:{i * 1000}-{i * 1000 + 200}" for i in range(40)]
     d = root / "MU_TC"
     d.mkdir()
-    ingest._to_canonical(rna, d, modality='rna')
-    ingest._to_canonical(atac, d, modality='peak')
+    ingest._write_canonical(d / "rna.h5", rna.X, list(rna.var_names), list(rna.obs_names), dtype="float64", compression=None, block=1024)
+    ingest._write_canonical(d / "atac_peak.h5", atac.X, list(atac.var_names), list(atac.obs_names), dtype="float64", compression=None, block=1024)
     pd.DataFrame({"x": rng.choice(["T", "B"], n)}).to_csv(d / "cty.csv", index=False)
     return d
 

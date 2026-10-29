@@ -1,4 +1,4 @@
-"""to_canonical / export_dataset category= hint (Tomás): modality='peak' wrote
+"""export_dataset category= hint (Tomás): modality='peak' wrote
 atac_peak.h5, which no vertical method resolves."""
 import anndata as ad
 import numpy as np
@@ -21,38 +21,10 @@ def _genes(n_cell=6, n_feat=5):
     return a
 
 
-def test_to_canonical_vertical_writes_atac_h5_for_any_representation(tmp_path):
-    d = tmp_path / "V"; d.mkdir()
-    assert ingest._to_canonical(_peaks(), d, modality='peak', category='vertical').name == "atac.h5"
-    d2 = tmp_path / "V2"; d2.mkdir()
-    assert ingest._to_canonical(_genes(), d2, modality='gas', category='vertical').name == "atac.h5"
-    d3 = tmp_path / "V3"; d3.mkdir()
-    assert ingest._to_canonical(_peaks(), d3, modality='atac', category='vertical').name == "atac.h5"
-    # non-ATAC modalities are untouched by the hint
-    assert ingest._to_canonical(_genes(), d3, modality='rna', category='vertical').name == "rna.h5"
-    # the vertical `atac` role now resolves
-    assert resolve._resolve_role(d, "atac").name == "atac.h5" and (d / "atac.h5").is_file()
-
-
-def test_to_canonical_other_categories_and_none_keep_todays_names(tmp_path):
-    for cat in ("diagonal", "mosaic", "cross", None):
-        d = tmp_path / str(cat); d.mkdir()
-        assert ingest._to_canonical(_peaks(), d, modality='peak', category=cat).name == "atac_peak.h5"
-        assert ingest._to_canonical(_genes(), d, modality='gas', category=cat).name == "atac_gas.h5"
-        assert ingest._to_canonical(_peaks(), d, modality='atac', category=cat).name == "atac.h5"
-    with pytest.raises(ValueError, match="unknown category"):
-        ingest._to_canonical(_peaks(), tmp_path, modality='peak', category='vertcal')
-    # an explicit file path is used verbatim whatever the category
-    out = ingest._to_canonical(_peaks(), tmp_path / 'mine.h5', modality='peak', category='vertical')
-    assert out.name == "mine.h5"
-
-
-def test_to_canonical_peak_vertical_makes_scan_find_a_runnable_layout(tmp_path):
-    d = tmp_path / "TWOADATA"; d.mkdir()
+def test_peak_vertical_makes_scan_find_a_runnable_layout(tmp_path):
     rna = _genes(); rna.obs["ct"] = ["a", "b"] * 3
-    ingest._to_canonical(rna, d, modality='rna')
-    ingest._to_canonical(_peaks(), d, modality='peak', category='vertical')
-    ingest._write_labels(rna.obs["ct"], d / "cty.csv")
+    ingest.export_dataset(None, tmp_path / "TWOADATA", rna=rna, atac=_peaks(),
+                          atac_kind="peak", labels=rna.obs["ct"], category="vertical")
     got = resolve.inputs_for("TWOADATA", "vertical", "Matilda", modalities=["rna", "atac"],
                              data_path=tmp_path, check=True)
     assert got["atac"].endswith("atac.h5")

@@ -212,7 +212,7 @@ def test_dataset_files_keep_passing_the_file_check(ready, tmp_path):
     with h5py.File(tmp_path / "GOOD" / "rna.h5", "a") as f:
         f["matrix/indptr"] = np.arange(3)
     assert ingest._is_tenx_h5(tmp_path / "GOOD" / "rna.h5")
-    assert ingest._to_canonical(tmp_path / 'GOOD' / 'rna.h5') == tmp_path / "GOOD" / "rna.h5"
+    ingest._check_canonical(tmp_path / "GOOD" / "rna.h5")
     df = full_scan("GOOD", "vertical", **kw)
     assert df["files_ok"].all() and list(df["reason"]) == ["", ""]
 

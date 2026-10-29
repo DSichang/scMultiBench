@@ -549,7 +549,7 @@ def test_files_outside_the_layout_are_never_judged(tmp_path):
     (f / "notes.txt").write_text("cells of another experiment\n")
     (f / "scMM_data").mkdir()
     (f / "scMM_data" / "rna.h5").write_bytes(b"not a file of this folder")
-    ingest._to_canonical(ex_atac, f / 'peak.h5')
+    ingest._write_canonical(f / "peak.h5", ex_atac.X, list(ex_atac.var_names), list(ex_atac.obs_names), dtype="float64", compression=None, block=1024)
     (f / "rna7.h5").mkdir()
     (f / "adt.h5").write_bytes(b"not an HDF5 file")
     (f / "atac_cty.csv").write_bytes(b"\x00\xff not a table")

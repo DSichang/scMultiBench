@@ -109,23 +109,20 @@ def test_bare_array_needs_master_and_adt_names_warns(tmp_path):
         ingest.export_dataset(rna, tmp_path / "E", adt="obsm:protein", adt_names=["a", "b"])
 
 
-def test_to_canonical_missing_file_names_path_and_cwd(tmp_path, monkeypatch):
+def test_a_missing_run_input_names_path_and_cwd(tmp_path, monkeypatch):
+    from multibench.engine import runner
     monkeypatch.chdir(tmp_path)
     with pytest.raises(FileNotFoundError) as e:
-        ingest._to_canonical('nothere.h5ad', tmp_path / 'x.h5')
-    assert "nothere.h5ad" in str(e.value) and f"cwd {os.getcwd()}" in str(e.value)
-    with pytest.raises(FileNotFoundError, match="does not exist"):
-        ingest._to_canonical('nothere.h5', tmp_path / 'x.h5')
+        runner._check_input("rna", "nothere.h5", real=True)
+    assert "nothere.h5" in str(e.value) and f"cwd {os.getcwd()}" in str(e.value)
 
 
-def test_to_canonical_rejects_h5_without_matrix_data(tmp_path):
+def test_a_run_input_without_matrix_data_is_refused(tmp_path):
+    from multibench.engine import runner
     p = tmp_path / "embedding.h5"
     with h5py.File(p, "w") as f:
         f.create_dataset("data", data=np.zeros((4, 2)))
-    with pytest.raises(ValueError) as e:
-        ingest._to_canonical(p, tmp_path / 'x.h5')
-    msg = str(e.value)
-    assert "no dataset 'matrix/data'" in msg and "found keys ['data']" in msg
-    assert "method output" in msg and "evaluate" in msg
+    with pytest.raises(ValueError, match="is not a canonical .h5: it has no 2-D matrix/data"):
+        runner._check_input("rna", str(p), real=True)
 
 

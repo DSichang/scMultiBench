@@ -4,7 +4,6 @@ M18, M21, M22, M31, M36: resolve.py, ingest.py and two methods.yaml entries).
 Each test fails on the code before its fix.
 """
 import os
-import warnings
 
 import anndata as ad
 import h5py
@@ -14,7 +13,7 @@ import pytest
 
 import multibench as mtb
 from multibench import config, workflow
-from multibench.engine import envs, ingest, resolve
+from multibench.engine import envs, resolve
 from tests.conftest import full_scan
 
 PEAKS = [f"chr1:{i * 1000}-{i * 1000 + 200}" for i in range(40)]
@@ -356,40 +355,6 @@ def _gas_adata(barcodes, seed=0):
     return a
 
 
-def test_to_canonical_gas_follows_the_peak_order(tmp_path, capsys):
-    atac = [f"a{i}" for i in range(40)]
-    d = _diagonal(tmp_path, "TOCAN", [f"c{i}" for i in range(50)], atac)
-    shuffled = list(np.random.default_rng(2).permutation(atac))
-    gas = _gas_adata(shuffled)
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        out = ingest._to_canonical(gas, d, modality="gas")   # io.to_canonical, deprecated
-    assert out == d / "atac_gas.h5"
-    assert _barcodes(out) == atac
-    back = mtb.io.read(out)
-    import scipy.sparse as sp
-    if sp.issparse(back.X):
-        back.X = back.X.toarray()
-    np.testing.assert_array_equal(back[atac].X, gas[atac].X)
-    err = capsys.readouterr().err
-    assert "atac_peak.h5" in err and len(err.strip().splitlines()) == 1
-    mtb.engine.resolve.inputs_for("TOCAN", "diagonal", "SCALEX", data_path=tmp_path, check=True)
-
-
-def test_to_canonical_gas_of_other_cells_warns(tmp_path):
-    d = _diagonal(tmp_path, "TOCAN2", [f"c{i}" for i in range(50)],
-                  [f"a{i}" for i in range(40)])
-    with pytest.warns(UserWarning, match="different cells"):
-        mtb.engine.ingest._to_canonical(_gas_adata([f'b{i}' for i in range(40)]), d, modality='gas')
-
-
-def test_to_canonical_gas_in_peak_order_prints_nothing(tmp_path, capsys):
-    atac = [f"a{i}" for i in range(40)]
-    d = _diagonal(tmp_path, "TOCAN3", [f"c{i}" for i in range(50)], atac)
-    mtb.engine.ingest._to_canonical(_gas_adata(atac), d, modality='gas')
-    assert capsys.readouterr().err == ""
-
-
 # --- M21: UnitedNet reads the vertical cty.csv --------------------------------
 def test_unitednet_runs_on_an_exported_vertical_folder(tmp_path, envs_installed):
     cells = [f"c{i}" for i in range(30)]
@@ -420,12 +385,4 @@ def test_run_all_prints_the_unused_batch(root, tmp_path, capsys, monkeypatch):
     assert ("[run]   UINMF reads batches 1-2 of 3. Batch 3 is not used.\n"
             in capsys.readouterr().out)
 
-
-def test_to_canonical_gas_for_vertical_keeps_its_order(tmp_path, capsys):
-    atac = [f"a{i}" for i in range(40)]
-    d = _diagonal(tmp_path, "VERT", atac, atac)
-    shuffled = list(np.random.default_rng(3).permutation(atac))
-    out = mtb.engine.ingest._to_canonical(_gas_adata(shuffled), d, modality='gas', category='vertical')
-    assert out == d / "atac.h5" and _barcodes(out) == shuffled
-    assert capsys.readouterr().err == ""
 

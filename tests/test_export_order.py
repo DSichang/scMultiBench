@@ -89,7 +89,9 @@ def test_two_orders_in_the_folder_are_refused(tmp_path, capsys):
     a = _cells()
     f = tmp_path / "TWO"
     ingest.export_dataset(a, f, rna="X")
-    ingest._to_canonical(_shuffled(a), f / 'adt.h5', obsm='protein')     # written apart
+    s = _shuffled(a)                                                    # written apart
+    ingest._write_canonical(f / "adt.h5", np.asarray(s.obsm["protein"]), [f"P{i}" for i in range(s.obsm["protein"].shape[1])],
+                            list(s.obs_names), dtype="float64", compression=None, block=1024)
     before = {p.name: p.read_bytes() for p in f.iterdir()}
     for kw in (dict(rna=None, labels="obs:celltype"),
                dict(rna="X", adt="obsm:protein", labels="obs:celltype", overwrite=True)):

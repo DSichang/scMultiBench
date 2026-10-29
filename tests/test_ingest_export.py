@@ -200,7 +200,7 @@ def test_export_dataset_accepts_mudata_modality_names(tmp_path):
     # a loaded .h5mu behaves the same; from_mudata itself is gone
     p = tmp_path / "m.h5mu"
     m.write(p)
-    d3 = ingest.export_dataset(ingest._to_anndata(p), tmp_path / "FP", rna="rna", labels="rna:ct")
+    d3 = ingest.export_dataset(mu.read_h5mu(p), tmp_path / "FP", rna="rna", labels="rna:ct")
     assert (d3 / "rna.h5").exists() and (d3 / "cty.csv").exists()
     assert not hasattr(ingest, "from_mudata")
     # MuData without a mod: selector (and no such mod name) is refused with the names
