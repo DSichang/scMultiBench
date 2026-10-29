@@ -278,8 +278,8 @@ def test_c43_the_labels_recipe_follows_the_package_order():
             continue
         ns = {"pd": pd, "folder": folder}
         exec(code, ns)
-        want = list(_quiet(resolve.labels_for, folder.name, category, None, data_path=root,
-                           check=False).values())
+        want = list(_quiet(resolve.labels_for, folder.name, category, None,
+                           data_path=root).values())
         assert [f.name for f in ns["files"]] == [Path(p).name for p in want], folder.name
         expected = np.concatenate([pd.read_csv(p).iloc[:, 0].to_numpy() for p in want])
         assert (ns["labels"] == expected).all(), folder.name
