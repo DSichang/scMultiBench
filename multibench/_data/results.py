@@ -197,7 +197,7 @@ def load_results(
         No stored results for a requested category or dataset; the message
         names the datasets there are.
     KeyError
-        Unknown method name in ``methods``, with a did-you-mean hint.
+        Unknown method name in ``methods``.
     ValueError
         Unknown ``category`` or ``metrics``.
 
@@ -383,7 +383,7 @@ def rank(
         ``modalities`` naming data that none of the ranked datasets measured
         (pass such scores as ``long_df=``).
     KeyError
-        Unknown method name in ``methods``, with a did-you-mean hint.
+        Unknown method name in ``methods``.
 
     Warns
     -----
