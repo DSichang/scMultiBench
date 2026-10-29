@@ -280,14 +280,6 @@ def test_no_pca_says_to_make_one():
         mtb.evaluate(a, labels=["a", "b"] * 5, obsm="X_pca")
 
 
-def test_a_modality_string_gets_a_list_that_works():
-    with pytest.raises(TypeError) as e:
-        mtb.find_methods("vertical", modalities="rna+adt")
-    hint = str(e.value).split("pass modalities=")[1].rstrip(".")
-    assert mtb.find_methods("vertical", modalities=eval(hint)) == \
-        mtb.find_methods("vertical", modalities=["rna", "adt"])
-
-
 def test_the_missing_label_code_of_export_works(tmp_path):
     import anndata as ad
     adata = ad.AnnData(np.random.default_rng(0).poisson(1, (40, 10)).astype(float))

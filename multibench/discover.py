@@ -26,11 +26,7 @@ def _modality_filter(modalities) -> tuple[set[str] | None, str | None]:
     """``(base types every matching variant must consume, ATAC representation)``:
     the modality rule of ``find_methods`` and ``rank`` (see the
     ``find_methods`` Notes)."""
-    if isinstance(modalities, str):
-        import re
-        tokens = [t.lower() for t in re.split(r"[\s+,;/&]+", modalities) if t]
-        raise TypeError(f"modalities takes a list with one entry per modality: pass "
-                        f"modalities={tokens!r}.")
+    registry.check_id_list(modalities, "modalities")
     if modalities is None:
         return None, None
     toks = registry.normalize_modalities(modalities)
@@ -40,16 +36,13 @@ def _modality_filter(modalities) -> tuple[set[str] | None, str | None]:
 
 def _reads_both_files(modalities) -> bool:
     """Whether ``modalities`` names both ATAC representations, in any spelling."""
-    if modalities is None or isinstance(modalities, str):
+    if modalities is None:
         return False
     return _BOTH_FILES <= set(registry.normalize_modalities(modalities))
 
 
-def _variant_matches(v, category, want, needs_labels, atac) -> bool:
-    """Whether variant ``v`` satisfies every per-variant filter; ``v=None`` (a stub)
-    satisfies only filters that ask nothing of a variant."""
-    if v is None:
-        return want is None and atac is None and not needs_labels
+def _variant_matches(v, category, want, needs_labels) -> bool:
+    """Whether variant ``v`` satisfies every per-variant filter."""
     if category and v.when.get("category") != category:
         return False
     if want is not None and not want <= v.modality_types:
@@ -113,11 +106,11 @@ def find_methods(category: str | None = None, *,
         # atac is declared per method, but only a variant with an ATAC input honours it
         if atac and s.atac != atac:
             continue
-        if any(_variant_matches(v, category, want, needs_labels, atac)
-               and (not atac or v is None or v.consumes_atac)
-               and (not both or v is not None and _BOTH_FILES <= {
+        if any(_variant_matches(v, category, want, needs_labels)
+               and (not atac or v.consumes_atac)
+               and (not both or _BOTH_FILES <= {
                    r.rstrip("0123456789") for r in v.when.get("modalities") or []})
-               for v in s.variants or [None]):
+               for v in s.variants):
             out.append(s.id)
     return out
 
@@ -139,16 +132,6 @@ def _reference_batch(variant):
     ref = next((a.const for a in variant.args if a.role == "reference" and a.const), None)
     ref = str(ref) if ref is not None else ""
     return int(ref[4:]) if ref.startswith("data") and ref[4:].isdigit() else None
-
-
-class _Info(dict):
-    """``method_info``'s dict: a hyperparameter key names ``params_for``."""
-
-    def __missing__(self, key):
-        if key in ("params", "fixed_in_script", "upstream_knobs", "upstream_url"):
-            raise KeyError(f"{key!r} is in mtb.params_for({self.get('id')!r}, "
-                           f"category, modalities)")
-        raise KeyError(key)
 
 
 def method_info(method: str) -> dict:
@@ -184,7 +167,7 @@ def method_info(method: str) -> dict:
     Raises
     ------
     KeyError
-        Unknown method id. The message suggests a close match.
+        Unknown method id.
 
     Examples
     --------
@@ -199,10 +182,8 @@ def method_info(method: str) -> dict:
     mtb.find_methods : filter methods by category, modalities, labels, ATAC representation.
     """
     s = registry.get(method)
-    if not s.variants:
-        raise KeyError(f"{s.id}: no variants (declared stub)")
     ref = s.reference
-    return _Info(
+    return dict(
         id=s.id, language=s.language, notes=ref.get("summary") or None,
         categories=s.categories, env=envs.group_for(s.id), atac=s.atac,
         needs_labels=s.needs_labels,
@@ -232,8 +213,7 @@ def _runtimes() -> dict:
 
 
 def _runtime_hint(method: str) -> dict:
-    """``method_info(method)["runtime"]`` (see its Notes); a typo raises ``KeyError``."""
-    method = registry.check_method(method)
+    """``method_info(method)["runtime"]``."""
     rt = dict(_runtimes().get(method, {"tier": "unknown", "worst_sec": None,
                                        "observed": []}))
     # every observation was taken on the GPU benchmark host
@@ -278,7 +258,7 @@ def params_for(method: str, category: str | None = None,
     Raises
     ------
     KeyError
-        Unknown method, a declared stub, or no variant for ``category`` /
+        Unknown method, or no variant for ``category`` /
         ``modalities``.
     ValueError
         Unknown ``category`` or modality token, or several variants with other
@@ -299,8 +279,6 @@ def params_for(method: str, category: str | None = None,
     method = s.id
     registry.check_category(category)
     modalities = registry.normalize_modalities(modalities)
-    if not s.variants:
-        raise KeyError(f"{method}: no variants (declared stub); nothing to tune")
 
     def example(v):
         mods = list(v.when.get("modalities", []))
