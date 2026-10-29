@@ -264,13 +264,18 @@ def test_a_renamed_run_keeps_its_language_chip():
 
 
 # ------------------------------------------- rescore, embedding, export
-def test_rescore_of_a_folder_without_outputs_prints_no_status_line(tmp_path, capsys):
+def test_rescore_of_a_folder_without_outputs_says_so(tmp_path, capsys):
     res = mtb.RunResult([{"method": "Matilda", "status": "RUN_OK", "out_dir":
                             str(tmp_path / "Matilda_D11"), "modalities": ["rna", "adt"]}],
                           "D11", "vertical", out_dir=str(tmp_path))
     with pytest.raises(FileNotFoundError, match="^No method output in "):
         _quiet(res.rescore)
-    assert "[rescore] Matilda ->" not in capsys.readouterr().out
+    # each method still gets its line
+    assert "[rescore] Matilda -> ran" in capsys.readouterr().out
+    # a record without out_dir is looked for where run puts it
+    res.records[0].pop("out_dir")
+    with pytest.raises(FileNotFoundError, match="^No method output in "):
+        _quiet(res.rescore)
 
 
 def test_export_length_errors_name_the_fix(tmp_path):

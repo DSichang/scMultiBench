@@ -1755,12 +1755,9 @@ class RunResult:
                 mods = rec.get("modalities") or []
                 variant = registry.get(method).select(self.category, set(mods))
                 try:
-                    if not rec.get("out_dir"):
-                        raise FileNotFoundError(
-                            f"The record of {method} has no out_dir, and "
-                            f"{Path(self.out_dir or '.') / f'{method}_{self.dataset}'} "
-                            f"does not exist.")
-                    emb = _load_embedding(Path(rec["out_dir"]), variant)
+                    # a record without out_dir: the folder run names
+                    emb = _load_embedding(Path(rec.get("out_dir") or Path(self.out_dir or ".")
+                                               / f"{method}_{self.dataset}"), variant)
                 except FileNotFoundError:
                     no_output.append(method)
                     raise
@@ -1790,7 +1787,7 @@ class RunResult:
                 _drop_scores(rec)
                 rec["status"] = "ran"
                 rec["error"] = _clip_error(f"{type(e).__name__}: {e}")
-            if verbose and method not in no_output:      # its error says what is missing
+            if verbose:
                 print(f"[rescore] {method} -> {_status(rec['status'])} {_ari_tail(rec)}".rstrip(),
                       flush=True)
             if metrics is not None and batch is None and labels is None \
