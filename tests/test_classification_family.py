@@ -66,7 +66,10 @@ def _caught(fn, *a, **kw):
 
 
 def _reference(emb, paths):
-    return _quiet(mtb.eval.classify.classification_metrics, _quiet(mtb.eval.classify.classify, emb, labels=paths)).loc["mean"]
+    labels = [x for p in paths for x in pd.read_csv(p)["x"]]
+    batch = [p.stem for p in paths for _ in pd.read_csv(p)["x"]]
+    C = mtb.eval.classify
+    return _quiet(C.classification_metrics, _quiet(C.classify, emb, labels, batch)).loc["mean"]
 
 
 def _values(df):

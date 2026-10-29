@@ -580,8 +580,7 @@ def _classification_scores(request, emb, ct, cb, *, category, graph, metrics):
         from .classify import classification_metrics, classify
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
-            pred = classify(emb, labels=np.asarray(ct, dtype=object),
-                            batch=np.array([str(b) for b in cb], dtype=object), seed=0)
+            pred = classify(emb, ct, cb, seed=0)
         table = classification_metrics(pred)
         if "mean" in table.index:
             mean = table.loc["mean"]

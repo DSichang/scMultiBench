@@ -9,141 +9,45 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import io
 from .. import _text
-from .._text import _and_list
-from ..plot.bar import CLASSIFICATION_METRICS as _CLASSIFICATION_METRICS
-from .pipeline import (_cell_labels, _count_error, _labels_from_dict, _no_batch_error,
-                       _no_label_error, _obs_or_vector, _origin_names, _read_output)
+from .._data.catalog import FAMILY_METRICS
 
 #: the columns of the frame classify() returns
 COLUMNS = ["reference", "batch", "cell", "label", "predicted"]
 
 
-def classify(output, labels=None, *, batch=None, reference=None,
-             obsm: str | None = None, seed: int = 0) -> pd.DataFrame:
-    """Predict the cell type of each query cell from a reference batch.
+def classify(emb, labels, batch, seed: int = 0) -> pd.DataFrame:
+    """Predict the cell type of each query cell, each batch in turn the reference.
 
-    One batch is the reference: a small neural network learns the cell
-    types from the embedding of its cells, then predicts the cells of all the
-    other batches, the query.
+    ``emb`` (cells x dims), ``labels`` and ``batch`` (one per cell) are the
+    arrays ``evaluate`` has checked: no missing value, two or more batches.
+    A small neural network learns the cell types of the reference batch and
+    predicts the cells of the other batches; the same seed and input give the
+    same predictions.
 
-    Parameters
-    ----------
-    output
-        Embedding, cells x dims, in the forms ``mtb.evaluate`` takes: a run
-        output file (``embedding.h5``, ``.h5ad``, ``.csv``), an AnnData, a
-        DataFrame or an array.
-    labels
-        Cell types, one per cell, in the forms ``mtb.evaluate`` takes. A
-        ``{name: path}`` dict of label files also gives the batches: each file
-        is one batch, named by its key (``cty1``, ``cty2``, ...).
-    batch
-        Batch of each cell, in the forms ``labels`` takes; needed unless
-        ``labels`` lists two or more files.
-    reference : str, optional
-        The batch to learn from. ``None`` = every batch in turn, as in the
-        article.
-    obsm : str | None
-        ``.obsm`` key of an AnnData or ``.h5ad`` ``output``; ``'X'`` means
-        ``.X``; ``None`` = ``X_emb``.
-    seed : int
-        Seed of the network; the same seed and the same input, with the
-        cells in the same order, give the same predictions.
-
-    Returns
-    -------
-    pandas.DataFrame
-        One row per query cell and reference, with the columns
-        ``reference``, ``batch`` (the cell's own batch), ``cell`` (the cell
-        id, or the row number when the embedding has none), ``label`` (the
-        true cell type) and ``predicted``. A query cell of a type the
-        reference batch lacks is left out; ``attrs["left_out"]`` counts them
-        per reference.
-
-    Raises
-    ------
-    ValueError
-        Fewer than two batches, an input that is not an embedding, a
-        ``reference`` that is not a batch, and the label and batch errors of
-        ``mtb.evaluate``.
-
-    Warns
-    -----
-    UserWarning
-        Cells without a label are left out; a reference batch with fewer
-        than two cell types is skipped.
-
-    See Also
-    --------
-    mtb.evaluate : scores the same embedding with the scIB metrics.
+    Returns one row per query cell and reference, with the columns
+    ``reference``, ``batch``, ``cell`` (the row number), ``label`` and
+    ``predicted``. A query cell of a type the reference lacks is left out;
+    ``attrs["left_out"]`` counts them per reference. A reference batch with
+    one cell type is skipped with a ``UserWarning``.
     """
-    if labels is None:
-        raise ValueError("classify needs labels, one cell type per cell.")
-    names = None
-    if isinstance(labels, dict):
-        names = [str(k) for k in labels]
-        labels = _labels_from_dict(labels)
-    who = _graph_writer(output)
-    if who is not None:
-        raise ValueError(_graph_error(who))
-    emb, ids, adata, table = _read_output(output, obsm, "output")
-    if emb.ndim != 2:
-        raise ValueError("classify needs an embedding, cells x dims. Pass the method's "
-                         "embedding file.")
-    emb, ct, origin = _cell_labels(labels, emb, adata, ids, table)
-    n_cells = emb.shape[0]
-    if len(ct) != n_cells:
-        raise ValueError(_count_error("labels", len(ct), n_cells))
-    if emb.shape[1] == n_cells or _is_neighbour_index(emb):
-        raise ValueError(_graph_error("output"))     # cells x cells, or a kNN index
-    if batch is not None:
-        ba = _obs_or_vector(batch, adata, what="batch", ids=ids, table=table)
-        if len(ba) != n_cells:
-            raise ValueError(_count_error("batch", len(ba), n_cells))
-    elif origin is not None:
-        ba = _origin_names(labels, origin, names)
-    else:
-        raise ValueError("classify needs the batch of each cell. Pass batch=.")
-
-    miss = io.missing_mask(ct)
-    if miss.all():
-        raise ValueError(_no_label_error(ct, miss, labels))
-    keep = ~miss
-    has_batch = ~io.missing_mask(ba)
-    if (keep & ~has_batch).any():
-        raise ValueError(_no_batch_error(np.asarray(ba)[keep], ~has_batch[keep], batch))
-    ba = np.array([str(b) for b in ba], dtype=object)
-    ct = np.array([str(c) for c in ct], dtype=object)
-    batches = list(pd.unique(ba[has_batch]))
-    if len(batches) < 2:
-        raise ValueError(
-            f"classify needs at least two batches; every cell is in batch {batches[0]}. "
-            f"Pass batch= with two or more batches.")
-    if reference is not None and str(reference) not in batches:
-        raise ValueError(
-            f"reference={reference!r} is not a batch. Pass one of "
-            f"{_and_list(batches, 'or')}.")
-    if miss.any():
-        _text.warn(f"{int(miss.sum()):,} of the {n_cells:,} cells have no label; "
-                     f"they are left out.", UserWarning)
-    cell = np.asarray(ids, dtype=object) if ids is not None else np.arange(n_cells)
+    emb = np.asarray(emb)
+    ct = np.array([str(c) for c in labels], dtype=object)
+    ba = np.array([str(b) for b in batch], dtype=object)
+    cell = np.arange(len(ct))
     frames = []
     left_out: dict = {}
-    for ref in batches if reference is None else [str(reference)]:
-        train = keep & (ba == ref)
+    for ref in pd.unique(ba):
+        train = ba == ref
         types = pd.unique(ct[train])
         if len(types) < 2:
-            _text.warn(
-                f"Reference batch {ref} has " + ("no labelled cell" if len(types) == 0
-                                                 else "one cell type")
-                + "; skipped.", UserWarning)
+            _text.warn(f"Reference batch {ref} has one cell type; skipped.", UserWarning)
             continue
-        query = keep & (ba != ref) & np.isin(ct, types)
-        left_out[ref] = int((keep & (ba != ref) & ~np.isin(ct, types)).sum())
+        query = (ba != ref) & np.isin(ct, types)
+        left_out[ref] = int(((ba != ref) & ~np.isin(ct, types)).sum())
         if not query.any():
             _text.warn(f"No other batch has a cell type of reference batch {ref}; "
-                         f"skipped.", UserWarning)
+                       f"skipped.", UserWarning)
             continue
         predicted = _mlp(emb[train], ct[train], seed).predict(emb[query])
         frames.append(pd.DataFrame({
@@ -162,10 +66,6 @@ def _graph_text(who: str) -> str:
     return f"{who} a graph, not an embedding, so it has no classification scores."
 
 
-def _graph_error(who: str) -> str:
-    return _graph_text(who) + " Score it with mtb.evaluate(metrics='clustering')."
-
-
 def _graph_writer(output) -> str | None:
     """The method that writes ``output`` when it is a file only graph methods
     write; ``"output"`` when several do; ``None`` for anything else."""
@@ -178,21 +78,21 @@ def _graph_writer(output) -> str | None:
 
 
 def _registry_files() -> dict:
-    """``{file name: [(output kind, variant output kind, method), ...]}`` over
-    every output and extra output of the registry."""
+    """``{file name: [(variant output kind, method), ...]}`` over every output
+    and extra output of the registry."""
     from ..engine import registry
     files: dict = {}
     for spec in registry.load():
         for v in spec.variants:
             for o in [v.output, *v.extra_outputs]:
-                files.setdefault(o.file, []).append((o.kind, v.output.kind, spec.id))
+                files.setdefault(o.file, []).append((v.output.kind, spec.id))
     return files
 
 
 def _graph_files() -> dict:
     """``{file name: [method, ...]}`` for files that only graph variants write."""
-    return {f: sorted({m for _, _, m in uses}) for f, uses in _registry_files().items()
-            if all(vk == "graph" for _, vk, _ in uses)}
+    return {f: sorted({m for _, m in uses}) for f, uses in _registry_files().items()
+            if all(vk == "graph" for vk, _ in uses)}
 
 
 def _is_neighbour_index(emb) -> bool:
@@ -229,67 +129,35 @@ def _mlp(x, y, seed: int):
 
 
 #: the columns of the frame classification_metrics() returns, in the article's order
-METRICS = list(_CLASSIFICATION_METRICS)
+METRICS = list(FAMILY_METRICS["classification"])
 
 
 def classification_metrics(predictions) -> pd.DataFrame:
-    """Score the predicted cell types of :func:`classify` with the benchmark's metrics.
+    """Score the frame :func:`classify` returns with the benchmark's metrics.
 
-    Parameters
-    ----------
-    predictions : pandas.DataFrame
-        The frame :func:`classify` returns, or any frame with the columns
-        ``label`` (true cell type) and ``predicted``; with a ``reference``
-        column, each reference batch is scored on its own.
+    Returns one row per reference batch (index ``reference``, in input
+    order) and a last row ``mean``, the mean over the references, which is
+    what ``mtb.evaluate(metrics="classification")`` reports. The columns, in
+    [0, 1]:
 
-    Returns
-    -------
-    pandas.DataFrame
-        One row per reference batch (index ``reference``, in input order)
-        and a last row ``mean``, the mean over the references; a frame
-        without ``reference`` gives one row. The columns, in [0, 1]:
+    - ``OCA``: overall classification accuracy, the fraction of cells
+      predicted correctly.
+    - ``ACA``: average classification accuracy, the fraction of the cells of
+      a type predicted correctly, averaged over the types.
+    - ``Spec``: specificity, the fraction of the cells of other types not
+      predicted as a type, averaged over the types.
+    - ``Sens``: sensitivity, the fraction of the cells of a type predicted as
+      that type, averaged over the types.
+    - ``F1``: F1-score, 2 x the cells correctly predicted as a type / (its
+      cells + the cells predicted as it), averaged over the types.
 
-        - ``OCA``: overall classification accuracy, the fraction of cells
-          predicted correctly.
-        - ``ACA``: average classification accuracy, the fraction of the
-          cells of a type predicted correctly, averaged over the types.
-        - ``Spec``: specificity, the fraction of the cells of other types
-          not predicted as a type, averaged over the types.
-        - ``Sens``: sensitivity, the fraction of the cells of a type
-          predicted as that type, averaged over the types.
-        - ``F1``: F1-score, 2 x the cells correctly predicted as a type /
-          (its cells + the cells predicted as it), averaged over the types.
-
-        The ``mean`` row is what ``mtb.evaluate(metrics="classification")``
-        returns; this adds one row per reference.
-
-    Raises
-    ------
-    TypeError
-        ``predictions`` is not a DataFrame.
-    ValueError
-        ``predictions`` lacks ``label`` or ``predicted``.
-
-    Notes
-    -----
-    The types are those true or predicted in a reference's query. ``ACA``
-    and ``Sens`` average over the types that are true, ``Spec`` and ``F1``
-    over all of them, so ``Spec`` is NaN when a query has one true type; the
-    ``mean`` row is then NaN too. A row with a missing ``label`` or
-    ``predicted`` is left out.
+    The types are those true or predicted in a reference's query. ``ACA`` and
+    ``Sens`` average over the types that are true, ``Spec`` and ``F1`` over all
+    of them, so ``Spec`` is NaN when a query has one true type; the ``mean``
+    row is then NaN too.
     """
-    if not isinstance(predictions, pd.DataFrame):
-        raise TypeError("classification_metrics needs a DataFrame. "
-                        "Pass the frame classify returns.")
-    missing = [c for c in ("label", "predicted") if c not in predictions.columns]
-    if missing:
-        raise ValueError(
-            f"predictions has no {' and no '.join(missing)} column. "
-            f"Pass the frame classify returns.")
-    if "reference" not in predictions.columns:
-        return pd.DataFrame([_metrics(predictions)], columns=METRICS)
-    codes, refs = pd.factorize(predictions["reference"], use_na_sentinel=False)
-    table = pd.DataFrame([_metrics(predictions[codes == i]) for i in range(len(refs))],
+    refs = pd.unique(predictions["reference"])
+    table = pd.DataFrame([_metrics(predictions[predictions["reference"] == r]) for r in refs],
                          index=pd.Index(refs, name="reference"), columns=METRICS)
     if len(table):
         table.loc["mean"] = table.mean(skipna=False)
@@ -299,10 +167,8 @@ def classification_metrics(predictions) -> pd.DataFrame:
 def _metrics(frame: pd.DataFrame) -> list:
     """The five metrics of one query, from the confusion table of every type
     true or predicted."""
-    keep = ~(io.missing_mask(frame["label"].to_numpy(dtype=object))
-             | io.missing_mask(frame["predicted"].to_numpy(dtype=object)))
-    truth = frame["label"].to_numpy(dtype=object)[keep]
-    pred = frame["predicted"].to_numpy(dtype=object)[keep]
+    truth = frame["label"].to_numpy(dtype=object)
+    pred = frame["predicted"].to_numpy(dtype=object)
     codes, levels = pd.factorize(np.concatenate([truth, pred]))
     k, n = len(levels), len(truth)
     cm = np.bincount(codes[:n] * k + codes[n:], minlength=k * k).reshape(k, k).astype(float)

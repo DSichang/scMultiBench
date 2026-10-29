@@ -106,17 +106,15 @@ def test_x49_obsm_none_reads_x_emb_only():
 
 
 def test_x50_x71_classification_docs_and_left_out_cells():
-    # 0.4.0: mtb.classify and mtb.classification_metrics are deprecated wrappers
-    # ("Deprecated: use ..."); the implementation keeps these docs
     from multibench.eval import classify as C
     doc = " ".join(C.classification_metrics.__doc__.split())
-    assert ('The ``mean`` row is what ``mtb.evaluate(metrics="classification")`` '
-            "returns; this adds one row per reference.") in doc
+    assert ('a last row ``mean``, the mean over the references, which is what '
+            '``mtb.evaluate(metrics="classification")`` reports') in doc
     import numpy as np
     emb = np.random.default_rng(3).normal(size=(90, 4))
     labels = np.array(["a", "b", "c"] * 15 + ["a", "b"] * 22 + ["a"])
     batch = np.array(["1"] * 45 + ["2"] * 45)
-    pred = C.classify(emb, labels=labels, batch=batch)
+    pred = C.classify(emb, labels, batch)
     # batch 2 lacks type c: the 15 c cells of batch 1 are left out with 2 as reference
     assert pred.attrs["left_out"] == {"1": 0, "2": 15}
     assert "lacks is left out" in " ".join(C.classify.__doc__.split())
