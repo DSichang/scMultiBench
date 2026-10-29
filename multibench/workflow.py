@@ -1100,12 +1100,7 @@ def _label_inputs(inputs: dict, variant, label_files: dict) -> tuple:
 def _label_candidates(dataset, n, data_path=None):
     """``[(file names, labels, batch per cell)]``: every label ordering of ``n``
     cells; length alone cannot pick one. The batch is each cell's label file."""
-    by_file = {}
-    for p in _label_files(dataset, data_path):
-        try:
-            by_file[p.name] = _eio.read_labels(p)
-        except Exception:
-            pass
+    by_file = {p.name: _eio.read_labels(p) for p in _label_files(dataset, data_path)}
     cands = [([k], v) for k, v in by_file.items()]
     rna = [k for k in by_file if k.startswith("rna_cty")]
     atac = [k for k in by_file if k.startswith("atac_cty")]
@@ -1320,12 +1315,8 @@ def _check_save_target(folder: Path, dataset: str, category: str) -> None:
     path = Path(folder) / "batch_result.json"
     if not path.exists():
         return
-    try:
-        with open(path) as fh:
-            blob = json.load(fh)
-    except (OSError, ValueError) as e:
-        raise ValueError(f"{path} exists but cannot be read ({e}); save to another "
-                         f"folder or remove it") from e
+    with open(path) as fh:
+        blob = json.load(fh)
     have = (blob.get("dataset"), blob.get("category"))
     if have != (dataset, category):
         raise ValueError(
