@@ -471,8 +471,9 @@ def _count_error(what: str, n: int, n_cells: int, cells: _Cells | None = None) -
     if cells is not None and what == "labels":
         return (f"The label files of {cells.dataset} hold {_n(n, 'cell')}; the embedding "
                 f"has {_n(n_cells, 'row')}. For other cells, pass a dataset name of your own.")
+    one = {"labels": "label", "clusters": "cluster id", "batch": "batch"}[what]
     return (f"{what} has {_n(n, 'entry', 'entries')} for {_n(n_cells, 'cell')} in the "
-            f"embedding: give one per cell.")
+            f"embedding: give one {one} per cell.")
 
 
 #: the fix for batch metrics without a batch

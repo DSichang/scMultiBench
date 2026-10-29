@@ -60,14 +60,6 @@ def _read_h5ad(path, what: str = "file"):
                          f"or it is damaged.") from None
 
 
-def _refuse_h5mu(path) -> None:
-    """``ValueError`` for an ``.h5mu`` path: it holds one AnnData per modality,
-    and evaluate takes one of them."""
-    if Path(path).suffix.lower() == ".h5mu":
-        raise ValueError(f"{Path(path).name} is an .h5mu: pass one modality, e.g. "
-                         f"mudata.read(path)['rna'], with obsm='...'.")
-
-
 def read_embedding(path: Path | str) -> np.ndarray:
     """Read an embedding from an HDF5 file's dataset ``data``; orient as (cells, dims).
 
@@ -90,25 +82,14 @@ def read_embedding(path: Path | str) -> np.ndarray:
     FileNotFoundError
         ``path`` does not exist (the message names it and the cwd).
     ValueError
-        The file has no dataset ``data``: the message lists the keys found
-        and, when they are the canonical input layout (a ``matrix`` group
-        holding ``data``/``barcodes``/``features``), says that this is an
-        input matrix, not a method output.
+        The file has no dataset ``data``; the message lists the keys found.
     """
     path = _require_file(path, "output")
-    _refuse_h5mu(path)
     with h5py.File(path, "r") as f:
         if "data" not in f or not isinstance(f["data"], h5py.Dataset):
-            keys = sorted(f.keys())
-            hint = ""
-            if "matrix" in keys:
-                hint = (" - this looks like a canonical input matrix (matrix/data, "
-                        "matrix/barcodes, matrix/features: rna.h5 / adt.h5 / "
-                        "atac.h5), not an embedding; evaluate() wants a method "
-                        "output such as out/<method>/embedding.h5 (or pass an "
-                        "AnnData / .npy / .csv embedding)")
-            raise ValueError(
-                f"{path} has no dataset 'data'; found keys {keys}{hint}")
+            keys = ", ".join(sorted(f.keys()))
+            raise ValueError(f"{path.name} has no dataset 'data' (keys: {keys}): it is not "
+                             f"an embedding. Pass a method's embedding file.")
         X = np.asarray(f["data"])
     if X.ndim != 2:
         raise ValueError(
@@ -483,7 +464,8 @@ def as_vector(x, *, what: str = "labels", column: str | None = None) -> np.ndarr
     if isinstance(x, dict):
         if len(x) == 1:
             return np.asarray(read_labels(next(iter(x.values())), column=column))
-        raise ValueError(_multi_dict_message(what, x))
+        raise ValueError(f"{what} is a dict of {len(x)} files, which fixes no cell order. "
+                         f"Pass a list of paths in cell order.")
     if _is_label_path_list(x):
         return np.concatenate([np.asarray(read_labels(p, column=column)) for p in x])
     if isinstance(x, pd.DataFrame):
@@ -501,19 +483,6 @@ def as_vector(x, *, what: str = "labels", column: str | None = None) -> np.ndarr
     raise TypeError(
         f"{what} must be a CSV path, list of paths, or 1-D array-like of length "
         f"n_cells; got {type(x).__name__}")
-
-
-def _multi_dict_message(what: str, d: dict) -> str:
-    """The error for a ``{name: path}`` dict with several entries: a dict fixes
-    no cell order, and a wrong order invalidates every score without an error."""
-    keys = [str(k) for k in d]
-    return (
-        f"{what}: got a dict with {len(d)} label files {keys}; a dict does not "
-        f"fix the cell order, and the order must be the method's cell order "
-        f"(the order in which the method concatenated its input cells, which "
-        f"is not alphabetical; for most methods numbered files ascending, cty1, "
-        f"cty2, ..., and rna before atac). Pass the paths as a list in that order, "
-        f"or dataset=, category= and method=, which read them in that order.")
 
 
 def _first(ix, n: int = 5) -> list:
@@ -557,7 +526,6 @@ def _align_vector(x, ids, *, what: str, column: str | None):
             f"{_first(dup)}); cannot align {what} by cell id - pass "
             f"{what}.to_numpy() to match positionally")
     missing = ids.difference(x.index, sort=False)
-    extra = x.index.difference(ids, sort=False)
     if len(missing) and len(missing) == len(ids):
         head = (f"The {what}{chr(39) if what.endswith('s') else chr(39) + 's'} cell ids "
                 f"do not match the embedding's (embedding e.g. {ids[0]}, {what} e.g. "
@@ -571,14 +539,12 @@ def _align_vector(x, ids, *, what: str, column: str | None):
                          f"{what}.to_numpy() to match by position.")
     if len(missing):
         # ids the embedding lacks are left out: every cell has its value
-        hint = (" Score the cells that have a label only."
-                if what == "labels" and not len(extra) else "")
         by_position = (f", or {what}.to_numpy() to match positionally"
                        if len(x) == len(ids) else "")
         raise ValueError(
             f"{what}: cannot align by cell id - {len(missing)} of the embedding's "
             f"{len(ids)} cells are missing from {what} (first: {_first(missing)}). "
-            f"Pass {what} for every cell of the embedding{by_position}.{hint}")
+            f"Pass {what} for every cell of the embedding{by_position}.")
     return np.asarray(x.reindex(ids).to_numpy())
 
 
@@ -632,10 +598,6 @@ def _anndata_matrix(adata, obsm: str | None) -> np.ndarray:
     if (obsm == "X" and has_x) or (obsm != "X" and key in adata.obsm):
         return _own_dtype(adata.X if obsm == "X" else adata.obsm[key])
     kind = type(adata).__name__            # AnnData, or MuData for a MuData
-    if key == "X_pca":
-        # the PCA has not been computed yet: the fix is to compute it
-        raise ValueError(f"The {kind} has no obsm['X_pca']. Make the PCA first, as "
-                         f"sc.pp.pca(adata).")
     keys = sorted(map(str, adata.obsm.keys()))
     picks = ([f"obsm={keys[0]!r}"] if len(keys) == 1 else
              ["obsm= with one of them"] if keys else [])
@@ -707,7 +669,6 @@ def as_matrix(output, *, obsm: str | None = None) -> np.ndarray:
         return _anndata_matrix(output, obsm)
     if isinstance(output, (str, Path)):
         p = _require_file(output, "output")
-        _refuse_h5mu(p)
         suf = p.suffix.lower()
         if suf in {".h5", ".hdf5", ".hdf"}:
             return read_embedding(p)

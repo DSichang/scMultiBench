@@ -237,7 +237,7 @@ def test_multi_entry_dict_error_names_keys_and_the_stacking_rule(tmp_path):
     # R4-13: short sentences, no parenthesis holding clauses
     assert "(" not in msg and ";" not in msg
     # the same rule reaches as_vector() directly (batch= given as a dict)
-    with pytest.raises(ValueError, match="batch: got a dict with 2 label files"):
+    with pytest.raises(ValueError, match="^batch is a dict of 2 files, which fixes no cell order"):
         io.as_vector(d, what="batch")
     # metrics='all' does not trip over the batch check BEFORE explaining the dict
     with pytest.raises(ValueError, match="are not in the default order"):

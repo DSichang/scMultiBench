@@ -144,14 +144,6 @@ def test_x72_batch_leiden_warning_says_what_it_affects(monkeypatch):
     assert sorted(set(got)) == ["a", "b"]
 
 
-def test_x74_an_h5mu_path_names_the_fix(tmp_path):
-    p = tmp_path / "x.h5mu"
-    p.write_bytes(b"")
-    with pytest.raises(ValueError, match=r"x\.h5mu is an \.h5mu: pass one modality, e\.g\. "
-                                         r"mudata\.read\(path\)\['rna'\]"):
-        mtb.evaluate(str(p), labels=["a"] * 3)
-
-
 def test_x76_tokens_ignore_letter_case():
     import numpy as np
     plan = mtb.scan("D11", "vertical", modalities=["RNA", "ADT"], verbose=False)

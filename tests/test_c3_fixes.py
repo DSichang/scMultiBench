@@ -243,7 +243,7 @@ def test_e13_e14_a_benchmark_dataset_gives_its_category_and_its_cells():
     got = _quiet(mtb.evaluate, a, labels="ct", obsm="X", dataset="D11", method="mine",
                  metrics=["cLISI"])
     assert set(got["category"]) == {"vertical"}
-    with pytest.raises(ValueError, match=r"^The label files of D11 \(cty\.csv\) hold 2,864 "
+    with pytest.raises(ValueError, match=r"^The label files of D11 hold 2,864 "
                                          r"cells; the embedding has 1,000 rows\."):
         _quiet(mtb.evaluate, a[:1000].copy(), labels="ct", obsm="X", dataset="D11",
                metrics=["cLISI"])

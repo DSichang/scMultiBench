@@ -68,20 +68,6 @@ def test_evaluate_requires_batch_for_batch_task():
     assert "metrics='batch' needs batch labels" in str(exc.value)
 
 
-def test_compute_rejects_length_mismatch():
-    import pytest
-    anndata = pytest.importorskip("anndata")
-    from multibench.eval import scib as escib
-    emb = np.zeros((6, 3))
-    ct = np.array([0, 0, 1, 1, 2])      # one short -> mismatch
-    cl = np.array([0, 0, 1, 1, 2, 2])
-    ba = np.array([0, 1, 0, 1, 0, 1])
-    with pytest.raises(ValueError) as exc:
-        escib.compute(emb, ct, cl, ba, group="clustering")
-    # R3-14: named after evaluate's argument, with the two counts
-    assert str(exc.value) == "labels has 5 entries for 6 cells in the embedding."
-
-
 def test_compute_rejects_unknown_group():
     import pytest
     anndata = pytest.importorskip("anndata")

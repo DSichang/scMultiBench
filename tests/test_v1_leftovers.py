@@ -86,5 +86,5 @@ def test_an_unreadable_h5ad_is_named_in_one_sentence(tmp_path, capsys):
 def test_one_cell_is_singular(tmp_path, capsys):
     (tmp_path / 'one.csv').write_text('a,b\n1,2\n')
     pd.DataFrame({'x': ['T', 'B', 'T']}).to_csv(tmp_path / 'lab.csv', index=False)
-    with pytest.raises(ValueError, match='^labels has 1 entry for 3 embedding rows: '):
+    with pytest.raises(ValueError, match='^labels has 1 entry for 3 cells in the embedding: '):
         _quiet(mtb.evaluate, np.zeros((3, 2)), labels=np.array(['T']), metrics=['ASW'])
