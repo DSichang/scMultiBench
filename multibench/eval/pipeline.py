@@ -136,7 +136,7 @@ class _Table:
         self.name, self.moved = name, []
 
 
-def _read_output(output, labels, obsm, what: str):
+def _read_output(output, obsm, what: str):
     """``(emb, ids, adata, table)`` of an embedding argument: the matrix, its
     cell ids, the AnnData it is (else ``None``) and the :class:`_Table` of a
     ``.csv`` / ``.tsv`` with ids. ``what`` names a missing file."""
@@ -148,34 +148,14 @@ def _read_output(output, labels, obsm, what: str):
         return np.asarray(io.as_matrix(output, obsm=obsm)), ids, adata, None
     file = io._require_file(output, what)
     emb, ids = io._read_csv_embedding(file)
-    if ids is not None and emb.shape[0] != emb.shape[1] \
-            and _n_values(labels, adata) == emb.shape[1]:
-        ids = None           # dims x cells: the first column names the dimensions
     return emb, ids, adata, None if ids is None else _Table(file.name)
 
 
-def _same_cells(keys, ids, *, what: str, name: str, table: _Table, fix: str) -> bool:
-    """Whether the cell ids ``keys`` of an argument are in another order than
-    ``ids``, the barcodes of ``table``; ``ValueError`` when they name other cells.
-
-    Ids of which none is a cell of the embedding are not an order: ``False``,
-    and the caller matches by position with a warning.
-    """
+def _reordered(keys, ids) -> bool:
+    """Whether the cell ids ``keys`` of an argument name cells of ``ids`` in
+    another order (for the line that says so)."""
     keys, ids = pd.Index([str(k) for k in keys]), pd.Index([str(i) for i in ids])
-    if not keys.isin(ids).any():
-        return False
-    extra = keys[~keys.isin(ids)].unique()
-    missing = ids.difference(keys, sort=False)
-    if len(extra) or len(missing):
-        ix, a, b = (missing, table.name, name) if len(missing) else (extra, name, table.name)
-        raise ValueError(
-            f"{what}: {_n(len(ix), 'cell')} of {a} {'is' if len(ix) == 1 else 'are'} "
-            f"not in {b}, for example {ix[0]}. {fix}")
-    return not keys.equals(ids)
-
-
-def _file_fix(plural: bool = False) -> str:
-    return "Write them for the same cells." if plural else "Write both for the same cells."
+    return bool(keys.isin(ids).any()) and not keys.equals(ids)
 
 
 def _file_carries_ids(first, ids) -> bool:
@@ -215,8 +195,7 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, table=None, read=()
         unique = ids is not None and pd.Index(ids).is_unique
         name = Path(x).name
         if table is not None and unique and _file_carries_ids(first, ids) \
-                and _same_cells(first, ids, what=what, name=name, table=table,
-                                fix=_file_fix()):
+                and _reordered(first, ids):
             table.moved.append(name)
         if what == "labels" and first is None and _has_cell_ids(ids):
             # no ids: the dataset folder's matrix names the cells
@@ -233,8 +212,7 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, table=None, read=()
         if ids is not None:
             name = f"the {what} {type(x).__name__}"
             if table is not None and x.index.is_unique and pd.Index(ids).is_unique \
-                    and _same_cells(x.index, ids, what=what, name=name, table=table,
-                                    fix=f"Pass {what} for the cells of {table.name}."):
+                    and _reordered(x.index, ids):
                 table.moved.append(name)
             return io._align_vector(x, ids, what=what, column=column)
         _text.warn(
@@ -378,9 +356,7 @@ def _stack_label_files(files, ids, table=None, read=(), others=None):
         name = _and_list(names)
         keys = pd.concat([first for _, first in rows], ignore_index=True)
         if table is not None and unique and _file_carries_ids(keys, ids) \
-                and _same_cells(keys, ids, what="labels", table=table, **(
-                    dict(name=name, fix=_file_fix()) if len(names) == 1 else
-                    dict(name="the label files", fix=_file_fix(plural=True)))):
+                and _reordered(keys, ids):
             table.moved.extend(names)
         pos, _ = io.by_id_column(np.arange(len(vals)), keys, ids if unique else None,
                                  what="labels", name=name, target="the embedding",
@@ -467,19 +443,6 @@ def _named_files(given) -> str:
     in memory."""
     files = _label_files(given)
     return f" ({', '.join(f.name for f in files)})" if files else ""
-
-
-def _n_values(labels, adata) -> int | None:
-    """The number of label values, read by position and silently; ``None`` when
-    that read fails (the read with the cell ids then raises)."""
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        try:
-            if io._is_label_path_list(labels):
-                return len(_stack_label_files(labels, None)[0])
-            return len(_obs_or_vector(labels, adata, what="labels"))
-        except Exception:  # noqa: BLE001 - the second read says what is wrong
-            return None
 
 
 def _measured_warning(given, adata, reason: str, distinct: int, cells: int) -> str:
@@ -987,7 +950,7 @@ def _scores(
         from .classify import _graph_writer, _not_embedding
         not_embedding = _not_embedding(embedding)  # a label file or a list
         graph = _graph_writer(embedding)           # a file only graph methods write
-    emb, ids, adata, table = _read_output(embedding, labels, obsm, "embedding")
+    emb, ids, adata, table = _read_output(embedding, obsm, "embedding")
     if cells is not None and cells.moved and not _follows_cells(labels, adata, cells):
         stems = ", ".join(cells.moved)
         raise ValueError(

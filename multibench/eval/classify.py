@@ -86,7 +86,7 @@ def classify(output, labels=None, *, batch=None, reference=None,
         names = [str(k) for k in labels]
         labels = _labels_from_dict(labels)
     _check_embedding(output)
-    emb, ids, adata, table = _read_output(output, labels, obsm, "output")
+    emb, ids, adata, table = _read_output(output, obsm, "output")
     if emb.ndim != 2:
         raise ValueError(_NOT_EMBEDDING.format(what="output"))
     if io._is_label_path_list(labels):
