@@ -72,18 +72,14 @@ def _known_metrics() -> list[str]:
     return [c for codes in FAMILY_METRICS.values() for c in codes]
 
 
-def _canonical_metric(code: str, *, strict: bool = False) -> str | None:
+def _canonical_metric(code: str) -> str | None:
     """The canonical code for a metric name in any case or scIB spelling
     (``"kbet"`` -> ``"kBET"``, ``"isolated_label_f1"`` -> ``"iF1"``); ``None``
-    for a blank; an unknown code comes back stripped, or with ``strict=True``
-    raises ``ValueError``."""
+    for a blank; an unknown code comes back stripped."""
     key = "" if code is None else str(code).strip().lower()
     if key in ("", "nan"):
         return None
-    out = _METRIC_CANON.get(key, str(code).strip())
-    if strict and out not in _METRIC_CANON.values():
-        raise ValueError(f"unknown metric {code!r}; valid: {_known_metrics()}")
-    return out
+    return _METRIC_CANON.get(key, str(code).strip())
 
 
 class MetricSelection:
@@ -130,13 +126,8 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
     Raises
     ------
     ValueError
-        A string that is neither a family token nor a metric code (a method
-        task token gets an extra sentence saying the slot selects a metric
-        family), an unknown code in a list
-        (listing the valid codes), an empty list, or a list that names the
-        same metric twice after canonicalisation.
-    TypeError
-        Anything that is neither ``None``, a string nor a collection.
+        A string that is neither a family token nor a metric code, an unknown
+        code in a list, or an empty list.
     """
     def family_word(m) -> bool:
         return isinstance(m, str) and m.lower() in (*FAMILY_METRICS, "all")
@@ -153,11 +144,6 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
             metrics = [code]               # one code: a list of one
         else:
             raise ValueError(_unknown_metrics(kw, f"token {metrics}"))
-    if isinstance(metrics, (bytes, dict)) or not hasattr(metrics, "__iter__"):
-        got = type(metrics).__name__
-        raise TypeError(
-            f"{kw}= takes None, a family ('all', 'clustering', 'batch', 'classification'), "
-            f"a metric code, or a list of them. It got {'an' if got[:1] in 'aeiou' else 'a'} {got}.")
     wanted = list(metrics)
     if not wanted:
         raise ValueError(
@@ -165,7 +151,7 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
             f"or a non-empty list of codes.")
     valid = _known_metrics()
     present = sorted(set(map(str, extra)))
-    codes, named, unknown = [], [], []
+    codes, unknown = [], []
     for m in wanted:
         if family_word(m):
             # a family in the list: its codes (kBET only when named, as for the token)
@@ -173,7 +159,6 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
             codes += [c for c in family if c != "kBET" and c not in codes]
             continue
         c = _canonical_metric(m)
-        named.append(c)
         if c is None or (c not in valid and c not in present):
             unknown.append(m)
         else:
@@ -182,11 +167,7 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
         raise ValueError(_unknown_metrics(kw, f"token{'s' if len(unknown) > 1 else ''} "
                                               f"{', '.join(map(str, unknown))}")
                          + (f" This frame also has {', '.join(present)}." if present else ""))
-    dup = sorted({c for c in named if named.count(c) > 1})
     codes = list(dict.fromkeys(codes))
-    if dup:
-        raise ValueError(
-            f"{kw}= names the same metric twice after canonicalisation: {dup}")
     holding = [f for f, members in FAMILY_METRICS.items() if all(c in members for c in codes)]
     return MetricSelection(holding[0] if holding else "all", codes, True)
 

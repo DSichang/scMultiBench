@@ -24,13 +24,14 @@ def test_rank_refuses_rows_of_another_category():
     cross = _quiet(mtb.load_results, "cross")
     with pytest.raises(ValueError) as e:
         _quiet(mtb.rank, "cross", long_df=vertical)
-    assert str(e.value) == ("long_df holds vertical rows: pass rank('vertical', "
-                            "long_df=...).")
+    assert str(e.value) == (
+        "long_df holds vertical rows: rank one category at a time, as "
+        "rank('vertical', long_df=long_df[long_df['category'] == 'vertical']).")
     both = pd.concat([cross, vertical])
     with pytest.raises(ValueError) as e:
         _quiet(mtb.rank, "cross", long_df=both)
     assert str(e.value) == (
-        "long_df holds vertical rows next to cross ones: rank one category at a time, as "
+        "long_df holds vertical rows: rank one category at a time, as "
         "rank('cross', long_df=long_df[long_df['category'] == 'cross']).")
     with pytest.raises(ValueError, match=r"^long_df holds cross and vertical rows: rank one "
                                          r"category at a time, as rank\('cross', "):

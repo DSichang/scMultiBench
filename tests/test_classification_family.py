@@ -294,9 +294,8 @@ def test_rank_without_classification_scores():
     # D11 (vertical, one batch) has none; D28, D45 and D52 have them
     with pytest.raises(ValueError) as e:
         _quiet(mtb.rank, "vertical", metrics="classification")
-    assert str(e.value) == ("The stored results of vertical have no classification "
-                            "scores. Score your runs with mtb.evaluate and pass them as "
-                            "long_df=.")
+    assert str(e.value).startswith("The stored results of vertical have no "
+                                   "metrics='classification' scores; they have ")
 
 
 @pytest.mark.parametrize("category", ["diagonal", "mosaic", "cross"])

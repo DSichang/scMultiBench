@@ -17,9 +17,8 @@ def test_a_family_in_a_list_adds_its_codes_without_kbet():
     assert "kBET" in metric_selection(["batch", "kBET"]).codes
 
 
-def test_a_code_named_twice_is_refused():
-    with pytest.raises(ValueError, match="names the same metric twice"):
-        metric_selection(["ari", "ARI"])
+def test_a_code_named_twice_is_kept_once():
+    assert metric_selection(["ari", "ARI"]).codes == ["ARI"]
 
 
 def test_an_unknown_token_names_the_valid_ones():
