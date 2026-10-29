@@ -57,8 +57,7 @@ def bar(long_df: pd.DataFrame, *, metrics=None, methods=None, title: str | None 
     -----
     UserWarning
         A method missing from some datasets, a dataset with one method, a
-        metric only one method has, rows scored before 0.4.0, or a figure of
-        two methods.
+        metric only one method has, or rows scored before 0.4.0.
 
     Examples
     --------
@@ -76,15 +75,13 @@ def bar(long_df: pd.DataFrame, *, metrics=None, methods=None, title: str | None 
             "long_df has no rows to plot. If it came from load_results, its "
             "UserWarning says why.")
     if methods is not None:
-        methods = _resolve(methods, long_df["method"].unique().tolist(), "method",
-                           catalog._canonical_id)
+        methods = _resolve(methods, long_df["method"].unique().tolist(), catalog._canonical_id)
         long_df = long_df[long_df["method"].isin(methods)]
     family = (metrics.lower() if isinstance(metrics, str)
               and metrics.lower() in FAMILY_METRICS else None)
     if metrics is not None:
         names = long_df["metric"].dropna().unique().tolist()
-        metrics = _resolve(_expand_families(metrics, names), names, "metric",
-                           catalog._canonical_metric)
+        metrics = _resolve(_expand_families(metrics, names), names, catalog._canonical_metric)
 
     picked = long_df if not metrics else long_df[long_df["metric"].isin(metrics)]
     _refuse_repeats(picked)

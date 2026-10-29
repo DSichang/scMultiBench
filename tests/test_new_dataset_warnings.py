@@ -48,8 +48,8 @@ def test_bar_warns_about_a_lone_method_and_the_incomplete_matrix():
     assert lone == ["Dataset LABMOS has only one method, PCA_standin. Its Overall "
                     "there is always 1.0. Plot it with methods scored on the same "
                     "dataset."]
-    inc = [m for m in msgs if m.startswith("The summary ranks ")]
-    assert len(inc) == 1 and "PCA_standin has scores on 1 of them." in inc[0]
+    inc = [m for m in msgs if "scores on only some of the" in m]
+    assert len(inc) == 1 and "PCA_standin" in inc[0]
     assert inc[0].endswith("Pass methods= with the methods scored on every dataset.")
 
 

@@ -189,4 +189,4 @@ def test_end_to_end_plot_compares_this_run_with_the_stored_table():
     assert long.method.nunique() == ns["stored"].method.nunique() + 1
     assert ours == [], ours
     _, ours = _run_plot_cell(_scores_like_evaluate("igraph"))
-    assert any("igraph Leiden backend" in m for m in ours), ours
+    assert any("clustered with igraph" in m for m in ours), ours

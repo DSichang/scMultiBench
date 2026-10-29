@@ -213,15 +213,10 @@ def coverage_warnings(parts: dict) -> list:
     none_shared = _no_overlap_message(parts)
     out = [none_shared] if none_shared else []
     if not none_shared and n > 1 and (per_method < n).any():
-        partial = per_method[per_method < n].sort_values()
-        by_count: dict = {}
-        for m, c in partial.items():
-            by_count.setdefault(int(c), []).append(str(m))
-        seen = " ".join(
-            f"{_and_list(ms)} {'has' if len(ms) == 1 else 'have'} scores on {c} of them."
-            for c, ms in by_count.items())
-        out.append(f"The summary ranks {n} datasets. {seen} A missing dataset is left out. "
-                   f"Pass methods= with the methods scored on every dataset.")
+        partial = [str(m) for m in per_method[per_method < n].index]
+        out.append(f"{_and_list(partial)} {'has' if len(partial) == 1 else 'have'} scores on "
+                   f"only some of the {n} datasets. Pass methods= with the methods scored "
+                   f"on every dataset.")
     out += _lone_method_messages(parts, "its Overall there is always 1.0")
     return out
 
@@ -292,15 +287,6 @@ def old_scoring(scored_with) -> "pd.Series":
     return parts.map(old).astype(bool)
 
 
-#: the warning for rows scored before 0.4.0 next to the stored tables
-OLD_SCORING = ("The rows for {names} were scored before multibench 0.4.0. "
-               "Score them again to compare them with the stored results.")
-#: the same for rows that do not record their scoring
-NO_SCORING = ("The rows for {names} do not record how they were scored (no "
-              "scored_with). Score them with multibench 0.4.0 to compare them with "
-              "the stored results.")
-
-
 def old_scoring_warning(df: pd.DataFrame) -> str | None:
     """The message for rows of your own, scored before 0.4.0 or with no
     ``scored_with``, plotted next to the stored rows; else ``None``."""
@@ -315,23 +301,15 @@ def old_scoring_warning(df: pd.DataFrame) -> str | None:
     hit = old_scoring(sw).to_numpy()
     if not hit.any():
         return None
-    blank = sw.isna().to_numpy()
     names = ", ".join(sorted(map(str, own.loc[hit, "method"].unique())))
-    return (NO_SCORING if blank[hit].all() else OLD_SCORING).format(names=names)
+    return (f"The rows for {names} were not scored by multibench 0.4.0. Score them again "
+            f"to compare them with the stored results.")
 
 
 def backend_warning(df: pd.DataFrame) -> str | None:
-    """The message for igraph-scored rows plotted next to stored rows, else ``None``.
-
-    Rows of your own scored before 0.4.0, or without ``scored_with``, get
-    :func:`old_scoring_warning`'s message instead.
-
-    The stored tables were clustered with leidenalg. A row is affected when
-    its ``scored_with`` starts with ``igraph/`` and its metric came from
-    Leiden: iF1, ARI_batch and NMI_batch always; ARI, NMI, ASW and iASW when
-    the clusters part is ``search``.
-    Rows without ``scored_with`` (NaN) never trigger the igraph check.
-    """
+    """The message for rows of your own clustered with igraph (their Leiden
+    metrics) next to the stored rows, which used leidenalg; first
+    :func:`old_scoring_warning`'s; else ``None``."""
     old = old_scoring_warning(df)
     if old:
         return old
@@ -350,24 +328,21 @@ def backend_warning(df: pd.DataFrame) -> str | None:
     if not hit.any():
         return None
     names = ", ".join(sorted(map(str, df.loc[hit, "method"].unique())))
-    return (f"The rows for {names} were clustered with the igraph Leiden backend. "
-            f"The stored results used leidenalg, which can move ARI by up to "
-            f"about 0.1. Set mtb.config.leiden_flavor = 'leidenalg' before "
-            f"evaluate to compare them.")
+    return (f"The rows for {names} were clustered with igraph, the stored results with "
+            f"leidenalg. Set mtb.config.leiden_flavor = 'leidenalg' and evaluate again to "
+            f"compare them.")
 
 
 #: colour ramp names the package defines itself, on top of matplotlib's
 PINKS = "Pinks"
 
 
-def colormap(name):
+def colormap(name: str):
     """The matplotlib colormap ``name``, or ``"Pinks"``: the pink half of
     ColorBrewer's PiYG, from near-white to deep magenta, which is the
     classification family's ramp as blues and greens are the other two
-    families'. A colormap object is returned as it is."""
+    families'."""
     from matplotlib import colormaps, colors
-    if not isinstance(name, str):
-        return name
     if name == PINKS:
         ramp = colormaps["PiYG"](np.linspace(0.5, 0.0, 256))
         return colors.ListedColormap(ramp, name=PINKS)

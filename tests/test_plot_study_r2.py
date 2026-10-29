@@ -70,7 +70,8 @@ def _ilisi_tie():
 
 def test_one_method_figure_warns_and_is_grey():
     _, msgs = _messages(_build_table, _mine())
-    assert msgs == ["Only one method, PCA: nothing to rank it against, so the fills are grey."]
+    assert msgs == ["Only one method, PCA: nothing to rank it against, so the fills are grey. "
+                    "Plot it with other methods."]
     fig, msgs = _messages(mtb.plot.bubble, _mine())
     assert len(msgs) == 1
     assert len(_circles(fig, _grey())) == 4                  # every metric marker
@@ -95,10 +96,9 @@ def test_constant_column_warns_and_uses_the_neutral_fill():
 
 # --- M03: igraph rows next to the stored tables -----------------------------
 
-BACKEND = ("The rows for {m} were clustered with the igraph Leiden backend. The stored "
-           "results used leidenalg, which can move ARI by up to about 0.1. Set "
-           "mtb.config.leiden_flavor = 'leidenalg' before evaluate to compare "
-           "them.")
+BACKEND = ("The rows for {m} were clustered with igraph, the stored results with "
+           "leidenalg. Set mtb.config.leiden_flavor = 'leidenalg' and evaluate again to "
+           "compare them.")
 
 
 # ---- restored from before the 0.4 cut: kept behaviour
@@ -134,14 +134,14 @@ def test_igraph_rows_next_to_stored_rows_warn(fn):
 def test_no_backend_warning_for_leidenalg_or_own_rows(fn):
     lalg = _mine(method="MyMethod", dataset="D11", scored_with="leidenalg/search/0.4.0")
     _, msgs = _messages(fn, pd.concat([_stored("D11"), lalg], ignore_index=True))
-    assert not any("igraph Leiden backend" in m for m in msgs), msgs
+    assert not any("clustered with igraph" in m for m in msgs), msgs
     own = pd.concat([_mine(method="M1"), _mine(method="M2", values=(0.4, 0.6, 0.5, 0.8))],
                     ignore_index=True)
     _, msgs = _messages(fn, own)
-    assert not any("igraph Leiden backend" in m for m in msgs), msgs
+    assert not any("clustered with igraph" in m for m in msgs), msgs
     # rows without scored_with (stored rows only) never trigger it
     _, msgs = _messages(fn, _stored("D11"))
-    assert not any("igraph Leiden backend" in m for m in msgs), msgs
+    assert not any("clustered with igraph" in m for m in msgs), msgs
 
 
 def test_backend_warning_needs_a_sweep_metric_on_show():
@@ -149,10 +149,10 @@ def test_backend_warning_needs_a_sweep_metric_on_show():
                    ignore_index=True)
     # under the 0.4.0 search ASW reads the Leiden clusters too: cLISI does not
     _, msgs = _messages(_build_table, df, metrics=["cLISI"])
-    assert not any("igraph Leiden backend" in m for m in msgs), msgs
+    assert not any("clustered with igraph" in m for m in msgs), msgs
     # clusters from the user: only iF1 depends on the backend
     user = _mine(method="MyMethod", dataset="D11", scored_with="igraph/user/0.4.0")
     _, msgs = _messages(_build_table,
                         pd.concat([_stored("D11"), user], ignore_index=True))
-    assert not any("igraph Leiden backend" in m for m in msgs), msgs
+    assert not any("clustered with igraph" in m for m in msgs), msgs
 

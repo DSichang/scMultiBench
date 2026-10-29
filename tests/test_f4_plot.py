@@ -76,13 +76,13 @@ def _incomplete():
                       _mine("A", "D2", 0.3), _mine("B", "D2", 0.45)], ignore_index=True)
 
 
-def test_incomplete_matrix_groups_methods_by_count():
+def test_incomplete_matrix_names_the_methods():
     parts = {"D1": pd.DataFrame(index=["A", "B", "C", "E"]),
              "D2": pd.DataFrame(index=["A", "B"]),
              "D3": pd.DataFrame(index=["A", "C"])}
     (msg,) = style.coverage_warnings(parts)
-    assert ("The summary ranks 3 datasets. E has scores on 1 of them. B and C have "
-            "scores on 2 of them.") in msg
+    assert msg == ("B, C and E have scores on only some of the 3 datasets. Pass methods= "
+                   "with the methods scored on every dataset.")
 
 
 # --- R4-12 (d): the n/a error -------------------------------------------------
