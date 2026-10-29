@@ -89,7 +89,7 @@ def test_install_packed_refuses_off_linux_before_download(off_linux, monkeypatch
 
 
 @pytest.mark.parametrize("fn", [
-    lambda: envs.create_env("matilda", dry_run=False),
+    lambda: envs.create_all(methods=["Matilda"], dry_run=False),
 ])
 def test_every_builder_refuses_off_linux(off_linux, monkeypatch, fn):
     monkeypatch.setattr(envs, "_run_all", lambda cmds: pytest.fail("a build was started"))

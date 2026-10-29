@@ -42,7 +42,7 @@ def test_create_env_runs_any_post_install_script():
     body = post.read_text(encoding="utf-8")
     assert "rliger" in body
 
-    cmds = envs.create_env("scmb_r", dry_run=True)
+    cmds = envs.create_env("scmb_r")
     flat = " ".join(" ".join(c) for c in cmds)
     assert post.name in flat, f"create_env would not run {post.name}: {flat}"
 

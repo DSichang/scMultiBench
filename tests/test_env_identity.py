@@ -191,11 +191,11 @@ def test_run_refuses_off_linux_also_when_the_env_is_installed(fake_root, tmp_pat
 
 def test_a_lockfile_build_marks_its_env_and_refuses_a_users_env(fake_root):
     conda = str(Path(config.envs_dir).parent.parent / "bin" / "conda")
-    envs.create_env("glue", conda=conda, dry_run=False, force=True)
+    envs._build("glue", envs.create_env("glue", conda=conda), conda, "lockfile")
     assert (fake_root / "envs" / "glue" / envs.FLAVOR_FILE).read_text() == "build\n"
     assert envs.env_prefix("glue") == fake_root / "envs" / "glue"
     assert envs.installed_flavor("glue") is None          # not a packed install
     with pytest.raises(RuntimeError, match="matilda was not installed by this version of multibench"):
-        envs.create_env("matilda", conda=conda, dry_run=False, force=True)
+        envs._install_rows(["Matilda"], packed=False, conda=conda, force=True)
 
 

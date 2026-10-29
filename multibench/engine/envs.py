@@ -246,28 +246,14 @@ def _single_build(env: str, *, manifest: dict | None = None) -> bool:
     return archive_key(env, "cpu") not in manifest
 
 
-def _cpu_fallback_warning(env: str, manifest: dict, sizes: dict) -> str:
-    """The warning for a CPU request that installs the ``'<env>'`` archive."""
-    size = _gb((sizes.get(env) or {}).get("archive_bytes"))
-    if _single_build(env, manifest=manifest):
-        return (f"{env} has a single build (the same archive for CPU and GPU hosts); "
-                f"installing it ({size})")
-    return (f"no CPU archive for {env}; installing the GPU build ({size}) - the CPU "
-            f"archive {archive_key(env, 'cpu')} is not published yet")
-
-
-def auto_flavor_note(flavor: str, *, planning: bool = False,
-                     dry_run: bool = False) -> str | None:
+def auto_flavor_note(flavor: str, *, dry_run: bool = False) -> str | None:
     """The stderr note for ``flavor='auto'`` on a host without a GPU, else
-    ``None``: pass ``'gpu'`` when the jobs run on GPU nodes. ``planning``
-    returns the advice alone (``env plan`` already names the CPU builds);
-    ``dry_run`` says what would be installed."""
+    ``None``: pass ``'gpu'`` when the jobs run on GPU nodes. ``dry_run`` says
+    what would be installed."""
     if flavor != "auto" or resolve_flavor(flavor) != "cpu" or host_platform_problem():
         # off Linux nothing is installed here: no GPU node to plan for
         return None
     gpu = "flavor='gpu'"
-    if planning:
-        return f"# for jobs on GPU nodes, pass {gpu}"
     verb = "would install" if dry_run else "installing"
     return (f"# {verb} CPU builds (no NVIDIA GPU on this host); if the jobs run on GPU "
             f"nodes, pass {gpu}")
@@ -503,14 +489,6 @@ def other_env_text(env: str, prefix, then: str) -> str:
     recognise. The action comes before the path, so a clipped line keeps it."""
     return (f"Environment {env} was not installed by this version of multibench, so "
             f"it is not used. Rename or remove {prefix}, then {then}")
-
-
-def _refuse_other_env(env: str, conda: str | None = None) -> None:
-    """``RuntimeError`` before an install when an env of that name exists that
-    multibench did not install."""
-    other = other_env_prefix(env, conda)
-    if other is not None:
-        raise RuntimeError(other_env_text(env, other, "install again."))
 
 
 def _mark_built(env: str, conda: str | None, how: str, before: set) -> None:
@@ -789,8 +767,11 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
         raise RuntimeError(other_env_text(env, dest, "install again."))
     manifest, sizes = packed_manifest(), packed_sizes()
     key, installed = archive_for(env, flavor, manifest=manifest, sizes=sizes)
-    if resolve_flavor(flavor) == "cpu" and installed == "gpu":
-        _text.warn(_cpu_fallback_warning(env, manifest, sizes), UserWarning)
+    if (resolve_flavor(flavor) == "cpu" and installed == "gpu"
+            and not _single_build(env, manifest=manifest)):
+        size = _gb((sizes.get(env) or {}).get("archive_bytes"))
+        _text.warn(f"No CPU build of {env} yet; installing the GPU build ({size}).",
+                   UserWarning)
     urls = archive_urls(key, manifest)
     build = "single" if _single_build(env, manifest=manifest) else installed
     envs_root.mkdir(parents=True, exist_ok=True)
@@ -933,20 +914,10 @@ def post_install(env_name: str):
     return p if p.is_file() else None
 
 
-def create_env(env_name: str, conda: str | None = None,
-               dry_run: bool = True, *, force: bool = False) -> list[list[str]]:
-    """Create one env from its shipped lockfile (the reproducible path).
-
-    ``dry_run=False`` runs the commands; on a non-Linux host it raises
-    ``RuntimeError`` first unless ``force``. A missing lockfile raises
-    ``FileNotFoundError``.
-
-    Returns
-    -------
-    list of list of str
-        The commands: conda phase, pip ``--no-deps`` phase, post-install
-        script when shipped.
-    """
+def create_env(env_name: str, conda: str | None = None) -> list[list[str]]:
+    """The commands that build one env from its shipped lockfile: conda phase,
+    pip ``--no-deps`` phase, post-install script when shipped. A missing
+    lockfile raises ``FileNotFoundError``."""
     lock = lockfile(env_name)
     if lock is None:
         raise FileNotFoundError(
@@ -960,16 +931,12 @@ def create_env(env_name: str, conda: str | None = None,
     post = post_install(env_name)
     if post is not None:
         cmds.append([conda, "run", "-n", env_name, "bash", str(post)])
-    if not dry_run:
-        _require_linux(force)
-        _build(env_name, cmds, conda, "lockfile")
     return cmds
 
 
 def _build(env_name: str, cmds: list[list[str]], conda: str | None, how: str) -> None:
     """Run the build ``cmds`` of ``env_name`` and mark the new env as made by
-    multibench; refused first when another env already has that name."""
-    _refuse_other_env(env_name, conda)
+    multibench."""
     before = set(_same_named(env_name, conda))
     _run_all(cmds)
     _mark_built(env_name, conda, how, before)
@@ -1012,7 +979,7 @@ def create_all(category: str | None = None, methods: list[str] | None = None,
         exists = env in have
         cmds: list[list[str]] = []
         if not exists and lock is not None:
-            cmds = create_env(env, conda=conda, dry_run=True)
+            cmds = create_env(env, conda=conda)
             if not dry_run:
                 _build(env, cmds, conda, "lockfile")
         out.append({"env": env, "methods": ms, "exists": exists,
@@ -1036,16 +1003,6 @@ def packed_manifest() -> dict:
 
 #: The columns of :func:`install`'s table; the rows hold more, for the package.
 INSTALL_COLUMNS = ("env", "methods", "state", "flavor", "archive_bytes", "unpacked_bytes")
-
-
-def _frame(rows: list[dict], first: tuple):
-    """``rows`` as a DataFrame, ``first`` columns first."""
-    import pandas as pd
-    df = pd.DataFrame(rows)
-    if df.empty:
-        return pd.DataFrame(columns=list(first))
-    return df[[c for c in first if c in df.columns]
-              + [c for c in df.columns if c not in first]]
 
 
 def install(methods: list[str] | None = None, *, category: str | None = None,
@@ -1085,7 +1042,7 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
     Raises
     ------
     KeyError
-        Unknown method id, with a did-you-mean hint.
+        Unknown method id.
     RuntimeError
         A real install on a host that is not Linux, no conda where needed, or
         a failed build.
@@ -1098,7 +1055,8 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
     """
     rows = _install_rows(methods, category=category, packed=not build, dry_run=dry_run,
                          flavor=flavor)
-    plan = _frame(rows, INSTALL_COLUMNS)[list(INSTALL_COLUMNS)]
+    import pandas as pd
+    plan = pd.DataFrame(rows, columns=list(INSTALL_COLUMNS))
     if dry_run and not build:
         todo = to_download(rows)
         totals, line = plan_totals(todo)
@@ -1119,9 +1077,6 @@ def _install_rows(methods: list[str] | None = None, *, category: str | None = No
                   force: bool = False, flavor: str = "auto") -> list[dict]:
     """The rows of :func:`install`, as dicts."""
     check_flavor(flavor)
-    if isinstance(methods, str) and methods in registry.CATEGORIES:
-        raise TypeError(f"methods must be a list of ids, got the category {methods!r} - "
-                        f"did you mean category={methods!r}?")
     methods = _check_methods(methods)
     manifest = packed_manifest() if packed else {}
     sizes = packed_sizes() if packed else {}
@@ -1145,15 +1100,10 @@ def _install_rows(methods: list[str] | None = None, *, category: str | None = No
                 else would_install)
         if flav == "gpu" and packed and _single_build(env, manifest=manifest):
             flav = "any"            # one archive for CPU and GPU hosts
-        # what runs: the archive is unpacked, so the lockfile build is the fallback
-        archived = packed and env in manifest and state not in ("BUILD", "NO-LOCK")
-        cmds, fallback = ([], r.get("cmds", [])) if archived else (r.get("cmds", []), [])
-        other = None if r["exists"] else _str_or_none(other_env_prefix(env, conda))
-        out.append({**r, "state": state, "other_env": other,
+        out.append({**r, "state": state,
                     "packed_url": _first_url(manifest.get(key)),
                     "archive_bytes": size.get("archive_bytes"),
-                    "unpacked_bytes": size.get("unpacked_bytes"),
-                    "flavor": flav, "cmds": cmds, "fallback_cmds": fallback})
+                    "unpacked_bytes": size.get("unpacked_bytes"), "flavor": flav})
     if dry_run and packed and any(not r["exists"] and r["flavor"] == "cpu"
                                   and r["state"] != "name taken" for r in out):
         note = auto_flavor_note(flavor, dry_run=True)
@@ -1246,44 +1196,26 @@ def _str_or_none(path) -> str | None:
     return None if path is None else str(path)
 
 
-#: R's variables that name a library of the user's own; :func:`without_user_r_library`
-#: removes them
 _R_USER_LIBRARY_VARS = ("R_LIBS", "R_LIBS_SITE")
-#: R's variables set to a path that is not a directory: R leaves such a path off
-#: .libPaths() and reads no file there. An empty R_LIBS_USER would not do:
-#: R's etc/Renviron sets ${R_LIBS_USER:-'%U'}, the default personal library.
 _R_NO_USER_FILES = ("R_LIBS_USER", "R_ENVIRON_USER", "R_PROFILE_USER")
 
 
 def without_user_r_library(environ) -> dict:
-    """``environ`` as a dict in which R sees only the env's own library.
-
-    A package in the user's personal library (``R_LIBS_USER``, by default
-    ``~/R/<platform>-library/<x.y>``) is loaded before the env's copy, and
-    one built with another compiler fails to load (MOFA2: plyr.so,
-    ``CXXABI_1.3.15 not found``). ``R_LIBS`` and ``R_LIBS_SITE`` go,
-    ``R_LIBS_USER`` points at a path that is not a directory, and so do
-    ``R_ENVIRON_USER`` and ``R_PROFILE_USER``: ``~/.Renviron`` and
-    ``~/.Rprofile`` can set the library again.
-    """
+    """``environ`` as a dict in which R reads only the env's own library:
+    ``R_LIBS``/``R_LIBS_SITE`` removed, ``R_LIBS_USER``, ``R_ENVIRON_USER`` and
+    ``R_PROFILE_USER`` set to a path that is not a directory (R's Renviron
+    turns an empty ``R_LIBS_USER`` back into ``~/R/...``)."""
     out = {k: v for k, v in environ.items() if k not in _R_USER_LIBRARY_VARS}
     out.update(dict.fromkeys(_R_NO_USER_FILES, os.devnull))
     return out
 
 
 def _run_all(cmds: list[list[str]]) -> None:
-    # else pip skips a package that ~/.local provides, which run() hides
-    os.environ.setdefault("PYTHONNOUSERSITE", "1")
-    # else a post-install script finds an R package in the user's library,
-    # skips it, and the run, which does not read that library, fails
-    env = without_user_r_library(os.environ)
+    # a package in ~/.local or the user's R library would be skipped by pip or
+    # a post-install script, and the run, which reads neither, fails
+    env = {**without_user_r_library(os.environ), "PYTHONNOUSERSITE": "1"}
     if cmds and shutil.which(cmds[0][0]) is None:
-        raise RuntimeError(
-            "Neither conda nor mamba is on this machine. Method environments "
-            "cannot be built here. They need Linux with conda, and mamba is "
-            "recommended. The installation guide shows the steps. The method "
-            "list, stored results and figures work without them."
-        )
+        raise RuntimeError(f"{NO_CONDA} Install conda first.")
     for c in cmds:
         proc = subprocess.run(c, capture_output=True, text=True, env=env)
         if proc.returncode != 0:

@@ -55,12 +55,6 @@ def test_nothing_runnable_lists_rows_with_files_in_place_first(no_envs, tmp_path
     assert [l.split()[0] for l in lines] == sorted(l.split()[0] for l in lines)
 
 
-def test_cpu_fallback_warning_names_no_internal_file():
-    msg = envs._cpu_fallback_warning("scmb_torch", {"scmb_torch-cpu": "u"}, {})
-    assert msg == ("no CPU archive for scmb_torch; installing the GPU build (?) - the CPU "
-                   "archive scmb_torch-cpu is not published yet")
-
-
 def test_data_and_repo_path_variables(monkeypatch, tmp_path):
     for var, field in ((_settings.DATA_PATH_VAR, "data_path"), (_settings.REPO_PATH_VAR, "repo_path")):
         monkeypatch.delenv(var, raising=False)

@@ -126,24 +126,15 @@ def _diag_folder(root, name="D28", n=40):
     return d, emb
 
 
-def test_install_warning_and_unpack_line_for_a_single_build(tmp_path, monkeypatch):
+def test_single_build_is_an_env_without_a_cpu_key(tmp_path, monkeypatch):
     manifest = {"scmb_r": "https://x/scmb_r.tar.gz",
                 "scmb_torch": "https://x/scmb_torch.tar.gz",
                 "scmb_torch-cpu": "https://x/scmb_torch-cpu.tar.gz"}
-    sizes = {"scmb_r": {"archive_bytes": 900_000_000}}
-    msg = envs._cpu_fallback_warning("scmb_r", manifest, sizes)
-    assert msg == ("scmb_r has a single build (the same archive for CPU and GPU hosts); "
-                   "installing it (0.9 GB)")
-    assert "GPU build" not in msg
-    # an env whose CPU archive is listed but not uploaded keeps the two-build words
-    assert envs._cpu_fallback_warning("scmb_torch", manifest, {}) == (
-        "no CPU archive for scmb_torch; installing the GPU build (?) - the CPU archive "
-        "scmb_torch-cpu is not published yet")
     assert envs._single_build("scmb_r", manifest=manifest)
     assert not envs._single_build("scmb_torch", manifest=manifest)
 
 
-def test_single_build_install_warns_in_its_own_words_and_unpacks_as_single(
+def test_single_build_install_does_not_warn_and_unpacks_as_single(
         tmp_path, monkeypatch, capsys):
     import urllib.request
 
@@ -157,11 +148,9 @@ def test_single_build_install_warns_in_its_own_words_and_unpacks_as_single(
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
     tgz = _tiny_archive(tmp_path / "a.tar.gz")
     serve_archives(monkeypatch, lambda url: (str(tgz), None))
-    with pytest.warns(UserWarning) as rec:
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
         assert envs.install_packed("scmb_r", envs_dir=tmp_path / "envs") is True
-    assert [str(r.message) for r in rec] == [
-        "scmb_r has a single build (the same archive for CPU and GPU hosts); "
-        "installing it (0.9 GB)"]
     out = capsys.readouterr().out
     assert "[env] downloading scmb_r (single build) 900 MB ..." in out
     assert "gpu build" not in out.lower()
