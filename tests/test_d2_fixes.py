@@ -86,8 +86,9 @@ def test_repeated_barcodes_in_another_order_are_refused(d28_like):
         W._cell_vector(s, "DD", folder.parent)
 
 
-def test_load_run_of_a_missing_folder_says_it_does_not_exist(tmp_path):
-    with pytest.raises(FileNotFoundError, match=r"nothing does not exist\. Pass the out_dir"):
+def test_load_run_of_a_missing_folder_says_it_holds_no_result(tmp_path):
+    with pytest.raises(FileNotFoundError, match=r"nothing holds no batch_result\.json\. Pass "
+                                                r"the out_dir"):
         mtb.load_run(tmp_path / "nothing")
 
 

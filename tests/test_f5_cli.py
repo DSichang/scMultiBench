@@ -84,13 +84,14 @@ def test_scan_reason_is_sentences_with_their_own_subjects(tmp_path, monkeypatch)
 def test_count_lines_say_rows_without_plural_brackets(monkeypatch, capsys, tmp_path):
     monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
-    n = len(full_scan("D11", "vertical", modalities="all"))
+    plan = full_scan("D11", "vertical", modalities="all")
+    n = plan.loc[plan["files_ok"].astype(bool), "method"].nunique()
     mtb.scan("D11", "vertical", modalities="all")
     line = capsys.readouterr().out.splitlines()[0]
     assert line.startswith("[scan] 14 of 18 methods have their input files in D11. ")
     with pytest.raises(ValueError) as e:
         mtb.run("D11", "vertical", out_dir=tmp_path, verbose=False, modalities="all")
-    assert f"\nThe first 3 of {n} blocked rows:\n" in str(e.value)
+    assert f"\nThe first 3 of {n} blocked methods:\n" in str(e.value)
     for text in (line, str(e.value)):
         assert "(s)" not in text and "variant" not in text
 

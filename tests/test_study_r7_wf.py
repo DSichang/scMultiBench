@@ -202,13 +202,13 @@ def test_the_list_header_counts_methods_when_each_has_one_row(no_envs, mydata):
     plan = mtb.scan(os.path.join('data', 'MYDATA'), 'vertical', modalities=['rna', 'adt'], verbose=False)
     assert plan["method"].is_unique and len(plan) > 3
     assert f"\nThe first 3 of {len(plan)} blocked methods:\n" in msg
-    # several rows per method: still rows
+    # several rows per method: still one line per method
     msg = _nothing_runnable(os.path.join("data", "MYDATA"), modalities="all")
-    assert re.search(r"\nThe first 3 of \d+ blocked rows:\n", msg), msg
-    # with methods=, one line per requested method or row
+    assert re.search(r"\nThe first 3 of \d+ blocked methods:\n", msg), msg
+    # with methods=, one line per requested method
     msg = _nothing_runnable(os.path.join("data", "MYDATA"), methods=["Matilda", "totalVI"],
                             modalities=["rna", "adt"])
-    assert "\nBlocked, one line per requested method:\n" in msg
+    assert "\nBlocked:\n" in msg
     assert msg.splitlines()[-1].startswith(
         "mtb.scan('data/MYDATA', 'vertical', methods=['Matilda', "
         "'totalVI'], modalities=['rna', 'adt']) says why.")

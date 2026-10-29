@@ -67,8 +67,7 @@ def test_scan_reason_is_short_but_files_reason_is_verbatim(no_envs):
         assert "mtb.env.install([" in r["reason"]   # install command kept
     row = df[(df["method"] == "UnitedNet")].iloc[0]
     # the meaning first for ATAC (L31); D11's cty.csv is UnitedNet's label file (M21)
-    assert row["reason"].startswith("UnitedNet needs peak ATAC (atac.h5), which the "
-                                    "folder does not have. ")
+    assert row["reason"].startswith("UnitedNet needs peak ATAC (atac.h5). ")
     assert "cty" not in row["reason"]
 
 
@@ -113,16 +112,10 @@ def test_run_all_real_run_raises_on_missing_dataset_before_any_dispatch(monkeypa
                     verbose=False)
 
 
-# ----------------------------------------------------------------- P03: data_dir note
-def test_scan_modalities_warns_about_excluded_data_dir_methods(all_envs):
-    with pytest.warns(UserWarning) as rec:
-        df = full_scan("D28", "diagonal", modalities=["rna", "atac_gas"])
-    msgs = [str(w.message) for w in rec if "leave out scBridge" in str(w.message)]
-    assert len(msgs) == 1, msgs
-    assert msgs[0] == ("The modalities rna and atac_gas leave out scBridge, which reads a "
-                       "folder instead of modality files. Pass modalities=[] to select it, "
-                       "or leave out modalities= to see every variant.")
-    assert "(data_dir)" not in set(df["modalities"])      # rows unchanged: exact selector
+# ----------------------------------------------------------------- P03: data_dir rows
+def test_scan_modalities_selects_data_dir_methods_only_with_an_empty_list(all_envs):
+    df = full_scan("D28", "diagonal", modalities=["rna", "atac_gas"])
+    assert "(data_dir)" not in set(df["modalities"])      # exact selector
     # modalities=[] selects exactly it, and no note is emitted
     with warnings.catch_warnings():
         warnings.simplefilter("error")

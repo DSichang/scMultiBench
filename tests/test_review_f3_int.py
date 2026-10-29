@@ -51,7 +51,7 @@ ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 def _wrong_atac(reasons):
     """The scan rows blocked by the ATAC file they would read."""
     text = reasons.astype(str)
-    return text.str.contains("Export the ATAC as ", regex=False) | text.str.contains(
+    return text.str.contains(W._WRONG_ATAC_BODY, regex=True) | text.str.contains(
         W.PEAK_NAMES_REASON, regex=False)
 
 
@@ -116,8 +116,8 @@ def test_gene_names_in_the_peak_file_block_glue_seurat_v3_and_multimap(tmp_path,
             f"{m} reads peak names such as chr1:100-200. atac_peak.h5 holds other names, "
             f"for example GENE0. They are genes: export the ATAC as gene activity."), m
     assert sc.loc["MultiMAP", "reason"] == (
-        "MultiMAP needs peak ATAC, and atac_peak.h5 holds gene activity. Export the ATAC "
-        "as peaks.")
+        "MultiMAP needs peak ATAC. The features of atac_peak.h5 do not look like "
+        "chr:start-end, so it seems to hold gene activity.")
     # R4-01: naming the method keeps it blocked
     for m in ("GLUE", "Seurat_v3", "MultiMAP"):
         named = _quiet(full_scan, "LUNG_ga", "diagonal", methods=[m], data_path=root,
@@ -303,10 +303,10 @@ def _flat(page):
 def test_pages_state_the_donor_count_cross_reads():
     """The Quickstart and the run guide say how many batches the cross
     patterns of the registry read."""
-    from multibench import workflow as W
     from multibench.engine.schema import _batch_of
+    from tests.test_docs_folder_layout import batch_patterns
     reads = {}
-    for roles, methods in W.batch_patterns("cross"):
+    for roles, methods in batch_patterns("cross"):
         if any("atac" in r for r in roles):   # the page is about RNA + ADT donors
             continue
         top = max(_batch_of(r) for r in roles)
@@ -417,16 +417,12 @@ def test_a_named_method_keeps_the_row_its_roles_spell(pinned, capsys):
     assert 'moETM' not in set(df['method'])
 
 
-def test_a_representation_token_that_drops_a_named_method_says_why(pinned, capsys):
+def test_a_representation_token_that_drops_a_named_method_says_where_to_look(pinned, capsys):
     for call in (full_scan, lambda *a, **k: mtb.scan(*a, **k)):
         with pytest.raises(ValueError) as e:
             _quiet(call, 'D28', 'vertical', methods=['moETM'], modalities=['rna', 'gene_activity'], verbose=False)
-        assert str(e.value) == "moETM does not read rna+gene_activity in vertical data. moETM reads peaks. Pass modalities=['rna', 'atac_peak'] or ['rna', 'atac'].", str(e.value)
-        assert "method_info(m)['supports']" not in str(e.value)
-    with pytest.raises(ValueError, match="Matilda reads peaks\\. Pass modalities=\\['rna', 'atac_peak'\\] or \\['rna', 'atac'\\]\\.$"):
-        _quiet(full_scan, 'D11', 'vertical', methods=['Matilda'], modalities=['rna', 'atac_gas'], verbose=False)
-    with pytest.raises(ValueError, match="SCALEX reads gene activity\\. Pass modalities=\\['rna', 'atac_gas'\\] or \\['rna', 'atac'\\]\\.$"):
-        _quiet(full_scan, 'D28', 'diagonal', methods=['SCALEX'], modalities=['rna', 'atac_peak'], verbose=False)
+        assert str(e.value) == ("moETM does not read rna+gene_activity in vertical data. "
+                                "mtb.method_info('moETM')['supports'] lists what moETM reads.")
 
 
 def test_scan_names_the_missing_scripts_and_no_start_notes(pinned, capsys):

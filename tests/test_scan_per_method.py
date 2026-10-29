@@ -134,49 +134,22 @@ def _tenx(path, n=60):
         g.create_group("features")["name"] = np.array(GENES, dtype="S32")
 
 
-def test_the_first_line_names_10x_files(linux, tmp_path, capsys):
-    """A 10x file copied to rna.h5 is not RNA that the folder holds."""
+def test_a_10x_file_under_a_dataset_name_is_named_on_its_methods_lines(linux, tmp_path,
+                                                                       capsys):
+    """A 10x file copied to rna.h5: the line of each method that reads it says so."""
     def first(*a, **kw):
         mtb.config.data_path = tmp_path
         pm = _quiet(mtb.scan, *a, **kw)
         return pm, capsys.readouterr().out.splitlines()[0]
 
-    counts = ("[scan] 0 of 2 methods have their input files in {0}. 0 of 2 can run on "
-              "this computer. ")
-    for name, other, methods in (("TXADT", "adt.h5", ["Seurat_WNN", "totalVI"]),
-                                 ("TXATAC", "atac.h5", ["VIMCCA", "scMM"])):
-        (tmp_path / name).mkdir()
-        _tenx(tmp_path / name / "rna.h5")
-        _tenx(tmp_path / name / other)
-        pm, line = first(name, "vertical", methods=methods)
-        assert line == counts.format(name) + (
-            f"{name} holds no dataset file: rna.h5 and {other} are 10x Genomics files "
-            f"under the names of dataset files.")
-        assert "holds RNA and" not in line
-        # the rows listed are still those of the names in the folder
-        assert pm.attrs["held"] == ["rna", other[:-len(".h5")]]
-        assert list(pm["method"]) == methods and not pm["runnable"].any()
-    # with the rows that are not listed: the same sentence starts the note
-    mtb.config.data_path = tmp_path
-    _quiet(mtb.scan, 'TXADT', 'vertical')
-    assert capsys.readouterr().out.splitlines()[0].endswith(
-        "TXADT holds no dataset file: rna.h5 and adt.h5 are 10x Genomics files "
-        "under the names of dataset files.")
-    # one of two: the family of the other file is held, and the 10x file is named
     _cite(tmp_path, "MIX")
     _tenx(tmp_path / "MIX" / "rna.h5")
-    pm, line = first("MIX", "vertical", methods=["Seurat_WNN", "totalVI"])
-    assert line == counts.format("MIX") + (
-        "MIX holds ADT. rna.h5 is a 10x Genomics file under the name of a dataset file.")
-    assert pm.attrs["held"] == ["rna", "adt"]
-    # numbered files: the batches of the families named
-    _donors(tmp_path, "TWO", 2)
-    _tenx(tmp_path / "TWO" / "rna1.h5", n=40)
-    _tenx(tmp_path / "TWO" / "adt2.h5", n=40)
-    pm, line = first("TWO", "cross", methods=["StabMap", "sciPENN"])
-    assert line == counts.format("TWO") + (
-        "TWO holds RNA and ADT, in batches 1-2. rna1.h5 and adt2.h5 are 10x Genomics "
-        "files under the names of dataset files.")
+    mtb.config.data_path = tmp_path
+    pm = _quiet(mtb.scan, "MIX", "vertical", methods=["Seurat_WNN", "totalVI"])
+    out = capsys.readouterr().out
+    for m in ("Seurat_WNN", "totalVI"):
+        assert f"[scan] {m}: rna.h5 is a 10x Genomics file." in out, out
+    assert not pm["runnable"].any()
     # a 2-D matrix/data next to a matrix/indptr is a dataset file, as for mtb.run
     _cite(tmp_path, "BOTH")
     with h5py.File(tmp_path / "BOTH" / "rna.h5", "a") as f:
@@ -198,11 +171,10 @@ def test_the_first_line_names_10x_files(linux, tmp_path, capsys):
     assert line == ("[scan] 2 of 2 methods have their input files in GAS. 2 of 2 can run "
                     "on this computer. GAS holds RNA and ATAC.")
     assert pm.attrs["held"] == ["rna", "atac"] and pm["runnable"].all()
-    # as diagonal a gene-activity method reads atac_gas.h5, and the file is named
+    # as diagonal a gene-activity method reads atac_gas.h5, the 10x file
     pm, line = first("GAS", "diagonal", methods=["SCALEX", "Seurat_v5"])
     assert line == ("[scan] 1 of 2 methods has its input files in GAS. 1 of 2 can run on "
-                    "this computer. GAS holds RNA and ATAC. atac_gas.h5 is a 10x Genomics "
-                    "file under the name of a dataset file.")
+                    "this computer. GAS holds RNA and ATAC.")
     assert list(pm["method"]) == ["Seurat_v5", "SCALEX"]
     assert list(pm["runnable"]) == [True, False]
 

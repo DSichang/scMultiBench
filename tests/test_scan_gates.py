@@ -118,7 +118,6 @@ def test_scan_env_reason_names_method_and_category(no_envs):
     df = full_scan("D11", "cross")
     row = df[df["method"] == "StabMap"].iloc[0]
     assert "mtb.env.install(['StabMap'])" in row["env_reason"]
-    assert "mtb.env.install(category='cross')" in row["env_reason"]
     assert "--run" not in row["env_reason"]        # env install acts by default (X27)
     assert row["env_reason"].startswith(f"Environment {row['env']} is not installed.")
     assert not row["env_ok"]

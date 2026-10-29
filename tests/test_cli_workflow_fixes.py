@@ -35,10 +35,9 @@ def test_nothing_runnable_lists_only_requested_methods(no_envs):
     msg = str(e.value)
     assert msg.startswith("None of the requested methods (Matilda) can run on D11 "
                           "(vertical).")
-    assert "one line per requested row" in msg
-    # every requested variant on its own line, with ITS reason
-    assert "\n  Matilda (rna+adt): Environment matilda is not installed" in msg
-    assert "\n  Matilda (rna+atac): " in msg
+    # one line per requested method: the row whose files are in place, with ITS reason
+    assert "\nBlocked:\n  Matilda (rna+adt): Environment matilda is not installed" in msg
+    assert msg.count("\n  Matilda (") == 1
     # nobody else's reason - Concerto/MIRA/MOFA2 were not requested
     for other in ("Concerto", "MIRA", "MOFA2", "scmb_concerto"):
         assert other not in msg
@@ -50,9 +49,9 @@ def test_nothing_runnable_without_methods_says_first_3_of_n(no_envs):
         mtb.run("D11", "vertical", out_dir="/tmp/unused", verbose=False,
                     modalities="all")
     msg = str(e.value)
-    m = re.search(r"The first 3 of (\d+) blocked rows:\n", msg)
+    m = re.search(r"The first 3 of (\d+) blocked methods:\n", msg)
     assert m and int(m.group(1)) >= 10
-    body = msg.split("blocked rows:\n", 1)[1]
+    body = msg.split("blocked methods:\n", 1)[1]
     lines = [l for l in body.splitlines() if l.startswith("  ")]
     assert len(lines) == 3
     assert all(re.match(r"  \w+ \([\w+()]+\): \S", l) for l in lines), lines

@@ -210,18 +210,13 @@ def test_run_all_refusal_off_linux_has_no_parenthesis_or_semicolon(off_linux, tm
 
 def test_env_reason_on_linux_leads_with_the_install_command(monkeypatch):
     monkeypatch.setattr(R, "linux_only_sentence", lambda: None)
-    text = W._env_hint("scmb_r", "StabMap", "mosaic")
-    assert text == ("Environment scmb_r is not installed. Run mtb.env.install(['StabMap']). "
-                    "mtb.env.install(category='mosaic') installs the environments of every "
-                    "mosaic method.")
-    assert "mtb.env.install(['StabMap'])." in text[:120]
-    assert W._env_hint("scmb_r", "StabMap", None) == (
+    assert W._env_hint("scmb_r", "StabMap") == (
         "Environment scmb_r is not installed. Run mtb.env.install(['StabMap']).")
     # every method's install command fits in the first 120 characters
     for m in registry.list_methods():
         env = envs.group_for(m)
         cmd = f"mtb.env.install([{m!r}])."
-        assert cmd in W._env_hint(env, m, "vertical")[:120], m
+        assert cmd in W._env_hint(env, m)[:120], m
 
 
 def test_scan_env_reason_on_linux(monkeypatch):

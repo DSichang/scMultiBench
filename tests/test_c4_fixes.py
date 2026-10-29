@@ -274,7 +274,7 @@ def test_rescore_of_a_folder_without_outputs_prints_no_status_line(tmp_path, cap
     res = mtb.RunResult([{"method": "Matilda", "status": "RUN_OK", "out_dir":
                             str(tmp_path / "Matilda_D11"), "modalities": ["rna", "adt"]}],
                           "D11", "vertical", out_dir=str(tmp_path))
-    with pytest.raises(FileNotFoundError, match="^No output of Matilda"):
+    with pytest.raises(FileNotFoundError, match="^No method output in "):
         _quiet(res.rescore)
     assert "[rescore] Matilda ->" not in capsys.readouterr().out
 

@@ -114,16 +114,6 @@ def test_a_two_batch_diagonal_folder_gets_one_folder_line(tmp_path, capsys):
     assert not out["reason"].str.contains("holds numbered batches").any()
 
 
-def test_the_batch_gap_is_named(tmp_path, capsys):
-    from multibench import workflow as W
-    d = tmp_path / "GAP"
-    d.mkdir()
-    for f in ("rna1.h5", "rna2.h5", "atac2.h5", "atac4.h5"):
-        (d / f).touch()
-    assert W._renumber_hint(d, "mosaic") == (
-        "GAP has batches 1, 2 and 4: export them to a new folder, numbered 1 to 3.")
-
-
 def test_a_shared_barcode_gets_its_batch_and_one_batch_names_none():
     one = mtb.load_run(Path(__file__).resolve().parent.parent / "data" / "outputs" / "D11")
     m = one.records[0]["method"]

@@ -152,7 +152,7 @@ def test_a_10x_atac_file_is_named_where_a_method_reads_another_atac_file(
     df = mtb.scan("STRAY", "diagonal", verbose=False, **kw)
     assert list(df["method"]) == ["SCALEX", "Seurat_v5"]
     reasons = [f"atac.h5 {TENX}",
-               "Seurat_v5 needs peak ATAC (atac_peak.h5), and the folder has ATAC (atac.h5)."]
+               "Seurat_v5 needs peak ATAC (atac_peak.h5)."]
     assert list(df["reason"]) == reasons
     plan = mtb.scan("STRAY", "diagonal", **kw)
     assert list(plan["reason"]) == reasons and not plan["runnable"].any()

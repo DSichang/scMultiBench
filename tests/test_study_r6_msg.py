@@ -176,9 +176,8 @@ def test_the_atac_caveats_start_with_the_method(tmp_path, pinned, gas_matilda):
     blocked = _quiet(full_scan, "MU_PEAK", "vertical", methods=["Matilda"],
                      modalities=["rna", "atac"], data_path=tmp_path,
                      verbose=False).iloc[0]
-    assert blocked["reason"] == (
-        "Matilda needs gene-activity ATAC, and atac.h5 holds peaks. Export the ATAC as gene "
-        "activity.")
+    assert blocked["reason"] == ("Matilda needs gene-activity ATAC. The features of atac.h5 "
+                                 "look like chr:start-end, so it holds peaks.")
 
 
 def test_scbridge_reason_is_a_sentence(tmp_path, pinned):

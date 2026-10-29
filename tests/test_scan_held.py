@@ -248,8 +248,7 @@ def test_the_log_of_a_real_run_names_the_listed_variants_only(linux, tmp_path, c
     log = capsys.readouterr().out.splitlines()
     assert log[:3] == [
         f"[run] skipping moETM (rna+adt): {gpu}",
-        "[run] skipping moETM (rna+atac): moETM needs peak ATAC (atac.h5), which "
-        f"the folder does not have. {gpu}",
+        f"[run] skipping moETM (rna+atac): moETM needs peak ATAC (atac.h5). {gpu}",
         "[run] 2 more rows need files this folder does not have. mtb.scan shows them."]
 
 
@@ -291,8 +290,7 @@ def test_a_named_method_keeps_its_rows(no_envs):
     assert sorted(zip(df["method"], df["modalities"])) == [("MIRA", "rna+atac"),
                                                            ("sciPENN", "rna+adt")]
     mira = df.set_index("method").loc["MIRA"]
-    assert mira["reason"].startswith("MIRA needs peak ATAC (atac.h5), which the folder "
-                                     "does not have.")
+    assert mira["reason"].startswith("MIRA needs peak ATAC (atac.h5).")
     assert _core(df.attrs) == {"held": ["rna", "adt"], "not_listed": 0, "not_held": []}
     # a named method with a listed row is listed by that row
     df = full_scan("D11", "vertical", methods=["Matilda", "MIRA"], verbose=False)
@@ -393,9 +391,10 @@ def test_the_hint_carries_all(no_envs, capsys):
     call = "mtb.scan('D11', 'vertical', modalities=\"all\")"
     assert lines[-1] == (f"{call} says why. mtb.env.install(dry_run=True) checks the "
                          f"environments.")
-    n = int(re.fullmatch(r"The first 3 of (\d+) blocked rows:", lines[1]).group(1))
+    n = int(re.fullmatch(r"The first 3 of (\d+) blocked methods:", lines[1]).group(1))
     shown = eval(call, {"mtb": mtb})                      # noqa: S307 - our own hint
-    assert n == 33 and len(shown) == 18 and not shown["runnable"].any()
+    # the methods whose files D11 holds; the 4 ATAC methods are left to scan
+    assert n == 14 and len(shown) == 18 and not shown["runnable"].any()
     assert "not listed" not in "\n".join(lines)
     # the default call: the rows it lists, the same count; c3 (C55): no sentence on
     # the rows that read ATAC

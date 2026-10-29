@@ -110,8 +110,8 @@ def test_rescore_without_outputs_names_the_methods_and_the_fix(tmp_path):
     (folder / "Matilda_D11" / "embedding.h5").unlink()
     with pytest.raises(FileNotFoundError) as e:
         _quiet(mtb.load_run(folder).rescore)
-    assert str(e.value) == (f"No output of Matilda in {folder}: load the folder that holds "
-                            f"its method folder, or run it again.")
+    assert str(e.value) == (f"No method output in {folder}. Load the folder that holds "
+                            f"the method folders, or run the methods again.")
 
 
 # --------------------------------------------------------------- E02
@@ -229,9 +229,8 @@ def test_c22_one_sentence_for_the_missing_files_of_one_kind(tmp_path):
     d = _folder(tmp_path, "CROSS2", {"rna2.h5": "rna", "atac_peak2.h5": "peak",
                                      "cty2.csv": ""})
     reason = _quiet(mtb.scan, str(d), "cross", methods=["StabMap"]).at[0, "reason"]
-    assert reason.count("which the folder does not have") <= 1
-    assert "StabMap needs peak ATAC (atac_peak1.h5, atac_peak3.h5), which the folder does " \
-           "not have." in reason, reason
+    assert reason.count("needs peak ATAC") == 1
+    assert "StabMap needs peak ATAC (atac_peak1.h5, atac_peak3.h5)." in reason, reason
 
 
 # --------------------------------------------------------------- E13 / E14

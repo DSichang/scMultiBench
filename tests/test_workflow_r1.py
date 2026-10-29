@@ -51,8 +51,7 @@ def _rows(df):
 def test_scan_base_atac_token_matches_every_atac_role():
     """'atac' used to be an exact role: scan('D28', 'diagonal', ['rna', 'atac'])
     returned no row although every diagonal method reads RNA + ATAC."""
-    with pytest.warns(UserWarning, match="scBridge"):
-        df = full_scan("D28", "diagonal", modalities=["rna", "atac"], verbose=False)
+    df = full_scan("D28", "diagonal", modalities=["rna", "atac"], verbose=False)
     # every row: the rows for numbered batches are listed when modalities is given
     full = full_scan("D28", "diagonal", modalities="all", verbose=False)
     assert _rows(df) == _rows(full[full["modalities"] != "(data_dir)"])
@@ -99,8 +98,7 @@ def test_scan_unknown_modality_token_raises_with_the_vocabulary():
 
 
 def test_run_all_dry_run_uses_the_same_rule():
-    with pytest.warns(UserWarning):
-        plan = mtb.scan("D28", "diagonal", modalities=["rna", "atac"], verbose=False)
+    plan = mtb.scan("D28", "diagonal", modalities=["rna", "atac"], verbose=False)
     assert len(plan) >= 13
 
 
@@ -343,9 +341,7 @@ def test_scan_reason_leads_with_the_atac_meaning_and_never_cuts_a_path(tmp_path,
     for col in ("reason", "files_reason"):
         assert not df[col].str.contains(r" \.\.\. ", regex=True).any(), col
     scalex = df[df["method"] == "SCALEX"].iloc[0]
-    assert scalex["reason"].startswith(
-        "SCALEX needs gene-activity ATAC (atac_gas.h5), and the folder has peaks "
-        "(atac_peak.h5).")
+    assert scalex["reason"].startswith("SCALEX needs gene-activity ATAC (atac_gas.h5).")
     # full folder path kept, in the sentence that names the file (R6-12)
     assert f"SCALEX (diagonal) needs atac_gas.h5 in {data / 'LUNG'}." in scalex["files_reason"]
 

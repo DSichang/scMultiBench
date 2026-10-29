@@ -23,7 +23,6 @@ import importlib.util
 import inspect
 import json
 import math
-import re
 import warnings
 from pathlib import Path
 
@@ -76,27 +75,20 @@ def _nothing_runnable(dataset, category, **kw):
     return str(e.value)
 
 
-def test_the_macos_list_counts_only_rows_whose_files_are_present(macos_no_gpu):
+def test_the_macos_list_leaves_out_methods_whose_files_are_missing(macos_no_gpu):
     msg = _nothing_runnable("D11", "vertical", modalities="all")
-    plan = full_scan("D11", "vertical", verbose=False, modalities="all")
-    lacking = int((~plan["files_ok"]).sum())
     lines = msg.splitlines()
-    # 0.4: off Linux the GPU sentence is left out (the OS already blocks), so no
-    # method is listed as also blocked by something else
-    assert lines[2] == f"{lacking} rows need files that D11 does not have."
-    assert lines[3].startswith("mtb.scan('D11', 'vertical', modalities=\"all\") says why.")
-    assert "NVIDIA GPU" not in msg and "also blocked" not in msg
-    assert "atac" not in msg
-    # with modalities= the rows the folder cannot have are not in the scan
-    msg = _nothing_runnable("D11", "vertical", modalities=["rna", "adt"])
-    assert "need files" not in msg and "also blocked" not in msg
+    # 0.4: off Linux the GPU sentence is left out (the OS already blocks), and the
+    # ATAC methods, whose files D11 lacks, are left to scan
+    assert len(lines) == 3, msg
+    assert lines[2] == "mtb.scan('D11', 'vertical', modalities=\"all\") says why."
+    assert "NVIDIA GPU" not in msg and "atac" not in msg
 
 
 def test_a_mosaic_folder_lists_no_file_it_cannot_have(macos_no_gpu):
     msg = _nothing_runnable("D46", "mosaic")
     listed = [l for l in msg.splitlines() if l.startswith("  ")]
     assert not [l for l in listed if "atac3.h5" in l or "adt2.h5" in l], listed
-    assert re.search(r"^\d+ rows? needs? files that D46 does not have\.$", msg, re.M), msg
 
 
 def test_a_folder_variant_is_listed_by_its_method_name(macos_no_gpu, monkeypatch):

@@ -119,8 +119,9 @@ def test_scan_blocks_and_real_run_warns(tmp_path, pinned, monkeypatch, capsys,
                          data_path=root)
     row = _quiet(mtb.scan, str(root / "MU_PEAK"), "vertical", methods=["Matilda"],
                  modalities=["rna", "atac"], verbose=False).iloc[0]
-    assert row["reason"].startswith("Matilda needs gene-activity ATAC, and atac.h5 holds "
-                                    "peaks."), row["reason"]
+    assert row["reason"].startswith("Matilda needs gene-activity ATAC. The features of "
+                                    "atac.h5 look like chr:start-end, so it holds peaks."), \
+        row["reason"]
 
     class Stop(Exception):
         pass
@@ -299,8 +300,8 @@ def test_named_blocked_methods_are_logged_and_recorded(tmp_path, monkeypatch, ca
     assert set(fails.index) == {"scMVP", "UnitedNet", "MIRA"}
     assert "logger.py" in fails.loc["MIRA", "reason"]
     assert "needs an NVIDIA GPU" in fails.loc["UnitedNet", "reason"]
-    # the export fix ends the reason, after the GPU sentence; no override (0.4.0)
-    assert fails.loc["UnitedNet", "reason"].endswith("Export the ATAC as gene activity.")
+    # the ATAC sentence ends the reason, after the GPU sentence; no override (0.4.0)
+    assert fails.loc["UnitedNet", "reason"].endswith("so it holds peaks.")
     assert "allow_atac_mismatch" not in fails.loc["UnitedNet", "reason"]
     disk = pd.read_csv(tmp_path / "out" / "summary.csv").set_index("method")
     assert disk.loc["MIRA", "status"] == "skipped"
@@ -315,7 +316,7 @@ def test_named_blocked_methods_are_logged_and_recorded(tmp_path, monkeypatch, ca
     again = _quiet(mtb.load_run(tmp_path / "out", methods=["MIRA"]).rescore,
                    metrics=["ARI"])
     assert {r["method"]: r["status"] for r in again.records}["MIRA"] == "skipped"
-    with pytest.raises(FileNotFoundError, match="^No output of "):
+    with pytest.raises(FileNotFoundError, match="^No method output in "):
         _quiet(back.rescore, metrics=["ARI"])
 
 

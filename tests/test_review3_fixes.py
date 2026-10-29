@@ -284,8 +284,7 @@ def linux(monkeypatch, tmp_path):
 
 
 # c2 (C22): the files cross export writes, atac_peak<i>.h5
-GAS_REASON = ("{m} needs peak ATAC (atac_peak1.h5, atac_peak2.h5, atac_peak3.h5), and the "
-              "folder has gene activity (atac_gas1.h5, atac_gas2.h5, atac_gas3.h5).")
+GAS_REASON = "{m} needs peak ATAC (atac_peak1.h5, atac_peak2.h5, atac_peak3.h5)."
 
 
 def test_the_rows_listed_for_a_gene_activity_folder(linux, tmp_path, capsys):
@@ -307,7 +306,7 @@ def test_the_rows_listed_for_a_gene_activity_folder(linux, tmp_path, capsys):
 
 
 def test_one_missing_atac_file_reads_as_before(linux, tmp_path, capsys):
-    """One ATAC role, one sentence: the text of 0.3.4."""
+    """One ATAC role, one sentence."""
     d = tmp_path / "ONE"
     d.mkdir()
     bars = [f"c{i}" for i in range(40)]
@@ -316,8 +315,7 @@ def test_one_missing_atac_file_reads_as_before(linux, tmp_path, capsys):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         df = mtb.scan(os.path.join(tmp_path, 'ONE'), 'vertical', methods=['MOFA2'], modalities=['rna', 'atac'], verbose=False)
-    assert list(df["reason"]) == ["MOFA2 needs peak ATAC (atac.h5), and the folder has gene "
-                                  "activity (atac_gas.h5)."]
+    assert list(df["reason"]) == ["MOFA2 needs peak ATAC (atac.h5)."]
 
 
 # ------------------------------- 3: two names for the cell types (diagonal)
@@ -539,8 +537,9 @@ def test_gene_activity_under_the_peak_name_keeps_its_reason(linux, tmp_path, cap
     _, lines = _check(capsys, "PK", "cross", methods=["StabMap"], data_path=tmp_path)
     assert lines[0] == ("[scan] 1 of 1 method has its input files in PK. 0 of 1 can run on "
                         "this computer. PK holds RNA and ATAC, in batches 1-3.")
-    assert lines[2] == ("[scan] StabMap: StabMap needs peak ATAC, and atac_peak1.h5 holds "
-                        "gene activity. Export the ATAC as peaks.")
+    assert lines[2] == ("[scan] StabMap: StabMap needs peak ATAC. The features of "
+                        "atac_peak1.h5 do not look like chr:start-end, so it seems to hold "
+                        "gene activity.")
 
 
 @needs_docs

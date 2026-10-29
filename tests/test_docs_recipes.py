@@ -737,14 +737,10 @@ def test_the_label_file_that_the_check_names_depends_on_the_layout(host, tmp_pat
     # about the ATAC file where it has not
     assert seen[name]["scJoint"] == one
     assert seen["PEAKS"]["scJoint"] == (
-        "scJoint needs gene-activity ATAC (atac_gas.h5), and the folder has peaks "
-        "(atac_peak.h5). " + one)
-    assert seen[name]["Seurat_v3"] == (
-        "Seurat_v3 needs peak ATAC (atac_peak.h5), and the folder has gene activity "
-        "(atac_gas.h5). " + both)
+        "scJoint needs gene-activity ATAC (atac_gas.h5). " + one)
+    assert seen[name]["Seurat_v3"] == "Seurat_v3 needs peak ATAC (atac_peak.h5). " + both
     assert seen["PEAKS"]["Seurat_v3"] == (
-        "Seurat_v3 needs gene-activity ATAC (atac_gas.h5), and the folder has peaks "
-        "(atac_peak.h5). " + both)
+        "Seurat_v3 needs gene-activity ATAC (atac_gas.h5). " + both)
     assert {m for rs in seen.values() for m in rs} == {"scJoint", "Seurat_v3", "scBridge"}
     # every reason about labels names the file of the RNA side
     assert all("rna_cty.csv" in r for rs in seen.values() for r in rs.values())
