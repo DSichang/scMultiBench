@@ -2,8 +2,8 @@
 
 A label file with ``NA`` or an empty field gave a ``CHAIN_OK`` record up to
 0.3.4: the missing labels were scored as one more cell type. A real run now
-stops before its first method, a dry run says so, and ``rescore`` records the
-reason per record. A method that reads the label file as an input stops the
+stops before its first method, a dry run says so, and ``rescore`` refuses
+to score. A method that reads the label file as an input stops the
 run with ``evaluate=False`` as well.
 
 A synthetic CITE-seq folder and a fake ``_run`` that writes ``embedding.h5``
@@ -317,29 +317,25 @@ def test_only_the_files_a_method_reads_stop_a_run_without_scores(tmp_path, host)
 
 
 # ------------------------------------------------------------------ rescore
-M2 = ("ValueError: 9 of the 120 labels in {files} are missing{example}. Give "
-      "every cell a label, then score again.")
+M2 = ("labels: 9 of the 120 cells of MYCITE have no label{example}. Give every cell "
+      "a label.")
 
 
-def test_rescore_records_the_error(cite, tmp_path, host, monkeypatch):
+def test_rescore_refuses_a_label_file_with_a_gap(cite, tmp_path, host, monkeypatch):
     res = _run(cite, tmp_path, ["Matilda", "totalVI"])
     assert [r["status"] for r in res.records] == ["scored", "scored"]
     _write(cite / "MYCITE" / "cty.csv", _with_gaps())
-    # the ranking would take the error of an order and go on: it is not reached
+    # nothing is scored
     monkeypatch.setattr(W, "_evaluate_best_order", lambda *a, **k: 1 / 0)
-    again = res.rescore()
-    for rec in again.records:
-        assert rec["status"] == "ran"
-        assert rec["error"] == M2.format(files="cty.csv", example="")
-        assert not rec.get("metrics") and rec.get("_long") is None
-        assert "labels_used" not in rec
-    assert list(again.summary["status"]) == ["ran"] * 2
-    assert "ARI" not in again.summary.columns
+    with pytest.raises(ValueError) as e:
+        res.rescore()
+    assert str(e.value) == ("cty.csv of MYCITE has 9 of 120 cells without a label. "
+                            "Write the folder again with a label for every cell.")
     # the first result is untouched, and complete labels score again
     assert [r["status"] for r in res.records] == ["scored", "scored"]
     monkeypatch.undo()
     _write(cite / "MYCITE" / "cty.csv", LABELS)
-    assert [r["status"] for r in again.rescore().records] == ["scored", "scored"]
+    assert [r["status"] for r in res.rescore().records] == ["scored", "scored"]
 
 
 def test_several_label_files_are_not_ranked(tmp_path, host, monkeypatch):
@@ -363,38 +359,34 @@ def test_several_label_files_are_not_ranked(tmp_path, host, monkeypatch):
     real = W._evaluate_best_order
     monkeypatch.setattr(W, "_evaluate_best_order",
                         lambda *a, **k: ranked.append(1) or real(*a, **k))
-    (rec,) = res.rescore().records
-    assert rec["status"] == "ran" and ranked == []
-    # c2 (D28): the files in the order the record was scored with
-    a, b, c = res.records[0]["labels_used"]
-    assert rec["error"] == (
-        f"ValueError: 2 of the 120 labels in {a}, {b} and {c} are missing. "
-        "Give every cell a label, then score again.")
-    assert "label_order_candidates" not in rec and "metrics" not in rec
-    # a real run on this folder stops before the method
+    gap = ("cty2.csv of DONORS has 2 of 40 cells without a label. "
+           "Write the folder again with a label for every cell.")
+    with pytest.raises(ValueError) as e:
+        res.rescore()
+    assert str(e.value) == gap and ranked == []
+    # a real run on this folder stops before the method, with the same text
     host.clear()
     with pytest.raises(ValueError) as e:
         _quiet(mtb.run, "DONORS", "cross", tmp_path / "out2", methods=["totalVI"], **kw)
-    assert str(e.value) == ("cty2.csv of DONORS has 2 of 40 cells without a label. "
-                            "Write the folder again with a label for every cell.")
+    assert str(e.value) == gap
     assert host == []
 
 
 def test_labels_passed_to_rescore(cite, tmp_path, host):
     res = _run(cite, tmp_path, ["totalVI"])
     gaps = _with_gaps()
-    passed = M2.format(files="the labels you passed", example=", for example 'NA'")
+    passed = M2.format(example=", for example 'NA'")
     # in the rows of the embedding, and by barcode
     for labels in (gaps, list(gaps), pd.Series(gaps, index=[f"c{i}" for i in range(N)])):
-        (rec,) = res.rescore(labels=labels).records
-        assert (rec["status"], rec["error"]) == ("ran", passed)
-        assert "metrics" not in rec
-    # a file: the same record
+        with pytest.raises(ValueError) as e:
+            res.rescore(labels=labels)
+        assert str(e.value) == passed
+    # a file: the same error
     sheet = tmp_path / "labels.csv"
     pd.DataFrame({"celltype": gaps}, index=[f"c{i}" for i in range(N)]).to_csv(sheet)
-    (rec,) = res.rescore(labels=sheet).records
-    assert (rec["status"], rec["error"]) == (
-        "ran", M2.format(files="the labels you passed", example=""))
+    with pytest.raises(ValueError) as e:
+        res.rescore(labels=sheet)
+    assert str(e.value) == M2.format(example="")
     # complete labels from a file score as the same labels in memory
     pd.DataFrame({"celltype": LABELS}, index=[f"c{i}" for i in range(N)]).to_csv(sheet)
     (from_file,) = res.rescore(labels=sheet).records
@@ -405,13 +397,12 @@ def test_labels_passed_to_rescore(cite, tmp_path, host):
     assert rec["status"] == "scored"
 
 
-def test_the_error_of_a_record_counts_with_separators(tmp_path, host):
-    cands = [(["cty.csv"], np.array(["A"] * 1200 + [None] * 1300, dtype=object), None)]
-    assert W._unlabelled_error(cands, "X", tmp_path, user=True) == (
-        "ValueError: 1,300 of the 2,500 labels in the labels you passed are missing. "
-        "Give every cell a label, then score again.")
-    assert W._unlabelled_error([(["cty.csv"], np.array(["A", "B"]), None)], "X", tmp_path,
-                               user=True) is None
+def test_the_error_counts_with_separators():
+    with pytest.raises(ValueError) as e:
+        W._check_gaps(np.array(["A"] * 1200 + [None] * 1300, dtype=object), "X", "labels")
+    assert str(e.value) == ("labels: 1,300 of the 2,500 cells of X have no label. Give "
+                            "every cell a label.")
+    assert W._check_gaps(np.array(["A", "B"]), "X", "labels") is None
 
 
 # ------------------------------------------------------------------ one list of files

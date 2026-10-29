@@ -1672,7 +1672,7 @@ class RunResult:
             status ``ran``, and ``reason`` says why.
         ValueError
             ``labels`` or ``batch`` holds ids that are not cells of the dataset,
-            or a cell has no batch.
+            or a cell has no batch or no label (also in the label files).
 
         Warns
         -----
@@ -1709,13 +1709,19 @@ class RunResult:
                     labels_at[root] = _cell_vector(labels, self.dataset, root, what="labels",
                                                    order=_ROWS, moved=True,
                                                    tried=tried[root])
+                    _check_gaps(labels_at[root][0], self.dataset, "labels")
+                else:
+                    # a missing label would be scored as one more cell type
+                    unlabelled = _missing_labels_problem(self.dataset, root)
+                    if unlabelled:
+                        raise ValueError(unlabelled)
                 # a batch vector follows labels given in embedding row order
                 rows = labels is not None and not labels_at[root][1]
                 if batch is not None:
                     vec, by_cell = _cell_vector(batch, self.dataset, root, what="batch",
                                                 order=_ROWS if rows else None,
                                                 moved=True, tried=tried[root])
-                    _check_batch(vec, self.dataset)
+                    _check_gaps(vec, self.dataset)
                     bad = not rows and not by_cell and _batch_length_problem(
                         [(r.get("method"), r.get("modalities")) for r in self.records
                          if _scorable(r)], vec, self.dataset, self.category, root)
@@ -2489,21 +2495,22 @@ def _has_gap(values) -> bool:
     return bool(_eio.missing_mask(pd.unique(np.asarray(values, dtype=object))).any())
 
 
-def _check_batch(vec, dataset: str) -> None:
-    """``ValueError`` when the batch vector has a cell without a batch."""
+def _check_gaps(vec, dataset: str, what: str = "batch") -> None:
+    """``ValueError`` when the ``batch`` or ``labels`` vector has a cell without one."""
     if not _has_gap(vec):
         return
     miss = _eio.missing_mask(vec)
+    one = "batch" if what == "batch" else "label"
     raise ValueError(
-        f"batch: {int(miss.sum()):,} of the "
-        f"{len(miss):,} cells of {dataset} have no batch{_eio._missing_example(vec)}. "
-        f"Give every cell a batch.")
+        f"{what}: {int(miss.sum()):,} of the "
+        f"{len(miss):,} cells of {dataset} have no {one}{_eio._missing_example(vec)}. "
+        f"Give every cell a {one}.")
 
 
 def _batch_vector(batch, dataset, data_path) -> np.ndarray:
     """``batch`` as one id per cell (:func:`_cell_vector`), checked for gaps."""
     vec = _cell_vector(batch, dataset, data_path, what="batch")[0]
-    _check_batch(vec, dataset)
+    _check_gaps(vec, dataset)
     return vec
 
 
@@ -2524,43 +2531,29 @@ def _label_gaps(dataset, data_path) -> dict:
     return gaps
 
 
-def _missing_labels_problem(dataset: str, data_path, rows: "pd.DataFrame",
-                            private: "pd.DataFrame", *, evaluate: bool) -> str:
-    """Why ``run`` does not start on label files with a missing label, or "".
-    Without ``evaluate`` only the ``rows`` that read such a file as an input stop it."""
+def _missing_labels_problem(dataset: str, data_path, rows: "pd.DataFrame | None" = None,
+                            private: "pd.DataFrame | None" = None, *,
+                            evaluate: bool = True) -> str:
+    """Why ``run`` or ``rescore`` does not start on label files with a missing
+    label, or "". Without ``evaluate`` only the ``rows`` that read such a file as
+    an input stop it."""
     gaps = _label_gaps(dataset, data_path)
-    # the methods that read a label file with a gap as an input, with those files
-    readers = {m: [n for n in private.at[i, "_label_inputs"] if n in gaps]
-               for i, m in rows["method"].items()}
-    readers = {m: read for m, read in readers.items() if read}
-    if not gaps or not (evaluate or readers):
+    if not gaps:
         return ""
     who = ""
     if not evaluate:
+        # the methods that read a label file with a gap as an input, with those files
+        readers = {m: [n for n in private.at[i, "_label_inputs"] if n in gaps]
+                   for i, m in rows["method"].items()}
+        readers = {m: read for m, read in readers.items() if read}
+        if not readers:
+            return ""
         who = f", and {next(iter(readers))} reads the label files"
         gaps = {k: g for k, g in gaps.items() if k in set().union(*readers.values())}
     name, (n, total, shown) = next(iter(gaps.items()))
     return (f"{name} of {dataset} has {n:,} of {total:,} cells without a label"
             f"{_eio._missing_example(shown)}{who}. Write the folder again with a label for "
             f"every cell.")
-
-
-def _unlabelled_error(cands, dataset, data_path, *, user: bool) -> str | None:
-    """The ``error`` of a record whose candidate labels have a gap, or ``None``;
-    ``user``: the labels came from the caller."""
-    for names, lab, _ in cands:
-        if not _has_gap(lab):
-            continue
-        miss, shown, files = _eio.missing_mask(lab), lab, "the labels you passed"
-        if not user:
-            folder = _dataset_folder(dataset, data_path)
-            files = _and_list(names)
-            shown = np.concatenate([np.asarray(_eio.read_labels(folder / k), dtype=object)
-                                    for k in names])
-        return (f"ValueError: {int(miss.sum()):,} of the {len(miss):,} labels in {files} "
-                f"are missing{_eio._missing_example(shown)}. Give every cell a label, then "
-                f"score again.")
-    return None
 
 
 def _inputs_on_disk(row, dataset, data_path) -> bool:
@@ -2750,11 +2743,6 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
         if not _dataset_folder(dataset, data_path).is_dir():
             why = _folder_missing(dataset, tried or [data_path])
             rec["note"] = f"{why[:1].upper()}{why[1:]}. {_MOVED_FIX}"
-        return rec
-    # not inside the ranking: it would take the error of each order and rank on
-    unlabelled = _unlabelled_error(cands, dataset, data_path, user=labels is not None)
-    if unlabelled:
-        rec["status"], rec["error"] = "ran", unlabelled
         return rec
     names, val, spread = _evaluate_best_order(emb, category, cands, metrics=metrics,
                                               user_batch=batch is not None,
