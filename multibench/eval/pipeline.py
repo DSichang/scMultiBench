@@ -797,7 +797,7 @@ def _expected_cells(dataset, category, method, data_path, read, *,
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             folder = _file_list(resolve.labels_for(dataset, category, None,
-                                                   data_path=data_path, check=False))
+                                                   data_path=data_path))
         if [f.name for f in folder] != [f.name for f in files]:
             moved = tuple(f.stem for f in files)
     from ..workflow import _method_files
@@ -851,7 +851,7 @@ def _dataset_labels(dataset, category, method, data_path):
             warnings.simplefilter("ignore")
             try:
                 theirs = list(resolve.labels_for(dataset, category, near,
-                                                 data_path=data_path, check=False))
+                                                 data_path=data_path))
             except Exception:  # noqa: BLE001 - no variant here: nothing to suggest
                 theirs = list(labels)
         if theirs != list(labels):

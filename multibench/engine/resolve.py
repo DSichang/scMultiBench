@@ -437,7 +437,7 @@ def _missing_inputs_text(method: str, category: str, ds_dir: Path, missing: dict
 
 
 # every stem an ATAC role may be looked up under (workflow names a near miss)
-_ATAC_FILE_BASES = ("atac", "atac_peak", "atac_gas", "peak")
+_ATAC_FILE_BASES = ("atac", "atac_peak", "atac_gas")
 
 
 @functools.lru_cache(maxsize=512)
@@ -1114,7 +1114,7 @@ def _reordering_methods(stems: list[str], category: str | None, dataset: str,
         warnings.simplefilter("ignore")
         for (method, cat), variants in cands.items():
             try:
-                order = list(labels_for(dataset, cat, method, data_path=base, check=False))
+                order = list(labels_for(dataset, cat, method, data_path=base))
             except Exception:  # noqa: BLE001 - no order to compare
                 continue
             if sorted(order) != sorted(stems) or order == list(stems):
@@ -1174,8 +1174,7 @@ class LabelFiles(dict):
 
 def labels_for(dataset: str, category: str | None = None, method: str | None = None,
                *, modalities: list[str] | set[str] | None = None,
-               data_path: Path | str | None = None,
-               check: bool | None = None) -> dict:
+               data_path: Path | str | None = None) -> dict:
     """Return a dataset's cell-type label files, in the method's cell order.
 
     Hand the dict to ``mtb.evaluate(labels=...)`` as is. It matches an
@@ -1199,9 +1198,6 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     data_path : Path | str | None
         Data root that holds the dataset folders; ``None`` =
         ``mtb.config.data_path``.
-    check : bool | None
-        Vertical or diagonal ``category`` on a per-batch folder: ``None``
-        warns, ``True`` raises, ``False`` = no check.
 
     Returns
     -------
@@ -1214,7 +1210,7 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     FileNotFoundError
         ``<data_path>/<dataset>`` does not exist.
     ValueError
-        Unknown ``category``; or ``check=True`` and a per-batch folder for vertical / diagonal.
+        Unknown ``category``.
     KeyError
         Unknown ``method``, or it has no variant for ``category``.
 
@@ -1222,8 +1218,6 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     -----
     UserWarning
         ``dataset`` matches a folder only up to letter case.
-    UserWarning
-        ``check=None`` and a per-batch folder for a vertical or diagonal ``category``.
     UserWarning
         No ``method``, and a method that can run on the folder puts these
         cells in another order (StabMap on ``D52``); the warning names it.
@@ -1254,12 +1248,6 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
     ds_dir = base / dataset
     if not ds_dir.is_dir():
         raise FileNotFoundError(missing_dataset_message(os.fspath(root), dataset))
-    hint = _per_batch_hint(ds_dir, category) if check is not False else None
-    if hint:
-        msg = f"labels_for({dataset!r}, {category!r}): {hint}"
-        if check:
-            raise ValueError(msg)
-        _text.warn(msg, UserWarning)
     files = {p.stem: str(p) for p in ds_dir.glob("*cty*.csv")
              if "scjoint" not in p.name.lower()}
     stems = sorted(files, key=_label_sort_key)

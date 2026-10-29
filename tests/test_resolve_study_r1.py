@@ -55,17 +55,13 @@ def test_per_batch_folder_fails_every_vertical_row_with_the_hint(tmp_path):
     assert got["rna3"].endswith("rna3.h5")
 
 
-def test_labels_for_vertical_on_a_per_batch_folder_warns_or_raises(tmp_path):
+def test_labels_for_a_per_batch_folder_lists_its_label_files(tmp_path):
     _per_batch_folder(tmp_path / "MB")
-    with pytest.warns(UserWarning, match="This folder holds per-batch files"):
-        lab = resolve.labels_for("MB", "vertical", data_path=tmp_path)
-    assert list(lab) == ["cty1", "cty2", "cty3"]
-    with pytest.raises(ValueError, match="Export without batch="):
-        resolve.labels_for("MB", "vertical", data_path=tmp_path, check=True)
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        resolve.labels_for("MB", "vertical", data_path=tmp_path, check=False)
+        lab = resolve.labels_for("MB", "vertical", data_path=tmp_path)
         resolve.labels_for("MB", "cross", "StabMap", data_path=tmp_path)
+    assert list(lab) == ["cty1", "cty2", "cty3"]
     # without a method only the default-order warning (StabMap reorders), since 0.4
     with pytest.warns(UserWarning) as rec:
         resolve.labels_for("MB", data_path=tmp_path)

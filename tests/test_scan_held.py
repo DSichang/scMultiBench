@@ -350,16 +350,6 @@ def test_attrs():
     assert W._held_families(config.data_path / "D52", "cross") == ["rna", "adt"]
 
 
-def test_an_older_file_name_counts_as_held(tmp_path):
-    d = tmp_path / "OLD"
-    d.mkdir()
-    _h5(d / "rna.h5", GENES[:30], [f"r{i}" for i in range(20)])
-    _h5(d / "peak.h5", [f"chr1:{i * 100}-{i * 100 + 50}" for i in range(40)],
-        [f"a{i}" for i in range(20)])
-    df = _quiet(full_scan, "OLD", "diagonal", data_path=tmp_path, verbose=False)
-    assert df.attrs["held"] == ["rna", "atac"] and df.attrs["not_listed"] == 0
-
-
 def test_verbose_false_prints_nothing_and_sets_attrs(capsys):
     df = full_scan("D11", "vertical", verbose=False)
     assert capsys.readouterr().out == ""

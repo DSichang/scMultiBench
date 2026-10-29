@@ -1140,7 +1140,7 @@ def _label_candidates(dataset, n, data_path=None):
             pass
     cands = [([k], v) for k, v in by_file.items()]
     rna = [k for k in by_file if k.startswith("rna_cty")]
-    atac = [k for k in by_file if k.startswith(("atac_cty", "peak_cty"))]
+    atac = [k for k in by_file if k.startswith("atac_cty")]
     for a, b in itertools.product(rna, atac):
         cands += [([a, b], np.concatenate([by_file[a], by_file[b]])),
                   ([b, a], np.concatenate([by_file[b], by_file[a]]))]
@@ -1984,7 +1984,7 @@ def _embedding_obs(rec, dataset, category, root, n, batch_text=None) -> pd.DataF
             warnings.simplefilter("ignore")
             files = _resolve.labels_for(dataset, category, rec["method"],
                                         modalities=rec.get("modalities") or None,
-                                        data_path=root, check=False)
+                                        data_path=root)
         names = [Path(p).name for p in files.values()]
     labels, barcodes, batch = [], [], []
     # the barcodes of the files the method read (atac_gas.h5, not atac_peak.h5)
@@ -2245,7 +2245,7 @@ def _label_file_sizes(dataset, category=None, method=None, *, modalities=None,
         with warnings.catch_warnings():     # the default order is meant without a method
             warnings.filterwarnings("ignore", message=_resolve.DEFAULT_ORDER_WARNING)
             files = _resolve.labels_for(dataset, category, method, modalities=modalities,
-                                        data_path=data_path, check=False)
+                                        data_path=data_path)
         return [(Path(p).name, len(_eio.read_labels(p))) for p in files.values()]
     except Exception:  # noqa: BLE001 - no label files: nothing to compare against
         return []
@@ -2291,8 +2291,8 @@ def _label_data_files(label: Path, read=()) -> list[Path]:
         stems = ["rna", "adt", "atac", "atac_peak", "atac_gas"]
     elif base in ("rna_cty", "adt_cty"):
         stems = [base[:-4]]
-    elif base in ("atac_cty", "peak_cty"):
-        stems = ["atac_peak", "atac_gas", "atac", "peak"]
+    elif base == "atac_cty":
+        stems = ["atac_peak", "atac_gas", "atac"]
     else:
         stems = []
     files = [label.parent / f"{s}{digits}.h5" for s in stems]
@@ -2371,7 +2371,7 @@ def _dataset_cell_ids(dataset, data_path) -> list | None:
     try:
         with warnings.catch_warnings():       # the default order is meant here
             warnings.simplefilter("ignore", UserWarning)
-            files = _resolve.labels_for(dataset, data_path=data_path, check=False)
+            files = _resolve.labels_for(dataset, data_path=data_path)
         for p in map(Path, files.values()):
             n = len(_eio.read_labels(p))
             bars = next((b for b in map(_resolve._barcodes_of, _label_data_files(p))
@@ -2393,8 +2393,7 @@ def _embedding_cell_ids(dataset, data_path) -> list:
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
-            files = list(map(Path, _resolve.labels_for(dataset, data_path=data_path,
-                                                       check=False).values()))
+            files = list(map(Path, _resolve.labels_for(dataset, data_path=data_path).values()))
         sizes = [len(_eio.read_labels(p)) for p in files]
     except Exception:  # noqa: BLE001 - no readable files: no ids
         return []

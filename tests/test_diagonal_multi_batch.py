@@ -143,7 +143,7 @@ def test_no_per_batch_hint_on_such_a_folder(tmp_path):
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         resolve.labels_for("MB", "diagonal", data_path=tmp_path)
-        resolve.labels_for("MB", "diagonal", "iNMF", data_path=tmp_path, check=True)
+        resolve.labels_for("MB", "diagonal", "iNMF", data_path=tmp_path)
         for method in METHODS:
             resolve.inputs_for("MB", "diagonal", method, data_path=tmp_path, check=True)
     # a method that reads one rna.h5 is not told to export again
@@ -160,8 +160,6 @@ def test_the_hint_still_fires_when_no_variant_reads_the_folder(tmp_path):
     _h5(d / "atac_gas.h5", ["g0", "g1", "g2"], [f"a{k}" for k in range(5)])
     assert "SPLIT holds numbered batches (rna1.h5, rna2.h5, ...)" in \
         resolve._per_batch_hint(d, "diagonal")
-    with pytest.warns(UserWarning, match="SPLIT holds numbered batches"):
-        mtb.engine.resolve.labels_for("SPLIT", "diagonal", data_path=tmp_path)
     # vertical is not affected by the diagonal rule
     assert resolve._per_batch_hint(_folder(tmp_path), "vertical") is not None
 
