@@ -268,8 +268,7 @@ def test_seen_sentence_and_rename_sentence():
 # ============================================================ "error"
 def _label_forms(tmp_path):
     """``{form: (output, labels, src)}``: 30 of 300 labels missing, each way
-    of passing labels. A file that writes the missing labels as a word adds
-    the example that names one, ``(..., example)``."""
+    of passing labels."""
     emb, lab = _cells()
     nan, ids = _gaps(lab), [f"cell{i}" for i in range(N)]
     one = tmp_path / "cty.csv"                      # as export writes it
@@ -294,7 +293,6 @@ def _label_forms(tmp_path):
     words[0].parent.mkdir()
     for path, part in zip(words, (_gaps(lab, "NA")[:150], _gaps(lab, "N/A")[150:])):
         pd.DataFrame({"x": part}).to_csv(path, index=False)
-    na = (EX_NA,)
     return {
         "array": (emb, nan, ""),
         "list": (emb, list(nan), ""),
@@ -304,18 +302,16 @@ def _label_forms(tmp_path):
         "string dtype": (emb, pd.Series(_gaps(lab, pd.NA), dtype="string"), ""),
         "obs column": (a, "celltype", ""),
         "obs category column": (a, "ct_cat", ""),
-        "one-column file": (emb, str(one), " (cty.csv)", *na),
-        "Path": (emb, one, " (cty.csv)", *na),
+        "one-column file": (emb, str(one), " (cty.csv)"),
+        "Path": (emb, one, " (cty.csv)"),
         "id,label file": (a, str(two), " (obs.csv)"),
         "file list": (emb, [str(p) for p in halves], " (cty1.csv, cty2.csv)"),
         "labels_for dict": (emb, {"cty1": str(halves[0]), "cty2": str(halves[1])},
                             " (cty1.csv, cty2.csv)"),
-        "file of None": (emb, str(none), " (cty.csv)", ", for example 'None'"),
+        "file of None": (emb, str(none), " (cty.csv)"),
         "file with an empty field": (a, str(empty), " (empty.csv)"),
-        "id,label file of null": (a, null, " (null.tsv)", ", for example 'null'"),
-        # two words: the first one, in sorted order, is the example
-        "file list of words": (
-            emb, [str(p) for p in words], " (cty1.csv, cty2.csv)", ", for example 'N/A'"),
+        "id,label file of null": (a, null, " (null.tsv)"),
+        "file list of words": (emb, [str(p) for p in words], " (cty1.csv, cty2.csv)"),
     }
 
 
@@ -325,67 +321,13 @@ def _label_forms(tmp_path):
     "file list", "labels_for dict", "file of None", "file with an empty field",
     "id,label file of null", "file list of words"])
 def test_evaluate_raises_on_missing_labels(form, tmp_path):
-    output, labels, src, *said = _label_forms(tmp_path)[form]
-    # NaN, and an empty field of a file, are no word: no example
-    (example,) = said or ("",)
-    for kw in ({},):
-        with pytest.raises(ValueError) as e:
-            mtb.evaluate(output, labels=labels, metrics=["ASW"], **kw)
-        assert str(e.value) == _e1(src, example), form
-
-
-def test_a_label_file_names_the_word_it_holds_whole_message(tmp_path):
-    """A cell type called None in a CSV: the reader reads NaN, and the message
-    names the word in the file as its example. No sentence says to rename it."""
-    emb, lab = _cells()
-    path = tmp_path / "cty.csv"
-    path.write_text("x\n" + "".join(f"{v}\n" for v in np.where(lab == "C", "None", lab)))
-    assert pd.isna(eio.read_labels(path)).sum() == 100
+    output, labels, src = _label_forms(tmp_path)[form]
     with pytest.raises(ValueError) as e:
-        mtb.evaluate(emb, labels=str(path), metrics=["ASW"])
-    assert str(e.value) == (
-        "labels (cty.csv): 100 of the 300 cells have no label, for example 'None'."
-        + KEEP_FIX)
-    assert "rename" not in str(e.value)
+        mtb.evaluate(output, labels=labels, metrics=["ASW"])
+    assert str(e.value) == _e1(src), form
 
 
-def test_a_label_file_is_read_as_written_for_the_message_only(tmp_path):
-    emb, lab = _cells()
-    ids = [f"cell{i}" for i in range(N)]
-    mixed = _gaps(lab, "NA")
-    mixed[0], mixed[1], mixed[2], mixed[3] = "None", "", " ", "NA "
-    path = tmp_path / "obs.csv"
-    path.write_text("barcode,celltype\n" + "".join(
-        f'{i},"{v}"\n' for i, v in zip(ids, mixed)))            # a quoted "NA" is NA too
-    plain, first = eio.read_labels_ids(path)
-    shown, first_shown = eio.read_labels_ids(path, as_written=True)
-    assert first.equals(first_shown)
-    # the reader's values did not move: NaN for the words and the empty field
-    assert pd.isna(plain).sum() == 32 and set(plain[~pd.isna(plain)]) == {
-        "A", "B", "C", " ", "NA "}
-    # as written, the words are back and the empty field is still NaN
-    assert shown[0] == "None" and pd.isna(shown[1]) and shown[2] == " " and shown[3] == "NA "
-    assert set(shown[GAPS]) == {"NA"}
-    keep = ~pd.isna(plain)
-    assert (shown[keep] == plain[keep]).all()
-    assert (eio.missing_mask(shown) == eio.missing_mask(plain)).all()
-    assert eio.read_labels(path, as_written=True).tolist() == shown.tolist()
-    assert eio.as_vector([path, path], as_written=True).tolist() == shown.tolist() * 2
-    with pytest.raises(ValueError) as e:
-        mtb.evaluate(_adata(emb), labels=str(path), metrics=["ASW"])
-    assert str(e.value) == _e1(" (obs.csv)", EX_NA, n=34)
-    # numbers stay numbers where nothing is missing, and a cluster number
-    # next to NA is named as the file writes it
-    numbers = tmp_path / "clusters.csv"
-    numbers.write_text("x\n" + "".join(f"{v}\n" for v in np.tile([1, 2, 3], 100)))
-    assert eio.read_labels(numbers, as_written=True).dtype == np.int64
-    numbers.write_text("x\n" + "".join(f"{v}\n" for v in _gaps(np.tile([1, 2, 3], 100), "NA")))
-    assert eio.read_labels(numbers).dtype == np.float64
-    assert eio._missing_example(eio.read_labels(numbers, as_written=True)) == EX_NA
-
-
-def test_a_file_read_twice_for_the_message_warns_once(tmp_path):
-    """The second read, which names the words, repeats no warning of the first."""
+def test_a_file_of_missing_words_warns_once(tmp_path):
     emb, lab = _cells()
     path = tmp_path / "obs.csv"
     pd.DataFrame({"celltype": _gaps(lab, "NA")},
@@ -394,7 +336,7 @@ def test_a_file_read_twice_for_the_message_warns_once(tmp_path):
         warnings.simplefilter("always")
         with pytest.raises(ValueError) as e:
             mtb.evaluate(emb, labels=str(path), metrics=["ASW"])
-    assert str(e.value) == _e1(" (obs.csv)", EX_NA)
+    assert str(e.value) == _e1(" (obs.csv)")
     assert [str(w.message) for w in rec] == [
         "The first column of obs.csv looks like cell ids, but the embedding has no cell "
         "ids. The file is matched by position. Check that its rows follow the rows of "
@@ -487,8 +429,7 @@ def test_evaluate_raises_when_every_label_is_missing(tmp_path):
     pd.DataFrame({"x": ["NA"] * N}).to_csv(path, index=False)
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=str(path), **kw)
-    assert str(e.value) == ("labels (cty.csv): none of the 300 cells has a label, for "
-                            "example 'NA'." + NONE_FIX)
+    assert str(e.value) == "labels (cty.csv): none of the 300 cells has a label." + NONE_FIX
     path.write_text("x\n" + '""\n' * N)                         # 300 empty fields
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=str(path), **kw)

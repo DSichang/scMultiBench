@@ -208,23 +208,6 @@ def _missing_example(values) -> str:
     return f", for example {words[0]!r}" if words else ""
 
 
-def _as_written(col: pd.Series, d: pd.DataFrame, path: Path) -> np.ndarray:
-    """Column ``col`` of the frame ``d`` read from ``path``, with each value read
-    as missing replaced by the word the file holds there; an empty field stays
-    NaN. For messages only."""
-    vals, null = col.to_numpy(), col.isna().to_numpy()
-    if not null.any():
-        return vals
-    text = pd.read_csv(path, sep=_sep_for(path), dtype=str, na_filter=False)  # nothing parsed
-    if text.shape != d.shape:
-        return vals
-    text = text.iloc[:, d.columns.get_loc(col.name)].str.strip()
-    named = null & text.isin(missing_words(text[null])).to_numpy()
-    out = vals.astype(object)
-    out[named] = text[named].to_numpy()
-    return out
-
-
 def _names_no_file(x) -> bool:
     """A string that is not a file and does not look like one (``"donor"``,
     ``"obs:donor"``; not ``"missing.csv"``)."""
@@ -233,8 +216,7 @@ def _names_no_file(x) -> bool:
             and "/" not in x and os.sep not in x)
 
 
-def read_labels(path: Path | str, column: str | None = None, *,
-                as_written: bool = False) -> np.ndarray:
+def read_labels(path: Path | str, column: str | None = None) -> np.ndarray:
     """Read a cell-type (or batch) label vector from a CSV/TSV with a header row.
 
     The benchmark's label files (``cty.csv``, ``cty1.csv`` ...) are R's
@@ -262,10 +244,6 @@ def read_labels(path: Path | str, column: str | None = None, *,
         CSV (``,``) or TSV (``.tsv`` -> ``\\t``) file with a header row.
     column : str, optional
         Name of the column holding the labels.
-    as_written : bool
-        ``True`` returns each value read as missing as the word the file
-        holds there (``'NA'``, not NaN), for a message that names it
-        (:func:`read_labels_ids`).
 
     Returns
     -------
@@ -279,11 +257,11 @@ def read_labels(path: Path | str, column: str | None = None, *,
     Callers that know the cells' ids align the file by it
     (:func:`read_labels_ids`, :func:`by_id_column`).
     """
-    return read_labels_ids(path, column, as_written=as_written)[0]
+    return read_labels_ids(path, column)[0]
 
 
 def read_labels_ids(path: Path | str, column: str | None = None, *,
-                    what: str | None = None, pick=None, as_written: bool = False):
+                    what: str | None = None, pick=None):
     """:func:`read_labels`, plus the first column it left out.
 
     Returns ``(values, first)``. ``first`` is the file's first column (a
@@ -294,16 +272,11 @@ def read_labels_ids(path: Path | str, column: str | None = None, *,
     ``what`` ("labels", "batch", "clustering") starts the error messages.
     ``pick`` ends an ambiguous file's error: a sentence, or a function of the
     pandas call that reads one column as a Series (default: pass ``column=``).
-    ``as_written=True`` returns each value read as missing (``NA``, ``None``,
-    ...) as the word the file holds, for messages only.
     """
     path = _require_file(path, f"{what} file" if what else "labels file")
     d = _read_table(path, _sep_for(path))
     head = f"The {what} file {path.name}" if what else str(path)
     first = d.iloc[:, 0] if d.shape[1] > 1 else None
-
-    def values(col):
-        return _as_written(col, d, path) if as_written else col.to_numpy()
 
     if column is not None:
         if column not in d.columns:
@@ -313,15 +286,15 @@ def read_labels_ids(path: Path | str, column: str | None = None, *,
                     f"Its columns{after} are {', '.join(names)}.")
             raise ValueError(f"{head} has no column named {column!r}. {have}")
         other = first is not None and str(d.columns[0]) != str(column)
-        return values(d[column]), (first if other else None)
+        return d[column].to_numpy(), (first if other else None)
     if "x" in d.columns:
         extra = first is not None and str(d.columns[0]) != "x"
-        return values(d["x"]), (first if extra else None)
+        return d["x"].to_numpy(), (first if extra else None)
     if d.shape[1] == 1:
-        return values(d.iloc[:, 0]), None
+        return d.iloc[:, 0].to_numpy(), None
     if d.shape[1] == 2:
         if first.is_unique:
-            return values(d.iloc[:, -1]), first
+            return d.iloc[:, -1].to_numpy(), first
         no_header = _no_header(d.columns[0])
         # barcodes with a repeat, not a sample or batch column: an index written
         # without a header (pandas' and R's to_csv), or text that is 90% distinct
@@ -332,7 +305,7 @@ def read_labels_ids(path: Path | str, column: str | None = None, *,
                 f"{what or path}: the first column of {path.name} repeats "
                 f"{_n_ids(len(dup))} (first: {_first(dup, 3)}). Give each cell one row.")
         if no_header and _stacked_row_numbers(first):
-            return values(d.iloc[:, -1]), first
+            return d.iloc[:, -1].to_numpy(), first
         if no_header and pd.api.types.is_integer_dtype(first):
             # stacked row numbers, reordered after the concat
             raise ValueError(f"{head} has row numbers that repeat out of order, so its "
@@ -494,8 +467,7 @@ def _is_anndata(x) -> bool:
     return hasattr(x, "obsm") and hasattr(x, "obs") and hasattr(x, "n_obs")
 
 
-def as_vector(x, *, what: str = "labels", column: str | None = None,
-              as_written: bool = False) -> np.ndarray:
+def as_vector(x, *, what: str = "labels", column: str | None = None) -> np.ndarray:
     """Coerce a label-like input to a 1-D numpy array of length n_cells.
 
     Accepted forms:
@@ -519,10 +491,6 @@ def as_vector(x, *, what: str = "labels", column: str | None = None,
         Name used in error messages (``'labels'``, ``'batch'``, ``'clustering'``).
     column : str, optional
         Column to take when ``x`` is a file path or a multi-column DataFrame.
-    as_written : bool
-        ``True`` reads files as :func:`read_labels_ids` does with
-        ``as_written=True``, for a message that names the missing words;
-        values that are not read from a file are not changed.
 
     Returns
     -------
@@ -530,15 +498,13 @@ def as_vector(x, *, what: str = "labels", column: str | None = None,
         1-D array. Values are returned as-is (not re-coded).
     """
     if isinstance(x, (str, Path)):
-        return np.asarray(read_labels(x, column=column, as_written=as_written))
+        return np.asarray(read_labels(x, column=column))
     if isinstance(x, dict):
         if len(x) == 1:
-            return np.asarray(read_labels(next(iter(x.values())), column=column,
-                                          as_written=as_written))
+            return np.asarray(read_labels(next(iter(x.values())), column=column))
         raise ValueError(_multi_dict_message(what, x))
     if _is_label_path_list(x):
-        return np.concatenate([np.asarray(read_labels(p, column=column,
-                                                      as_written=as_written)) for p in x])
+        return np.concatenate([np.asarray(read_labels(p, column=column)) for p in x])
     if isinstance(x, pd.DataFrame):
         return np.asarray(_one_column(x, what, column).to_numpy())
     if isinstance(x, np.ndarray):

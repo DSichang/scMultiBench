@@ -47,14 +47,10 @@ def test_evaluate_raises_on_a_missing_batch(fill, seen, tmp_path):
     a = _adata(emb, celltype=lab, donor=bat)
     path = tmp_path / "batch.csv"
     pd.DataFrame({"x": bat}).to_csv(path, index=False)
-    # a file holds NaN, None and '' as an empty field, which the reader gives
-    # as NaN and the message does not name; a word that it reads as NaN is
-    # named as the file writes it
-    in_file = seen if isinstance(fill, str) and fill else ""
     forms = {"array": (emb, bat, "", seen), "list": (emb, list(bat), "", seen),
              "Series": (emb, pd.Series(bat), "", seen),
              "obs column": (a, "donor", "", seen), "obs: column": (a, "obs:donor", "", seen),
-             "file": (emb, str(path), " (batch.csv)", in_file)}
+             "file": (emb, str(path), " (batch.csv)", "")}
     for form, (output, batch, src, said) in forms.items():
         for kw in ({},):
             with pytest.raises(ValueError) as e:
@@ -77,9 +73,9 @@ def test_evaluate_raises_on_a_missing_batch_whole_message():
     assert str(e.value) == _bv1()
 
 
-def test_a_batch_file_names_the_word_it_holds(tmp_path):
-    """Donors written NA or None in a file: the reader reads NaN, and the
-    message names the word, whichever way the file is matched to the cells."""
+def test_a_batch_file_of_missing_words(tmp_path):
+    """Donors written NA or None in a file: the reader reads NaN, whichever
+    way the file is matched to the cells."""
     emb, lab = _cells()
     ids = [f"cell{i}" for i in range(N)]
     sheet = tmp_path / "sheet.csv"                 # ids in another order than the cells
@@ -87,20 +83,19 @@ def test_a_batch_file_names_the_word_it_holds(tmp_path):
         frac=1.0, random_state=2).to_csv(sheet)
     with pytest.raises(ValueError) as e:
         mtb.evaluate(_adata(emb), labels=lab, batch=sheet, metrics=["ASW_batch"])
-    assert str(e.value) == _bv1(" (sheet.csv)", ", for example 'None'")
+    assert str(e.value) == _bv1(" (sheet.csv)")
     halves = [tmp_path / "b1.csv", tmp_path / "b2.csv"]
     for path, part in zip(halves, (_gaps(_donors(), "NA")[:150], _gaps(_donors())[150:])):
         pd.DataFrame({"x": part}).to_csv(path, index=False)
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=lab, batch=[str(p) for p in halves], metrics=["ASW_batch"])
-    assert str(e.value) == _bv1(" (b1.csv, b2.csv)", ", for example 'NA'")
+    assert str(e.value) == _bv1(" (b1.csv, b2.csv)")
     # a dict of one file, the last of the forms that name a file
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb[:150], labels=lab[:150], batch={"batch": halves[0]},
                      metrics=["ASW_batch"])
     assert str(e.value) == (
-        "batch (b1.csv): 15 of the 150 cells have no batch, for example 'NA'. Give "
-        "every cell a batch.")
+        "batch (b1.csv): 15 of the 150 cells have no batch. Give every cell a batch.")
 
 
 def test_a_complete_batch_changes_nothing(tmp_path):

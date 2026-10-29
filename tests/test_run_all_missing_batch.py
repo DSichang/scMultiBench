@@ -124,7 +124,7 @@ def test_a_float_batch_with_a_gap(cite, tmp_path):
     assert calls == []
 
 
-def test_a_batch_file_names_the_word_it_holds(cite, tmp_path):
+def test_a_batch_file_of_missing_words(cite, tmp_path):
     data, calls = cite
     mtb.config.data_path = data
     kw = dict(methods=['totalVI'], verbose=False, out_dir=tmp_path / "out")
@@ -133,7 +133,7 @@ def test_a_batch_file_names_the_word_it_holds(cite, tmp_path):
     for batch in (sheet, str(sheet)):
         with pytest.raises(ValueError) as e:
             mtb.run("MYCITE", "vertical", batch=batch, **kw)
-        assert str(e.value) == _bv2(5, ", for example 'NA'")
+        assert str(e.value) == _bv2(5, NAN)
     _donor(np.nan).to_frame().to_csv(sheet)               # empty fields
     with pytest.raises(ValueError) as e:
         mtb.run("MYCITE", "vertical", batch=sheet, **kw)
@@ -141,7 +141,7 @@ def test_a_batch_file_names_the_word_it_holds(cite, tmp_path):
     pd.DataFrame({"x": _donor("None", 2).to_numpy()}).to_csv(sheet, index=False)
     with pytest.raises(ValueError) as e:
         mtb.run("MYCITE", "vertical", batch=sheet, **kw)
-    assert str(e.value) == _bv2(2, ", for example 'None'")
+    assert str(e.value) == _bv2(2, NAN)
     assert calls == []
 
 
@@ -160,7 +160,7 @@ def test_rescore_stops_on_a_missing_batch(cite, tmp_path):
     _donor("NA").to_frame().to_csv(sheet)
     with pytest.raises(ValueError) as e:
         res.rescore(batch=sheet)
-    assert str(e.value) == _bv2(5, ", for example 'NA'")
+    assert str(e.value) == _bv2(5, NAN)
     # with labels in the rows of the embedding as well
     with pytest.raises(ValueError, match="5 of the 120 cells of MYCITE have no batch"):
         res.rescore(labels=np.array(["A"] * 60 + ["B"] * 60), batch=_donor(np.nan))

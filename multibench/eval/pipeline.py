@@ -186,12 +186,11 @@ def _file_carries_ids(first, ids) -> bool:
     return bool(first.is_unique or pd.Index(first.astype(str)).isin(ids).any())
 
 
-def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
-                   table=None, read=(), others=None):
+def _obs_or_vector(x, adata, *, what, column=None, ids=None, table=None, read=(),
+                   others=None):
     """One label-like argument as a 1-D array in the output's cell order: an obs
     column, a Series aligned by id, a file aligned by its id column, else by position.
 
-    ``as_written`` reads files for a message naming the missing words;
     ``table`` (a ``.csv`` embedding's barcodes) collects the arguments put in
     its row order; ``read`` and ``others`` name the files whose barcodes name
     the cells (:func:`_folder_ids`).
@@ -212,8 +211,7 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
             f"{what}={x!r} is not a file, and the embedding has no obs. Pass the values, as "
             f"{what}=adata.obs[{x.removeprefix('obs:')!r}].")
     if isinstance(x, (str, Path)) and column is None:
-        vals, first = io.read_labels_ids(x, what=what, pick=_pick(what),
-                                         as_written=as_written)
+        vals, first = io.read_labels_ids(x, what=what, pick=_pick(what))
         unique = ids is not None and pd.Index(ids).is_unique
         name = Path(x).name
         if table is not None and unique and _file_carries_ids(first, ids) \
@@ -246,7 +244,7 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
     if io._numbers_rows(x, ids) and _has_cell_ids(ids):
         raise ValueError(f"{what} is a Series without cell ids, and the embedding has: index "
                          f"it by the barcodes, or pass {what}.to_numpy() to match by position.")
-    return io.as_vector(x, what=what, column=column, as_written=as_written)
+    return io.as_vector(x, what=what, column=column)
 
 
 def _pick(what: str):
@@ -369,7 +367,7 @@ def _no_ids(ids) -> str:
             else "the embedding has no cell ids")
 
 
-def _stack_label_files(files, ids, as_written=False, table=None, read=(), others=None):
+def _stack_label_files(files, ids, table=None, read=(), others=None):
     """Several label files, stacked in order, and each row's file (1, 2, ...).
 
     When every file has a first column of cell ids, the rows are aligned to
@@ -377,8 +375,7 @@ def _stack_label_files(files, ids, as_written=False, table=None, read=(), others
     files a method read, first: :func:`_folder_ids`, which refuses ids that are
     not distinct cells of the folder); otherwise they stay in file order.
     """
-    rows = [io.read_labels_ids(f, what="labels", pick=_pick("labels"),
-                               as_written=as_written) for f in files]
+    rows = [io.read_labels_ids(f, what="labels", pick=_pick("labels")) for f in files]
     vals = np.concatenate([np.asarray(v) for v, _ in rows])
     origin = np.concatenate([np.full(len(v), i + 1) for i, (v, _) in enumerate(rows)])
     names = [Path(f).name for f in files]
@@ -492,21 +489,6 @@ def _n_values(labels, adata) -> int | None:
             return None
 
 
-def _as_written(given, adata, ids, *, what, read=(), others=None):
-    """An argument of evaluate() that names files, read again in cell order with
-    each missing value as the word the file holds; ``None`` for values in memory.
-    ``read``: as :func:`_stack_label_files`."""
-    if not _label_files(given):
-        return None
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")           # the first read said them
-        if what == "labels" and io._is_label_path_list(given):
-            return _stack_label_files(given, ids, as_written=True, read=read,
-                                      others=others)[0]
-        return _obs_or_vector(given, adata, what=what, ids=ids, as_written=True, read=read,
-                              others=others)
-
-
 def _measured_warning(given, adata, reason: str, distinct: int, cells: int) -> str:
     """The warning for labels that look like a measured number per cell, such as
     ``nCount_RNA``; names the column, Series or file(s) when known."""
@@ -527,7 +509,7 @@ def _measured_warning(given, adata, reason: str, distinct: int, cells: int) -> s
 
 def _no_label_error(shown, miss, given) -> str:
     """evaluate()'s error for labels missing where ``miss`` is true. ``shown``
-    are the labels as written."""
+    are the labels."""
     n, n_cells = int(miss.sum()), len(miss)
     head = "labels" + _named_files(given)
     example = io._missing_example(shown)
@@ -540,7 +522,7 @@ def _no_label_error(shown, miss, given) -> str:
 
 def _no_batch_error(shown, miss, given) -> str:
     """evaluate()'s error for a batch missing where ``miss`` is true. ``shown``
-    is the batch as written."""
+    is the batch."""
     head = "batch" + _named_files(given)
     return (f"{head}: {int(miss.sum()):,} of the {len(miss):,} cells have no batch"
             f"{io._missing_example(shown)}. Give every cell a batch.")
@@ -1081,16 +1063,11 @@ def _scores(
     # checked here: compute() casts labels to str, and "nan" would become a cell type
     miss = io.missing_mask(ct)
     if miss.any():
-        shown = _as_written(labels, adata, lab_ids, what="labels", read=read,
-                            others=others)
-        raise ValueError(_no_label_error(ct if shown is None else shown, miss, labels))
+        raise ValueError(_no_label_error(ct, miss, labels))
     if batch is not None:
         no_batch = io.missing_mask(ba)
         if no_batch.any():
-            shown = _as_written(batch, adata, ba_ids, what="batch", read=read,
-                                others=others)
-            raise ValueError(_no_batch_error(
-                ba if shown is None else np.asarray(shown), no_batch, batch))
+            raise ValueError(_no_batch_error(np.asarray(ba), no_batch, batch))
     if group in ("batch", "all") and len(set(np.asarray(ba).astype(str).tolist())) < 2:
         # batch metrics on one batch: NaN, or a GC of 1.0
         if metrics is not None:

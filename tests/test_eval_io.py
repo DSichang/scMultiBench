@@ -259,12 +259,9 @@ def test_evaluate_dict_with_several_label_files_raises_listing_keys(tmp_path):
     # a dict whose insertion order IS the stacking order (what labels_for
     # returns) is accepted as-is: the two files are concatenated in that order
     # (here both hold the same 90 cells, so the only complaint is the length)
-    # the first files that hold the embedding's cells are named (0.4.0, X68), by
-    # their file names
     p1, p2 = tmp_path / "cty1.csv", tmp_path / "cty2.csv"
     _write_cty(p1, ct); _write_cty(p2, ct)
-    with pytest.raises(ValueError, match=r"The embedding has 90 cells = cty1\. Pass the "
-                                         r"label files cty1\.csv only\.$"):
+    with pytest.raises(ValueError, match=r"^labels has 180 entries for 90 cells"):
         evaluate(emb, labels={"cty1": str(p1), "cty2": str(p2)}, metrics=["ARI"])
     # any other order must be explicit
     with pytest.raises(ValueError) as exc:

@@ -13,7 +13,7 @@ from . import io
 from .. import _text
 from .._text import _and_list
 from ..plot.bar import CLASSIFICATION_METRICS as _CLASSIFICATION_METRICS
-from .pipeline import (_as_written, _count_error, _labels_from_dict, _no_batch_error,
+from .pipeline import (_count_error, _labels_from_dict, _no_batch_error,
                        _no_label_error, _obs_or_vector, _origin_names, _read_output,
                        _stack_label_files)
 
@@ -111,14 +111,11 @@ def classify(output, labels=None, *, batch=None, reference=None,
 
     miss = io.missing_mask(ct)
     if miss.all():
-        shown = _as_written(labels, adata, ids, what="labels")
-        raise ValueError(_no_label_error(ct if shown is None else shown, miss, labels))
+        raise ValueError(_no_label_error(ct, miss, labels))
     keep = ~miss
     has_batch = ~io.missing_mask(ba)
     if (keep & ~has_batch).any():
-        shown = _as_written(batch, adata, ids, what="batch")
-        raise ValueError(_no_batch_error(
-            np.asarray(ba if shown is None else shown)[keep], ~has_batch[keep], batch))
+        raise ValueError(_no_batch_error(np.asarray(ba)[keep], ~has_batch[keep], batch))
     ba = np.array([str(b) for b in ba], dtype=object)
     ct = np.array([str(c) for c in ct], dtype=object)
     batches = list(pd.unique(ba[has_batch]))
