@@ -70,8 +70,8 @@ def test_missing_helper_module_blocks_the_script_gate(tmp_path, monkeypatch):
     why = workflow._missing_script(v, method="MIRA")
     # user wording (L17): what is missing and where it goes, no host jargon
     assert "MIRA's script imports logger.py" in why
-    assert "Put a logger.py next to main_MIRA.py." in why
-    assert "does not include it" in why
+    assert "Put logger.py next to main_MIRA.py." in why
+    assert "repository does not include." in why
     assert why.endswith("mtb.method_info('MIRA')['setup_hint'] shows how.")
     assert "shim" not in why and "benchmark host" not in why
     (script.parent / "logger.py").write_text("")

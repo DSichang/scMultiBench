@@ -137,8 +137,8 @@ def test_the_mira_and_bridge_reasons_are_sentences(tmp_path, monkeypatch):
     v = SimpleNamespace(entrypoint="tools_scripts/MIRA/main_MIRA.py",
                         helpers=["logger.py"])
     why = W._missing_script(v, method="MIRA")
-    assert why.startswith("MIRA's script imports logger.py. The public scMultiBench "
-                          "repository does not include it. Put a logger.py next to "
+    assert why.startswith("MIRA's script imports logger.py, which the public scMultiBench "
+                          "repository does not include. Put logger.py next to "
                           "main_MIRA.py.")
     assert ";" not in why and "(" not in why.replace("('MIRA')", "")
     from multibench.engine.resolve import SAME_CELLS_REASON
@@ -168,5 +168,5 @@ def test_run_all_reads_r_row_numbers_on_a_folder_with_numbered_barcodes(cite, tm
 def test_the_linux_only_reason_fits_the_table(monkeypatch):
     monkeypatch.setattr(envs, 'host_system', lambda: "macOS")
     longest = max((envs.group_for(m) for m in registry.list_methods()), key=len)
-    reason = W._env_hint(longest, 'X', 'vertical')
+    reason = W._env_hint(longest, 'X')
     assert reason == f'Environment {longest} runs only on Linux, not on this computer.'

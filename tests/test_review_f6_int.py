@@ -168,7 +168,7 @@ def test_no_unsaved_batch_warning_without_a_batch_metric(cite, tmp_path):
         warnings.filterwarnings("ignore", message="ARI_batch and NMI_batch use")
         new = old.rescore(metrics=["ARI"])
     assert new.records[0]["status"] == "scored"
-    with pytest.warns(UserWarning, match="which older versions did not save"):
+    with pytest.warns(UserWarning, match="which is not saved with it"):
         old.rescore(metrics=["ARI", "iLISI"])
 
 

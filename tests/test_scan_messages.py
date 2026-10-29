@@ -9,7 +9,6 @@ ad = pytest.importorskip("anndata")
 
 
 def test_peaks_under_the_vertical_name_are_told_the_diagonal_name(tmp_path, capsys):
-    # Z35 (r3): "needs peak ATAC (atac_peak.h5), and the folder has peaks (atac.h5)"
     rng = np.random.default_rng(0)
     obs = pd.DataFrame({"ct": ["A", "B"] * 15}, index=[f"c{i}" for i in range(30)])
     rna = ad.AnnData(rng.poisson(1, (30, 20)).astype("float32"), obs=obs,
@@ -22,7 +21,7 @@ def test_peaks_under_the_vertical_name_are_told_the_diagonal_name(tmp_path, caps
     capsys.readouterr()
     mtb.scan(str(tmp_path / "MULTI"), "diagonal")
     out = capsys.readouterr().out
-    assert "[scan] GLUE: GLUE reads atac_peak.h5: rename atac.h5 to atac_peak.h5." in out
+    assert "[scan] GLUE: GLUE needs peak ATAC (atac_peak.h5)." in out
     assert "the folder has peaks" not in out
 
 

@@ -136,9 +136,9 @@ def test_rescore_handles_missing_output(cite, tmp_path):
     res = mtb.run(os.path.join(data, 'MYCITE'), 'vertical', methods=['Matilda'], modalities=['rna', 'adt'], out_dir=tmp_path / 'out', verbose=False)
     (tmp_path / "out" / "Matilda_MYCITE" / "embedding.h5").unlink()
     # 0.4: no output to score at all is an error, not a table without scores
-    with pytest.raises(FileNotFoundError, match=r"^No output of Matilda in .*out: load the "
-                                                r"folder that holds its method folder, or "
-                                                r"run it again\.$"):
+    with pytest.raises(FileNotFoundError, match=r"^No method output in .*out\. Load the "
+                                                r"folder that holds the method folders, or "
+                                                r"run the methods again\.$"):
         res.rescore()
 
 

@@ -42,14 +42,6 @@ from .eval.pipeline import LONG_COLUMNS as _LONG_COLUMNS, _long_table as _to_lon
 __all__ = ["scan", "run", "RunResult", "load_run"]
 
 
-def _registry_id_or(name):
-    """The registry id of ``name``, else ``name`` unchanged."""
-    try:
-        return registry.check_method(name)
-    except KeyError:
-        return name
-
-
 def load_run(out_dir, *, methods=None) -> "RunResult":
     """Reload a saved ``run`` result.
 
@@ -93,12 +85,9 @@ def load_run(out_dir, *, methods=None) -> "RunResult":
     ``mtb.config.data_path``.
     """
     folder = Path(out_dir).expanduser()
-    if not folder.is_dir():
-        raise FileNotFoundError(f"{folder} does not exist. Pass the out_dir that mtb.run wrote.")
     if not (folder / "batch_result.json").is_file():
-        raise FileNotFoundError(
-            f"{folder} holds no batch_result.json, so it is not an out_dir of mtb.run. "
-            f"Pass the out_dir that mtb.run wrote.")
+        raise FileNotFoundError(f"{folder} holds no batch_result.json. Pass the out_dir "
+                                f"that mtb.run wrote.")
     with open(folder / "batch_result.json") as fh:
         blob = json.load(fh)
     records = blob["records"]
@@ -106,7 +95,7 @@ def load_run(out_dir, *, methods=None) -> "RunResult":
         registry.check_id_list(methods, "methods")
         have = [r.get("method") for r in records]
         # a method id in any letter case, or a display name, names its record
-        methods = [m if m in have else _registry_id_or(m) for m in methods]
+        methods = [m if m in have else registry.check_method(m) for m in methods]
         unknown = [m for m in methods if m not in have]
         if unknown:
             raise KeyError(f"no record for {unknown} in {folder}; methods in the "
@@ -181,29 +170,6 @@ def _scored_before_040(long_table, records) -> bool:
 
 
 
-def batch_patterns(category: str) -> list[tuple[tuple, list[str]]]:
-    """The batch patterns a category's variants accept, with their methods.
-
-    Returns ``[(roles, methods), ...]``: ``roles`` sorted by batch then
-    modality (``('rna1', 'rna2', 'atac2', 'atac3')``), ``methods`` in
-    registry order. Variants that read the same set of files share one
-    pattern whatever their argument order (Cobolt and MultiVI).
-    """
-    from .engine.schema import _batch_of, base_modality, modality_family
-    order = {"rna": 0, "adt": 1, "atac": 2}
-    patterns: dict = {}
-    for spec, v, _cat, mods in _variant_rows(category):
-        if not mods:
-            continue
-        key = tuple(sorted((modality_family(m) for m in mods),
-                           key=lambda r: (_batch_of(r) or 0,
-                                          order.get(base_modality(r), 9), r)))
-        ids = patterns.setdefault(key, [])
-        if spec.id not in ids:
-            ids.append(spec.id)
-    return list(patterns.items())
-
-
 # --------------------------------------------------------------------------- scan
 def _installed_envs() -> frozenset:
     """The envs on this machine, read on every call so that an env installed
@@ -242,19 +208,10 @@ def _missing_script(variant, *, method: str | None = None) -> str:
                     + "['setup_hint']")
                 name = f"{method}'s script" if method else f"The script {entry.name}"
                 files = " and ".join(gone)
-                one = len(gone) == 1
-                return (f"{name} imports {files}. The public scMultiBench repository "
-                        f"does not include {'it' if one else 'them'}. Put "
-                        f"{'a ' if one else ''}{files} next to {entry.name}. {who} shows "
-                        f"how.")
+                return (f"{name} imports {files}, which the public scMultiBench repository "
+                        f"does not include. Put {files} next to {entry.name}. {who} shows how.")
             return ""
     return ""
-
-
-def _rows_word(df: "pd.DataFrame", k: int) -> str:
-    """``method(s)`` when each method of the scan frame has one row, else ``row(s)``."""
-    noun = "method" if len(df) and df["method"].is_unique else "row"
-    return noun if k == 1 else noun + "s"
 
 
 def _have_their(k: int, n: int) -> str:
@@ -291,7 +248,7 @@ SCAN_COLUMNS = ["method", "category", "modalities", "runnable", "reason", "env",
 OUT_DIR_PLACEHOLDER = "<out_dir>"
 
 
-def _env_hint(env: str, method: str, category: str | None, other=None) -> str:
+def _env_hint(env: str, method: str, other=None) -> str:
     """The ``env_reason`` text: the install command first, so a clipped reason
     still holds it; off Linux only the platform sentence; ``other`` = the
     prefix of a same-named env multibench did not install."""
@@ -299,10 +256,7 @@ def _env_hint(env: str, method: str, category: str | None, other=None) -> str:
         return f"Environment {env} runs only on Linux, not on this computer."
     if other is not None:
         return envs.other_env_text(env, other, f"run mtb.env.install([{method!r}]).")
-    alt = (f" mtb.env.install(category={category!r}) installs the environments of every "
-           f"{category} method." if category else "")
-    return (f"Environment {env} is not installed. Run "
-            f"mtb.env.install([{method!r}]).{alt}")
+    return f"Environment {env} is not installed. Run mtb.env.install([{method!r}])."
 
 
 #: ``.format(method=)`` caveat of a GPU-only row that ``scan(assume_gpu=True)``
@@ -330,21 +284,6 @@ def _first_sentence(text: str) -> str:
     return (m.group(1) if m else text).strip()
 
 
-def _atac_kind_of(path: Path) -> str:
-    """What an ATAC-family file holds, from its name, else from its features."""
-    stem = path.stem.rstrip("0123456789")
-    if stem in ("atac_peak", "peak"):
-        return "peaks"
-    if stem == "atac_gas":
-        return "gene activity"
-    frac = _resolve._peak_fraction_of(path)
-    if frac is not None and frac >= 0.9:
-        return "peaks"
-    if frac is not None and frac <= 0.1:
-        return "gene activity"
-    return "ATAC"
-
-
 def _reads_one_of_numbered(missing, category: str) -> bool:
     """A diagonal method that reads one file of a folder of numbered batches
     (``rna.h5`` next to ``rna1.h5``): scan's folder line covers it."""
@@ -365,8 +304,8 @@ def _missing_paths(spec, category: str, mods: list, dataset: str, data_path) -> 
 
 def _missing_files_reason(spec, category: str, mods: list, dataset: str,
                           data_path) -> str:
-    """The ``reason`` for input files that are not on disk, or ``""``: ``SCALEX needs
-    gene-activity ATAC (atac_gas.h5), and the folder has peaks (atac_peak.h5).``"""
+    """The ``reason`` for input files that are not on disk, or ``""``:
+    ``SCALEX needs gene-activity ATAC (atac_gas.h5). rna_cty.csv is missing.``"""
     from .engine.schema import is_label_role
     missing = _missing_paths(spec, category, mods, dataset, data_path)
     if not missing:
@@ -374,89 +313,43 @@ def _missing_files_reason(spec, category: str, mods: list, dataset: str,
     if _reads_one_of_numbered(missing.values(), category):
         names = [p.name for p in missing.values() if p.suffix == ".h5"]
         return f"{spec.id} reads {_and_list(names)}."
-    atac_parts, other = [], []
-    has_other = {}         # (need, kinds found) -> its part: numbered files share one
-    absent = {}            # need -> the files of a part none of whose kinds is here
-    for role, p in missing.items():
-        digits = role[len(role.rstrip("0123456789")):]
-        # a numbered file whose other batches are here: only this batch is missing
-        siblings = digits and any(q.name != p.name for q in p.parent.glob(
-            f"{p.stem[:len(p.stem) - len(digits)]}[0-9]*.h5"))
-        if is_label_role(role) or _schema_base(role) != "atac" or siblings:
-            other.append(p.name)
-            continue
+    parts = []
+
+    def kind(role):
+        """The ATAC representation a role reads: its own name, else the method's."""
         stem = role.rstrip("0123456789")
-        # the name export writes: atac.h5 (vertical), atac_peak<i>.h5 (cross)
-        want_file = (f"atac{digits}.h5" if category == "vertical" else
-                     f"atac_peak{digits}.h5" if category == "cross" and stem == "atac"
-                     else p.name)
         if stem == "atac_peak":
-            want = "peak"
-        elif stem == "atac_gas" and category != "vertical":
-            want = "gene-activity"
-        else:
-            want = {"peak": "peak", "gene_activity": "gene-activity"}.get(spec.atac or "", "")
-        need = f"{spec.id} needs {want + ' ' if want else ''}ATAC"
-        found = [p.parent / f"{b}{digits}.h5" for b in ("atac", "atac_peak", "atac_gas", "peak")]
-        found = [f for f in found if f.is_file() and f.name != want_file]
-        # the right representation under another name: only the name is wrong
-        same = [f for f in found if want
-                and _atac_kind_of(f) == {"peak": "peaks",
-                                         "gene-activity": "gene activity"}[want]]
-        if same and category == "vertical":
-            atac_parts.append(
-                f"{spec.id} reads {want_file} for vertical. Rename {same[0].name} to "
-                f'{want_file}, or write it with category="vertical"')
-        elif same:
-            atac_parts.append(f"{spec.id} reads {want_file}: rename {same[0].name} to "
-                              f"{want_file}")
-        elif found:
-            kinds = tuple(_atac_kind_of(f) for f in found)
-            part = has_other.get((need, kinds))
-            if part is None:
-                part = has_other[need, kinds] = ([], [[] for _ in found])
-                atac_parts.append(part)
-            part[0].append(want_file)
-            for names, f in zip(part[1], found):
-                names.append(f.name)
-        else:
-            if need not in absent:
-                absent[need] = []
-                atac_parts.append(absent[need])
-            absent[need].append(want_file)
-    for need, files in absent.items():
-        atac_parts[atac_parts.index(files)] = (
-            f"{need} ({', '.join(files)}), which the folder does not have")
-    for (need, kinds), part in has_other.items():
-        has = ", ".join(f"{k} ({', '.join(names)})" for k, names in zip(kinds, part[1]))
-        atac_parts[atac_parts.index(part)] = (
-            f"{need} ({', '.join(part[0])}), and the folder has {has}")
+            return "peak"
+        if stem == "atac_gas" and category != "vertical":
+            return "gene-activity"
+        return {"peak": "peak", "gene_activity": "gene-activity"}.get(spec.atac or "", "")
+
+    def batch_of_many(p):
+        """A numbered file whose other batches are here: only this batch is missing."""
+        stem = p.stem.rstrip("0123456789")
+        return stem != p.stem and any(q.name != p.name
+                                      for q in p.parent.glob(f"{stem}[0-9]*.h5"))
+    roles = [r for r, p in missing.items() if kind(r) and _schema_base(r) == "atac"
+             and not is_label_role(r) and not batch_of_many(p)]
+    for want in dict.fromkeys(map(kind, roles)):
+        # a cross role atac<i> as the file export writes, atac_peak<i>.h5
+        files = [f"atac_peak{r[4:]}.h5" if category == "cross" and r.rstrip("0123456789")
+                 == "atac" else missing[r].name for r in roles if kind(r) == want]
+        parts.append(f"{spec.id} needs {want} ATAC ({', '.join(files)})")
+    other = [p.name for r, p in missing.items() if r not in roles]
     if other:
-        atac_parts.append(", ".join(other) + (" is" if len(other) == 1 else " are")
-                          + " missing")
+        parts.append(f"{', '.join(other)} {'is' if len(other) == 1 else 'are'} missing")
     # rna1.h5 + rna2.h5 where a vertical / diagonal method reads one rna.h5
-    ds_dir = next(iter(missing.values())).parent
     batch_hint = _resolve._per_batch_hint(
-        ds_dir, category, {st for r in missing for st in _resolve._role_stems(r)[0]})
+        next(iter(missing.values())).parent, category,
+        {st for r in missing for st in _resolve._role_stems(r)[0]})
     if batch_hint:
-        atac_parts.append(batch_hint[:1].upper() + batch_hint[1:])
-    return _join_sentences(atac_parts)
+        parts.append(batch_hint[:1].upper() + batch_hint[1:])
+    return _join_sentences(parts)
 
 
 _ABS_PATH_RE = re.compile(r"(?<![\w./-])/(?:[^\s'\"\[\]{}(),:;]+/)+[^\s'\"\[\]{}(),:;]*")
 _EXC_PREFIX_RE = re.compile(r"^[A-Z]\w*(?:Error|Exception|Warning): ")
-
-
-def _dropped_dirs_message(modalities, dropped: list) -> str:
-    """The warning of ``scan(modalities=...)`` for the methods that read a folder."""
-    one = len(dropped) == 1
-    mods = _and_list([str(m) for m in modalities])
-    head = (f"The modality {mods} leaves" if len(modalities) == 1
-            else f"The modalities {mods} leave")
-    fix = (f"Pass modalities=[] to select {'it' if one else 'them'}, or leave out "
-        f"modalities= to see every variant.")
-    return (f"{head} out {_and_list(dropped)}, which "
-            f"{'reads' if one else 'read'} a folder instead of modality files. {fix}")
 
 
 def _short_reason(text: str, method: str, dataset: str) -> str:
@@ -487,17 +380,10 @@ def _blocking_caveats(caveats) -> list[str]:
     return [c for c in caveats if _WRONG_ATAC_RE.match(c) or _PEAK_NAMES_RE.match(c)]
 
 
-def _wrong_atac_reason(method: str, caveats) -> str:
+def _wrong_atac_reason(caveats) -> str:
     """The ``reason`` of a row whose ATAC file the method cannot read (the other
-    representation, or peak names it cannot parse), or ""; the override comes last."""
-    for text in _blocking_caveats(caveats):
-        m = _WRONG_ATAC_RE.match(text)
-        if m:
-            as_ = "gene activity" if m.group(1) == "gene-activity" else "peaks"
-            return (f"{method} needs {m.group(1)} ATAC, and {m.group(2)} holds "
-                    f"{m.group(3)}. Export the ATAC as {as_}.")
-        return text
-    return ""
+    representation, or peak names it cannot parse), or ""."""
+    return next(iter(_blocking_caveats(caveats)), "")
 
 
 def _atac_mismatch_caveats(method: str, category: str, inputs) -> list[str]:
@@ -593,10 +479,6 @@ def _modality_matcher(modalities, named=None):
     return match
 
 
-#: ``method_info(m)['atac']`` -> representation token stem
-_TOKEN_OF_REP = {v: k for k, v in _REPRESENTATION_TOKENS.items()}
-
-
 def _token_reps(modalities) -> set:
     """The ATAC representations (``peak``, ``gene_activity``) the tokens name."""
     out = set()
@@ -606,35 +488,6 @@ def _token_reps(modalities) -> set:
         if rep:
             out.add(rep)
     return out
-
-
-def _representation_note(category, methods, modalities) -> str:
-    """Why a representation token dropped the named ``methods`` (what each reads,
-    and the list to pass), or ""."""
-    if not methods or not modalities:
-        return ""
-    tokens = [registry.MODALITY_ALIASES.get(str(t).lower(), str(t).lower())
-              for t in modalities]
-
-    def rep(token):
-        return _REPRESENTATION_TOKENS.get(token.rstrip("0123456789"))
-    reps = {rep(t) for t in tokens if rep(t)}
-    if len(reps) != 1:
-        return ""
-    loose = _modality_matcher(["atac" if rep(t) else t for t in tokens])
-    notes, seen = [], set()
-    for spec, _v, _cat, mods in _variant_rows(category):
-        if (spec.id not in methods or spec.id in seen or not spec.atac
-                or spec.atac in reps or not loose(spec, mods)):
-            continue
-        seen.add(spec.id)
-        other = next((r for r in mods if rep(r) and rep(r) != spec.atac), None)
-        via = f" through its {other} input" if other else ""
-        fixed = [_TOKEN_OF_REP[spec.atac] if rep(t) else t for t in tokens]
-        base = ["atac" if rep(t) else t for t in tokens]
-        notes.append(f"{spec.id} reads {_resolve._READS[spec.atac]}{via}. Pass "
-                     f"modalities={fixed!r} or {base!r}.")
-    return " ".join(notes)
 
 
 def _no_variant_error(category, methods, modalities) -> ValueError:
@@ -656,10 +509,8 @@ def _no_variant_error(category, methods, modalities) -> ValueError:
                      f"{mods} in {where}." if dropped else
                      f"No method reads {mods} in {where}.")
         one = dropped[0] if len(dropped) == 1 else None
-        parts.append(_representation_note(category, dropped, modalities)
-                     or (f"mtb.method_info({one!r})['supports'] lists what {one} reads."
-                         if one else
-                         "mtb.method_info(m)['supports'] lists what each method reads."))
+        parts.append(f"mtb.method_info({one!r})['supports'] lists what {one} reads."
+                     if one else "mtb.method_info(m)['supports'] lists what each method reads.")
     return ValueError(" ".join(parts) or f"No method runs on {where}.")
 
 
@@ -736,50 +587,6 @@ def _role_files(ds_dir: Path, category: str | None) -> dict:
     return files
 
 
-def _batch_desc(batches: dict) -> str:
-    """``{1: {"rna", "atac"}, 2: {"rna"}}`` -> ``1 RNA+ATAC, 2 RNA``."""
-    order = list(registry._BASE_MODALITIES)
-    return ", ".join(f"{b} " + "+".join(_FAMILY_WORDS[f] for f in sorted(fams, key=order.index))
-                     for b, fams in sorted(batches.items()))
-
-
-def _renumber_hint(ds_dir: Path, category: str | None, mods=None) -> str:
-    """For a folder whose numbered batches match an accepted pattern of
-    ``category`` (of the variant reading ``mods``, when given) only after
-    renumbering: what it holds and what the methods read; ``""`` otherwise."""
-    import itertools
-    from .engine.schema import _batch_of, modality_family
-    if category not in ("mosaic", "cross"):
-        return ""
-    have: dict = {}
-    for q in ds_dir.iterdir():
-        m = re.fullmatch(r"(rna|adt|atac|atac_peak|atac_gas|peak)(\d+)\.h5", q.name)
-        if m:
-            fam = "atac" if m.group(1) == "peak" else _family(m.group(1))
-            have.setdefault(int(m.group(2)), set()).add(fam)
-    if len(have) < 2:
-        return ""
-    nums = sorted(have)
-    if nums != list(range(1, len(nums) + 1)):
-        return (f"{ds_dir.name} has batches {_and_list(nums)}: export them to a new "
-                f"folder, numbered 1 to {len(nums)}.")
-    patterns = ([[modality_family(m) for m in mods]] if mods else
-                [roles for roles, _methods in batch_patterns(category)])
-    for roles in patterns:
-        want: dict = {}
-        for r in roles:
-            want.setdefault(_batch_of(r), set()).add(_family(r.rstrip("0123456789")))
-        if sorted(want) != nums or want == have:
-            continue
-        for perm in itertools.permutations(nums):
-            moved = {perm[i]: have[b] for i, b in enumerate(nums)}
-            if moved == want:
-                # the action first: a clipped table column still shows it
-                return (f"Export the batches to a new folder, numbered {_batch_desc(want)} "
-                        f"({ds_dir.name} has {_batch_desc(have)}).")
-    return ""
-
-
 def _held_families(ds_dir: Path, category: str | None) -> list:
     """The families the folder holds a file of (:func:`_role_files`)."""
     held = set(_role_files(ds_dir, category).values())
@@ -798,57 +605,28 @@ def _listed(df: "pd.DataFrame", need, held, methods) -> list:
     return keep
 
 
-def _tenx_files(ds_dir: Path, files: dict) -> list:
-    """The names in ``files`` that are 10x Genomics files, by batch, then RNA, ADT, ATAC."""
-    from .engine.ingest import _is_canonical_h5, _is_tenx_h5
-
-    def order(name):
-        stem = name.rsplit(".", 1)[0]
-        return (int(stem[len(stem.rstrip("0123456789")):] or 0),
-                registry._BASE_MODALITIES.index(files[name]))
-    return sorted((n for n in files if not _is_canonical_h5(ds_dir / n)
-                   and _is_tenx_h5(ds_dir / n)), key=order)
-
-
 def _holds_sentence(dataset: str, ds_dir: Path, held, category: str | None = None) -> str:
-    """``D52 holds RNA and ADT, in batches 1-3.``; a 10x Genomics file is named as
-    such and does not count for its family."""
+    """``D52 holds RNA and ADT, in batches 1-3.``"""
     if not held:
         if not _cells_per_file(ds_dir):
             return f"{dataset} holds no RNA, ADT or ATAC file."
         return (f"{dataset} holds no RNA, ADT or ATAC file under a name that a "
                 f"{category + ' ' if category else ''}method reads.")
-    files = _role_files(ds_dir, category)
-    tenx = _tenx_files(ds_dir, files)
-    is_tenx = ""
-    if tenx:
-        is_tenx = f" {_and_list(tenx)} " + (
-            "is a 10x Genomics file under the name of a dataset file." if len(tenx) == 1
-            else "are 10x Genomics files under the names of dataset files.")
-        held = [f for f in held
-                if any(fam == f and n not in tenx for n, fam in files.items())]
-        if not held:
-            return f"{dataset} holds no dataset file:{is_tenx}"
     nums = sorted(_resolve._folder_batches(ds_dir))
     where = (f", in {'batch' if len(nums) == 1 else 'batches'} {_resolve._span(nums)}"
              if nums else "")
-    return (f"{dataset} holds {_and_list(_FAMILY_WORDS[f] for f in held)}{where}."
-            + is_tenx)
+    return f"{dataset} holds {_and_list(_FAMILY_WORDS[f] for f in held)}{where}."
 
 
 def _not_listed_note(df: "pd.DataFrame", dataset: str, ds_dir: Path,
                      category: str | None = None) -> str:
-    """What the folder holds when that has a fix (10x files under dataset names,
-    variants for numbered batches it lacks), else ``""`` (the same words in
-    ``scan`` and ``run``). The rows that read a
-    modality the folder lacks go unsaid: a named method among them has its own
-    error."""
-    batch = df.attrs.get("not_listed_batch")
-    if not batch and not _tenx_files(ds_dir, _role_files(ds_dir, category)):
+    """What the folder holds when variants for numbered batches it lacks are not
+    listed, else ``""``. The rows that read a modality the folder lacks go
+    unsaid: a named method among them has its own error."""
+    if not df.attrs.get("not_listed_batch"):
         return ""
-    return (_holds_sentence(dataset, ds_dir, df.attrs["held"], category) + (
-        ' Variants for numbered batches are not listed. modalities="all" lists them.'
-        if batch else ""))
+    return (_holds_sentence(dataset, ds_dir, df.attrs["held"], category)
+            + ' Variants for numbered batches are not listed. modalities="all" lists them.')
 
 
 def _batch_listed(df: "pd.DataFrame", ds_dir: Path, keep, methods=None) -> list:
@@ -977,8 +755,7 @@ def own_batches_only(dataset) -> None:
     if known_category(dataset) is not None:
         name = _resolve.split_dataset(dataset, None)[0]
         raise ValueError(f"{name} is a benchmark dataset: its batches are its label files. "
-                         f"For other batches, export your cells as a dataset folder of your "
-                         f"own and pass batch= there.")
+                         f"Pass batch= only for a dataset of your own.")
 
 
 def _scan(dataset: str, category: str | None = None, *, methods=None, modalities=None,
@@ -1002,18 +779,12 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
     # the real run refuses these scripts, so every row is blocked
     wrong_ref = scripts.scripts_ref_problem(repo) or scripts.scripts_folder_problem(repo) or ""
     rows = []
-    dropped_dirs: list[str] = []
     off_linux = bool(_runner.linux_only_sentence())
     others: dict = {}          # env -> a same-named env multibench did not install
-    reps = _token_reps(modalities)
     for spec, v, cat, mods in _variant_rows(category):
         if methods is not None and spec.id not in methods:
             continue
         if wanted is not None and not wanted(spec, mods):
-            # one representation token already excludes a method that reads the other
-            other_rep = len(reps) == 1 and spec.atac and spec.atac not in reps
-            if not mods and not other_rep and spec.id not in dropped_dirs:
-                dropped_dirs.append(spec.id)
             continue
         runtime = _runtimes().get(spec.id, {})
         rec = {"method": spec.id, "category": cat, "modalities": "+".join(mods) or "(data_dir)",
@@ -1045,12 +816,11 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
             if extra:
                 rec["caveat"] = _join_sentences([rec["caveat"], *extra])
                 rec["_folder_caveat"] = _join_sentences(extra)
-            wrong_atac = _wrong_atac_reason(spec.id, extra)
+            wrong_atac = _wrong_atac_reason(extra)
         except Exception as e:  # missing files, no variant, bad layout
             full = f"{type(e).__name__}: {e}"
             file_problems.append(full)
-            short = (_renumber_hint(ds_dir, cat, mods)
-                     or _missing_files_reason(spec, cat, mods, dataset, data_path)
+            short = (_missing_files_reason(spec, cat, mods, dataset, data_path)
                      or _short_reason(full, spec.id, dataset))
             short_problems.append(short)
             if _reads_one_of_numbered(
@@ -1063,7 +833,7 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
             rec["env_ok"] = False
             if not off_linux and rec["env"] not in others:
                 others[rec["env"]] = _other_env(rec["env"])
-            env_hint = _env_hint(rec["env"], spec.id, cat, others.get(rec["env"]))
+            env_hint = _env_hint(rec["env"], spec.id, others.get(rec["env"]))
         # a script that calls CUDA unconditionally: run() raises this sentence
         if spec.requires_gpu and not envs.host_has_gpu():
             if assume_gpu:
@@ -1076,7 +846,7 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
         rec["env_reason"] = " ".join(r for r in (env_hint, gpu_hint) if r)
         rec["runnable"] = bool(rec["files_ok"] and rec["env_ok"] and not wrong_atac
                                and not wrong_ref)
-        # the ATAC reason ends with its override, so it comes last
+        # the ATAC reason comes last
         rec["reason"] = _join_sentences([wrong_ref, *short_problems, rec["env_reason"],
                                          wrong_atac])
         rec["_other"] = _join_sentences([wrong_ref, *(p for p in short_problems
@@ -1115,9 +885,6 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
             raise _no_variant_error(category, missing or methods, modalities)
     if params:
         _check_param_keys(df, params)
-    if dropped_dirs and modalities:
-        _text.warn(_dropped_dirs_message(modalities, dropped_dirs),
-                     UserWarning)
     # last, so every check above saw every variant
     held = _held_families(ds_dir, category)
     need = [_row_families(m) for m in _shown_modalities(df)["modalities"]]
@@ -1290,15 +1057,13 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
     print(line + _env_tail(df, _installed_envs(), LINUX_ONLY_CHECK), flush=True)
     if cells:
         print(f"[scan] {_cells_line(cells)}", flush=True)
-    renumber = "" if n_files else _renumber_hint(ds_dir, private.attrs["category"])
-    for once in (renumber, per_batch):
-        if once:
-            print(f"[scan] {once}", flush=True)
+    if per_batch:
+        print(f"[scan] {per_batch}", flush=True)
     if not several:                   # one category: why each method cannot run
         for method, reason in sorted(reasons):
-            # the renumber and per-batch sentences were printed once above
-            for once in (renumber, per_batch):
-                reason = reason.replace(once, "").strip() if once else reason
+            # the per-batch sentence was printed once above
+            if per_batch:
+                reason = reason.replace(per_batch, "").strip()
             if reason:
                 print(f"[scan] {method}: {reason}", flush=True)
     would = [i for i, r in df.iterrows() if _would_run(r)]
@@ -1642,14 +1407,9 @@ def _warn_unsaved_batch(records, result) -> None:
     lost = [r for r in records if "batch_file" in r
             and result._batch_text(r.get("batch_file")) is None
             and (r.get("batch_file") or r.get("batch_source") == "user")]
-    if old:
-        _text.warn("This result was scored with your batch vector, which older "
-                     "versions did not save. Pass batch= again to keep the batch "
-                     "metrics.", UserWarning)
-    elif lost:
-        _text.warn("This result was scored with your batch vector, which is not "
-                     "saved with it. Pass batch= again to keep the batch metrics.",
-                     UserWarning)
+    if old or lost:
+        _text.warn("This result was scored with your batch, which is not saved with it. "
+                   "Pass batch= again to keep the batch metrics.", UserWarning)
 
 
 class RunResult:
@@ -1913,9 +1673,6 @@ class RunResult:
         ValueError
             ``labels`` or ``batch`` holds ids that are not cells of the dataset,
             or a cell has no batch.
-        FileNotFoundError
-            ``labels`` or ``batch`` is the name of an obs column, such as
-            ``"donor"``. Pass the column itself: ``batch=adata.obs["donor"]``.
 
         Warns
         -----
@@ -2018,7 +1775,7 @@ class RunResult:
                         # the batch run was given, when it is saved
                         text = self._batch_text(rec.get("batch_file"))
                         file = text and (rec["batch_file"], text)
-                        batch_ids, batch_by_cell = ((_read_batch_text(text), True) if text
+                        batch_ids, batch_by_cell = ((_read_batch_csv(text)["batch"].to_numpy(), True) if text
                                                     else (None, False))
                     if file:
                         new._batches[file[0]] = file[1]
@@ -2056,12 +1813,9 @@ class RunResult:
         # to score, so say so instead of returning a table without scores
         tried_records = [r for r in new.records if _scorable(r)]
         if tried_records and len(no_output) == len(tried_records):
-            one = len(tried_records) == 1
             raise FileNotFoundError(
-                f"No output of {_and_list([r['method'] for r in tried_records])} in "
-                f"{self.out_dir or '.'}: load the folder that holds "
-                f"{'its method folder' if one else 'their method folders'}, or run "
-                f"{'it' if one else 'them'} again.")
+                f"No method output in {self.out_dir or '.'}. Load the folder that holds "
+                f"the method folders, or run the methods again.")
         return new
 
     def embedding(self, method: str):
@@ -2098,7 +1852,7 @@ class RunResult:
         """
         import anndata as ad
         have = [r.get("method") for r in self.records]
-        name = method if method in have else _registry_id_or(method)
+        name = method if method in have else registry.check_method(method)
         rec = next((r for r in self.records if r.get("method") == name), None)
         if rec is None:
             raise KeyError(f"No record for {method!r}; this result has {_and_list(have)}.")
@@ -2292,7 +2046,7 @@ def _saved_batch(text, cells, names, dataset, root):
     when it cannot be placed: by cell id, else by label file."""
     if not text:
         return None
-    saved = pd.read_csv(__import__("io").StringIO(text), dtype=str, keep_default_na=False)
+    saved = _read_batch_csv(text)
     if "cell" in saved.columns and cells.is_unique and set(cells) <= set(saved["cell"]):
         return saved.set_index("cell")["batch"].reindex(cells).to_numpy(dtype=object)
     by_file = _batch_segments(dataset, root, saved["batch"].to_numpy(dtype=object))
@@ -2375,69 +2129,36 @@ def _scan_hint(dataset: str, category: str, *, data_path=None, methods=None,
 def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame,
                               methods, *, data_path=None, modalities=None, others=None,
                               every: bool = False, note: str = "") -> str:
-    """The ``ValueError`` text when no requested row can start (run's Notes);
-    ``others``: each row's blocks besides the platform."""
-    def _line(r):
-        return f"  {_row_label(r)}: {r['reason']}"
-    # rows whose files are in place first: an env install fixes those
-    blocked = blocked.assign(_files=~blocked["files_ok"].astype(bool)).sort_values(
-        ["_files", "method"], kind="stable").drop(columns="_files")
-    platform = _platform_line(blocked)
+    """The ``ValueError`` text when no requested row can start (run's Notes): one
+    line per blocked method with its reason (every named method, else the first 3
+    whose files are in place). Off Linux the platform blocks every row, so a method
+    is listed only for what else blocks it (``others``: each row's blocks besides
+    the platform)."""
+    linux_only = _runner.linux_only_sentence()
+    platform = bool(linux_only) and not blocked["env_ok"].all()
+    why = (others.reindex(blocked.index).fillna("") if platform and others is not None
+           else blocked["reason"])
+    # per method, the row whose files are in place first, as run would run it
+    order = blocked.assign(_files=~blocked["files_ok"].astype(bool), _why=why).sort_values(
+        ["_files", "method"], kind="stable")
+    rows = [r for _, r in order.groupby("method", sort=False).head(1).iterrows()
+            if r["_why"] and (methods or not r["_files"])]
+    lines = [(f"None of the requested methods ({', '.join(methods)}) can run on "
+              if methods else "No method can run on ") + f"{dataset} ({category})."]
+    if platform:
+        lines.append(f"{linux_only} On this computer you can check files, score embeddings "
+                     f"and plot. Run the methods on a Linux machine, such as Colab.")
+    shown = rows if methods else rows[:3]
+    if shown:
+        lines.append("Blocked:" if len(shown) == len(rows)
+                     else f"The first {len(shown)} of {len(rows)} blocked methods:")
+        lines += [f"  {_row_label(r)}: {r['_why']}" for r in shown]
+    if note:
+        lines.append(note)
     where = _scan_hint(dataset, category, data_path=data_path, methods=methods,
                        modalities=modalities, every=every)
-    lacking = ""
-    if platform and others is not None:
-        # as for skipped records: the rest are only counted
-        shown, n_lacking = _skipped_rows(blocked, set(), methods, dataset, data_path)
-        if shown and n_lacking:
-            blocked = blocked.loc[[r.name for r, _ in shown]]
-            lacking = (f"\n{n_lacking} {'row needs' if n_lacking == 1 else 'rows need'} "
-                       f"files that {dataset} does not have.")
-    if methods and not every and not lacking:
-        # the rows whose files the folder holds; the others are only counted
-        held = [i for i, r in blocked.iterrows() if _inputs_on_disk(r, dataset, data_path)]
-        if held and len(held) < len(blocked):
-            n = len(blocked) - len(held)
-            blocked = blocked.loc[held]
-            lacking = (f"\n{n} other {'row needs' if n == 1 else 'rows need'} files that "
-                       f"{dataset} does not have.")
-    # off Linux with nothing else in the way: the plan is the one thing to look at
-    only_platform = bool(platform) and others is not None and not lacking and not any(
-        others.reindex(blocked.index).fillna(""))
-    head = (f"None of the requested methods ({', '.join(methods)}) can run on "
-            if methods else "No method can run on ") + f"{dataset} ({category})."
-    if only_platform:
-        return f"{head}\n{platform}" + (f"{note}\n" if note else "") + f"{where} shows the plan."
-    if platform and others is not None:
-        listing = (_other_blocks(blocked, others, requested=bool(methods))
-                   + lacking).lstrip("\n")
-    elif methods:
-        listing = (f"Blocked, one line per requested {_rows_word(blocked, 1)}:\n"
-                   + "\n".join(_line(r) for _, r in blocked.iterrows()) + lacking)
-    else:
-        n, k = len(blocked), min(3, len(blocked))
-        rows = _rows_word(blocked, n)
-        shown = (f"The first {k} of {n} blocked {rows}" if n > k
-                 else f"The blocked {rows}" if n == 1 else f"The {n} blocked {rows}")
-        listing = f"{shown}:\n" + "\n".join(_line(r) for _, r in blocked.head(k).iterrows())
-    return (f"{head}\n{platform}{listing}" + (f"\n{note}" if note else "")
-            + f"\n{where} says why. {_DOCTOR}")
-
-
-def _other_blocks(blocked: pd.DataFrame, others: pd.Series, *, requested: bool) -> str:
-    """The list under the off-Linux line of the "No method can run" error: the rows
-    something else also blocks, with that reason (all when ``requested``, else 3)."""
-    rest = others.reindex(blocked.index).fillna("")
-    listed = [(r, rest[i]) for i, r in blocked.iterrows() if rest[i]]
-    n, k = len(blocked), len(listed)
-    noun = ("requested " if requested else "") + _rows_word(blocked, n)
-    if not listed:
-        return ""
-    count = f"{k} of {n} {noun} {'is' if k == 1 else 'are'} also blocked by something else"
-    shown = listed if requested else listed[:3]
-    lines = "\n".join(f"  {_row_label(r)}: {text}" for r, text in shown)
-    return (f"{count}:" if len(shown) == k
-            else f"{count}. The first {len(shown)}:") + "\n" + lines
+    lines.append(f"{where} says why." + ("" if platform else f" {_DOCTOR}"))
+    return "\n".join(lines)
 
 
 def _row_label(r) -> str:
@@ -2446,41 +2167,18 @@ def _row_label(r) -> str:
     return r["method"] if mods == "(data_dir)" else f"{r['method']} ({mods})"
 
 
-def _platform_line(blocked: pd.DataFrame) -> str:
-    """The off-Linux line (with its newline) of the "No method can run" error when
-    an env check blocks a row, else ``""``."""
-    linux_only = _runner.linux_only_sentence()
-    if not linux_only or blocked["env_ok"].all():
-        return ""
-    return (f"{linux_only} On this computer you can check files, score embeddings and "
-            f"plot. Run the methods on a Linux machine, such as Colab.\n")
-
-
-def _check_params_shape(params, methods, fn: str) -> None:
+def _check_params_shape(params, fn: str) -> None:
     """``TypeError`` for a ``params`` dict that is not keyed by method (a value
-    that is not a dict), showing the nested form."""
-    if not params or not isinstance(params, dict):
-        return
-    if all(isinstance(v, dict) for v in params.values()):
-        return
-    flat = {k: v for k, v in params.items() if not isinstance(v, dict)}
-    if all(":" in str(k) for k in flat):
-        # 'Multigrate:epochs': split it for the example
-        nested: dict = {}
-        for k, v in flat.items():
-            m, key = str(k).split(":", 1)
-            nested.setdefault(m, {})[key] = v
-        example = nested
-    else:
-        example = {methods[0] if methods else "Matilda": flat}
-    raise TypeError(f"{fn}(params=) takes one dict per method, such as "
-                    f"params={example!r}.")
+    that is not a dict)."""
+    if isinstance(params, dict) and not all(isinstance(v, dict) for v in params.values()):
+        raise TypeError(f"{fn}(params=) takes one dict per method, such as "
+                        f"params={{'Matilda': {{'epochs': 3}}}}.")
 
 
 def _checked_args(category, methods, modalities, params, fn: str) -> tuple:
     """``(methods, every, modalities, params)`` of a ``scan`` / ``run`` call, checked
     before any I/O: method ids in any case or display names, ``"all"`` as
-    ``every``, ``params`` keyed by method id (did-you-mean ``KeyError``)."""
+    ``every``, ``params`` keyed by method id."""
     registry.check_category(category)
     registry.check_id_list(methods, "methods")
     every = isinstance(modalities, str) and modalities == "all"
@@ -2490,7 +2188,7 @@ def _checked_args(category, methods, modalities, params, fn: str) -> tuple:
     registry.check_id_list(modalities, "modalities")
     if methods is not None:
         methods = [registry.check_method(m) for m in methods]
-    _check_params_shape(params, methods, fn)
+    _check_params_shape(params, fn)
     params = {registry.check_method(m): v for m, v in (params or {}).items()}
     stray = [m for m in params if methods is not None and m not in methods]
     if stray:
@@ -2660,11 +2358,10 @@ def _batch_csv(vec, dataset, data_path) -> tuple[str, str]:
     return f"batch_{hashlib.sha1(text.encode()).hexdigest()[:8]}.csv", text
 
 
-def _read_batch_text(text: str) -> np.ndarray:
-    """The batch ids of a file :func:`_batch_csv` wrote, as text."""
+def _read_batch_csv(text: str) -> pd.DataFrame:
+    """The frame of a file :func:`_batch_csv` wrote, as text."""
     import io
-    return pd.read_csv(io.StringIO(text), dtype=str,
-                       keep_default_na=False)["batch"].to_numpy()
+    return pd.read_csv(io.StringIO(text), dtype=str, keep_default_na=False)
 
 
 def _dataset_cell_ids(dataset, data_path) -> list | None:
@@ -2726,8 +2423,6 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
     from .eval.pipeline import _carries_ids
     if what == "batch":
         own_batches_only(dataset)
-    if _eio._names_no_file(x):
-        raise FileNotFoundError(_column_name_error(what, x))
     order = order or f"the order of the label files of {dataset}"
     folder = _dataset_folder(dataset, data_path)
     if not folder.is_dir():
@@ -2784,10 +2479,6 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
         fix = suffix_fix(what, ids, list(index)) if len(foreign) == len(index) else ""
         if fix:
             raise ValueError(f"{what}: its ids are not cells of {dataset}.{fix}")
-        if pd.api.types.is_integer_dtype(x.index):
-            raise ValueError(f"{what}: the index holds row numbers (first: "
-                             f"{list(x.index[:3])}), not cell barcodes. Set the "
-                             f"index to the dataset's barcodes, or {by_position}.")
         raise ValueError(f"{what}: {_eio._n_ids(len(foreign))} "
                          f"{'is not a cell' if len(foreign) == 1 else 'are not cells'} "
                          f"of {dataset} (first: {list(foreign[:3])}). Rename the index "
@@ -2798,13 +2489,6 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
                          f"have no id in {what} (first: {list(missing[:3])}). Give "
                          f"{unit} for every cell.")
     return np.asarray(pd.Series(vals, index=index).reindex(ids).to_numpy()), True
-
-
-def _column_name_error(what: str, x: str) -> str:
-    """The error for ``batch=`` / ``labels=`` given the name of an obs column."""
-    col = x[4:] if x.startswith("obs:") else x
-    return (f"{what}={x!r} is not a file. Pass the column itself, as "
-        f"{what}=adata.obs[{col!r}].")
 
 
 def _has_gap(values) -> bool:
@@ -2852,27 +2536,20 @@ def _missing_labels_problem(dataset: str, data_path, rows: "pd.DataFrame",
     """Why ``run`` does not start on label files with a missing label, or "".
     Without ``evaluate`` only the ``rows`` that read such a file as an input stop it."""
     gaps = _label_gaps(dataset, data_path)
-    readers: dict = {}            # method -> the label files with a gap it reads
-    for i, m in rows["method"].items():
-        read = [n for n in private.at[i, "_label_inputs"] if n in gaps]
-        if read:
-            readers.setdefault(m, set()).update(read)
+    # the methods that read a label file with a gap as an input, with those files
+    readers = {m: [n for n in private.at[i, "_label_inputs"] if n in gaps]
+               for i, m in rows["method"].items()}
+    readers = {m: read for m, read in readers.items() if read}
     if not gaps or not (evaluate or readers):
         return ""
+    who = ""
     if not evaluate:
-        read = set().union(*readers.values())
-        gaps = {name: g for name, g in gaps.items() if name in read}
-    (name, (n, total, shown)), more = next(iter(gaps.items())), len(gaps) - 1
-    head = (f"{name} of {dataset} has {n:,} of {total:,} cells without a label"
-            f"{_eio._missing_example(shown)}")
-    if more:
-        head += f", and {more} more label {'file has' if more == 1 else 'files have'} some"
-    if not evaluate:
-        who, others = next(iter(readers)), len(readers) - 1
-        head += (f", and {who} reads the label files" if not others else
-                 f", and {who} and {others} more {'method' if others == 1 else 'methods'} "
-                 f"read the label files")
-    return f"{head}. Write the folder again with a label for every cell."
+        who = f", and {next(iter(readers))} reads the label files"
+        gaps = {k: g for k, g in gaps.items() if k in set().union(*readers.values())}
+    name, (n, total, shown) = next(iter(gaps.items()))
+    return (f"{name} of {dataset} has {n:,} of {total:,} cells without a label"
+            f"{_eio._missing_example(shown)}{who}. Write the folder again with a label for "
+            f"every cell.")
 
 
 def _unlabelled_error(cands, dataset, data_path, *, user: bool) -> str | None:
@@ -3185,26 +2862,22 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
     """
     dataset, data_path = _resolve.split_dataset(dataset, None)
     if not isinstance(out_dir, (str, os.PathLike)):
-        raise TypeError(f"run() takes out_dir, the folder the outputs go to, such as "
-                        f"out_dir='out/'; got {out_dir!r}.")
+        raise TypeError(f"out_dir must be a folder path, such as out_dir='out/'; "
+                        f"got {out_dir!r}.")
     out_dir = Path(out_dir).expanduser()
     # the arguments first, so a bad combination is not reported as an I/O error
     methods, every, modalities, params = _checked_args(category, methods, modalities,
                                                        params, "run")
     if skip_existing and params:
-        raise ValueError("skip_existing=True with params=... would return results computed "
-                         "with the earlier parameters (reuse is keyed on the output file, not "
-                         "on params). Use a fresh out_dir per parameter setting, or "
-                         "skip_existing=False.")
+        raise ValueError("skip_existing=True would reuse outputs made with other params. "
+                         "Pass a new out_dir, or skip_existing=False.")
     root = Path(data_path) if data_path is not None else config.data_path
     # the on-disk spelling, once, so out_dir names and records agree (one warning)
     dataset = _resolve.canonical_dataset(root, dataset)
     # a real run checks params per method and records a bad key as FAIL
     plan_df, private = _scan(dataset, category, data_path=data_path, methods=methods,
                              modalities="all" if every else modalities, out_dir=out_dir)
-    not_listed = (_not_listed_note(plan_df, dataset, private.attrs["folder"], category)
-                  if plan_df.attrs["not_listed"] or plan_df.attrs.get("not_listed_batch")
-                  else "")
+    not_listed = _not_listed_note(plan_df, dataset, private.attrs["folder"], category)
 
     if plan_df.empty:
         # a modalities= selection that matches nothing, without methods=

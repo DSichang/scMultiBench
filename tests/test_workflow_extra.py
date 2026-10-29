@@ -18,7 +18,7 @@ def test_skip_existing_with_params_is_refused():
     with pytest.raises(ValueError) as e:
         mtb.run("D11", "vertical", out_dir="/tmp/unused",
                     params={"Matilda": {"epochs": 5}}, skip_existing=True)
-    assert "earlier parameters" in str(e.value)
+    assert "would reuse outputs made with other params" in str(e.value)
     assert "OLD" not in str(e.value)                  # no emphasis by capitals (L61)
 
 

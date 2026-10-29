@@ -67,8 +67,8 @@ def test_rescore_raises_when_it_finds_no_output(tmp_path, monkeypatch):
     with pytest.raises(FileNotFoundError) as e:
         res.rescore(metrics=["ARI"], verbose=False)
     assert str(e.value) == (
-        f"No output of totalVI and Matilda in {tree}: load the folder that holds their "
-        f"method folders, or run them again.")
+        f"No method output in {tree}. Load the folder that holds the method folders, or "
+        f"run the methods again.")
 
 
 def test_a_method_without_output_is_recorded_when_another_scores(tmp_path, monkeypatch):

@@ -661,7 +661,7 @@ def test_the_documented_batch_call_works(key, linux, tmp_path, monkeypatch):
     assert {r["method"] for r in res.records if r["status"] == "scored"} == \
         set(GEN.TASKS[key]["methods"])
     # "a column name alone is not enough there"
-    with pytest.raises(FileNotFoundError, match="batch='donor' is not a file"):
+    with pytest.raises(FileNotFoundError, match="The batch file donor does not exist"):
         eval(call.replace(f'{obj}.obs["donor"]', '"donor"'), ns)
     # "every cell needs a donor"
     ns[obj].obs.loc[ns[obj].obs_names[0], "donor"] = np.nan

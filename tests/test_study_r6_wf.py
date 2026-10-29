@@ -206,8 +206,8 @@ def test_a_folder_without_the_saved_batch_warns_once(batched):
         (tmp / "out" / r.pop("batch_file")).unlink()
     p.write_text(json.dumps(blob))
     old = mtb.load_run(tmp / "out")
-    text = ("This result was scored with your batch vector, which older versions did "
-            "not save. Pass batch= again to keep the batch metrics.")
+    text = ("This result was scored with your batch, which is not saved with it. Pass "
+            "batch= again to keep the batch metrics.")
     new, caught = _rescore(old)
     assert caught.count(text) == 1, caught
     assert new.records[0]["n_batches"] == 1

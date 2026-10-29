@@ -25,20 +25,11 @@ import multibench as mtb
 from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, ingest, registry
-from multibench.engine import runner as R
 from tests.test_docs_r4 import _flat, needs_docs
 from tests.test_study_r7_msg import ALL_ENVS, GENES, _h5, _lung, _quiet
 from tests.conftest import full_scan
 
 ROOT = __import__("pathlib").Path(__file__).resolve().parent.parent
-
-
-def test_env_reason_names_the_category_in_a_sentence(monkeypatch):
-    monkeypatch.setattr(R, "linux_only_sentence", lambda: None)
-    text = W._env_hint("glue", "GLUE", "diagonal")
-    assert text == ("Environment glue is not installed. Run mtb.env.install(['GLUE']). "
-                    "mtb.env.install(category='diagonal') installs the environments of "
-                    "every diagonal method.")
 
 
 # ======================================================================= R7-11
@@ -87,17 +78,6 @@ def test_missing_batch_file_is_named_as_a_batch_file(tmp_path, monkeypatch):
 def _lung_data(root):
     d = _lung(root / "data")
     return d
-
-
-def test_modalities_warning_in_python_is_sentences(tmp_path):
-    _lung_data(tmp_path)
-    with pytest.warns(UserWarning) as rec:
-        full_scan("LUNG", "diagonal", data_path=tmp_path / "data",
-                 modalities=["rna", "atac_gas"], verbose=False)
-    msg = next(str(w.message) for w in rec if "scBridge" in str(w.message))
-    assert msg == ("The modalities rna and atac_gas leave out scBridge, which reads a "
-                   "folder instead of modality files. Pass modalities=[] to select it, or "
-                   "leave out modalities= to see every variant.")
 
 
 # ==================================================== missing feature names

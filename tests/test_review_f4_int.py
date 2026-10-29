@@ -117,8 +117,9 @@ def test_gene_names_in_the_peak_file_still_block_multimap(tmp_path, pinned):
     row = _quiet(full_scan, "LUNG_ga", "diagonal", methods=["MultiMAP"], data_path=root,
                  verbose=False).iloc[0]
     assert not row["runnable"]
-    assert row["reason"].startswith("MultiMAP needs peak ATAC, and atac_peak.h5 holds gene "
-                                    "activity. ")
+    assert row["reason"].startswith("MultiMAP needs peak ATAC. The features of atac_peak.h5 "
+                                    "do not look like chr:start-end, so it seems to hold "
+                                    "gene activity.")
 
 
 def test_names_are_genes_needs_a_file_to_compare_with(tmp_path):
@@ -151,7 +152,7 @@ def test_a_gpu_blocked_row_ends_with_the_export_fix_and_no_override(
                  modalities=["rna", "atac"], data_path=root, verbose=False).iloc[0]
     assert not row["runnable"]
     assert "needs an NVIDIA GPU" in row["reason"]
-    assert row["reason"].endswith("Export the ATAC as gene activity.")
+    assert row["reason"].endswith("so it holds peaks.")
     assert "allow_atac_mismatch" not in row["reason"] and "anyway" not in row["reason"]
 
 
@@ -187,15 +188,15 @@ def mycite(tmp_path):
     return tmp_path, bars
 
 
-def test_an_integer_index_is_named_as_row_numbers(mycite):
+def test_an_integer_index_gets_the_foreign_ids_error(mycite):
     root, bars = mycite
     meta = pd.DataFrame({"batch": [1, 2] * 10, "keep": [True, False] * 10})
     sub = meta.loc[meta.keep, "batch"]            # row numbers 0, 2, 4, ...: not a RangeIndex
     with pytest.raises(ValueError) as e:
         W._batch_vector(sub, "MYCITE", root)
     msg = str(e.value)
-    assert msg.startswith("batch: the index holds row numbers (first: [0, 2, 4]), not "
-                          "cell barcodes. "), msg
+    assert msg.startswith("batch: 10 ids are not cells of MYCITE (first: ['0', '2', '4']). "
+                          "Rename the index to the dataset's barcodes, or "), msg
     assert msg.endswith("only when batch is already in the order of the label files of "
                         "MYCITE."), msg      # 0.4: labels_for is deprecated
 

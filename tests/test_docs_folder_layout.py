@@ -16,12 +16,31 @@ import multibench as mtb
 from multibench import workflow as W
 from multibench._text import _and_list
 from multibench.engine import resolve
-from multibench.engine.schema import _batch_of, base_modality
+from multibench.engine.schema import _batch_of, base_modality, modality_family
 
 DOCS = os.environ.get("SCMULTIBENCH_DOCS")
 pytestmark = pytest.mark.skipif(not (DOCS and Path(DOCS).is_dir()),
                                 reason="SCMULTIBENCH_DOCS not set")
 HEADING = "### Dataset folder layout { #folder-layout }"
+
+
+def batch_patterns(category: str) -> list[tuple[tuple, list[str]]]:
+    """The batch patterns a category's variants accept, with their methods:
+    ``[(roles, methods), ...]``, ``roles`` sorted by batch then modality
+    (``('rna1', 'rna2', 'atac2', 'atac3')``), ``methods`` in registry order.
+    Variants that read the same set of files share one pattern."""
+    order = {"rna": 0, "adt": 1, "atac": 2}
+    patterns: dict = {}
+    for spec, _v, _cat, mods in W._variant_rows(category):
+        if not mods:
+            continue
+        key = tuple(sorted((modality_family(m) for m in mods),
+                           key=lambda r: (_batch_of(r) or 0,
+                                          order.get(base_modality(r), 9), r)))
+        ids = patterns.setdefault(key, [])
+        if spec.id not in ids:
+            ids.append(spec.id)
+    return list(patterns.items())
 
 
 def _section() -> str:
@@ -47,7 +66,7 @@ def test_messages_point_to_the_section():
 @pytest.mark.parametrize("category", ["mosaic", "cross"])
 def test_the_batch_pattern_table_is_the_registrys(category):
     want = []
-    for roles, ids in W.batch_patterns(category):
+    for roles, ids in batch_patterns(category):
         per: dict = {}
         for r in roles:
             per.setdefault(_batch_of(r), []).append(base_modality(r))

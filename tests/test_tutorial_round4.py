@@ -261,8 +261,8 @@ def test_runnable_sentence_holds_for_the_named_method_calls_of_the_run_cells(
         for m in trio:
             r = df.loc[m]
             assert r.files_ok and r.env_ok and not r.runnable, (m, r.reason)
-            assert r.reason.startswith(f"{m} needs peak ATAC, and atac2.h5 holds gene "
-                                       "activity"), r.reason
+            assert r.reason.startswith(f"{m} needs peak ATAC. The features of atac2.h5 do "
+                                       "not look like chr:start-end"), r.reason
     assert "Give ATAC as peaks." in _visible(_markdown("tutorial_mosaic_shared"))
 
 

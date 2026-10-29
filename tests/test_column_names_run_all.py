@@ -1,10 +1,9 @@
-"""run and rescore say why they cannot take the name of an obs column (0.3.5).
+"""run and rescore take a batch or labels as a vector, a Series or a file.
 
 ``export_dataset`` and ``evaluate`` take ``"obs:donor"`` and ``"donor"``,
 because they are given the object. ``run`` and ``rescore`` are given a
-folder. Up to 0.3.4 ``batch="donor"`` answered ``The batch file donor does
-not exist``; the message now says what to pass. A name that looks like a
-file keeps the file error.
+folder, so a string is a file: ``batch="donor"`` answers ``The batch file
+donor does not exist``, before anything runs.
 
 A synthetic CITE-seq folder and a fake ``_run`` keep these independent of any
 conda env.
@@ -80,39 +79,28 @@ def cite(tmp_path, monkeypatch):
     return tmp_path / "data", calls
 
 
-def _c1(what, given, col):
-    return (f"{what}={given!r} is not a file. Pass the column itself, as "
-            f"{what}=adata.obs[{col!r}].")
+def _c1(what, given):
+    return (f"The {what} file {Path(given)} does not exist. From the working directory "
+            f"{Path.cwd()}, the path resolves to {Path(given).resolve()}.")
 
 
 @pytest.mark.parametrize("given", ["donor", "obs:donor"])
-def test_a_column_name_is_explained(cite, tmp_path, given):
+def test_a_column_name_is_a_missing_file(cite, tmp_path, given):
     data, calls = cite
     mtb.config.data_path = data
     kw = dict(methods=['totalVI'], verbose=False)
     with pytest.raises(FileNotFoundError) as e:
         mtb.run("MYCITE", "vertical", tmp_path / "out", batch=given, **kw)
-    assert str(e.value) == _c1("batch", given, "donor")
+    assert str(e.value) == _c1("batch", given)
     assert calls == [] and not (tmp_path / "out").exists()
     res = _quiet(mtb.run, "MYCITE", "vertical", tmp_path / "out", **kw)
     with pytest.raises(FileNotFoundError) as e:
         res.rescore(batch=given)
-    assert str(e.value) == _c1("batch", given, "donor")
+    assert str(e.value) == _c1("batch", given)
     with pytest.raises(FileNotFoundError) as e:
         res.rescore(labels=given.replace("donor", "celltype"))
-    assert str(e.value) == _c1("labels", given.replace("donor", "celltype"), "celltype")
+    assert str(e.value) == _c1("labels", given.replace("donor", "celltype"))
     assert [r["status"] for r in res.records] == ["scored"]
-
-
-def test_other_names_that_are_no_file(cite, tmp_path):
-    data, _ = cite
-    mtb.config.data_path = data
-    kw = dict(methods=['totalVI'], verbose=False, out_dir=tmp_path / "out")
-    for given, col in (("sample id", "sample id"), ("rna:donor", "rna:donor"),
-                       ("donor.h5ad", "donor.h5ad"), ("obs:", "")):
-        with pytest.raises(FileNotFoundError) as e:
-            mtb.run("MYCITE", "vertical", batch=given, **kw)
-        assert str(e.value) == _c1("batch", given, col)
 
 
 def test_a_missing_csv_keeps_its_text(cite, tmp_path):
@@ -171,8 +159,3 @@ def test_the_column_itself_works(cite, tmp_path):
     assert again.records[0]["status"] == "scored"
     assert again.records[0]["metrics"]["ARI"] == rec["metrics"]["ARI"]
     assert calls == ["totalVI", "totalVI"]
-
-
-def test_the_docstrings_state_the_rule():
-    flat = " ".join(W.RunResult.rescore.__doc__.split())
-    assert 'Pass the column itself: ``batch=adata.obs["donor"]``.' in flat

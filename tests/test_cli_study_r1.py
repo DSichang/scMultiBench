@@ -48,7 +48,7 @@ def test_nothing_runnable_lists_rows_with_files_in_place_first(no_envs, tmp_path
     with pytest.raises(ValueError) as e:
         mtb.run("D11", "vertical", out_dir=str(tmp_path), verbose=False,
                     modalities="all")
-    body = str(e.value).split("blocked rows:\n", 1)[1]
+    body = str(e.value).split("blocked methods:\n", 1)[1]
     lines = [l for l in body.splitlines() if l.startswith("  ")]
     # D11 is CITE-seq: the rna+adt rows have their files; MIRA (rna+atac) does not
     assert len(lines) == 3 and all("(rna+adt)" in l for l in lines), lines

@@ -74,21 +74,19 @@ def test_vertical_peak_file_under_the_diagonal_name_says_how_to_fix(tmp_path, ga
     # stands for a vertical method that reads gene activity
     df = full_scan("MU_TC", "vertical", data_path=tmp_path, verbose=False)
     df = df.set_index(["method", "modalities"])
-    peak = df.loc[("scMVP", "rna+atac"), "reason"]
-    assert ('scMVP reads atac.h5 for vertical. Rename atac_peak.h5 to atac.h5, or write it '
-            'with category="vertical".') in peak
-    assert "needs peak ATAC" not in peak
+    peak = df.loc[("scMVP", "rna+atac")]
+    assert peak["reason"].startswith("scMVP needs peak ATAC (atac.h5).")
+    assert ('Rename atac_peak.h5 to atac.h5, or write it with category="vertical".'
+            in peak["files_reason"])
     gas = df.loc[("Matilda", "rna+atac"), "reason"]
-    assert ("Matilda needs gene-activity ATAC (atac.h5), and the folder has peaks "
-            "(atac_peak.h5).") in gas
+    assert gas.startswith("Matilda needs gene-activity ATAC (atac.h5).")
     assert "ename" not in gas
-    # the peak methods whose role was atac_gas (atac since 0.4.0, X13): the reason and
-    # files_reason give one rule, 'vertical reads atac.h5', and never atac_gas.h5 as the
-    # rename target
+    # the peak methods whose role was atac_gas (atac since 0.4.0, X13): files_reason
+    # gives one rule, 'vertical reads atac.h5', and never atac_gas.h5 as the rename target
     for m in ("moETM", "scMM", "iPOLNG"):
         row = df.loc[(m, "rna+atac")]
+        assert "ename atac_peak.h5 to atac.h5" in row["files_reason"], (m, row["files_reason"])
         for col in ("reason", "files_reason"):
-            assert "ename atac_peak.h5 to atac.h5" in row[col], (m, col, row[col])
             assert "vertical reads atac_gas.h5" not in row[col], (m, col)
             assert "reads atac_gas.h5 for vertical" not in row[col], (m, col)
             assert "to atac_gas.h5" not in row[col], (m, col)

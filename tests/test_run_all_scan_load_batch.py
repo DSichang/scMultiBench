@@ -97,13 +97,13 @@ def test_x64_tunable_leaves_out_what_the_package_or_script_sets():
     assert "r_dim" not in mtb.params_for("scMM", "vertical", ["rna", "atac"])["tunable"]
 
 
-def test_x65_method_colon_key_gets_the_nested_example():
-    with pytest.raises(TypeError, match=r"such as params=\{'Multigrate': \{'epochs': 3\}\}\.$"):
+def test_x65_a_flat_params_dict_is_refused():
+    with pytest.raises(TypeError, match=r"takes one dict per method"):
         mtb.scan("D52mini", "cross", params={"Multigrate:epochs": 3})
 
 
 def test_x66_run_refuses_skip_existing_with_params(tmp_path):
-    with pytest.raises(ValueError, match=r"^skip_existing=True with params="):
+    with pytest.raises(ValueError, match=r"^skip_existing=True would reuse outputs made with other params"):
         mtb.run("D52mini", "cross", tmp_path / "out", methods=["Multigrate"],
                 params={"Multigrate": {"epochs": 3}}, skip_existing=True, verbose=False)
     assert not (tmp_path / "out").exists()
@@ -131,22 +131,6 @@ def test_x81_online_inmf_size_note_only_on_a_small_folder():
     from multibench.engine import registry
     v = registry.get("online_iNMF").select("diagonal", {"rna", "atac_gas"})
     assert v.min_cells == 5000 and "5,000 cells" in v.size_hint
-
-
-def test_x79_scan_names_the_batch_renumbering(tmp_path, capsys, monkeypatch):
-    import os
-    src = mtb.config.data_path / "D45mini"
-    d = tmp_path / "MYMOSAIC"
-    d.mkdir()
-    for new, old in (("rna1", "rna2"), ("atac1", "atac2"), ("rna2", "rna1"),
-                     ("atac3", "atac3")):
-        os.symlink(src / f"{old}.h5", d / f"{new}.h5")
-    monkeypatch.chdir(tmp_path)
-    mtb.scan("./MYMOSAIC", "mosaic")
-    out = capsys.readouterr().out
-    assert ("[scan] Export the batches to a new folder, numbered 1 RNA, 2 RNA+ATAC, 3 ATAC (MYMOSAIC has "
-            "1 RNA+ATAC, 2 RNA, 3 ATAC).") in out
-    assert out.count("Export the batches to a new folder") == 1                  # Z20 (r3): once
 
 
 def test_x11_a_local_folder_shadowed_by_the_data_path_is_named(tmp_path, monkeypatch):

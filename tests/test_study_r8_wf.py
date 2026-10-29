@@ -16,7 +16,6 @@ import os
 import inspect
 import math
 import re
-import warnings
 from pathlib import Path
 
 import pandas as pd
@@ -133,33 +132,6 @@ def lung(tmp_path, monkeypatch):
     return tmp_path
 
 
-def _scan_warnings(**kw):
-    with warnings.catch_warnings(record=True) as seen:
-        warnings.simplefilter("always")
-        full_scan("LUNG", "diagonal", data_path="data", verbose=False, **kw)
-    return [str(w.message) for w in seen if issubclass(w.category, UserWarning)]
-
-
-@pytest.mark.parametrize("mods", [["rna", "atac_peak"], ["rna", "peak"]])
-def test_a_peak_token_does_not_name_scbridge(lung, mods):
-    assert mtb.method_info("scBridge")["atac"] == "gene_activity"
-    assert not [m for m in _scan_warnings(modalities=mods) if "scBridge" in m]
-
-
-@pytest.mark.parametrize("mods", [["rna", "atac_gas"], ["rna", "atac"],
-                                  ["rna", "atac_peak", "atac_gas"]])
-def test_other_tokens_still_name_scbridge(lung, mods):
-    (msg,) = [m for m in _scan_warnings(modalities=mods) if "scBridge" in m]
-    assert msg.startswith("The modalities rna"), msg
-    assert " leave out scBridge, which reads a folder instead of modality files." in msg
-
-
-def test_one_token_is_singular(lung):
-    (msg,) = [m for m in _scan_warnings(modalities=["rna"]) if "scBridge" in m]
-    assert msg.startswith("The modality rna leaves out scBridge, which reads a folder "
-                          "instead of modality files. Pass modalities=[] to select it"), msg
-
-
 # ============================================================ R8-04
 @pytest.fixture
 def no_envs(monkeypatch):
@@ -211,20 +183,19 @@ def test_a_selection_with_every_method_present_is_unchanged(no_envs, labmos):
     assert {"StabMap", "scMoMaT"} <= set(every["method"])
 
 
-def test_a_method_the_modalities_drop_raises_with_the_representation_note(lung):
+def test_a_method_the_modalities_drop_raises_with_where_to_look(lung):
     with pytest.raises(ValueError) as e:
         full_scan("LUNG", "diagonal", data_path="data", methods=["GLUE", "SCALEX"],
                  modalities=["rna", "atac_peak"], verbose=False)
-    assert str(e.value) == ("SCALEX does not read rna+atac_peak in diagonal data. SCALEX "
-                            "reads gene activity. Pass modalities=['rna', 'atac_gas'] or "
-                            "['rna', 'atac'].")
+    assert str(e.value) == ("SCALEX does not read rna+atac_peak in diagonal data. "
+                            "mtb.method_info('SCALEX')['supports'] lists what SCALEX reads.")
     # another category and the modalities, in one message
     with pytest.raises(ValueError) as e:
         full_scan("LUNG", "diagonal", data_path="data", methods=["GLUE", "Matilda", "SCALEX"],
                  modalities=["rna", "atac_peak"], verbose=False)
     assert str(e.value).startswith("Matilda does not run on diagonal data. Its categories: "
                                    "vertical. SCALEX does not read rna+atac_peak in "
-                                   "diagonal data. SCALEX reads gene activity."), e.value
+                                   "diagonal data."), e.value
 
 
 def test_the_docstrings_say_a_method_without_a_variant_raises():
@@ -271,53 +242,42 @@ def test_rows_blocked_only_by_the_platform_are_not_listed(macos, mydata):
     lines = msg.splitlines()
     assert lines[0] == "No method can run on MYDATA (vertical)."
     assert lines[1].startswith(MACOS)
-    assert lines[2] == "mtb.scan('data/MYDATA', 'vertical', modalities=['rna', 'adt']) shows the plan."
+    assert lines[2] == "mtb.scan('data/MYDATA', 'vertical', modalities=['rna', 'adt']) says why."
     assert len(lines) == 3 and "not on this computer" not in msg
     msg = _nothing_runnable(modalities=["rna", "adt"], methods=["Matilda", "totalVI"])
     assert msg.splitlines()[2] == ("mtb.scan('data/MYDATA', 'vertical', methods=['Matilda', "
                                    "'totalVI'], modalities=['rna', 'adt']) "
-                                   "shows the plan.")                      # Y22
+                                   "says why.")                            # Y22
     msg = _nothing_runnable(modalities=["rna", "adt"], methods=["totalVI"])
     assert len(msg.splitlines()) == 3 and "Nothing else blocks" not in msg
 
 
-def test_a_row_that_also_lacks_a_file_is_listed_with_that_reason(macos, mydata):
-    msg = _nothing_runnable(methods=["Matilda", "totalVI"], modalities="all")
+def test_a_method_that_also_lacks_a_file_is_listed_with_that_reason(macos, mydata):
+    msg = _nothing_runnable(methods=["Matilda", "MIRA"], modalities="all")
     lines = msg.splitlines()
-    assert lines[0] == ("None of the requested methods (Matilda, totalVI) can run on "
+    assert lines[0] == ("None of the requested methods (Matilda, MIRA) can run on "
                         "MYDATA (vertical).")
-    # Matilda's two rows that read ATAC; its rna+adt row and totalVI's lack nothing
-    assert lines[2] == "2 of 4 requested rows are also blocked by something else:"
-    assert lines[3] == ("  Matilda (rna+atac): Matilda needs peak ATAC (atac.h5), "
-                        "which the folder does not have.")
-    assert lines[4] == ("  Matilda (rna+adt+atac): Matilda needs peak ATAC (atac.h5), "
-                        "which the folder does not have.")
-    assert lines[5].startswith("mtb.scan('data/MYDATA', 'vertical', "
-                               "methods=['Matilda', 'totalVI'], modalities=\"all\") says why.")
+    # Matilda's rna+adt row lacks nothing but the platform: only MIRA is listed
+    assert lines[2:4] == ["Blocked:", "  MIRA (rna+atac): MIRA needs peak ATAC (atac.h5)."]
+    assert lines[4] == ("mtb.scan('data/MYDATA', 'vertical', methods=['Matilda', 'MIRA'], "
+                        "modalities=\"all\") says why.")
     assert "not on this computer" not in msg
 
 
 def test_without_methods_the_first_3_other_blocks_are_shown(macos, mydata, monkeypatch):
-    # the review of round 8: rows whose files MYDATA lacks are counted, not listed
-    msg = _nothing_runnable(modalities="all")
+    # the methods whose files MYDATA lacks are left to scan
+    lines = _nothing_runnable(modalities="all").splitlines()
+    assert len(lines) == 3 and lines[2].endswith(" says why.")
+    # scripts at another commit block every method whose files are in place
     plan = _plan(modalities="all")
-    lacking = int((~plan["files_ok"]).sum())
-    have = plan[plan["files_ok"]]
-    lines = msg.splitlines()
-    assert lines[2] == f"{lacking} rows need files that MYDATA does not have."
-    # scripts at another commit block every row: the first 3 are listed
-    from multibench import config
+    have = set(plan.loc[plan["files_ok"].astype(bool), "method"])
     monkeypatch.setattr(scripts, "scripts_ref_problem", lambda repo=None: "Wrong scripts.")
-    msg = _nothing_runnable(modalities="all")
-    lines = msg.splitlines()
-    n = len(have)
-    assert lines[2] == (f"{n} of {n} methods are also blocked by something else. "
-                        "The first 3:")
-    listed = lines[3:6]
-    assert [l.split(" (")[0].strip() for l in listed] == sorted(have["method"])[:3]
-    assert all(l.startswith("  ") and "not on this computer" not in l for l in listed)
-    assert lines[6] == f"{lacking} rows need files that MYDATA does not have."
-    assert lines[7].startswith("mtb.scan('data/MYDATA', 'vertical', "
+    lines = _nothing_runnable(modalities="all").splitlines()
+    assert lines[2] == f"The first 3 of {len(have)} blocked methods:"
+    assert [l.split(" (")[0].strip() for l in lines[3:6]] == sorted(have)[:3]
+    assert all(l.startswith("  ") and "Wrong scripts." in l and "not on this computer" not in l
+               for l in lines[3:6])
+    assert lines[6].startswith("mtb.scan('data/MYDATA', 'vertical', "
                                "modalities=\"all\") says why.")
 
 
@@ -329,7 +289,7 @@ def test_off_linux_a_gpu_block_is_left_out(macos, mydata, monkeypatch):
     assert any(mtb.method_info(m)["gpu"] == "required" for m in plan["method"])   # moETM
     assert "NVIDIA GPU" not in msg and "also blocked by something else" not in msg
     assert msg.splitlines()[2].startswith(
-        "mtb.scan('data/MYDATA', 'vertical', modalities=['rna', 'adt']) shows the plan."), msg
+        "mtb.scan('data/MYDATA', 'vertical', modalities=['rna', 'adt']) says why."), msg
     assert "not on this computer" not in msg
 
 
@@ -347,8 +307,7 @@ def test_on_linux_the_message_is_todays(no_envs, mydata, monkeypatch):
     assert msg == want
     assert "is not installed. Run mtb.env.install([" in msg
     msg = _nothing_runnable(modalities=["rna", "adt"], methods=["totalVI"])
-    assert "\nBlocked, one line per requested method:\n  totalVI (rna+adt): Environment " \
-           in msg
+    assert "\nBlocked:\n  totalVI (rna+adt): Environment " in msg
 
 
 def test_the_scan_frame_keeps_the_linux_sentence(macos, mydata):

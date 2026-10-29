@@ -50,7 +50,7 @@ PEAK_METHODS = {"MIRA", "Seurat_WNN", "VIMCCA", "iPOLNG", "moETM", "scMM", "scMV
 def _wrong_atac(reasons):
     """The scan rows blocked by the ATAC file they would read."""
     text = reasons.astype(str)
-    return text.str.contains("Export the ATAC as ", regex=False) | text.str.contains(
+    return text.str.contains(W._WRONG_ATAC_BODY, regex=True) | text.str.contains(
         W.PEAK_NAMES_REASON, regex=False)
 
 
@@ -121,8 +121,8 @@ def test_scan_blocks_peak_methods_given_gene_activity(tmp_path):
                 verbose=False).set_index("method")
     for m in ("moETM", "scMM", "iPOLNG", "scMVP"):
         assert not df.loc[m, "runnable"] and df.loc[m, "files_ok"], m
-        assert df.loc[m, "reason"].startswith(f"{m} needs peak ATAC, and atac.h5 holds gene "
-                                              "activity")
+        assert df.loc[m, "reason"].startswith(f"{m} needs peak ATAC. The features of atac.h5 "
+                                              "do not look like chr:start-end")
     assert df.loc[sorted(GAS_METHODS), "runnable"].all()
 
 

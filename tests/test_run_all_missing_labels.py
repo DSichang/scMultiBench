@@ -218,7 +218,7 @@ def test_two_methods_that_read_the_label_file(cite, tmp_path, host):
     methods = ["Matilda", "UnitedNet", "totalVI"]
     assert _refused(cite, tmp_path, methods) == M1
     assert _refused(cite, tmp_path, methods, evaluate=False) == (
-        HEAD + ", and Matilda and 1 more method read the label files" + FIX)
+        M1_MATILDA)
     assert host == [] and not (tmp_path / "out").exists()
 
 
