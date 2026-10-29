@@ -469,7 +469,7 @@ def test_blank_lines_in_a_one_column_file_keep_the_count_error(tmp_path):
     assert len(eio.read_labels(path)) == 270
     for kw in ({},):
         with pytest.raises(ValueError, match=r"^labels has 270 entries for 300 cells "
-                                             r"in the embedding\."):
+                                             r"in the embedding:"):
             mtb.evaluate(emb, labels=str(path), metrics=["ASW"], **kw)
 
 

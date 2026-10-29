@@ -47,16 +47,14 @@ def test_python_label_count_error_names_dataset_category_and_method(tmp_path):
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=str(folder / "cty1.csv"), metrics=["ASW"])
     assert str(e.value) == (
-        "labels has 30 entries for 90 cells in the embedding. For a folder with one "
-        "label file per batch, pass dataset=, category= and method=.")
+        "labels has 30 entries for 90 cells in the embedding: give one per cell.")
 
 
 def test_more_labels_than_cells_gives_no_per_batch_advice():
     emb, lab = _blobs()
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb[:60], labels=lab, metrics=["ASW"])
-    assert str(e.value) == ("labels has 90 entries for 60 cells in the embedding: give one "
-                            "label per cell.")
+    assert str(e.value) == "labels has 90 entries for 60 cells in the embedding: give one per cell."
 
 
 # --- the review of 0.3.5: label files of one diagonal side, and none at all ---
@@ -82,9 +80,9 @@ def _folder(root, name, cells, labels):
 
 def test_an_empty_labels_dict_has_nothing_to_score(tmp_path):
     """mtb.labels_for returns an empty dict for a folder without label files.
-    evaluate says that the dict is empty, not that the labels have 0 entries."""
+    evaluate says that there are no labels."""
     emb, _ = _blobs()
-    text = "labels is an empty dict. Pass the cell types, as labels=adata.obs['celltype']."
+    text = "labels has 0 entries for 90 cells in the embedding: give one per cell."
     data = tmp_path / "data"
     _folder(data, "NOLAB", {"rna.h5": 50, "atac_gas.h5": 40}, {})
     _folder(data, "X_NOLAB", {f"{m}{i}.h5": 45 for m in ("rna", "adt") for i in (1, 2)},
@@ -189,5 +187,5 @@ def test_other_short_label_files_keep_their_advice(tmp_path, capsys):
     d = _folder(data, 'BOTH', {'rna.h5': 80, 'atac_gas.h5': 70}, {'rna_cty.csv': 80, 'atac_cty.csv': 70})
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=str(d / 'rna_cty.csv'), metrics=['ASW'])
-    assert str(e.value) == 'labels has 80 entries for 150 cells in the embedding. For a folder with one label file per batch, pass dataset=, category= and method=.'
+    assert str(e.value) == 'labels has 80 entries for 150 cells in the embedding: give one per cell.'
     d = _folder(data, 'RNA2', {}, {'rna_cty1.csv': 40, 'rna_cty2.csv': 40})

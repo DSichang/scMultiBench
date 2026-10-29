@@ -1,7 +1,6 @@
 """evaluate(): turn a run output into a metric.csv-shaped DataFrame."""
 from __future__ import annotations
 
-import contextvars
 import warnings
 from pathlib import Path
 from typing import NamedTuple
@@ -58,12 +57,6 @@ def _long_table(value_df, *, method: str, dataset: str | None = None,
     out = out.rename(columns={out.columns[0]: "metric"})   # the index, whatever its name
     out["metric"] = out["metric"].map(catalog._canonical_metric)
     out = out.dropna(subset=["metric"])
-    dup = out["metric"].duplicated(keep=False)
-    if dup.any():
-        raise ValueError(
-            f"metric names collide after canonicalisation: "
-            f"{sorted(set(out.loc[dup, 'metric']))} - the input names two rows that "
-            f"map to the same canonical metric (e.g. 'ari' and 'ARI'); drop one")
     out["method"] = method
     out["dataset"] = "all" if dataset is None else dataset
     out["category"] = category
@@ -447,10 +440,6 @@ def _labels_from_dict(d: dict) -> list:
         f"not alphabetical.")
 
 
-#: the keys of a labels dict, in the order of its files (label_order's spelling)
-_LABEL_KEYS = contextvars.ContextVar("label_keys", default=None)
-
-
 class _Cells(NamedTuple):
     """The cells ``evaluate(dataset=)`` expects in the embedding."""
     dataset: str
@@ -563,107 +552,19 @@ def _n_batches(ba) -> int:
     return len(set(ba[~io.missing_mask(ba)].astype(str).tolist()))
 
 
-def _batch_files(path: Path, n_cells: int) -> list:
-    """``cty1.csv, cty2.csv, ...`` next to ``path``, in number order, when their
-    labels add up to ``n_cells``; else ``[]``."""
-    import re
-    m = re.fullmatch(r"(.*?)\d+(\.\w+)", path.name)
-    if not m:
-        return []
-    head, suffix = m.groups()
-    pattern = re.compile(re.escape(head) + r"(\d+)" + re.escape(suffix))
-    found = sorted((int(pattern.fullmatch(q.name).group(1)), q)
-                   for q in path.parent.iterdir() if pattern.fullmatch(q.name))
-    try:
-        total = sum(len(io.read_labels(q)) for _, q in found)
-    except Exception:  # noqa: BLE001 - a file that does not read: no suggestion
-        return []
-    return [q for _, q in found] if len(found) > 1 and total == n_cells else []
-
-
-def _diagonal_side(files) -> tuple | None:
-    """``("RNA", "ATAC")`` when every file is ``rna_cty<N>.csv`` and no folder of
-    theirs holds an ATAC label file (``atac_cty`` or ``peak_cty``), the reverse
-    for ``atac_cty<N>.csv``; else ``None``."""
-    import re
-    sides = {m.group(1) if m else None
-             for m in (re.fullmatch(r"(rna|atac)_cty\d*", f.stem) for f in files)}
-    if len(sides) != 1 or None in sides:
-        return None
-    side = sides.pop()
-    other = re.compile(r"(atac|peak)_cty\d*" if side == "rna" else r"rna_cty\d*")
-    if any(other.fullmatch(q.stem) and q.suffix.lower() in io._LABEL_FILE_SUFFIXES
-           for folder in {f.parent for f in files} for q in folder.iterdir()):
-        return None
-    return ("RNA", "ATAC") if side == "rna" else ("ATAC", "RNA")
-
-
-def _files_that_fit(files: list, n_cells: int) -> list:
-    """The first label files whose cells add up to ``n_cells`` (a method that
-    read batches 1-2 of 3), else ``[]``."""
-    total, out = 0, []
-    for f in files:
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                total += len(io.read_labels(f))
-        except Exception:  # noqa: BLE001 - only a hint: no fit
-            return []
-        out.append(f)
-        if total == n_cells:
-            return out
-        if total > n_cells:
-            return []
-    return []
-
-
 def _n(n: int, one: str, many: str | None = None) -> str:
     """``1 cell``, ``2,500 cells``: ``n`` and the word in its number."""
     return f"{n:,} {one if n == 1 else many or one + 's'}"
 
 
-def _count_error(what: str, n: int, n_cells: int, given, category=None,
-                 cells: _Cells | None = None) -> str:
-    """evaluate()'s error for ``n`` values of ``what`` against ``n_cells`` rows.
-
-    Too few labels get the per-batch fix, or, for one side of a diagonal folder, the "No
-    labels" recipe. ``cells``: the labels are those of a dataset folder.
-    """
-    files, names = _label_files(given), _named_files(given)
-    side = _diagonal_side(files) if what == "labels" and n < n_cells else None
+def _count_error(what: str, n: int, n_cells: int, cells: _Cells | None = None) -> str:
+    """evaluate()'s error for ``n`` values of ``what`` against ``n_cells`` rows;
+    ``cells``: the labels are the label files of a dataset folder."""
     if cells is not None and what == "labels":
-        dataset = cells.dataset
-        head = (f"The label files of {dataset}{names} hold {_n(n, 'cell')}; the "
-                f"embedding has {_n(n_cells, 'row')}.")
-        if side and category == "diagonal":
-            return (f'{head} {dataset} labels the {side[0]} cells only, see the recipe '
-                    f'"No labels" in the docs.')
-        if cells.method:
-            return f"{head} Check that the embedding is the one of method= on {dataset}."
-        return (f"{head} To score other cells, pass their labels and a dataset name of "
-                f"your own, such as dataset='{dataset}_subset', and plot them apart from "
-                f"the stored results.")
-    fact = f"{what} has {_n(n, 'entry', 'entries')} for {_n(n_cells, 'cell')} in the embedding"
-    if what == "labels" and n > n_cells and len(files) > 1:
-        fit = _files_that_fit(files, n_cells)
-        if fit:
-            given_keys = _LABEL_KEYS.get()
-            keys = (given_keys[:len(fit)] if given_keys and len(given_keys) == len(files)
-                    else [f.stem for f in fit])
-            return (f"The embedding has {_n(n_cells, 'cell')} = {'+'.join(keys)}. "
-                    f"Pass the label files {_and_list(f.name for f in fit)} only.")
-    if what != "labels" or n >= n_cells:
-        one = {"labels": "label", "clusters": "cluster id", "batch": "batch"}[what]
-        return f"{fact}: give one {one} per cell."
-    batches = _batch_files(files[0], n_cells) if len(files) == 1 else []
-    if side and not batches:
-        return (f'{fact}. {files[0].name} labels the {side[0]} cells only, see the recipe '
-                f'"No labels" in the docs.')
-    if files:
-        return (f"{fact}. For a folder with one label file per batch, pass dataset=, "
-                f"category= and method=.")
-    return (f"labels has {_n(n, 'entry', 'entries')} for {_n(n_cells, 'embedding row')}: "
-            f"give one label per row.")
+        return (f"The label files of {cells.dataset} hold {_n(n, 'cell')}; the embedding "
+                f"has {_n(n_cells, 'row')}. For other cells, pass a dataset name of your own.")
+    return (f"{what} has {_n(n, 'entry', 'entries')} for {_n(n_cells, 'cell')} in the "
+            f"embedding: give one per cell.")
 
 
 #: the fix for batch metrics without a batch
@@ -1036,7 +937,6 @@ def _dataset_labels(dataset, category, method, data_path):
     folder's, with one did-you-mean warning when ``method`` is close to a
     package method that puts the cells in another order."""
     from ..engine import resolve
-    from ..workflow import known_category
     own = registry.method_of(method)
     cats = registry.get(own).categories if own is not None else []
     if own is not None and category is None:
@@ -1045,10 +945,6 @@ def _dataset_labels(dataset, category, method, data_path):
     own_fix = " For your own embedding, pass the label files as labels=."
     if own is not None and category not in cats:
         from ..engine.schema import no_category_message
-        known = known_category(dataset)
-        if known in cats:
-            raise ValueError(f"{own} does not run on {category} data; {dataset} is {known}: "
-                             f"pass category={known!r}.")
         raise ValueError(no_category_message(own, cats, category) + own_fix)
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message=resolve.DEFAULT_ORDER_WARNING)
@@ -1106,14 +1002,7 @@ def _scores(
     replaces the Leiden clusters of ARI, NMI, ASW, iASW and iF1; ``cells`` are
     the cells of ``evaluate(dataset=)``."""
     registry.check_category(category)
-    if labels is None:
-        raise ValueError("metrics require `labels` (cty / ground-truth cell types).")
-    if isinstance(labels, dict) and not labels:
-        raise ValueError(
-            "labels is an empty dict. Pass the cell types, as "
-            "labels=adata.obs['celltype'].")
     # a dict becomes a list of paths first, for the file-of-origin batch rule
-    _LABEL_KEYS.set([str(k) for k in labels] if isinstance(labels, dict) else None)
     if isinstance(labels, dict):
         labels = _labels_from_dict(labels)
     batch_from_files = batch is None and io._is_label_path_list(labels) and len(labels) > 1
@@ -1183,14 +1072,12 @@ def _scores(
     if cells is not None and cells.whole:
         n_held = sum(len(io.read_labels(f)) for f in cells.files)
         if n_held != n_cells:
-            raise ValueError(_count_error("labels", n_held, n_cells, cells.files, category,
-                                          cells))
+            raise ValueError(_count_error("labels", n_held, n_cells, cells))
     from_files = cells if cells is not None and cells.from_files else None
     for what, values, given in (("labels", ct, labels), ("clusters", cl, clusters),
                                 ("batch", ba, batch)):
         if values is not None and len(values) != n_cells:
-            raise ValueError(_count_error(what, len(values), n_cells, given, category,
-                                          from_files))
+            raise ValueError(_count_error(what, len(values), n_cells, from_files))
     # checked here: compute() casts labels to str, and "nan" would become a cell type
     miss = io.missing_mask(ct)
     if miss.any():

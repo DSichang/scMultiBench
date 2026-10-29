@@ -81,8 +81,6 @@ def classify(output, labels=None, *, batch=None, reference=None,
     """
     if labels is None:
         raise ValueError("classify needs labels, one cell type per cell.")
-    if isinstance(labels, dict) and not labels:
-        raise ValueError("labels is an empty dict. Pass one cell type per cell.")
     names = None
     if isinstance(labels, dict):
         names = [str(k) for k in labels]
@@ -99,13 +97,13 @@ def classify(output, labels=None, *, batch=None, reference=None,
         emb = emb.T                    # dims x cells, as evaluate orients it
     n_cells = emb.shape[0]
     if len(ct) != n_cells:
-        raise ValueError(_count_error("labels", len(ct), n_cells, labels))
+        raise ValueError(_count_error("labels", len(ct), n_cells))
     if emb.shape[1] == n_cells or _is_neighbour_index(emb):
         raise ValueError(_graph_error("output"))     # cells x cells, or a kNN index
     if batch is not None:
         ba = _obs_or_vector(batch, adata, what="batch", ids=ids, table=table)
         if len(ba) != n_cells:
-            raise ValueError(_count_error("batch", len(ba), n_cells, batch))
+            raise ValueError(_count_error("batch", len(ba), n_cells))
     elif origin is not None:
         ba = _origin_names(labels, origin, names)
     else:

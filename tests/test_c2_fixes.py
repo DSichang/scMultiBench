@@ -217,8 +217,7 @@ def test_a_package_method_on_the_wrong_category():
         warnings.simplefilter("error")
         with pytest.raises(ValueError) as e:
             mtb.evaluate(_emb(10), dataset="D52", category="vertical", method="StabMap")
-    assert str(e.value) == ("StabMap does not run on vertical data; D52 is cross: pass "
-                            "category='cross'.")
+    assert str(e.value).startswith("StabMap does not run on vertical data. Its categories: ")
 
 
 # --------------------------------------------------------------- C15, D29
