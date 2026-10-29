@@ -216,7 +216,7 @@ def test_the_package_gives_the_same_batch_advice(tmp_path):
     assert str(e.value) == (
         "batch= writes per-batch files (rna1.h5, rna2.h5, ...). Vertical methods read one "
         'rna.h5. Export without batch= and pass the column itself, as '
-        'run(batch=adata.obs["donor"]). For RNA+ADT batches, use category="cross".')
+        'run(batch=adata.obs["donor"]).')
 
 
 # ------------------------------------------------ R4-01: named methods

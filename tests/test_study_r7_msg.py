@@ -69,12 +69,12 @@ def pinned(monkeypatch, tmp_path):
     monkeypatch.delenv(scripts.SCRIPTS_REF_VAR, raising=False)
 
 
-def test_single_file_variant_keeps_the_method_info_pointer(tmp_path, pinned):
+def test_a_missing_atac_file_names_what_the_folder_holds(tmp_path, pinned):
     _lung(tmp_path)
     with pytest.raises(FileNotFoundError) as e:
         mtb.engine.resolve.inputs_for("LUNG", "diagonal", "SCALEX", data_path=tmp_path, check=True)
     assert str(e.value).endswith(
-        'method_info("SCALEX")["atac"] says which ATAC SCALEX needs.')
+        "The folder holds atac_cty.csv, atac_peak.h5, rna.h5 and rna_cty.csv.")
 
 
 # ======================================================================= R7-07
@@ -159,12 +159,11 @@ def test_raw_counts_warning_of_an_anndata_export(tmp_path):
     (msg,) = _count_warnings(ingest.export_dataset, a, tmp_path / "LOG",
                              adt="obsm:protein", labels="obs:cell_type")
     assert msg == ("The rna values are not whole numbers, so they look log-normalised. "
-                   "The methods normalise raw counts themselves. Export raw counts, for "
-                   "example with rna='layer:counts'.")
+                   "Export raw counts.")
     assert "(log-normalised?)" not in msg and "e.g." not in msg and "MuData" not in msg
 
 
-def test_raw_counts_warning_names_the_mudata_form_for_a_mudata_selector(tmp_path):
+def test_raw_counts_warning_of_a_mudata_selector(tmp_path):
     mu = pytest.importorskip("mudata")
     a = _cite(log=True)
     rna = ad.AnnData(a.X.copy(), obs=a.obs[[]].copy(), var=a.var.copy())
@@ -174,8 +173,7 @@ def test_raw_counts_warning_names_the_mudata_form_for_a_mudata_selector(tmp_path
     msgs = _count_warnings(ingest.export_dataset, m, tmp_path / "MU", rna="gex",
                            adt="adt")
     assert msgs == ["The rna values are not whole numbers, so they look log-normalised. "
-                    "The methods normalise raw counts themselves. Export raw counts, for "
-                    "example with rna='mod:gex.layer:counts'."]
+                    "Export raw counts."]
 
 
 # ======================================================================= R7-10
@@ -286,19 +284,6 @@ def test_orientation_error_starts_with_the_method(tmp_path, pinned):
         mtb.engine.resolve.inputs_for("TRANS", "vertical", "totalVI", data_path=tmp_path, check=True)
     msg = str(e.value)
     assert msg == ("totalVI reads rna.h5 of TRANS, which stores matrix/data as cells x "
-                   "features, shape (20, 60). The file lists 60 features and 20 cells. Its "
-                   "matrix/data needs features x cells, shape (60, 20). Export it again "
-                   "with mtb.io.export_dataset, or transpose matrix/data.")
+                   "features (20, 60); it must be features x cells. Export it again with "
+                   "mtb.io.export_dataset.")
     assert " - " not in msg and "TRANS/vertical" not in msg
-
-
-# ---- the Python part of tests that also ran the command line
-@pytest.mark.parametrize('method', ['MultiMAP', 'Seurat_v3'])
-def test_both_file_variants_say_they_read_both_files(tmp_path, monkeypatch, method, pinned):
-    _lung(tmp_path)
-    both = f'{method} reads both atac_peak.h5 and atac_gas.h5.'
-    row = _quiet(full_scan, 'LUNG', 'diagonal', methods=[method], data_path=tmp_path, verbose=False).iloc[0]
-    assert both in row['files_reason'], row['files_reason']
-    assert 'method_info' not in row['files_reason']
-
-

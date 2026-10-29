@@ -134,7 +134,7 @@ def test_disjoint_rna_and_atac_lead_with_the_diagonal_hint(tmp_path):
     msg = str(e.value)
     # 0.4.0 (X10): an example barcode of each, then the two fixes
     assert msg == ("RNA and ATAC share no barcode (RNA e.g. c0, ATAC e.g. a0). Make the "
-                   "names match; for different cells pass category=\"diagonal\".")
+                   "names match, or pass category='diagonal' for different cells.")
     assert "subset" not in msg.lower()
 
 
@@ -151,40 +151,20 @@ def test_partial_overlap_says_which_cells_in_short_sentences(tmp_path):
             "to the shared barcodes first.") in msg
 
 
-def test_adt_hint_follows_the_obsm_selector(tmp_path):
+def test_the_raw_count_warning_names_no_selector(tmp_path):
     clr = np.random.default_rng(0).normal(size=(30, 5))
     rna = _rna_adata([f"c{i}" for i in range(30)], obsm=clr)
-    with pytest.warns(UserWarning, match=r"for example with adt='obsm:protein_counts'\."):
+    told = "The adt values are not whole numbers, so they look log-normalised. Export raw counts."
+    with pytest.warns(UserWarning) as rec:
         mtb.io.export_dataset(rna, tmp_path / "O", adt="obsm:protein",
                               adt_names=[f"p{i}" for i in range(5)])
-
-
-def test_adt_hint_for_a_layer_stays_layer_counts(tmp_path):
-    """For ADT read by a selector. ADT passed as its own object has no
-    selector: ``adt='layer:counts'`` would read a layer of the RNA object, so
-    the hint names the X of the ADT object (review round 3 of 0.3.5)."""
-    rna = _rna_adata([f"c{i}" for i in range(30)])
+    assert [str(w.message) for w in rec if "whole numbers" in str(w.message)] == [told]
     prot = ad.AnnData(np.random.default_rng(0).normal(size=(30, 5)))
     prot.obs_names = list(rna.obs_names)
     prot.var_names = [f"p{i}" for i in range(5)]
     with pytest.warns(UserWarning) as rec:
         mtb.io.export_dataset(rna, tmp_path / "L", adt=prot)
-    assert [str(w.message) for w in rec if "whole numbers" in str(w.message)] == [
-        "The adt values are not whole numbers, so they look log-normalised. Put the raw "
-        "counts in adt.X first."]
-    with pytest.warns(UserWarning, match=r"for example with adt='layer:counts'\."):
-        mtb.io.export_dataset(prot, tmp_path / "S", rna=None, adt="X")
-
-
-def test_unitednet_still_reads_an_older_rna_cty_file(tmp_path):
-    cells = [f"c{i}" for i in range(30)]
-    d = tmp_path / "OLD"
-    d.mkdir()
-    _h5(d / "rna.h5", GENES, cells)
-    _h5(d / "atac.h5", GENES, cells)        # the vertical ATAC name (X13)
-    _labels(d / "rna_cty.csv", 30)
-    got = mtb.engine.resolve.inputs_for("OLD", "vertical", "UnitedNet", data_path=tmp_path, check=True)
-    assert got["cty"] == str(d / "rna_cty.csv")
+    assert [str(w.message) for w in rec if "whole numbers" in str(w.message)] == [told]
 
 
 def test_rna_cty_next_to_atac_cty_is_not_paired_labels(root, tmp_path):

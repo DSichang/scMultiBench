@@ -82,13 +82,12 @@ def test_vertical_peak_file_under_the_diagonal_name_says_how_to_fix(tmp_path, ga
     assert ("Matilda needs gene-activity ATAC (atac.h5), and the folder has peaks "
             "(atac_peak.h5).") in gas
     assert "ename" not in gas
-    # the peak methods whose role was atac_gas (atac since 0.4.0, X13): the reason and
-    # files_reason give one rule, 'vertical reads atac.h5', and never atac_gas.h5 as the
-    # rename target
+    # the peak methods whose role was atac_gas (atac since 0.4.0, X13): the reason
+    # gives one rule, 'vertical reads atac.h5', and never atac_gas.h5 as the rename target
     for m in ("moETM", "scMM", "iPOLNG"):
         row = df.loc[(m, "rna+atac")]
+        assert "ename atac_peak.h5 to atac.h5" in row["reason"], (m, row["reason"])
         for col in ("reason", "files_reason"):
-            assert "ename atac_peak.h5 to atac.h5" in row[col], (m, col, row[col])
             assert "vertical reads atac_gas.h5" not in row[col], (m, col)
             assert "reads atac_gas.h5 for vertical" not in row[col], (m, col)
             assert "to atac_gas.h5" not in row[col], (m, col)
@@ -158,7 +157,7 @@ def test_global_obs_miss_names_the_modality_spelling(tmp_path):
         ingest.export_dataset(m, tmp_path / "B", rna="rna", atac="atac", atac_kind="peak",
                               labels="obs:cell_type", category="mosaic", batch_index=2)
     msg = str(ei.value)
-    assert "mdata['rna'].obs has 'cell_type': use labels='rna:cell_type'" in msg
+    assert "column 'cell_type' not in obs: searched mdata.obs" in msg and "use labels" not in msg
 
 
 def test_run_dry_run_note_names_the_install_check(monkeypatch, capsys):

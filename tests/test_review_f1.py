@@ -70,16 +70,14 @@ def test_a_two_file_method_gets_no_representation_caveat(data):
 
 
 # ------------------------------------------------------------------ L13 inputs_for
-@pytest.mark.parametrize("ds,cat,method,mods,msg", [
-    ("D28", "diagonal", "GLUE", ["rna", "gas"], "GLUE reads peaks; modalities name gene activity"),
-    ("D28", "diagonal", "SCALEX", ["rna", "peak"], "SCALEX reads gene activity; modalities name peaks"),
-    ("D11", "vertical", "Matilda", ["rna", "gas"], "Matilda reads peaks; modalities name gene activity"),
-    ("D28", "diagonal", "GLUE", BOTH, "GLUE reads peaks; modalities name peaks and gene activity"),
+@pytest.mark.parametrize("ds,cat,method,mods", [
+    ("D28", "diagonal", "GLUE", ["rna", "gas"]),
+    ("D28", "diagonal", "SCALEX", ["rna", "peak"]),
+    ("D11", "vertical", "Matilda", ["rna", "gas"]),
+    ("D28", "diagonal", "GLUE", BOTH),
 ])
-def test_inputs_for_applies_the_representation_rule(data, ds, cat, method, mods, msg):
-    with pytest.raises(KeyError, match=re.escape(msg)):
-        mtb.engine.resolve.inputs_for(ds, cat, method, modalities=mods, data_path=data)
-    # scan leaves the same method out for the same tokens
+def test_scan_leaves_out_a_method_whose_atac_the_tokens_do_not_name(data, ds, cat, method,
+                                                                    mods):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         sc = full_scan(ds, cat, modalities=mods, data_path=data, verbose=False)

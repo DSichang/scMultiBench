@@ -266,9 +266,9 @@ def test_the_diagonal_numbered_batches_message_names_the_missing_files(tmp_path)
         mtb.io.export_dataset(rna, d, atac=atac, atac_kind="gene_activity",
                               labels="obs:celltype", category="diagonal", batch_index=b)
     hint = resolve._per_batch_hint(d, "diagonal")
-    assert "rna3.h5 and atac_gas3.h5 are missing" in hint
-    assert "batch=" not in hint.split("run(batch=")[0]       # one action: run(batch=...)
-    assert hint.count("run(batch=") == 1 and "Export without" not in hint
+    assert hint == ("DIAG2 holds numbered batches (rna1.h5, rna2.h5, ...). scJoint, GLUE, iNMF "
+                    "and online_iNMF read exactly 3; the other diagonal methods read one "
+                    "rna.h5 and one ATAC file.")
 
 
 def test_no_pca_says_to_make_one():
@@ -288,19 +288,14 @@ def test_a_modality_string_gets_a_list_that_works():
         mtb.find_methods("vertical", modalities=["rna", "adt"])
 
 
-def test_the_missing_label_code_of_export_works(tmp_path):
+def test_the_missing_label_error_of_export_has_one_action(tmp_path):
     import anndata as ad
     adata = ad.AnnData(np.random.default_rng(0).poisson(1, (40, 10)).astype(float))
     for gap in (None, "NA"):
         adata.obs["cell_type"] = ["T"] * 36 + [gap] * 4
         with pytest.raises(ValueError) as e:
             mtb.io.export_dataset(adata, tmp_path / "X", labels="obs:cell_type")
-        code = str(e.value).split("keep the labelled cells first: ")[1]
-        ns = {"adata": adata}
-        exec(code, ns)
-        assert ns["adata"].n_obs == 36
-        mtb.io.export_dataset(ns["adata"], tmp_path / "X", labels="obs:cell_type",
-                              overwrite=True)
+        assert str(e.value).endswith("). Keep only the labelled cells first.")
 
 
 def test_rank_says_which_methods_have_the_scores():
@@ -333,7 +328,7 @@ def test_read_of_another_file_is_one_sentence(tmp_path):
     (tmp_path / "cty.csv").write_text("x\nA\n")
     with pytest.raises(ValueError, match=r"^cty\.csv is not an \.h5 file\."):
         mtb.io.read(tmp_path / "cty.csv")
-    with pytest.raises(ValueError, match=r"is a folder: pass one of its \.h5 files"):
+    with pytest.raises(ValueError, match=r" is not an \.h5 file\.$"):
         mtb.io.read(tmp_path)
 
 

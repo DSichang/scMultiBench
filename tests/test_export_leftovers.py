@@ -148,14 +148,14 @@ def test_fewer_donors_after_more_are_refused(tmp_path):
     kw = dict(**CITE, batch="obs:donor", category="cross")
     _write(five, f, **kw)
     assert _refused(three, f, **kw) == (
-        f"{f} holds rna4.h5 and 5 more files of batches 4-5. {ADVICE}")
+        f"{f} holds rna4.h5 and 5 more files of other data. {ADVICE}")
     # the first file is named, the others are counted
     assert _refused(two, f, **kw) == (
-        f"{f} holds rna3.h5 and 8 more files of batches 3-5. {ADVICE}")
+        f"{f} holds rna3.h5 and 8 more files of other data. {ADVICE}")
     g = tmp_path / "THREE"
     _write(three, g, **kw)
     assert _refused(two, g, **kw) == (
-        f"{g} holds rna3.h5 and 2 more files of batch 3. {ADVICE}")
+        f"{g} holds rna3.h5 and 2 more files of other data. {ADVICE}")
 
 
 # ----------------------------------------------------------- (b) other cells
@@ -171,7 +171,7 @@ def test_another_dataset_into_the_same_mosaic_folder(tmp_path):
     two, two_atac = _cells(100, "TWO", seed=1)
     _write(two, f, rna="X", batch_index=1, **kw)
     assert _refused(two, f, rna="X", atac=two_atac, atac_kind="peak", batch_index=2, **kw) == (
-        f"{f} holds adt2.h5 with other cells. {ADVICE}")
+        f"{f} holds adt2.h5 of other data. {ADVICE}")
 
 
 @pytest.mark.parametrize("how,files", [
@@ -184,7 +184,7 @@ def test_labels_alone_for_other_cells_are_refused(tmp_path, how, files):
     _write(_cells(100, "EX")[0], f, rna="X", **how)
     other, _ = _cells(100, "ME", seed=1)
     assert _refused(other, f, rna=None, labels="obs:celltype", **how) == (
-        f"{f} holds {files} with other cells. {ADVICE}")
+        f"{f} holds {files} of other data. {ADVICE}")
 
 
 def test_labels_without_barcodes_are_judged_by_their_number(tmp_path):
@@ -192,7 +192,7 @@ def test_labels_without_barcodes_are_judged_by_their_number(tmp_path):
     ex, _ = _cells(100, "EX")
     _write(ex, f, rna="X")
     assert _refused(None, f, rna=None, labels=["T"] * 90) == (
-        f"{f} holds rna.h5 with other cells. {ADVICE}")
+        f"{f} holds rna.h5 of other data. {ADVICE}")
     _write(None, f, rna=None, labels=list(ex.obs["celltype"]))
     assert pd.read_csv(f / "cty.csv")["x"].tolist() == list(ex.obs["celltype"])
 
@@ -212,7 +212,7 @@ def test_a_label_series_names_its_cells(tmp_path, how, files):
     other, _ = _cells(100, "ME", seed=1)
     series = {k: other.obs[v] if k == "batch" else v for k, v in how.items()}
     assert _refused(None, f, labels=other.obs["celltype"], **series) == (
-        f"{f} holds {files} with other cells. {ADVICE}")
+        f"{f} holds {files} of other data. {ADVICE}")
     # the cells of the folder, from a Series: its labels are written
     mine = {k: ex.obs[v] if k == "batch" else v for k, v in how.items()}
     _write(None, f, labels=ex.obs["celltype"], **mine)
@@ -229,7 +229,7 @@ def test_a_series_that_names_no_cell_is_judged_by_its_number(tmp_path):
     twice = pd.Series(labels, index=["one"] * 50 + ["two"] * 50)
     for series in (pd.Series(labels), twice):
         assert _refused(None, f, labels=series.iloc[:90]) == (
-            f"{f} holds rna.h5 with other cells. {ADVICE}")
+            f"{f} holds rna.h5 of other data. {ADVICE}")
         _write(None, f, labels=series)
         assert pd.read_csv(f / "cty.csv")["x"].tolist() == labels
 
@@ -264,7 +264,7 @@ def test_the_row_numbers_of_a_filtered_table_name_no_cell(tmp_path, how, files):
     before = _snapshot(f)
     assert _refused(None, f, labels=kept["celltype"].iloc[:90],
                     **{k: kept[v].iloc[:90] if k == "batch" else v for k, v in how.items()}) == (
-        f"{f} holds {files} with other cells. {ADVICE}")
+        f"{f} holds {files} of other data. {ADVICE}")
     # given the object, the column is matched to its barcodes, as before
     with pytest.raises(ValueError) as e:
         ingest.export_dataset(ex, f, rna=None, labels=kept["celltype"], overwrite=True)
@@ -308,7 +308,7 @@ def test_integers_that_name_cells_of_the_folder_are_barcodes(tmp_path):
     partly = pd.Series(labels, index=[3 * i for i in range(99)] + [1000])
     assert partly.index.inferred_type == "integer"
     assert _refused(None, f, labels=partly) == (
-        f"{f} holds rna.h5 with other cells. {ADVICE}")
+        f"{f} holds rna.h5 of other data. {ADVICE}")
     # integers that name none of them are row numbers
     _write(None, f, labels=pd.Series(labels, index=[1000 + i for i in range(100)]))
     assert pd.read_csv(f / "cty.csv")["x"].tolist() == list(labels)
@@ -317,7 +317,7 @@ def test_integers_that_name_cells_of_the_folder_are_barcodes(tmp_path):
     ex.obs_names = [f"{3 * i}-1" for i in range(100)]
     _write(ex, g, rna="X")
     assert _refused(None, g, labels=partly) == (
-        f"{g} holds rna.h5 with other cells. {ADVICE}")
+        f"{g} holds rna.h5 of other data. {ADVICE}")
     _write(None, g, labels=pd.Series(labels, index=[3 * i for i in range(100)]))
     assert pd.read_csv(g / "cty.csv")["x"].tolist() == list(labels)
 
@@ -338,7 +338,7 @@ def test_cells_without_unique_barcodes_are_judged_by_their_number(tmp_path):
 
     other = twice(_cells(90, "ME", seed=1)[0])
     assert _refused(other, f, rna=None, labels="obs:celltype") == (
-        f"{f} holds rna.h5 and 1 more file with other cells. {ADVICE}")
+        f"{f} holds rna.h5 and 1 more file of other data. {ADVICE}")
     # a matrix of these cells: repeated barcodes are refused first since 0.4.0 (X09)
     with pytest.raises(ValueError, match=r"^1 barcodes repeat, e\.g\. ME0000-1\."):
         ingest.export_dataset(other, f, rna=None, adt="obsm:protein")
@@ -356,7 +356,7 @@ def test_another_atac_kind_for_other_cells_is_refused(tmp_path):
     _write(ex, f, rna="X", atac=ex_atac, atac_kind="peak", labels="obs:celltype")
     assert _refused(me, f, rna="X", atac=_genes(me_atac), atac_kind="gene_activity",
                     labels="obs:celltype") == (
-        f"{f} holds atac.h5 and 1 more file with other cells. {ADVICE}")
+        f"{f} holds atac.h5 and 1 more file of other data. {ADVICE}")
     # the same cells: the folder holds both forms of their ATAC
     _write(ex, f, rna="X", atac=_genes(ex_atac), atac_kind="gene_activity",
            labels="obs:celltype")
@@ -364,11 +364,6 @@ def test_another_atac_kind_for_other_cells_is_refused(tmp_path):
 
 
 # ------------------------------ labels alone, for a folder of two sides or of batches
-#: the closing advice when the folder holds the cells of a call that writes
-#: labels only: the other files may be part of the same dataset
-ADD_LABELS = ("To add labels, run the export call that wrote the folder again with labels= and "
-              "overwrite=True.")
-
 
 def test_a_labels_only_call_on_a_diagonal_folder_names_the_call_that_wrote_it(tmp_path):
     """Cell types that come later, for a diagonal folder written without
@@ -380,7 +375,7 @@ def test_a_labels_only_call_on_a_diagonal_folder_names_the_call_that_wrote_it(tm
     wrote = dict(rna="X", atac=_genes(atac), atac_kind="gene_activity", category="diagonal")
     _write(rna, f, **wrote)
     assert _names(f) == ["atac_gas.h5", "rna.h5"]
-    told = f"{f} holds atac_gas.h5 with other cells. {ADD_LABELS}"
+    told = f"{f} holds atac_gas.h5 of other data. {ADVICE}"
     assert _refused(rna, f, rna=None, labels="obs:celltype") == told
     # labels without barcodes are the cells of rna.h5 by their number
     assert _refused(None, f, rna=None, labels=list(rna.obs["celltype"])) \
@@ -390,9 +385,7 @@ def test_a_labels_only_call_on_a_diagonal_folder_names_the_call_that_wrote_it(tm
     with pytest.raises(ValueError) as e:
         ingest.export_dataset(rna, f, rna=None, labels="obs:celltype", category="diagonal",
                               overwrite=True)
-    assert str(e.value) == (
-        "category='diagonal' names the label file after the modality it labels "
-        "(rna_cty.csv, atac_cty.csv): pass rna= or atac= together with labels=")
+    assert str(e.value) == "category='diagonal' with labels= needs rna= or atac=."
     assert _snapshot(f) == before
     # the call that wrote the folder writes its matrix files again: without
     # overwrite=True, which the message names, it is refused once more
@@ -424,7 +417,7 @@ def test_a_labels_only_call_on_a_mosaic_folder_names_the_call_that_wrote_it(tmp_
     _write(two, f, rna="X", adt="obsm:protein", batch_index=2, category="mosaic")
     _write(three, f, rna=None, adt="obsm:protein", batch_index=3, category="mosaic")
     assert _refused(one, f, rna=None, labels="obs:celltype") == (
-        f"{f} holds rna2.h5 and 2 more files with other cells. {ADD_LABELS}")
+        f"{f} holds rna2.h5 and 2 more files of other data. {ADVICE}")
     _write(one, f, rna="X", labels="obs:celltype", batch_index=1, category="mosaic")
     assert _names(f) == ["adt2.h5", "adt3.h5", "cty1.csv", "rna1.h5", "rna2.h5"]
     assert pd.read_csv(f / "cty1.csv")["x"].tolist() == list(one.obs["celltype"])
@@ -437,12 +430,12 @@ def test_a_folder_that_does_not_hold_the_cells_of_the_labels_keeps_the_advice(tm
     paired = tmp_path / "PAIRED"
     _write(_cells(120, "EX")[0], paired, rna="X", adt="obsm:protein")
     assert _refused(other, paired, rna=None, labels="obs:celltype") == (
-        f"{paired} holds rna.h5 and 1 more file with other cells. {ADVICE}")
+        f"{paired} holds rna.h5 and 1 more file of other data. {ADVICE}")
     diagonal = tmp_path / "DIAG"
     _write(_cells(120, "RNA")[0], diagonal, rna="X", atac=_genes(_cells(90, "ATAC", seed=1)[1]),
            atac_kind="gene_activity", category="diagonal")
     assert _refused(other, diagonal, rna=None, labels="obs:celltype") == (
-        f"{diagonal} holds rna.h5 and 1 more file with other cells. {ADVICE}")
+        f"{diagonal} holds rna.h5 and 1 more file of other data. {ADVICE}")
 
 
 # ----------------------------------------------------- (c) other label counts
@@ -450,7 +443,7 @@ def test_labels_left_out_for_other_cells(tmp_path):
     f = tmp_path / "NOLABELS"
     _write(_cells(100, "EX")[0], f, **CITE)
     assert _refused(_cells(90, "ME", seed=1)[0], f, rna="X", adt="obsm:protein") == (
-        f"{f} holds cty.csv with another number of labels. {ADVICE}")
+        f"{f} holds cty.csv of other data. {ADVICE}")
     # as many cells as the old file has labels: the call cannot tell (a label
     # file has no barcodes), and the old labels stay
     old = (f / "cty.csv").read_bytes()
@@ -474,7 +467,7 @@ def test_unnumbered_diagonal_files_into_a_numbered_diagonal_folder(tmp_path):
                atac=_genes(_cells(70, f"A{b}", seed=10 + b)[1]), **kw)
     assert _refused(_cells(80, "ME", seed=5)[0], f,
                     atac=_genes(_cells(70, "MA", seed=6)[1]), **kw) == (
-        f"{f} holds rna1.h5 and 5 more files with other cells. {ADVICE}")
+        f"{f} holds rna1.h5 and 5 more files of other data. {ADVICE}")
 
 
 def test_a_trailing_gem_well_suffix_is_the_same_cell(tmp_path):
@@ -517,8 +510,8 @@ def test_an_empty_list_leaves_the_old_check_and_text(tmp_path):
 
 # ------------------------------------------------------------------ the names
 def test_the_rule_uses_the_resolver_names():
-    """Every name export_dataset writes is a layout name, and for a name with
-    a batch number the layout pattern and the resolver's batch pattern agree."""
+    """Every name export_dataset writes is a layout name, and the batch number
+    the layout pattern reads is the one in the name."""
     roles = ("rna", "adt", "atac_peak", "atac_gas")
     names = {ingest._export_filename(role, suf, cat) for role in roles
              for suf in ("", "1", "2", "12") for cat in (None, *registry.CATEGORIES)}
@@ -527,11 +520,8 @@ def test_the_rule_uses_the_resolver_names():
     for name in sorted(names):
         m = resolve._LAYOUT_FILE_RE.match(name)
         assert m, name
-        digits = m.group(1) or m.group(2)
-        b = resolve._BATCH_FILE_RE.match(name)
-        assert bool(b) == bool(digits), name
-        if b:
-            assert (b.group(1) or b.group(2)) == digits, name
+        digits = m.group(1) or m.group(2) or ""
+        assert digits == "".join(ch for ch in name.split(".")[0] if ch.isdigit()), name
     assert sorted({ingest._layout_order(n)[1] for n in names}) == list(range(8))
     for other in ("notes.txt", "peak.h5", "rna.h5ad", "my_rna.h5", "cty.csv.bak",
                   "adt_cty.csv", "rna_.h5", "RNA.h5", "scMM_data"):
