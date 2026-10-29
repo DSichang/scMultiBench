@@ -188,28 +188,26 @@ def _other_env(env: str):
         return None
 
 
-def _missing_script(variant, *, method: str | None = None) -> str:
+def _missing_script(variant, method: str) -> str:
     """Why this variant's script or a helper module it imports is missing from
     the scripts checkout, or "" (also when there is no checkout yet: run fetches it)."""
     entry = Path(variant.entrypoint)
     for root in (Path(config.repo_path), _settings._ROOT):
         if (root / "tools_scripts").is_dir():
             # a script the package ships is copied in before the run
-            shipped = (method and entry.name in variant.helpers
+            shipped = (entry.name in variant.helpers
                        and _runner.shipped_helper(method, entry.name))
             if not (root / entry).exists() and not shipped:
                 return (f"method script {entry} is missing from the reference checkout at "
                         f"{root}: " + _runner.missing_script_fix(root))
             gone = [h for h in variant.helpers
                     if not (root / entry).parent.joinpath(h).exists()
-                    and not (method and _runner.shipped_helper(method, h))]
+                    and not _runner.shipped_helper(method, h)]
             if gone:
-                who = ((f"mtb.method_info({method!r})" if method else "method_info(m)")
-                    + "['setup_hint']")
-                name = f"{method}'s script" if method else f"The script {entry.name}"
                 files = " and ".join(gone)
-                return (f"{name} imports {files}, which the public scMultiBench repository "
-                        f"does not include. Put {files} next to {entry.name}. {who} shows how.")
+                return (f"{method}'s script imports {files}, which the public scMultiBench "
+                        f"repository does not include. Put {files} next to {entry.name}. "
+                        f"mtb.method_info({method!r})['setup_hint'] shows how.")
             return ""
     return ""
 
@@ -269,14 +267,6 @@ LINUX_ONLY_CHECK = ("Methods run only on Linux. On this computer you can "
 _DOCTOR = "mtb.env.install(dry_run=True) checks the environments."
 
 
-def _env_tail(df: "pd.DataFrame", installed, off_linux: str) -> str:
-    """The end of a scan summary line: ``off_linux`` off Linux, else the env
-    check when a row's env is not installed."""
-    if envs.linux_only_text():
-        return f" {off_linux}"
-    return f" {_DOCTOR}" if any(e and e not in installed for e in df["env"]) else ""
-
-
 def _first_sentence(text: str) -> str:
     """The first sentence of ``text``; a dotted file name does not end it."""
     m = re.match(r"(.+?[.!?])(\s|$)", text.strip(), re.S)
@@ -301,12 +291,10 @@ def _missing_paths(spec, category: str, mods: list, dataset: str, data_path) -> 
     return {r: Path(p) for r, p in paths.items() if not Path(p).exists()}
 
 
-def _missing_files_reason(spec, category: str, mods: list, dataset: str,
-                          data_path) -> str:
-    """The ``reason`` for input files that are not on disk, or ``""``:
-    ``SCALEX needs gene-activity ATAC (atac_gas.h5). rna_cty.csv is missing.``"""
+def _missing_files_reason(spec, category: str, missing: dict) -> str:
+    """The ``reason`` for the input files ``missing`` (:func:`_missing_paths`), or
+    ``""``: ``SCALEX needs gene-activity ATAC (atac_gas.h5). rna_cty.csv is missing.``"""
     from .engine.schema import is_label_role
-    missing = _missing_paths(spec, category, mods, dataset, data_path)
     if not missing:
         return ""
     if _reads_one_of_numbered(missing.values(), category):
@@ -377,12 +365,6 @@ def _blocking_caveats(caveats) -> list[str]:
     """The caveats that block a row: the ATAC file holds the other
     representation, or peak names the method's script cannot read."""
     return [c for c in caveats if _WRONG_ATAC_RE.match(c) or _PEAK_NAMES_RE.match(c)]
-
-
-def _wrong_atac_reason(caveats) -> str:
-    """The ``reason`` of a row whose ATAC file the method cannot read (the other
-    representation, or peak names it cannot parse), or ""."""
-    return next(iter(_blocking_caveats(caveats)), "")
 
 
 def _atac_mismatch_caveats(method: str, category: str, inputs) -> list[str]:
@@ -800,15 +782,15 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
             if extra:
                 rec["caveat"] = _join_sentences([rec["caveat"], *extra])
                 rec["_folder_caveat"] = _join_sentences(extra)
-            wrong_atac = _wrong_atac_reason(extra)
+            wrong_atac = next(iter(_blocking_caveats(extra)), "")
         except Exception as e:  # missing files, no variant, bad layout
             full = f"{type(e).__name__}: {e}"
             file_problems.append(full)
-            short = (_missing_files_reason(spec, cat, mods, dataset, data_path)
+            missing = _missing_paths(spec, cat, mods, dataset, data_path)
+            short = (_missing_files_reason(spec, cat, missing)
                      or _short_reason(full, spec.id, dataset))
             short_problems.append(short)
-            if _reads_one_of_numbered(
-                    _missing_paths(spec, cat, mods, dataset, data_path).values(), cat):
+            if _reads_one_of_numbered(missing.values(), cat):
                 folder_only.append(short)
         if file_problems:
             rec["files_ok"], rec["files_reason"] = False, " ".join(file_problems)
@@ -1038,7 +1020,9 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
     fit = _category_hint(df, private.attrs["category"])
     if fit:
         line += f" {fit}"
-    print(line + _env_tail(df, _installed_envs(), LINUX_ONLY_CHECK), flush=True)
+    if envs.linux_only_text():
+        line += f" {LINUX_ONLY_CHECK}"
+    print(line, flush=True)
     if cells:
         print(f"[scan] {_cells_line(cells)}", flush=True)
     if per_batch:
