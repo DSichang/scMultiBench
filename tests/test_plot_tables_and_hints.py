@@ -55,9 +55,10 @@ def test_x07_a_family_only_your_row_has_does_not_lift_it():
     cls = pd.DataFrame({"metric": ["OCA", "F1"], "value": [0.9, 0.8], "method": "Mine",
                         "dataset": "D11", "category": "vertical", "clustering": "default",
                         "source": "user", "scored_with": "leidenalg/search/0.4.0"})
-    plain, _ = _messages(_build_table, pd.concat([d11, mine]))
+    from multibench.plot import style
     tbl, msgs = _messages(_build_table, pd.concat([d11, mine, cls]))
-    assert tbl.overall["Mine"] == pytest.approx(plain.overall["Mine"])
+    assert style.overall(pd.concat([d11, mine, cls]))["Mine"] == pytest.approx(
+        style.overall(pd.concat([d11, mine]))["Mine"])
     assert "Classification" in [b.label for b in tbl.blocks]          # still drawn
     assert not any("Classification" in m for m in msgs), msgs   # the n/a cells show it
     # bar: the lone metrics are left out of the ranks, with one line

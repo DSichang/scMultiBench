@@ -50,7 +50,7 @@ def test_bubble_does_not_suggest_the_name_it_was_given():
                        for m, v in (("scMM", 0.5), ("Multigrate", 0.6), ("moETM", 0.4))])
     with pytest.raises(ValueError) as e:
         mtb.plot.bubble(df, methods=["Matilda", "totalVI"])
-    assert str(e.value) == ("Matilda and totalVI are not in this table. The table has "
+    assert str(e.value) == ("Matilda and totalVI are not in the table. The table has "
                             "Multigrate, moETM and scMM.")
-    with pytest.raises(ValueError, match=r"^Unknown method Multigrat\. The table has"):
+    with pytest.raises(ValueError, match=r"^Multigrat is not in the table\. The table has"):
         mtb.plot.bubble(df, methods=["Multigrat"])

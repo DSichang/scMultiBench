@@ -73,7 +73,7 @@ def test_x14_rows_repeating_stored_rows_are_refused(fn):
         call()
 
 
-def test_x89_batch_family_on_vertical_says_why():
-    with pytest.raises(ValueError, match=r'^The vertical tables have no batch scores '
-                                         r'\(D11 has one batch\)\. Use metrics="clustering"\.$'):
+def test_x89_batch_family_on_vertical_names_the_scores_there_are():
+    with pytest.raises(ValueError) as e:
         mtb.rank("vertical", metrics="batch")
+    assert str(e.value) == "The stored results of vertical have no metrics='batch' scores; they have ARI, ASW, NMI, cLISI, iASW and iF1."

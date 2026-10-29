@@ -64,29 +64,27 @@ def test_missing_output_file_names_path_and_cwd(tmp_path):
         eio.read_labels(tmp_path / "nothere.csv")
 
 
-def test_input_matrix_passed_as_output_is_explained(tmp_path):
+def test_input_matrix_passed_as_output_is_refused(tmp_path):
     f = tmp_path / "rna.h5"
     with h5py.File(f, "w") as h:
         g = h.create_group("matrix")
         g.create_dataset("data", data=np.zeros((3, 4)))
         g.create_dataset("barcodes", data=np.array([b"a", b"b", b"c"]))
         g.create_dataset("features", data=np.array([b"g1", b"g2", b"g3", b"g4"]))
-    with pytest.raises(ValueError, match=r"has no dataset 'data'; found keys \['matrix'\]") as e:
+    with pytest.raises(ValueError) as e:
         evaluate(str(f), labels=["a", "b", "c"])
-    msg = str(e.value)
-    assert "looks like a canonical input matrix (matrix/data" in msg
-    assert "not an embedding" in msg and "out/<method>/embedding.h5" in msg
-    # any other h5 without 'data' lists its keys, without the input hint
+    assert str(e.value) == ("rna.h5 has no dataset 'data' (keys: matrix): it is not an "
+                            "embedding. Pass a method's embedding file.")
+    # any other h5 without 'data' lists its keys
     g2 = tmp_path / "other.h5"
     with h5py.File(g2, "w") as h:
         h.create_dataset("X", data=np.zeros((3, 4)))
-    with pytest.raises(ValueError, match=r"found keys \['X'\]") as e2:
+    with pytest.raises(ValueError, match=r"\(keys: X\)"):
         eio.read_embedding(g2)
-    assert "input matrix" not in str(e2.value)
 
 
-def test_a_wrong_batch_column_gets_its_error_without_the_unused_batch_warning(tmp_path):
-    # Z23 (r3): the batch is read before the "changes nothing" warning
+def test_a_wrong_batch_column_gets_its_error_and_no_warning(tmp_path):
+    # Z23 (r3): a wrong batch column gets its error, and no warning
     import warnings
     import anndata as ad
     import numpy as np

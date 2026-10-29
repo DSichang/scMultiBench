@@ -13,9 +13,8 @@ from . import io
 from .. import _text
 from .._text import _and_list
 from ..plot.bar import CLASSIFICATION_METRICS as _CLASSIFICATION_METRICS
-from .pipeline import (_as_written, _count_error, _labels_from_dict, _no_batch_error,
-                       _no_label_error, _obs_or_vector, _origin_names, _read_output,
-                       _stack_label_files)
+from .pipeline import (_cell_labels, _count_error, _labels_from_dict, _no_batch_error,
+                       _no_label_error, _obs_or_vector, _origin_names, _read_output)
 
 #: the columns of the frame classify() returns
 COLUMNS = ["reference", "batch", "cell", "label", "predicted"]
@@ -81,31 +80,27 @@ def classify(output, labels=None, *, batch=None, reference=None,
     """
     if labels is None:
         raise ValueError("classify needs labels, one cell type per cell.")
-    if isinstance(labels, dict) and not labels:
-        raise ValueError("labels is an empty dict. Pass one cell type per cell.")
     names = None
     if isinstance(labels, dict):
         names = [str(k) for k in labels]
         labels = _labels_from_dict(labels)
-    _check_embedding(output)
-    emb, ids, adata, table = _read_output(output, labels, obsm, "output")
+    who = _graph_writer(output)
+    if who is not None:
+        raise ValueError(_graph_error(who))
+    emb, ids, adata, table = _read_output(output, obsm, "output")
     if emb.ndim != 2:
-        raise ValueError(_NOT_EMBEDDING.format(what="output"))
-    if io._is_label_path_list(labels):
-        ct, origin = _stack_label_files(labels, ids, table=table)
-    else:
-        ct, origin = _obs_or_vector(labels, adata, what="labels", ids=ids, table=table), None
-    if emb.shape[0] != len(ct) and emb.shape[1] == len(ct):
-        emb = emb.T                    # dims x cells, as evaluate orients it
+        raise ValueError("classify needs an embedding, cells x dims. Pass the method's "
+                         "embedding file.")
+    emb, ct, origin = _cell_labels(labels, emb, adata, ids, table)
     n_cells = emb.shape[0]
     if len(ct) != n_cells:
-        raise ValueError(_count_error("labels", len(ct), n_cells, labels))
+        raise ValueError(_count_error("labels", len(ct), n_cells))
     if emb.shape[1] == n_cells or _is_neighbour_index(emb):
         raise ValueError(_graph_error("output"))     # cells x cells, or a kNN index
     if batch is not None:
         ba = _obs_or_vector(batch, adata, what="batch", ids=ids, table=table)
         if len(ba) != n_cells:
-            raise ValueError(_count_error("batch", len(ba), n_cells, batch))
+            raise ValueError(_count_error("batch", len(ba), n_cells))
     elif origin is not None:
         ba = _origin_names(labels, origin, names)
     else:
@@ -113,14 +108,11 @@ def classify(output, labels=None, *, batch=None, reference=None,
 
     miss = io.missing_mask(ct)
     if miss.all():
-        shown = _as_written(labels, adata, ids, what="labels")
-        raise ValueError(_no_label_error(ct if shown is None else shown, miss, labels))
+        raise ValueError(_no_label_error(ct, miss, labels))
     keep = ~miss
     has_batch = ~io.missing_mask(ba)
     if (keep & ~has_batch).any():
-        shown = _as_written(batch, adata, ids, what="batch")
-        raise ValueError(_no_batch_error(
-            np.asarray(ba if shown is None else shown)[keep], ~has_batch[keep], batch))
+        raise ValueError(_no_batch_error(np.asarray(ba)[keep], ~has_batch[keep], batch))
     ba = np.array([str(b) for b in ba], dtype=object)
     ct = np.array([str(c) for c in ct], dtype=object)
     batches = list(pd.unique(ba[has_batch]))
@@ -163,10 +155,6 @@ def classify(output, labels=None, *, batch=None, reference=None,
     return out
 
 
-_NOT_EMBEDDING = ("classify needs an embedding; {what} is not one. "
-                  "Pass the method's embedding file.")
-
-
 def _graph_text(who: str) -> str:
     """What is wrong with the output of a graph method: ``who`` is the method,
     or ``"output"`` when the method is not known."""
@@ -174,29 +162,8 @@ def _graph_text(who: str) -> str:
     return f"{who} a graph, not an embedding, so it has no classification scores."
 
 
-def _check_embedding(output) -> None:
-    """``ValueError`` for an output that is a graph or labels, not an embedding:
-    a file a method writes as its graph or label output, or a list of labels."""
-    who = _graph_writer(output)
-    if who is not None:
-        raise ValueError(_graph_error(who))
-    what = _not_embedding(output)
-    if what is not None:
-        raise ValueError(_NOT_EMBEDDING.format(what=what))
-
-
 def _graph_error(who: str) -> str:
     return _graph_text(who) + " Score it with mtb.evaluate(metrics='clustering')."
-
-
-def _not_embedding(output) -> str | None:
-    """The name of an output that is labels, not an embedding (``"output"``
-    for a list, the file name for a label file); ``None`` for anything else."""
-    if isinstance(output, (list, tuple)):
-        return "output"
-    if isinstance(output, (str, Path)) and Path(output).name in _label_outputs():
-        return Path(output).name
-    return None
 
 
 def _graph_writer(output) -> str | None:
@@ -220,12 +187,6 @@ def _registry_files() -> dict:
             for o in [v.output, *v.extra_outputs]:
                 files.setdefault(o.file, []).append((o.kind, v.output.kind, spec.id))
     return files
-
-
-def _label_outputs() -> set:
-    """File names the registry gives to label outputs, and to no embedding."""
-    return {f for f, uses in _registry_files().items()
-            if {k for k, _, _ in uses} == {"labels"}}
 
 
 def _graph_files() -> dict:

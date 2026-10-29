@@ -1954,17 +1954,15 @@ class RunResult:
                              if _status(r.get("status")) != "skipped")
         for root in used:
             if labels is not None:
-                # as written: a record names the word for a missing label
                 labels_at[root] = _cell_vector(labels, self.dataset, root, what="labels",
                                                order=_ROWS, moved=True,
-                                               tried=tried[root], as_written=True)
+                                               tried=tried[root])
             # a batch vector follows labels given in embedding row order
             rows = labels is not None and not labels_at[root][1]
             if batch is not None:
                 vec, by_cell = _cell_vector(batch, self.dataset, root, what="batch",
                                             order=_ROWS if rows else None,
-                                            moved=True, tried=tried[root],
-                                            as_written=True)
+                                            moved=True, tried=tried[root])
                 _check_batch(vec, self.dataset)
                 bad = not rows and not by_cell and _batch_length_problem(
                     [(r.get("method"), r.get("modalities")) for r in self.records
@@ -2722,10 +2720,10 @@ _ROWS = "the embedding rows"
 
 def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | None = None,
                  moved: bool = False,
-                 tried=None, as_written: bool = False) -> tuple[np.ndarray, bool]:
+                 tried=None) -> tuple[np.ndarray, bool]:
     """``(x per cell, aligned by id)``: an id-carrying Series, DataFrame or CSV in
     ``labels_for`` order."""
-    from .eval.pipeline import _carries_ids, _pick
+    from .eval.pipeline import _carries_ids
     if what == "batch":
         own_batches_only(dataset)
     if _eio._names_no_file(x):
@@ -2741,8 +2739,7 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
                f"repeated barcodes)")
         fix, no_ids = f"Check that it follows {order}.", why
     if isinstance(x, (str, Path)):
-        vals, first = _eio.read_labels_ids(x, what=what, pick=_pick(what),
-                                           as_written=as_written)
+        vals, first = _eio.read_labels_ids(x, what=what)
         if first is None:
             return np.asarray(vals), False
         return _eio.by_id_column(
@@ -2828,14 +2825,13 @@ def _check_batch(vec, dataset: str) -> None:
 
 def _batch_vector(batch, dataset, data_path) -> np.ndarray:
     """``batch`` as one id per cell (:func:`_cell_vector`), checked for gaps."""
-    vec = _cell_vector(batch, dataset, data_path, what="batch",
-                       as_written=True)[0]
+    vec = _cell_vector(batch, dataset, data_path, what="batch")[0]
     _check_batch(vec, dataset)
     return vec
 
 
 def _label_gaps(dataset, data_path) -> dict:
-    """``{file name: (missing, total, labels as written)}`` of the label files
+    """``{file name: (missing, total, labels)}`` of the label files
     with a cell without a label; an unreadable file is left to the scoring."""
     gaps = {}
     for p in _label_files(dataset, data_path):
@@ -2847,7 +2843,7 @@ def _label_gaps(dataset, data_path) -> dict:
             continue
         miss = _eio.missing_mask(labels)
         gaps[p.name] = (int(miss.sum()), len(miss),
-                        np.asarray(_eio.read_labels(p, as_written=True), dtype=object))
+                        np.asarray(labels, dtype=object))
     return gaps
 
 
@@ -2889,8 +2885,8 @@ def _unlabelled_error(cands, dataset, data_path, *, user: bool) -> str | None:
         if not user:
             folder = _dataset_folder(dataset, data_path)
             files = _and_list(names)
-            shown = np.concatenate([np.asarray(_eio.read_labels(folder / k, as_written=True),
-                                               dtype=object) for k in names])
+            shown = np.concatenate([np.asarray(_eio.read_labels(folder / k), dtype=object)
+                                    for k in names])
         return (f"ValueError: {int(miss.sum()):,} of the {len(miss):,} labels in {files} "
                 f"are missing{_eio._missing_example(shown)}. Give every cell a label, then "
                 f"score again.")

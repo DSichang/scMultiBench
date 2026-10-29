@@ -68,20 +68,6 @@ def test_evaluate_requires_batch_for_batch_task():
     assert "metrics='batch' needs batch labels" in str(exc.value)
 
 
-def test_compute_rejects_length_mismatch():
-    import pytest
-    anndata = pytest.importorskip("anndata")
-    from multibench.eval import scib as escib
-    emb = np.zeros((6, 3))
-    ct = np.array([0, 0, 1, 1, 2])      # one short -> mismatch
-    cl = np.array([0, 0, 1, 1, 2, 2])
-    ba = np.array([0, 1, 0, 1, 0, 1])
-    with pytest.raises(ValueError) as exc:
-        escib.compute(emb, ct, cl, ba, group="clustering")
-    # R3-14: named after evaluate's argument, with the two counts
-    assert str(exc.value) == "labels has 5 entries for 6 cells in the embedding."
-
-
 def test_compute_rejects_unknown_group():
     import pytest
     anndata = pytest.importorskip("anndata")
@@ -259,12 +245,9 @@ def test_evaluate_dict_with_several_label_files_raises_listing_keys(tmp_path):
     # a dict whose insertion order IS the stacking order (what labels_for
     # returns) is accepted as-is: the two files are concatenated in that order
     # (here both hold the same 90 cells, so the only complaint is the length)
-    # the first files that hold the embedding's cells are named (0.4.0, X68), by
-    # their file names
     p1, p2 = tmp_path / "cty1.csv", tmp_path / "cty2.csv"
     _write_cty(p1, ct); _write_cty(p2, ct)
-    with pytest.raises(ValueError, match=r"The embedding has 90 cells = cty1\. Pass the "
-                                         r"label files cty1\.csv only\.$"):
+    with pytest.raises(ValueError, match=r"^labels has 180 entries for 90 cells"):
         evaluate(emb, labels={"cty1": str(p1), "cty2": str(p2)}, metrics=["ARI"])
     # any other order must be explicit
     with pytest.raises(ValueError) as exc:
@@ -272,12 +255,9 @@ def test_evaluate_dict_with_several_label_files_raises_listing_keys(tmp_path):
     msg = str(exc.value)
     assert "The label keys cty2 and cty1 " in msg
     assert "list of paths in cell order" in msg
-    # 0.3.x: the hint must no longer recommend the alphabetical order; it names
-    # the cell-order rule and (0.4.0) dataset=, category= and method=, not the
-    # deprecated label_order=
-    assert "dataset=, category= and method=" in msg and "are not in the default order" in msg
+    # the hint names the cell-order rule, not the deprecated label_order=
+    assert "are not in the default order: cty1, cty2, ... by number" in msg
     assert "label_order=" not in msg
-    assert "not alphabetical" in msg
     assert "list(d.values())" not in msg
 
 

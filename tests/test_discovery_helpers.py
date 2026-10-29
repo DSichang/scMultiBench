@@ -91,11 +91,10 @@ def test_rank_task_error_names_real_metrics(result_dir):
     from multibench._data.results import rank
     # vertical ships no batch metrics; the error must list what IS there,
     # not "metrics present: []" (the loader used to pre-filter by task)
-    # the family on a single-batch category says so (X89)
-    with pytest.raises(ValueError, match=r'^The vertical tables have no batch scores '
-                                         r'\(D11 has one batch\)\. Use metrics="clustering"\.$'):
+    with pytest.raises(ValueError) as e:
         rank("vertical", metrics="batch")
-    with pytest.raises(ValueError, match=r"metrics present: \['ARI'"):
+    assert str(e.value) == "The stored results of vertical have no metrics='batch' scores; they have ARI, ASW, NMI, cLISI, iASW and iF1."
+    with pytest.raises(ValueError, match=r"; they have ARI, ASW"):
         rank("vertical", metrics=["GC", "iLISI"])
 
 

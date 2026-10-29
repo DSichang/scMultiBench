@@ -109,17 +109,6 @@ def test_x66_run_refuses_skip_existing_with_params(tmp_path):
     assert not (tmp_path / "out").exists()
 
 
-def test_x68_size_error_names_the_label_files_that_fit(tmp_path):
-    import numpy as np
-    labels = mtb.engine.resolve.labels_for("D52mini", "cross", "UINMF")
-    n = sum(len(pd.read_csv(labels[k])) for k in ("cty1", "cty2"))
-    emb = np.random.default_rng(0).normal(size=(n, 5))
-    with pytest.raises(ValueError, match=rf"^The embedding has {n:,} cells = cty1\+cty2\. "
-                                         r"Pass the label files cty1\.csv and cty2\.csv "
-                                         r"only\.$"):
-        mtb.evaluate(emb, labels=labels, category="cross", metrics=["ARI"])
-
-
 def test_x68_scan_leaves_out_the_nested_variant():
     # 0.4.0: the plan leaves out the row a run leaves out
     plan = mtb.scan("D52mini", "cross", methods=["UINMF"], verbose=False)

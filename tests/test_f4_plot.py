@@ -80,7 +80,7 @@ def test_incomplete_matrix_groups_methods_by_count():
     parts = {"D1": pd.DataFrame(index=["A", "B", "C", "E"]),
              "D2": pd.DataFrame(index=["A", "B"]),
              "D3": pd.DataFrame(index=["A", "C"])}
-    (msg,) = style.coverage_warnings(parts, basis="rank", incomplete_fix="Fix.")
+    (msg,) = style.coverage_warnings(parts)
     assert ("The summary ranks 3 datasets. E has scores on 1 of them. B and C have "
             "scores on 2 of them.") in msg
 
@@ -133,10 +133,8 @@ def test_reordered_label_dict_error_is_short_sentences(tmp_path):
                      labels={"cty2": str(p2), "cty1": str(p1)}, metrics=["ASW"],
                      verbose=False)
     assert str(e.value) == (
-        "The label keys cty2 and cty1 are not in the default order. Pass a list of paths "
-        "in cell order, or dataset=, category= and method=. The default "
-        "order is cty1, cty2, ... by number, with rna before adt before atac. It is not "
-        "alphabetical.")
+        "The label keys cty2 and cty1 are not in the default order: cty1, cty2, ... by "
+        "number, and rna before adt before atac. Pass a list of paths in cell order.")
 
 
 # --- R4-13 (b): run's nothing-runnable error and dry-run count line --------

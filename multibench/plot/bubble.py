@@ -48,72 +48,40 @@ CONSTANT_FILL = "#bfbfbf"
 class FamilyBlock:
     """One metric family of a :class:`BubbleTable` (a colour-banded column block).
 
-    ``raw`` / ``norm`` / ``ranks`` are method x metric frames in the table's
-    row order; ``ranks`` holds per-column max-ranks (``n`` = best, ties share
-    the higher number - R's ``ties.method="max"``), ``norm`` per-column
-    min-max values, ``overall`` the family's Overall score per method.
+    ``raw`` / ``norm`` are method x metric frames in the table's row order:
+    the metric means and their per-column min-max values; ``overall`` is the
+    family's Overall score per method.
     """
     label: str
     cmap: str
     raw: pd.DataFrame
     norm: pd.DataFrame
-    ranks: pd.DataFrame
     overall: pd.Series
 
 
 @dataclass
 class BubbleTable:
     """The numbers behind a bubble figure (internal: ``mtb.plot.bubble`` builds
-    and draws it; ``mtb.rank(category, long_df=...)`` gives its row order).
-
-    Rows are ``methods``; the per-family matrices live in ``blocks``.
+    and draws it).
 
     Attributes
     ----------
     methods : list of str
-        Row order: best first;
-        ``methods.index(name) + 1`` is the row's position (1 = top).
+        Row order: best first, as ``mtb.rank`` orders them.
     blocks : list of FamilyBlock
         One block per metric family present, in paper order: clustering
-        (blues), batch correction (greens), classification
-        (pinks), then "Other" (purples) for metrics outside the three. Each
-        has its own ``raw``, ``norm``, ``ranks`` and ``overall``.
-    norm : pandas.DataFrame
-        Per-column min-max values (method x metric) of all families, in
-        figure order.
-    raw : pandas.DataFrame
-        Unscaled matrix (method x metric) in figure order: metric means.
-    overall : pandas.Series
-        The overall score per method, as ``mtb.rank`` gives it; it sets
-        the row order.
+        (blues), batch correction (greens), classification (pinks), then
+        "Other" (purples) for metrics outside the three.
     datasets : tuple of str
         Dataset ids in the frame, sorted; ``()`` without a ``dataset`` column.
     method_datasets : dict or None
         ``{method: [dataset, ...]}`` from the frame; ``None`` without a
         ``dataset`` column.
-    na_cells : list of str or None
-        The ``n/a`` cells: one line per family and method.
     """
     methods: list
     blocks: list
-    norm: pd.DataFrame
-    raw: pd.DataFrame
-    overall: pd.Series
     datasets: tuple = ()
     method_datasets: object = None
-    na_cells: object = None
-
-    def __repr__(self) -> str:
-        n = len(self.methods)
-        head = ", ".join(map(str, self.methods[:5])) + (", ..." if n > 5 else "")
-        fams = ", ".join(f"{b.label} ({b.raw.shape[1]})" for b in self.blocks)
-        ds = ", ".join(self.datasets) if self.datasets else "one"
-        return f"BubbleTable: {n} methods ({head}); families {fams}; datasets {ds}"
-
-    @property
-    def ranks(self) -> pd.DataFrame:
-        """All families' per-column max-ranks (``n`` = best), in figure order."""
-        return pd.concat([b.ranks for b in self.blocks], axis=1)
 
 
 def _and_distinct(values) -> str:
@@ -123,26 +91,10 @@ def _and_distinct(values) -> str:
 
 def _unknown_names(unknown, available, kind: str) -> str:
     """The error for ``unknown`` names of ``kind``, then the names the table has."""
-    from ..engine import registry
-    pool = [str(a) for a in available]
-    absent = []                     # package methods this table lacks
-    for u in unknown:
-        if kind == "method":
-            try:
-                registry.check_method(str(u))
-                absent.append(u)
-            except KeyError:
-                pass
-    rest = [u for u in unknown if u not in absent]
-    parts = []
-    if rest:
-        parts.append(f"Unknown {kind if len(rest) == 1 else kind + 's'} {_and_distinct(rest)}.")
-    if absent:
-        parts.append(f"{_and_distinct(absent)} {'is' if len(absent) == 1 else 'are'} "
-                     f"not in this table.")
-    text = " ".join(parts)
-    have = sorted(set(pool))
-    return text + (f" The table has {_and_distinct(have)}." if have else " The table is empty.")
+    one = len(set(map(str, unknown))) == 1
+    have = sorted({str(a) for a in available})
+    return (f"{_and_distinct(unknown)} {'is' if one else 'are'} not in the table. "
+            + (f"The table has {_and_distinct(have)}." if have else "The table is empty."))
 
 
 def _resolve(requested, available, kind: str, canon) -> list:
@@ -212,10 +164,8 @@ def _need_long(long_df: pd.DataFrame, fn: str) -> None:
     """``ValueError`` when ``long_df`` is not a long table (method, metric, value)."""
     absent = sorted({"method", "metric", "value"} - set(long_df.columns))
     if absent:
-        hint = (" mtb.evaluate returns the long table this function takes."
-                if "Value" in long_df.columns or long_df.index.name == "metric" else "")
         raise ValueError(f"{fn}() needs a long table with columns "
-                         f"['method', 'metric', 'value']; missing {absent}.{hint}")
+                         f"['method', 'metric', 'value']; missing {absent}.")
 
 
 def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None) -> BubbleTable:
@@ -248,7 +198,7 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None) -> Bubble
     if len(datasets) > 1:
         # the per-dataset view, only to see which datasets share methods; the
         # figure itself shows raw values
-        for msg in style.dataset_mode_warnings(style.per_dataset_ranks(df)):
+        for msg in style.dataset_mode_warnings(style.dataset_tables(df)):
             _text.warn(msg, UserWarning)
     raw_all = df.pivot_table(index="method", columns="metric", values="value",
                              aggfunc="mean")
@@ -263,7 +213,6 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None) -> Bubble
         return FamilyBlock(
             label=label, cmap=cmap, raw=raw,
             norm=raw.apply(lambda col: style.minmax(col.to_numpy()), axis=0),
-            ranks=raw.apply(lambda col: style.rank_max(col.to_numpy()), axis=0),
             overall=style.overall(df, cols).reindex(rows))
 
     blocks = []
@@ -280,13 +229,12 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None) -> Bubble
     if not blocks:
         raise ValueError("no known metrics found in long_df")
 
-    na_cells = _na_report(blocks)
     # a family some rows lack (classification of your rows next to stored rows
     # without it) is drawn, but counts in no row's Overall; its n/a cells need
     # no words
     missing = _na_missing([b for b in blocks if b.raw.notna().any(axis=1).all()] or blocks)
-    if na_cells and missing:
-        _text.warn(_na_message(missing, df), UserWarning)
+    if missing:
+        _text.warn(_na_message(missing), UserWarning)
 
     raw = pd.concat([b.raw for b in blocks], axis=1)
     msg = _no_comparison_message(rows, style.constant_columns(raw),
@@ -294,24 +242,16 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None) -> Bubble
     if msg:
         _text.warn(msg, UserWarning)
 
-    return BubbleTable(
-        methods=rows, blocks=blocks,
-        norm=pd.concat([b.norm for b in blocks], axis=1),
-        raw=raw,
-        overall=score.reindex(rows),
-        datasets=datasets,
-        method_datasets=method_datasets,
-        na_cells=na_cells,
-    )
+    return BubbleTable(methods=rows, blocks=blocks, datasets=datasets,
+                       method_datasets=method_datasets)
 
 
 def _no_comparison_message(methods, constant: dict, partial=frozenset()) -> str | None:
     """The warning for grey fills: one method, or the ``constant`` columns
     (``partial`` ones lack some values); ``None`` when there is none."""
     if len(methods) == 1:
-        return (f"Only one method, {methods[0]}, is in this figure. With nothing "
-                f"to rank it against, the fills are grey. Plot it with methods "
-                f"scored on the same dataset.")
+        return (f"Only one method, {methods[0]}: nothing to rank it against, so the "
+                f"fills are grey.")
     if not constant:
         return None
     which = "That column is" if len(constant) == 1 else "Those columns are"
@@ -326,78 +266,23 @@ def _no_comparison_message(methods, constant: dict, partial=frozenset()) -> str 
     return f"{' '.join(sentences)} {which} grey.{fix}"
 
 
-def _na_report(blocks) -> list:
-    """The ``na_cells`` lines: one per family and method with n/a cells."""
-    lines = []
-    for b in blocks:
-        n = b.raw.shape[1]
-        whole = []
-        for m in b.raw.index:
-            na = [c for c in b.raw.columns if pd.isna(b.raw.loc[m, c])]
-            if na and len(na) < n:
-                lines.append(f"{m}: {b.label} Overall over {n - len(na)} of {n} "
-                             f"metrics ({', '.join(map(str, na))} n/a)")
-            elif na:
-                whole.append(str(m))
-        if whole:
-            # methods with no metric of the family (single- next to multi-batch
-            # datasets) get no Overall bar: one line for all
-            lines.append(f"no {b.label} metric (no {b.label} Overall) for: "
-                         f"{', '.join(whole)}")
-    return lines
-
-
 def _na_missing(blocks) -> list:
-    """The n/a cells per row, in row order, as ``[(method, codes, families)]``,
-    where ``families`` are those the method has no value in; codes in column
-    order."""
+    """The n/a cells per row, in row order, as ``[(method, codes)]``; codes in
+    column order."""
     out = []
     for m in blocks[0].raw.index:
-        codes, whole = [], []
-        for b in blocks:
-            na = [c for c in b.raw.columns if pd.isna(b.raw.loc[m, c])]
-            codes += na
-            if na and len(na) == b.raw.shape[1]:
-                whole.append(b.label)
+        codes = [c for b in blocks for c in b.raw.columns if pd.isna(b.raw.loc[m, c])]
         if codes:
-            out.append((m, codes, whole))
+            out.append((m, codes))
     return out
 
 
-#: most rows the ``n/a`` warning names before it counts the rest
-NA_ROWS_SHOWN = 3
-
-
-def _na_message(missing: list, df: pd.DataFrame) -> str:
-    """The n/a warning: one sentence per row (at most ``NA_ROWS_SHOWN``), then
-    what to do about it."""
-    stored_sources = set(style.STORED_SOURCES)
-    has_ds = "dataset" in df.columns
-    sentences = []
-    for m, codes, whole in missing[:NA_ROWS_SHOWN]:
-        rows = df[df["method"] == m]
-        src = (set(rows["source"].dropna().astype(str)) if "source" in rows.columns
-               else set())
-        stored = bool(src) and src <= stored_sources
-        who = ("The stored row" if stored else
-               "Your row" if src and not src & stored_sources else "Row")
-        where = []
-        if has_ds:
-            where += sorted(map(str, rows["dataset"].dropna().unique()))
-        if stored:
-            where += sorted(src)
-        name = f"{who} {m}" + (f" ({', '.join(where)})" if where else "")
-        what = _and_list(dict.fromkeys(codes), "or")
-        text = f"{name} has no {what}."
-        if whole:
-            text += f" It has no {' or '.join(whole)} Overall."
-        sentences.append(text)
-    more = len(missing) - NA_ROWS_SHOWN
-    if more > 0:
-        sentences.append(f"... and {more} more row{'s' if more > 1 else ''}.")
-    gaps = _and_list(dict.fromkeys(c for _, codes, _w in missing for c in codes))
-    sentences.append(f"Pass metrics= without {gaps} to compare on the same metrics.")
-    return " ".join(sentences)
+def _na_message(missing: list) -> str:
+    """The n/a warning: the rows with n/a cells, then what to do about it."""
+    have = "has" if len(missing) == 1 else "have"
+    codes = list(dict.fromkeys(c for _, cs in missing for c in cs))
+    return (f"{_and_distinct(m for m, _ in missing)} {have} no {_and_list(codes, 'or')}. "
+            f"Pass metrics= without {_and_list(codes)} to compare on the same metrics.")
 
 
 def _by_id(df):

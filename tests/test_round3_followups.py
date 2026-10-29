@@ -17,14 +17,9 @@ def test_io_dir_hides_leaked_imports():
     assert not hasattr(mtb.io, "annotations")  # d1: a facade, no module internals
 
 
-def test_load_results_canonicalises_dataset_case():
-    with pytest.warns(UserWarning, match="dataset 'd52' is not in the stored results but 'D52' is"):
-        df = mtb.load_results("cross", dataset="d52")
-    assert set(df["dataset"].astype(str)) == {"D52"}
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        ok = mtb.load_results("cross", dataset="D52")
-    assert len(ok) == len(df)
+def test_load_results_dataset_ids_are_case_sensitive():
+    with pytest.raises(FileNotFoundError, match=r"^The stored results of cross hold .*, not d52\."):
+        mtb.load_results("cross", dataset="d52")
 
 
 def test_load_results_unknown_dataset_still_fails_loudly():

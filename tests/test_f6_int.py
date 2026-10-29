@@ -23,9 +23,8 @@ pytest.importorskip("scib")
 
 
 # --------------------------------------------------------------- integration repairs
-# wf R6-02 x R6-05: rescore reuses the batch run saved. That batch is not
-# one the caller gave, so a metrics= without a batch metric must not warn
-# 'batch= changes nothing here' (the first Example of RunResult.rescore).
+# wf R6-02 x R6-05: rescore reuses the batch run saved; a metrics= without a
+# batch metric gives no warning.
 from tests.test_study_r4_wf import N, _batch_metrics, cite  # noqa: E402,F401
 from multibench.eval import pipeline  # noqa: E402
 
@@ -55,10 +54,6 @@ def test_rescore_with_the_saved_batch_and_no_batch_metric_does_not_warn(cite, tm
     new.save(tmp_path / "ari_only")
     again = _quiet(mtb.load_run(tmp_path / "ari_only").rescore)
     assert _batch_metrics(again) == _batch_metrics(res)
-    # a batch the caller gives still warns, as R6-05 keeps
-    with pytest.warns(UserWarning, match=r"^batch= changes nothing here, because "
-                                         r"metrics=\['ARI'\] has no batch metric"):
-        back.rescore(batch=batch, metrics=["ARI"])
 
 
 def test_rescore_with_new_batches_keeps_only_the_metrics_it_scored(cite, tmp_path):

@@ -271,15 +271,6 @@ def test_the_diagonal_numbered_batches_message_names_the_missing_files(tmp_path)
     assert hint.count("run(batch=") == 1 and "Export without" not in hint
 
 
-def test_no_pca_says_to_make_one():
-    import anndata as ad
-    a = ad.AnnData(np.zeros((10, 3)))
-    a.obsm["protein"] = np.zeros((10, 2))
-    with pytest.raises(ValueError, match=r"has no obsm\['X_pca'\]\. Make the PCA first, as "
-                                         r"sc\.pp\.pca\(adata\)\.$"):
-        mtb.evaluate(a, labels=["a", "b"] * 5, obsm="X_pca")
-
-
 def test_the_missing_label_code_of_export_works(tmp_path):
     import anndata as ad
     adata = ad.AnnData(np.random.default_rng(0).poisson(1, (40, 10)).astype(float))

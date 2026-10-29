@@ -49,8 +49,7 @@ def test_one_method_warning_is_plain():
     _, msgs = _messages(_build_table,
                         pd.DataFrame(_rows("PCA_LSI_stack", (0.3, 0.4, 0.9))))
     assert msgs == [
-        "Only one method, PCA_LSI_stack, is in this figure. With nothing to rank it "
-        "against, the fills are grey. Plot it with methods scored on the same dataset."]
+        "Only one method, PCA_LSI_stack: nothing to rank it against, so the fills are grey."]
 
 
 def test_equal_column_warning_is_plain():
@@ -84,10 +83,8 @@ def test_reordered_plain_dict_error_names_only_the_default_order(tmp_path):
     with pytest.raises(ValueError) as e:
         P._labels_from_dict({"cty2": p2, "cty1": p1})
     assert str(e.value) == (
-        "The label keys cty2 and cty1 are not in the default order. Pass a list of "
-        "paths in cell order, or dataset=, category= and method=. The default order is cty1, "
-        "cty2, ... by number, with rna before adt before atac. It is not "
-        "alphabetical.")
+        "The label keys cty2 and cty1 are not in the default order: cty1, cty2, ... by "
+        "number, and rna before adt before atac. Pass a list of paths in cell order.")
 
 
 def test_reordered_labels_for_dict_names_the_method_order(tmp_path):
@@ -103,9 +100,7 @@ def test_reordered_labels_for_dict_names_the_method_order(tmp_path):
     with pytest.raises(ValueError) as e:
         P._labels_from_dict(three)
     assert str(e.value).startswith(
-        "The label keys cty1, cty3 and cty2 are in neither the method's cell "
-        "order nor the default order. Pass a list of paths in cell order, or dataset=, "
-        "category= and method=.")
+        "The label keys cty1, cty3 and cty2 are not in the default order")
     # labels_for without a method returns the default order: no method to name
     plain = LabelFiles({"cty1": p1, "cty2": p2})
     plain["cty1"] = plain.pop("cty1")
@@ -180,8 +175,7 @@ def test_several_datasets_warning_is_plain():
     df = pd.concat([d11, d11.assign(dataset="D11b")], ignore_index=True).assign(source="user")
     _, msgs = _messages(_build_table, df)
     assert msgs == [
-        "This figure averages each method over 2 datasets, D11 and D11b. Its rows "
-        "mix datasets. mtb.plot.bar ranks the methods within each dataset; or filter "
-        "to one dataset."]
+        "This figure averages each method over 2 datasets, D11 and D11b. Plot one "
+        "dataset, or use mtb.plot.bar."]
 
 

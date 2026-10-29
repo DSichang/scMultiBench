@@ -113,7 +113,7 @@ def _refused(data, tmp_path, methods, **kw):
     return str(e.value)
 
 
-HEAD = "cty.csv of MYCITE has 9 of 120 cells without a label, for example 'NA'"
+HEAD = "cty.csv of MYCITE has 9 of 120 cells without a label"
 FIX = ". Write the folder again with a label for every cell."
 #: the whole message of a run that scores; it is the same for every method
 M1 = HEAD + FIX
@@ -143,15 +143,15 @@ def test_complete_labels_run_as_before(cite, tmp_path, host):
     assert all(r["metrics"]["ARI"] > 0.9 for r in res.records)
 
 
-#: (the label of one cell, the example the message gives of it): a text that
-#: reads as missing is named, NaN and a blank are not
+#: (the label of one cell, the example the message gives of it): the reader
+#: reads NA, None and nan as NaN, which is not named; "NA " stays text
 FORMS = [
     (np.nan, ""),
     ("", ""),                                               # an empty field of the file
-    ("NA", ", for example 'NA'"),
+    ("NA", ""),
     ("NA ", ", for example 'NA'"),
-    ("None", ", for example 'None'"),
-    ("nan", ", for example 'nan'"),
+    ("None", ""),
+    ("nan", ""),
 ]
 
 
@@ -288,7 +288,7 @@ def test_a_method_that_is_fed_the_folder_reads_its_label_files(tmp_path, host):
     with pytest.raises(ValueError) as e:
         _quiet(mtb.run, "UNPAIRED", "diagonal", tmp_path / "out", evaluate=False, **kw)
     assert str(e.value) == (
-        "rna_cty.csv of UNPAIRED has 3 of 60 cells without a label, for example 'NA', "
+        "rna_cty.csv of UNPAIRED has 3 of 60 cells without a label, "
         "and scBridge reads the label files. Write the folder again with a label for "
         "every cell.")
     assert host == []
@@ -312,13 +312,13 @@ def test_only_the_files_a_method_reads_stop_a_run_without_scores(tmp_path, host)
     with pytest.raises(ValueError) as e:
         _quiet(mtb.run, "DONORS", "cross", tmp_path / "out2", methods=["totalVI"], **kw)
     assert str(e.value) == (
-        "cty2.csv of DONORS has 3 of 40 cells without a label, for example 'NA'. Write "
+        "cty2.csv of DONORS has 3 of 40 cells without a label. Write "
         "the folder again with a label for every cell.")
     assert not (tmp_path / "out2").exists()
 
 
 # ------------------------------------------------------------------ rescore
-M2 = ("ValueError: 9 of the 120 labels in {files} are missing, for example 'NA'. Give "
+M2 = ("ValueError: 9 of the 120 labels in {files} are missing{example}. Give "
       "every cell a label, then score again.")
 
 
@@ -331,7 +331,7 @@ def test_rescore_records_the_error(cite, tmp_path, host, monkeypatch):
     again = res.rescore()
     for rec in again.records:
         assert rec["status"] == "ran"
-        assert rec["error"] == M2.format(files="cty.csv")
+        assert rec["error"] == M2.format(files="cty.csv", example="")
         assert not rec.get("metrics") and rec.get("_long") is None
         assert "labels_used" not in rec
     assert list(again.summary["status"]) == ["ran"] * 2
@@ -369,23 +369,22 @@ def test_several_label_files_are_not_ranked(tmp_path, host, monkeypatch):
     # c2 (D28): the files in the order the record was scored with
     a, b, c = res.records[0]["labels_used"]
     assert rec["error"] == (
-        f"ValueError: 2 of the 120 labels in {a}, {b} and {c} are missing, "
-        "for example 'None'. Give every cell a label, then score again.")
+        f"ValueError: 2 of the 120 labels in {a}, {b} and {c} are missing. "
+        "Give every cell a label, then score again.")
     assert "label_order_candidates" not in rec and "metrics" not in rec
     # a real run on this folder stops before the method
     host.clear()
     with pytest.raises(ValueError) as e:
         _quiet(mtb.run, "DONORS", "cross", tmp_path / "out2", methods=["totalVI"], **kw)
-    assert str(e.value) == ("cty2.csv of DONORS has 2 of 40 cells without a label, for "
-                            "example 'None'. Write the folder again with a label for "
-                            "every cell.")
+    assert str(e.value) == ("cty2.csv of DONORS has 2 of 40 cells without a label. "
+                            "Write the folder again with a label for every cell.")
     assert host == []
 
 
 def test_labels_passed_to_rescore(cite, tmp_path, host):
     res = _run(cite, tmp_path, ["totalVI"])
     gaps = _with_gaps()
-    passed = M2.format(files="the labels you passed")
+    passed = M2.format(files="the labels you passed", example=", for example 'NA'")
     # in the rows of the embedding, and by barcode
     for labels in (gaps, list(gaps), pd.Series(gaps, index=[f"c{i}" for i in range(N)])):
         (rec,) = res.rescore(labels=labels).records
@@ -395,7 +394,8 @@ def test_labels_passed_to_rescore(cite, tmp_path, host):
     sheet = tmp_path / "labels.csv"
     pd.DataFrame({"celltype": gaps}, index=[f"c{i}" for i in range(N)]).to_csv(sheet)
     (rec,) = res.rescore(labels=sheet).records
-    assert (rec["status"], rec["error"]) == ("ran", passed)
+    assert (rec["status"], rec["error"]) == (
+        "ran", M2.format(files="the labels you passed", example=""))
     # complete labels from a file score as the same labels in memory
     pd.DataFrame({"celltype": LABELS}, index=[f"c{i}" for i in range(N)]).to_csv(sheet)
     (from_file,) = res.rescore(labels=sheet).records

@@ -169,15 +169,10 @@ def test_several_label_files_are_matched_by_their_barcodes(tmp_path, capsys, see
 def test_other_cells_are_an_error_with_counts_and_examples(tmp_path, seen):
     emb = _emb(tmp_path)
     bars = BARS[:55] + [f"TTTG{i:04d}-1" for i in range(4)]
-    with pytest.raises(ValueError) as e:
+    with pytest.raises(ValueError, match=r"^labels: 4 of the 59 ids in the first column of "
+                                         r"labels\.csv are not cells of the embedding"):
         mtb.evaluate(emb, labels=_labels(tmp_path, values=TYPES[:59], bars=bars),
                      metrics=["ARI"])
-    assert str(e.value) == (
-        "labels: 5 cells of emb.csv are not in labels.csv, for example AAAC0055-1. Write "
-        "both for the same cells.")
-    # the 4 barcodes that only labels.csv holds are not counted, and the
-    # message no longer says to delete the barcode column
-    assert "TTTG" not in str(e.value) and "by position" not in str(e.value)
     assert not seen
 
 
@@ -187,8 +182,8 @@ def test_a_file_with_fewer_cells(tmp_path, seen):
         mtb.evaluate(emb, labels=_labels(tmp_path, values=TYPES[:59], bars=BARS[:59]),
                      metrics=["ARI"])
     assert str(e.value) == (
-        "labels: 1 cell of emb.csv is not in labels.csv, for example AAAC0059-1. Write "
-        "both for the same cells.")
+        "labels: labels.csv has no row for 1 of the 60 cells of the embedding (first: "
+        "['AAAC0059-1']). Give a row for every cell.")
     assert not seen
 
 
@@ -228,33 +223,29 @@ def test_ids_of_which_only_some_are_cells_stay_an_error(tmp_path, seen):
     bars = BARS[:half] + NO_SUFFIX[half:]
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=_labels(tmp_path, bars=bars), metrics=["ARI"])
-    assert str(e.value) == (
-        "labels: 30 cells of emb.csv are not in labels.csv, for example AAAC0030-1. Write "
-        "both for the same cells.")
+    assert str(e.value).startswith(
+        "labels: 30 of the 60 ids in the first column of labels.csv are not cells of the "
+        "embedding")
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=pd.Series(TYPES, index=bars), metrics=["ARI"])
-    assert str(e.value) == (
-        "labels: 30 cells of emb.csv are not in the labels Series, for example "
-        "AAAC0030-1. Pass labels for the cells of emb.csv.")
+    assert "30 of the embedding's 60 cells are missing from labels" in str(e.value)
     assert not seen
 
 
 def test_following_the_error_for_other_cells(tmp_path, seen):
-    """What each error says to do, done: the same cells in the file, and
-    labels for the cells of the embedding."""
+    """What each error says to do, done: a row for every cell; rows of other
+    cells are left out, as for an AnnData embedding."""
     emb = _emb(tmp_path)
     full = pd.Series(TYPES, index=BARS)
-    with pytest.raises(ValueError, match="Write both for the same cells"):
+    with pytest.raises(ValueError, match="Give a row for every cell"):
         mtb.evaluate(emb, labels=_labels(tmp_path, values=TYPES[:59], bars=BARS[:59]),
                      metrics=["ARI"])
     mtb.evaluate(emb, labels=_labels(tmp_path, order=PERM), metrics=["ARI"])
     assert seen["labels"] == list(TYPES)
     extra = pd.concat([full, pd.Series(["T"] * 3, index=["ZZZ0", "ZZZ1", "ZZZ2"])])
-    with pytest.raises(ValueError) as e:
-        mtb.evaluate(emb, labels=extra, metrics=["ARI"])
-    assert str(e.value) == (
-        "labels: 3 cells of the labels Series are not in emb.csv, for example ZZZ0. Pass "
-        "labels for the cells of emb.csv.")
+    seen.clear()
+    mtb.evaluate(emb, labels=extra, metrics=["ARI"])
+    assert seen["labels"] == list(TYPES)
     seen.clear()
     mtb.evaluate(emb, labels=extra.loc[BARS], metrics=["ARI"])
     assert seen["labels"] == list(TYPES)
@@ -277,9 +268,7 @@ def test_a_series_with_other_cells(tmp_path, seen):
     emb = _emb(tmp_path)
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=pd.Series(TYPES[:58], index=BARS[2:]), metrics=["ARI"])
-    assert str(e.value) == (
-        "labels: 2 cells of emb.csv are not in the labels Series, for example "
-        "AAAC0000-1. Pass labels for the cells of emb.csv.")
+    assert "2 of the embedding's 60 cells are missing from labels" in str(e.value)
     assert "to_numpy" not in str(e.value)
     assert not seen
 
@@ -291,9 +280,7 @@ def test_several_label_files_with_other_cells(tmp_path, seen):
     second = _labels(tmp_path, "cty2.csv", np.arange(half, CELLS - 1))
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb, labels=[first, second], metrics=["ARI"])
-    assert str(e.value) == (
-        "labels: 1 cell of emb.csv is not in the label files, for example AAAC0059-1. "
-        "Write them for the same cells.")
+    assert "has no row for 1 of the 60 cells of the embedding" in str(e.value)
     assert not seen
 
 
@@ -377,16 +364,17 @@ def test_repeated_barcodes_and_a_series_raise_as_for_an_anndata(tmp_path, seen):
     assert seen["labels"] == list(TYPES)
 
 
-def test_a_dims_by_cells_table_is_still_transposed(tmp_path, capsys, seen):
-    """The first column names the dimensions, not the cells: no ids."""
+def test_a_dims_by_cells_table_refuses_barcoded_labels(tmp_path, seen):
+    """The first column names the dimensions, not the cells: labels with
+    barcodes are refused rather than matched by position."""
     path = tmp_path / "wide.csv"
     pd.DataFrame(EMB.T, index=[f"dim{i}" for i in range(5)], columns=BARS).to_csv(path)
-    with pytest.warns(UserWarning) as rec:
+    with pytest.raises(ValueError, match=r"^labels: 60 of the 60 ids in the first column of "
+                                         r"labels\.csv are not cells of the embedding"):
         mtb.evaluate(str(path), labels=_labels(tmp_path, order=PERM), metrics=["ARI"])
-    # the label count says which axis holds the cells: transposed without a word
-    assert [str(w.message) for w in rec] == [NO_IDS.format("labels.csv")]
-    assert seen["emb"].shape == (CELLS, 5) and seen["labels"] == list(TYPES[PERM])
-    assert capsys.readouterr().err == ""
+    # values without ids: transposed by the label count
+    mtb.evaluate(str(path), labels=TYPES, metrics=["ARI"])
+    assert seen["emb"].shape == (CELLS, 5) and seen["labels"] == list(TYPES)
 
 
 def test_a_dims_by_cells_table_with_another_number_of_labels(tmp_path, seen):

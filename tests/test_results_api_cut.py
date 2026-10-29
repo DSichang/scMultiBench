@@ -40,17 +40,14 @@ def test_metric_selection_is_one_vocabulary():
     assert metric_selection(["MyScore"], extra=["MyScore"]).codes == ["MyScore"]
     with pytest.raises(ValueError, match="metrics=\\[\\] selects nothing"):
         metric_selection([])
-    with pytest.raises(ValueError, match="names the same metric twice"):
-        metric_selection(["ARI", "ari"])
+    assert metric_selection(["ARI", "ari"]).codes == ["ARI"]
     # 0.4.0: one code is accepted alone, and families go inside a list
     one = metric_selection("ARI")
     assert one.codes == ["ARI"] and one.explicit
     assert metric_selection(["clustering", "ARI"]).codes == clu.codes
     mixed = metric_selection(["clustering", "kBET"])
     assert mixed.codes == clu.codes + ["kBET"] and mixed.family == "all"
-    with pytest.raises(TypeError, match=r"^metrics= takes None, a family \('all', "
-                                        r"'clustering', 'batch', 'classification'\), a "
-                                        r"metric code, or a list of them\. It got an int\.$"):
+    with pytest.raises(TypeError):
         metric_selection(3)
 
 

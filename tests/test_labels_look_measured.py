@@ -27,7 +27,7 @@ N = 60
 TYPES = np.array(["T", "B", "NK"] * (N // 3))
 EMB = np.random.default_rng(0).normal(size=(N, 5)) + pd.Categorical(TYPES).codes[:, None] * 4.0
 COUNTS = np.arange(1000, 1000 + N)                    # one value per cell
-CHECK = "Check that it holds the cell types."
+CHECK = "Check that they are the cell types."
 
 
 @pytest.fixture(autouse=True)
@@ -73,33 +73,30 @@ def test_the_rule():
 
 
 # -------------------------------------------------------------------- Python
+COUNT = f"The labels have 60 different values for 60 cells. {CHECK}"
+FRACTION = f"The labels hold numbers that are not whole numbers. {CHECK}"
+
+
 def test_an_obs_column_of_counts():
-    assert _warned(_adata(), labels="nCount_RNA") == [
-        f"labels='nCount_RNA' has 60 different labels for 60 cells. {CHECK}"]
-    assert _warned(_adata(), labels="obs:nCount_RNA") == [
-        f"labels='obs:nCount_RNA' has 60 different labels for 60 cells. {CHECK}"]
+    assert _warned(_adata(), labels="nCount_RNA") == [COUNT]
+    assert _warned(_adata(), labels="obs:nCount_RNA") == [COUNT]
 
 
 def test_an_obs_column_of_numbers_that_are_not_whole():
-    assert _warned(_adata(), labels="percent_mt") == [
-        f"labels='percent_mt' holds numbers that are not whole numbers. {CHECK}"]
+    assert _warned(_adata(), labels="percent_mt") == [FRACTION]
 
 
 def test_a_series_an_array_and_a_file(tmp_path):
     a = _adata()
-    assert _warned(EMB, labels=a.obs["nCount_RNA"].to_numpy()) == [
-        f"labels has 60 different labels for 60 cells. {CHECK}"]
-    assert _warned(a, labels=a.obs["nCount_RNA"]) == [
-        f"The labels Series 'nCount_RNA' has 60 different labels for 60 cells. {CHECK}"]
+    assert _warned(EMB, labels=a.obs["nCount_RNA"].to_numpy()) == [COUNT]
+    assert _warned(a, labels=a.obs["nCount_RNA"]) == [COUNT]
     one = tmp_path / "counts.csv"
     pd.DataFrame({"x": COUNTS}).to_csv(one, index=False)
-    assert _warned(EMB, labels=str(one)) == [
-        f"labels (counts.csv) has 60 different labels for 60 cells. {CHECK}"]
+    assert _warned(EMB, labels=str(one)) == [COUNT]
     two = tmp_path / "more.csv"
     pd.DataFrame({"x": COUNTS[:30] + 0.5}).to_csv(two, index=False)
     pd.DataFrame({"x": COUNTS[:30]}).to_csv(one, index=False)
-    assert _warned(EMB, labels=[str(one), str(two)]) == [
-        f"labels (counts.csv and 1 more) holds numbers that are not whole numbers. {CHECK}"]
+    assert _warned(EMB, labels=[str(one), str(two)]) == [FRACTION]
 
 
 def test_cell_types_and_cluster_ids_do_not_warn(tmp_path):

@@ -19,7 +19,6 @@ missing: NaN, blank text, and text that a label file reads back as missing.
 from __future__ import annotations
 
 import io as _io
-import json
 import os
 from pathlib import Path
 
@@ -61,14 +60,6 @@ def _read_h5ad(path, what: str = "file"):
                          f"or it is damaged.") from None
 
 
-def _refuse_h5mu(path) -> None:
-    """``ValueError`` for an ``.h5mu`` path: it holds one AnnData per modality,
-    and evaluate takes one of them."""
-    if Path(path).suffix.lower() == ".h5mu":
-        raise ValueError(f"{Path(path).name} is an .h5mu: pass one modality, e.g. "
-                         f"mudata.read(path)['rna'], with obsm='...'.")
-
-
 def read_embedding(path: Path | str) -> np.ndarray:
     """Read an embedding from an HDF5 file's dataset ``data``; orient as (cells, dims).
 
@@ -91,25 +82,14 @@ def read_embedding(path: Path | str) -> np.ndarray:
     FileNotFoundError
         ``path`` does not exist (the message names it and the cwd).
     ValueError
-        The file has no dataset ``data``: the message lists the keys found
-        and, when they are the canonical input layout (a ``matrix`` group
-        holding ``data``/``barcodes``/``features``), says that this is an
-        input matrix, not a method output.
+        The file has no dataset ``data``; the message lists the keys found.
     """
     path = _require_file(path, "output")
-    _refuse_h5mu(path)
     with h5py.File(path, "r") as f:
         if "data" not in f or not isinstance(f["data"], h5py.Dataset):
-            keys = sorted(f.keys())
-            hint = ""
-            if "matrix" in keys:
-                hint = (" - this looks like a canonical input matrix (matrix/data, "
-                        "matrix/barcodes, matrix/features: rna.h5 / adt.h5 / "
-                        "atac.h5), not an embedding; evaluate() wants a method "
-                        "output such as out/<method>/embedding.h5 (or pass an "
-                        "AnnData / .npy / .csv embedding)")
-            raise ValueError(
-                f"{path} has no dataset 'data'; found keys {keys}{hint}")
+            keys = ", ".join(sorted(f.keys()))
+            raise ValueError(f"{path.name} has no dataset 'data' (keys: {keys}): it is not "
+                             f"an embedding. Pass a method's embedding file.")
         X = np.asarray(f["data"])
     if X.ndim != 2:
         raise ValueError(
@@ -208,23 +188,6 @@ def _missing_example(values) -> str:
     return f", for example {words[0]!r}" if words else ""
 
 
-def _as_written(col: pd.Series, d: pd.DataFrame, path: Path) -> np.ndarray:
-    """Column ``col`` of the frame ``d`` read from ``path``, with each value read
-    as missing replaced by the word the file holds there; an empty field stays
-    NaN. For messages only."""
-    vals, null = col.to_numpy(), col.isna().to_numpy()
-    if not null.any():
-        return vals
-    text = pd.read_csv(path, sep=_sep_for(path), dtype=str, na_filter=False)  # nothing parsed
-    if text.shape != d.shape:
-        return vals
-    text = text.iloc[:, d.columns.get_loc(col.name)].str.strip()
-    named = null & text.isin(missing_words(text[null])).to_numpy()
-    out = vals.astype(object)
-    out[named] = text[named].to_numpy()
-    return out
-
-
 def _names_no_file(x) -> bool:
     """A string that is not a file and does not look like one (``"donor"``,
     ``"obs:donor"``; not ``"missing.csv"``)."""
@@ -233,8 +196,7 @@ def _names_no_file(x) -> bool:
             and "/" not in x and os.sep not in x)
 
 
-def read_labels(path: Path | str, column: str | None = None, *,
-                as_written: bool = False) -> np.ndarray:
+def read_labels(path: Path | str, column: str | None = None) -> np.ndarray:
     """Read a cell-type (or batch) label vector from a CSV/TSV with a header row.
 
     The benchmark's label files (``cty.csv``, ``cty1.csv`` ...) are R's
@@ -262,10 +224,6 @@ def read_labels(path: Path | str, column: str | None = None, *,
         CSV (``,``) or TSV (``.tsv`` -> ``\\t``) file with a header row.
     column : str, optional
         Name of the column holding the labels.
-    as_written : bool
-        ``True`` returns each value read as missing as the word the file
-        holds there (``'NA'``, not NaN), for a message that names it
-        (:func:`read_labels_ids`).
 
     Returns
     -------
@@ -279,11 +237,11 @@ def read_labels(path: Path | str, column: str | None = None, *,
     Callers that know the cells' ids align the file by it
     (:func:`read_labels_ids`, :func:`by_id_column`).
     """
-    return read_labels_ids(path, column, as_written=as_written)[0]
+    return read_labels_ids(path, column)[0]
 
 
 def read_labels_ids(path: Path | str, column: str | None = None, *,
-                    what: str | None = None, pick=None, as_written: bool = False):
+                    what: str | None = None):
     """:func:`read_labels`, plus the first column it left out.
 
     Returns ``(values, first)``. ``first`` is the file's first column (a
@@ -291,19 +249,14 @@ def read_labels_ids(path: Path | str, column: str | None = None, *,
     rule 4 dropped the first of two columns; it may hold cell ids. Otherwise
     ``first`` is ``None``.
 
-    ``what`` ("labels", "batch", "clustering") starts the error messages.
-    ``pick`` ends an ambiguous file's error: a sentence, or a function of the
-    pandas call that reads one column as a Series (default: pass ``column=``).
-    ``as_written=True`` returns each value read as missing (``NA``, ``None``,
-    ...) as the word the file holds, for messages only.
+    ``what`` ("labels", "batch", "clustering") starts the error messages; an
+    ambiguous file's error then asks for one column as values, else for
+    ``column=``.
     """
     path = _require_file(path, f"{what} file" if what else "labels file")
     d = _read_table(path, _sep_for(path))
     head = f"The {what} file {path.name}" if what else str(path)
     first = d.iloc[:, 0] if d.shape[1] > 1 else None
-
-    def values(col):
-        return _as_written(col, d, path) if as_written else col.to_numpy()
 
     if column is not None:
         if column not in d.columns:
@@ -313,15 +266,15 @@ def read_labels_ids(path: Path | str, column: str | None = None, *,
                     f"Its columns{after} are {', '.join(names)}.")
             raise ValueError(f"{head} has no column named {column!r}. {have}")
         other = first is not None and str(d.columns[0]) != str(column)
-        return values(d[column]), (first if other else None)
+        return d[column].to_numpy(), (first if other else None)
     if "x" in d.columns:
         extra = first is not None and str(d.columns[0]) != "x"
-        return values(d["x"]), (first if extra else None)
+        return d["x"].to_numpy(), (first if extra else None)
     if d.shape[1] == 1:
-        return values(d.iloc[:, 0]), None
+        return d.iloc[:, 0].to_numpy(), None
     if d.shape[1] == 2:
         if first.is_unique:
-            return values(d.iloc[:, -1]), first
+            return d.iloc[:, -1].to_numpy(), first
         no_header = _no_header(d.columns[0])
         # barcodes with a repeat, not a sample or batch column: an index written
         # without a header (pandas' and R's to_csv), or text that is 90% distinct
@@ -332,18 +285,22 @@ def read_labels_ids(path: Path | str, column: str | None = None, *,
                 f"{what or path}: the first column of {path.name} repeats "
                 f"{_n_ids(len(dup))} (first: {_first(dup, 3)}). Give each cell one row.")
         if no_header and _stacked_row_numbers(first):
-            return values(d.iloc[:, -1]), first
+            return d.iloc[:, -1].to_numpy(), first
         if no_header and pd.api.types.is_integer_dtype(first):
             # stacked row numbers, reordered after the concat
             raise ValueError(f"{head} has row numbers that repeat out of order, so its "
                              f"rows may not follow the cells. Save it in cell order.")
     kind, names = _data_columns(d)
-    if callable(pick):
-        # barcodes become the Series index; row numbers would not match any cell
-        pick = pick(_series_example(path, names, index=kind == "cell ids", what=what))
     after = f" after the {kind}" if kind else ""
-    raise ValueError(f"{head} has several columns{after}: {', '.join(names)}. "
-                     f"{pick or 'Pass column=<name>.'}")
+    if what is None:
+        fix = "Pass column=<name>."
+    else:
+        # barcodes become the Series index; row numbers would not match any cell
+        sep = ', sep="\\t"' if _sep_for(path) == "\t" else ""
+        call = (f"pd.read_csv(path{sep}, index_col=0)['<column>']" if kind == "cell ids"
+                else f"pd.read_csv(path{sep})['<column>'].to_numpy()")
+        fix = f"Pass one of them, as {call}."
+    raise ValueError(f"{head} has several columns{after}: {', '.join(names)}. {fix}")
 
 
 def _stacked_row_numbers(col: pd.Series) -> bool:
@@ -371,28 +328,6 @@ def _data_columns(d: pd.DataFrame) -> tuple[str | None, list]:
         kind = "cell ids" if ids else "row numbers"
         return kind, [c for c in cols[1:] if not _no_header(c)] or cols[1:]
     return None, [c for c in cols if not _no_header(c)] or cols
-
-
-#: words in a column name that suggest what the column holds, by ``what``;
-#: the example of an ambiguous file's error takes the first such column
-_COLUMN_HINTS = {"labels": ("celltype", "cell_type", "cell type", "label", "cty"),
-                 "batch": ("batch", "sample", "donor"),
-                 "clustering": ("cluster", "leiden", "louvain")}
-
-
-def _series_example(path: Path, names: list, *, index: bool, what: str | None) -> str:
-    """The pandas call that reads one column of ``path``, the column whose name
-    suggests ``what``, else the last: a Series indexed by the cell ids when the
-    file has them, else an array, which is matched by position."""
-    hints = _COLUMN_HINTS.get(what or "", ())
-    col = next((n for n in names if any(h in n.lower() for h in hints)), names[-1])
-    args = [json.dumps(str(path), ensure_ascii=False)]
-    if _sep_for(path) == "\t":
-        args.append('sep="\\t"')
-    if index:
-        args.append("index_col=0")
-    return (f"pd.read_csv({', '.join(args)})[{json.dumps(col, ensure_ascii=False)}]"
-            + ("" if index else ".to_numpy()"))
 
 
 def _n_ids(n: int) -> str:
@@ -494,8 +429,7 @@ def _is_anndata(x) -> bool:
     return hasattr(x, "obsm") and hasattr(x, "obs") and hasattr(x, "n_obs")
 
 
-def as_vector(x, *, what: str = "labels", column: str | None = None,
-              as_written: bool = False) -> np.ndarray:
+def as_vector(x, *, what: str = "labels", column: str | None = None) -> np.ndarray:
     """Coerce a label-like input to a 1-D numpy array of length n_cells.
 
     Accepted forms:
@@ -519,10 +453,6 @@ def as_vector(x, *, what: str = "labels", column: str | None = None,
         Name used in error messages (``'labels'``, ``'batch'``, ``'clustering'``).
     column : str, optional
         Column to take when ``x`` is a file path or a multi-column DataFrame.
-    as_written : bool
-        ``True`` reads files as :func:`read_labels_ids` does with
-        ``as_written=True``, for a message that names the missing words;
-        values that are not read from a file are not changed.
 
     Returns
     -------
@@ -530,15 +460,14 @@ def as_vector(x, *, what: str = "labels", column: str | None = None,
         1-D array. Values are returned as-is (not re-coded).
     """
     if isinstance(x, (str, Path)):
-        return np.asarray(read_labels(x, column=column, as_written=as_written))
+        return np.asarray(read_labels(x, column=column))
     if isinstance(x, dict):
         if len(x) == 1:
-            return np.asarray(read_labels(next(iter(x.values())), column=column,
-                                          as_written=as_written))
-        raise ValueError(_multi_dict_message(what, x))
+            return np.asarray(read_labels(next(iter(x.values())), column=column))
+        raise ValueError(f"{what} is a dict of {len(x)} files, which fixes no cell order. "
+                         f"Pass a list of paths in cell order.")
     if _is_label_path_list(x):
-        return np.concatenate([np.asarray(read_labels(p, column=column,
-                                                      as_written=as_written)) for p in x])
+        return np.concatenate([np.asarray(read_labels(p, column=column)) for p in x])
     if isinstance(x, pd.DataFrame):
         return np.asarray(_one_column(x, what, column).to_numpy())
     if isinstance(x, np.ndarray):
@@ -554,19 +483,6 @@ def as_vector(x, *, what: str = "labels", column: str | None = None,
     raise TypeError(
         f"{what} must be a CSV path, list of paths, or 1-D array-like of length "
         f"n_cells; got {type(x).__name__}")
-
-
-def _multi_dict_message(what: str, d: dict) -> str:
-    """The error for a ``{name: path}`` dict with several entries: a dict fixes
-    no cell order, and a wrong order invalidates every score without an error."""
-    keys = [str(k) for k in d]
-    return (
-        f"{what}: got a dict with {len(d)} label files {keys}; a dict does not "
-        f"fix the cell order, and the order must be the method's cell order "
-        f"(the order in which the method concatenated its input cells, which "
-        f"is not alphabetical; for most methods numbered files ascending, cty1, "
-        f"cty2, ..., and rna before atac). Pass the paths as a list in that order, "
-        f"or dataset=, category= and method=, which read them in that order.")
 
 
 def _first(ix, n: int = 5) -> list:
@@ -610,7 +526,6 @@ def _align_vector(x, ids, *, what: str, column: str | None):
             f"{_first(dup)}); cannot align {what} by cell id - pass "
             f"{what}.to_numpy() to match positionally")
     missing = ids.difference(x.index, sort=False)
-    extra = x.index.difference(ids, sort=False)
     if len(missing) and len(missing) == len(ids):
         head = (f"The {what}{chr(39) if what.endswith('s') else chr(39) + 's'} cell ids "
                 f"do not match the embedding's (embedding e.g. {ids[0]}, {what} e.g. "
@@ -624,14 +539,12 @@ def _align_vector(x, ids, *, what: str, column: str | None):
                          f"{what}.to_numpy() to match by position.")
     if len(missing):
         # ids the embedding lacks are left out: every cell has its value
-        hint = (" Score the cells that have a label only."
-                if what == "labels" and not len(extra) else "")
         by_position = (f", or {what}.to_numpy() to match positionally"
                        if len(x) == len(ids) else "")
         raise ValueError(
             f"{what}: cannot align by cell id - {len(missing)} of the embedding's "
             f"{len(ids)} cells are missing from {what} (first: {_first(missing)}). "
-            f"Pass {what} for every cell of the embedding{by_position}.{hint}")
+            f"Pass {what} for every cell of the embedding{by_position}.")
     return np.asarray(x.reindex(ids).to_numpy())
 
 
@@ -685,10 +598,6 @@ def _anndata_matrix(adata, obsm: str | None) -> np.ndarray:
     if (obsm == "X" and has_x) or (obsm != "X" and key in adata.obsm):
         return _own_dtype(adata.X if obsm == "X" else adata.obsm[key])
     kind = type(adata).__name__            # AnnData, or MuData for a MuData
-    if key == "X_pca":
-        # the PCA has not been computed yet: the fix is to compute it
-        raise ValueError(f"The {kind} has no obsm['X_pca']. Make the PCA first, as "
-                         f"sc.pp.pca(adata).")
     keys = sorted(map(str, adata.obsm.keys()))
     picks = ([f"obsm={keys[0]!r}"] if len(keys) == 1 else
              ["obsm= with one of them"] if keys else [])
@@ -760,7 +669,6 @@ def as_matrix(output, *, obsm: str | None = None) -> np.ndarray:
         return _anndata_matrix(output, obsm)
     if isinstance(output, (str, Path)):
         p = _require_file(output, "output")
-        _refuse_h5mu(p)
         suf = p.suffix.lower()
         if suf in {".h5", ".hdf5", ".hdf"}:
             return read_embedding(p)

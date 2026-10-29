@@ -74,7 +74,7 @@ def test_changes_say_how_a_csv_embedding_is_matched(tmp_path, capsys, monkeypatc
     assert capsys.readouterr().err == ""
     # the three cases of the page: some barcodes shared, none shared, a repeated barcode
     other = [b[:-2] for b in bars]
-    with pytest.raises(ValueError, match="15 cells of emb.csv are not in the labels Series"):
+    with pytest.raises(ValueError, match="15 of the embedding's 30 cells are missing from labels"):
         mtb.evaluate(str(tmp_path / "emb.csv"), labels=pd.Series(
             types, index=bars[:15] + other[15:]), metrics=["ARI"])
     # 0.4.0 (c3, E05): the ids decide, as for an AnnData

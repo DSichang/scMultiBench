@@ -70,9 +70,7 @@ def _ilisi_tie():
 
 def test_one_method_figure_warns_and_is_grey():
     _, msgs = _messages(_build_table, _mine())
-    assert msgs == ["Only one method, PCA, is in this figure. With nothing to rank "
-                    "it against, the fills are grey. Plot it with methods scored on "
-                    "the same dataset."]
+    assert msgs == ["Only one method, PCA: nothing to rank it against, so the fills are grey."]
     fig, msgs = _messages(mtb.plot.bubble, _mine())
     assert len(msgs) == 1
     assert len(_circles(fig, _grey())) == 4                  # every metric marker
@@ -85,8 +83,9 @@ def test_constant_column_warns_and_uses_the_neutral_fill():
     tbl, msgs = _messages(_build_table, _ilisi_tie())
     assert msgs == ["iLISI is 0.000 for every method. That column is grey. Leave it out "
                     "with metrics=."]
-    assert tbl.norm["iLISI"].tolist() == [1.0, 1.0, 1.0]    # R parity kept
-    assert tbl.ranks["iLISI"].tolist() == [3.0, 3.0, 3.0]
+    (batch,) = tbl.blocks
+    assert batch.norm["iLISI"].tolist() == [1.0, 1.0, 1.0]    # R parity kept
+    assert B.style.rank_max(batch.raw["iLISI"].to_numpy()).tolist() == [3.0, 3.0, 3.0]
     fig = B.render(tbl)
     grey = _circles(fig, _grey())
     assert len(grey) == 3
@@ -119,9 +118,8 @@ def _pair():
 def test_dataset_mode_rerun_pair_suggests_plot_bar():
     _, msgs = _messages(_build_table, _pair())
     assert msgs == [
-        "This figure averages each method over 2 datasets, D11 and D11b. Its rows "
-        "mix datasets. mtb.plot.bar ranks the methods within each dataset; or filter "
-        "to one dataset."]
+        "This figure averages each method over 2 datasets, D11 and D11b. Plot one "
+        "dataset, or use mtb.plot.bar."]
 
 
 @pytest.mark.parametrize("fn", [_build_table, mtb.plot.bubble, mtb.plot.bar])

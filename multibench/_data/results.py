@@ -139,31 +139,6 @@ def _load_rerun(category: str | None, datasets: list | None, base: Path) -> pd.D
     return out
 
 
-def _canonical_dataset_ids(category, datasets, base) -> list:
-    """Replace a dataset id that differs from a stored id only in case, with a
-    warning: a case-insensitive filesystem would load ``d52`` from ``D52`` and
-    stamp the frame with the wrong spelling."""
-    try:
-        have = _list_datasets(category, base)
-    except Exception:
-        return list(datasets)
-    have = [str(h) for h in have]
-    by_lower = {h.lower(): h for h in have}
-    out = []
-    for d in datasets:
-        s = str(d)
-        canon = by_lower.get(s.lower())
-        if canon is not None and canon != s and s not in have:
-            _text.warn(
-                f"dataset {s!r} is not in the stored results but {canon!r} is - using "
-                f"that spelling (dataset ids are case-sensitive: 'D52', not 'd52')",
-                UserWarning)
-            out.append(canon)
-        else:
-            out.append(s)
-    return out
-
-
 def _check_methods(wanted: list, present) -> None:
     """``KeyError`` for a method that is neither a method id nor in the frame:
     an empty frame would hide the typo."""
@@ -222,7 +197,7 @@ def load_results(
         No stored results for a requested category or dataset; the message
         names the datasets there are.
     KeyError
-        Unknown method name in ``methods``, with a did-you-mean hint.
+        Unknown method name in ``methods``.
     ValueError
         Unknown ``category`` or ``metrics``.
 
@@ -268,8 +243,6 @@ def _load_results(
     wanted_methods = _as_list(methods)
 
     base = _base_path()
-    if datasets and category is not None:
-        datasets = _canonical_dataset_ids(category, datasets, base)
     rerun_versions: set[str] = set()
     cats = [category] if category is not None else list(_CATEGORIES)
     frames: list[pd.DataFrame] = []
@@ -297,16 +270,14 @@ def _load_results(
             avail = _list_datasets(category, base)
             raise FileNotFoundError(_no_dataset_msg(category, missing, avail))
 
-    where = f"{category or 'any category'}/{datasets if datasets else 'any dataset'}"
+    of = " of " + ", ".join(x for x in [category, *map(str, datasets or ())] if x) \
+        if category or datasets else ""
     if wanted_methods is not None:
-        avail = sorted(out["method"].unique())
-        _check_methods(wanted_methods, avail)
+        _check_methods(wanted_methods, sorted(out["method"].unique()))
         out = _of_methods(out, wanted_methods)
         if out.empty:
-            shown = wanted_methods if len(wanted_methods) > 1 else wanted_methods[0]
-            _text.warn(
-                f"no rerun rows for method {shown!r} in {where} (available: "
-                f"{avail})", UserWarning)
+            _text.warn(f"The stored results{of} have no rows for {_and_list(wanted_methods)}.",
+                       UserWarning)
     have_metrics = sorted(out["metric"].unique())
     if sel is None:
         sel = catalog.metric_selection(metrics, extra=have_metrics)
@@ -318,8 +289,6 @@ def _load_results(
             _text.warn(f"The stored results have no {_and_list(absent)}.",
                          UserWarning)
         elif out.empty and before:
-            of = " of " + ", ".join(x for x in [category, *map(str, datasets or ())] if x) \
-                if category or datasets else ""
             _text.warn(
                 f"The stored results{of} have no {sel.family} scores, so no rows are left. "
                 f"Leave out metrics= to get the scores they have "
@@ -414,7 +383,7 @@ def rank(
         ``modalities`` naming data that none of the ranked datasets measured
         (pass such scores as ``long_df=``).
     KeyError
-        Unknown method name in ``methods``, with a did-you-mean hint.
+        Unknown method name in ``methods``.
 
     Warns
     -----
@@ -446,7 +415,6 @@ def rank(
         long_df = _load_results(category)
     elif "category" in long_df.columns:
         _refuse_other_categories(long_df, category)
-    table_noun = "stored results" if stored else "long_df frame"
     label = "the stored results" if stored else "long_df"
 
     df, foreign = _drop_unrun(long_df.copy(), category, label)
@@ -467,7 +435,7 @@ def rank(
     if sel.codes is not None:
         df = df[df["metric"].isin(sel.codes)]
         if df.empty:
-            raise ValueError(_no_metric_rows(category, metrics, sel, long_df, stored))
+            raise ValueError(_no_metric_rows(category, metrics, long_df, stored))
     if "dataset" not in df.columns:
         df["dataset"] = "all"
     _refuse_repeats(df)
@@ -525,12 +493,8 @@ def rank(
             f"over one method is always 1.0.")
     if foreign:
         one = len(foreign) == 1
-        it, they = ("it", "it is") if one else ("them", "they are")
-        notes.append(
-            f"{_and_list(foreign)} {'has' if one else 'have'} scores in the "
-            f"{table_noun}, but this package does not run {it} for {category}, "
-            f"so {they} left out of the ranking. "
-            f"mtb.find_methods(category={category!r}) does not list {it}.")
+        notes.append(f"{_and_list(foreign)} {'is' if one else 'are'} not run for {category} "
+                     f"by this package and left out.")
     partial = [m for m in out["method"] if m in n_ds.index and n_ds.loc[m] < len(kept)]
     if partial:
         notes.append(
@@ -556,16 +520,11 @@ def _refuse_other_categories(long_df, category) -> None:
     ranked against this one's."""
     cats = {str(c) for c in long_df["category"].dropna()}
     other = sorted(cats - {category})
-    if len(other) == 1 and category not in cats:
-        raise ValueError(f"long_df holds {other[0]} rows: pass "
-                         f"rank({other[0]!r}, long_df=...).")
     if other:
         one = category if category in cats else other[0]
         raise ValueError(
-            f"long_df holds {_and_list(other)} rows"
-            + (f" next to {category} ones" if category in cats else "")
-            + f": rank one category at a time, as rank({one!r}, "
-            f"long_df=long_df[long_df['category'] == {one!r}]).")
+            f"long_df holds {_and_list(other)} rows: rank one category at a time, as "
+            f"rank({one!r}, long_df=long_df[long_df['category'] == {one!r}]).")
 
 
 def _drop_unrun(df, category, label) -> tuple[pd.DataFrame, list]:
@@ -588,17 +547,11 @@ def _drop_unrun(df, category, label) -> tuple[pd.DataFrame, list]:
     return df, foreign
 
 
-def _no_metric_rows(category, metrics, sel, long_df, stored: bool) -> str:
+def _no_metric_rows(category, metrics, long_df, stored: bool) -> str:
     """rank()'s error when ``metrics=`` leaves no row."""
-    if stored and set(sel.codes) <= set(catalog.FAMILY_METRICS["classification"]):
-        return (f"The stored results of {category} have no classification scores. "
-                f"Score your runs with mtb.evaluate and pass them as long_df=.")
-    if stored and not sel.explicit and sel.family == "batch":
-        one = ", ".join(sorted(map(str, long_df["dataset"].unique())))
-        return (f"The {category} tables have no batch scores ({one} has one "
-                f"batch). Use metrics=\"clustering\".")
-    return (f"no {metrics!r} metrics ({sel.codes}) in the frame; metrics present: "
-            f"{sorted(long_df['metric'].unique())}")
+    label = f"stored results of {category}" if stored else "long_df rows"
+    have = _and_list(sorted(map(str, long_df["metric"].unique())))
+    return f"The {label} have no metrics={metrics!r} scores; they have {have}."
 
 
 #: the fewest methods a dataset needs to count in the ranking

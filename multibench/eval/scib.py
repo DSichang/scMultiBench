@@ -381,15 +381,6 @@ def _isolated_labels_f1(adata, label_key, batch_key, cluster_key, iso_threshold)
     return float(np.mean(scores))
 
 
-def count_error(what: str, n: int, n_cells: int) -> str:
-    """``'labels has 3,000 entries for 7,500 cells in the embedding.'``
-
-    ``what`` is the argument of ``mtb.evaluate`` that holds ``n`` values:
-    ``labels``, ``clusters`` or ``batch``.
-    """
-    return f"{what} has {n:,} entries for {n_cells:,} cells in the embedding."
-
-
 def compute(emb, celltype, cluster, batch, group: str = "clustering",
             slow_metrics: bool = False, only=None, *,
             verbose: bool | None = None, flavor=None) -> pd.DataFrame:
@@ -454,12 +445,6 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
         ) from e
 
     n = np.asarray(emb).shape[0]
-    # named after evaluate()'s arguments
-    for what, values in (("labels", celltype), ("clustering", cluster),
-                         ("batch", batch)):
-        if values is not None and len(np.asarray(values)) != n:
-            raise ValueError(count_error(what, len(np.asarray(values)), n))
-
     adata = _build_adata(emb, celltype, cluster, batch)
     _neighbors(adata, "X_emb")
 
