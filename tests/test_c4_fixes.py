@@ -144,7 +144,8 @@ def test_your_own_cells_on_a_benchmark_name_are_told_to_take_a_name_of_their_own
                        method="PCA", metrics=["ASW"], verbose=False)
     assert set(got["dataset"]) == {"D11_subset"}
     # a package method's output keeps the check of the embedding
-    with pytest.raises(ValueError, match="the embedding has 1,718 rows"):
+    with pytest.raises(ValueError, match="Check that the embedding is the one of method= "
+                                         "on D11.$"):
         mtb.evaluate(emb, dataset="D11", method="Matilda", metrics=["ASW"])
 
 

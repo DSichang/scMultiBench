@@ -469,8 +469,10 @@ def _count_error(what: str, n: int, n_cells: int, cells: _Cells | None = None) -
     """evaluate()'s error for ``n`` values of ``what`` against ``n_cells`` rows;
     ``cells``: the labels are the label files of a dataset folder."""
     if cells is not None and what == "labels":
+        fix = (f"Check that the embedding is the one of method= on {cells.dataset}."
+               if cells.method else "For other cells, pass a dataset name of your own.")
         return (f"The label files of {cells.dataset} hold {_n(n, 'cell')}; the embedding "
-                f"has {_n(n_cells, 'row')}. For other cells, pass a dataset name of your own.")
+                f"has {_n(n_cells, 'row')}. {fix}")
     one = {"labels": "label", "clusters": "cluster id", "batch": "batch"}[what]
     return (f"{what} has {_n(n, 'entry', 'entries')} for {_n(n_cells, 'cell')} in the "
             f"embedding: give one {one} per cell.")

@@ -160,11 +160,11 @@ def _emb(n, seed=0):
 def test_the_length_messages_fit_the_call():
     with pytest.raises(ValueError) as e:
         mtb.evaluate(_emb(500), labels=["a", "b"] * 249, metrics=["ARI"], verbose=False)
-    assert str(e.value) == "labels has 498 entries for 500 embedding rows: give one label per row."
+    assert str(e.value) == "labels has 498 entries for 500 cells in the embedding: give one label per cell."
     with pytest.raises(ValueError) as e:
         mtb.evaluate(_emb(2000), dataset="D11", category="vertical", method="sciPENN",
                      metrics=["ARI"], verbose=False)
-    assert str(e.value) == ("The label files of D11 (cty.csv) hold 2,864 cells; the "
+    assert str(e.value) == ("The label files of D11 hold 2,864 cells; the "
                             "embedding has 2,000 rows. Check that the embedding is the one "
                             "of method= on D11.")
 
