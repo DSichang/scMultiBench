@@ -79,7 +79,7 @@ def test_params_for_validates_and_aliases():
     import pytest
     p = discover.params_for("totalVI", "vertical", ["rna", "protein"])
     assert p["variant"] == "vertical:rna+adt"
-    with pytest.raises(KeyError, match="Did you mean StabMap"):
+    with pytest.raises(KeyError, match="Unknown method"):
         discover.params_for("StabMapp")
     with pytest.raises(ValueError, match="unknown category 'verticall'"):
         discover.params_for("totalVI", "verticall")

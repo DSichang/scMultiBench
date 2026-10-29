@@ -165,12 +165,12 @@ def test_parse_method_rejects_missing_or_stray_atac():
 
 # --- P09: one validator per token family -------------------------------------
 
-def test_get_unknown_method_has_did_you_mean():
+def test_get_unknown_method_names_find_methods():
     import pytest
     with pytest.raises(KeyError) as e:
         registry.get("StabMapp")
     msg = str(e.value)
-    assert "Did you mean StabMap" in msg and "mtb.find_methods()" in msg
+    assert msg == "'Unknown method StabMapp. mtb.find_methods() shows all methods.'"
     with pytest.raises(KeyError, match="Unknown method zzz"):
         registry.check_method("zzz")
     assert registry.check_method("StabMap") == "StabMap"

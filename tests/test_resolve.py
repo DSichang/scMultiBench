@@ -101,7 +101,7 @@ def test_inputs_for_protein_alias_and_bad_category(tmp_path):
     with pytest.raises(ValueError, match=r"^Unknown modality proteinx\."):
         resolve.inputs_for("D11", "vertical", "totalVI", modalities=["rna", "proteinx"],
                            data_path=tmp_path)
-    with pytest.raises(KeyError, match="Did you mean StabMap"):
+    with pytest.raises(KeyError, match="Unknown method"):
         resolve.inputs_for("D11", "cross", "StabMapp", data_path=tmp_path)
 
 

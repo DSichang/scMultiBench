@@ -133,14 +133,13 @@ def test_unknown_metric_raises_with_available():
     assert "The table has ARI, NMI and iF1." in str(e.value)
 
 
-def test_unknown_method_raises_with_suggestion():
+def test_unknown_method_lists_the_table():
     long = _three().replace({"method": {"A": "scJoint"}})
     tbl = bubble._build_table(long, methods=["scjoint"])      # case-insensitive: ok
     assert tbl.methods == ["scJoint"]
     with pytest.raises(ValueError) as e:
         bubble._build_table(long, methods=["scjiont"])
-    assert str(e.value) == ("Unknown method scjiont. Did you mean scJoint? The table has "
-                            "B, C and scJoint.")
+    assert str(e.value) == "Unknown method scjiont. The table has B, C and scJoint."
 
 
 def test_metric_alias_resolves():

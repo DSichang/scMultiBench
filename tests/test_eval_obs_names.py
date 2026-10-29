@@ -92,11 +92,9 @@ def test_unknown_column_keeps_its_error():
         name = kw[what]
         with pytest.raises(ValueError) as e:
             mtb.evaluate(a, metrics=METRICS, **kw)
-        # Y19 (r3): cell_type gets the did-you-mean
-        hint = " Did you mean 'celltype'?" if "cell_type" in name else ""
         assert str(e.value) == (
             f"{what}={name!r} is neither an obs column of the AnnData (obs columns: "
-            f"['celltype', 'donor']) nor an existing file.{hint}")
+            f"['celltype', 'donor']) nor an existing file.")
 
 
 def test_a_file_named_like_a_prefixed_column_is_still_read(tmp_path, monkeypatch):
@@ -146,20 +144,3 @@ def test_a_10x_suffix_on_one_side_names_its_fix():
     back = pd.Series(list("abab"), index=ids)
     with pytest.raises(ValueError, match=r"removesuffix\('-1'\)"):
         io._align_vector(back, [i[:-2] for i in ids], what="labels", column=None)
-
-
-def test_a_label_column_spelled_another_way_gets_a_did_you_mean():
-    # Y19 (r3): letter case and underscores, in evaluate as in export_dataset
-    import anndata as ad
-    import numpy as np
-    import pandas as pd
-    a = ad.AnnData(np.zeros((6, 2)), obs=pd.DataFrame({"celltype": list("ababab")},
-                                                     index=[f"c{i}" for i in range(6)]))
-    a.obsm["X_emb"] = np.random.default_rng(0).normal(size=(6, 3))
-    for wrong in ("Celltype", "cell_type"):
-        with pytest.raises(ValueError, match=r"Did you mean 'celltype'\?$"):
-            mtb.evaluate(a, labels=wrong, metrics=["ARI"])
-        with pytest.raises(ValueError, match=r"Did you mean 'celltype'\?$"):
-            mtb.io.export_dataset(a, "unused", labels=wrong)
-
-

@@ -10,7 +10,6 @@ from pathlib import Path
 
 import yaml
 
-from .. import _text
 from .schema import (ArgSpec, MethodSpec, OutputSpec, Variant, base_modality,
                      is_label_role)
 
@@ -172,19 +171,8 @@ def method_of(name) -> str | None:
     return None
 
 
-def unknown_method_message(method_id, hint: str | None = None) -> str:
-    """``"Unknown method X. Did you mean Y? ... shows all methods."``; ``hint``
-    defaults to :func:`closest_method`."""
-    if hint is None:
-        # every id the name starts (Seurat: Seurat_v3, Seurat_v4, Seurat_v5, Seurat_WNN)
-        low = str(method_id).lower()
-        prefixed = [s.id for s in load() if s.id.lower().startswith(low)] if low else []
-        hint = (_text._and_list(prefixed, "or") if len(prefixed) > 1
-                else closest_method(method_id))
-    return (f"Unknown method {method_id}."
-            + (f" Did you mean {hint}?" if hint else "")
-            + " mtb.find_methods()"
-            + " shows all methods.")
+def unknown_method_message(method_id) -> str:
+    return f"Unknown method {method_id}. mtb.find_methods() shows all methods."
 
 
 def closest_method(method_id: str) -> str | None:
@@ -207,20 +195,13 @@ def check_id_list(value, name: str):
 #: The four integration categories.
 CATEGORIES = ("cross", "diagonal", "mosaic", "vertical")
 
-#: assay names a category= gets by mistake (lower case, no dash or space)
-_ASSAY_TOKENS = ("citeseq", "multiome", "10xmultiome", "sharesesq", "shareseq",
-                 "teaseq", "asapseq", "dogmaseq", "snareseq")
-
 
 def check_category(category: str | None) -> str | None:
     """Validate a category token; ``None`` passes through. An unknown one raises
     ``ValueError`` listing the four."""
     if category is None or (isinstance(category, str) and category in CATEGORIES):
         return category
-    # an assay name is the usual slip: say where it belongs
-    assay = ". CITE-seq and 10x Multiome are vertical." if str(category).lower().replace(
-        "-", "").replace(" ", "") in _ASSAY_TOKENS else ""
-    raise ValueError(f"unknown category {category!r}; valid: {list(CATEGORIES)}{assay}")
+    raise ValueError(f"unknown category {category!r}; valid: {list(CATEGORIES)}")
 
 
 @functools.lru_cache(maxsize=1)

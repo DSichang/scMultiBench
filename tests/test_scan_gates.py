@@ -145,7 +145,7 @@ def test_scan_methods_filter_and_unknown_raises():
     assert set(df["method"]) == {"Matilda"} and len(df) >= 1
     with pytest.raises(KeyError, match="Unknown method Nope"):
         full_scan("D11", "vertical", methods=["Nope"])
-    with pytest.raises(KeyError, match="Did you mean StabMap"):
+    with pytest.raises(KeyError, match="Unknown method"):
         full_scan("D11", "cross", methods=["StabMapp"])
 
 
@@ -237,7 +237,7 @@ def test_scan_has_the_command_with_a_placeholder_out_dir():
 def test_run_all_dry_run_unknown_method_still_keyerror():
     with pytest.raises(KeyError, match="Unknown method"):
         mtb.scan("D28", "diagonal", methods=["NotAMethod"], verbose=False)
-    with pytest.raises(KeyError, match="Did you mean StabMap"):
+    with pytest.raises(KeyError, match="Unknown method"):
         mtb.scan("D11", "cross", methods=["StabMapp"], verbose=False)
 
 

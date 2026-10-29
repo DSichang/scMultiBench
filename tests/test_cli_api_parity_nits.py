@@ -23,7 +23,7 @@ ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 
 
 def test_inputs_for_plain_typos_keep_their_messages():
-    with pytest.raises(KeyError, match="Did you mean StabMap"):
+    with pytest.raises(KeyError, match="Unknown method"):
         mtb.engine.resolve.inputs_for("D52", "cross", "StabMapp")
     with pytest.raises(ValueError, match="unknown category 'cros'; valid"):
         mtb.engine.resolve.inputs_for("D52", "cros", "StabMap")

@@ -211,12 +211,9 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, as_written=False,
         if in_mod is not None:
             return in_mod
         if not Path(x).is_file():
-            from ..engine.ingest import _case_hint
-            choices = _obs_choices(adata)
             raise ValueError(
                 f"{what}={x!r} is neither an obs column of the {type(adata).__name__} "
-                f"(obs columns: {choices}) nor an existing file."
-                + _case_hint(x.removeprefix("obs:"), choices))
+                f"(obs columns: {_obs_choices(adata)}) nor an existing file.")
     if adata is None and io._names_no_file(x):    # an obs column name, and no obs
         raise FileNotFoundError(
             f"{what}={x!r} is not a file, and the embedding has no obs. Pass the values, as "

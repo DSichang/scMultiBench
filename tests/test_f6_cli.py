@@ -33,8 +33,7 @@ _DATA = Path(mtb.__file__).resolve().parent.parent / "data"
 def test_check_method_is_short_sentences():
     with pytest.raises(KeyError) as e:
         registry.check_method("stabmapp")
-    assert e.value.args[0] == ("Unknown method stabmapp. Did you mean StabMap? "
-                               "mtb.find_methods() shows all methods.")
+    assert e.value.args[0] == "Unknown method stabmapp. mtb.find_methods() shows all methods."
     with pytest.raises(KeyError) as e:
         registry.check_method("zzz")
     assert e.value.args[0] == "Unknown method zzz. mtb.find_methods() shows all methods."

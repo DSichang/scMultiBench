@@ -16,6 +16,6 @@ def test_flat_params_show_the_nested_form():
                             "params={'Matilda': {'epochs': 3}}.")
 
 
-def test_a_nested_dict_with_an_unknown_method_still_gets_the_did_you_mean():
-    with pytest.raises(KeyError, match="Did you mean Matilda"):
+def test_a_nested_dict_with_an_unknown_method_is_refused():
+    with pytest.raises(KeyError, match="Unknown method"):
         mtb.scan("D11", "vertical", params={"Matlida": {"epochs": 3}}, verbose=False)

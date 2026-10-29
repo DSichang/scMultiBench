@@ -90,7 +90,7 @@ def test_ambiguity_is_a_valueerror_listing_the_folder(tmp_path):
 def test_labels_for_validates_method_and_returns_absolute(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     _touch(tmp_path / "data" / "D11", ["rna.h5", "adt.h5", "cty.csv"])
-    with pytest.raises(KeyError, match="Did you mean Matilda"):
+    with pytest.raises(KeyError, match="Unknown method"):
         resolve.labels_for("D11", method="Matlida", data_path="data")
     got = resolve.labels_for("D11", data_path="data")
     assert list(got) == ["cty"] and os.path.isabs(got["cty"])

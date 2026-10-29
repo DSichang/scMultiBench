@@ -165,22 +165,13 @@ def _canonical_dataset_ids(category, datasets, base) -> list:
 
 
 def _check_methods(wanted: list, present) -> None:
-    """``KeyError`` with a did-you-mean hint for a method that is neither a
-    method id nor in the frame: an empty frame would hide the typo."""
+    """``KeyError`` for a method that is neither a method id nor in the frame:
+    an empty frame would hide the typo."""
     present = list(present)
     by_lower = {str(m).lower() for m in present}
     for m in wanted:
-        cid = catalog._canonical_id(m)
-        if cid.lower() in by_lower:
-            continue
-        try:
+        if catalog._canonical_id(m).lower() not in by_lower:
             catalog._canonical_id(m, strict=True)
-        except KeyError:
-            import difflib
-            pool = sorted(set(present) | set(catalog._registry_ids()))
-            hint = difflib.get_close_matches(str(m), pool, n=1, cutoff=0.6)
-            raise KeyError(registry.unknown_method_message(m, hint[0] if hint else "")
-                           ) from None
 
 
 def _of_methods(df, wanted) -> pd.DataFrame:

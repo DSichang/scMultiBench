@@ -284,14 +284,14 @@ def test_plot_unknown_names_are_one_sentence_form(tmp_path, capsys):
     long = pd.DataFrame({'metric': ['ARI', 'NMI'] * 2, 'value': [0.5, 0.6, 0.4, 0.3], 'method': ['A', 'A', 'B', 'B'], 'dataset': 'D11', 'category': 'vertical'})
     with pytest.raises(ValueError) as e:
         _build_table(long, methods=['Matlida'])
-    assert str(e.value) == 'Unknown method Matlida. Did you mean Matilda? The table has A and B.'
+    assert str(e.value) == 'Unknown method Matlida. The table has A and B.'
     csv = tmp_path / 'long.csv'
     long.to_csv(csv, index=False)
     empty = tmp_path / 'empty.csv'
     long.iloc[:0].to_csv(empty, index=False)
     with pytest.raises(KeyError) as e:
         mtb.load_results('vertical', methods=['Matlida'])
-    assert e.value.args[0] == 'Unknown method Matlida. Did you mean Matilda? mtb.find_methods() shows all methods.'
+    assert e.value.args[0] == 'Unknown method Matlida. mtb.find_methods() shows all methods.'
 
 
 @needs_git

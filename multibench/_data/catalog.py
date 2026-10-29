@@ -30,7 +30,7 @@ def _canonical_id(name: str, *, strict: bool = False) -> str:
     """The method id for any known spelling (``"MOFA+"`` -> ``"MOFA2"``,
     ``"totalvi"`` -> ``"totalVI"``): the alias table, then a case-folded match
     of the ids after collapsing spaces and dots to ``_``; an unknown name comes
-    back folded, or with ``strict=True`` raises the did-you-mean ``KeyError``."""
+    back folded, or with ``strict=True`` raises ``KeyError``."""
     key = str(name).strip().lower()
     if key in _ALIASES:
         return _ALIASES[key]
@@ -42,9 +42,7 @@ def _canonical_id(name: str, *, strict: bool = False) -> str:
     if folded.lower() in by_lower:
         return by_lower[folded.lower()]
     if strict:
-        import difflib
-        hint = difflib.get_close_matches(folded, ids, n=1, cutoff=0.6)
-        raise KeyError(registry.unknown_method_message(name, hint[0] if hint else ""))
+        raise KeyError(registry.unknown_method_message(name))
     return folded
 
 

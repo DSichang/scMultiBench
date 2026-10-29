@@ -171,12 +171,9 @@ def test_x83_read_reads_an_embedding_file(tmp_path):
     assert a.n_obs == 10 and a.obsm["X_emb"].shape == (10, 3)
 
 
-def test_x90_x91_hints_for_an_assay_and_a_prefix():
-    with pytest.raises(ValueError, match=r"CITE-seq and 10x Multiome are vertical\.$"):
+def test_an_assay_name_is_an_unknown_category():
+    with pytest.raises(ValueError, match=r"^unknown category 'CITE-seq'; valid: \["):
         mtb.find_methods(category="CITE-seq")
-    with pytest.raises(KeyError) as e:
-        mtb.method_info("Seurat")
-    assert all(s in str(e.value) for s in ("Seurat_v3", "Seurat_v5", "Seurat_WNN"))
 
 
 # X67: labels_for without a method warns once per dataset and category
@@ -216,16 +213,16 @@ def test_export_dataset_given_a_path():
 
 
 # Y18: one file "has", once per file
-# Y19: a label column that differs in letter case gets a did-you-mean
-def test_label_column_case_did_you_mean(tmp_path):
+# a label column that differs in letter case lists the columns
+def test_label_column_in_another_case(tmp_path):
     import numpy as np
     import pandas as pd
     ad = pytest.importorskip("anndata")
     a = ad.AnnData(np.ones((4, 3)), obs=pd.DataFrame({"celltype": list("abab")},
                                                      index=[f"c{i}" for i in range(4)]))
-    with pytest.raises(KeyError, match=r"Did you mean 'celltype'\?"):
+    with pytest.raises(KeyError, match=r"available: \['celltype'\]"):
         mtb.io.export_dataset(a, tmp_path / "A", labels="obs:Celltype")
-    with pytest.raises(ValueError, match=r"Did you mean 'celltype'\?$"):
+    with pytest.raises(ValueError, match=r"Columns: celltype\.$"):
         mtb.io.export_dataset(a, tmp_path / "B", labels="Celltype")
 
 

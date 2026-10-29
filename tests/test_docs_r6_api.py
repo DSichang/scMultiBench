@@ -44,7 +44,7 @@ def test_changes_page_quotes_the_live_texts():
     text = _flat("changes.md")
     spec = registry.get("SCALEX")
     for shown in (
-            registry.unknown_method_message("stabmap"),
+            registry.unknown_method_message("scalexx"),
             schema.no_category_message("SCALEX", spec.wired_categories, "vertical"),
             resolve.UNUSED_BATCHES_CAVEAT.format(method="UINMF", used="1-2", n=3,
                                                  unused="Batch 3 is not used"),

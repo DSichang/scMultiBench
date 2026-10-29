@@ -80,12 +80,12 @@ def test_requested_method_with_no_variant_in_category_is_a_request_error(no_envs
     lambda: full_scan("NOPE", "vertical", data_path="/nonexistent/dir", methods=["StabMapp"],
                      out_dir="runs"),
 ])
-def test_unknown_method_raises_did_you_mean_before_filesystem(call):
+def test_unknown_method_raises_before_filesystem(call):
     """A typo'd id must not surface as FileNotFoundError for the dataset folder
     (the folder here does not exist either): KeyError comes first."""
     with pytest.raises(KeyError) as e:
         call()
-    assert "Did you mean StabMap" in str(e.value)
+    assert "Unknown method" in str(e.value)
 
 
 def test_scan_command_column_renders_for_out_dir():
@@ -108,12 +108,12 @@ def test_run_dry_run_mirrors_run_builder():
     assert "--epochs" in argv and argv[argv.index("--epochs") + 1] == "5"
     assert argv[argv.index("--save_path") + 1] == os.path.join(os.path.abspath("o"), "")
     assert not os.path.exists("o")                       # nothing created
-    with pytest.raises(KeyError, match="Did you mean"):
+    with pytest.raises(KeyError, match="Unknown method Matlda"):
         mtb.engine.runner.preview("Matlda", "vertical", inputs=inp, out_dir="o")[0]
 
 
 def test_run_all_params_unknown_method_before_io_and_dry_run_key_check():
-    with pytest.raises(KeyError, match="Did you mean Matilda"):
+    with pytest.raises(KeyError, match="Unknown method Matlda"):
         mtb.run("/nonexistent/NOPE", "vertical", out_dir="/tmp/unused",
                     params={"Matlda": {"epochs": 5}}, verbose=False)
     with pytest.raises(KeyError) as e:

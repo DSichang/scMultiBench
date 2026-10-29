@@ -891,15 +891,6 @@ def _mudata_selector(mdata, spec):
     return spec
 
 
-def _case_hint(col, columns) -> str:
-    """`` Did you mean 'celltype'?`` for a name that differs only in letter case
-    or in underscores (``cell_type``)."""
-    def key(name):
-        return str(name).lower().replace("_", "")
-    same = [str(c) for c in columns if key(c) == key(col) and str(c) != str(col)]
-    return f" Did you mean {same[0]!r}?" if len(same) == 1 else ""
-
-
 #: the warning for gene-activity ATAC written for vertical methods
 _VERTICAL_GAS = ("Vertical methods need peak ATAC, and this ATAC holds gene activity. "
                  "Export the ATAC as peaks.")
@@ -922,8 +913,7 @@ _ADATA_OBS = "the AnnData's obs"
 def _obs_column(obs, col, *, what, spec, where):
     if col not in obs.columns:
         raise KeyError(f"{what}={spec!r}: column {col!r} not in obs: searched {where}; "
-                       f"available: {list(obs.columns)}"
-                       + (f".{hint}" if (hint := _case_hint(col, obs.columns)) else ""))
+                       f"available: {list(obs.columns)}")
     return obs[col]
 
 
@@ -981,7 +971,7 @@ def _select_obs(data, spec, *, what):
         + ("mdata.obs" if mu else _ADATA_OBS)
         + (f". Columns: {', '.join(cols[:5])}"
            f"{f' and {len(cols) - 5:,} more' if len(cols) > 5 else ''}."
-           if cols else ", which has no columns.") + _case_hint(spec, cols))
+           if cols else ", which has no columns."))
 
 
 def _is_file_name(spec: str) -> bool:

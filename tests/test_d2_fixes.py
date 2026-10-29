@@ -86,11 +86,6 @@ def test_repeated_barcodes_in_another_order_are_refused(d28_like):
         W._cell_vector(s, "DD", folder.parent)
 
 
-def test_a_misspelt_method_in_other_letter_case_gets_a_hint():
-    with pytest.raises(KeyError, match=r"Unknown method scalexx\. Did you mean SCALEX\?"):
-        mtb.method_info("scalexx")
-
-
 def test_load_run_of_a_missing_folder_says_it_does_not_exist(tmp_path):
     with pytest.raises(FileNotFoundError, match=r"nothing does not exist\. Pass the out_dir"):
         mtb.load_run(tmp_path / "nothing")
