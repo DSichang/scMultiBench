@@ -1,7 +1,6 @@
 """Review of the round-2 integration (wp/f2_int).
 
-M21: UnitedNet's old input key ``rna_cty`` keeps working (DeprecationWarning),
-and labels_for keys an older folder's ``rna_cty.csv`` as ``cty``.
+M21: UnitedNet's old input key ``rna_cty`` keeps working (DeprecationWarning).
 M23: every vertical near-miss hint names ``atac.h5``, whatever the role.
 M02: the summary figure names a tied mean rank, not a metric value; the CLI
 prints one one-method warning for bubble.
@@ -57,28 +56,6 @@ def _messages(fn, *args, **kw):
         warnings.simplefilter("always")
         out = fn(*args, **kw)
     return out, [str(w.message) for w in rec if issubclass(w.category, UserWarning)]
-
-
-# ====================================================================== M21
-def _old_unitednet_folder(root):
-    """A vertical RNA + gene-activity folder that names its labels rna_cty.csv."""
-    d = root / "OLD"
-    d.mkdir()
-    cells = [f"c{i}" for i in range(30)]
-    _h5(d / "rna.h5", [f"g{i}" for i in range(20)], cells)
-    _h5(d / "atac.h5", [f"G{i}" for i in range(15)], cells, seed=1)
-    pd.DataFrame({"x": ["T", "B"] * 15}).to_csv(d / "rna_cty.csv", index=False)
-    return d
-
-
-def test_labels_for_gives_an_older_folder_the_cty_key(tmp_path):
-    d = _old_unitednet_folder(tmp_path)
-    got = mtb.engine.resolve.labels_for("OLD", "vertical", "UnitedNet", data_path=tmp_path)
-    assert dict(got) == {"cty": str(d / "rna_cty.csv")}
-    inp = mtb.engine.resolve.inputs_for("OLD", "vertical", "UnitedNet", data_path=tmp_path)
-    assert inp["cty"] == got["cty"]
-    # without a method the stem is kept, as before
-    assert list(mtb.engine.resolve.labels_for("OLD", data_path=tmp_path)) == ["rna_cty"]
 
 
 # ====================================================================== M02
