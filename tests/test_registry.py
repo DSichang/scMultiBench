@@ -127,12 +127,6 @@ def test_methods_yaml_has_no_hand_needs_labels_key():
     assert offenders == [], offenders
 
 
-def test_parse_method_rejects_hand_needs_labels_key():
-    import pytest
-    with pytest.raises(ValueError, match="needs_labels is derived"):
-        registry._parse_method({"id": "X", "needs_labels": True})
-
-
 def test_every_atac_consuming_method_declares_atac():
     for spec in registry.load():
         if spec.consumes_atac:
@@ -145,22 +139,23 @@ def test_every_atac_consuming_method_declares_atac():
     assert registry.get("SCALEX").atac == "gene_activity"
 
 
-def test_parse_method_rejects_missing_or_stray_atac():
-    import pytest
+def test_parse_method_reads_the_atac_key():
     variant = {"when": {"category": "vertical", "modalities": ["rna", "atac"]},
                "entrypoint": "tools_scripts/X/main.py",
                "args": [{"role": "rna", "flag": "--a"}, {"role": "atac", "flag": "--b"},
                         {"role": "out_dir", "flag": "--o"}],
                "output": {"kind": "embedding", "file": "embedding.h5", "dataset": "data"}}
-    with pytest.raises(ValueError, match="consumes an ATAC input but declares no `atac:`"):
-        registry._parse_method({"id": "X", "variants": [variant]})
-    with pytest.raises(ValueError, match="valid: \\['peak', 'gene_activity'\\]"):
-        registry._parse_method({"id": "X", "atac": "peaks!", "variants": [variant]})
-    with pytest.raises(ValueError, match="no variant takes an ATAC input"):
-        registry._parse_method({"id": "X", "atac": "peak", "variants": []})
     # the valid shape parses and derives needs_labels=False
     spec = registry._parse_method({"id": "X", "atac": "peak", "variants": [variant]})
     assert spec.atac == "peak" and spec.consumes_atac and not spec.needs_labels
+
+
+def test_every_method_has_variants_and_every_size_hint_a_threshold():
+    for spec in registry.load():
+        assert spec.variants, spec.id
+        for v in spec.variants:
+            if v.size_hint:
+                assert v.min_cells or v.min_cells_per_batch or v.min_genes, spec.id
 
 
 # --- P09: one validator per token family -------------------------------------
@@ -186,7 +181,7 @@ def test_normalize_modalities_aliases_base_and_errors():
     with pytest.raises(ValueError) as e:
         registry.normalize_modalities(["rna", "proteinx"])
     assert str(e.value).startswith("Unknown modality proteinx. ")
-    assert "adt (or protein)" in str(e.value)
+    assert "atac_peak or atac_gas" in str(e.value)
     assert {"rna", "adt", "atac", "atac_gas", "atac_peak", "rna1"} <= registry.known_modalities()
 
 

@@ -19,7 +19,7 @@ from tests.conftest import full_scan
 
 @pytest.fixture(autouse=True)
 def _linux_no_envs(monkeypatch):
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
+    monkeypatch.setattr(envs, "host_system", lambda: None)
     monkeypatch.setattr(envs, "installed_envs", lambda conda=None: [])
 
 

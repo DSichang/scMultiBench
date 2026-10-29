@@ -94,9 +94,7 @@ def test_off_linux_messages_say_to_make_the_commands_on_the_linux_machine(
     import shlex
     from multibench import workflow as W
     from multibench.engine import envs, runner
-    monkeypatch.setattr(envs, "host_platform_problem",
-                        lambda: "method environments are linux-64 conda envs (packed "
-                                "archives + lockfiles); this host is darwin/arm64")
+    monkeypatch.setattr(envs, "host_system", lambda: "macOS")
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     monkeypatch.setattr(runner.envs, "installed_envs", lambda conda=None: [])
 
@@ -108,8 +106,7 @@ def test_off_linux_messages_say_to_make_the_commands_on_the_linux_machine(
         mtb.engine.runner.run("totalVI", "vertical", inputs=mtb.engine.resolve.inputs_for("D11", "vertical", "totalVI"),
                 out_dir=str(tmp_path / "out"))
     msg = str(e.value)
-    assert ("Run this call on a Linux machine, such as Colab. mtb.scan shows the method's "
-            "command here.") in msg
+    assert msg.endswith("Run this call on a Linux machine, such as Colab.")
     assert "run it on a Linux machine" not in msg
 
 

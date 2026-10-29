@@ -2,7 +2,7 @@
 dry run without --out-dir, plain env/evaluate texts, literal blocks in
 docstrings, and the method-scripts commit in fetch/config/run records.
 
-Every platform- or GPU-dependent test pins ``envs.host_platform_problem`` /
+Every platform- or GPU-dependent test pins ``envs.host_system`` /
 ``envs.host_has_gpu``, so it holds on Linux and macOS alike.
 """
 import inspect
@@ -26,15 +26,13 @@ from multibench import workflow as W
 from multibench.engine import envs, registry, runner
 
 ROOT = Path(__file__).resolve().parents[1]
-DARWIN = ("method environments are linux-64 conda envs (packed archives + "
-          "lockfiles); this host is darwin/arm64")
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 GPU_VALUES = {"required", "used when present", "not used", "unknown"}
 
 
 @pytest.fixture
 def off_linux(monkeypatch):
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: DARWIN)
+    monkeypatch.setattr(envs, "host_system", lambda: "macOS")
 
 
 # ====================================================================== M14
@@ -72,7 +70,7 @@ def test_runtime_note_mentions_the_cpu_only_for_gpu_methods():
 
 
 # ====================================================================== M26
-PLAIN_REFUSAL = ("Method environments run only on Linux, and this computer runs macOS. "
+PLAIN_REFUSAL = ("Methods run only on Linux, and this computer runs macOS. "
                  "Run the install on a Linux machine, such as Colab. {force} tries anyway.")
 
 

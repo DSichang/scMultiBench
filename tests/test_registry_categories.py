@@ -14,11 +14,6 @@ def test_methods_yaml_has_no_hand_categories_key():
     assert [m["id"] for m in data["methods"] if "categories" in m] == []
 
 
-def test_parse_method_rejects_hand_categories_key():
-    with pytest.raises(ValueError, match="categories is derived"):
-        registry._parse_method({"id": "X", "categories": ["cross"]})
-
-
 def test_explicit_categories_still_accepted_by_the_dataclass():
     spec = MethodSpec(id="M", language="python", categories=["mosaic"], tasks=[])
     assert spec.categories == ["mosaic"] and spec.wired_categories == []

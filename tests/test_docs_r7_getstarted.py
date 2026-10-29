@@ -14,8 +14,6 @@ from multibench.engine import envs
 from multibench.engine import runner as R
 from tests.test_docs_r4 import _read, needs_docs
 
-DARWIN = ("method environments are linux-64 conda envs (packed archives + lockfiles); "
-          "this host is darwin/arm64")
 
 
 def _heading(needle):
@@ -52,7 +50,7 @@ def test_missing_env_heading_quotes_the_run_error(tmp_path, monkeypatch):
 @needs_docs
 def test_linux_only_heading_quotes_the_run_refusal(tmp_path, monkeypatch):
     heading = _heading("Linux")
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: DARWIN)
+    monkeypatch.setattr(envs, "host_system", lambda: "macOS")
     monkeypatch.setattr(R.envs, "installed_envs", lambda conda=None: ["base"])
     err = _run_totalvi(tmp_path)
     assert _matches(heading, err), (heading, str(err))

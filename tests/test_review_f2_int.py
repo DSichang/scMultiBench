@@ -244,7 +244,7 @@ def test_missing_script_in_a_folder_that_is_not_a_git_checkout(tmp_path, monkeyp
     why = W._missing_script(variant, method="GLUE")
     assert "missing from the reference checkout" in why
     assert "git pull" not in why
-    assert "not a git checkout" in why and "git clone --depth 1 https://github.com/PYangLab/scMultiBench.git <folder>" in why
+    assert "not a git checkout; move it away" in why
     notes = runner.script_notes(registry.get("GLUE"), variant, tmp_path)
     assert any("not a git checkout" in n for n in notes) and not any(
         "git pull" in n for n in notes)

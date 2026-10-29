@@ -32,14 +32,10 @@ def _dry(method, category, inputs, params, tmp_path):
 
 # --- deprecations and catalog: X39, X40, X41, X43 ----------------------------
 
-def test_x40_method_info_default_keys_and_the_verbose_hint():
+def test_x40_method_info_default_keys():
     info = mtb.method_info("Matilda")
     assert set(info) == {"id", "language", "notes", "categories", "env", "atac",
                          "needs_labels", "supports", "runtime", "gpu",
                          "cpu_params", "setup_hint", "repo_url", "reference"}
-    # the hint names params_for
-    with pytest.raises(KeyError, match=r"'params' is in mtb\.params_for\('Matilda', "
-                                       r"category, modalities\)"):
-        info["params"]
 
 

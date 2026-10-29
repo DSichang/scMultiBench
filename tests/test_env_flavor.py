@@ -51,7 +51,7 @@ def fake_tables(monkeypatch):
     monkeypatch.setattr(envs, "packed_layers", lambda: {})
     monkeypatch.setattr(envs, "packed_manifest", lambda: dict(MANIFEST))
     monkeypatch.setattr(envs, "packed_sizes", lambda: {k: dict(v) for k, v in SIZES.items()})
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
+    monkeypatch.setattr(envs, "host_system", lambda: None)
 
 
 @pytest.fixture
@@ -207,12 +207,10 @@ def test_install_packed_cpu_falls_back_with_one_warning(envs_dir, tmp_path, monk
                                                         fake_tables):
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)   # 'auto' must mean cpu here, even on a GPU host
     fetched = _fetch(monkeypatch, _tiny_archive(tmp_path / "a.tar.gz"))
-    # no CPU key at all
-    with pytest.warns(UserWarning) as rec:
+    # no CPU key at all: one archive for both, nothing to warn about
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
         assert envs.install_packed("scmb_r", flavor="cpu") is True
-    assert len(rec) == 1
-    assert str(rec[0].message) == ("scmb_r has a single build (the same archive for CPU "
-                                   "and GPU hosts); installing it (0.9 GB)")
     assert fetched == ["https://x/scmb_r.tar.gz"]
     # one archive for CPU and GPU hosts: recorded as a single build (review of wp/f4_int)
     assert (envs_dir / "scmb_r" / envs.FLAVOR_FILE).read_text() == "single\n"
@@ -223,13 +221,12 @@ def test_install_packed_cpu_falls_back_with_one_warning(envs_dir, tmp_path, monk
         assert envs.install_packed("scmb_torch", flavor="auto") is True
     assert len(rec) == 1
     assert str(rec[0].message) == (
-        "no CPU archive for scmb_torch; installing the GPU build (4.5 GB) - "
-        "the CPU archive scmb_torch-cpu is not published yet")
+        "No CPU build of scmb_torch yet; installing the GPU build (4.5 GB).")
     assert fetched[-1] == "https://x/scmb_torch.tar.gz"
     # an unmeasured GPU archive prints '?' for the size, never a guess
     monkeypatch.setattr(envs, "packed_sizes", lambda: {})
-    with pytest.warns(UserWarning, match=re.escape("installing it (?)")):
-        envs.install_packed("scmb_r", envs_dir=tmp_path / "o2", flavor="cpu")
+    with pytest.warns(UserWarning, match=re.escape("installing the GPU build (?)")):
+        envs.install_packed("scmb_torch", envs_dir=tmp_path / "o2", flavor="cpu")
 
 
 def test_install_packed_gpu_never_warns(envs_dir, tmp_path, monkeypatch, fake_tables):
@@ -242,7 +239,7 @@ def test_install_packed_gpu_never_warns(envs_dir, tmp_path, monkeypatch, fake_ta
 
 
 def test_install_packed_invalid_flavor_before_anything(envs_dir, monkeypatch):
-    monkeypatch.setattr(envs, "host_platform_problem",
+    monkeypatch.setattr(envs, "host_system",
                         lambda: pytest.fail("platform checked before the flavour"))
     serve_archives(monkeypatch, lambda url: pytest.fail("downloaded"))
     with pytest.raises(ValueError) as e:

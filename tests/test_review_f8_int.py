@@ -164,8 +164,7 @@ def test_the_no_conda_error_is_plain(monkeypatch):
     monkeypatch.setattr(envs.shutil, "which", lambda _: None)
     e = _raised(envs._run_all, [["mamba", "create"]])
     assert isinstance(e, RuntimeError)
-    assert str(e).startswith("Neither conda nor mamba is on this machine. Method "
-                             "environments cannot be built here.")
+    assert str(e) == "Conda is not installed on this computer. Install conda first."
     _plain(str(e))
 
 

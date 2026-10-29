@@ -108,11 +108,8 @@ def run_mode(env: str) -> tuple[str, Path | None]:
             f"{RUN_MODES}")
     prefix = envs.env_prefix(env)
     if forced == "prefix" and prefix is None:
-        raise OSError(
-            f"{RUN_MODE_VAR}=prefix but env {env!r} has no prefix under "
-            f"envs_dir {config.envs_dir} (and conda reports none) - "
-            f"run mtb.env.install([<method>]) to unpack it, or "
-            f"point MULTIBENCH_ENVS_DIR / mtb.config.envs_dir at it")
+        raise OSError(f"{RUN_MODE_VAR}=prefix, but {env} is not in {config.envs_dir}. "
+                      f"Run mtb.env.install([<method>]).")
     if forced == "conda":
         return "conda", None
     return ("prefix", prefix) if prefix is not None else ("conda", None)
@@ -198,32 +195,16 @@ def _repo_root_no_fetch() -> Path:
     return scripts._scripts_checkout() or Path(config.repo_path)
 
 
-#: The command that fetches the method scripts by hand, ahead of a run.
-FETCH_SCRIPTS_CMD = scripts.FETCH_SCRIPTS
-
-
-def linux_only_sentence() -> str | None:
-    """``"Methods run only on Linux, and this computer runs macOS."``, or
-    ``None`` on Linux."""
-    problem = envs.host_platform_problem()
-    if not problem:
-        return None
-    return (f"Methods run only on Linux, and this computer runs "
-            f"{envs._host_system_name(problem)}.")
+#: workflow's name for :func:`envs.linux_only_text`
+linux_only_sentence = envs.linux_only_text
 
 
 def missing_script_fix(repo) -> str:
-    """What to do about a method script missing from the checkout at ``repo``.
-
-    A folder that is not a git checkout (often one made by hand for GLUE's
-    annotation) blocks the fetch until it is moved away.
-    """
+    """What to do about a method script missing from the checkout at ``repo``."""
     if scripts.scripts_commit(repo) is not None:
         return ("update it with git pull, or delete it so the next run fetches a "
                 "fresh copy")
-    return (f"that folder is not a git checkout. If you made it by hand, move out "
-            f"the files you added, delete it, run {FETCH_SCRIPTS_CMD} and put the "
-            f"files back; otherwise copy a full scripts checkout there")
+    return "that folder is not a git checkout; move it away so the next run fetches the scripts"
 
 
 #: How the note that no method scripts are here begins; ``mtb.scan`` finds it by this text.
@@ -245,7 +226,6 @@ def provide_script_files(spec, variant, repo: Path) -> None:
     (GLUE's annotation) a script reads from its own folder, when missing.
     A file already there is left alone."""
     import shutil
-    import urllib.request
 
     folder = repo / Path(variant.entrypoint).parent
     for name in variant.helpers:
@@ -258,15 +238,7 @@ def provide_script_files(spec, variant, repo: Path) -> None:
             continue
         part = dest.with_name(dest.name + ".partial")
         try:
-            size = None
-            try:
-                with urllib.request.urlopen(urllib.request.Request(item["url"], method="HEAD"),
-                                            timeout=60) as r:
-                    size = int(r.headers.get("Content-Length") or 0) or None
-            except OSError:
-                pass
-            envs.download_archive([item["url"]], part,
-                                  label=f"{item['file']} for {spec.id}", total=size)
+            envs.download_archive([item["url"]], part, label=f"{item['file']} for {spec.id}")
             part.rename(dest)
         finally:
             part.unlink(missing_ok=True)
@@ -300,7 +272,7 @@ def script_notes(spec, variant, repo: Path) -> list[str]:
         elif not scripts.scripts_folder_problem(repo):      # else preview() names it
             notes.append(f"{SCRIPTS_NOT_HERE}{repo}. The first real run clones "
                          f"PYangLab/scMultiBench with git. On a host without network, "
-                         f"run {FETCH_SCRIPTS_CMD} first.")
+                         f"run {scripts.FETCH_SCRIPTS} first.")
     return notes
 
 
@@ -532,10 +504,8 @@ def _argv(variant, method: str, values: dict, out_str: str, repo: Path,
 def unknown_params_error(method: str, unknown: list, allowed: set) -> KeyError:
     """The error for ``params`` keys a variant does not accept (``run`` and
     ``mtb.run`` say the same)."""
-    if not allowed:
-        return KeyError(f"{method} does not accept {unknown}; {method} takes no "
-                        f"hyperparameters (its script hardcodes them).")
-    return KeyError(f"{method} does not accept {unknown}; it accepts {sorted(allowed)}.")
+    return KeyError(f"{method} does not accept {unknown}; it accepts "
+                    f"{sorted(allowed) or 'no parameters'}.")
 
 
 def check_params(method: str, variant, params: dict | None) -> None:
@@ -695,7 +665,7 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     inputs_dir = out / "inputs"
     # every input-format check before anything is written or fetched
     plan = _plan_inputs(variant, inputs, inputs_dir, convert=True, real=True)
-    repo = _fetch_scripts()
+    repo = scripts.ensure_repo()
     provide_script_files(spec, variant, repo)
     out.mkdir(parents=True, exist_ok=True)
     if _modality_roles(inputs):
@@ -728,8 +698,7 @@ def _check_env(method: str, env_name: str) -> None:
     linux_only = linux_only_sentence()
     if linux_only:
         raise envs.LinuxOnlyError(
-            f"{linux_only} Run this call on a Linux machine, such as Colab. mtb.scan shows the "
-            f"method's command here.")
+            f"{linux_only} Run this call on a Linux machine, such as Colab.")
     have = envs.installed_envs()
     if env_name not in have:
         # conda's env list is cached per process: probe once more
@@ -829,18 +798,4 @@ def _prepared_note(plan: dict, out_str: str, method: str) -> str | None:
         return None
     that = "that file" if len(files) == 1 else "those files"
     return (f"{method} reads {', '.join(files)}. mtb.run writes {that} first, so "
-            f"start {method} with mtb.run. The printed command alone fails in a job "
-            f"script.")
-
-
-def _fetch_scripts() -> Path:
-    """``scripts.ensure_repo``; a failed clone raises ``RuntimeError`` naming
-    the offline route."""
-    try:
-        return Path(scripts.ensure_repo())
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        raise RuntimeError(
-            f"could not clone the method scripts (PYangLab/scMultiBench) into "
-            f"{Path(config.repo_path)}: {e}. On a host without network, fetch them first on a "
-            f"connected machine with {FETCH_SCRIPTS_CMD} and copy the folder, or "
-            f"point repo_path at an existing checkout") from e
+            f"start {method} with mtb.run.")

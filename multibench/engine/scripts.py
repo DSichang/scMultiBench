@@ -152,31 +152,15 @@ def scripts_folder_problem(repo=None) -> str | None:
     p = Path(config.repo_path if repo is None else repo)
     if any((q / "tools_scripts").is_dir() for q in (p, _settings._ROOT)) or _fillable(p):
         return None
-    where = "MULTIBENCH_REPO_PATH or mtb.config.repo_path"
-    return (f"{p} holds other files and no method scripts. Set {where} to an empty "
-            f"or new folder; the first run fetches the scripts into it. If the folder is "
-            f"left over from an earlier fetch, you can remove it instead")
+    return (f"{p} holds other files and no method scripts. Set mtb.config.repo_path to "
+            f"an empty or new folder")
 
 
 def ensure_repo(path=None):
-    """Return a directory that contains ``tools_scripts/``, provisioning it if needed.
-
-    Resolution order: the given (or configured) ``repo_path``; the package root
-    itself (the merged-repository layout, where ``tools_scripts/`` sits next to
-    ``multibench/``); otherwise a one-time shallow fetch of the public
-    scMultiBench repository into the configured location, so methods run on a
-    fresh machine or Colab, where the package does not carry the upstream
-    method scripts.
-
-    The location may be an existing empty folder: it is filled in place and
-    keeps its owner and permissions. A folder that holds other files is
-    refused (:func:`scripts_folder_problem`); nothing in it is deleted.
-
-    ``$MULTIBENCH_SCRIPTS_REF`` names a commit or tag: a fetch
-    checks it out instead of the default branch, and scripts already present
-    must be at it (``RuntimeError`` otherwise). A failed fetch raises
-    ``RuntimeError`` naming the offline route, and leaves nothing behind.
-    """
+    """A folder with ``tools_scripts/``: ``path`` (default ``repo_path``), the
+    package root, else a shallow clone into ``path``. An empty folder is filled
+    in place; one with other files is refused. ``$MULTIBENCH_SCRIPTS_REF``
+    pins the commit; a failed fetch raises ``RuntimeError`` and leaves nothing."""
     ref = os.environ.get(SCRIPTS_REF_VAR) or None
     p = Path(path) if path else config.repo_path
     for have in (p, _settings._ROOT):
@@ -228,9 +212,6 @@ def _clone(part: Path, ref: str | None) -> None:
                 (part / ".git" / _REF_RECORD).write_text(ref + "\n")
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         shutil.rmtree(part, ignore_errors=True)
-        # run's FAIL line shows the last 200 characters of an error: each
-        # text keeps its subject within them ("RuntimeError: " in front, and
-        # with a ref of up to 40 characters, a full commit SHA)
         if ref and not isinstance(e, FileNotFoundError):
             raise RuntimeError(
                 f"Could not fetch the method scripts at {ref!r}. There is no network, "

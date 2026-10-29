@@ -15,9 +15,7 @@ from multibench.engine import envs
 
 def test_off_linux_the_requested_methods_error_counts_the_rows_without_files(
         tmp_path, monkeypatch):
-    monkeypatch.setattr(envs, "host_platform_problem",
-                        lambda: "method environments are linux-64 conda envs (packed "
-                                "archives + lockfiles); this host is darwin/arm64")
+    monkeypatch.setattr(envs, "host_system", lambda: "macOS")
     d = tmp_path / "DG"
     d.mkdir()
     for f in ("rna.h5", "atac_gas.h5", "rna_cty.csv", "atac_cty.csv"):

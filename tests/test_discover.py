@@ -55,17 +55,6 @@ def test_find_methods_modalities_rna_ubiquitous():
         assert m in ids
 
 
-def test_find_methods_modalities_excludes_stub():
-    # A declared stub (no variants) has an empty modality set, so it must never
-    # appear in a modalities= filter. Checked dynamically over any remaining
-    # stubs: every method is currently wired (zero stubs), so this may be
-    # vacuous now, but it stays correct if an unwired stub is ever re-added.
-    from multibench.engine import registry
-    for stub in [s.id for s in registry.load() if not s.variants]:
-        for req in (["rna"], ["rna", "atac"], ["adt"]):
-            assert stub not in discover.find_methods(modalities=req)
-
-
 def test_find_methods_modalities_none_unchanged():
     # modalities=None must behave exactly like the call without the kwarg
     assert discover.find_methods() == discover.find_methods(modalities=None)

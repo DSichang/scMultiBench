@@ -39,13 +39,13 @@ def _pin_conda_run_mode(request, monkeypatch):
 # refuses a missing env even when the env probe finds nothing. Most tests
 # assert the Linux behaviour, so pin the platform to Linux everywhere except in
 # the tests of the platform check itself. A test that needs another host
-# monkeypatches envs.host_platform_problem in its body, which overrides this.
+# monkeypatches envs.host_system in its body, which overrides this.
 @_pytest.fixture(autouse=True)
 def _pin_linux_platform(request, monkeypatch):
     if request.node.fspath.basename in ("test_envs_platform.py",):
         return
     from multibench.engine import envs
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
+    monkeypatch.setattr(envs, "host_system", lambda: None)
 
 
 @pytest.fixture

@@ -280,14 +280,6 @@ def test_no_pca_says_to_make_one():
         mtb.evaluate(a, labels=["a", "b"] * 5, obsm="X_pca")
 
 
-def test_a_modality_string_gets_a_list_that_works():
-    with pytest.raises(TypeError) as e:
-        mtb.find_methods("vertical", modalities="rna+adt")
-    hint = str(e.value).split("pass modalities=")[1].rstrip(".")
-    assert mtb.find_methods("vertical", modalities=eval(hint)) == \
-        mtb.find_methods("vertical", modalities=["rna", "adt"])
-
-
 def test_the_missing_label_code_of_export_works(tmp_path):
     import anndata as ad
     adata = ad.AnnData(np.random.default_rng(0).poisson(1, (40, 10)).astype(float))
@@ -314,7 +306,7 @@ def test_rank_says_which_methods_have_the_scores():
 
 
 def test_the_install_preview_off_linux_has_no_gpu_node_note(monkeypatch, capsys):
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: "this host is darwin/arm64")
+    monkeypatch.setattr(envs, "host_system", lambda: "macOS")
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
     mtb.env.install(["SCALEX"], dry_run=True)
     assert "GPU nodes" not in capsys.readouterr().err

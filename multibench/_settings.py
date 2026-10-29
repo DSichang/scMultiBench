@@ -109,7 +109,7 @@ class Settings:
 
     def __init__(self):
         for slot in self.__slots__:
-            object.__setattr__(self, slot, None)
+            setattr(self, slot, None)
 
     @property
     def data_path(self) -> Path:
@@ -148,13 +148,6 @@ class Settings:
             raise ValueError(f"leiden_flavor takes {_and_list(map(repr, LEIDEN_FLAVORS), 'or')}, "
                              f"not {value!r}.")
         self._leiden_flavor = value
-
-    def __setattr__(self, name, value):
-        # a typo such as data_dir= would otherwise be a field nothing reads
-        if name not in self.FIELDS and name not in self.__slots__:
-            raise AttributeError(f"mtb.config has no setting {name!r}. Its settings are "
-                                 f"{_and_list(self.FIELDS)}.")
-        object.__setattr__(self, name, value)
 
     def __repr__(self) -> str:
         return ("mtb.config(" + ", ".join(f"{k}={getattr(self, k)!r}" for k in self.FIELDS)

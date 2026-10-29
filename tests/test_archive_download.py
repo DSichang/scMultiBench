@@ -124,7 +124,7 @@ def _tgz(path):
 
 
 def test_install_packed_joins_parts_and_leaves_no_download(monkeypatch, tmp_path):
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
+    monkeypatch.setattr(envs, "host_system", lambda: None)
     data = _tgz(tmp_path / "a.tar.gz")
     half = len(data) // 2
     monkeypatch.setattr(envs, "packed_manifest",

@@ -8,7 +8,7 @@ path), L32 (the atac column), L53 (``RunResult.obs_names``), L61 (plain
 wording).
 
 Host-independent: the platform is pinned to Linux by conftest; the tests of
-the other hosts patch ``envs.host_platform_problem`` themselves.
+the other hosts patch ``envs.host_system`` themselves.
 """
 import inspect
 import json
@@ -28,8 +28,6 @@ from multibench import config, workflow as W
 from multibench.engine import envs, registry, runner
 from tests.conftest import full_scan
 
-DARWIN = ("method environments are linux-64 conda envs (packed archives + "
-          "lockfiles); this host is darwin/arm64")
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 
 
@@ -40,7 +38,7 @@ def no_envs(monkeypatch):
 
 @pytest.fixture
 def off_linux(monkeypatch):
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: DARWIN)
+    monkeypatch.setattr(envs, "host_system", lambda: "macOS")
 
 
 def _rows(df):
@@ -94,7 +92,7 @@ def test_scan_numbered_and_base_tokens_on_mosaic():
 
 
 def test_scan_unknown_modality_token_raises_with_the_vocabulary():
-    with pytest.raises(ValueError, match=r"Unknown modality peaks2x\. The tokens are"):
+    with pytest.raises(ValueError, match=r"Unknown modality peaks2x\. Use rna, adt"):
         full_scan("D11", "vertical", modalities=["rna", "peaks2x"], verbose=False)
 
 
@@ -169,9 +167,8 @@ def test_run_off_linux_starts_with_the_platform(off_linux, tmp_path, monkeypatch
             mtb.engine.runner.run("totalVI", "vertical", inputs=mtb.engine.resolve.inputs_for("D11", "vertical", "totalVI"),
                     out_dir=str(tmp_path / "out"))
         msg = str(e.value)
-        assert msg.startswith("Methods run only on Linux, and this computer runs macOS. "
-                              "Run this call on a Linux machine, such as Colab. mtb.scan shows the "
-                              "method's command here.")
+        assert msg == ("Methods run only on Linux, and this computer runs macOS. "
+                       "Run this call on a Linux machine, such as Colab.")
         # R3-16: off Linux an install refuses, so no install line follows
         assert "is not installed" not in msg and "env install" not in msg
         assert not (tmp_path / "out").exists()
@@ -205,9 +202,10 @@ def test_scan_notes_missing_scripts_in_caveat_not_files_ok(no_scripts):
 
 def test_real_run_without_network_names_the_fetch_command(tmp_path, monkeypatch,
                                                           linux_with_envs):
-    def offline(path=None):
-        raise subprocess.CalledProcessError(128, ["git", "clone"])
-    monkeypatch.setattr(runner.scripts, "ensure_repo", offline)
+    def offline(cmd, **kw):
+        raise subprocess.CalledProcessError(128, cmd)
+    monkeypatch.setattr(subprocess, "run", offline)
+    monkeypatch.setattr(mtb.config, "repo_path", tmp_path / "scripts")
     with pytest.raises(RuntimeError, match="git clone --depth 1") as e:
         mtb.engine.runner.run("totalVI", "vertical", inputs=mtb.engine.resolve.inputs_for("D11", "vertical", "totalVI"),
                 out_dir=str(tmp_path / "out"))

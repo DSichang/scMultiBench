@@ -37,7 +37,6 @@ from multibench import workflow as W                                  # noqa: E4
 from multibench.engine import envs, registry, runner                  # noqa: E402
 from tests.test_review_f3_int import _diagonal, _quiet, pinned        # noqa: E402,F401
 
-DARWIN = "method environments are linux-64 conda envs; this host is darwin/arm64"
 
 
 def _strings(node):
@@ -64,7 +63,7 @@ def test_peak_name_note_and_warning_end_with_the_fix(tmp_path, pinned, capsys):
 
 
 def test_scan_reason_is_sentences_with_their_own_subjects(tmp_path, monkeypatch):
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: DARWIN)
+    monkeypatch.setattr(envs, "host_system", lambda: "macOS")
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
     root = _diagonal(tmp_path, "LUNG_ids", [f"peak_{i}" for i in range(60)])
@@ -82,7 +81,7 @@ def test_scan_reason_is_sentences_with_their_own_subjects(tmp_path, monkeypatch)
 
 
 def test_count_lines_say_rows_without_plural_brackets(monkeypatch, capsys, tmp_path):
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
+    monkeypatch.setattr(envs, "host_system", lambda: None)
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     n = len(full_scan("D11", "vertical", modalities="all"))
     mtb.scan("D11", "vertical", modalities="all")
@@ -96,7 +95,7 @@ def test_count_lines_say_rows_without_plural_brackets(monkeypatch, capsys, tmp_p
 
 
 def test_platform_line_is_two_sentences(monkeypatch, tmp_path):
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: DARWIN)
+    monkeypatch.setattr(envs, "host_system", lambda: "macOS")
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     with pytest.raises(ValueError) as e:
         mtb.run("D11", "vertical", out_dir=tmp_path, verbose=False)

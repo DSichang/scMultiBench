@@ -24,7 +24,7 @@ def test_leiden_flavor_is_checked_when_set():
 
 def test_config_is_a_plain_object_with_four_settings():
     import pytest
-    with pytest.raises(AttributeError, match="has no setting 'ensure_repo'"):
+    with pytest.raises(AttributeError, match="no attribute 'ensure_repo'"):
         config.ensure_repo = 3
     assert not hasattr(config, "__dict__")              # __slots__: no stray attribute
     config.data_path = "~/somewhere"

@@ -68,9 +68,9 @@ def test_config_is_the_settings_object():
     text = repr(mtb.config)
     assert text.startswith("mtb.config(data_path=")
     assert all(f"{k}=" in text for k in CONFIG_ALL)
-    with pytest.raises(AttributeError, match="mtb.config has no setting 'data_dir'"):
+    with pytest.raises(AttributeError, match="no attribute 'data_dir'"):
         mtb.config.data_dir = "x"
-    with pytest.raises(AttributeError, match="mtb.config has no setting 'ensure_repo'"):
+    with pytest.raises(AttributeError, match="no attribute 'ensure_repo'"):
         mtb.config.ensure_repo = 3
 
 

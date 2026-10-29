@@ -19,6 +19,6 @@ from multibench import discover
 def test_unknown_token_raises_with_the_vocabulary():
     with pytest.raises(ValueError, match=r"Unknown modality peaks2\.") as e:
         discover.find_methods(modalities=["rna", "peaks2"])
-    assert "atac_peak" in str(e.value) and "protein" in str(e.value)
+    assert "atac_peak" in str(e.value) and "adt" in str(e.value)
 
 

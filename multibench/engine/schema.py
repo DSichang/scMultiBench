@@ -13,20 +13,8 @@ def no_category_message(method: str, categories, category) -> str:
 
 
 class AmbiguousVariantError(ValueError, KeyError):
-    """Raised when several variants of a method fit and the call must pick one.
-
-    Raised by ``mtb.params_for`` and the folder lookup of ``mtb.scan`` /
-    ``mtb.run``; the message spells out the call that selects one variant.
-    ``except ValueError`` catches it.
-
-    It is a ``ValueError`` and also a ``KeyError``, so ``except KeyError``
-    catches it too. ``str(exc)`` is the plain message, without ``KeyError``
-    quoting.
-
-    See Also
-    --------
-    mtb.method_info : ``supports`` lists every variant with its category and modalities
-    """
+    """Several variants of a method fit; the message names the call that picks
+    one. A ``ValueError`` and a ``KeyError``; ``str(exc)`` is unquoted."""
 
     def __str__(self) -> str:
         return str(self.args[0]) if self.args else ""
@@ -77,79 +65,6 @@ def modality_family(role: str) -> str:
         if role.startswith(rep) and role[len(rep):].isdigit():
             return "atac" + role[len(rep):]
     return role
-
-
-#: the values ``gpu_use`` may declare; ``required`` and ``unknown`` are derived
-GPU_USE_DECLARED = ("used when present", "not used")
-#: a ``cpu_params`` value: a command-line token (``""`` included), a number,
-#: or ``True`` for a bare flag
-_CPU_PARAM_VALUE_TYPES = (str, int, float, bool)
-
-
-def validate_gpu_fields(method_id: str, cpu_params, requires_gpu, gpu_evidence,
-                        gpu_use="") -> None:
-    """Check the GPU/CPU keys of one method in ``methods.yaml``.
-
-    ``cpu_params`` maps a flag to a command-line value; ``requires_gpu`` is a
-    bool; ``gpu_evidence`` is ``"<file>:<line>"`` (several joined by ``", "``),
-    set exactly when ``requires_gpu``; ``gpu_use`` is ``""`` or one of
-    :data:`GPU_USE_DECLARED`. Raises ``ValueError`` naming the method and the
-    key on a wrong shape or a contradiction between the keys.
-    """
-    if not isinstance(cpu_params, dict):
-        raise ValueError(
-            f"{method_id}: cpu_params must be a mapping {{flag: value}}, got "
-            f"{type(cpu_params).__name__}")
-    for k, v in cpu_params.items():
-        if not isinstance(k, str) or not k:
-            raise ValueError(
-                f"{method_id}: cpu_params keys must be non-empty command-line "
-                f"param names, got {k!r}")
-        if v is None or v is False or not isinstance(v, _CPU_PARAM_VALUE_TYPES):
-            raise ValueError(
-                f"{method_id}: cpu_params[{k!r}] must be a command-line value "
-                f"(a string, '' included, a number, or True for a bare flag) - "
-                f"None/False are never emitted, so they cannot turn CUDA off; "
-                f"got {v!r}")
-    if not isinstance(requires_gpu, bool):
-        raise ValueError(
-            f"{method_id}: requires_gpu must be true or false, got {requires_gpu!r}")
-    if not isinstance(gpu_evidence, str):
-        raise ValueError(
-            f"{method_id}: gpu_evidence must be a '<file>:<line>' string, got "
-            f"{gpu_evidence!r}")
-    if requires_gpu and cpu_params:
-        raise ValueError(
-            f"{method_id}: requires_gpu and cpu_params are both set - a script "
-            f"that has a switch turning CUDA off does not require a GPU; keep one")
-    if requires_gpu and not gpu_evidence.strip():
-        raise ValueError(
-            f"{method_id}: requires_gpu is true but gpu_evidence is empty - name "
-            f"the unconditional CUDA call as '<file>:<line>' (it is quoted in "
-            f"the refusal the runner raises on a host without a GPU)")
-    if gpu_evidence.strip() and not requires_gpu:
-        raise ValueError(
-            f"{method_id}: gpu_evidence {gpu_evidence!r} is set but requires_gpu "
-            f"is false - remove it or set requires_gpu: true")
-    if requires_gpu:
-        for entry in gpu_evidence.split(","):
-            path, sep, line = entry.strip().rpartition(":")
-            if not sep or not path or not line.isdigit():
-                raise ValueError(
-                    f"{method_id}: gpu_evidence must be '<file>:<line>' (several "
-                    f"joined by ', '), got {gpu_evidence!r}")
-    if gpu_use not in ("",) + GPU_USE_DECLARED:
-        raise ValueError(
-            f"{method_id}: gpu_use must be one of {list(GPU_USE_DECLARED)}, got "
-            f"{gpu_use!r}")
-    if gpu_use and requires_gpu:
-        raise ValueError(
-            f"{method_id}: gpu_use {gpu_use!r} is set but requires_gpu is true - "
-            f"a method that requires a GPU reads gpu 'required'; remove gpu_use")
-    if cpu_params and gpu_use not in ("", "used when present"):
-        raise ValueError(
-            f"{method_id}: gpu_use {gpu_use!r} contradicts cpu_params - a script "
-            f"with a switch that turns CUDA off uses the GPU when one is present")
 
 
 @dataclass
@@ -357,9 +272,8 @@ class MethodSpec:
     status: str = "declared"            # declared | verified
     variants: list[Variant] = field(default_factory=list)
     reference: dict = field(default_factory=dict)     # provenance (references.yaml)
-    # GPU/CPU keys, checked by validate_gpu_fields: the flags that turn CUDA
-    # off (merged by runner.cpu_params_for on a host without a GPU), or a
-    # script that calls CUDA unconditionally (with the file:line of the call)
+    # the flags that turn CUDA off (merged by runner.cpu_params_for on a host
+    # without a GPU), or a script that calls CUDA unconditionally (file:line)
     cpu_params: dict = field(default_factory=dict)
     requires_gpu: bool = False
     gpu_evidence: str = ""
@@ -368,8 +282,6 @@ class MethodSpec:
     def __post_init__(self):
         if not self.categories:
             self.categories = self.wired_categories
-        validate_gpu_fields(self.id, self.cpu_params, self.requires_gpu,
-                            self.gpu_evidence, self.gpu_use)
 
     @property
     def gpu(self) -> str:

@@ -91,12 +91,12 @@ def test_methods_as_a_string_raises_pass_a_list(call):
     with pytest.raises(TypeError) as e:
         call()
     msg = str(e.value)
-    assert "must be a list of ids" in msg and "methods=['StabMap']" in msg
+    assert msg == "methods must be a list, got the string 'StabMap'."
     assert "Unknown method S" not in msg
 
 
 def test_modalities_as_a_string_raises_pass_a_list():
-    with pytest.raises(TypeError, match=r"modalities=\['rna'\]"):
+    with pytest.raises(TypeError, match="must be a list, got the string 'rna'"):
         full_scan("D11", "vertical", modalities="rna")
     with pytest.raises(TypeError, match="must be a list"):
         mtb.run("D11", "vertical", modalities="rna", out_dir="/tmp/unused", verbose=False)
@@ -153,8 +153,7 @@ def test_scan_and_run_all_docs_cite_the_placeholder():
 
 # ----------------------------------------------------------------- P05: platform note
 def test_nothing_runnable_message_names_the_platform_off_linux(no_envs, monkeypatch):
-    monkeypatch.setattr(envs, "host_platform_problem",
-                        lambda: "method environments are linux-64 conda envs; this host is darwin/arm64")
+    monkeypatch.setattr(envs, "host_system", lambda: "macOS")
     for kw in ({"methods": ["Matilda"]}, {}):
         with pytest.raises(ValueError) as e:
             mtb.run("D11", "vertical", out_dir="/tmp/unused", verbose=False, **kw)
@@ -165,7 +164,7 @@ def test_nothing_runnable_message_names_the_platform_off_linux(no_envs, monkeypa
         assert ("On this computer you can check files, score embeddings and plot. Run "
                 "the methods on a Linux machine, such as Colab.") in msg
         assert not re.search(r"\n  Methods", msg)       # never looks like a variant line
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
+    monkeypatch.setattr(envs, "host_system", lambda: None)
     with pytest.raises(ValueError) as e:
         mtb.run("D11", "vertical", methods=["Matilda"], out_dir="/tmp/unused", verbose=False)
     assert "Methods run only on Linux" not in str(e.value)
