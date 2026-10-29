@@ -139,7 +139,7 @@ def test_your_own_cells_on_a_benchmark_name_are_told_to_take_a_name_of_their_own
         mtb.evaluate(emb, labels=lab, dataset="D11", method="PCA", metrics=["ASW"])
     assert str(e.value) == (
         "The label files of D11 hold 2,864 cells; the embedding has 1,718 rows. "
-        "For other cells, pass a dataset name of your own.")
+        "For other cells, pass labels= and another name, such as dataset='D11_subset'.")
     got = mtb.evaluate(emb, labels=lab, dataset="D11_subset", category="vertical",
                        method="PCA", metrics=["ASW"], verbose=False)
     assert set(got["dataset"]) == {"D11_subset"}
