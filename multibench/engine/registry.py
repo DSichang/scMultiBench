@@ -66,10 +66,6 @@ def _parse_variant(d: dict, method_id: str | None = None) -> Variant:
         min_cells_per_batch=d.get("min_cells_per_batch"),
         min_genes=d.get("min_genes"),
     )
-    # scan shows a size hint only for data below its size
-    if v.size_hint and not (v.min_cells or v.min_cells_per_batch or v.min_genes):
-        raise ValueError(f"methods.yaml: {method_id!r} {_variant_key(v.when)}: size_hint "
-                         f"needs min_cells, min_cells_per_batch or min_genes")
     # labels_for orders label files by this: a bad declaration fails at load
     try:
         v.stacked_roles()
@@ -79,14 +75,6 @@ def _parse_variant(d: dict, method_id: str | None = None) -> Variant:
 
 
 def _parse_method(d: dict) -> MethodSpec:
-    if "needs_labels" in d:
-        raise ValueError(
-            f"methods.yaml: {d.get('id')!r} declares needs_labels, but needs_labels "
-            f"is derived from the variants' label roles (cty/label) - remove the key")
-    if "categories" in d:
-        raise ValueError(
-            f"methods.yaml: {d.get('id')!r} declares categories, but categories is "
-            f"derived from the variants' when.category - remove the key")
     variants = [_parse_variant(v, d["id"]) for v in d.get("variants", [])]
     # params.yaml has no entry for a variant that runs the same script as
     # another (scMDC, scMM cross): it takes that variant's tunables
@@ -94,40 +82,22 @@ def _parse_method(d: dict) -> MethodSpec:
         if not v.tunable:
             v.tunable = next((dict(o.tunable) for o in variants
                               if o.tunable and o.entrypoint == v.entrypoint), v.tunable)
-    spec = MethodSpec(
+    return MethodSpec(
         id=d["id"], language=d.get("language", "python"),
         tasks=d.get("tasks", []),
         atac=d.get("atac"),
         setup_hint=d.get("setup_hint", ""), status=d.get("status", "declared"),
         variants=variants,
-        # any present value is handed over, so validate_gpu_fields refuses a wrong shape
-        cpu_params=d["cpu_params"] if d.get("cpu_params") is not None else {},
+        cpu_params=d.get("cpu_params") or {},
         requires_gpu=d.get("requires_gpu", False),
         gpu_evidence=d.get("gpu_evidence", "") or "",
         gpu_use=d.get("gpu_use", "") or "",
     )
-    if spec.atac is not None and spec.atac not in ATAC_VALUES:
-        raise ValueError(
-            f"methods.yaml: {spec.id!r} has atac={spec.atac!r}; valid: {list(ATAC_VALUES)}")
-    if spec.consumes_atac and spec.atac is None:
-        raise ValueError(
-            f"methods.yaml: {spec.id!r} consumes an ATAC input but declares no "
-            f"`atac:` key; set it to one of {list(ATAC_VALUES)} (the representation "
-            f"the upstream script expects - check the script, not the role name)")
-    if spec.atac is not None and not spec.consumes_atac:
-        raise ValueError(
-            f"methods.yaml: {spec.id!r} declares atac={spec.atac!r} but no variant "
-            f"takes an ATAC input; remove the key or wire the variant")
-    return spec
 
 
 @functools.lru_cache(maxsize=1)
 def _references() -> dict:
-    """Parsed engine/references.yaml; a missing file raises."""
-    if not _REFERENCES.is_file():
-        raise FileNotFoundError(
-            f"{_REFERENCES} is missing - the package data is incomplete "
-            f"(engine/references.yaml must ship with multibench)")
+    """Parsed engine/references.yaml."""
     return yaml.safe_load(_REFERENCES.read_text()) or {}
 
 
@@ -186,9 +156,7 @@ def check_id_list(value, name: str):
     """Return ``value``; raise ``TypeError`` if it is a bare string, which
     would be iterated character by character."""
     if isinstance(value, str):
-        raise TypeError(
-            f"{name} must be a list of ids, got the string {value!r} - did you "
-            f"mean {name}=[{value!r}]?")
+        raise TypeError(f"{name} must be a list, got the string {value!r}.")
     return value
 
 
@@ -226,11 +194,8 @@ def normalize_modalities(modalities, *, base: bool = False) -> list[str]:
         low = str(tok).lower()               # RNA, ADT: the tokens are lower case
         t = MODALITY_ALIASES.get(low, low)
         if t not in known and not is_label_role(t):
-            raise ValueError(
-                f"Unknown modality {tok}. The tokens are rna, adt (or protein) and "
-                f"atac. atac_peak (or peak, peaks) and atac_gas (or gas, "
-                f"gene_activity) name the ATAC form a method reads. rna1, adt1, "
-                f"atac2 ... name numbered batches.")
+            raise ValueError(f"Unknown modality {tok}. Use rna, adt, atac, atac_peak or "
+                             f"atac_gas (rna1, adt2 ... for batches).")
         if base:
             t = base_modality(t)
         if t not in out:

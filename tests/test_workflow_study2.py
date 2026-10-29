@@ -91,12 +91,12 @@ def test_methods_as_a_string_raises_pass_a_list(call):
     with pytest.raises(TypeError) as e:
         call()
     msg = str(e.value)
-    assert "must be a list of ids" in msg and "methods=['StabMap']" in msg
+    assert msg == "methods must be a list, got the string 'StabMap'."
     assert "Unknown method S" not in msg
 
 
 def test_modalities_as_a_string_raises_pass_a_list():
-    with pytest.raises(TypeError, match=r"modalities=\['rna'\]"):
+    with pytest.raises(TypeError, match="must be a list, got the string 'rna'"):
         full_scan("D11", "vertical", modalities="rna")
     with pytest.raises(TypeError, match="must be a list"):
         mtb.run("D11", "vertical", modalities="rna", out_dir="/tmp/unused", verbose=False)

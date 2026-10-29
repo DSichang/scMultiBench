@@ -20,10 +20,11 @@ import h5py
 import numpy as np
 import pandas as pd
 import pytest
+import yaml
 
 import multibench as mtb
 from multibench import workflow as W
-from multibench.engine import envs, registry, runner, schema
+from multibench.engine import envs, registry, runner
 from tests.conftest import full_scan
 
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
@@ -120,41 +121,63 @@ def test_schema_accepts_the_two_valid_shapes():
     assert spec.cpu_params == {} and spec.requires_gpu is False and spec.gpu_evidence == ""
 
 
-def test_schema_rejects_bad_shapes():
-    with pytest.raises(ValueError, match="X: cpu_params must be a mapping"):
-        _parse(cpu_params=["--device", "cpu"])
-    with pytest.raises(ValueError, match="cpu_params keys must be non-empty"):
-        _parse(cpu_params={"": "cpu"})
-    with pytest.raises(ValueError, match=r"cpu_params\['device'\] must be a command-line value"):
-        _parse(cpu_params={"device": None})
-    with pytest.raises(ValueError, match="None/False are never emitted"):
-        _parse(cpu_params={"device": False})
-    with pytest.raises(ValueError, match="requires_gpu must be true or false"):
-        _parse(requires_gpu="yes", gpu_evidence="a.py:1")
-    with pytest.raises(ValueError, match="gpu_evidence must be a '<file>:<line>' string"):
-        _parse(requires_gpu=True, gpu_evidence=12)
-    with pytest.raises(ValueError, match="requires_gpu and cpu_params are both set"):
-        _parse(requires_gpu=True, gpu_evidence="a.py:1", cpu_params={"device": "cpu"})
-    with pytest.raises(ValueError, match="requires_gpu is true but gpu_evidence is empty"):
-        _parse(requires_gpu=True)
-    with pytest.raises(ValueError, match="is set but requires_gpu is false"):
-        _parse(gpu_evidence="a.py:1")
-    with pytest.raises(ValueError, match="gpu_evidence must be '<file>:<line>'"):
-        _parse(requires_gpu=True, gpu_evidence="a.py")
-    with pytest.raises(ValueError, match="gpu_evidence must be '<file>:<line>'"):
-        _parse(requires_gpu=True, gpu_evidence="a.py:twelve")
+def _gpu_field_problems(d: dict) -> list:
+    """What is wrong with the GPU keys of one methods.yaml entry."""
+    cpu, req = d.get("cpu_params") or {}, d.get("requires_gpu", False)
+    ev, use = d.get("gpu_evidence", "") or "", d.get("gpu_use", "") or ""
+    bad = []
+    if not isinstance(cpu, dict):
+        return ["cpu_params is not a mapping"]
+    for k, v in cpu.items():
+        if not isinstance(k, str) or not k:
+            bad.append(f"cpu_params key {k!r}")
+        # None/False are never emitted, so they cannot turn CUDA off
+        if v is None or v is False or not isinstance(v, (str, int, float, bool)):
+            bad.append(f"cpu_params[{k!r}] = {v!r}")
+    if not isinstance(req, bool):
+        bad.append("requires_gpu is not a bool")
+    if not isinstance(ev, str):
+        return bad + ["gpu_evidence is not a string"]
+    if req and cpu:
+        bad.append("requires_gpu and cpu_params both set")
+    if bool(req) != bool(ev.strip()):
+        bad.append("gpu_evidence must be set exactly when requires_gpu")
+    if req and not all(e.strip().rpartition(":")[0] and e.strip().rpartition(":")[2].isdigit()
+                       for e in ev.split(",")):
+        bad.append(f"gpu_evidence {ev!r} is not '<file>:<line>'")
+    if use not in ("", "used when present", "not used"):
+        bad.append(f"gpu_use {use!r}")
+    if use and req:
+        bad.append("gpu_use set with requires_gpu")
+    if cpu and use not in ("", "used when present"):
+        bad.append(f"gpu_use {use!r} contradicts cpu_params")
+    return bad
+
+
+def test_methods_yaml_gpu_keys_are_consistent():
+    data = yaml.safe_load(registry._YAML.read_text())
+    bad = {m["id"]: _gpu_field_problems(m) for m in data["methods"]}
+    assert {k: v for k, v in bad.items() if v} == {}
+
+
+def test_the_gpu_key_check_catches_bad_shapes():
+    for d in ({"cpu_params": ["--device", "cpu"]}, {"cpu_params": {"": "cpu"}},
+              {"cpu_params": {"device": None}}, {"cpu_params": {"device": False}},
+              {"requires_gpu": "yes", "gpu_evidence": "a.py:1"},
+              {"requires_gpu": True, "gpu_evidence": 12},
+              {"requires_gpu": True, "gpu_evidence": "a.py:1", "cpu_params": {"device": "cpu"}},
+              {"requires_gpu": True}, {"gpu_evidence": "a.py:1"},
+              {"requires_gpu": True, "gpu_evidence": "a.py"},
+              {"requires_gpu": True, "gpu_evidence": "a.py:twelve"},
+              {"gpu_use": "sometimes"}, {"gpu_use": "not used", "cpu_params": {"device": "cpu"}}):
+        assert _gpu_field_problems(d), d
+    assert _gpu_field_problems({"cpu_params": {"device": "cpu"}}) == []
 
 
 def test_registry_rejects_cpu_params_the_script_does_not_accept():
     # r3: the CUDA switch left tunable, so the check reads the scripts themselves
     from tests.test_params_api import test_the_keys_left_out_are_script_arguments
     test_the_keys_left_out_are_script_arguments()
-
-
-def test_validate_gpu_fields_is_the_schema_entry_point():
-    schema.validate_gpu_fields("Y", {}, False, "")
-    with pytest.raises(ValueError, match="^Y: "):
-        schema.validate_gpu_fields("Y", {}, True, "")
 
 
 # ------------------------------------------------------------ runner: cpu_params

@@ -26,7 +26,7 @@ def test_a_bare_string_raises_the_type_error_scan_raises(name):
     with pytest.raises(TypeError) as e:
         CALLS[name]("Matilda")
     msg = str(e.value)
-    assert "must be a list of ids" in msg and "methods=['Matilda']" in msg
+    assert msg == "methods must be a list, got the string 'Matilda'."
     assert "Unknown method M" not in msg
     assert msg == _scan_message("Matilda")
 

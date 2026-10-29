@@ -161,8 +161,7 @@ def test_all_is_the_one_string_modalities_takes():
         for other in ("rna", "ALL", "all "):
             with pytest.raises(TypeError) as e:
                 call(other)
-            assert str(e.value) == (f"modalities must be a list of ids, got the string "
-                                    f"{other!r} - did you mean modalities=[{other!r}]?")
+            assert str(e.value) == f"modalities must be a list, got the string {other!r}."
         # a list is the selection it was, with nothing left out
         df = call(["rna", "adt"])
         assert set(df["modalities"]) == {"rna+adt"} and df.attrs["not_listed"] == 0
