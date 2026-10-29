@@ -36,7 +36,7 @@ def _launch_env(monkeypatch, tmp_path, method, category):
         raise RuntimeError("stop after env capture")
 
     monkeypatch.setattr(runner.subprocess, "Popen", fake_popen)
-    monkeypatch.setattr(runner, "linux_only_sentence", lambda: None)
+    monkeypatch.setattr("multibench.engine.envs.host_system", lambda: None)
     monkeypatch.setattr(runner.envs, "installed_envs",
                         lambda conda=None: [envs.group_for(method)])
     monkeypatch.setattr(runner.envs, "other_env_prefix", lambda name: None)

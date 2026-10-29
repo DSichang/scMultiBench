@@ -74,7 +74,7 @@ def test_the_dry_run_refuses_two_feature_types(tmp_path, monkeypatch):
                         lambda *a, **k: pytest.fail("the method was started"))
     monkeypatch.setattr(mtb.config, "repo_path", tmp_path / "repo")
     real_kw = dict(out_dir=str(out))
-    monkeypatch.setattr(runner, "linux_only_sentence", lambda: None)
+    monkeypatch.setattr("multibench.engine.envs.host_system", lambda: None)
     monkeypatch.setattr(envs, "installed_envs",
                         lambda conda=None: {envs.group_for(m) for m in ("VIMCCA", "SCALEX")})
     for method, category, roles in (

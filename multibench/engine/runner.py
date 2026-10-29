@@ -195,9 +195,6 @@ def _repo_root_no_fetch() -> Path:
     return scripts._scripts_checkout() or Path(config.repo_path)
 
 
-#: workflow's name for :func:`envs.linux_only_text`
-linux_only_sentence = envs.linux_only_text
-
 
 def missing_script_fix(repo) -> str:
     """What to do about a method script missing from the checkout at ``repo``."""
@@ -695,7 +692,7 @@ def _check_env(method: str, env_name: str) -> None:
     """The env check of scan, before anything is written: off Linux always; on
     Linux when the probe finds some env (else the subprocess reports the
     failure) or an env of that name multibench did not install."""
-    linux_only = linux_only_sentence()
+    linux_only = envs.linux_only_text()
     if linux_only:
         raise envs.LinuxOnlyError(
             f"{linux_only} Run this call on a Linux machine, such as Colab.")

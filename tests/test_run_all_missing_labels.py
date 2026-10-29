@@ -247,8 +247,7 @@ def test_scan_off_linux_names_the_gap(
         cite, monkeypatch, capsys):
     # no environment can be installed here; the rows would run on Linux
     from multibench.engine import runner as R
-    monkeypatch.setattr(R, "linux_only_sentence",
-                        lambda: "Methods run only on Linux, and this computer runs macOS.")
+    monkeypatch.setattr("multibench.engine.envs.host_system", lambda: "macOS")
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     _write(cite / "MYCITE" / "cty.csv", _with_gaps())
     plan = mtb.scan(os.path.join(cite, 'MYCITE'), 'vertical', methods=['Matilda', 'totalVI'])

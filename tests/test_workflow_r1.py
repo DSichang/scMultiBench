@@ -423,7 +423,7 @@ def _fake_run(monkeypatch, tmp_path, method, category, dataset, n):
     calls = {}
     monkeypatch.setattr(runner.subprocess, "Popen", _fake_popen(n, calls))
     monkeypatch.setattr(config, "repo_path", repo)
-    monkeypatch.setattr(runner, "linux_only_sentence", lambda: None)
+    monkeypatch.setattr("multibench.engine.envs.host_system", lambda: None)
     monkeypatch.setattr(envs, "installed_envs", lambda conda=None: {envs.group_for(method)})
     monkeypatch.setattr(runner, "run_mode", lambda env: ("conda", None))
     return inp, mtb.engine.runner.run(method, category, inputs=inp, out_dir=str(tmp_path / method))

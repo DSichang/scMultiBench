@@ -252,7 +252,7 @@ def _env_hint(env: str, method: str, other=None) -> str:
     """The ``env_reason`` text: the install command first, so a clipped reason
     still holds it; off Linux only the platform sentence; ``other`` = the
     prefix of a same-named env multibench did not install."""
-    if _runner.linux_only_sentence():
+    if envs.linux_only_text():
         return f"Environment {env} runs only on Linux, not on this computer."
     if other is not None:
         return envs.other_env_text(env, other, f"run mtb.env.install([{method!r}]).")
@@ -265,7 +265,7 @@ GPU_NODE_CAVEAT = ("{method} needs an NVIDIA GPU. This check assumes the job run
                    "GPU node.")
 
 #: What the first line of ``scan`` adds off Linux.
-LINUX_ONLY_CHECK = ("Method environments run only on Linux. On this computer you can "
+LINUX_ONLY_CHECK = ("Methods run only on Linux. On this computer you can "
                     "check files, score embeddings and plot.")
 _DOCTOR = "mtb.env.install(dry_run=True) checks the environments."
 
@@ -273,7 +273,7 @@ _DOCTOR = "mtb.env.install(dry_run=True) checks the environments."
 def _env_tail(df: "pd.DataFrame", installed, off_linux: str) -> str:
     """The end of a scan summary line: ``off_linux`` off Linux, else the env
     check when a row's env is not installed."""
-    if _runner.linux_only_sentence():
+    if envs.linux_only_text():
         return f" {off_linux}"
     return f" {_DOCTOR}" if any(e and e not in installed for e in df["env"]) else ""
 
@@ -779,7 +779,7 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
     # the real run refuses these scripts, so every row is blocked
     wrong_ref = scripts.scripts_ref_problem(repo) or scripts.scripts_folder_problem(repo) or ""
     rows = []
-    off_linux = bool(_runner.linux_only_sentence())
+    off_linux = bool(envs.linux_only_text())
     others: dict = {}          # env -> a same-named env multibench did not install
     for spec, v, cat, mods in _variant_rows(category):
         if methods is not None and spec.id not in methods:
@@ -1214,7 +1214,7 @@ def _evaluate_best_order(emb, category, cands, *, metrics=None, user_batch=False
     """Score each candidate label order and keep the best: ``(names, scores, spread)``.
     ``user_batch``: the candidates carry the caller's batch; ``batch_given``: passed now."""
     # a file-of-origin batch, or the saved one rescore reuses, goes to evaluate only
-    # for a metric that uses it: evaluate would warn about a batch never given
+    # for a metric that uses it
     use_batch = (user_batch and batch_given) or _names_batch_metric(metrics)
 
     def _full(lab, batch, clusters=None):
@@ -2134,7 +2134,7 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
     whose files are in place). Off Linux the platform blocks every row, so a method
     is listed only for what else blocks it (``others``: each row's blocks besides
     the platform)."""
-    linux_only = _runner.linux_only_sentence()
+    linux_only = envs.linux_only_text()
     platform = bool(linux_only) and not blocked["env_ok"].all()
     why = (others.reindex(blocked.index).fillna("") if platform and others is not None
            else blocked["reason"])

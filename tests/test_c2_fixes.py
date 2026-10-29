@@ -143,7 +143,7 @@ def test_the_dry_run_command_keeps_the_out_dir_placeholder():
 def test_a_batch_of_the_wrong_length_is_refused_before_anything_runs(tmp_path, monkeypatch):
     monkeypatch.setattr(workflow, "_installed_envs",
                         lambda: frozenset({envs.group_for("Matilda")}))
-    monkeypatch.setattr(workflow._runner, "linux_only_sentence", lambda: None)
+    monkeypatch.setattr("multibench.engine.envs.host_system", lambda: None)
     # e2: D11 is a benchmark dataset, its batches are its label files
     with pytest.raises(ValueError, match=r"^D11 is a benchmark dataset: its batches are "
                                          r"its label files\."):

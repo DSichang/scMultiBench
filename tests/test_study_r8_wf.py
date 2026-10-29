@@ -211,7 +211,7 @@ MACOS = "Methods run only on Linux, and this computer runs macOS."
 def macos(monkeypatch, no_envs):
     """This computer runs macOS, no environment is installed, a GPU is present
     (so only the platform and the files block a row)."""
-    monkeypatch.setattr(R, "linux_only_sentence", lambda: MACOS)
+    monkeypatch.setattr("multibench.engine.envs.host_system", lambda: "macOS")
     monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
 
 
@@ -294,7 +294,7 @@ def test_off_linux_a_gpu_block_is_left_out(macos, mydata, monkeypatch):
 
 
 def test_on_linux_the_message_is_todays(no_envs, mydata, monkeypatch):
-    monkeypatch.setattr(R, "linux_only_sentence", lambda: None)
+    monkeypatch.setattr("multibench.engine.envs.host_system", lambda: None)
     msg = _nothing_runnable(modalities=["rna", "adt"])
     plan = _plan(modalities=["rna", "adt"])
     order = plan.assign(_f=~plan["files_ok"]).sort_values(["_f", "method"], kind="stable")

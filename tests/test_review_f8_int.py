@@ -64,7 +64,7 @@ def test_a_stored_minus_zero_ari_reads_zero_in_summary(tmp_path):
 # ======================================================================= R8-05
 @pytest.fixture
 def macos_no_gpu(monkeypatch):
-    monkeypatch.setattr(R, "linux_only_sentence", lambda: MACOS)
+    monkeypatch.setattr("multibench.engine.envs.host_system", lambda: "macOS")
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
 
@@ -97,7 +97,7 @@ def test_a_folder_variant_is_listed_by_its_method_name(macos_no_gpu, monkeypatch
         assert "((" not in msg
         assert "NVIDIA GPU" not in msg, msg          # 0.4: left out off Linux
     # on Linux the GPU sentence is said, on the line of the method's name
-    monkeypatch.setattr(R, "linux_only_sentence", lambda: None)
+    monkeypatch.setattr("multibench.engine.envs.host_system", lambda: None)
     msg = _nothing_runnable("D28", "diagonal", methods=["scBridge", "SCALEX"])
     assert "((" not in msg
     line = next(l for l in msg.splitlines() if l.startswith("  scBridge"))

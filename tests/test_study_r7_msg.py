@@ -182,8 +182,7 @@ def test_raw_counts_warning_names_the_mudata_form_for_a_mudata_selector(tmp_path
 @pytest.mark.parametrize("name", ["macOS", "Windows", "freebsd14"])
 def test_linux_only_sentences_name_the_system(monkeypatch, name):
     monkeypatch.setattr(envs, "host_system", lambda: name)
-    assert R.linux_only_sentence() == f"Methods run only on Linux, and this computer runs {name}."
-    assert envs.linux_only_text() == R.linux_only_sentence()
+    assert envs.linux_only_text() == f"Methods run only on Linux, and this computer runs {name}."
 
 
 @pytest.fixture
@@ -203,7 +202,7 @@ def test_run_all_refusal_off_linux_has_no_parenthesis_or_semicolon(off_linux, tm
 
 
 def test_env_reason_on_linux_leads_with_the_install_command(monkeypatch):
-    monkeypatch.setattr(R, "linux_only_sentence", lambda: None)
+    monkeypatch.setattr("multibench.engine.envs.host_system", lambda: None)
     assert W._env_hint("scmb_r", "StabMap") == (
         "Environment scmb_r is not installed. Run mtb.env.install(['StabMap']).")
     # every method's install command fits in the first 120 characters

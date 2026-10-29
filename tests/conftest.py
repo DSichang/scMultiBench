@@ -101,7 +101,7 @@ def linux_with_envs(monkeypatch):
     for tests that fake the method's subprocess."""
     from multibench.engine import envs, registry, runner
     every = {envs.group_for(m) for m in registry.list_methods()}
-    monkeypatch.setattr(runner, "linux_only_sentence", lambda: None)
+    monkeypatch.setattr("multibench.engine.envs.host_system", lambda: None)
     monkeypatch.setattr(envs, "installed_envs", lambda conda=None: every)
     monkeypatch.setattr(runner, "run_mode", lambda env: ("conda", None))
     return every

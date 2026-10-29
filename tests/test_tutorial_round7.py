@@ -193,7 +193,7 @@ def test_env_reason_on_linux_holds_the_install_command_the_tutorials_name(name, 
     md = _markdown(name, "## 2. Download the data and the environments")
     # installing is the default since 0.4.0 (X27)
     assert "mtb.env.install" in md
-    monkeypatch.setattr(R, "linux_only_sentence", lambda: None)
+    monkeypatch.setattr("multibench.engine.envs.host_system", lambda: None)
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     ds = t["ds"]
     if not (mtb.config.data_path / ds).is_dir():
