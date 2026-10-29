@@ -299,12 +299,7 @@ def write_example(dataset: str, folder: Path | str = ".", *, verbose: bool = Tru
     built = {}
     if "write" in state.values():
         build, kw = _BUILD[dataset]
-        made = build(root / dataset, read, **kw)
-        if tuple(name for name, _, _ in made) != EXAMPLES[dataset]:
-            raise RuntimeError(f"The example of {dataset} is built as "
-                               f"{[name for name, _, _ in made]}, and EXAMPLES lists "
-                               f"{list(EXAMPLES[dataset])}.")
-        built = {name: (a, what) for name, a, what in made}
+        built = {name: (a, what) for name, a, what in build(root / dataset, read, **kw)}
         folder.mkdir(parents=True, exist_ok=True)
     for name in EXAMPLES[dataset]:
         target = folder / name
