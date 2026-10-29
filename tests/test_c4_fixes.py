@@ -239,12 +239,7 @@ def test_scan_prints_no_reads_line_for_a_folder_of_numbered_batches(tmp_path, ca
 
 
 # ------------------------------------------- E18, u2 #5, u3 #11: plot.bar
-def test_the_default_bar_runs_no_rank_matrix(monkeypatch):
-    from multibench.plot import style
-
-    def boom(*a, **k):
-        raise AssertionError("the 0.3 ranks ran")
-    monkeypatch.setattr(style, "per_dataset_ranks", boom)
+def test_the_default_bar_runs():
     st = mtb.load_results("vertical")
     mtb.plot.bar(st)
     two = pd.concat([st, st.assign(dataset="D11b")]).assign(source="user")

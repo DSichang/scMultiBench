@@ -49,8 +49,7 @@ def test_one_method_warning_is_plain():
     _, msgs = _messages(_build_table,
                         pd.DataFrame(_rows("PCA_LSI_stack", (0.3, 0.4, 0.9))))
     assert msgs == [
-        "Only one method, PCA_LSI_stack, is in this figure. With nothing to rank it "
-        "against, the fills are grey. Plot it with methods scored on the same dataset."]
+        "Only one method, PCA_LSI_stack: nothing to rank it against, so the fills are grey."]
 
 
 def test_equal_column_warning_is_plain():
@@ -176,8 +175,7 @@ def test_several_datasets_warning_is_plain():
     df = pd.concat([d11, d11.assign(dataset="D11b")], ignore_index=True).assign(source="user")
     _, msgs = _messages(_build_table, df)
     assert msgs == [
-        "This figure averages each method over 2 datasets, D11 and D11b. Its rows "
-        "mix datasets. mtb.plot.bar ranks the methods within each dataset; or filter "
-        "to one dataset."]
+        "This figure averages each method over 2 datasets, D11 and D11b. Plot one "
+        "dataset, or use mtb.plot.bar."]
 
 

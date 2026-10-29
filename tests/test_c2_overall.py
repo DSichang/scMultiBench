@@ -177,7 +177,14 @@ def test_bar_of_a_family_only_your_rows_have():
 def _article(st, metrics):
     """The article's score of a stored-only table, from the per-dataset max-ranks:
     mean over the datasets of minmax(mean rank), best first, ties by name."""
-    parts = style.per_dataset_ranks(st, metrics)
+    rows = st[st["metric"].isin(metrics)] if metrics else st
+    parts = {}
+    for ds, g in rows.groupby("dataset", sort=True):
+        mat = g.pivot_table(index="method", columns="metric", values="value")
+        mat = mat.dropna(axis=1, how="all")
+        mat = mat.drop(columns=style.lone_columns(mat))
+        if not mat.empty:
+            parts[ds] = mat.apply(lambda col: style.rank_max(col.to_numpy()), axis=0)
     def per_ds(mat):            # minmax of the mean per-column max-rank
         mean_rank = mat.apply(lambda col: style.rank_max(col.to_numpy()), axis=0).mean(axis=1)
         return pd.Series(style.minmax(mean_rank.to_numpy()), index=mat.index)

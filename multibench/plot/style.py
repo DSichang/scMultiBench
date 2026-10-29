@@ -53,39 +53,15 @@ def rank_max(x: np.ndarray) -> np.ndarray:
 
 # cross-dataset summary math, shared by bubble and bar
 
-def per_dataset_ranks(long_df: pd.DataFrame, metrics=None) -> dict:
-    """Within-dataset max-ranks: ``{dataset: DataFrame(method x metric)}``.
-
-    For each dataset the frame is pivoted to method x metric (mean over
-    duplicate rows), metrics that dataset never computed are dropped, and
-    every remaining column is replaced by its max-rank (1 = worst ... n =
-    best, ties share the maximum rank). A metric only one of three or more
-    methods has is dropped too (:func:`lone_columns`); ``attrs["lone"]``
-    names it. A frame without a ``dataset`` column
-    is treated as one dataset named ``"all"``. Datasets whose pivot is empty
-    are skipped.
-    """
-    rows = long_df[long_df["metric"].isin(metrics)] if metrics else long_df
-    if rows.empty:
-        raise ValueError("no rows left after filtering to metrics=%r" % (metrics,))
-    if "dataset" not in rows.columns:
-        rows = rows.assign(dataset="all")
-    out = {}
-    for ds, group in rows.groupby("dataset", sort=True):
-        mat = group.pivot_table(index="method", columns="metric", values="value",
-                                aggfunc="mean")
-        mat = mat.dropna(axis=1, how="all")
-        if mat.empty:
-            continue
-        # a metric only one method has ranks nothing, as rank's min-max rule
-        lone = lone_columns(mat)
-        mat = mat.drop(columns=lone)
-        ranked = mat.apply(lambda col: rank_max(col.to_numpy()), axis=0)
-        ranked.attrs["lone"] = lone
-        out[ds] = ranked
-    if not out:
-        raise ValueError("no dataset had usable metrics")
-    return out
+def dataset_tables(long_df: pd.DataFrame) -> dict:
+    """``{dataset: method x metric}`` means of a long table, for the warnings of
+    a summary over datasets; a frame without ``dataset`` is one dataset
+    ``"all"``, and a dataset with no value is left out."""
+    groups = (long_df.groupby("dataset", sort=True) if "dataset" in long_df.columns
+              else [("all", long_df)])
+    return {ds: mat for ds, g in groups
+            if not (mat := g.pivot_table(index="method", columns="metric",
+                                         values="value")).empty}
 
 
 def lone_columns(mat: pd.DataFrame) -> list:
@@ -225,14 +201,12 @@ def _lone_method_messages(parts: dict, consequence: str) -> list:
             for ds, mat in parts.items() if len(mat.index) == 1]
 
 
-def coverage_warnings(parts: dict, *, basis: str, incomplete_fix: str) -> list:
-    """The warnings a cross-dataset summary of ``parts`` needs, as messages.
+def coverage_warnings(parts: dict) -> list:
+    """The warnings ``plot.bar``'s summary of ``parts`` needs, as messages.
 
-    ``parts`` is ``{dataset: method x metric frame}``, as :func:`per_dataset_ranks`
-    returns, ``basis`` the ``overall=`` in use and ``incomplete_fix`` the
-    caller's remedy sentence.
-    One message when no method spans two datasets, else one when a method
-    misses a dataset; plus one per dataset that holds a single method.
+    ``parts`` is ``{dataset: method x metric frame}``, as :func:`dataset_tables`
+    returns. One message when no method spans two datasets, else one when a
+    method misses a dataset; plus one per dataset that holds a single method.
     """
     n = len(parts)
     per_method = coverage(parts)
@@ -246,12 +220,9 @@ def coverage_warnings(parts: dict, *, basis: str, incomplete_fix: str) -> list:
         seen = " ".join(
             f"{_and_list(ms)} {'has' if len(ms) == 1 else 'have'} scores on {c} of them."
             for c, ms in by_count.items())
-        missing = ("A missing dataset is left out." if basis == "mean_overall"
-                   else "A missing dataset counts as rank 0, the lowest.")
-        out.append(f"The summary ranks {n} datasets. {seen} {missing} {incomplete_fix}")
-    out += _lone_method_messages(
-        parts, "its Overall there is always 1.0" if basis == "mean_overall"
-        else "its rank there is always the lowest")
+        out.append(f"The summary ranks {n} datasets. {seen} A missing dataset is left out. "
+                   f"Pass methods= with the methods scored on every dataset.")
+    out += _lone_method_messages(parts, "its Overall there is always 1.0")
     return out
 
 
@@ -259,8 +230,6 @@ def dataset_mode_warnings(parts: dict) -> list:
     """The warnings a figure of raw values from several datasets needs.
 
     The bubble figure ranks rows from different datasets against each other.
-    ``mtb.plot.bar`` is suggested only when every method has rows in at least
-    two datasets and no dataset holds a single method.
     """
     n = len(parts)
     if n <= 1:
@@ -270,10 +239,8 @@ def dataset_mode_warnings(parts: dict) -> list:
     none_shared = _no_overlap_message(parts)
     if none_shared:
         return [none_shared] + lone
-    fix = ("mtb.plot.bar ranks the methods within each dataset; or filter to one dataset."
-           if (coverage(parts) >= 2).all() and not lone else "Plot each dataset on its own.")
     return [f"This figure averages each method over {n} datasets, {_and_list(parts)}. "
-            f"Its rows mix datasets. {fix}"] + lone
+            f"Plot one dataset, or use mtb.plot.bar."] + lone
 
 
 def constant_columns(mat: pd.DataFrame) -> dict:
@@ -295,7 +262,7 @@ def constant_columns(mat: pd.DataFrame) -> dict:
 #: the clusters part of a 0.4.0 ``scored_with``: the article's resolution
 #: search, the user's own clusters, or none (classification only)
 SCORING_PROTOCOLS = ("search", "user", "none")
-#: first package version that scores with :data:`SCORING_PROTOCOL`
+#: first package version that scores with :data:`SCORING_PROTOCOLS`
 SCORING_VERSION = (0, 4, 0)
 
 
@@ -362,7 +329,7 @@ def backend_warning(df: pd.DataFrame) -> str | None:
     The stored tables were clustered with leidenalg. A row is affected when
     its ``scored_with`` starts with ``igraph/`` and its metric came from
     Leiden: iF1, ARI_batch and NMI_batch always; ARI, NMI, ASW and iASW when
-    the clusters part is ``search`` (ARI and NMI also ``sweep``, before 0.4).
+    the clusters part is ``search``.
     Rows without ``scored_with`` (NaN) never trigger the igraph check.
     """
     old = old_scoring_warning(df)
@@ -379,8 +346,7 @@ def backend_warning(df: pd.DataFrame) -> str | None:
     metric = df["metric"]
     hit = (flavor == "igraph") & (
         metric.isin(["iF1", "ARI_batch", "NMI_batch"])
-        | (metric.isin(["ARI", "NMI", "ASW", "iASW"]) & (clusters == "search"))
-        | (metric.isin(["ARI", "NMI"]) & (clusters == "sweep")))
+        | (metric.isin(["ARI", "NMI", "ASW", "iASW"]) & (clusters == "search")))
     if not hit.any():
         return None
     names = ", ".join(sorted(map(str, df.loc[hit, "method"].unique())))

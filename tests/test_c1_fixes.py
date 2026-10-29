@@ -49,7 +49,7 @@ def test_batch_metrics_on_one_batch_are_refused():
     emb = np.random.default_rng(0).normal(size=(40, 3))
     labels = ["a", "b"] * 20
     for metrics in ("batch", ["ARI_batch", "NMI_batch"], ["ASW_batch"]):
-        with pytest.raises(ValueError, match="needs two or more batches; every cell is in "
+        with pytest.raises(ValueError, match="cannot be computed: every cell is in "
                                              "one batch"):
             mtb.evaluate(emb, labels, batch=["b1"] * 40, metrics=metrics, verbose=False)
     # the default leaves them out

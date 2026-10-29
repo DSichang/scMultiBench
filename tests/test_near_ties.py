@@ -62,9 +62,10 @@ def _noise_frame():
 def test_build_table_near_tie_ranks_are_equal():
     from multibench.plot.bubble import _build_table
     tbl = _build_table(_noise_frame())
-    assert tbl.ranks["iLISI"].nunique() == 1
-    assert tbl.norm["iLISI"].tolist() == [1.0, 1.0, 1.0]
-    assert tbl.overall.nunique() == 1
+    (batch,) = tbl.blocks
+    assert len(set(style.rank_max(batch.raw["iLISI"].to_numpy()))) == 1
+    assert batch.norm["iLISI"].tolist() == [1.0, 1.0, 1.0]
+    assert style.overall(_noise_frame()).nunique() == 1
 
 
 def _old_rank_max(x):

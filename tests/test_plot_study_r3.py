@@ -53,16 +53,14 @@ def test_rank_documents_the_backend_line():
 
 # --- R3-08 -------------------------------------------------------------------
 
-def test_na_warning_stops_after_three_rows():
+def test_na_warning_names_the_rows_in_one_sentence():
     frames = []
     for i, m in enumerate("ABCDE"):
         rows = _mine(m, "X", base=0.1 * i)
         frames.append(rows[rows["metric"] != "NMI"] if m != "E" else rows)
     _, msgs = _messages(_build_table, pd.concat(frames, ignore_index=True))
-    (msg,) = [m for m in msgs if "has no" in m]
-    assert msg.count("has no NMI.") == 3
-    assert "... and 1 more row." in msg
-    assert msg.endswith("Pass metrics= without NMI to compare on the same metrics.")
+    assert [m for m in msgs if "have no" in m] == [
+        "D, C, B and A have no NMI. Pass metrics= without NMI to compare on the same metrics."]
 
 
 # ---- restored from before the 0.4 cut: kept behaviour

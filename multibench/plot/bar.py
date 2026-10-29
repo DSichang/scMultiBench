@@ -81,16 +81,7 @@ def bar(long_df: pd.DataFrame, *, metrics=None, methods=None, title: str | None 
         long_df = long_df[long_df["method"].isin(methods)]
     family = (metrics.lower() if isinstance(metrics, str)
               and metrics.lower() in FAMILY_METRICS else None)
-    if family:
-        metrics = FAMILY_METRICS[family]
-        present = set(long_df["metric"].unique())
-        if not (set(metrics) & present):
-            why = ("The stored results have none. mtb.evaluate computes them on "
-                   "multi-batch data." if family == "classification" else
-                   "Batch metrics need a multi-batch dataset - a single-batch design "
-                   "has none to compute.")
-            raise ValueError(f"no {family!r} metrics present. Found {sorted(present)}. {why}")
-    elif metrics is not None:
+    if metrics is not None:
         names = long_df["metric"].dropna().unique().tolist()
         metrics = _resolve(_expand_families(metrics, names), names, "metric",
                            catalog._canonical_metric)
@@ -99,16 +90,11 @@ def bar(long_df: pd.DataFrame, *, metrics=None, methods=None, title: str | None 
     _refuse_repeats(picked)
     mean = style.overall(long_df, metrics)       # refuses your rows on another dataset
     # the methods and metrics of each dataset, for the warnings
-    groups = picked.groupby("dataset") if "dataset" in picked.columns else [("all", picked)]
-    parts = {ds: mat for ds, g in groups
-             if not (mat := g.pivot_table(index="method", columns="metric",
-                                          values="value")).empty}
+    parts = style.dataset_tables(picked)
     lone = style.lone_message({ds: style.lone_columns(mat) for ds, mat in parts.items()})
     if lone:
         _text.warn(lone, UserWarning)
-    for msg in style.coverage_warnings(
-            parts, basis="mean_overall",
-            incomplete_fix="Pass methods= with the methods scored on every dataset."):
+    for msg in style.coverage_warnings(parts):
         _text.warn(msg, UserWarning)
     backend = style.backend_warning(picked)
     if backend:

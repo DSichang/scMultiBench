@@ -8,6 +8,16 @@ import pandas as pd
 bubble = importlib.import_module("multibench.plot.bubble")
 
 
+def _matrix(tbl, what):
+    """The ``what`` frames (``raw`` or ``norm``) of every block, in figure order."""
+    return pd.concat([getattr(b, what) for b in tbl.blocks], axis=1)
+
+
+def _ranks(raw):
+    """The per-column max-ranks of a method x metric frame (``n`` = best)."""
+    return raw.apply(lambda col: bubble.style.rank_max(col.to_numpy()), axis=0)
+
+
 def _toy_long():
     return pd.DataFrame(
         {
@@ -22,17 +32,18 @@ def _toy_long():
 
 def test_build_table_pivots_and_adds_overall():
     tbl = bubble._build_table(_toy_long(), metrics=["ARI", "NMI"])
-    assert set(tbl.norm.columns) == {"ARI", "NMI"}
-    assert set(tbl.norm.index) == {"A", "B"}
+    norm = _matrix(tbl, "norm")
+    assert set(norm.columns) == {"ARI", "NMI"}
+    assert set(norm.index) == {"A", "B"}
     # B dominates both metrics -> higher overall
-    assert tbl.overall["B"] > tbl.overall["A"]
+    assert tbl.blocks[0].overall["B"] > tbl.blocks[0].overall["A"]
     # rows sorted by overall descending by default
-    assert list(tbl.norm.index) == ["B", "A"]
+    assert list(norm.index) == tbl.methods == ["B", "A"]
 
 
 def test_build_table_respects_method_filter():
     tbl = bubble._build_table(_toy_long(), metrics=["ARI"], methods=["A"])
-    assert list(tbl.norm.index) == ["A"]
+    assert list(_matrix(tbl, "norm").index) == ["A"]
 
 
 def test_render_returns_figure_with_circles(tmp_path):
@@ -116,7 +127,7 @@ def test_bubble_is_plain_function_with_signature_and_docstring():
 def test_metrics_order_is_honoured():
     import matplotlib; matplotlib.use("Agg")
     tbl = bubble._build_table(_three(), metrics=["NMI", "ARI", "iF1"])
-    assert list(tbl.raw.columns) == ["NMI", "ARI", "iF1"]
+    assert list(_matrix(tbl, "raw").columns) == ["NMI", "ARI", "iF1"]
     fig = bubble.render(tbl)
     labels = [t.get_text() for t in fig.axes[0].texts if t.get_text() in {"NMI", "ARI", "iF1"}]
     assert labels == ["NMI", "ARI", "iF1"]
@@ -124,11 +135,11 @@ def test_metrics_order_is_honoured():
     long = _three()
     extra = long[long.metric == "ARI"].assign(metric="GC")
     tbl2 = bubble._build_table(pd.concat([long, extra]), metrics=["GC", "ARI"])
-    assert list(tbl2.raw.columns) == ["ARI", "GC"]
+    assert list(_matrix(tbl2, "raw").columns) == ["ARI", "GC"]
 
 
 def test_unknown_metric_raises_with_available():
-    with pytest.raises(ValueError, match=r"^Unknown metric F1\. ") as e:
+    with pytest.raises(ValueError, match=r"^F1 is not in the table\. ") as e:
         bubble._build_table(_three(), metrics=["ARI", "NMI", "F1"])
     assert "The table has ARI, NMI and iF1." in str(e.value)
 
@@ -139,12 +150,12 @@ def test_unknown_method_lists_the_table():
     assert tbl.methods == ["scJoint"]
     with pytest.raises(ValueError) as e:
         bubble._build_table(long, methods=["scjiont"])
-    assert str(e.value) == "Unknown method scjiont. The table has B, C and scJoint."
+    assert str(e.value) == "scjiont is not in the table. The table has B, C and scJoint."
 
 
 def test_metric_alias_resolves():
     tbl = bubble._build_table(_three(), metrics=["ari", "nmi"])
-    assert list(tbl.raw.columns) == ["ARI", "NMI"]
+    assert list(_matrix(tbl, "raw").columns) == ["ARI", "NMI"]
     with pytest.raises(ValueError, match="more than once"):
         bubble._build_table(_three(), metrics=["ARI", "ari"])
 
@@ -190,34 +201,20 @@ def test_chips_unknown_and_known(monkeypatch):
     assert len(badges) == 3
 
 
-# --- P10: BubbleTable.ranks / .norm as the concatenation over blocks -------
-import importlib
-B = importlib.import_module("multibench.plot.bubble")     # the module, not the function
-
-def test_table_ranks_concatenates_blocks_in_figure_order():
-    long = _three()
-    long = pd.concat([long, pd.DataFrame({"method": ["A", "B", "C"], "metric": "GC",
-                                          "value": [0.3, 0.9, 0.6], "dataset": "D1"})])
-    tbl = bubble._build_table(long, metrics=["NMI", "ARI", "GC"])
-    assert list(tbl.ranks.columns) == list(tbl.norm.columns) == ["NMI", "ARI", "GC"]
-    assert tbl.ranks.index.tolist() == tbl.methods
-    for b in tbl.blocks:
-        for c in b.ranks.columns:
-            assert tbl.ranks[c].equals(b.ranks[c])
-
-
+# --- P10: the per-column ranks and min-max values ---------------------------
 def test_table_ranks_are_max_ranks():
     tbl = bubble._build_table(_three())
     n = len(tbl.methods)
-    for c in tbl.ranks.columns:
-        assert tbl.ranks[c].max() == n and tbl.ranks[c].min() == 1   # n = best
+    ranks = _ranks(_matrix(tbl, "raw"))
+    for c in ranks.columns:
+        assert ranks[c].max() == n and ranks[c].min() == 1   # n = best
     # the legend's 1 = best is the row position
-    assert tbl.methods.index(tbl.ranks["ARI"].idxmax()) + 1 == 1
+    assert tbl.methods.index(ranks["ARI"].idxmax()) + 1 == 1
 
 
 def test_table_norm_is_matrix():
     tbl = bubble._build_table(_three())
-    assert tbl.norm.index.tolist() == tbl.methods
+    assert _matrix(tbl, "norm").index.tolist() == tbl.methods
 
 
 # --- the figure carries its legends and nothing under them -------------------
@@ -230,20 +227,18 @@ def _with_gap():
 
 
 def test_na_warn_default_names_method_and_rule():
-    # R3-08: short sentences that name the row (no source column: plain "Row")
-    with pytest.warns(UserWarning, match=r"Row B \(D1\) has no NMI\.") as rec:
+    with pytest.warns(UserWarning) as rec:
         tbl = bubble._build_table(_with_gap())
-    msg = str([w for w in rec if "has no NMI" in str(w.message)][0].message)
-    assert "Pass metrics= without NMI to compare on the same metrics." in msg   # Y29 (r3)
-    assert tbl.na_cells == ["B: Clustering Overall over 2 of 3 metrics (NMI n/a)"]
+    assert [str(w.message) for w in rec if "has no NMI" in str(w.message)] == [
+        "B has no NMI. Pass metrics= without NMI to compare on the same metrics."]
     # the arithmetic the message describes: B's Overall is the mean over ARI, cLISI ranks
     b = tbl.blocks[0]
     assert b.overall["B"] == pytest.approx(
-        bubble.style.minmax(b.ranks.mean(axis=1).to_numpy())[tbl.methods.index("B")])
+        bubble.style.minmax(_ranks(b.raw).mean(axis=1).to_numpy())[tbl.methods.index("B")])
 
 
 def test_circles_of_values_tied_by_rounding_have_one_size():
-    # tbl.ranks counts 0.0 and 2.2e-16 as a tie; the circle sizes must agree
+    # the ranks count 0.0 and 2.2e-16 as a tie; the circle sizes must agree
     import importlib
     from matplotlib.patches import Circle
     B = importlib.import_module("multibench.plot.bubble")
