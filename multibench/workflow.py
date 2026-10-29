@@ -2307,11 +2307,11 @@ def _dataset_folder(dataset, data_path) -> Path:
 
 def _root_tries(rec: dict) -> list:
     """The data roots a saved record's dataset is looked up under: the recorded
-    ``data_path`` (``None`` = config's), then ``data_root``."""
+    ``data_path``, then ``data_root``, then config's (``None``)."""
     tries = [rec.get("data_path")]
     if rec.get("data_root"):
         tries.append(rec["data_root"])
-    return tries
+    return tries + [None]
 
 
 def _dataset_root(rec: dict, dataset: str) -> tuple:
