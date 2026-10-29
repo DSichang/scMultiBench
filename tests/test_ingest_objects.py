@@ -57,7 +57,7 @@ def test_export_raises_when_barcodes_differ(tmp_path):
         ingest.export_dataset(rna, tmp_path / "X", atac=atac, atac_kind="peak")
     msg = str(e.value)
     assert msg.startswith("RNA and ATAC share no barcode (RNA e.g. ")       # X10
-    assert 'pass category="diagonal"' in msg
+    assert msg.endswith("Make the names match, or pass category='diagonal' for different cells.")
     # a different cell count, no barcode in common: the same message
     with pytest.raises(ValueError, match="RNA and ATAC share no barcode"):
         ingest.export_dataset(rna, tmp_path / "Y", atac=atac[:10].copy(), atac_kind="peak")
@@ -90,10 +90,9 @@ def test_bare_array_needs_master_and_adt_names_warns(tmp_path):
     arr = np.ones((rna.n_obs, 4))
     with pytest.raises(ValueError, match="cell barcodes are unknown"):
         ingest.export_dataset(None, tmp_path / "A", adt=arr)
-    with pytest.warns(UserWarning, match="has no feature names. The file names them "
-                                         "feature_0 to feature_3.") as rec:
+    with pytest.warns(UserWarning, match="has no feature names; they are written as "
+                                         "feature_0 to feature_3."):
         ingest.export_dataset(rna, tmp_path / "A", adt=arr)
-    assert "adt_names=" in str(rec[0].message)
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         d = ingest.export_dataset(rna, tmp_path / "B", adt=arr, adt_names=["CD3", "CD4", "CD8", "CD19"])

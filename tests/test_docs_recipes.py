@@ -519,10 +519,8 @@ def test_csv_recipe_names_another_missing_text(tmp_path, monkeypatch, capsys):
     with pytest.raises(ValueError) as e:
         mtb.io.export_dataset(ns["adata"], "mydata/MYCSV", rna="X", labels="obs:celltype")
     assert str(e.value) == (
-        "labels='obs:celltype': 12 of the 300 labels for the cells (the AnnData's obs) are missing "
-        "(NaN, None, '' or text such as 'N/A'); keep the labelled cells first: adata = "
-        "adata[~adata.obs[\"celltype\"].astype(str).str.strip().isin(['', 'N/A', 'None', "
-        "'nan'])]")
+        "labels='obs:celltype': 12 of the 300 labels for the cells are missing (NaN, None, '' "
+        "or text such as 'N/A'). Keep only the labelled cells first.")
     assert not Path("mydata").exists()
     ns = {"mtb": mtb, "adata": adata.copy()}
     _run_cell(add.replace(listed, '["", "NA", "nan", "N/A"]'), ns)
@@ -763,8 +761,8 @@ def test_a_diagonal_folder_with_labels_for_one_side_is_not_scored(host, tmp_path
     atac = _cells(60, seed=1)
     atac.obs_names = [f"A{i:04d}-1" for i in range(60)]
     # export_dataset does not write the labels of one side alone
-    with pytest.raises(KeyError, match=r"Without cell types for the ATAC cells, leave labels= "
-                                       r"out\.\"?$"):
+    with pytest.raises(KeyError, match=r"not in obs of the ATAC object \(atac\); "
+                                       r"available: \[.*\]\.\"?$"):
         mtb.io.export_dataset(rna, "mydata/ONESIDE", atac=atac, atac_kind="gene_activity",
                               labels="obs:celltype", category="diagonal")
     assert not Path("mydata").exists()
@@ -891,17 +889,15 @@ def test_labels_later_on_a_diagonal_folder(key, host, tmp_path, monkeypatch):
     export, rescore = _later()
 
     # the line of the recipe, with the RNA object of the tutorial for adata
-    with pytest.raises(FileExistsError, match=r" with other cells\. To add labels, run the "
-                                              r"export call that wrote the folder again with "
-                                              r"labels= and overwrite=True\.$"):
+    with pytest.raises(FileExistsError, match=r" of other data\. Export to a new folder\.$"):
         _run_cell(export.replace("(adata,", f"({rna},"), dict(ns))
     assert _bytes(folder) == before
     # "Diagonal data needs the column in both files."
     one_side = dict(ns)
     one_side[atac] = ns[atac].copy()
     del one_side[atac].obs["celltype"]
-    with pytest.raises(KeyError, match=r"Without cell types for the ATAC cells, leave labels= "
-                                       r"out\.\"?$"):
+    with pytest.raises(KeyError, match=r"not in obs of the ATAC object \(atac\); "
+                                       r"available: \[.*\]\.\"?$"):
         _run_cell(export_cell, one_side)
     assert _bytes(folder) == before
 
@@ -1090,7 +1086,7 @@ def test_details_name_the_filter_error_and_the_files_of_other_data(tmp_path):
     for overwrite in (False, True):
         with pytest.raises(FileExistsError) as left:
             mtb.io.export_dataset(other, tmp_path / "ARC", overwrite=overwrite)
-        assert str(left.value) == (f"{out} holds atac.h5 and 1 more file with other cells. "
+        assert str(left.value) == (f"{out} holds atac.h5 and 1 more file of other data. "
                                    f"Export to a new folder.")
     assert _bytes(out) == before
 

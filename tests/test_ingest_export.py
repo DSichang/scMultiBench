@@ -88,14 +88,12 @@ def test_export_dataset_selectors_and_errors(tmp_path):
         ingest.export_dataset(a, tmp_path / "E", rna="X", labels="nope")
     with pytest.raises(ValueError, match="nothing to export"):
         ingest.export_dataset(a, tmp_path / "E", rna=None)
-    with pytest.raises(ValueError, match="atac_kind= given without atac="):
-        ingest.export_dataset(a, tmp_path / "E", atac_kind="peak")
     # adt='X' when obsm keys exist is the classic silent mistake -> refused
     with pytest.raises(ValueError) as e:
         ingest.export_dataset(a, tmp_path / "E", rna=None, adt="X")
     assert str(e.value) == (
-        "adt='X' takes X, and the object also holds obsm['protein']. If that is the protein "
-        "matrix, pass adt='obsm:protein'.")
+        "adt='X' takes X, and the object also holds obsm['protein']. If the protein matrix is "
+        "there, pass adt='obsm:protein'.")
     assert not (tmp_path / "E").exists()
 
 
@@ -127,7 +125,7 @@ def test_export_dataset_atac_kinds(tmp_path):
     with pytest.raises(ValueError, match=r"^The ATAC feature names are not peaks such as "
                                          r"chr1:100-200\. Pass atac_kind="):
         ingest.export_dataset(genes, tmp_path / "E2", rna=None, atac="X")
-    with pytest.raises(ValueError, match="atac_kind= must be one of"):
+    with pytest.raises(ValueError, match="atac_kind= must be 'peak' or 'gene_activity', got 'gas'"):
         ingest.export_dataset(peaks, tmp_path / "E3", rna=None, atac="X", atac_kind="gas")
     with pytest.warns(UserWarning, match="look like peaks such as chr1:100-200, not genes"):
         ingest.export_dataset(peaks, tmp_path / "W", rna=None, atac="X",

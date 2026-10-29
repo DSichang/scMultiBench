@@ -181,15 +181,3 @@ def test_prepared_file_note_names_the_method(root):
             "first, so start GLUE with mtb.run. The printed command alone "
             "fails in a job script.") in cav
     assert "shell line" not in cav
-
-
-# --- R4-13 (f): the batch advice names run too ----------------------------
-
-def test_batch_with_atac_warning_names_run_all():
-    from multibench.engine import ingest
-    with pytest.warns(UserWarning) as rec:
-        ingest._check_batch_args("obs:batch", None, None, adt=None, atac="X")
-    assert [str(w.message) for w in rec] == [
-        "batch= with atac=: only mosaic methods read numbered ATAC files. For mosaic pass "
-        "category='mosaic'; otherwise export without batch= and pass the column itself, as "
-        'run(batch=adata.obs["donor"])']

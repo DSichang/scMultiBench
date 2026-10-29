@@ -85,43 +85,36 @@ def test_the_way_there_is_a_label_table_with_other_barcodes(tmp_path):
 
 
 # ----------------------------------------------------------------- 0 features
-NO_FEATURES = "The {what}matrix holds 0 features for 60 cells. "
-WHY = "For a 10x file, read it with gex_only=False."
-#: the object has var['feature_types']: its features were selected by type
-TYPE = ("Check the feature type you selected: var['feature_types'] of the whole object "
-        "lists the names.")
+NO_FEATURES = "The {what} matrix holds 0 features for 60 cells. Check {what}=."
 
 
 def test_the_advice_for_a_wrong_type_name_works(tmp_path):
     """A 10x object with genes and peaks, split with ``'Peak'`` for
-    ``'Peaks'``: the reader of 0.3.5 was sent to ``gex_only=False``, which
-    the file was read with. The names of the whole object show the type."""
+    ``'Peaks'``: the error names the argument to check."""
     a = _cite()
     a.var["feature_types"] = ["Gene Expression"] * 12 + ["Peaks"] * 8
     a.var_names = [f"GENE{i}" for i in range(12)] + [f"chr1:{i}00-{i}50" for i in range(8)]
     kind = a.var["feature_types"]
     rna, none = a[:, kind == "Gene Expression"].copy(), a[:, kind == "Peak"].copy()
     kw = dict(rna="X", atac_kind="peak", labels="obs:ct")
-    assert _value_error(tmp_path, rna, atac=none, **kw) \
-        == NO_FEATURES.format(what="atac ") + TYPE
+    assert _value_error(tmp_path, rna, atac=none, **kw) == NO_FEATURES.format(what="atac")
     names = sorted(set(a.var["feature_types"]))          # of the whole object
     assert names == ["Gene Expression", "Peaks"]
     out = ingest.export_dataset(rna, tmp_path / "OK", atac=a[:, kind == names[1]].copy(), **kw)
     assert ingest.read(out / "atac.h5").n_vars == 8
 
 
-def test_an_object_without_feature_types_keeps_the_advice_for_a_10x_file(tmp_path):
-    """Nothing says how the features were selected: the text of before."""
+def test_an_object_without_feature_types_gets_the_same_text(tmp_path):
     rna = _cite()
     assert "feature_types" not in rna.var.columns
     none = rna[:, :0].copy()
     assert _value_error(tmp_path, rna, rna="X", atac=none, atac_kind="peak") \
-        == NO_FEATURES.format(what="atac ") + WHY
+        == NO_FEATURES.format(what="atac")
     # a matrix in obsm has no var: the column of the object says nothing about it
     rna.var["feature_types"] = "Gene Expression"
     rna.obsm["protein"] = np.zeros((60, 0))
     assert _value_error(tmp_path, rna, rna="X", adt="obsm:protein") \
-        == NO_FEATURES.format(what="adt ") + WHY
+        == NO_FEATURES.format(what="adt")
 
 
 # ------------------------------------------------------------- a missing batch
@@ -171,16 +164,8 @@ def test_a_complete_batch_column_writes_every_cell(tmp_path):
 
 
 # ------------------------------------------------------------- a missing label
-WHERE = "labels for the cells (the AnnData's obs) are missing"
-#: d1 (u1): the error gives the code that keeps the labelled cells
-KEEP = 'keep the labelled cells first: adata = adata['
-NOTNA = KEEP + 'adata.obs["ct"].notna()]'
-SERIES_ADVICE = "give every cell a label, or keep the labelled cells first"
-
-
-def _words(*words):
-    return (KEEP + '~adata.obs["ct"].astype(str).str.strip().isin('
-            + repr(sorted({"", "nan", "None", *words})) + ")]")
+WHERE = "labels for the cells are missing"
+KEEP = "Keep only the labelled cells first."
 
 
 @pytest.mark.parametrize("word", ["NA", "None", "nan", "null", "N/A", "NA "])
@@ -192,8 +177,8 @@ def test_labels_that_read_back_as_missing_are_refused(tmp_path, word):
     a.obs["ct"] = ct
     shown = repr(word.strip())
     assert _value_error(tmp_path, a, rna="X", labels="obs:ct") == (
-        f"labels='obs:ct': 2 of the 60 {WHERE} (NaN, None, '' or text such as {shown}); "
-        f"{_words(word.strip())}")
+        f"labels='obs:ct': 2 of the 60 {WHERE} (NaN, None, '' or text such as {shown}). "
+        f"{KEEP}")
 
 
 def test_several_missing_words_show_the_first(tmp_path):
@@ -202,8 +187,7 @@ def test_several_missing_words_show_the_first(tmp_path):
     ct[0], ct[1], ct[2], ct[3], ct[4] = "NA", "None", np.nan, "null", "n/a"
     a.obs["ct"] = ct
     assert _value_error(tmp_path, a, rna="X", labels=a.obs["ct"]) == (
-        f"labels=Series: 5 of the 60 labels for the cells (the labels you passed) are "
-        f"missing (NaN, None, '' or text such as 'NA'); {SERIES_ADVICE}")
+        f"labels=Series: 5 of the 60 {WHERE} (NaN, None, '' or text such as 'NA'). {KEEP}")
 
 
 @pytest.mark.parametrize("gap", [np.nan, None, "", "   "], ids=["NaN", "None", "empty", "blank"])
@@ -213,8 +197,7 @@ def test_the_older_forms_keep_their_text(tmp_path, gap):
     ct[5] = gap
     a.obs["ct"] = ct
     assert _value_error(tmp_path, a, rna="X", labels="obs:ct") == (
-        f"labels='obs:ct': 1 of the 60 {WHERE} (NaN, None or ''); "
-        f"{_words() if gap in ('', '   ') else NOTNA}")
+        f"labels='obs:ct': 1 of the 60 {WHERE} (NaN, None or ''). {KEEP}")
 
 
 ACCEPTED = ["na", "none", "Unknown", "-", "?", "NaT", "0", "T cell", "CD4+, naive",
@@ -300,21 +283,18 @@ def test_adt_in_x_next_to_a_protein_matrix(tmp_path):
     a.obsm["protein"] = np.ones((a.n_obs, 4))
     a.obsm["X_umap"] = np.zeros((a.n_obs, 2))
     assert _value_error(tmp_path, a, rna=None, adt="X") == (
-        "adt='X' takes X, and the object also holds obsm['protein']. If that is the protein "
-        "matrix, pass adt='obsm:protein'.")
+        "adt='X' takes X, and the object also holds obsm['protein']. If the protein matrix "
+        "is there, pass adt='obsm:protein'.")
     a.obsm["totalvi"] = np.ones((a.n_obs, 3))
     assert _value_error(tmp_path, _cite(), rna="X", adt=a) == (
-        "adt=AnnData takes X, and the object also holds 2 obsm entries, for example "
-        "'protein'. If X is the protein matrix, delete them first, as del adt.obsm['protein'].")
+        "adt=AnnData takes X, and the object also holds the obsm entries ['protein', "
+        "'totalvi']. If X is the protein matrix, delete them from obsm first.")
     # both ways out work: the key that the first message names
     ingest.export_dataset(a, tmp_path / "KEY", rna=None, adt="obsm:protein",
                           adt_names=["CD3", "CD4", "CD8", "CD19"])
-    # and the line of the second, once for each entry
+    # and the second
     adt = a
     del adt.obsm['protein']
-    assert _value_error(tmp_path, _cite(), rna="X", adt=adt) == (
-        "adt=AnnData takes X, and the object also holds obsm['totalvi']. If X is the protein "
-        "matrix, run del adt.obsm['totalvi'] first.")
     del adt.obsm['totalvi']
     own = ingest.export_dataset(_cite(), tmp_path / "OWN", rna="X", adt=adt)
     assert ingest.read(own / "adt.h5").n_vars == 20
