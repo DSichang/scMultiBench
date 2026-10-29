@@ -1688,132 +1688,129 @@ class RunResult:
         mtb.evaluate : the scoring function applied per record.
         RunResult.save : persist the re-scored result.
         """
+        import copy
         with warnings.catch_warnings():
             # load_run chose the data folder: no note on a same-named one here
             warnings.filterwarnings("ignore", message=r"Using .*; \./.* also exists")
-            return self._rescore(batch=batch, labels=labels, metrics=metrics,
-                                 verbose=verbose)
-
-    def _rescore(self, *, batch, labels, metrics, verbose) -> "RunResult":
-        """:meth:`rescore`, without the note on a same-named folder here."""
-        import copy
-        new = RunResult([], self.dataset, self.category, out_dir=self.out_dir)
-        found = [_dataset_root(r, self.dataset) for r in self.records]
-        roots = [root for root, _ in found]
-        tried: dict = {}           # the roots searched, named when the folder is not found
-        for root, r in zip(roots, self.records):
-            tried.setdefault(root, _root_tries(r))
-        # labels and batch per data folder, before any record is scored: ids
-        # that are not cells of the dataset raise here
-        labels_at: dict = {}
-        batch_at: dict = {}
-        used = dict.fromkeys(root for root, r in zip(roots, self.records)
-                             if _status(r.get("status")) != "skipped")
-        for root in used:
-            if labels is not None:
-                labels_at[root] = _cell_vector(labels, self.dataset, root, what="labels",
-                                               order=_ROWS, moved=True,
-                                               tried=tried[root])
-            # a batch vector follows labels given in embedding row order
-            rows = labels is not None and not labels_at[root][1]
-            if batch is not None:
-                vec, by_cell = _cell_vector(batch, self.dataset, root, what="batch",
-                                            order=_ROWS if rows else None,
-                                            moved=True, tried=tried[root])
-                _check_batch(vec, self.dataset)
-                bad = not rows and not by_cell and _batch_length_problem(
-                    [(r.get("method"), r.get("modalities")) for r in self.records
-                     if _scorable(r)], vec, self.dataset, self.category, root)
-                if bad:
-                    raise ValueError(bad)
-                # saved with the result, unless it follows the embedding rows
-                file = None if rows and not by_cell else _batch_csv(vec, self.dataset, root)
-                batch_at[root] = (vec, by_cell, file)
-        if batch is None and _names_batch_metric(metrics):
-            _warn_unsaved_batch([r for r in self.records if _scorable(r)], self)
-        caveats = {root: _plan_caveats(self.dataset, self.category, root,
-                                       [r.get("method") for r in self.records
-                                        if _scorable(r)])
-                   for root in used}
-        no_output = []             # records whose saved output is not found
-        for r, (root, ok) in zip(self.records, found):
-            # n_tunable: a field of 0.3 records, stale since
-            rec = copy.deepcopy({k: v for k, v in r.items() if k not in ("_long", "n_tunable")})
-            rec["_long"] = None
-            method = rec.get("method")
-            if not _scorable(rec):
-                new.records.append(rec)
-                continue
-            rec["data_path"] = root
-            if ok and root is not None:
-                rec["data_root"] = root
-            # the plan's caveat as this version words it
-            plan = caveats.get(root)
-            if plan is not None:
-                rec["caveat"] = plan.get((method, tuple(rec.get("modalities") or ())), "")
-            try:
-                mods = rec.get("modalities") or []
-                variant = registry.get(method).select(self.category, set(mods))
+            new = RunResult([], self.dataset, self.category, out_dir=self.out_dir)
+            found = [_dataset_root(r, self.dataset) for r in self.records]
+            roots = [root for root, _ in found]
+            tried: dict = {}           # the roots searched, named when the folder is not found
+            for root, r in zip(roots, self.records):
+                tried.setdefault(root, _root_tries(r))
+            # labels and batch per data folder, before any record is scored: ids
+            # that are not cells of the dataset raise here
+            labels_at: dict = {}
+            batch_at: dict = {}
+            used = dict.fromkeys(root for root, r in zip(roots, self.records)
+                                 if _status(r.get("status")) != "skipped")
+            for root in used:
+                if labels is not None:
+                    labels_at[root] = _cell_vector(labels, self.dataset, root, what="labels",
+                                                   order=_ROWS, moved=True,
+                                                   tried=tried[root])
+                # a batch vector follows labels given in embedding row order
+                rows = labels is not None and not labels_at[root][1]
+                if batch is not None:
+                    vec, by_cell = _cell_vector(batch, self.dataset, root, what="batch",
+                                                order=_ROWS if rows else None,
+                                                moved=True, tried=tried[root])
+                    _check_batch(vec, self.dataset)
+                    bad = not rows and not by_cell and _batch_length_problem(
+                        [(r.get("method"), r.get("modalities")) for r in self.records
+                         if _scorable(r)], vec, self.dataset, self.category, root)
+                    if bad:
+                        raise ValueError(bad)
+                    # saved with the result, unless it follows the embedding rows
+                    file = None if rows and not by_cell else _batch_csv(vec, self.dataset, root)
+                    batch_at[root] = (vec, by_cell, file)
+            if batch is None and _names_batch_metric(metrics):
+                _warn_unsaved_batch([r for r in self.records if _scorable(r)], self)
+            caveats = {root: _plan_caveats(self.dataset, self.category, root,
+                                           [r.get("method") for r in self.records
+                                            if _scorable(r)])
+                       for root in used}
+            no_output = []             # records whose saved output is not found
+            for r, (root, ok) in zip(self.records, found):
+                # n_tunable: a field of 0.3 records, stale since
+                rec = copy.deepcopy({k: v for k, v in r.items()
+                                     if k not in ("_long", "n_tunable")})
+                rec["_long"] = None
+                method = rec.get("method")
+                if not _scorable(rec):
+                    new.records.append(rec)
+                    continue
+                rec["data_path"] = root
+                if ok and root is not None:
+                    rec["data_root"] = root
+                # the plan's caveat as this version words it
+                plan = caveats.get(root)
+                if plan is not None:
+                    rec["caveat"] = plan.get((method, tuple(rec.get("modalities") or ())), "")
                 try:
-                    # a record without out_dir: the folder run names
-                    emb = _load_embedding(Path(rec.get("out_dir") or Path(self.out_dir or ".")
-                                               / f"{method}_{self.dataset}"), variant)
-                except FileNotFoundError:
-                    no_output.append(method)
-                    raise
-                if emb is None:
-                    rec["status"], rec["note"] = "ran", _RAN_REASON["RUN_OK_NO_EMBEDDING"]
-                else:
-                    label_ids, labels_by_cell = labels_at.get(root, (None, False))
-                    if batch is not None:
-                        batch_ids, batch_by_cell, file = batch_at[root]
-                        rec["batch_file"] = file and file[0]
+                    mods = rec.get("modalities") or []
+                    variant = registry.get(method).select(self.category, set(mods))
+                    try:
+                        # a record without out_dir: the folder run names
+                        emb = _load_embedding(Path(rec.get("out_dir") or Path(self.out_dir or ".")
+                                                   / f"{method}_{self.dataset}"), variant)
+                    except FileNotFoundError:
+                        no_output.append(method)
+                        raise
+                    if emb is None:
+                        rec["status"], rec["note"] = "ran", _RAN_REASON["RUN_OK_NO_EMBEDDING"]
                     else:
-                        # the batch run was given, when it is saved
-                        text = self._batch_text(rec.get("batch_file"))
-                        file = text and (rec["batch_file"], text)
-                        batch_ids, batch_by_cell = ((_read_batch_csv(text)["batch"].to_numpy(), True) if text
-                                                    else (None, False))
-                    if file:
-                        new._batches[file[0]] = file[1]
-                    _score_record(rec, emb, self.dataset, self.category, root, variant,
-                                  batch=batch_ids, labels=label_ids, metrics=metrics,
-                                  labels_by_cell=labels_by_cell,
-                                  batch_by_cell=batch_by_cell,
-                                  batch_given=batch is not None,
-                                  on_rank=_rank_line(method) if verbose else None,
-                                  tried=tried[root])
-            except Exception as e:  # noqa: BLE001 - one bad record must not abort the rest
-                _drop_scores(rec)
-                rec["status"] = "ran"
-                rec["error"] = _clip_error(f"{type(e).__name__}: {e}")
-            if verbose:
-                print(f"[rescore] {method} -> {_status(rec['status'])} {_ari_tail(rec)}".rstrip(),
-                      flush=True)
-            if metrics is not None and batch is None and labels is None \
-                    and rec.get("metrics") and r.get("metrics"):
-                # the named metrics replace theirs; the other scores stay (not
-                # after new batches or labels: they were scored with the old ones)
-                rec["metrics"] = {**r["metrics"], **rec["metrics"]}
-                both = pd.concat([RunResult([r], self.dataset, self.category).long,
-                                  rec["_long"]], ignore_index=True)
-                rec["_long"] = both.drop_duplicates("metric", keep="last").set_index(
-                    "metric").loc[list(dict.fromkeys(both["metric"]))].reset_index()
-            new.records.append(rec)
-        # a saved batch that fits no label order: the batch metrics are gone
-        unused = next((r["note"] for r in new.records
-                       if str(r.get("note") or "").startswith("The saved batch is not used")),
-                      None)
-        if unused:
-            _text.warn(unused, UserWarning)
-        # a tree whose outputs are all gone (moved, or an older layout): nothing
-        # to score, so say so instead of returning a table without scores
-        tried_records = [r for r in new.records if _scorable(r)]
-        if tried_records and len(no_output) == len(tried_records):
-            raise FileNotFoundError(
-                f"No method output in {self.out_dir or '.'}. Load the folder that holds "
-                f"the method folders, or run the methods again.")
-        return new
+                        label_ids, labels_by_cell = labels_at.get(root, (None, False))
+                        if batch is not None:
+                            batch_ids, batch_by_cell, file = batch_at[root]
+                            rec["batch_file"] = file and file[0]
+                        else:
+                            # the batch run was given, when it is saved
+                            text = self._batch_text(rec.get("batch_file"))
+                            file = text and (rec["batch_file"], text)
+                            batch_ids, batch_by_cell = (
+                                (_read_batch_csv(text)["batch"].to_numpy(), True) if text
+                                else (None, False))
+                        if file:
+                            new._batches[file[0]] = file[1]
+                        _score_record(rec, emb, self.dataset, self.category, root, variant,
+                                      batch=batch_ids, labels=label_ids, metrics=metrics,
+                                      labels_by_cell=labels_by_cell,
+                                      batch_by_cell=batch_by_cell,
+                                      batch_given=batch is not None,
+                                      on_rank=_rank_line(method) if verbose else None,
+                                      tried=tried[root])
+                except Exception as e:  # noqa: BLE001 - one bad record must not abort the rest
+                    _drop_scores(rec)
+                    rec["status"] = "ran"
+                    rec["error"] = _clip_error(f"{type(e).__name__}: {e}")
+                if verbose:
+                    print(f"[rescore] {method} -> {_status(rec['status'])} "
+                          f"{_ari_tail(rec)}".rstrip(), flush=True)
+                if metrics is not None and batch is None and labels is None \
+                        and rec.get("metrics") and r.get("metrics"):
+                    # the named metrics replace theirs; the other scores stay (not
+                    # after new batches or labels: they were scored with the old ones)
+                    rec["metrics"] = {**r["metrics"], **rec["metrics"]}
+                    both = pd.concat([RunResult([r], self.dataset, self.category).long,
+                                      rec["_long"]], ignore_index=True)
+                    rec["_long"] = both.drop_duplicates("metric", keep="last").set_index(
+                        "metric").loc[list(dict.fromkeys(both["metric"]))].reset_index()
+                new.records.append(rec)
+            # a saved batch that fits no label order: the batch metrics are gone
+            unused = next((r["note"] for r in new.records
+                           if str(r.get("note") or "").startswith("The saved batch is not used")),
+                          None)
+            if unused:
+                _text.warn(unused, UserWarning)
+            # a tree whose outputs are all gone (moved, or an older layout): nothing
+            # to score, so say so instead of returning a table without scores
+            tried_records = [r for r in new.records if _scorable(r)]
+            if tried_records and len(no_output) == len(tried_records):
+                raise FileNotFoundError(
+                    f"No method output in {self.out_dir or '.'}. Load the folder that holds "
+                    f"the method folders, or run the methods again.")
+            return new
 
     def embedding(self, method: str):
         """The embedding of one method, as an AnnData.
@@ -2959,9 +2956,8 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
             # a saved run is scored again, as rescore does: its record is kept,
             # with its folder as found from here
             rec = (RunResult([dict(saved, out_dir=str(method_dir))], dataset, category,
-                               out_dir)._rescore(
-                batch=batch, labels=None, metrics=None, verbose=False).records[0]
-                if evaluate else dict(saved))
+                             out_dir).rescore(batch=batch, verbose=False).records[0]
+                   if evaluate else dict(saved))
             rec["reused"] = True
             if variant.output.kind == "embedding" and rec.get("emb_shape"):
                 _write_cell_names(rec, output, dataset, category, data_path)
