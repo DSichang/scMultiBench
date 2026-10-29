@@ -10,7 +10,6 @@ an index and its other column.
 R6-15: the catalog's cLISI and iLISI rows name the median over cells.
 """
 import os
-import json
 
 import numpy as np
 import pandas as pd
@@ -41,42 +40,31 @@ def _h5ad(tmp_path):
     return a, tmp_path / "mine_emb.h5ad"
 
 
-def _example(msg: str) -> str:
-    """The ``pd.read_csv(...)[...]`` expression a Python error suggests."""
-    start = msg.index("pd.read_csv(")
-    end = msg.index("]", start) + 1
-    return msg[start:end] + (".to_numpy()" if msg[end:].startswith(".to_numpy()") else "")
-
-
-def test_python_errors_suggest_a_series_that_works(cite, tmp_path):
+def test_python_errors_ask_for_one_column(cite, tmp_path):
     a, _ = _h5ad(tmp_path)
     sheet = _sheet(tmp_path / "obs_sheet.csv", list(a.obs_names))
-    quoted = json.dumps(str(sheet))
     with pytest.raises(ValueError) as e:
         mtb.evaluate(a, labels="celltype", batch=str(sheet), metrics=METRICS)
-    msg = str(e.value)
-    assert msg == ("The batch file obs_sheet.csv has several columns after the cell "
-                   "ids: celltype, sample. Pass one column, for example "
-                   f'pd.read_csv({quoted}, index_col=0)["sample"].')
-    # the suggested call, pasted, gives the scores of the obs column
-    series = eval(_example(msg), {"pd": pd})
+    assert str(e.value) == ("The batch file obs_sheet.csv has several columns after the cell "
+                            "ids: celltype, sample. Pass one of them, as "
+                            "pd.read_csv(path, index_col=0)['<column>'].")
+    # the column as a Series by barcode scores as the obs column
+    series = pd.read_csv(sheet, index_col=0)["sample"]
     pd.testing.assert_frame_equal(
         mtb.evaluate(a, labels="celltype", batch=series, metrics=METRICS),
         mtb.evaluate(a, labels="celltype", batch="sample", metrics=METRICS))
     with pytest.raises(ValueError) as e:
         mtb.evaluate(a, labels=str(sheet), metrics=["ASW"])
     assert str(e.value) == ("The labels file obs_sheet.csv has several columns after "
-                            "the cell ids: celltype, sample. Pass one column, for "
-                            f'example pd.read_csv({quoted}, index_col=0)["celltype"], '
-                            "or name the label column x.")
+                            "the cell ids: celltype, sample. Pass one of them, as "
+                            "pd.read_csv(path, index_col=0)['<column>'].")
     # run reads the file before any method runs, with the same advice
     data, batch, _ = cite
     (tmp_path / "d").mkdir()
     dsheet = _sheet(tmp_path / "d" / "obs_sheet.csv", BARS, batch)
     with pytest.raises(ValueError, match=r"^The batch file obs_sheet\.csv has several "
                                          r"columns after the cell ids: celltype, sample\. "
-                                         r"Pass "
-                                         r"one column, for example "
+                                         r"Pass one of them, as "
                                          r"pd\.read_csv\("):
         mtb.run(os.path.join(data, 'MYCITE'), 'vertical', tmp_path / "out", batch=dsheet, **KW)
 
@@ -88,15 +76,12 @@ def test_files_without_an_id_column_and_tsv_files(tmp_path):
     with pytest.raises(ValueError) as e:
         mtb.evaluate(a, labels="celltype", batch=str(plain), metrics=METRICS)
     assert str(e.value) == ("The batch file meta.csv has several columns: celltype, "
-                            "sample. "
-                            "Pass one column, for example "
-                            f'pd.read_csv({json.dumps(str(plain))})["sample"].to_numpy().')
+                            "sample. Pass one of them, as "
+                            "pd.read_csv(path)['<column>'].to_numpy().")
     tsv = _sheet(tmp_path / "obs.tsv", list(a.obs_names), sep="\t")
     with pytest.raises(ValueError) as e:
         mtb.evaluate(a, labels="celltype", batch=str(tsv), metrics=METRICS)
-    msg = str(e.value)
-    assert f'pd.read_csv({json.dumps(str(tsv))}, sep="\\t", index_col=0)["sample"]' in msg
-    assert list(eval(_example(msg), {"pd": pd}).index[:2]) != [0, 1]
+    assert """pd.read_csv(path, sep="\\t", index_col=0)['<column>']""" in str(e.value)
     # R's row numbers before the columns: the example keeps the rows by position
     rn = tmp_path / "rn.csv"
     pd.DataFrame({"celltype": CELLTYPE, "sample": SAMPLES},
@@ -106,9 +91,9 @@ def test_files_without_an_id_column_and_tsv_files(tmp_path):
     msg = str(e.value)
     assert msg.startswith("The batch file rn.csv has several columns after the row "
                           "numbers: celltype, sample. ")
-    assert f'pd.read_csv({json.dumps(str(rn))})["sample"].to_numpy()' in msg
+    assert "pd.read_csv(path)['<column>'].to_numpy()" in msg
     pd.testing.assert_frame_equal(
-        mtb.evaluate(a, labels="celltype", batch=eval(_example(msg), {"pd": pd}),
+        mtb.evaluate(a, labels="celltype", batch=pd.read_csv(rn)["sample"].to_numpy(),
                      metrics=METRICS),
         mtb.evaluate(a, labels="celltype", batch=SAMPLES, metrics=METRICS))
 

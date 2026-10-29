@@ -211,7 +211,7 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, table=None, read=()
             f"{what}={x!r} is not a file, and the embedding has no obs. Pass the values, as "
             f"{what}=adata.obs[{x.removeprefix('obs:')!r}].")
     if isinstance(x, (str, Path)) and column is None:
-        vals, first = io.read_labels_ids(x, what=what, pick=_pick(what))
+        vals, first = io.read_labels_ids(x, what=what)
         unique = ids is not None and pd.Index(ids).is_unique
         name = Path(x).name
         if table is not None and unique and _file_carries_ids(first, ids) \
@@ -245,13 +245,6 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, table=None, read=()
         raise ValueError(f"{what} is a Series without cell ids, and the embedding has: index "
                          f"it by the barcodes, or pass {what}.to_numpy() to match by position.")
     return io.as_vector(x, what=what, column=column)
-
-
-def _pick(what: str):
-    """The ``pick`` of ``io.read_labels_ids``: how to choose one column of a
-    per-cell file."""
-    tail = ", or name the label column x." if what == "labels" else "."
-    return lambda example: f"Pass one column, for example {example}{tail}"
 
 
 def _has_cell_ids(ids) -> bool:
@@ -375,7 +368,7 @@ def _stack_label_files(files, ids, table=None, read=(), others=None):
     files a method read, first: :func:`_folder_ids`, which refuses ids that are
     not distinct cells of the folder); otherwise they stay in file order.
     """
-    rows = [io.read_labels_ids(f, what="labels", pick=_pick("labels")) for f in files]
+    rows = [io.read_labels_ids(f, what="labels") for f in files]
     vals = np.concatenate([np.asarray(v) for v, _ in rows])
     origin = np.concatenate([np.full(len(v), i + 1) for i, (v, _) in enumerate(rows)])
     names = [Path(f).name for f in files]
@@ -831,7 +824,7 @@ def _gives_ids(x, adata) -> bool:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")     # the read that scores says them
         try:
-            firsts = [io.read_labels_ids(f, what="labels", pick=_pick("labels"))[1]
+            firsts = [io.read_labels_ids(f, what="labels")[1]
                       for f in files]
         except (ValueError, KeyError, OSError):
             return False

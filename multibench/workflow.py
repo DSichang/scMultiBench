@@ -2723,7 +2723,7 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
                  tried=None) -> tuple[np.ndarray, bool]:
     """``(x per cell, aligned by id)``: an id-carrying Series, DataFrame or CSV in
     ``labels_for`` order."""
-    from .eval.pipeline import _carries_ids, _pick
+    from .eval.pipeline import _carries_ids
     if what == "batch":
         own_batches_only(dataset)
     if _eio._names_no_file(x):
@@ -2739,7 +2739,7 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
                f"repeated barcodes)")
         fix, no_ids = f"Check that it follows {order}.", why
     if isinstance(x, (str, Path)):
-        vals, first = _eio.read_labels_ids(x, what=what, pick=_pick(what))
+        vals, first = _eio.read_labels_ids(x, what=what)
         if first is None:
             return np.asarray(vals), False
         return _eio.by_id_column(

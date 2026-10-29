@@ -19,7 +19,6 @@ missing: NaN, blank text, and text that a label file reads back as missing.
 from __future__ import annotations
 
 import io as _io
-import json
 import os
 from pathlib import Path
 
@@ -261,7 +260,7 @@ def read_labels(path: Path | str, column: str | None = None) -> np.ndarray:
 
 
 def read_labels_ids(path: Path | str, column: str | None = None, *,
-                    what: str | None = None, pick=None):
+                    what: str | None = None):
     """:func:`read_labels`, plus the first column it left out.
 
     Returns ``(values, first)``. ``first`` is the file's first column (a
@@ -269,9 +268,9 @@ def read_labels_ids(path: Path | str, column: str | None = None, *,
     rule 4 dropped the first of two columns; it may hold cell ids. Otherwise
     ``first`` is ``None``.
 
-    ``what`` ("labels", "batch", "clustering") starts the error messages.
-    ``pick`` ends an ambiguous file's error: a sentence, or a function of the
-    pandas call that reads one column as a Series (default: pass ``column=``).
+    ``what`` ("labels", "batch", "clustering") starts the error messages; an
+    ambiguous file's error then asks for one column as values, else for
+    ``column=``.
     """
     path = _require_file(path, f"{what} file" if what else "labels file")
     d = _read_table(path, _sep_for(path))
@@ -311,12 +310,16 @@ def read_labels_ids(path: Path | str, column: str | None = None, *,
             raise ValueError(f"{head} has row numbers that repeat out of order, so its "
                              f"rows may not follow the cells. Save it in cell order.")
     kind, names = _data_columns(d)
-    if callable(pick):
-        # barcodes become the Series index; row numbers would not match any cell
-        pick = pick(_series_example(path, names, index=kind == "cell ids", what=what))
     after = f" after the {kind}" if kind else ""
-    raise ValueError(f"{head} has several columns{after}: {', '.join(names)}. "
-                     f"{pick or 'Pass column=<name>.'}")
+    if what is None:
+        fix = "Pass column=<name>."
+    else:
+        # barcodes become the Series index; row numbers would not match any cell
+        sep = ', sep="\\t"' if _sep_for(path) == "\t" else ""
+        call = (f"pd.read_csv(path{sep}, index_col=0)['<column>']" if kind == "cell ids"
+                else f"pd.read_csv(path{sep})['<column>'].to_numpy()")
+        fix = f"Pass one of them, as {call}."
+    raise ValueError(f"{head} has several columns{after}: {', '.join(names)}. {fix}")
 
 
 def _stacked_row_numbers(col: pd.Series) -> bool:
@@ -344,28 +347,6 @@ def _data_columns(d: pd.DataFrame) -> tuple[str | None, list]:
         kind = "cell ids" if ids else "row numbers"
         return kind, [c for c in cols[1:] if not _no_header(c)] or cols[1:]
     return None, [c for c in cols if not _no_header(c)] or cols
-
-
-#: words in a column name that suggest what the column holds, by ``what``;
-#: the example of an ambiguous file's error takes the first such column
-_COLUMN_HINTS = {"labels": ("celltype", "cell_type", "cell type", "label", "cty"),
-                 "batch": ("batch", "sample", "donor"),
-                 "clustering": ("cluster", "leiden", "louvain")}
-
-
-def _series_example(path: Path, names: list, *, index: bool, what: str | None) -> str:
-    """The pandas call that reads one column of ``path``, the column whose name
-    suggests ``what``, else the last: a Series indexed by the cell ids when the
-    file has them, else an array, which is matched by position."""
-    hints = _COLUMN_HINTS.get(what or "", ())
-    col = next((n for n in names if any(h in n.lower() for h in hints)), names[-1])
-    args = [json.dumps(str(path), ensure_ascii=False)]
-    if _sep_for(path) == "\t":
-        args.append('sep="\\t"')
-    if index:
-        args.append("index_col=0")
-    return (f"pd.read_csv({', '.join(args)})[{json.dumps(col, ensure_ascii=False)}]"
-            + ("" if index else ".to_numpy()"))
 
 
 def _n_ids(n: int) -> str:
