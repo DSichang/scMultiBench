@@ -94,30 +94,24 @@ def test_demo_folders_hold_raw_counts(root, ds, cat):
 # ------------------------------------------------------------------ L03 per-batch folders
 def test_batch_with_vertical_or_diagonal_is_refused_before_writing(tmp_path):
     a = _cite()
-    for cat, read, tail in (
-            ("vertical", "one rna.h5", 'For RNA+ADT batches, use category="cross".'),
-            ("diagonal", "one rna.h5 and one ATAC file",
-             "scJoint, GLUE, iNMF and online_iNMF also read exactly 3 numbered RNA and ATAC batches, "
-             "written one batch per call with batch_index=.")):
+    for cat in ("vertical", "diagonal"):
         with pytest.raises(ValueError) as ei:
             ingest.export_dataset(a, tmp_path / cat, adt="obsm:protein", batch="obs:batch",
                                   category=cat)
         assert str(ei.value) == (
             "batch= writes per-batch files (rna1.h5, rna2.h5, ...). "
-            f"{cat.capitalize()} methods read {read}. Export without batch= and pass the "
-            f"column itself, as run(batch=adata.obs[\"donor\"]). {tail}")
+            f"{cat.capitalize()} methods read one rna.h5. Export without batch= and pass the "
+            f"column itself, as run(batch=adata.obs[\"donor\"]).")
         assert not (tmp_path / cat).exists()
-        # cross is RNA+ADT: never offered to a diagonal (RNA+ATAC) user
-        assert ('category="cross"' in str(ei.value)) == (cat == "vertical")
 
 
-def test_batch_with_atac_and_no_category_warns(tmp_path):
+def test_batch_with_atac_and_no_category_writes_numbered_files(tmp_path):
     m = _rna(60)
     m.obsm["peaks"] = pd.DataFrame(_counts(60, len(PEAKS), 3), index=m.obs_names, columns=PEAKS)
     m.obs["batch"] = np.repeat(["x", "y"], 30)
-    with pytest.warns(UserWarning, match="only mosaic methods read numbered ATAC files"):
-        ingest.export_dataset(m, tmp_path / "B", atac="obsm:peaks", atac_kind="peak",
+    d = ingest.export_dataset(m, tmp_path / "B", atac="obsm:peaks", atac_kind="peak",
                               batch="obs:batch")
+    assert {"rna1.h5", "rna2.h5", "atac1.h5", "atac2.h5"} <= {p.name for p in d.iterdir()}
 
 
 def test_mudata_docstring_example_is_vertical_without_batch():
@@ -158,8 +152,8 @@ def test_diagonal_label_column_missing_names_the_object(tmp_path):
 def test_disjoint_barcodes_point_at_diagonal_and_leave_no_folder(tmp_path):
     with pytest.raises(ValueError, match=r"^RNA and ATAC share no barcode \(RNA e\.g\. "
                                          r"\S+, ATAC e\.g\. \S+\)\. Make the names "
-                                         r"match; for different cells pass "
-                                         r"category=\"diagonal\"\.$"):
+                                         r"match, or pass category='diagonal' for "
+                                         r"different cells\.$"):
         ingest.export_dataset(_rna(), tmp_path / "X", atac=_atac(), atac_kind="peak",
                               labels="obs:cell_type")
     assert not (tmp_path / "X").exists()
@@ -242,10 +236,10 @@ def test_batch_index_writes_the_d46_pattern_and_scan_finds_it(tmp_path):
 
 def test_batch_index_argument_checks(tmp_path):
     ro = _rna(20)
-    with pytest.raises(ValueError, match="pass batch= or batch_index=, not both"):
+    with pytest.raises(ValueError, match="Pass batch= or batch_index=, not both"):
         ingest.export_dataset(ro, tmp_path / "B", batch="obs:cell_type", batch_index=1,
                               category="mosaic")
-    with pytest.raises(ValueError, match="only mosaic and cross methods read"):
+    with pytest.raises(ValueError, match="only mosaic, cross and diagonal methods read"):
         ingest.export_dataset(ro, tmp_path / "B", batch_index=1)
     with pytest.raises(ValueError, match="positive integer"):
         ingest.export_dataset(ro, tmp_path / "B", batch_index=0, category="cross")
@@ -292,7 +286,7 @@ def test_mudata_global_obs_labels(tmp_path):
         ingest.export_dataset(m, tmp_path / "MU1", rna="rna", atac="atac", atac_kind="peak",
                               labels="rna:celltype", category="vertical")
     msg = str(ei.value)
-    assert "searched mdata['rna'].obs" in msg and "pass labels='obs:celltype'" in msg
+    assert "searched mdata['rna'].obs" in msg
     assert not (tmp_path / "MU1").exists()
     d = ingest.export_dataset(m, tmp_path / "MU1", rna="rna", atac="atac", atac_kind="peak",
                               labels="obs:celltype", category="vertical")
@@ -337,8 +331,6 @@ def test_diagonal_mudata_global_obs_labels_with_gaps_are_refused(tmp_path):
                               category="diagonal")
     msg = str(ei.value)
     assert "50 of the 50 labels for the ATAC cells (mdata['atac']) are missing" in msg
-    assert "labels='cell_type' reads that column from each modality's own obs" in msg
-    assert "labels='obs:<col>'" not in msg
     assert not (tmp_path / "MU").exists()
 
 
@@ -351,7 +343,7 @@ def test_labels_with_missing_values_are_refused_in_every_category(tmp_path, cate
     a.obs["ct"] = lab
     kw = {"batch_index": 1} if category in ("cross", "mosaic") else {}
     with pytest.raises(ValueError, match=r"labels='obs:ct': 2 of the 60 labels for the "
-                                         r"(RNA )?cells \((the AnnData's obs|data)\) are missing"):
+                                         r"(RNA cells \(data\)|cells) are missing"):
         ingest.export_dataset(a, tmp_path / "GAP", adt="obsm:protein", labels="obs:ct",
                               category=category, **kw)
     assert not (tmp_path / "GAP").exists()

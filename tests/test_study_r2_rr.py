@@ -4,7 +4,6 @@ M18, M21, M22, M31, M36: resolve.py, ingest.py and two methods.yaml entries).
 Each test fails on the code before its fix.
 """
 import os
-import warnings
 
 import anndata as ad
 import h5py
@@ -14,7 +13,7 @@ import pytest
 
 import multibench as mtb
 from multibench import config, workflow
-from multibench.engine import envs, ingest, resolve
+from multibench.engine import envs, resolve
 from tests.conftest import full_scan
 
 PEAKS = [f"chr1:{i * 1000}-{i * 1000 + 200}" for i in range(40)]
@@ -135,7 +134,7 @@ def test_disjoint_rna_and_atac_lead_with_the_diagonal_hint(tmp_path):
     msg = str(e.value)
     # 0.4.0 (X10): an example barcode of each, then the two fixes
     assert msg == ("RNA and ATAC share no barcode (RNA e.g. c0, ATAC e.g. a0). Make the "
-                   "names match; for different cells pass category=\"diagonal\".")
+                   "names match, or pass category='diagonal' for different cells.")
     assert "subset" not in msg.lower()
 
 
@@ -152,40 +151,20 @@ def test_partial_overlap_says_which_cells_in_short_sentences(tmp_path):
             "to the shared barcodes first.") in msg
 
 
-def test_adt_hint_follows_the_obsm_selector(tmp_path):
+def test_the_raw_count_warning_names_no_selector(tmp_path):
     clr = np.random.default_rng(0).normal(size=(30, 5))
     rna = _rna_adata([f"c{i}" for i in range(30)], obsm=clr)
-    with pytest.warns(UserWarning, match=r"for example with adt='obsm:protein_counts'\."):
+    told = "The adt values are not whole numbers, so they look log-normalised. Export raw counts."
+    with pytest.warns(UserWarning) as rec:
         mtb.io.export_dataset(rna, tmp_path / "O", adt="obsm:protein",
                               adt_names=[f"p{i}" for i in range(5)])
-
-
-def test_adt_hint_for_a_layer_stays_layer_counts(tmp_path):
-    """For ADT read by a selector. ADT passed as its own object has no
-    selector: ``adt='layer:counts'`` would read a layer of the RNA object, so
-    the hint names the X of the ADT object (review round 3 of 0.3.5)."""
-    rna = _rna_adata([f"c{i}" for i in range(30)])
+    assert [str(w.message) for w in rec if "whole numbers" in str(w.message)] == [told]
     prot = ad.AnnData(np.random.default_rng(0).normal(size=(30, 5)))
     prot.obs_names = list(rna.obs_names)
     prot.var_names = [f"p{i}" for i in range(5)]
     with pytest.warns(UserWarning) as rec:
         mtb.io.export_dataset(rna, tmp_path / "L", adt=prot)
-    assert [str(w.message) for w in rec if "whole numbers" in str(w.message)] == [
-        "The adt values are not whole numbers, so they look log-normalised. Put the raw "
-        "counts in adt.X first."]
-    with pytest.warns(UserWarning, match=r"for example with adt='layer:counts'\."):
-        mtb.io.export_dataset(prot, tmp_path / "S", rna=None, adt="X")
-
-
-def test_unitednet_still_reads_an_older_rna_cty_file(tmp_path):
-    cells = [f"c{i}" for i in range(30)]
-    d = tmp_path / "OLD"
-    d.mkdir()
-    _h5(d / "rna.h5", GENES, cells)
-    _h5(d / "atac.h5", GENES, cells)        # the vertical ATAC name (X13)
-    _labels(d / "rna_cty.csv", 30)
-    got = mtb.engine.resolve.inputs_for("OLD", "vertical", "UnitedNet", data_path=tmp_path, check=True)
-    assert got["cty"] == str(d / "rna_cty.csv")
+    assert [str(w.message) for w in rec if "whole numbers" in str(w.message)] == [told]
 
 
 def test_rna_cty_next_to_atac_cty_is_not_paired_labels(root, tmp_path):
@@ -355,40 +334,6 @@ def _gas_adata(barcodes, seed=0):
     return a
 
 
-def test_to_canonical_gas_follows_the_peak_order(tmp_path, capsys):
-    atac = [f"a{i}" for i in range(40)]
-    d = _diagonal(tmp_path, "TOCAN", [f"c{i}" for i in range(50)], atac)
-    shuffled = list(np.random.default_rng(2).permutation(atac))
-    gas = _gas_adata(shuffled)
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        out = ingest._to_canonical(gas, d, modality="gas")   # io.to_canonical, deprecated
-    assert out == d / "atac_gas.h5"
-    assert _barcodes(out) == atac
-    back = mtb.io.read(out)
-    import scipy.sparse as sp
-    if sp.issparse(back.X):
-        back.X = back.X.toarray()
-    np.testing.assert_array_equal(back[atac].X, gas[atac].X)
-    err = capsys.readouterr().err
-    assert "atac_peak.h5" in err and len(err.strip().splitlines()) == 1
-    mtb.engine.resolve.inputs_for("TOCAN", "diagonal", "SCALEX", data_path=tmp_path, check=True)
-
-
-def test_to_canonical_gas_of_other_cells_warns(tmp_path):
-    d = _diagonal(tmp_path, "TOCAN2", [f"c{i}" for i in range(50)],
-                  [f"a{i}" for i in range(40)])
-    with pytest.warns(UserWarning, match="different cells"):
-        mtb.engine.ingest._to_canonical(_gas_adata([f'b{i}' for i in range(40)]), d, modality='gas')
-
-
-def test_to_canonical_gas_in_peak_order_prints_nothing(tmp_path, capsys):
-    atac = [f"a{i}" for i in range(40)]
-    d = _diagonal(tmp_path, "TOCAN3", [f"c{i}" for i in range(50)], atac)
-    mtb.engine.ingest._to_canonical(_gas_adata(atac), d, modality='gas')
-    assert capsys.readouterr().err == ""
-
-
 # --- M21: UnitedNet reads the vertical cty.csv --------------------------------
 def test_unitednet_runs_on_an_exported_vertical_folder(tmp_path, envs_installed):
     cells = [f"c{i}" for i in range(30)]
@@ -419,12 +364,4 @@ def test_run_all_prints_the_unused_batch(root, tmp_path, capsys, monkeypatch):
     assert ("[run]   UINMF reads batches 1-2 of 3. Batch 3 is not used.\n"
             in capsys.readouterr().out)
 
-
-def test_to_canonical_gas_for_vertical_keeps_its_order(tmp_path, capsys):
-    atac = [f"a{i}" for i in range(40)]
-    d = _diagonal(tmp_path, "VERT", atac, atac)
-    shuffled = list(np.random.default_rng(3).permutation(atac))
-    out = mtb.engine.ingest._to_canonical(_gas_adata(shuffled), d, modality='gas', category='vertical')
-    assert out == d / "atac.h5" and _barcodes(out) == shuffled
-    assert capsys.readouterr().err == ""
 

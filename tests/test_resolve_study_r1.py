@@ -45,11 +45,10 @@ def test_per_batch_folder_fails_every_vertical_row_with_the_hint(tmp_path):
     _per_batch_folder(tmp_path / "MB")
     sc = full_scan("MB", "vertical", data_path=tmp_path)
     assert len(sc) > 20 and not sc["files_ok"].any()
-    assert sc["files_reason"].str.contains(
+    assert sc["reason"].str.contains(
         r"This folder holds per-batch files \(rna1.h5, rna2.h5, \.\.\.\)\. Vertical methods "
         r"read one rna.h5\. Export without batch=").all()
-    with pytest.raises(FileNotFoundError,
-                       match=r'For RNA\+ADT batches, use category="cross"\.'):
+    with pytest.raises(FileNotFoundError, match=r"The folder holds adt1\.h5, "):
         resolve.inputs_for("MB", "vertical", "totalVI", data_path=tmp_path, check=True)
     # the same folder is a valid cross folder
     got = resolve.inputs_for("MB", "cross", "totalVI", data_path=tmp_path, check=True)
@@ -91,18 +90,6 @@ def test_a_single_numbered_file_still_resolves(tmp_path):
 
 
 # ------------------------------------------------------------------ L06
-def test_numbered_atac_near_miss_names_the_right_file(tmp_path):
-    d = tmp_path / "M"
-    d.mkdir()
-    hints = resolve._near_miss_hints(d, {"atac2": str(d / "atac2.h5")}, "mosaic")
-    assert hints == []
-    _h5(d / "atac_gas2.h5", 30, 40)
-    hints = resolve._near_miss_hints(d, {"atac2": str(d / "atac2.h5")}, "mosaic")
-    assert hints == ["Mosaic methods read atac2.h5 or atac_peak2.h5. Every mosaic method "
-                     "reads peak ATAC."]
-    assert "atac22" not in hints[0]
-
-
 def test_numbered_atac_role_reads_the_031_peak_name(tmp_path):
     d = tmp_path / "LABMOS"
     d.mkdir()

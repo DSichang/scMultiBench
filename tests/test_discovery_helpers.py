@@ -12,14 +12,14 @@ pytestmark = pytest.mark.filterwarnings(
 
 def test_inputs_for_check_raises_on_missing(tmp_path):
     d = tmp_path / "D27"; d.mkdir()
-    (d / "rna.h5").write_text("")  # peak.h5 deliberately missing
+    (d / "rna.h5").write_text("")  # atac_peak.h5 deliberately missing
     with pytest.raises(FileNotFoundError):
         resolve.inputs_for("D27", "diagonal", "Seurat_v5", data_path=tmp_path, check=True)
 
 
 def test_inputs_for_check_passes_when_present(tmp_path):
     d = tmp_path / "D27"; d.mkdir()
-    for n in ["rna.h5", "peak.h5"]:
+    for n in ["rna.h5", "atac_peak.h5"]:
         (d / n).write_text("")
     got = resolve.inputs_for("D27", "diagonal", "Seurat_v5", data_path=tmp_path, check=True)
     assert "atac_peak" in got
@@ -29,7 +29,7 @@ def test_inputs_for_check_passes_when_present(tmp_path):
 
 def test_inputs_for_check_none_warns_on_missing(tmp_path):
     d = tmp_path / "D27"; d.mkdir()
-    (d / "rna.h5").write_text("")   # peak.h5 deliberately missing
+    (d / "rna.h5").write_text("")   # atac_peak.h5 deliberately missing
     with pytest.warns(UserWarning, match="atac_peak") as rec:
         got = resolve.inputs_for("D27", "diagonal", "Seurat_v5", data_path=tmp_path,
                                  check=None)
@@ -37,7 +37,6 @@ def test_inputs_for_check_none_warns_on_missing(tmp_path):
     msg = str(rec[0].message)
     assert msg.startswith(f"Seurat_v5 (diagonal) needs atac_peak.h5 in {d}. The folder "
                           f"holds rna.h5.")
-    assert "Pass check=True to raise this as an error" in msg
 
 
 def test_inputs_for_check_false_is_silent_and_check_is_the_default(tmp_path):
@@ -57,12 +56,12 @@ def test_inputs_for_check_false_is_silent_and_check_is_the_default(tmp_path):
 def test_inputs_for_default_no_warning_when_present(tmp_path):
     import warnings
     d = tmp_path / "D27"; d.mkdir()
-    for n in ["rna.h5", "peak.h5"]:
+    for n in ["rna.h5", "atac_peak.h5"]:
         (d / n).write_text("")
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         got = resolve.inputs_for("D27", "diagonal", "Seurat_v5", data_path=tmp_path)
-    assert got["atac_peak"].endswith("/D27/peak.h5")
+    assert got["atac_peak"].endswith("/D27/atac_peak.h5")
 def test_rank_unknown_result_id_and_modalities(result_dir):
     import pandas as pd
     from multibench._data.results import rank

@@ -55,7 +55,8 @@ def test_peak_name_note_and_warning_end_with_the_fix(tmp_path, pinned, capsys):
     d = root / "LUNG_ids"
     inputs = {"rna": str(d / "rna.h5"), "atac_peak": str(d / "atac_peak.h5")}
     note = ("GLUE reads peak names such as chr1:100-200. atac_peak.h5 holds other names, "
-            "for example peak_0. Rename them to chr:start-end.")
+            "for example peak_0. Rename them to chr:start-end, or export gene activity with "
+            "atac_kind='gene_activity'.")
     with pytest.warns(UserWarning) as rec:
         with pytest.raises(Exception):
             mtb.engine.runner.run("GLUE", "diagonal", inputs=inputs, out_dir=tmp_path / "o2")
@@ -72,7 +73,8 @@ def test_scan_reason_is_sentences_with_their_own_subjects(tmp_path, monkeypatch)
     assert sc["reason"] == (
         f"Environment {sc['env']} runs only on Linux, not on this computer. GLUE reads peak "
         f"names such as chr1:100-200. atac_peak.h5 holds other names, for example peak_0. "
-        f"Rename them to chr:start-end.")        # 0.4.0: no deprecated override offered
+        f"Rename them to chr:start-end, or export gene activity with "
+        f"atac_kind='gene_activity'.")        # 0.4.0: no deprecated override offered
     moetm = _quiet(full_scan, "D11", "vertical", methods=["moETM"], verbose=False).iloc[0]
     # 0.4.0: off Linux the GPU sentence is left out (the OS already blocks)
     assert moetm["reason"] == (

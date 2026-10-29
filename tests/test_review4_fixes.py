@@ -1,14 +1,12 @@
-"""Review round 4 of 0.3.5: the raw-count hint for every selector, and wording.
+"""Review round 4 of 0.3.5: the raw-count warning for every selector, and wording.
 
 - The warning for values that are not whole numbers named ``'layer:counts'``
   for a matrix read from ``obsm`` and for a feature filter. A layer belongs
   to ``X``, so the suggested call wrote the main matrix of the object (the
-  RNA) as the ATAC file, or the features of every modality. The hint now
-  names the raw counts of the matrix that the selector reads.
-- The refusal of one matrix for two modalities told a caller who had passed
-  ``data`` again as the second modality to pass an object.
-- ``adt_names`` given a string named ``uns['protein_names']`` for an object
-  without that key.
+  RNA) as the ATAC file, or the features of every modality. The warning now
+  names no selector.
+- The refusal of one matrix for two modalities.
+- ``adt_names`` given a string.
 - On the command line the diagonal label error began with ``labels='...'``.
 - The Changes page said that ``adt='layer:counts'`` is refused.
 """
@@ -22,7 +20,7 @@ from multibench import config
 from multibench.engine import ingest
 
 from tests.test_docs_r4 import needs_docs
-from tests.test_review3_fixes import (CELLS, DEBUG, LOOKS, N, NOT_COUNTS, SAME, _adt, _atac,
+from tests.test_review3_fixes import (CELLS, COUNTS, DEBUG, LOOKS, N, OWN, SAME, _adt, _atac,
                                       _changes, _dense, _refused, _rna, _two_cohorts, _warned)
 
 ad = pytest.importorskip("anndata")
@@ -54,11 +52,9 @@ def _tenx(col="feature_types"):
     return a
 
 
-def _in_obsm(what, example=None):
-    """The whole warning for an obsm entry that has no counts entry to name."""
-    example = example or f"{what}='obsm:<key>'"
-    return (LOOKS.format(what=what)
-            + f"Name the obsm entry that holds the raw counts, as {example}.")
+def _in_obsm(what):
+    """The whole warning, for any selector."""
+    return COUNTS.format(what=what)
 
 
 # --------------------------------------------- 1: a matrix read from obsm
@@ -92,8 +88,7 @@ def test_adt_in_obsm_keeps_its_hint_and_the_hint_works(tmp_path):
     cite = _cite()
     msgs = _warned(ingest.export_dataset, cite, tmp_path / "A", rna="layer:counts",
                    adt="obsm:protein")
-    assert msgs == [NOT_COUNTS.format(what="adt") + "Export raw counts, for example with "
-                                                    "adt='obsm:protein_counts'."]
+    assert msgs == [_in_obsm("adt")]
     assert _warned(ingest.export_dataset, cite, tmp_path / "B", rna="layer:counts",
                    adt="obsm:protein_counts") == []
     assert np.array_equal(_dense(tmp_path / "B" / "adt.h5"), _adt().layers["counts"])
@@ -122,8 +117,7 @@ def test_the_hint_keeps_the_feature_filter(tmp_path, col, what, value, part):
     msgs = _warned(ingest.export_dataset, tenx, tmp_path / "A", **{what: f"X[{col}={value}]"},
                    **kw)
     hinted = f"layer:counts[{col}={value}]"
-    assert msgs == [NOT_COUNTS.format(what=what) + "Export raw counts, for example with "
-                                                   f"{what}='{hinted}'."]
+    assert msgs == [_in_obsm(what)]
     assert _warned(ingest.export_dataset, tenx, tmp_path / "B", **{what: hinted}, **kw) == []
     name = {"rna": "rna.h5", "adt": "adt.h5", "atac": "atac.h5"}[what]
     assert np.array_equal(_dense(tmp_path / "B" / name), part().layers["counts"])
@@ -138,47 +132,40 @@ def test_the_hints_of_a_mudata_keep_the_modality(tmp_path):
         m = md.MuData({"rna": rna, "all": _tenx()})
     kw = dict(rna="mod:rna.layer:counts")
     msgs = _warned(ingest.export_dataset, m, tmp_path / "A", adt="mod:rna.obsm:protein", **kw)
-    assert msgs == [NOT_COUNTS.format(what="adt") + "Export raw counts, for example with "
-                                                    "adt='mod:rna.obsm:protein_counts'."]
+    assert msgs == [_in_obsm("adt")]
     assert _warned(ingest.export_dataset, m, tmp_path / "B",
                    adt="mod:rna.obsm:protein_counts", **kw) == []
     assert np.array_equal(_dense(tmp_path / "B" / "adt.h5"), _adt().layers["counts"])
     msgs = _warned(ingest.export_dataset, m, tmp_path / "C", atac="mod:rna.obsm:peaks",
                    atac_kind="peak", **kw)
-    assert msgs == [_in_obsm("atac", "atac='mod:rna.obsm:<key>'")]
+    assert msgs == [_in_obsm("atac")]
     msgs = _warned(ingest.export_dataset, m, tmp_path / "D",
                    adt="mod:all[feature_types=Antibody Capture]", **kw)
     hinted = "mod:all.layer:counts[feature_types=Antibody Capture]"
-    assert msgs == [NOT_COUNTS.format(what="adt") + "Export raw counts, for example with "
-                                                    f"adt='{hinted}'."]
+    assert msgs == [_in_obsm("adt")]
     assert _warned(ingest.export_dataset, m, tmp_path / "E", adt=hinted, **kw) == []
     assert np.array_equal(_dense(tmp_path / "E" / "adt.h5"), _adt().layers["counts"])
 
 
 # ------------------------------------------- 3(a): data passed once more
 def test_data_passed_as_the_second_modality_is_named_as_such(tmp_path):
-    """The 0.3.5 text names the two arguments and no longer says that they
-    are the object passed as ``data``."""
+    """The text names the two arguments as they were written."""
     rna = _rna()
     assert _refused(tmp_path, rna, rna="X", atac=rna, atac_kind="gene_activity") == (
-        "rna='X' and atac=" + SAME + "Pass the ATAC as its own object, as atac=<AnnData>.")
-    assert _refused(tmp_path, rna, rna=rna, adt=rna) == (
-        "rna= and adt=" + SAME + "Name where the ADT is, as adt='obsm:<key>'.")
-    # the second modality came by a selector: an object is still the advice
+        "rna='X' and atac=" + SAME + OWN)
+    assert _refused(tmp_path, rna, rna=rna, adt=rna) == "rna= and adt=" + SAME + OWN
     assert _refused(tmp_path, rna, rna=rna, atac="X", atac_kind="gene_activity") == (
-        "rna= and atac='X'" + SAME + "Pass the ATAC as its own object, as atac=<AnnData>.")
+        "rna= and atac='X'" + SAME + OWN)
 
 
 # ------------------------------------------- 3(b): the uns key of adt_names
-def test_adt_names_names_a_uns_key_only_when_the_string_is_one(tmp_path):
+def test_adt_names_as_one_string_names_no_key(tmp_path):
     cite = _rna(log=False)
     cite.obsm["protein"] = _adt(log=False).X
     cite.uns["mynames"] = [f"CD{j}" for j in range(8)]
-    head = "adt_names={!r} is one string. Pass a list of names, as adt_names=list(adata.uns[{}])."
-    for names, shown in (("mynames", "'mynames'"), ("protein_names", "'<key>'"),
-                         ("CD3,CD4", "'<key>'")):
+    for names in ("mynames", "protein_names", "CD3,CD4"):
         assert _refused(tmp_path, cite, adt="obsm:protein", adt_names=names) == (
-            head.format(names, shown))
+            f"adt_names={names!r} is one string. Pass a list of names.")
 
 
 # ------------------------------------------------ 2: the Changes page
@@ -214,5 +201,4 @@ def test_the_changes_page_says_what_is_refused_and_what_is_not(tmp_path):
     assert _warned(ingest.export_dataset, _cite(), tmp_path / "A", rna=None,
                    atac="obsm:peaks", atac_kind="peak") == [_in_obsm("atac")]
     assert _warned(ingest.export_dataset, _tenx(), tmp_path / "B", rna=None,
-                   adt="X[feature_types=Antibody Capture]")[0].endswith(
-        "adt='layer:counts[feature_types=Antibody Capture]'.")
+                   adt="X[feature_types=Antibody Capture]") == [_in_obsm("adt")]

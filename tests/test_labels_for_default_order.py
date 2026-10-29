@@ -27,27 +27,25 @@ def _notes(*args, **kw):
 
 
 def test_d52_names_its_own_category_without_a_category():
-    # the dataset's category only since 0.4.0 (X67): D52's batches hold the same
-    # modalities, so it reads as cross
     assert _notes("D52") == [
-        "labels_for('D52') returns the files in the default order cty1, cty2, cty3. In "
-        "cross, StabMap reads them in another order: pass mtb.evaluate(..., "
-        "dataset='D52', category='cross', method='StabMap') for its output."]
+        "labels_for('D52') returns the files in the default order cty1, cty2, cty3. StabMap "
+        "(cross, mosaic) reads them in another order: pass category= and method= for their "
+        "output."]
 
 
 def test_with_the_category_the_call_is_named():
     assert _notes("D52", "cross") == [
         "labels_for('D52', 'cross') returns the files in the default order cty1, cty2, "
-        "cty3. StabMap reads them in another order: pass mtb.evaluate(..., "
-        "dataset='D52', category='cross', method='StabMap') for its output."]
+        "cty3. StabMap (cross) reads them in another order: pass category= and method= for "
+        "their output."]
 
 
 def test_only_methods_whose_files_pass_the_check_are_named():
     # Seurat_v5 also puts ATAC first, but D28's RNA and ATAC are different cells
     assert _notes("D28") == [
-        "labels_for('D28') returns the files in the default order rna_cty, atac_cty. In "
-        "diagonal, uniPort reads them in another order: pass mtb.evaluate(..., "
-        "dataset='D28', category='diagonal', method='uniPort') for its output."]
+        "labels_for('D28') returns the files in the default order rna_cty, atac_cty. "
+        "uniPort (diagonal) reads them in another order: pass category= and method= for "
+        "their output."]
 
 
 def test_silent_calls():

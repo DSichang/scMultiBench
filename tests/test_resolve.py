@@ -12,13 +12,13 @@ def _make_diag(tmp_path, files):
     return tmp_path
 
 
-def test_inputs_for_flat_layout_and_peak_alias(tmp_path):
-    # Seurat_v5 (diagonal) uses roles rna + atac_peak; real file is peak.h5
-    data = _make_diag(tmp_path, ["rna.h5", "peak.h5", "rna_cty.csv", "peak_cty.csv"])
+def test_inputs_for_flat_layout(tmp_path):
+    # Seurat_v5 (diagonal) uses roles rna + atac_peak
+    data = _make_diag(tmp_path, ["rna.h5", "atac_peak.h5", "rna_cty.csv", "atac_cty.csv"])
     inputs = resolve.inputs_for("D27", "diagonal", "Seurat_v5", data_path=data)
     assert set(inputs) == {"rna", "atac_peak"}
     assert inputs["rna"].endswith("/D27/rna.h5")        # flat: no category folder
-    assert inputs["atac_peak"].endswith("/D27/peak.h5")  # alias atac_peak -> peak.h5
+    assert inputs["atac_peak"].endswith("/D27/atac_peak.h5")
 
 
 def test_inputs_for_gene_activity_alias(tmp_path):
@@ -141,7 +141,6 @@ def test_label_partners_pairing_rule():
     assert lp("cty", ["rna", "adt", "cty"]) == ["rna", "adt"]
     assert lp("rna_cty", ["rna", "atac_gas", "atac_peak", "rna_cty", "atac_cty"]) == ["rna"]
     assert lp("atac_cty", ["rna", "atac_gas", "atac_peak", "rna_cty", "atac_cty"]) == ["atac_gas", "atac_peak"]
-    assert lp("peak_cty", ["rna", "atac_peak"]) == ["atac_peak"]
     assert lp("cty2", ["rna1", "rna2", "adt1", "atac2", "cty1", "cty2"]) == ["rna2", "atac2"]
     assert lp("source_cty", ["data_dir", "source_data"]) == []
 

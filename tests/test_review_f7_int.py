@@ -98,20 +98,12 @@ def _names_warning(fn, *args, **kw):
     return [str(w.message) for w in rec if "feature names" in str(w.message)]
 
 
-def test_missing_feature_names_of_to_canonical_name_its_argument(tmp_path):
-    msgs = _names_warning(ingest._to_canonical, _citeseq(), tmp_path / "adt.h5",
-                          modality="adt", obsm="protein")
-    assert len(msgs) == 1 and "Pass feature_names=, store obsm['protein'] as a " \
-        "DataFrame" in msgs[0], msgs
-
-
 def test_missing_feature_names_of_a_bare_array(tmp_path):
     a = _citeseq()
     msgs = _names_warning(ingest.export_dataset, a, tmp_path / "ARR", rna="X",
                           adt=np.ones((30, 4)), labels="obs:cell_type")
-    assert msgs == ["The adt matrix array has no feature names. The file names them "
-                    "feature_0 to feature_3. Pass adt_names=, or give adt= as a DataFrame "
-                    "or AnnData with named features."]
+    assert msgs == ["The adt matrix array has no feature names; they are written as "
+                    "feature_0 to feature_3."]
 
 
 def test_method_info_returns_and_raises_read_as_a_card():

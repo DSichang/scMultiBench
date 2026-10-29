@@ -178,9 +178,11 @@ def test_a_dry_run_command_alone_can_fail():
     """The package fact behind both rewrites: for a method that reads a file
     ``mtb.run`` writes first, the dry-run note says the command alone fails."""
     from multibench.engine import runner as R
-    plan = {"rna": {"value": "/o/inputs/rna.h5", "convert": True, "normpeaks_from": None}}
+    plan = {"atac_peak": {"value": "/o/inputs/atac_peak_normpeaks.h5",
+                          "normpeaks_from": "/d/atac_peak.h5"}}
     note = R._prepared_note(plan, "/o", "X")
-    assert note == "X reads inputs/rna.h5. mtb.run writes that file first, so start X with mtb.run."
+    assert note == ("X reads inputs/atac_peak_normpeaks.h5. mtb.run writes that file first, "
+                    "so start X with mtb.run.")
 
 
 # ---------------------------------------------- R4-13 / R4-02: batch advice
@@ -214,7 +216,7 @@ def test_the_package_gives_the_same_batch_advice(tmp_path):
     assert str(e.value) == (
         "batch= writes per-batch files (rna1.h5, rna2.h5, ...). Vertical methods read one "
         'rna.h5. Export without batch= and pass the column itself, as '
-        'run(batch=adata.obs["donor"]). For RNA+ADT batches, use category="cross".')
+        'run(batch=adata.obs["donor"]).')
 
 
 # ------------------------------------------------ R4-01: named methods

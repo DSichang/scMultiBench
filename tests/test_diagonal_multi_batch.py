@@ -360,9 +360,8 @@ def test_diagonal_export_still_refuses_a_batch_column_and_a_bad_batch_index(tmp_
             mtb.io.export_dataset(rna, tmp_path / "B", labels="obs:celltype",
                                   batch_index=1, category=category)
         msg = str(e.value)
-        assert "only mosaic and cross methods read, and the diagonal methods that take " \
-               "several batches" in msg
-        assert "category='mosaic', category='cross' or category='diagonal'" in msg
+        assert msg == ("batch_index= writes numbered files, which only mosaic, cross and "
+                       "diagonal methods read: pass category=.")
     assert not (tmp_path / "B").exists()
 
 

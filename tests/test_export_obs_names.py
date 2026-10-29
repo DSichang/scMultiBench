@@ -2,8 +2,7 @@
 
 ``"obs:<column>"`` and ``"<column>"`` name a column of the object passed.
 0.3.4 took the first only and answered the second with a line about
-selector syntax. A name that is no column now names a column there is, and
-a file name says that it is one.
+selector syntax. A name that is no column now names the columns there are.
 """
 import warnings
 
@@ -24,10 +23,6 @@ def _cells(n=60, tag="c", seed=0):
     a.obs["celltype"] = np.array(["T", "B", "NK"])[rng.integers(0, 3, n)]
     a.obs["donor"] = np.array(["d1", "d2"])[np.arange(n) % 2]
     return a
-
-
-#: what to do with a file name, in Python
-RECIPE = 'Add the column first, as in the recipe "Labels in a CSV file" in the docs.'
 
 
 def _files(folder):
@@ -93,14 +88,15 @@ def test_diagonal_takes_the_bare_name(tmp_path):
     for name in ("rna_cty.csv", "atac_cty.csv"):
         assert (bare / name).read_bytes() == (prefixed / name).read_bytes()
     assert pd.read_csv(bare / "atac_cty.csv")["x"].tolist() == list(atac.obs["celltype"])
-    assert _value_error(tmp_path, rna, labels="annotation.csv", **kw) == (
-        f"labels='annotation.csv' is a file name. {RECIPE}")
+    with pytest.raises(KeyError) as e:
+        ingest.export_dataset(rna, tmp_path / "OUT", labels="annotation.csv", **kw)
+    assert e.value.args[0] == ("labels='annotation.csv': column 'annotation.csv' not in obs "
+                               "of the RNA object (data); available: ['celltype', 'donor'].")
 
 
 @pytest.mark.parametrize("spec", ["obs:celltype", "celltype"])
 def test_diagonal_side_without_the_column(tmp_path, spec):
-    """Cell types for one side only: the old error names the side, and now
-    also how to give the side the column, from another column it has."""
+    """Cell types for one side only: the error names the side and its columns."""
     rna, atac = _cells(60, "r"), _cells(40, "a", seed=1)
     del atac.obs["celltype"]
     out = tmp_path / "OUT"
@@ -109,16 +105,14 @@ def test_diagonal_side_without_the_column(tmp_path, spec):
         ingest.export_dataset(rna, out, atac=atac, **kw)
     assert e.value.args[0] == (
         f"labels={spec!r}: column 'celltype' not in obs of the ATAC object (atac); "
-        f"available: ['donor']. Copy its cell-type column first, as atac.obs['celltype'] = "
-        f"atac.obs['<its column>'].")
+        f"available: ['donor'].")
     del rna.obs["celltype"]
     atac.obs["celltype"] = "T"
     with pytest.raises(KeyError) as e:
         ingest.export_dataset(rna, out, atac=atac, **kw)
     assert e.value.args[0] == (
         f"labels={spec!r}: column 'celltype' not in obs of the RNA object (data); "
-        f"available: ['donor']. Copy its cell-type column first, as rna.obs['celltype'] = "
-        f"rna.obs['<its column>'].")
+        f"available: ['donor'].")
     assert not out.exists()
 
 
@@ -160,31 +154,27 @@ def test_mudata_spellings_are_unchanged(tmp_path):
         ingest.export_dataset(m, out, rna="rna", labels="nope")
     assert str(err.value) == "labels='nope' is not a column of mdata.obs. Columns: site."
     assert not out.exists()
-    # a missing label of a column read by its bare name names mdata.obs
+    # a missing label of a column read by its bare name
     site = m.obs["site"].astype(object).to_numpy()
     site[0] = np.nan
     m.obs["site"] = site
     with pytest.raises(ValueError) as err:
         ingest.export_dataset(m, out, rna="rna", labels="site")
     assert str(err.value).startswith(
-        "labels='site': 1 of the 60 labels for the cells (mdata.obs) are missing")
+        "labels='site': 1 of the 60 labels for the cells are missing")
 
 
 # ---- the Python part of tests that also ran the command line
-def test_a_modality_prefix_on_an_anndata_names_the_obs_spelling(tmp_path, capsys):
+def test_a_modality_prefix_on_an_anndata_is_a_column_name(tmp_path, capsys):
     """``'<mod>:<col>'`` reads a column of one modality of a MuData. Two
-    AnnData objects have no modalities: 0.3.4 answered with a ValueError
-    about the spelling, and so does this."""
+    AnnData objects have no modalities: the name is a column name, and the
+    error lists the columns there are."""
     rna, atac = (_cells(60, 'r'), _cells(40, 'a', seed=1))
     kw = dict(rna='X', atac=atac, atac_kind='gene_activity', category='diagonal')
-    head = 'names a modality of a MuData, and this data is not one.'
-    assert _value_error(tmp_path, rna, labels='rna:celltype', **kw) == f"labels='rna:celltype' {head} Write labels='obs:celltype'."
-    assert _value_error(tmp_path, rna, labels='atac:nope', **kw) == f"labels='atac:nope' {head} Write labels='obs:<col>'."
-    bare = atac.copy()
-    del bare.obs['celltype']
-    assert _value_error(tmp_path, rna, labels='rna:celltype', **{**kw, 'atac': bare}) == f"labels='rna:celltype' {head} Write labels='obs:<col>'."
-    frames = [pd.DataFrame(a.X, index=a.obs_names, columns=a.var_names) for a in (rna, atac)]
-    assert _value_error(tmp_path, None, labels='rna:celltype', **{**kw, 'rna': frames[0], 'atac': frames[1]}) == f"labels='rna:celltype' {head} Write labels='obs:<col>'."
+    with pytest.raises(KeyError) as e:
+        ingest.export_dataset(rna, tmp_path / 'OUT', labels='rna:celltype', **kw)
+    assert e.value.args[0] == ("labels='rna:celltype': column 'rna:celltype' not in obs of "
+                               "the RNA object (data); available: ['celltype', 'donor'].")
     out = ingest.export_dataset(rna, tmp_path / 'OBS', labels='obs:celltype', **kw)
     assert sorted(_files(out)) == ['atac_cty.csv', 'atac_gas.h5', 'rna.h5', 'rna_cty.csv']
     for a in (rna, atac):
@@ -194,9 +184,4 @@ def test_a_modality_prefix_on_an_anndata_names_the_obs_spelling(tmp_path, capsys
         assert (named / name).read_bytes() == (out / name).read_bytes()
     for a in (rna, atac):
         del a.obs['rna:celltype']
-    rna.write_h5ad(tmp_path / 'rna.h5ad')
-    atac.write_h5ad(tmp_path / 'atac.h5ad')
-    argv = ['convert', str(tmp_path / 'rna.h5ad'), str(tmp_path / 'OUT'), '--rna', 'X', '--atac-from', str(tmp_path / 'atac.h5ad'), '--atac-kind', 'gene_activity', '--category', 'diagonal', '--labels']
-    cli_head = 'names a modality of a .h5mu file, and SRC is not one.'
-    frames[0].to_csv(tmp_path / 'rna.csv')
     assert not (tmp_path / 'OUT').exists()

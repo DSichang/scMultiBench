@@ -54,7 +54,7 @@ def _cite(root, name):
 def test_canonical_dataset_returns_the_listed_spelling(tmp_path):
     _cite(tmp_path, "MYCITE")
     assert resolve.canonical_dataset(tmp_path, "MYCITE") == "MYCITE"
-    with pytest.warns(UserWarning, match="'mycite' is not a folder under .* but 'MYCITE' is"):
+    with pytest.warns(UserWarning, match="Using the folder 'MYCITE' for dataset 'mycite': the names differ in letter case"):
         assert resolve.canonical_dataset(tmp_path, "mycite") == "MYCITE"
     assert resolve.canonical_dataset(tmp_path, "nothere") == "nothere"       # caller's error fires
     assert resolve.canonical_dataset(tmp_path / "missing", "x") == "x"
@@ -63,15 +63,15 @@ def test_canonical_dataset_returns_the_listed_spelling(tmp_path):
 def test_scan_and_inputs_for_carry_the_on_disk_name(tmp_path, monkeypatch):
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     _cite(tmp_path, "MYCITE")
-    with pytest.warns(UserWarning, match="on-disk spelling"):
+    with pytest.warns(UserWarning, match="the names differ in letter case"):
         df = full_scan("mycite", "vertical", data_path=tmp_path)
     assert (df["files_reason"].str.contains("/mycite")).sum() == 0
     assert len(df) == len(full_scan("MYCITE", "vertical", data_path=tmp_path))
-    with pytest.warns(UserWarning, match="on-disk spelling"):
+    with pytest.warns(UserWarning, match="the names differ in letter case"):
         inp = mtb.engine.resolve.inputs_for("mycite", "vertical", "Matilda", modalities=["rna", "adt"],
                              data_path=tmp_path)
     assert all("/MYCITE/" in p for p in inp.values())
-    with pytest.warns(UserWarning, match="on-disk spelling"):
+    with pytest.warns(UserWarning, match="the names differ in letter case"):
         labs = mtb.engine.resolve.labels_for("mycite", data_path=tmp_path)
     assert "/MYCITE/" in labs["cty"]
 
@@ -91,7 +91,7 @@ def test_run_all_names_out_dir_and_records_after_the_folder(tmp_path, monkeypatc
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
         res = mtb.run(os.path.join(tmp_path, 'mycite'), 'vertical', methods=['Matilda'], out_dir=str(tmp_path / 'runs'), evaluate=False, verbose=False)
-    assert sum("on-disk spelling" in str(x.message) for x in w) == 1     # once, not per call
+    assert sum("differ in letter case" in str(x.message) for x in w) == 1     # once, not per call
     assert res.dataset == "MYCITE"
     assert calls == [str(tmp_path / "runs" / "Matilda_MYCITE")]
     assert all(r["dataset"] == "MYCITE" for r in res.records)

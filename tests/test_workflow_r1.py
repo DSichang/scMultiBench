@@ -253,29 +253,17 @@ def test_run_all_refuses_a_mismatched_out_dir_before_any_method(tmp_path, monkey
 
 
 # ----------------------------------------------------------------- L30: dry-run plan
-def test_dry_run_with_anndata_names_the_converted_files(tmp_path):
+@pytest.mark.parametrize("kind", ["anndata", "mudata"])
+def test_preview_refuses_an_object_like_the_real_run(tmp_path, kind, linux_with_envs):
     import anndata as ad
-    a = ad.AnnData(np.ones((5, 3)))
-    argv = mtb.engine.runner.preview("scMVP", "vertical", inputs={"rna": a, "atac": a}, out_dir=str(tmp_path / "o"))[0]
-    line = shlex.join(argv)
-    assert "AnnData object" not in line
-    assert str(tmp_path / "o" / "inputs" / "rna.h5") in argv
-    assert str(tmp_path / "o" / "inputs" / "atac.h5") in argv
-    assert not (tmp_path / "o").exists()
-
-
-@pytest.mark.parametrize("bad", ["foo.h5mu", "mudata"])
-def test_preview_refuses_mudata_like_the_real_run(tmp_path, bad, linux_with_envs):
-    if bad == "mudata":
+    bad = ad.AnnData(np.ones((4, 2)))
+    if kind == "mudata":
         mudata = pytest.importorskip("mudata")
-        import anndata as ad
-        bad = mudata.MuData({"rna": ad.AnnData(np.ones((4, 2)))})
-    with pytest.raises(ValueError, match="MuData"):
-        mtb.engine.runner.preview("scMVP", "vertical", inputs={"rna": bad, "atac": bad},
-                                  out_dir=str(tmp_path / "o"))
-    with pytest.raises(ValueError, match="MuData"):
-        mtb.engine.runner.run("scMVP", "vertical", inputs={"rna": bad, "atac": bad},
-                              out_dir=str(tmp_path / "o"))
+        bad = mudata.MuData({"rna": bad})
+    for call in (mtb.engine.runner.preview, mtb.engine.runner.run):
+        with pytest.raises(TypeError, match=r"inputs\['rna'\] must be a file path"):
+            call("scMVP", "vertical", inputs={"rna": bad, "atac": bad},
+                 out_dir=str(tmp_path / "o"))
     assert not (tmp_path / "o").exists()
 
 
@@ -307,13 +295,16 @@ def _fake_popen(n_rows, calls, dims=4):
 
 
 def test_preview_argv_is_the_real_command(tmp_path, monkeypatch, linux_with_envs):
-    import anndata as ad
-    a = ad.AnnData(np.ones((6, 3)))
-    a.obs_names = [f"c{i}" for i in range(6)]
+    from multibench.engine import ingest
+    for name in ("rna.h5", "atac.h5"):
+        ingest._write_canonical(tmp_path / "d" / name, np.ones((6, 3)), ["g0", "g1", "g2"],
+                                [f"c{i}" for i in range(6)], dtype="float64",
+                                compression=None, block=1024)
     repo = tmp_path / "repo"
     (repo / "tools_scripts").mkdir(parents=True)
     monkeypatch.setattr(config, "repo_path", repo)
-    kw = dict(inputs={"rna": a, "atac": a}, out_dir=str(tmp_path / "o"))
+    kw = dict(inputs={"rna": str(tmp_path / "d" / "rna.h5"),
+                      "atac": str(tmp_path / "d" / "atac.h5")}, out_dir=str(tmp_path / "o"))
     preview = mtb.engine.runner.preview("scMVP", "vertical", **kw)[0]
     calls = {}
     monkeypatch.setattr(runner.subprocess, "Popen", _fake_popen(6, calls))

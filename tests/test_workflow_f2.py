@@ -62,13 +62,13 @@ def _mu_tc(root):
     atac.var_names = [f"chr1:{i * 1000}-{i * 1000 + 200}" for i in range(40)]
     d = root / "MU_TC"
     d.mkdir()
-    ingest._to_canonical(rna, d, modality='rna')
-    ingest._to_canonical(atac, d, modality='peak')
+    ingest._write_canonical(d / "rna.h5", rna.X, list(rna.var_names), list(rna.obs_names), dtype="float64", compression=None, block=1024)
+    ingest._write_canonical(d / "atac_peak.h5", atac.X, list(atac.var_names), list(atac.obs_names), dtype="float64", compression=None, block=1024)
     pd.DataFrame({"x": rng.choice(["T", "B"], n)}).to_csv(d / "cty.csv", index=False)
     return d
 
 
-def test_vertical_peak_file_under_the_diagonal_name_says_how_to_fix(tmp_path, gas_matilda):
+def test_vertical_peak_file_under_the_diagonal_name_says_what_is_missing(tmp_path, gas_matilda):
     _mu_tc(tmp_path)
     # the real Matilda reads peaks and gets scMVP's advice; `gas_matilda`
     # stands for a vertical method that reads gene activity
@@ -76,16 +76,16 @@ def test_vertical_peak_file_under_the_diagonal_name_says_how_to_fix(tmp_path, ga
     df = df.set_index(["method", "modalities"])
     peak = df.loc[("scMVP", "rna+atac")]
     assert peak["reason"].startswith("scMVP needs peak ATAC (atac.h5).")
-    assert ('Rename atac_peak.h5 to atac.h5, or write it with category="vertical".'
-            in peak["files_reason"])
+    assert peak["files_reason"].endswith("needs atac.h5 in " + str(tmp_path / "MU_TC")
+                                         + ". The folder holds atac_peak.h5, cty.csv and rna.h5.")
     gas = df.loc[("Matilda", "rna+atac"), "reason"]
     assert gas.startswith("Matilda needs gene-activity ATAC (atac.h5).")
     assert "ename" not in gas
-    # the peak methods whose role was atac_gas (atac since 0.4.0, X13): files_reason
-    # gives one rule, 'vertical reads atac.h5', and never atac_gas.h5 as the rename target
+    # the peak methods whose role was atac_gas (atac since 0.4.0): files_reason names
+    # atac.h5, never atac_gas.h5
     for m in ("moETM", "scMM", "iPOLNG"):
         row = df.loc[(m, "rna+atac")]
-        assert "ename atac_peak.h5 to atac.h5" in row["files_reason"], (m, row["files_reason"])
+        assert "needs atac.h5 in" in row["files_reason"], (m, row["files_reason"])
         for col in ("reason", "files_reason"):
             assert "vertical reads atac_gas.h5" not in row[col], (m, col)
             assert "reads atac_gas.h5 for vertical" not in row[col], (m, col)
@@ -156,7 +156,7 @@ def test_global_obs_miss_names_the_modality_spelling(tmp_path):
         ingest.export_dataset(m, tmp_path / "B", rna="rna", atac="atac", atac_kind="peak",
                               labels="obs:cell_type", category="mosaic", batch_index=2)
     msg = str(ei.value)
-    assert "mdata['rna'].obs has 'cell_type': use labels='rna:cell_type'" in msg
+    assert "column 'cell_type' not in obs: searched mdata.obs" in msg and "use labels" not in msg
 
 
 def test_run_dry_run_note_names_the_install_check(monkeypatch, capsys):

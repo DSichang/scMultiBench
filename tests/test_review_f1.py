@@ -70,16 +70,14 @@ def test_a_two_file_method_gets_no_representation_caveat(data):
 
 
 # ------------------------------------------------------------------ L13 inputs_for
-@pytest.mark.parametrize("ds,cat,method,mods,msg", [
-    ("D28", "diagonal", "GLUE", ["rna", "gas"], "GLUE reads peaks; modalities name gene activity"),
-    ("D28", "diagonal", "SCALEX", ["rna", "peak"], "SCALEX reads gene activity; modalities name peaks"),
-    ("D11", "vertical", "Matilda", ["rna", "gas"], "Matilda reads peaks; modalities name gene activity"),
-    ("D28", "diagonal", "GLUE", BOTH, "GLUE reads peaks; modalities name peaks and gene activity"),
+@pytest.mark.parametrize("ds,cat,method,mods", [
+    ("D28", "diagonal", "GLUE", ["rna", "gas"]),
+    ("D28", "diagonal", "SCALEX", ["rna", "peak"]),
+    ("D11", "vertical", "Matilda", ["rna", "gas"]),
+    ("D28", "diagonal", "GLUE", BOTH),
 ])
-def test_inputs_for_applies_the_representation_rule(data, ds, cat, method, mods, msg):
-    with pytest.raises(KeyError, match=re.escape(msg)):
-        mtb.engine.resolve.inputs_for(ds, cat, method, modalities=mods, data_path=data)
-    # scan leaves the same method out for the same tokens
+def test_scan_leaves_out_a_method_whose_atac_the_tokens_do_not_name(data, ds, cat, method,
+                                                                    mods):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         sc = full_scan(ds, cat, modalities=mods, data_path=data, verbose=False)
@@ -134,32 +132,6 @@ def test_batchresult_plot_reads_the_fill_as_scaled_per_column():
     assert "darker is higher" not in doc and "rank 1 is the largest" not in doc
     assert "Circle size shows the rank within a column (bigger is better)." in doc
     assert "the lightest is the lowest in this figure, not zero." in doc
-
-
-# ------------------------------------------------------------------ .loom extra
-def test_the_loom_hint_names_the_distribution(tmp_path, monkeypatch):
-    import builtins
-    import sys
-    from multibench.engine import ingest
-
-    real_import = builtins.__import__
-
-    def no_loompy(name, *a, **k):
-        if name == "loompy":
-            raise ModuleNotFoundError("No module named 'loompy'")
-        return real_import(name, *a, **k)
-
-    monkeypatch.setitem(sys.modules, "loompy", None)
-    monkeypatch.setattr(builtins, "__import__", no_loompy)
-    (tmp_path / "x.loom").write_bytes(b"")
-    with pytest.raises(ImportError) as ei:
-        ingest._to_canonical(tmp_path / 'x.loom', tmp_path / 'x.h5', modality='rna')
-    assert "pip install 'multibench-sc[loom]'" in str(ei.value)
-    assert "'multibench[loom]'" not in str(ei.value)
-    from multibench.engine import runner
-    monkeypatch.setattr("importlib.util.find_spec", lambda name, *a: None)
-    with pytest.raises(ImportError, match=r"pip install 'multibench-sc\[loom\]'"):
-        runner._check_input("rna", str(tmp_path / "x.loom"), real=False)
 
 
 # ------------------------------------------------------------------ plain vocabulary

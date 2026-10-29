@@ -42,7 +42,7 @@ CELLS = [f"c{i:03d}" for i in range(N)]
 PEAKS = [f"chr1:{j * 1000}-{j * 1000 + 500}" for j in range(30)]
 DEBUG = ""          # c3 (E19): a refusal that names its fix prints no traceback line
 LOOKS = "The {what} values are not whole numbers, so they look log-normalised. "
-NOT_COUNTS = LOOKS + "The methods normalise raw counts themselves. "
+COUNTS = LOOKS + "Export raw counts."
 
 
 def _obj(names, seed, *, log=True, cells=CELLS):
@@ -100,11 +100,7 @@ def test_the_warning_for_an_object_names_its_own_x(tmp_path):
     by a selector and keeps the selector advice."""
     msgs = _warned(ingest.export_dataset, _rna(), tmp_path / "A", rna="X", adt=_adt(),
                    atac=_atac(), atac_kind="peak", labels="obs:celltype")
-    assert msgs == [
-        NOT_COUNTS.format(what="rna") + "Export raw counts, for example with "
-                                        "rna='layer:counts'.",
-        LOOKS.format(what="adt") + "Set adt.X = adt.layers[\"counts\"] first.",
-        LOOKS.format(what="atac") + "Set atac.X = atac.layers[\"counts\"] first."]
+    assert msgs == [COUNTS.format(what=w) for w in ("rna", "adt", "atac")]
 
 
 def test_the_layer_is_named_only_for_an_object_that_has_it(tmp_path):
@@ -116,8 +112,7 @@ def test_the_layer_is_named_only_for_an_object_that_has_it(tmp_path):
     kw = dict(rna="X", atac_kind="peak", labels="obs:celltype")
     msgs = _warned(ingest.export_dataset, _rna(log=False), tmp_path / "A", adt=adt, atac=atac,
                    **kw)
-    assert msgs == [LOOKS.format(what="adt") + "Put the raw counts in adt.X first.",
-                    LOOKS.format(what="atac") + "Put the raw counts in atac.X first."]
+    assert msgs == [COUNTS.format(what="adt"), COUNTS.format(what="atac")]
     with pytest.raises(KeyError):
         adt.X = adt.layers["counts"]                     # the line 0.3.5 gave
     adt.X = np.round(np.expm1(adt.X))                    # as the warning says
@@ -135,7 +130,7 @@ def test_the_warning_for_a_table_has_no_layer_to_name(tmp_path):
     a = _adt()
     table = pd.DataFrame(np.asarray(a.X), index=a.obs_names, columns=a.var_names)
     msgs = _warned(ingest.export_dataset, _rna(log=False), tmp_path / "A", rna="X", adt=table)
-    assert msgs == [LOOKS.format(what="adt") + "Pass the raw counts as adt=."]
+    assert msgs == [COUNTS.format(what="adt")]
 
 
 def test_following_the_advice_writes_the_counts_of_that_object(tmp_path):
@@ -154,38 +149,35 @@ def test_following_the_advice_writes_the_counts_of_that_object(tmp_path):
 
 # --------------------------------------- 1(b): one matrix for two modalities
 SAME = " name the same matrix. "
-OWN_ADT = "Name where the ADT is, as adt='obsm:<key>'."
-OWN_ATAC = "Pass the ATAC as its own object, as atac=<AnnData>."
+OWN = "Select each modality's own matrix, or pass rna=None."
 
 
 def test_two_modalities_from_one_matrix_are_refused(tmp_path):
     """What 0.3.4 wrote for these calls: the RNA matrix a second time, as
     ``adt.h5`` or as the ATAC file, without a message."""
     rna = _rna()
-    assert _refused(tmp_path, rna, rna="X", adt="X") == "rna='X' and adt='X'" + SAME + OWN_ADT
+    assert _refused(tmp_path, rna, rna="X", adt="X") == "rna='X' and adt='X'" + SAME + OWN
     assert _refused(tmp_path, rna, rna="layer:counts", adt="layer:counts",
                     labels="obs:celltype") == (
-        "rna='layer:counts' and adt='layer:counts'" + SAME + OWN_ADT)
+        "rna='layer:counts' and adt='layer:counts'" + SAME + OWN)
     assert _refused(tmp_path, rna, rna="layer:counts", atac="layer:counts",
                     atac_kind="peak") == (
-        "rna='layer:counts' and atac='layer:counts'" + SAME + OWN_ATAC)
+        "rna='layer:counts' and atac='layer:counts'" + SAME + OWN)
     assert _refused(tmp_path, rna, rna="X", atac="X", atac_kind="gene_activity",
-                    category="diagonal") == "rna='X' and atac='X'" + SAME + OWN_ATAC
+                    category="diagonal") == "rna='X' and atac='X'" + SAME + OWN
     assert _refused(tmp_path, rna, rna=None, adt="obsm:m", atac="obsm:m",
-                    atac_kind="peak") == "adt='obsm:m' and atac='obsm:m'" + SAME + OWN_ATAC
+                    atac_kind="peak") == "adt='obsm:m' and atac='obsm:m'" + SAME + OWN.replace("rna=", "adt=")
     # the object passed as data once more
-    assert _refused(tmp_path, rna, rna="X", adt=rna) == "rna='X' and adt=" + SAME + OWN_ADT
+    assert _refused(tmp_path, rna, rna="X", adt=rna) == "rna='X' and adt=" + SAME + OWN
     # one filter twice is one matrix
     rna.var["feature_types"] = "Gene Expression"
     assert _refused(tmp_path, rna, rna="X[feature_types=Gene Expression]",
                     adt="X[feature_types=Gene Expression]") == (
         "rna='X[feature_types=Gene Expression]' and adt='X[feature_types=Gene Expression]'"
-        + SAME + OWN_ADT)
+        + SAME + OWN)
     # the object itself, twice, and no data: no selector can be read, so the way out
     # is an object
-    assert _refused(tmp_path, None, rna=rna, adt=rna) == (
-        "rna= and adt= name the same matrix. Pass the ADT as its own object, as "
-        "adt=<AnnData>.")
+    assert _refused(tmp_path, None, rna=rna, adt=rna) == "rna= and adt=" + SAME + OWN
 
 
 def test_a_refused_call_leaves_the_folder_as_it_was(tmp_path):
@@ -199,13 +191,13 @@ def test_a_refused_call_leaves_the_folder_as_it_was(tmp_path):
 
 
 def test_adt_in_x_next_to_an_obsm_matrix_keeps_its_message(tmp_path):
-    """The object holds what is probably the protein matrix: the message
-    that names the key comes first, and its advice names that key."""
+    """The same matrix twice is refused first; adt='X' alone names the obsm key."""
     rna = _rna(log=False)
     rna.obsm["protein"] = _adt(log=False).X
-    assert _refused(tmp_path, rna, rna="X", adt="X") == (
-        "adt='X' takes X, and the object also holds obsm['protein']. If that is the protein "
-        "matrix, pass adt='obsm:protein'.")
+    assert _refused(tmp_path, rna, rna="X", adt="X") == "rna='X' and adt='X'" + SAME + OWN
+    assert _refused(tmp_path, rna, rna=None, adt="X") == (
+        "adt='X' takes X, and the object also holds obsm['protein']. If the protein matrix is "
+        "there, pass adt='obsm:protein'.")
 
 
 def test_two_matrices_of_one_object_pass(tmp_path):
@@ -247,7 +239,7 @@ def test_two_modalities_of_a_mudata(tmp_path):
         out = ingest.export_dataset(m, tmp_path / "MU", rna="rna", adt="adt")
     assert sorted(p.name for p in out.iterdir()) == ["adt.h5", "rna.h5"]
     assert _refused(tmp_path, m, rna="rna", adt="mod:rna") == (
-        "rna='rna' and adt='mod:rna'" + SAME + OWN_ADT)
+        "rna='rna' and adt='mod:rna'" + SAME + OWN)
 
 
 # ------------------------------------------ 2: a cross folder of gene activity
@@ -330,21 +322,19 @@ def _two_cohorts():
 
 
 HEAD = ("labels='obs:cell_type': column 'cell_type' not in obs of the ATAC object (atac); "
-        "available: ['predicted.id', 'prediction.score']. ")
+        "available: ['predicted.id', 'prediction.score'].")
 
 
-def test_the_other_column_name_is_the_first_advice(tmp_path):
+def test_a_side_without_the_column_lists_its_columns(tmp_path):
     rna, atac = _two_cohorts()
     kw = dict(rna="X", atac=atac, atac_kind="gene_activity", category="diagonal")
     out = tmp_path / "DIAG"
     with pytest.raises(KeyError) as e:
         ingest.export_dataset(rna, out, labels="obs:cell_type", **kw)
-    assert e.value.args[0] == (
-        HEAD + "Copy its cell-type column first, as atac.obs['cell_type'] = "
-        "atac.obs['<its column>'].")
+    assert e.value.args[0] == HEAD
     assert "evaluate=False" not in e.value.args[0]
     assert not out.exists()
-    # the advice, followed: each side gets the labels of its own cells
+    # with the column, each side gets the labels of its own cells
     atac.obs["cell_type"] = atac.obs["predicted.id"]
     ingest.export_dataset(rna, out, labels="obs:cell_type", **kw)
     assert sorted(p.name for p in out.iterdir()) == ["atac_cty.csv", "atac_gas.h5", "rna.h5",
@@ -361,8 +351,7 @@ def test_the_rna_side_without_the_column(tmp_path):
                               labels="obs:predicted.id", category="diagonal")
     assert e.value.args[0] == (
         "labels='obs:predicted.id': column 'predicted.id' not in obs of the RNA object "
-        "(data); available: ['cell_type']. Copy its cell-type column first, as "
-        "rna.obs['predicted.id'] = rna.obs['<its column>'].")
+        "(data); available: ['cell_type'].")
 
 
 def test_a_side_without_any_column_keeps_the_one_sentence(tmp_path):
@@ -374,7 +363,7 @@ def test_a_side_without_any_column_keeps_the_one_sentence(tmp_path):
                               category="diagonal")
     assert e.value.args[0] == (
         "labels='obs:cell_type': column 'cell_type' not in obs of the ATAC object (atac); "
-        "available: []. Without cell types for the ATAC cells, leave labels= out.")
+        "available: [].")
 
 
 # ------------------------------------------------------- 6(a): the order line
@@ -434,11 +423,9 @@ def test_adt_names_as_a_string_is_refused(tmp_path):
     cite = _rna(log=False)
     cite.obsm["protein"] = _adt(log=False).X
     cite.uns["protein_ids"] = [f"CD{j}" for j in range(8)]
-    for names, key in (("protein_ids", "protein_ids"), ("CD3", "<key>"),
-                       ("12345678", "<key>"), ("protein_names", "<key>")):
+    for names in ("protein_ids", "CD3", "12345678", "protein_names"):
         assert _refused(tmp_path, cite, adt="obsm:protein", adt_names=names) == (
-            f"adt_names={names!r} is one string. Pass a list of names, as "
-            f"adt_names=list(adata.uns[{key!r}]).")
+            f"adt_names={names!r} is one string. Pass a list of names.")
     # the example of the message, and a list as before
     out = ingest.export_dataset(cite, tmp_path / "LIST", adt="obsm:protein",
                                 adt_names=list(cite.uns["protein_ids"]))

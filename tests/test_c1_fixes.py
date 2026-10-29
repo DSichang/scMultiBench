@@ -108,8 +108,7 @@ def test_a_two_batch_diagonal_folder_gets_one_folder_line(tmp_path, capsys):
     log = capsys.readouterr().out
     # d1 (u3): the line names the missing batch files and gives one action
     assert log.count("DIAG2 holds numbered batches (rna1.h5, rna2.h5, ...).") == 1
-    assert ("scJoint, GLUE, iNMF and online_iNMF read exactly 3 numbered RNA and ATAC "
-            "batches, and rna3.h5 and atac_gas3.h5 are missing.") in log
+    assert "scJoint, GLUE, iNMF and online_iNMF read exactly 3;" in log
     assert "Export without batch=" not in log
     assert not out["reason"].str.contains("holds numbered batches").any()
 
@@ -169,7 +168,8 @@ def test_mosaic_rna_next_to_other_cells_atac_names_the_mosaic_fix(tmp_path):
     atac = ad.AnnData(np.ones((6, 3)))
     atac.obs_names = [f"a{i}" for i in range(6)]
     atac.var_names = [f"chr1:{i}-{i + 5}" for i in range(3)]
-    with pytest.raises(ValueError, match="for a batch with RNA only, export it without atac="):
+    with pytest.raises(ValueError, match=r"^RNA and ATAC share no barcode \(RNA e\.g\. r0, "
+                                         r"ATAC e\.g\. a0\)\. Make the names match\.$"):
         mtb.io.export_dataset(rna, tmp_path / "M", atac=atac, atac_kind="peak",
                               category="mosaic", batch_index=2)
 

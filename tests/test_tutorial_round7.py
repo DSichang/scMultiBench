@@ -177,7 +177,7 @@ def test_the_raw_counts_row_matches_the_live_warning(name, tmp_path):
     msgs = [str(w.message) for w in rec if "whole numbers" in str(w.message)]
     assert len(msgs) == 1, msgs
     assert "not whole numbers" in msgs[0]
-    assert "Export raw counts, for example with rna='layer:counts'." in msgs[0]
+    assert msgs[0].endswith("Export raw counts.")
 
 
 # ---------------------------- R7-10: the environment reason (guard)

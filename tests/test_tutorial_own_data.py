@@ -554,7 +554,7 @@ def test_a_file_name_left_unchanged_is_visible(key, changed, cells, linux, tmp_p
 
 
 @pytest.mark.parametrize("key,files", [
-    ("cross_rna_adt", "rna3.h5 and 2 more files of batch 3."),
+    ("cross_rna_adt", "rna3.h5 and 2 more files of other data."),
 ])
 def test_fewer_batches_than_the_folder_holds_are_refused(key, files, tmp_path, monkeypatch):
     """A reader with two batches leaves ``NAME`` as it is. The folder holds

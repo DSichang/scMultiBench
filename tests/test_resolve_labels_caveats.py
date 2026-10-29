@@ -131,9 +131,7 @@ def test_peak_fed_to_gas_method_is_flagged_on_the_plain_atac_role(tmp_path):
     assert resolve._preflight_caveats(got3, atac="peak") == []
 
 
-def test_near_miss_vertical_atac_names_the_peak_file(tmp_path, gas_matilda):
-    # for a vertical method that reads gene activity (`gas_matilda`): the real
-    # Matilda reads peaks and is told to rename atac_peak.h5
+def test_a_missing_atac_file_names_what_the_folder_holds(tmp_path):
     d = tmp_path / "MM"; d.mkdir()
     _h5(d / "rna.h5", 30, 50)
     _h5(d / "atac_peak.h5", 40, 50, feats=PEAKS)
@@ -141,34 +139,8 @@ def test_near_miss_vertical_atac_names_the_peak_file(tmp_path, gas_matilda):
     with pytest.raises(FileNotFoundError) as ei:
         resolve.inputs_for("MM", "vertical", "Matilda", modalities=["rna", "atac"],
                            data_path=tmp_path, check=True)
-    msg = str(ei.value)
-    assert msg == (f"Matilda (vertical) needs atac.h5 in {d}. The folder holds "
-                   f"atac_peak.h5, cty.csv and rna.h5. Vertical methods read atac.h5. "
-                   f'method_info("Matilda")["atac"] says which ATAC Matilda needs.')
-    # the warn-only form (check=None) carries the same hint
-    with pytest.warns(UserWarning, match=r"Vertical methods read atac\.h5\. method_info"):
+    assert str(ei.value) == (f"Matilda (vertical) needs atac.h5 in {d}. The folder holds "
+                             f"atac_peak.h5, cty.csv and rna.h5.")
+    with pytest.warns(UserWarning, match=r"^Matilda \(vertical\) needs atac\.h5"):
         resolve.inputs_for("MM", "vertical", "Matilda", modalities=["rna", "atac"],
                            data_path=tmp_path, check=None)
-
-
-def test_near_miss_diagonal_gas_names_the_peak_file_and_vice_versa(tmp_path):
-    d = tmp_path / "DG"; d.mkdir()
-    _h5(d / "rna.h5", 30, 50)
-    _h5(d / "atac_peak.h5", 40, 45, feats=PEAKS)
-    (d / "rna_cty.csv").write_text("x\n" + "\n".join(["a"] * 50) + "\n")
-    with pytest.raises(FileNotFoundError) as ei:
-        resolve.inputs_for("DG", "diagonal", "Portal", data_path=tmp_path, check=True)
-    assert (f"Portal (diagonal) needs atac_gas.h5 in {d}. The folder holds atac_peak.h5, "
-            f"rna.h5 and rna_cty.csv. Diagonal methods read atac_gas.h5 or atac.h5. "
-            f'method_info("Portal")["atac"] says which ATAC Portal needs.') == str(ei.value)
-    (d / "atac_peak.h5").unlink()
-    _h5(d / "atac_gas.h5", 40, 45)
-    with pytest.raises(FileNotFoundError) as ei:
-        resolve.inputs_for("DG", "diagonal", "Seurat_v3", data_path=tmp_path, check=True)
-    assert ("The folder holds atac_gas.h5, rna.h5 and rna_cty.csv. Diagonal methods read "
-            "atac_peak.h5 or peak.h5.") in str(ei.value)
-    # no sibling at all -> no near-miss clause, the plain message stands
-    (d / "atac_gas.h5").unlink()
-    with pytest.raises(FileNotFoundError) as ei:
-        resolve.inputs_for("DG", "diagonal", "Portal", data_path=tmp_path, check=True)
-    assert "methods read" not in str(ei.value)

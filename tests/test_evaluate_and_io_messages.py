@@ -125,7 +125,7 @@ def test_x50_x71_classification_docs_and_left_out_cells():
 def test_x67_labels_for_names_the_dataset_category_once():
     _, msgs = _messages(mtb.engine.resolve.labels_for, "D52mini")
     hits = [m for m in msgs if "default order" in m]
-    assert len(hits) == 1 and "In cross, StabMap" in hits[0] and "mosaic" not in hits[0]
+    assert len(hits) == 1 and "StabMap (cross, mosaic) reads" in hits[0]
     _, msgs = _messages(mtb.engine.resolve.labels_for, "D52mini")
     assert not [m for m in msgs if "default order" in m]          # once a session
 

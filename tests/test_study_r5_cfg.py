@@ -61,63 +61,30 @@ PEAK_IDS = ["peak_0", "peak_1", "peak_2", "peak_3"]
 COLON3 = ["chr4:171325400:171325903", "chr1:100:200", "chr2:5:9", "chrX:1:2"]
 
 
-@pytest.mark.parametrize("names", [PEAK_IDS, COLON3], ids=["peak_0", "chr:start:end"])
-def test_export_with_rna_gives_the_rename_advice(tmp_path, names):
+ONE_TEXT = ("Only 0% of the ATAC feature names look like peaks such as chr1:100-200. If "
+            "they are genes, pass atac_kind='gene_activity'; if peaks, rename them to "
+            "chr:start-end.")
+
+
+@pytest.mark.parametrize("names", [PEAK_IDS, COLON3, GENES[:3] + ["peak_9"]],
+                         ids=["peak_0", "chr:start:end", "genes"])
+def test_peak_kind_with_other_names_gives_both_options(tmp_path, names):
     data = _adata(GENES)
     atac = _adata(names)
     msgs = _messages(lambda: ingest.export_dataset(
         data, tmp_path / "X", rna="X", atac=atac, atac_kind="peak"))
-    assert msgs == ["Only 0% of the ATAC feature names look like peaks such as "
-                    "chr1:100-200. If they are peaks, rename them to chr:start-end. "
-                    "Some methods read the peak positions from the names, and "
-                    "mtb.scan names these methods."]
-    assert "did you mean" not in msgs[0] and "gene_activity" not in msgs[0]
-
-
-def test_export_with_rna_gene_names_suggests_gene_activity(tmp_path):
-    data = _adata(GENES)
-    atac = _adata(GENES[:3] + ["peak_9"])
-    msgs = _messages(lambda: ingest.export_dataset(
-        data, tmp_path / "X", rna="X", atac=atac, atac_kind="peak"))
-    assert msgs == ["Only 0% of the ATAC feature names look like peaks such as "
-                    "chr1:100-200, and 75% are RNA gene names. If the matrix holds "
-                    "gene activity, pass atac_kind='gene_activity'."]
-
-
-def test_diagonal_export_compares_with_the_rna_side(tmp_path):
-    rna = _adata(GENES)
-    atac = _adata(GENES)
-    atac.obs_names = [f"a{i}" for i in range(4)]
-    msgs = _messages(lambda: ingest.export_dataset(
-        rna, tmp_path / "X", rna="X", atac=atac, atac_kind="peak", category="diagonal"))
-    assert len(msgs) == 1 and "100% are RNA gene names" in msgs[0]
-
-
-def test_without_rna_names_both_options_rename_first(tmp_path):
-    atac = _adata(PEAK_IDS)
-    one = _messages(lambda: ingest._to_canonical(atac, tmp_path / 'a.h5', modality='atac_peak'))
-    assert one == ["Only 0% of the ATAC feature names look like peaks such as "
-                   "chr1:100-200. If they are peaks, rename them to chr:start-end. "
-                   "Some methods read the peak positions from the names, and "
-                   "mtb.scan names these methods. If the matrix holds gene activity, "
-                   "pass modality='atac_gas'."]
+    assert msgs == [ONE_TEXT]
     alone = _messages(lambda: ingest.export_dataset(atac, tmp_path / "Y", rna=None,
                                                     atac="X", atac_kind="peak"))
-    assert alone[0].endswith("If the matrix holds gene activity, pass "
-                             "atac_kind='gene_activity'.")
-    assert alone[0].index("rename them") < alone[0].index("gene activity")
+    assert alone == [ONE_TEXT]
 
 
 def test_gene_activity_with_peak_names_is_plain(tmp_path):
     peaks = _adata(["chr1_100_200", "chr1-300-400", "chr2:10-20", "chrX_5_9"])
-    one = _messages(lambda: ingest._to_canonical(peaks, tmp_path / 'a.h5', modality='atac_gas'))
-    assert one == ["100% of the ATAC feature names look like peaks such as "
-                   "chr1:100-200, not genes. If the matrix holds peaks, pass "
-                   "modality='atac_peak'."]
     two = _messages(lambda: ingest.export_dataset(peaks, tmp_path / "Y", rna=None,
                                                   atac="X", atac_kind="gene_activity"))
     assert two[0].endswith("pass atac_kind='peak'.")
-    for m in one + two:
+    for m in two:
         assert "did you mean" not in m and " but " not in m
 
 

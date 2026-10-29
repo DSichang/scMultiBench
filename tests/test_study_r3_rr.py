@@ -75,7 +75,8 @@ def test_peak_ids_without_coordinates_get_the_peak_names_caveat(tmp_path):
     # like every caveat, it starts with the method name (R6-10)
     assert cav.startswith("GLUE reads peak names such as chr1:100-200. atac_peak.h5 "
                           "holds other names, for example peak_1. Rename them to "
-                          "chr:start-end.")
+                          "chr:start-end, or export gene activity with "
+                          "atac_kind='gene_activity'.")
     # one caveat for the file, not also the representation guess
     assert "holds gene activity" not in cav
     # the same content check for the other method whose peaks mtb.run renames

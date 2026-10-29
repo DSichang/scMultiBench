@@ -333,8 +333,9 @@ def test_gene_named_atac_for_vertical_warns_at_export(tmp_path):
 # --------------------------------------------------------------- D18, C28
 def test_the_peak_name_caveat_takes_its_action():
     from multibench.engine import resolve
-    assert resolve.PEAK_NAMES_CAVEAT.endswith("{action}")
-    assert resolve.RENAME_PEAKS == "Rename them to chr:start-end."
+    assert resolve.PEAK_NAMES_CAVEAT.endswith(
+        "Rename them to chr:start-end, or export gene activity with "
+        "atac_kind='gene_activity'.")
 
 
 def test_the_first_family_is_clustering():

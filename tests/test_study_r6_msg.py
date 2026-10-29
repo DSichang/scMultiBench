@@ -146,7 +146,8 @@ def test_the_glue_uinmf_and_raw_count_caveats_read_as_sentences(tmp_path, pinned
                   data_path=_lung_ids(tmp_path / "a"), verbose=False).iloc[0]
     assert glue["caveat"].startswith(
         "GLUE reads peak names such as chr1:100-200. atac_peak.h5 holds other names, for "
-        "example peak_0. Rename them to chr:start-end. GLUE reads the GENCODE v43 human "
+        "example peak_0. Rename them to chr:start-end, or export gene activity with "
+        "atac_kind='gene_activity'. GLUE reads the GENCODE v43 human "
         "annotation (gencode.v43.chr_patch_hapl_scaff.annotation.gtf.gz, 53 MB) from "
         "<repo_path>/tools_scripts/GLUE/: on a host without network, put the file there. "
         f"{SCRIPTS_NOTE}{pinned}. The first real run clones PYangLab/scMultiBench with "
@@ -271,10 +272,7 @@ def test_per_batch_hint_is_sentences(tmp_path):
     msg = str(e.value)
     assert msg == (
         f"totalVI (vertical) needs rna.h5 and adt.h5 in {d}. The folder holds adt1.h5, "
-        "adt2.h5, cty1.csv, cty2.csv, rna1.h5 and rna2.h5. This folder holds per-batch files "
-        "(rna1.h5, rna2.h5, ...). Vertical methods read one rna.h5. Export without batch= "
-        'and pass the column itself, as run(batch=adata.obs["donor"]). For RNA+ADT batches, '
-        'use category="cross".')
+        "adt2.h5, cty1.csv, cty2.csv, rna1.h5 and rna2.h5.")
     assert " - " not in msg and "; " not in msg
 
 

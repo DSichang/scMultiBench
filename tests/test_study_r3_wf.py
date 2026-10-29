@@ -109,8 +109,7 @@ def test_gene_activity_near_miss_states_the_vertical_rule(tmp_path):
                 verbose=False)
     for m in ("scMDC", "UnitedNet", "Matilda"):
         text = df.loc[df.method == m, "files_reason"].iloc[0]
-        assert ("Vertical methods read atac.h5. method_info(\"" + m + "\")[\"atac\"] says "
-                "which ATAC " + m + " needs.") in text, (m, text)
+        assert f"{m} (vertical) needs atac.h5" in text, (m, text)
         assert "The folder holds atac_peak.h5" in text, (m, text)
         assert "atac_gas.h5 or atac.h5" not in text
 

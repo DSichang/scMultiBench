@@ -931,8 +931,7 @@ def test_api_overview_names_both_cases_of_file_exists_error(tmp_path):
     for overwrite in (False, True):
         with pytest.raises(FileExistsError) as left:
             mtb.io.export_dataset(other, out, overwrite=overwrite)
-        assert str(left.value) == (f"{out} holds cty.csv with another number of labels. "
-                                   f"Export to a new folder.")
+        assert str(left.value) == f"{out} holds cty.csv of other data. Export to a new folder."
     assert {p.name: p.read_bytes() for p in out.iterdir()} == held
     mtb.io.export_dataset(other, tmp_path / "OTHER")
 
