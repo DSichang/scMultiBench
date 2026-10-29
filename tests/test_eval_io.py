@@ -269,12 +269,9 @@ def test_evaluate_dict_with_several_label_files_raises_listing_keys(tmp_path):
     msg = str(exc.value)
     assert "The label keys cty2 and cty1 " in msg
     assert "list of paths in cell order" in msg
-    # 0.3.x: the hint must no longer recommend the alphabetical order; it names
-    # the cell-order rule and (0.4.0) dataset=, category= and method=, not the
-    # deprecated label_order=
-    assert "dataset=, category= and method=" in msg and "are not in the default order" in msg
+    # the hint names the cell-order rule, not the deprecated label_order=
+    assert "are not in the default order: cty1, cty2, ... by number" in msg
     assert "label_order=" not in msg
-    assert "not alphabetical" in msg
     assert "list(d.values())" not in msg
 
 

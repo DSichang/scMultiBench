@@ -78,8 +78,8 @@ def test_evaluate_refuses_a_dict_out_of_the_default_order(tmp_path):
     assert "ASW" in set(scored.metric)
     reordered = {"cty2": paths["cty2"], "cty1": paths["cty1"]}
     with pytest.raises(ValueError, match=re.escape(
-            "The label keys cty2 and cty1 are not in the default order. Pass a list of "
-            "paths in cell order, or dataset=, category= and method=.")):
+            "The label keys cty2 and cty1 are not in the default order: cty1, cty2, ... by "
+            "number, and rna before adt before atac. Pass a list of paths in cell order.")):
         mtb.evaluate(emb, labels=reordered, metrics=["ASW"], verbose=False)
     got = mtb.evaluate(emb, labels=[paths["cty2"], paths["cty1"]], metrics=["ASW"],
                        verbose=False)

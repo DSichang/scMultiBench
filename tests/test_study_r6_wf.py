@@ -351,12 +351,6 @@ def test_rescore_does_not_warn_about_its_own_file_of_origin_batch(cross, tmp_pat
     out = new.records[0]
     assert out["metrics"]["ARI"] == rec["metrics"]["ARI"]
     assert (out["batch_source"], out["n_batches"]) == ("file_of_origin", 2)
-    # a batch the caller gives still warns, in short sentences
-    with pytest.warns(UserWarning) as caught:
-        res.rescore(batch=np.repeat([1, 2], [40, 50]), metrics=["ARI"])
-    assert ("batch= changes nothing here, because metrics=['ARI'] has no batch metric. "
-            "Add ASW_batch, ARI_batch, NMI_batch, GC or iLISI, or pass metrics='all'.") in \
-        [str(w.message) for w in caught]
 
 
 # ================================================================ docstrings

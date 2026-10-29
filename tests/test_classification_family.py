@@ -125,19 +125,19 @@ def test_explicit_without_two_batches_is_an_error(three):
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb[:30], labels=paths[0], metrics="classification")
     assert str(e.value) == (
-        "metrics='classification' needs two or more batches. Pass batch=<vector>, or "
-        "labels as a list of two or more files.")
+        "metrics='classification' cannot be computed: it needs two or more batches. "
+        "Pass batch=<vector>, or labels as a list of two or more files.")
     with pytest.raises(ValueError) as e:
         mtb.evaluate(emb[:30], labels=paths[0], batch=["d1"] * 30, metrics=["OCA"])
     assert str(e.value) == (
-        "metrics=['OCA'] needs two or more batches; every cell is in one batch. Pass "
+        "metrics=['OCA'] cannot be computed: every cell is in one batch. Pass "
         "batch=<vector>, or labels as a list of two or more files.")
 
 
 def test_all_with_one_batch_is_refused(three):
     # c1 (C11): the batch metrics on one batch are refused, as classification is
     emb, paths = three
-    with pytest.raises(ValueError, match=r"^metrics='all' needs two or more batches; every "
+    with pytest.raises(ValueError, match=r"^metrics='all' cannot be computed: every "
                                          r"cell is in one batch\."):
         mtb.evaluate(emb[:30], labels=paths[0], batch=["d1"] * 30, metrics="all",
                      verbose=False)
@@ -155,14 +155,14 @@ def test_a_graph_output(three, tmp_path):
     df, said = _caught(mtb.evaluate, graph, labels=paths, metrics="all", verbose=False)
     assert _values(df)[CODES].isna().all()
     assert [m for m in said if "OCA" in m] == [
-        "scMoMaT writes a graph, not an embedding, so OCA, ACA, Spec, Sens and F1 are "
-        "NaN. Pass metrics='clustering' to leave them out."]
+        "OCA, ACA, Spec, Sens and F1 are NaN: scMoMaT writes a graph, not an embedding. "
+        "Pass metrics='clustering'."]
     # cells x cells, by default
     df, said = _caught(mtb.evaluate, np.eye(90), labels=paths, verbose=False)
     assert _values(df)[CODES].isna().all()
     assert [m for m in said if "OCA" in m] == [
-        "output is a graph, not an embedding, so OCA, ACA, Spec, Sens and F1 are NaN. "
-        "Pass metrics='clustering' to leave them out."]
+        "OCA, ACA, Spec, Sens and F1 are NaN: output is a graph, not an embedding. "
+        "Pass metrics='clustering'."]
 
 
 def _knn(n=90, k=20, seed=0):
@@ -184,8 +184,8 @@ def test_every_form_of_a_graph_output_is_treated_alike(three, tmp_path):
         df, said = _caught(mtb.evaluate, output, labels=paths, verbose=False)
         assert _values(df)[CODES].isna().all()
         assert [m for m in said if "OCA" in m] == [
-            f"{who}, not an embedding, so OCA, ACA, Spec, Sens and F1 are NaN. "
-            f"Pass metrics='clustering' to leave them out."]
+            f"OCA, ACA, Spec, Sens and F1 are NaN: {who}, not an embedding. "
+            f"Pass metrics='clustering'."]
         with pytest.raises(ValueError) as e:
             mtb.evaluate(output, labels=paths, metrics=["OCA", "ARI"])
         assert str(e.value) == (f"{who}, not an embedding, so it has no classification "
@@ -208,8 +208,8 @@ def test_spec_nan_for_a_query_of_one_cell_type_is_said(tmp_path):
     df, said = _caught(mtb.evaluate, emb, labels=paths, verbose=False)
     assert np.isnan(_values(df)["Spec"]) and _values(df)["OCA"] == 1.0
     assert [m for m in said if "Spec" in m] == [
-        "Spec is NaN: when batch cty1 or cty2 is the reference, the cells it predicts "
-        "are all of one cell type. Compare methods on the other metrics."]
+        "Spec is NaN when batch cty1 or cty2 is the reference: the cells it predicts "
+        "have one true cell type."]
     _, said = _caught(mtb.evaluate, emb, labels=paths, metrics=["OCA"], verbose=False)
     assert not [m for m in said if "Spec" in m]
 
@@ -219,8 +219,8 @@ def test_no_batch_to_learn_from(tmp_path):
     with pytest.raises(ValueError) as e:
         _quiet(mtb.evaluate, emb, labels=paths, metrics="classification")
     assert str(e.value) == (
-        "metrics='classification' found no batch to learn from: each needs two cell "
-        "types that another batch has. Check labels and batch.")
+        "metrics='classification' cannot be computed: no batch has two cell types that "
+        "another batch has. Check labels and batch.")
     df, said = _caught(mtb.evaluate, emb, labels=paths, metrics="all", verbose=False)
     assert _values(df)[CODES].isna().all()
     # one warning, not classify's one per skipped batch

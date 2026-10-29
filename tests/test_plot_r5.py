@@ -84,10 +84,8 @@ def test_reordered_plain_dict_error_names_only_the_default_order(tmp_path):
     with pytest.raises(ValueError) as e:
         P._labels_from_dict({"cty2": p2, "cty1": p1})
     assert str(e.value) == (
-        "The label keys cty2 and cty1 are not in the default order. Pass a list of "
-        "paths in cell order, or dataset=, category= and method=. The default order is cty1, "
-        "cty2, ... by number, with rna before adt before atac. It is not "
-        "alphabetical.")
+        "The label keys cty2 and cty1 are not in the default order: cty1, cty2, ... by "
+        "number, and rna before adt before atac. Pass a list of paths in cell order.")
 
 
 def test_reordered_labels_for_dict_names_the_method_order(tmp_path):
@@ -103,9 +101,7 @@ def test_reordered_labels_for_dict_names_the_method_order(tmp_path):
     with pytest.raises(ValueError) as e:
         P._labels_from_dict(three)
     assert str(e.value).startswith(
-        "The label keys cty1, cty3 and cty2 are in neither the method's cell "
-        "order nor the default order. Pass a list of paths in cell order, or dataset=, "
-        "category= and method=.")
+        "The label keys cty1, cty3 and cty2 are not in the default order")
     # labels_for without a method returns the default order: no method to name
     plain = LabelFiles({"cty1": p1, "cty2": p2})
     plain["cty1"] = plain.pop("cty1")

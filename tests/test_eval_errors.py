@@ -86,7 +86,7 @@ def test_input_matrix_passed_as_output_is_explained(tmp_path):
 
 
 def test_a_wrong_batch_column_gets_its_error_without_the_unused_batch_warning(tmp_path):
-    # Z23 (r3): the batch is read before the "changes nothing" warning
+    # Z23 (r3): a wrong batch column gets its error, and no warning
     import warnings
     import anndata as ad
     import numpy as np

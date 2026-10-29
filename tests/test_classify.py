@@ -134,10 +134,8 @@ def test_a_graph_or_label_output_is_an_error(three, tmp_path):
     assert str(e.value) == ("scMoMaT writes a graph, not an embedding, so it has no "
                             "classification scores. Score it with "
                             "mtb.evaluate(metrics='clustering').")
-    with pytest.raises(ValueError) as e:
-        classify(labels, labels=list(paths.values()))          # predicted labels
-    assert str(e.value) == ("classify needs an embedding; output is not one. "
-                            "Pass the method's embedding file.")
+    with pytest.raises(TypeError, match="got list$"):
+        classify(list(labels), labels=list(paths.values()))    # predicted labels
     # cells x cells, and a kNN index matrix as mtb.run returns it for scMoMaT
     knn = np.stack([np.roll(np.arange(90), -i)[:20] for i in range(90)])
     for output in (np.eye(90), knn, knn.astype(float), knn + 1, knn.T):

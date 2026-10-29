@@ -67,9 +67,8 @@ def test_evaluate_raises_on_a_missing_batch_whole_message():
     assert str(e.value) == (
         "batch: 30 of the 300 cells have no batch. Give every cell a batch.")
     # a batch that no metric of the call reads is checked all the same
-    with pytest.warns(UserWarning, match="batch= changes nothing here"):
-        with pytest.raises(ValueError) as e:
-            mtb.evaluate(emb, labels=lab, batch=donors, metrics=["ASW"])
+    with pytest.raises(ValueError) as e:
+        mtb.evaluate(emb, labels=lab, batch=donors, metrics=["ASW"])
     assert str(e.value) == _bv1()
 
 

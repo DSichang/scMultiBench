@@ -99,19 +99,6 @@ def test_only_valid_requests_still_work_and_unknown_lists_valid_names():
     assert str(exc.value).startswith("Unknown metrics= token XYZ. Pass 'all'")
 
 
-def test_batch_under_clustering_task_warns_instead_of_silently_ignoring():
-    emb, ct, bat, _ = _toy()
-    with pytest.warns(UserWarning, match=r"batch= changes nothing here, because "
-                                         r"metrics=\['ASW'\] has no batch metric"):
-        df = evaluate(emb, labels=ct, batch=bat, metrics=["ASW"])
-    assert _metrics(df) == ["ASW"]
-    # no such warning when batch is used
-    with warnings.catch_warnings(record=True) as rec:
-        warnings.simplefilter("always")
-        evaluate(emb, labels=ct, batch=bat, metrics=["ASW", "GC"])
-    assert not [w for w in rec if "batch= changes nothing" in str(w.message)]
-
-
 def test_evaluate_never_returns_an_empty_frame():
     """Every public path either raises or returns at least one metric row."""
     emb, ct, bat, _ = _toy()
@@ -188,9 +175,7 @@ def test_labels_series_with_ids_against_bare_array_is_positional_with_warning():
     msgs = [str(w.message) for w in rec if "is matched by position" in str(w.message)]
     assert len(msgs) == 1, msgs
     # R5-01: the warning says how to put the vector in order, not how to silence it
-    assert msgs[0] == ("The labels Series is matched by position, because the embedding "
-                       "has no cell ids. Check that it follows the embedding rows, or "
-                       "pass an AnnData whose obs_names are the barcodes.")
+    assert msgs[0] == "The labels Series is matched by position: the embedding has no cell ids."
     assert _ari(got) == pytest.approx(1.0)         # positional and in order: fine
     # batch= gets its own (one) warning
     with pytest.warns(UserWarning, match="The batch Series is matched by position"):
@@ -244,13 +229,11 @@ def test_multi_entry_dict_error_names_keys_and_the_stacking_rule(tmp_path):
         evaluate(emb, labels=d, metrics=["ARI"])
     msg = str(exc.value)
     assert msg.startswith("The label keys atac_cty and rna_cty are not in "
-                          "the default order. ")
+                          "the default order: ")
     # 0.4.0: evaluate's own keywords, not the deprecated label_order= / labels_for
-    assert "Pass a list of paths in cell order, or dataset=, category= and method=." in msg
+    assert msg.endswith("Pass a list of paths in cell order.")
     assert "label_order=" not in msg and "labels_for" not in msg
-    assert "The default order is cty1, cty2, ... by number" in msg
-    assert "rna before adt before atac" in msg
-    assert "not alphabetical" in msg
+    assert "cty1, cty2, ... by number, and rna before adt before atac" in msg
     # R4-13: short sentences, no parenthesis holding clauses
     assert "(" not in msg and ";" not in msg
     # the same rule reaches as_vector() directly (batch= given as a dict)
