@@ -796,5 +796,6 @@ def _prepared_note(plan: dict, out_str: str, method: str) -> str | None:
              if step["convert"] or step["normpeaks_from"]]
     if not files:
         return None
-    return (f"{method} reads {', '.join(files)}, which mtb.run writes first; start "
-            f"{method} with mtb.run.")
+    that = "that file" if len(files) == 1 else "those files"
+    return (f"{method} reads {', '.join(files)}. mtb.run writes {that} first, so "
+            f"start {method} with mtb.run.")

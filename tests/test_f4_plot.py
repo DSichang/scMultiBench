@@ -177,8 +177,8 @@ def test_prepared_file_note_names_the_method(root):
         sc = full_scan("D28", "diagonal", data_path=root / "data", verbose=False)
     # GLUE's one-batch row; its several-batch row lacks its files in D28
     cav = sc.set_index(["method", "modalities"]).loc[("GLUE", "rna+atac_peak"), "caveat"]
-    assert ("GLUE reads inputs/atac_peak_normpeaks.h5, which mtb.run writes first; "
-            "start GLUE with mtb.run.") in cav
+    assert ("GLUE reads inputs/atac_peak_normpeaks.h5. mtb.run writes that file "
+            "first, so start GLUE with mtb.run.") in cav
     assert "shell line" not in cav
 
 
