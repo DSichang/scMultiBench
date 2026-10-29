@@ -88,7 +88,7 @@ def test_sweep_notice_names_the_flavor(monkeypatch, capsys):
 def test_igraph_falls_back_to_leidenalg_on_old_scanpy(monkeypatch):
     """scanpy < 1.10 has no flavor= (it forwards the keyword to leidenalg and
     fails with TypeError); the resolver downgrades to leidenalg, warning once."""
-    monkeypatch.setattr(S, "_igraph_support", False)
+    monkeypatch.setattr(S, "igraph_flavor_available", lambda: False)
     monkeypatch.setattr(S, "_fallback_warned", False)
     with pytest.warns(UserWarning, match=r"cannot run flavor='igraph' \(needs scanpy>=1.10"):
         assert S._resolve_flavor("igraph") == "leidenalg"
@@ -99,7 +99,7 @@ def test_igraph_falls_back_to_leidenalg_on_old_scanpy(monkeypatch):
 
 
 def test_igraph_probe_reads_scanpy_version(monkeypatch):
-    monkeypatch.setattr(S, "_igraph_support", None)
+    S.igraph_flavor_available.cache_clear()
     from importlib.metadata import version
     from packaging.version import Version
     assert S.igraph_flavor_available() is (Version(version("scanpy")) >= Version("1.10"))
@@ -111,11 +111,11 @@ def test_leidenalg_path_passes_no_flavor_keyword(monkeypatch):
     import scanpy as sc
     calls = []
     monkeypatch.setattr(sc.tl, "leiden", lambda adata, **kw: calls.append(kw))
-    monkeypatch.setattr(S, "_flavor_kw", False)            # an old scanpy
+    monkeypatch.setattr(S, "_scanpy_has_flavor_kw", lambda: False)    # an old scanpy
     S._leiden(object(), 0.5, "k", "leidenalg")
     assert calls and "flavor" not in calls[0] and calls[0]["resolution"] == 0.5
     calls.clear()
-    monkeypatch.setattr(S, "_flavor_kw", True)             # scanpy >= 1.10
+    monkeypatch.setattr(S, "_scanpy_has_flavor_kw", lambda: True)     # scanpy >= 1.10
     S._leiden(object(), 0.5, "k", "leidenalg")
     assert calls[0]["flavor"] == "leidenalg"
     calls.clear()

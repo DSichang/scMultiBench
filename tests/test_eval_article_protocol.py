@@ -44,7 +44,7 @@ def test_the_search_keeps_the_last_clustering_when_it_cannot_reach_n(monkeypatch
     # Y11 (r3): the article's fallback, without a warning
     with warnings.catch_warnings():
         warnings.simplefilter("error", UserWarning)
-        cl = S.leiden_n_clusters(emb, 5, flavor="leidenalg")
+        cl = S.leiden_n_clusters(emb, 5)
     assert len(seen) == S._SEARCH_STEPS == 30
     assert seen[:3] == [1.5, 2.25, 2.625]       # bisected upwards: too few clusters
     assert set(cl) == {f"a{len(seen)}", f"b{len(seen)}"}
