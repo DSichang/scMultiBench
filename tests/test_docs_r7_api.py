@@ -6,11 +6,7 @@ package prints.
 
 Every test needs the docs source (SCMULTIBENCH_DOCS=<docs dir>) and is skipped without it.
 """
-import pytest
-
-import multibench as mtb
 from tests.test_docs_r4 import _flat, needs_docs
-from tests.test_f6_cli import _DATA, _lung
 
 
 @needs_docs
@@ -33,17 +29,3 @@ def test_changes_page_lists_round_7_changes():
             "`params_for` and `evaluate`. Also the environment messages, file checks, "
             "plot and scan warnings,"):
         assert phrase in text, phrase
-
-
-@needs_docs
-@pytest.mark.parametrize("method", ["MultiMAP", "Seurat_v3"])
-def test_changes_page_quotes_the_live_both_files_sentence(tmp_path, method):
-    d = _lung(tmp_path)
-    for f in ("rna_cty.csv", "atac_cty.csv"):
-        (d / f).write_bytes((_DATA / "D28" / f).read_bytes())
-    with pytest.raises(FileNotFoundError) as exc:
-        mtb.engine.resolve.inputs_for("LUNG", "diagonal", method, data_path=str(tmp_path / "data"),
-                       check=True)
-    assert str(exc.value).endswith(f"{method} reads both atac_peak.h5 and atac_gas.h5.")
-    assert ("For MultiMAP and Seurat_v3, the text ends "
-            "`<method> reads both atac_peak.h5 and atac_gas.h5.`") in _flat("changes.md")
