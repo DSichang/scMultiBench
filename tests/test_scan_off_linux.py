@@ -3,12 +3,10 @@
 import multibench as mtb
 from multibench.engine import envs
 
-DARWIN = ("method environments are linux-64 conda envs (packed archives + lockfiles); "
-          "this host is darwin/arm64")
 
 
 def test_no_gpu_sentence_off_linux(monkeypatch, capsys):
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: DARWIN)
+    monkeypatch.setattr(envs, "host_system", lambda: "macOS")
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
     table = mtb.scan("D11", "vertical", methods=["moETM"])
     assert "NVIDIA GPU" not in table["reason"].iloc[0]

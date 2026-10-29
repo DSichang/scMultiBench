@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import functools
 import json as _json
-import platform as _platform
 import shutil
 import os
 import re
@@ -36,53 +35,28 @@ class LinuxOnlyError(OSError, RuntimeError):
 
 
 # --- host platform --------------------------------------------------------
-def host_platform_problem() -> str | None:
-    """Why method environments cannot be built on this host, or ``None``.
-
-    The archives and lockfiles are linux-64: elsewhere a build fails after a
-    multi-GB download, or in the solver.
-
-    Returns
-    -------
-    str or None
-        ``None`` on Linux (WSL included); else a sentence ending
-        ``"this host is darwin/arm64"``.
-    """
+def host_system() -> str | None:
+    """``None`` on Linux (WSL included), else this computer's system for users:
+    ``'macOS'``, ``'Windows'`` or the platform name. The envs are linux-64."""
     if sys.platform == "linux":
         return None
-    return (f"method environments are linux-64 conda envs (packed archives + "
-            f"lockfiles); this host is {sys.platform}/{_platform.machine() or '?'}")
+    return {"darwin": "macOS", "win32": "Windows", "cygwin": "Windows"}.get(
+        sys.platform, sys.platform)
 
 
-def _host_of(problem: str) -> str:
-    """``'darwin/arm64'`` out of a :func:`host_platform_problem` text, so a
-    patched text and the real one name the same host."""
-    marker = "this host is "
-    if marker in problem:
-        return problem.rsplit(marker, 1)[1].strip().rstrip(".")
-    return f"{sys.platform}/{_platform.machine() or '?'}"
-
-
-def _host_system_name(problem: str) -> str:
-    """The operating system of a :func:`host_platform_problem` text, for
-    users: ``'macOS'``, ``'Windows'`` or the platform name."""
-    system = _host_of(problem).split("/", 1)[0]
-    return {"darwin": "macOS", "win32": "Windows", "cygwin": "Windows"}.get(system, system)
-
-
-def linux_only_text(problem: str) -> str:
-    """``"Method environments run only on Linux, and this computer runs macOS."``"""
-    return (f"Method environments run only on Linux, and this computer runs "
-            f"{_host_system_name(problem)}.")
+def linux_only_text() -> str | None:
+    """``"Methods run only on Linux, and this computer runs macOS."``, or
+    ``None`` on Linux."""
+    system = host_system()
+    return system and f"Methods run only on Linux, and this computer runs {system}."
 
 
 def _require_linux(force: bool) -> None:
     """Raise :class:`LinuxOnlyError` before any download or build on a
     non-Linux host, unless ``force``."""
-    problem = None if force else host_platform_problem()
-    if problem:
-        raise LinuxOnlyError(
-            f"{linux_only_text(problem)} Run the install on a Linux machine, such as Colab.")
+    text = None if force else linux_only_text()
+    if text:
+        raise LinuxOnlyError(f"{text} Run the install on a Linux machine, such as Colab.")
 
 
 #: The first sentence of the install error without conda (the docs quote it).
@@ -250,7 +224,7 @@ def auto_flavor_note(flavor: str, *, dry_run: bool = False) -> str | None:
     """The stderr note for ``flavor='auto'`` on a host without a GPU, else
     ``None``: pass ``'gpu'`` when the jobs run on GPU nodes. ``dry_run`` says
     what would be installed."""
-    if flavor != "auto" or resolve_flavor(flavor) != "cpu" or host_platform_problem():
+    if flavor != "auto" or resolve_flavor(flavor) != "cpu" or host_system():
         # off Linux nothing is installed here: no GPU node to plan for
         return None
     gpu = "flavor='gpu'"

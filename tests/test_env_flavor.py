@@ -51,7 +51,7 @@ def fake_tables(monkeypatch):
     monkeypatch.setattr(envs, "packed_layers", lambda: {})
     monkeypatch.setattr(envs, "packed_manifest", lambda: dict(MANIFEST))
     monkeypatch.setattr(envs, "packed_sizes", lambda: {k: dict(v) for k, v in SIZES.items()})
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
+    monkeypatch.setattr(envs, "host_system", lambda: None)
 
 
 @pytest.fixture
@@ -239,7 +239,7 @@ def test_install_packed_gpu_never_warns(envs_dir, tmp_path, monkeypatch, fake_ta
 
 
 def test_install_packed_invalid_flavor_before_anything(envs_dir, monkeypatch):
-    monkeypatch.setattr(envs, "host_platform_problem",
+    monkeypatch.setattr(envs, "host_system",
                         lambda: pytest.fail("platform checked before the flavour"))
     serve_archives(monkeypatch, lambda url: pytest.fail("downloaded"))
     with pytest.raises(ValueError) as e:

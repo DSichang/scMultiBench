@@ -2,7 +2,7 @@
 build on another host, ship archive sizes, explain the difficulty tags; and
 Rin's ``as_frame=`` on the three env tables.
 
-Every test pins the platform through ``envs.host_platform_problem`` so it
+Every test pins the platform through ``envs.host_system`` so it
 holds on Linux and macOS alike.
 """
 import json
@@ -16,26 +16,25 @@ from multibench.engine import envs, registry
 from _serve import serve_archives
 
 ROOT = Path(__file__).resolve().parents[1]
-DARWIN = "method environments are linux-64 conda envs (packed archives + lockfiles); this host is darwin/arm64"
 
 
 @pytest.fixture
 def off_linux(monkeypatch):
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: DARWIN)
+    monkeypatch.setattr(envs, "host_system", lambda: "macOS")
 
 
 @pytest.fixture
 def on_linux(monkeypatch):
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
+    monkeypatch.setattr(envs, "host_system", lambda: None)
 
 
 # ----------------------------------------------------------------- the guard
-def test_host_platform_problem_reflects_sys_platform(monkeypatch):
-    monkeypatch.setattr(sys, "platform", "linux")
-    assert envs.host_platform_problem() is None
-    monkeypatch.setattr(sys, "platform", "darwin")
-    msg = envs.host_platform_problem()
-    assert msg and "linux-64" in msg and "darwin" in msg
+@pytest.mark.parametrize("platform,name", [("linux", None), ("darwin", "macOS"),
+                                           ("win32", "Windows"), ("cygwin", "Windows"),
+                                           ("freebsd14", "freebsd14")])
+def test_host_system_reflects_sys_platform(monkeypatch, platform, name):
+    monkeypatch.setattr(sys, "platform", platform)
+    assert envs.host_system() == name
 
 
 def test_create_all_run_refuses_off_linux(off_linux, monkeypatch):

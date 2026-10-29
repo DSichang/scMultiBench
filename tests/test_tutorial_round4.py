@@ -180,8 +180,7 @@ def test_a_dry_run_command_alone_can_fail():
     from multibench.engine import runner as R
     plan = {"rna": {"value": "/o/inputs/rna.h5", "convert": True, "normpeaks_from": None}}
     note = R._prepared_note(plan, "/o", "X")
-    assert note.startswith("X reads inputs/rna.h5.")
-    assert "The printed command alone fails in a job script." in note
+    assert note == "X reads inputs/rna.h5, which mtb.run writes first; start X with mtb.run."
 
 
 # ---------------------------------------------- R4-13 / R4-02: batch advice

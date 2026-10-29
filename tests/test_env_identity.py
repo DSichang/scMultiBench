@@ -178,9 +178,7 @@ def test_run_refuses_the_users_env_on_linux(fake_root, tmp_path):
 
 def test_run_refuses_off_linux_also_when_the_env_is_installed(fake_root, tmp_path,
                                                               monkeypatch):
-    monkeypatch.setattr(envs, "host_platform_problem",
-                        lambda: "method environments are linux-64 conda envs (packed "
-                                "archives + lockfiles); this host is darwin/arm64")
+    monkeypatch.setattr(envs, "host_system", lambda: "macOS")
     assert envs.env_prefix("env_sciPENN") is not None
     inputs = mtb.engine.resolve.inputs_for("D11", "vertical", "sciPENN")
     with pytest.raises(OSError, match=r"^Methods run only on Linux, and this computer "

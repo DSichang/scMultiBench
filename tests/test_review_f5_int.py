@@ -168,7 +168,7 @@ def test_run_all_reads_r_row_numbers_on_a_folder_with_numbered_barcodes(cite, tm
 
 
 def test_the_linux_only_reason_fits_the_table(monkeypatch):
-    monkeypatch.setattr(envs, 'host_platform_problem', lambda: 'Method environments are Linux-only; this host is darwin/arm64')
+    monkeypatch.setattr(envs, 'host_system', lambda: "macOS")
     longest = max((envs.group_for(m) for m in registry.list_methods()), key=len)
     reason = W._env_hint(longest, 'X', 'vertical')
     assert reason == f'Environment {longest} runs only on Linux, not on this computer.'

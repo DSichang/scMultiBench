@@ -230,7 +230,7 @@ def _tiny_archive(path: Path, *, unpack_ok: bool = True) -> Path:
 def test_install_packed_without_conda_creates_the_prefix(envs_dir, tmp_path, monkeypatch):
     tgz = _tiny_archive(tmp_path / "matilda.tar.gz")
     fetched = []
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
+    monkeypatch.setattr(envs, "host_system", lambda: None)
     import urllib.request
     serve_archives(monkeypatch,
                         lambda url: (fetched.append(url), (str(tgz), None))[1])
@@ -253,7 +253,7 @@ def test_install_packed_without_conda_creates_the_prefix(envs_dir, tmp_path, mon
 
 def test_install_packed_explicit_envs_dir(envs_dir, tmp_path, monkeypatch):
     tgz = _tiny_archive(tmp_path / "x.tar.gz")
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
+    monkeypatch.setattr(envs, "host_system", lambda: None)
     import urllib.request
     serve_archives(monkeypatch, lambda url: (str(tgz), None))
     other = tmp_path / "elsewhere"
@@ -264,7 +264,7 @@ def test_install_packed_explicit_envs_dir(envs_dir, tmp_path, monkeypatch):
 
 def test_install_packed_unpack_failure_cleans_up(envs_dir, tmp_path, monkeypatch, capsys):
     tgz = _tiny_archive(tmp_path / "bad.tar.gz", unpack_ok=False)
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
+    monkeypatch.setattr(envs, "host_system", lambda: None)
     import urllib.request
     serve_archives(monkeypatch, lambda url: (str(tgz), None))
     assert envs.install_packed("matilda") is False
@@ -276,7 +276,7 @@ def test_install_packed_unpack_failure_cleans_up(envs_dir, tmp_path, monkeypatch
 def test_install_packed_no_archive_returns_false(envs_dir, monkeypatch):
     import urllib.error
     import urllib.request
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
+    monkeypatch.setattr(envs, "host_system", lambda: None)
 
     def gone(url):
         raise urllib.error.HTTPError(url, 404, "nope", {}, None)
@@ -287,7 +287,7 @@ def test_install_packed_no_archive_returns_false(envs_dir, monkeypatch):
 
 def test_install_packed_platform_guard_precedes_download(envs_dir, monkeypatch):
     import urllib.request
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: "this host is darwin/arm64")
+    monkeypatch.setattr(envs, "host_system", lambda: "macOS")
     serve_archives(monkeypatch,
                         lambda url: pytest.fail("downloaded on a non-linux host"))
     with pytest.raises(RuntimeError, match="this computer runs macOS"):

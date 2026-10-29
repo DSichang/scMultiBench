@@ -45,5 +45,4 @@ def test_a_method_without_hyperparameters_says_so():
     # Z16 (r3): the hardcoded-upstream sentence only where the set is empty
     with pytest.raises(KeyError) as e:
         mtb.scan("D11", "vertical", methods=["totalVI"], modalities=["rna", "adt"], params={"totalVI": {"epochs": 3}}, verbose=False)
-    assert e.value.args[0] == ("totalVI does not accept ['epochs']; totalVI takes no "
-                               "hyperparameters (its script hardcodes them).")
+    assert e.value.args[0] == "totalVI does not accept ['epochs']; it accepts no parameters."

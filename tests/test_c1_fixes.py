@@ -83,7 +83,7 @@ def test_bar_says_its_scale():
 
 def test_skip_existing_scores_a_saved_output_off_linux(tmp_path, monkeypatch):
     from multibench.engine import envs
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: "Methods run only on Linux.")
+    monkeypatch.setattr(envs, "host_system", lambda: "macOS")
     out = _tree(tmp_path, dims=4).parent / "out"
     res = mtb.run("D11", "vertical", methods=["Matilda"], out_dir=out,
                       skip_existing=True, verbose=False)

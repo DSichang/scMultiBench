@@ -18,7 +18,7 @@ def test_run_all_blocks_user_site(monkeypatch):
     seen = {}
 
     def fake(cmd, **kw):
-        seen["v"] = os.environ.get("PYTHONNOUSERSITE")
+        seen["v"] = kw["env"].get("PYTHONNOUSERSITE")
 
         class R:
             returncode = 0
@@ -31,6 +31,7 @@ def test_run_all_blocks_user_site(monkeypatch):
     assert seen.get("v") == "1", (
         "provisioning ran without PYTHONNOUSERSITE=1, so pip can skip packages "
         "it finds in ~/.local and silently under-populate the env")
+    assert "PYTHONNOUSERSITE" not in os.environ          # the user's own process is left alone
 
 
 def test_matilda_has_a_post_install_for_its_own_package():

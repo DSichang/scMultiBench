@@ -133,19 +133,18 @@ def test_sweep_note_is_short_sentences(capsys, monkeypatch):
 
 # --- R3-16 (b) ---------------------------------------------------------------
 
-DARWIN = ("method environments are linux-64 only; this host is darwin/arm64")
 
 
 def test_run_off_linux_is_the_linux_sentence_alone(tmp_path, monkeypatch):
     from multibench.engine import envs, runner
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: DARWIN)
+    monkeypatch.setattr(envs, "host_system", lambda: "macOS")
     monkeypatch.setattr(runner.envs, "installed_envs", lambda conda=None: ["base"])
     with pytest.raises(OSError) as e:
         mtb.engine.runner.run("totalVI", "vertical", inputs=mtb.engine.resolve.inputs_for("D11", "vertical", "totalVI"),
                 out_dir=str(tmp_path / "out"))
     msg = str(e.value)
     assert msg == ("Methods run only on Linux, and this computer runs macOS. Run this "
-                   "call on a Linux machine, such as Colab. mtb.scan shows the method's command here.")
+                   "call on a Linux machine, such as Colab.")
     assert "env install" not in msg and "is not installed" not in msg
 
 

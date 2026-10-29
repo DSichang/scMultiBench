@@ -28,8 +28,6 @@ from tests.conftest import full_scan
 
 GENES = [f"GENE{i}" for i in range(60)]
 PEAKS = [f"chr1:{i * 100}-{i * 100 + 50}" for i in range(40)]
-DARWIN = ("method environments are linux-64 conda envs (packed archives + lockfiles); "
-          "this host is darwin/arm64")
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 
 
@@ -181,20 +179,16 @@ def test_raw_counts_warning_names_the_mudata_form_for_a_mudata_selector(tmp_path
 
 
 # ======================================================================= R7-10
-@pytest.mark.parametrize("host,name", [("darwin/arm64", "macOS"), ("win32/AMD64", "Windows"),
-                                       ("cygwin/x86_64", "Windows"),
-                                       ("freebsd14/amd64", "freebsd14")])
-def test_linux_only_sentences_name_the_system(monkeypatch, host, name):
-    monkeypatch.setattr(envs, "host_platform_problem",
-                        lambda: f"method environments are linux-64 only; this host is {host}")
+@pytest.mark.parametrize("name", ["macOS", "Windows", "freebsd14"])
+def test_linux_only_sentences_name_the_system(monkeypatch, name):
+    monkeypatch.setattr(envs, "host_system", lambda: name)
     assert R.linux_only_sentence() == f"Methods run only on Linux, and this computer runs {name}."
-    assert envs.linux_only_text(envs.host_platform_problem()) == (
-        f"Method environments run only on Linux, and this computer runs {name}.")
+    assert envs.linux_only_text() == R.linux_only_sentence()
 
 
 @pytest.fixture
 def off_linux(monkeypatch):
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: DARWIN)
+    monkeypatch.setattr(envs, "host_system", lambda: "macOS")
 
 
 def test_run_all_refusal_off_linux_has_no_parenthesis_or_semicolon(off_linux, tmp_path,

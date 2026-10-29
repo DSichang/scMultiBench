@@ -144,7 +144,7 @@ def test_single_build_install_does_not_warn_and_unpacks_as_single(
     monkeypatch.setattr(envs, "packed_manifest", lambda: dict(manifest))
     monkeypatch.setattr(envs, "packed_sizes",
                         lambda: {"scmb_r": {"archive_bytes": 900_000_000}})
-    monkeypatch.setattr(envs, "host_platform_problem", lambda: None)
+    monkeypatch.setattr(envs, "host_system", lambda: None)
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
     tgz = _tiny_archive(tmp_path / "a.tar.gz")
     serve_archives(monkeypatch, lambda url: (str(tgz), None))
