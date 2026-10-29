@@ -335,15 +335,6 @@ def test_scan_reason_leads_with_the_atac_meaning_and_never_cuts_a_path(tmp_path,
     assert f"SCALEX (diagonal) needs atac_gas.h5 in {data / 'LUNG'}." in scalex["files_reason"]
 
 
-# ----------------------------------------------------------------- L32: atac column
-def test_atac_column_is_none_for_a_variant_without_atac():
-    df = full_scan("D11", "vertical", methods=["Seurat_WNN"], modalities="all",
-                  verbose=False)
-    by = df.set_index("modalities")["atac"]
-    assert by["rna+adt"] is None or pd.isna(by["rna+adt"])
-    assert by["rna+atac"] == "peak"
-
-
 def test_runresult_documents_obs_names_and_row_order():
     doc = inspect.getdoc(runner.RunResult)
     assert "obs_names" in doc and "labels_for" in doc

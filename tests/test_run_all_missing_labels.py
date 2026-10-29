@@ -207,8 +207,6 @@ def test_the_way_out_follows_the_methods(cite, tmp_path, host):
                             data_path=cite)
     assert dict(zip(plan["method"], private["_label_inputs"])) == {
         "Matilda": ("cty.csv",), "sciPENN": ()}
-    # the answer is read from the inputs, not from needs_labels alone
-    assert list(plan["needs_labels"]) == [True, False]
 
 
 def test_two_methods_that_read_the_label_file(cite, tmp_path, host):

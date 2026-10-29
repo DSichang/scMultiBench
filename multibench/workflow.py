@@ -31,7 +31,7 @@ from . import _text
 from . import _settings
 from ._settings import config
 from ._text import _and_list
-from .discover import _REPRESENTATION_TOKENS, _runtimes
+from .discover import _REPRESENTATION_TOKENS
 from .engine import envs, registry, resolve as _resolve, scripts
 from .engine import runner as _runner
 from .engine.schema import base_modality as _schema_base
@@ -235,9 +235,8 @@ def _variant_rows(category=None):
 
 
 #: The columns of the full plan, one row per method variant (``_scan``).
-PLAN_COLUMNS = ["method", "category", "modalities", "env", "output_kind", "n_tunable",
-                "runtime_tier", "observed_worst_sec", "caveat", "runnable", "reason",
-                "files_ok", "files_reason", "env_ok", "env_reason", "needs_labels", "atac",
+PLAN_COLUMNS = ["method", "category", "modalities", "env", "output_kind", "caveat",
+                "runnable", "reason", "files_ok", "files_reason", "env_ok", "env_reason",
                 "command"]
 
 #: The columns of ``scan``, one row per method; ``category`` only without one.
@@ -423,15 +422,6 @@ def _would_run(row) -> bool:
     """Whether run would run this scan row: runnable, or blocked only by its env."""
     return bool(row["files_ok"]) and (not row["reason"]
                                       or row["reason"] == row.get("env_reason"))
-
-
-def _variant_consumes_atac(variant) -> bool:
-    """Whether this variant takes an ATAC input, judged on its declared modalities
-    (Seurat_WNN's rna+adt variant passes ``NULL`` to its ATAC slot)."""
-    mods = variant.when.get("modalities") or []
-    if mods:
-        return any(_schema_base(m) == "atac" for m in mods)
-    return any(a.const and "atac" in str(a.const) for a in variant.args)
 
 
 def _modality_matcher(modalities, named=None):
@@ -786,16 +776,10 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
             continue
         if wanted is not None and not wanted(spec, mods):
             continue
-        runtime = _runtimes().get(spec.id, {})
         rec = {"method": spec.id, "category": cat, "modalities": "+".join(mods) or "(data_dir)",
                "env": envs.group_for(spec.id), "output_kind": v.output.kind,
-               "n_tunable": len(v.tunable),
-               "runtime_tier": runtime.get("tier", "unknown"),
-               "observed_worst_sec": runtime.get("worst_sec"),
                "caveat": "", "runnable": False, "reason": "",
                "files_ok": True, "files_reason": "", "env_ok": True, "env_reason": "",
-               "needs_labels": bool(v.needs_labels),
-               "atac": spec.atac if _variant_consumes_atac(v) else None,
                "command": ""}
         # check 1, files: both the script and the dataset files, so neither hides
         # the other. files_reason keeps the full text; reason the short form.
