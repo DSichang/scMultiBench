@@ -87,18 +87,18 @@ def classify(output, labels=None, *, batch=None, reference=None,
     who = _graph_writer(output)
     if who is not None:
         raise ValueError(_graph_error(who))
-    emb, ids, adata, table = _read_output(output, obsm, "output")
+    emb, ids, adata = _read_output(output, obsm, "output")
     if emb.ndim != 2:
         raise ValueError("classify needs an embedding, cells x dims. Pass the method's "
                          "embedding file.")
-    emb, ct, origin = _cell_labels(labels, emb, adata, ids, table)
+    emb, ct, origin = _cell_labels(labels, emb, adata, ids)
     n_cells = emb.shape[0]
     if len(ct) != n_cells:
         raise ValueError(_count_error("labels", len(ct), n_cells))
     if emb.shape[1] == n_cells or _is_neighbour_index(emb):
         raise ValueError(_graph_error("output"))     # cells x cells, or a kNN index
     if batch is not None:
-        ba = _obs_or_vector(batch, adata, what="batch", ids=ids, table=table)
+        ba = _obs_or_vector(batch, adata, what="batch", ids=ids)
         if len(ba) != n_cells:
             raise ValueError(_count_error("batch", len(ba), n_cells))
     elif origin is not None:

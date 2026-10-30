@@ -17,7 +17,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench.eval import io, pipeline
+from multibench.eval import io
 from multibench.eval import scib as escib
 
 from .test_workflow_batch import N, cite  # noqa: F401 - the fixture of the run tests
@@ -28,7 +28,6 @@ BARS = [f"AAAC{i:04d}-1" for i in range(CELLS)]
 EMB = np.random.default_rng(0).normal(size=(CELLS, 5)) \
     + pd.Categorical(TYPES).codes[:, None] * 4.0
 PERM = np.random.default_rng(1).permutation(CELLS)
-MOVED = "evaluate: matched {0} to the rows of emb.csv by barcode.\n"
 NO_IDS = ("The first column of {0} looks like cell ids, but the embedding has no cell ids. "
           "The file is matched by position. Check that its rows follow the rows of the "
           "embedding.")
@@ -133,12 +132,9 @@ def test_as_matrix_reads_the_same_matrix_as_before(tmp_path):
 # ----------------------------------------------------------- matched by barcode
 def test_labels_in_another_order_are_matched_by_barcode(tmp_path, capsys, seen):
     emb = _emb(tmp_path)
-    _quiet(capsys, emb, labels=_labels(tmp_path), metrics=["ARI"])     # same order: no line
+    _quiet(capsys, emb, labels=_labels(tmp_path), metrics=["ARI"])
     assert seen["labels"] == list(TYPES)
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        mtb.evaluate(emb, labels=_labels(tmp_path, "shuffled.csv", PERM), metrics=["ARI"])
-    assert capsys.readouterr().err == MOVED.format("shuffled.csv")
+    _quiet(capsys, emb, labels=_labels(tmp_path, "shuffled.csv", PERM), metrics=["ARI"])
     assert seen["labels"] == list(TYPES)
     np.testing.assert_allclose(seen["emb"], EMB)
 
@@ -157,11 +153,7 @@ def test_several_label_files_are_matched_by_their_barcodes(tmp_path, capsys, see
     half = CELLS // 2
     first = _labels(tmp_path, "cty1.csv", np.arange(half, CELLS))      # the second half
     second = _labels(tmp_path, "cty2.csv", np.arange(half))
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        mtb.evaluate(emb, labels=[first, second], metrics=["ARI"])
-    assert capsys.readouterr().err == (
-        "evaluate: matched cty1.csv and 1 more to the rows of emb.csv by barcode.\n")
+    _quiet(capsys, emb, labels=[first, second], metrics=["ARI"])
     assert seen["labels"] == list(TYPES)
 
 
@@ -248,19 +240,6 @@ def test_following_the_error_for_other_cells(tmp_path, seen):
     assert seen["labels"] == list(TYPES)
     seen.clear()
     mtb.evaluate(emb, labels=extra.loc[BARS], metrics=["ARI"])
-    assert seen["labels"] == list(TYPES)
-
-
-def test_verbose_false_prints_no_line(tmp_path, capsys, seen):
-    """The line for labels put in the order of the embedding is output of
-    ``verbose``: ``verbose=False`` prints nothing, and matches the same way."""
-    emb = _emb(tmp_path)
-    kw = dict(labels=_labels(tmp_path, "shuffled.csv", PERM), metrics=["ARI"])
-    mtb.evaluate(emb, **kw)
-    assert capsys.readouterr().err == MOVED.format("shuffled.csv")
-    assert seen["labels"] == list(TYPES)
-    seen.clear()
-    _quiet(capsys, emb, verbose=False, **kw)
     assert seen["labels"] == list(TYPES)
 
 
@@ -402,8 +381,6 @@ def test_method_runs_are_scored_in_file_order_as_before(cite, tmp_path, monkeypa
     data, labels = cite
     monkeypatch.setattr(io, "_read_csv_embedding",
                         lambda *a, **k: pytest.fail("a CSV embedding was read"))
-    monkeypatch.setattr(pipeline, "_Table",
-                        lambda *a, **k: pytest.fail("cell ids from a CSV embedding"))
     mtb.config.data_path = data
     kw = dict(methods=['Matilda'], modalities=['rna', 'adt'], verbose=False)
     plain = mtb.run("MYCITE", "vertical", out_dir=tmp_path / "plain", **kw)
