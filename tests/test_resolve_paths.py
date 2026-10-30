@@ -42,7 +42,7 @@ def test_atac_means_any_atac_role(tmp_path):
                        data_path=tmp_path, check=True)
     assert a == b and set(a) == {"rna", "atac"} and a["atac"].endswith("/atac.h5")
     # exact tokens still win when they exist; an unrelated set still raises KeyError
-    with pytest.raises(KeyError, match="no variant for category='vertical'"):
+    with pytest.raises(KeyError, match="No vertical variant of scMM reads adt and atac"):
         mtb.engine.resolve.inputs_for("SYNMULTI", "vertical", "scMM", modalities=["adt", "atac"],
                        data_path=tmp_path, check=False)
     # the aliases the layout text uses reach the same variant
@@ -63,12 +63,12 @@ def test_folder_disambiguates_multi_variant_method(tmp_path):
 
 def test_ambiguity_is_a_valueerror_listing_the_folder(tmp_path):
     # both VIMCCA variants satisfiable and not nested -> still ambiguous,
-    # ValueError (and KeyError for old callers)
+    # ValueError
     _touch(tmp_path / "D11", ["rna.h5", "adt.h5", "atac.h5", "cty.csv"])
     with pytest.raises(ValueError) as e:
         mtb.engine.resolve.inputs_for("D11", "vertical", "VIMCCA", data_path=tmp_path)
     msg = str(e.value)
-    assert isinstance(e.value, AmbiguousVariantError) and isinstance(e.value, KeyError)
+    assert isinstance(e.value, AmbiguousVariantError)
     assert msg.startswith("VIMCCA has 2 vertical variants, rna+adt and rna+atac.")
     assert f"The folder {tmp_path / 'D11'} has every input file of both." in msg
     assert msg.endswith("Pass modalities=['rna', 'adt'] or modalities=['rna', 'atac'].")
