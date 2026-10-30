@@ -378,7 +378,7 @@ def _check_env(method: str, env_name: str) -> None:
     failure) or an env of that name multibench did not install."""
     linux_only = envs.linux_only_text()
     if linux_only:
-        raise envs.LinuxOnlyError(
+        raise OSError(
             f"{linux_only} Run this call on a Linux machine, such as Colab.")
     have = envs.installed_envs()
     if env_name not in have:

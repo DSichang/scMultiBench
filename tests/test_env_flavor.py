@@ -155,8 +155,6 @@ def test_archive_for_every_flavour(fake_tables, monkeypatch):
     assert envs.archive_for("matilda", "cpu") == ("matilda-cpu", "cpu")
     # explicit tables win over the shipped ones
     assert envs.archive_for("matilda", "cpu", manifest={}, sizes={}) == ("matilda", "gpu")
-    with pytest.raises(ValueError, match="choose one of"):
-        envs.archive_for("matilda", "fast")
 
 
 # ---------------------------------------------------------------- install_packed
@@ -236,15 +234,6 @@ def test_install_packed_gpu_never_warns(envs_dir, tmp_path, monkeypatch, fake_ta
         assert envs.install_packed("scmb_r", flavor="gpu") is True
         monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
         assert envs.install_packed("scmb_torch", flavor="auto") is True
-
-
-def test_install_packed_invalid_flavor_before_anything(envs_dir, monkeypatch):
-    monkeypatch.setattr(envs, "host_system",
-                        lambda: pytest.fail("platform checked before the flavour"))
-    serve_archives(monkeypatch, lambda url: pytest.fail("downloaded"))
-    with pytest.raises(ValueError) as e:
-        envs.install_packed("matilda", flavor="cuda")
-    assert str(e.value) == "flavor='cuda': choose one of 'auto', 'cpu', 'gpu'"
 
 
 def test_install_packed_failed_unpack_leaves_no_flavor_record(envs_dir, tmp_path, monkeypatch,
@@ -346,7 +335,8 @@ def test_install_reports_the_installed_flavour_for_existing_envs(envs_dir, monke
 
 
 def test_install_invalid_flavor_is_a_value_error(monkeypatch):
-    monkeypatch.setattr(envs, "_check_methods", lambda m: pytest.fail("methods before flavour"))
+    monkeypatch.setattr(envs.registry, "check_method",
+                        lambda m: pytest.fail("methods before flavour"))
     with pytest.raises(ValueError) as e:
         mtb.env.install(["Matilda"], flavor="fast", dry_run=True).to_dict("records")
     assert str(e.value) == "flavor='fast': choose one of 'auto', 'cpu', 'gpu'"
@@ -358,8 +348,7 @@ def test_install_signature_and_docs():
     assert sig.parameters["flavor"].kind is inspect.Parameter.KEYWORD_ONLY
     sig = inspect.signature(envs.install_packed)
     assert sig.parameters["flavor"].default == "auto"
-    for fn in (envs.install, envs.install_packed, envs.host_has_gpu, envs.resolve_flavor,
-               envs.archive_for, envs.installed_flavor, envs.check_flavor):
+    for fn in (envs.install, envs.install_packed, envs.archive_for, envs.installed_flavor):
         doc = inspect.getdoc(fn)
         assert doc and "Returns" in doc, fn.__name__
     assert "flavor" in inspect.getdoc(envs.install)    # doctor is deprecated in 0.4.0

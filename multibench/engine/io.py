@@ -10,7 +10,7 @@ import numpy as np
 def load_output(out_dir: Path | str, spec):
     """The output ``spec`` names in ``out_dir``, loaded by its kind."""
     path = Path(out_dir) / spec.file
-    if spec.kind in ("embedding", "markers", "graph"):
+    if spec.kind in ("embedding", "graph"):
         with h5py.File(path, "r") as f:
             return np.asarray(f[spec.dataset or "data"])
     if spec.kind == "labels":

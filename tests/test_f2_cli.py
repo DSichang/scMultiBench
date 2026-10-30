@@ -71,16 +71,15 @@ def test_runtime_note_mentions_the_cpu_only_for_gpu_methods():
 
 # ====================================================================== M26
 PLAIN_REFUSAL = ("Methods run only on Linux, and this computer runs macOS. "
-                 "Run the install on a Linux machine, such as Colab. {force} tries anyway.")
+                 "Run the install on a Linux machine, such as Colab.")
 
 
 def test_install_refusal_is_plain_in_python(off_linux, monkeypatch):
     monkeypatch.setattr(envs, "installed_envs", lambda conda=None: [])
     monkeypatch.setattr(envs, "_run_all", lambda cmds: pytest.fail("a build was started"))
-    with pytest.raises(RuntimeError) as e:
-        envs.create_all(methods=["Matilda"], dry_run=False)
-    # the hidden force= is not offered since 0.4.0 (X33)
-    assert str(e.value) == PLAIN_REFUSAL.replace(" {force} tries anyway.", "")
+    with pytest.raises(OSError) as e:
+        envs.install(["Matilda"], build=True)
+    assert str(e.value) == PLAIN_REFUSAL
 
 
 def test_env_plan_fallback_line_agrees_in_number(monkeypatch):

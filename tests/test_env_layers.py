@@ -59,9 +59,9 @@ def test_marker_names_match_the_tool():
 def test_two_envs_share_one_copy(tmp_path, published):
     out, _ = published
     root = tmp_path / "envs"
-    assert envs.install_packed("env_a", envs_dir=root, force=True)
+    assert envs.install_packed("env_a", envs_dir=root)
     (out / "L.tar.gz").unlink()            # the second env must not download it again
-    assert envs.install_packed("env_b", envs_dir=root, force=True)
+    assert envs.install_packed("env_b", envs_dir=root)
     a, b = root / "env_a" / LIB, root / "env_b" / LIB
     assert a.read_bytes() == b"T" * 100
     assert a.stat().st_ino == b.stat().st_ino == (root / ".layers/L" / LIB).stat().st_ino
@@ -79,14 +79,14 @@ def test_a_layer_with_another_digest_installs_nothing(tmp_path, published, capsy
     stale = root / ".layers" / "L"
     stale.mkdir(parents=True)
     (stale / envs.LAYER_INFO).write_text(json.dumps({"name": "L", "digest": "other"}))
-    assert envs.install_packed("env_a", envs_dir=root, force=True) is False
+    assert envs.install_packed("env_a", envs_dir=root) is False
     assert not (root / "env_a").exists()
     assert "not the one this archive was packed with" in capsys.readouterr().out
 
 
 def test_an_unlisted_layer_installs_nothing(tmp_path, published, monkeypatch):
     monkeypatch.setattr(envs, "packed_layers", lambda: {})
-    assert envs.install_packed("env_a", envs_dir=tmp_path / "envs", force=True) is False
+    assert envs.install_packed("env_a", envs_dir=tmp_path / "envs") is False
     assert not (tmp_path / "envs" / "env_a").exists()
 
 

@@ -28,12 +28,6 @@ from .._settings import config
 from . import registry
 
 
-class LinuxOnlyError(OSError, RuntimeError):
-    """The refusal of a method run or an env install off Linux. Both an
-    ``OSError`` (what ``mtb.run`` raised) and a ``RuntimeError`` (what
-    ``mtb.env.install`` raised), so either ``except`` clause catches it."""
-
-
 # --- host platform --------------------------------------------------------
 def host_system() -> str | None:
     """``None`` on Linux (WSL included), else this computer's system for users:
@@ -49,14 +43,6 @@ def linux_only_text() -> str | None:
     ``None`` on Linux."""
     system = host_system()
     return system and f"Methods run only on Linux, and this computer runs {system}."
-
-
-def _require_linux(force: bool) -> None:
-    """Raise :class:`LinuxOnlyError` before any download or build on a
-    non-Linux host, unless ``force``."""
-    text = None if force else linux_only_text()
-    if text:
-        raise LinuxOnlyError(f"{text} Run the install on a Linux machine, such as Colab.")
 
 
 #: The first sentence of the install error without conda (the docs quote it).
@@ -115,18 +101,7 @@ _NVIDIA_PROC = Path("/proc/driver/nvidia/version")
 
 
 def check_flavor(flavor) -> str:
-    """``flavor`` when it is one of :data:`FLAVORS`.
-
-    Returns
-    -------
-    str
-        The value as given.
-
-    Raises
-    ------
-    ValueError
-        Any other value; the message lists the accepted ones.
-    """
+    """``flavor`` when it is one of :data:`FLAVORS`, else ``ValueError``."""
     if flavor not in FLAVORS:
         raise ValueError(f"flavor={flavor!r}: choose one of "
                          + ", ".join(repr(f) for f in FLAVORS))
@@ -135,28 +110,8 @@ def check_flavor(flavor) -> str:
 
 @functools.lru_cache(maxsize=1)
 def host_has_gpu() -> bool:
-    """Is an NVIDIA GPU visible on this host?
-
-    Returns
-    -------
-    bool
-        ``True`` when a GPU is visible; ``False`` on a CPU-only host.
-
-    Examples
-    --------
-    >>> from multibench.engine import envs
-    >>> envs.host_has_gpu()
-
-    Notes
-    -----
-    **Detection.** ``True`` when ``nvidia-smi -L`` runs and lists at least one
-    device, or when ``/proc/driver/nvidia/version`` exists (driver loaded, tool
-    not on ``PATH``). A torch install, ``CUDA_VISIBLE_DEVICES`` or a CUDA
-    library on disk do not count.
-
-    **Caching.** The result is cached per process;
-    ``host_has_gpu.cache_clear()`` probes again.
-    """
+    """Whether an NVIDIA GPU is visible: ``nvidia-smi -L`` lists a device, or
+    the driver is loaded (``/proc/driver/nvidia/version``). Cached per process."""
     smi = shutil.which("nvidia-smi")
     if smi:
         try:
@@ -171,15 +126,7 @@ def host_has_gpu() -> bool:
 
 
 def resolve_flavor(flavor: str = "auto") -> str:
-    """``'cpu'`` or ``'gpu'`` for a ``flavor=`` value.
-
-    Returns
-    -------
-    str
-        The value as given; for ``'auto'``, ``'gpu'`` when :func:`host_has_gpu`,
-        else ``'cpu'``.
-    """
-    check_flavor(flavor)
+    """``'cpu'`` or ``'gpu'`` for a ``flavor=`` value (``'auto'``: by :func:`host_has_gpu`)."""
     if flavor == "auto":
         return "gpu" if host_has_gpu() else "cpu"
     return flavor
@@ -268,15 +215,6 @@ def own_env_name(method: str) -> str:
     return f"scmb_{method.lower()}"
 
 
-def _conda_bin(prefer: str = "mamba") -> str:
-    order = [prefer, "mamba", "conda"] if prefer != "conda" else ["conda", "mamba"]
-    for cand in order:
-        found = shutil.which(cand)
-        if found:
-            return found
-    return prefer
-
-
 # --- shared group environments --------------------------------------------
 @functools.lru_cache(maxsize=1)
 def _env_groups() -> dict:
@@ -295,14 +233,6 @@ def group_for(method: str) -> str:
         if method in g.get("members", []):
             return name
     return own_env_name(method)
-
-
-def _check_methods(methods):
-    """``methods`` as registry ids (any letter case or a display name is
-    accepted); ``KeyError`` for an unknown id (else a typo gets a made-up
-    ``scmb_<typo>`` env) and ``TypeError`` for a bare string."""
-    registry.check_id_list(methods, "methods")
-    return None if methods is None else [registry.check_method(m) for m in methods]
 
 
 # --- env existence / status -----------------------------------------------
@@ -348,8 +278,7 @@ def _envs_dir(conda_bin: str) -> Path | None:
 
 
 def _find_conda() -> str | None:
-    """Path of the conda (else mamba) binary on PATH, or ``None`` (unlike
-    ``_conda_bin``, which returns a bare name when nothing is installed)."""
+    """Path of the conda (else mamba) binary on PATH, or ``None``."""
     return shutil.which("conda") or shutil.which("mamba")
 
 
@@ -375,11 +304,6 @@ def _prefixes_on_disk(envs_dir: Path) -> dict[str, Path]:
                 if (p / "bin").is_dir()}
     except OSError:
         return {}
-
-
-#: What :data:`FLAVOR_FILE` holds in an env built from a lockfile or a recipe
-#: (a packed install writes its flavour there instead).
-BUILT_FROM = {"lockfile": "build", "recipe": "recipe"}
 
 
 def _creation_command(prefix: Path) -> str:
@@ -465,47 +389,21 @@ def other_env_text(env: str, prefix, then: str) -> str:
             f"it is not used. Rename or remove {prefix}, then {then}")
 
 
-def _mark_built(env: str, conda: str | None, how: str, before: set) -> None:
-    """Write :data:`FLAVOR_FILE` (``BUILT_FROM[how]``) into the env a lockfile
-    or recipe build just created under the name ``env``: a prefix of that
-    name that was not there ``before`` the build."""
+def _mark_built(env: str, conda: str | None, before: set) -> None:
+    """Write ``build`` to :data:`FLAVOR_FILE` in the env a lockfile build just
+    created under the name ``env``: a prefix of that name that was not there
+    ``before`` the build."""
     _conda_prefixes.cache_clear()
     for p in _same_named(env, conda):
         if p not in before and p.is_dir():
-            (p / FLAVOR_FILE).write_text(BUILT_FROM[how] + "\n")
+            (p / FLAVOR_FILE).write_text("build\n")
 
 
 def env_prefix(env: str, conda: str | None = None) -> Path | None:
-    """The on-disk prefix of a method environment, or ``None``.
-
-    Parameters
-    ----------
-    env : str
-        Environment name, e.g. ``"matilda"`` (``mtb.method_info(m)["env"]``).
-    conda : str, optional
-        conda/mamba executable to ask when the env is not under ``envs_dir``;
-        ``None`` = the one on ``PATH``, if any.
-
-    Returns
-    -------
-    Path or None
-        The environment's prefix; ``None`` when it is not installed.
-
-    Examples
-    --------
-    >>> from multibench.engine import envs
-    >>> envs.env_prefix("matilda")       # None until the env is installed
-
-    Notes
-    -----
-    ``<mtb.config.envs_dir>/<env>`` when it contains ``bin/`` (no
-    conda needed); else the prefix ``conda env list`` reports for that name.
-    Only an env multibench installed counts: every install writes the file
-    ``.multibench_flavor`` into it, and an env built from a lockfile by an
-    earlier version is known by the build command conda recorded. An env
-    you made yourself under the same name is never used. This is what
-    "installed" means everywhere, and the prefix ``mtb.run`` activates.
-    """
+    """The prefix of the method env ``env`` multibench installed, or ``None``:
+    ``<mtb.config.envs_dir>/<env>``, else the one ``conda env list`` reports
+    (``conda`` = the conda/mamba to ask). An env of that name made by hand
+    is never used."""
     for p in _same_named(env, conda):
         if made_by_multibench(p, env):
             return p
@@ -704,8 +602,7 @@ def _link_layer(layer: Path, prefix: Path, info: dict) -> None:
 
 
 def install_packed(env: str, *, envs_dir: Path | str | None = None,
-                   conda: str | None = None, force: bool = False,
-                   flavor: str = "auto") -> bool:
+                   conda: str | None = None, flavor: str = "auto") -> bool:
     """Provision ``env`` from a prebuilt conda-pack archive, if one is published.
 
     Downloads the archive, extracts it into ``<envs_dir>/<env>`` and runs its
@@ -713,8 +610,7 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
     that of ``conda`` when only it is given, else
     ``mtb.config.envs_dir``. ``flavor`` picks the archive as in
     :func:`install`; the prefix is the same whatever the flavour, and the
-    flavour installed is written to :data:`FLAVOR_FILE`. A non-Linux host
-    raises ``RuntimeError`` unless ``force``.
+    flavour installed is written to :data:`FLAVOR_FILE`.
 
     Returns
     -------
@@ -726,8 +622,6 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
     import tarfile
     import urllib.error
 
-    check_flavor(flavor)                  # a typo fails before the platform check
-    _require_linux(force)                 # fail closed before any bytes land
     if envs_dir is not None:
         envs_root = Path(envs_dir)
     elif conda is not None and shutil.which(conda):
@@ -896,7 +790,7 @@ def create_env(env_name: str, conda: str | None = None) -> list[list[str]]:
     if lock is None:
         raise FileNotFoundError(
             f"no lockfile for env {env_name!r} (expected {_LOCKS_DIR / (env_name + '.yml')}).")
-    conda = conda or _conda_bin("conda")
+    conda = conda or _find_conda() or "conda"
     conda_yaml, req, pip_lines = _materialise_split(env_name, lock)
     cmds = [[conda, "env", "create", "-n", env_name, "-f", str(conda_yaml)]]
     if pip_lines:
@@ -908,21 +802,20 @@ def create_env(env_name: str, conda: str | None = None) -> list[list[str]]:
     return cmds
 
 
-def _build(env_name: str, cmds: list[list[str]], conda: str | None, how: str) -> None:
+def _build(env_name: str, cmds: list[list[str]], conda: str | None) -> None:
     """Run the build ``cmds`` of ``env_name`` and mark the new env as made by
     multibench."""
     before = set(_same_named(env_name, conda))
     _run_all(cmds)
-    _mark_built(env_name, conda, how, before)
+    _mark_built(env_name, conda, before)
 
 
 def create_all(category: str | None = None, methods: list[str] | None = None,
-               conda: str | None = None, dry_run: bool = True, *,
-               force: bool = False) -> list[dict]:
+               conda: str | None = None, dry_run: bool = True) -> list[dict]:
     """Provision every env needed to run the methods, from lockfiles.
 
-    With ``dry_run=False`` the missing envs that have a lockfile are built;
-    the others are reported, not built.
+    With ``dry_run=False`` the missing envs are built (:func:`install` checks
+    the host and the methods first).
 
     Parameters
     ----------
@@ -934,39 +827,25 @@ def create_all(category: str | None = None, methods: list[str] | None = None,
         conda executable; default ``conda``.
     dry_run : bool
         ``True`` (default) plans only.
-    force : bool
-        Build on a non-Linux host, which raises ``RuntimeError`` otherwise.
 
     Returns
     -------
     list of dict
-        One entry per env, largest first: ``{env, methods, exists, has_lock,
-        cmds}`` (``cmds`` = the commands run, or that would run).
+        One entry per env, largest first: ``{env, methods, exists, cmds}``
+        (``cmds`` = the commands run, or that would run).
     """
-    methods = _check_methods(methods)
-    if not dry_run:
-        _require_linux(force)             # before conda is even asked anything
     have = set(installed_envs(conda))
     out = []
     for env, ms in _envs_needed(category, methods):
-        lock = lockfile(env)
         exists = env in have
-        cmds: list[list[str]] = []
-        if not exists and lock is not None:
-            cmds = create_env(env, conda=conda)
-            if not dry_run:
-                _build(env, cmds, conda, "lockfile")
-        out.append({"env": env, "methods": ms, "exists": exists,
-                    "has_lock": lock is not None, "cmds": cmds})
+        cmds = [] if exists else create_env(env, conda=conda)
+        if cmds and not dry_run:
+            _build(env, cmds, conda)
+        out.append({"env": env, "methods": ms, "exists": exists, "cmds": cmds})
     return out
 
 
 _PACKED_MANIFEST = Path(__file__).resolve().parent / "packed_urls.json"
-
-
-def _first_url(entry):
-    """The URL a plan shows: the archive's, or its first part's."""
-    return entry[0] if isinstance(entry, list) and entry else entry
 
 
 def packed_manifest() -> dict:
@@ -1017,9 +896,10 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
     ------
     KeyError
         Unknown method id.
+    OSError
+        A real install on a host that is not Linux.
     RuntimeError
-        A real install on a host that is not Linux, no conda where needed, or
-        a failed build.
+        ``build=True`` without conda, or a failed build.
 
     Examples
     --------
@@ -1048,22 +928,21 @@ def to_download(rows) -> list[dict]:
 
 def _install_rows(methods: list[str] | None = None, *, category: str | None = None,
                   packed: bool = True, dry_run: bool = False, conda: str | None = None,
-                  force: bool = False, flavor: str = "auto") -> list[dict]:
+                  flavor: str = "auto") -> list[dict]:
     """The rows of :func:`install`, as dicts."""
     check_flavor(flavor)
-    methods = _check_methods(methods)
+    registry.check_id_list(methods, "methods")
+    methods = None if methods is None else [registry.check_method(m) for m in methods]
     manifest = packed_manifest() if packed else {}
     sizes = packed_sizes() if packed else {}
     unpacked = set() if dry_run else _install_missing(
         category, methods, packed=packed, manifest=manifest, sizes=sizes, conda=conda,
-        force=force, flavor=flavor)
-    rows = create_all(category=category, methods=methods, conda=conda,
-                      dry_run=dry_run, force=force)
+        flavor=flavor)
+    rows = create_all(category=category, methods=methods, conda=conda, dry_run=dry_run)
     out = []
     for r in rows:
         env = r["env"]
-        state = _row_state(r, unpacked=unpacked, dry_run=dry_run, packed=packed,
-                           manifest=manifest, conda=conda)
+        state = _row_state(r, unpacked=unpacked, dry_run=dry_run, packed=packed, conda=conda)
         # URL and sizes of the archive this host would fetch
         if packed:
             key, would_install = archive_for(env, flavor, manifest=manifest, sizes=sizes)
@@ -1075,7 +954,8 @@ def _install_rows(methods: list[str] | None = None, *, category: str | None = No
         if flav == "gpu" and packed and _single_build(env, manifest=manifest):
             flav = "any"            # one archive for CPU and GPU hosts
         out.append({**r, "state": state,
-                    "packed_url": _first_url(manifest.get(key)),
+                    "packed_url": (archive_urls(key, manifest)[0]
+                                   if key in manifest else None),
                     "archive_bytes": size.get("archive_bytes"),
                     "unpacked_bytes": size.get("unpacked_bytes"), "flavor": flav})
     if dry_run and packed and any(not r["exists"] and r["flavor"] == "cpu"
@@ -1086,42 +966,35 @@ def _install_rows(methods: list[str] | None = None, *, category: str | None = No
     return out
 
 
-def _install_missing(category, methods, *, packed, manifest, sizes, conda, force,
+def _install_missing(category, methods, *, packed, manifest, sizes, conda,
                      flavor) -> set:
-    """Refuse before any download or build (off Linux, an env name taken, no
-    conda where needed), then unpack the published archives (``packed``) of
-    the envs not installed; the names of the envs unpacked."""
-    _require_linux(force)             # before conda is even asked anything
-    missing = [r for r in _doctor_rows(category=category, methods=methods, conda=conda)
-               if not r["exists"]]
-    for r in missing:
-        if r.get("other_env"):
-            raise RuntimeError(other_env_text(r["env"], r["other_env"], "install again."))
-    if (conda or _find_conda()) is None:
-        # only the packed path works: refuse before any download
-        for r in missing:
-            if packed and r["env"] in manifest:
-                continue
-            if r["env"] in packed_manifest():
-                raise RuntimeError(
-                    f"{NO_CONDA} Environment {r['env']} has a packed archive. "
-                    + "Leave out build=True to install it.")
-            raise RuntimeError(
-                f"{NO_CONDA} Environment {r['env']} has no packed archive. Install "
-                f"conda first.")
+    """Refuse before any download or build (off Linux, an env name taken,
+    ``build=True`` without conda), then unpack the published archives
+    (``packed``) of the envs not installed; the names of the envs unpacked."""
+    linux_only = linux_only_text()
+    if linux_only:
+        raise OSError(f"{linux_only} Run the install on a Linux machine, such as Colab.")
+    have = set(installed_envs(conda))
+    missing = [env for env, _ in _envs_needed(category, methods) if env not in have]
+    for env in missing:
+        other = other_env_prefix(env, conda)
+        if other is not None:
+            raise RuntimeError(other_env_text(env, other, "install again."))
+    if not packed and (conda or _find_conda()) is None:
+        raise RuntimeError(f"{NO_CONDA} build=True needs it. Leave out build=True to "
+                           f"unpack the published archives.")
     if not packed:
         return set()
     # said only when a CPU build is taken
-    if any(archive_for(r["env"], flavor, manifest=manifest, sizes=sizes)[1] == "cpu"
-           for r in missing):
+    if any(archive_for(env, flavor, manifest=manifest, sizes=sizes)[1] == "cpu"
+           for env in missing):
         note = auto_flavor_note(flavor)
         if note:
             print(note, file=sys.stderr, flush=True)
-    return {r["env"] for r in missing
-            if install_packed(r["env"], conda=conda, force=force, flavor=flavor)}
+    return {env for env in missing if install_packed(env, conda=conda, flavor=flavor)}
 
 
-def _row_state(r: dict, *, unpacked, dry_run, packed, manifest, conda) -> str:
+def _row_state(r: dict, *, unpacked, dry_run, packed, conda) -> str:
     """The ``state`` of one row of :func:`install`'s table."""
     env = r["env"]
     if env in unpacked:
@@ -1131,27 +1004,8 @@ def _row_state(r: dict, *, unpacked, dry_run, packed, manifest, conda) -> str:
     if dry_run and other_env_prefix(env, conda) is not None:
         return "name taken"
     if not dry_run:
-        return "BUILD" if r["has_lock"] else "NO-LOCK"
-    if packed and env in manifest:
-        return "packed archive published"
-    if packed:
-        return "no archive - lockfile build" if r["has_lock"] else "no archive - NO-LOCK"
-    return "build(dry-run)" if r["has_lock"] else "NO-LOCK"
-
-
-def _doctor_rows(category: str | None = None,
-                 methods: list[str] | None = None,
-                 conda: str | None = None) -> list[dict]:
-    """One row per env the methods need: ``env``, ``methods``, ``exists``,
-    ``has_lock``, ``flavor`` and ``other_env``."""
-    methods = _check_methods(methods)
-    have = set(installed_envs(conda))
-    return [{"env": env, "methods": ms, "exists": env in have,
-             "has_lock": lockfile(env) is not None,
-             "flavor": installed_flavor(env, conda) if env in have else None,
-             "other_env": (None if env in have
-                           else _str_or_none(other_env_prefix(env, conda)))}
-            for env, ms in _envs_needed(category, methods)]
+        return "BUILD"
+    return "packed archive published" if packed else "build(dry-run)"
 
 
 def _envs_needed(category: str | None, methods: list[str] | None) -> list:
@@ -1164,10 +1018,6 @@ def _envs_needed(category: str | None, methods: list[str] | None) -> list:
         by_env.setdefault(group_for(m), []).append(m)
     return [(env, sorted(ms))
             for env, ms in sorted(by_env.items(), key=lambda kv: (-len(kv[1]), kv[0]))]
-
-
-def _str_or_none(path) -> str | None:
-    return None if path is None else str(path)
 
 
 _R_USER_LIBRARY_VARS = ("R_LIBS", "R_LIBS_SITE")

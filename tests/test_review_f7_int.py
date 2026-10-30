@@ -132,8 +132,7 @@ def test_run_page_names_the_methods_that_read_both_atac_files():
 @needs_docs
 def test_installation_heading_quotes_the_no_conda_error():
     text = _flat("installation.md")
-    assert (f"`RuntimeError: {envs.NO_CONDA} Environment <env> has a packed archive.`"
-            in text)
+    assert (f"`RuntimeError: {envs.NO_CONDA} build=True needs it.`" in text)
     assert "no conda/mamba" not in text
 
 

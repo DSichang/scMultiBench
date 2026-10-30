@@ -37,23 +37,18 @@ def test_host_system_reflects_sys_platform(monkeypatch, platform, name):
     assert envs.host_system() == name
 
 
-def test_create_all_run_refuses_off_linux(off_linux, monkeypatch):
+def test_install_refuses_off_linux_before_any_download_or_build(off_linux, monkeypatch):
     monkeypatch.setattr(envs, "installed_envs", lambda conda=None: [])
     monkeypatch.setattr(envs, "_run_all", lambda cmds: pytest.fail("a build was started"))
-    with pytest.raises(RuntimeError, match="run only on Linux") as e:
-        envs.create_all(methods=["Matilda"], dry_run=False)
-    assert "force" not in str(e.value)        # hidden since 0.4.0 (X33)
+    serve_archives(monkeypatch,
+                   lambda *a, **k: pytest.fail("download started on a non-Linux host"))
+    for build in (False, True):
+        with pytest.raises(OSError, match="^Methods run only on Linux, and this computer "
+                                          "runs macOS. Run the install on a Linux machine"):
+            envs.install(["Matilda"], build=build)
     # the dry run still plans everywhere
     rows = envs.create_all(methods=["Matilda"], dry_run=True)
     assert rows and rows[0]["env"] == "matilda" and rows[0]["exists"] is False
-
-
-def test_create_all_force_skips_the_guard(off_linux, monkeypatch):
-    monkeypatch.setattr(envs, "installed_envs", lambda conda=None: [])
-    ran = []
-    monkeypatch.setattr(envs, "_run_all", lambda cmds: ran.append(cmds))
-    envs.create_all(methods=["Matilda"], dry_run=False, force=True)
-    assert ran, "force=True must reach the build"
 
 
 def test_create_all_run_passes_on_linux(on_linux, monkeypatch):
@@ -64,43 +59,19 @@ def test_create_all_run_passes_on_linux(on_linux, monkeypatch):
     assert ran
 
 
-def test_install_packed_refuses_off_linux_before_download(off_linux, monkeypatch, tmp_path):
-    import urllib.request
-    serve_archives(monkeypatch,
-                        lambda *a, **k: pytest.fail("download started on a non-Linux host"))
-    with pytest.raises(RuntimeError, match="run only on Linux"):
-        envs.install_packed("scmb_r")
-    # force=True reaches the download (stubbed here to fail loudly)
-    monkeypatch.setattr(envs, "_conda_bin", lambda prefer="mamba": "conda")
-    monkeypatch.setattr(envs.shutil, "which", lambda c: "/usr/bin/conda")
-    monkeypatch.setattr(envs, "_envs_dir", lambda b: Path("/nonexistent/envs"))
-    monkeypatch.setenv("MULTIBENCH_ENVS_DIR", str(tmp_path / "no-envs"))   # no prefix on disk ...
-    monkeypatch.setattr(envs, "env_prefix", lambda env, conda=None: None)  # ... and none via conda
-    reached = []
-
-    def _retrieve(url, *a, **k):
-        reached.append(url)
-        raise urllib.error.HTTPError(url, 404, "nope", {}, None)
-    import urllib.error
-    serve_archives(monkeypatch, _retrieve)
-    assert envs.install_packed("scmb_r", force=True, envs_dir=tmp_path / "no-envs") is False
-    assert reached and reached[0].endswith("scmb_r.tar.gz")
-
-
-@pytest.mark.parametrize("fn", [
-    lambda: envs.create_all(methods=["Matilda"], dry_run=False),
-])
-def test_every_builder_refuses_off_linux(off_linux, monkeypatch, fn):
-    monkeypatch.setattr(envs, "_run_all", lambda cmds: pytest.fail("a build was started"))
-    with pytest.raises(RuntimeError, match="run only on Linux"):
-        fn()
-
-
 def test_builders_dry_run_everywhere(off_linux):
     assert envs.create_env("matilda")                  # commands, no build
 
 
 # ----------------------------------------------------------------- sizes
+def test_every_env_has_a_lockfile_and_a_packed_archive():
+    # install plans only "packed archive published" or a lockfile "BUILD": no
+    # state, and no refusal, for an env without either
+    envs_needed = [env for env, _ in envs._envs_needed(None, None)]
+    assert [e for e in envs_needed if envs.lockfile(e) is None] == []
+    assert [e for e in envs_needed if e not in envs.packed_manifest()] == []
+
+
 def test_packed_sizes_cover_every_packed_url():
     urls = json.loads((ROOT / "multibench/engine/packed_urls.json").read_text())
     sizes = envs.packed_sizes()
