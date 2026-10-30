@@ -650,8 +650,6 @@ def evaluate(embedding, labels=None, *, dataset: str | None = None,
     >>> mtb.evaluate(adata, labels="celltype", batch="sample", obsm="X_pca",
     ...              method="PCA")
     """
-    if not isinstance(method, str) or not method.strip():
-        raise TypeError(f"method= takes a name, such as method='Matilda'; got {method!r}.")
     if isinstance(embedding, (str, Path)):
         embedding = Path(embedding).expanduser()
     name = cells = None
