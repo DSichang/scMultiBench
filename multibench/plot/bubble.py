@@ -89,42 +89,36 @@ def _and_distinct(values) -> str:
     return _and_list(dict.fromkeys(map(str, values)))
 
 
-def _unknown_names(unknown, available, kind: str) -> str:
-    """The error for ``unknown`` names of ``kind``, then the names the table has."""
+def _unknown_names(unknown, available) -> str:
+    """The error for ``unknown`` names, then the names the table has."""
     one = len(set(map(str, unknown))) == 1
     have = sorted({str(a) for a in available})
     return (f"{_and_distinct(unknown)} {'is' if one else 'are'} not in the table. "
             + (f"The table has {_and_distinct(have)}." if have else "The table is empty."))
 
 
-def _resolve(requested, available, kind: str, canon) -> list:
-    """The frame's own spelling of each requested name, matched exactly, by
-    ``canon`` form, then case-insensitively; unknown or repeated names raise."""
+def _resolve(requested, available, canon) -> list:
+    """The frame's own spelling of each requested name: matched exactly, else by
+    ``canon`` form in any case. A name given twice counts once; an unknown name
+    raises."""
     requested = [requested] if isinstance(requested, str) else list(requested)
     available = list(available)
-    by_exact = set(available)
-    by_canon = {}
-    by_lower = {}
+
+    def key(x):
+        return str(canon(x)).lower()
+    by_key = {}
     for a in available:
-        by_canon.setdefault(canon(a), a)          # frame spelling wins
-        by_lower.setdefault(str(a).lower(), a)
+        by_key.setdefault(key(a), a)          # frame spelling wins
     out, unknown = [], []
     for r in requested:
-        if r in by_exact:
-            out.append(r)
-        elif canon(r) in by_canon:
-            out.append(by_canon[canon(r)])
-        elif str(r).lower() in by_lower:
-            out.append(by_lower[str(r).lower()])
-        else:
+        hit = r if r in available else by_key.get(key(r))
+        if hit is None:
             unknown.append(r)
+        else:
+            out.append(hit)
     if unknown:
-        raise ValueError(_unknown_names(unknown, available, kind))
-    dup = sorted({x for x in out if out.count(x) > 1})
-    if dup:
-        raise ValueError(
-            f"{kind}s listed more than once after canonicalisation: {dup}")
-    return out
+        raise ValueError(_unknown_names(unknown, available))
+    return list(dict.fromkeys(out))
 
 
 def _expand_families(metrics, available) -> list:
@@ -175,13 +169,11 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None) -> Bubble
     _need_long(long_df, "bubble")
     df = long_df.dropna(subset=["metric"])
     if methods is not None:
-        methods = _resolve(methods, df["method"].unique().tolist(), "method",
-                           catalog._canonical_id)
+        methods = _resolve(methods, df["method"].unique().tolist(), catalog._canonical_id)
         df = df[df["method"].isin(methods)]
     if metrics is not None:
         names = df["metric"].unique().tolist()
-        metrics = _resolve(_expand_families(metrics, names), names, "metric",
-                           catalog._canonical_metric)
+        metrics = _resolve(_expand_families(metrics, names), names, catalog._canonical_metric)
         df = df[df["metric"].isin(metrics)]
     if df.empty:
         raise ValueError("no rows left after applying methods=/metrics= filters"
@@ -227,7 +219,7 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None) -> Bubble
     if leftover:
         blocks.append(block("Other", "Purples", leftover))
     if not blocks:
-        raise ValueError("no known metrics found in long_df")
+        raise ValueError("The table has no values.")
 
     # a family some rows lack (classification of your rows next to stored rows
     # without it) is drawn, but counts in no row's Overall; its n/a cells need
@@ -237,8 +229,7 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None) -> Bubble
         _text.warn(_na_message(missing), UserWarning)
 
     raw = pd.concat([b.raw for b in blocks], axis=1)
-    msg = _no_comparison_message(rows, style.constant_columns(raw),
-                                 partial=set(raw.columns[raw.isna().any()]))
+    msg = _no_comparison_message(rows, style.constant_columns(raw))
     if msg:
         _text.warn(msg, UserWarning)
 
@@ -246,24 +237,18 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None) -> Bubble
                        method_datasets=method_datasets)
 
 
-def _no_comparison_message(methods, constant: dict, partial=frozenset()) -> str | None:
-    """The warning for grey fills: one method, or the ``constant`` columns
-    (``partial`` ones lack some values); ``None`` when there is none."""
+def _no_comparison_message(methods, constant: dict) -> str | None:
+    """The warning for grey fills: one method, or the ``constant`` columns;
+    ``None`` when there is none."""
     if len(methods) == 1:
         return (f"Only one method, {methods[0]}: nothing to rank it against, so the "
-                f"fills are grey.")
+                f"fills are grey. Plot it with other methods.")
     if not constant:
         return None
-    which = "That column is" if len(constant) == 1 else "Those columns are"
-    fix = (" Leave " + ("it" if len(constant) == 1 else "them") + " out with "
-           + "metrics=.")
-    sentences = []
-    for cols, who in (([c for c in constant if c not in partial], "every method"),
-                      ([c for c in constant if c in partial], "every method with a value")):
-        if cols:
-            sentences.append(_and_list([f"{c} is {constant[c]:.3f}" for c in cols])
-                             + f" for {who}.")
-    return f"{' '.join(sentences)} {which} grey.{fix}"
+    one = len(constant) == 1
+    values = _and_list([f"{c} is {v:.3f}" for c, v in constant.items()])
+    return (f"{values} for every method. {'That column is' if one else 'Those columns are'} "
+            f"grey. Leave {'it' if one else 'them'} out with metrics=.")
 
 
 def _na_missing(blocks) -> list:
@@ -717,7 +702,7 @@ def bubble(long_df, *, metrics=None, methods=None, title=None, save=None):
     -----
     UserWarning
         ``n/a`` cells, several datasets averaged per method, a column with the
-        same value in every row, or a figure of two methods.
+        same value in every row, or a figure of one method.
 
     Examples
     --------

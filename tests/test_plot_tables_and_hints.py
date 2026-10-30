@@ -74,8 +74,8 @@ def test_x87_clustering_columns_follow_catalog_metrics():
 
 
 @pytest.mark.parametrize("scored_with,expect", [
-    ("leidenalg/sweep/0.3.9", "were scored before multibench 0.4.0"),
-    (None, "do not record how they were scored"),
+    ("leidenalg/sweep/0.3.9", "were not scored by multibench 0.4.0"),
+    (None, "were not scored by multibench 0.4.0"),
     ("leidenalg/search/0.4.0", None),
     ("leidenalg/user/0.4.0", None),
     ("unknown", None)])
@@ -95,7 +95,7 @@ def test_x94_rank_warns_for_old_rows_too():
     d11 = _d11()
     _, msgs = _messages(mtb.rank, "vertical",
                         long_df=pd.concat([d11, _mine(d11, scored_with="igraph/sweep/0.3.1")]))
-    assert any("The rows for Mine were scored before multibench 0.4.0." in m for m in msgs)
+    assert any("The rows for Mine were not scored by multibench 0.4.0." in m for m in msgs)
 
 
 # X07: a family counts in the Overall only when every row has it, silently

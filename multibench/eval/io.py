@@ -35,29 +35,22 @@ _LABEL_FILE_SUFFIXES = {".csv", ".tsv", ".txt"}
 
 def _require_file(path: Path | str, what: str = "file") -> Path:
     """``Path(path)`` when it is an existing file; else ``FileNotFoundError``
-    naming ``what``, the path and, for a relative path, where it resolves from the
-    working directory (a notebook's cwd is the usual surprise). ``~`` is expanded."""
+    naming ``what`` and the path, resolved when it is relative (a notebook's
+    working directory is the usual surprise). ``~`` is expanded."""
     p = Path(path).expanduser()
-    where = ("" if p.is_absolute() else
-             f" From the working directory {Path.cwd()}, the path resolves to "
-             f"{p.resolve()}.")
+    where = "" if p.is_absolute() else f" (resolved: {p.resolve()})"
     if p.is_dir():
-        raise FileNotFoundError(f"The {what} {p} is a folder, not a file.{where}")
+        raise FileNotFoundError(f"The {what} {p} is a folder, not a file{where}.")
     if not p.is_file():
-        raise FileNotFoundError(f"The {what} {p} does not exist.{where}")
+        raise FileNotFoundError(f"The {what} {p} does not exist{where}.")
     return p
 
 
 def _read_h5ad(path, what: str = "file"):
     """The AnnData of the ``.h5ad`` file ``path`` (``what`` names it when it is
-    missing); a damaged or non-``.h5ad`` file raises one sentence, not h5py's."""
+    missing)."""
     import anndata as ad
-    p = _require_file(path, what)
-    try:
-        return ad.read_h5ad(p)
-    except OSError:
-        raise ValueError(f"{p.name} cannot be read: it is not an .h5ad file, "
-                         f"or it is damaged.") from None
+    return ad.read_h5ad(_require_file(path, what))
 
 
 def read_embedding(path: Path | str) -> np.ndarray:
@@ -208,15 +201,9 @@ def read_labels(path: Path | str, column: str | None = None) -> np.ndarray:
     1. ``column`` when given (must exist; error lists the columns otherwise);
     2. the column named ``x`` when present;
     3. the only column when the file has one;
-    4. the last column when the file has exactly two and the first is all
-       unique (an index / barcode column), or has no header and holds the
-       row numbers of ``pd.concat([...]).to_csv(path)`` (runs of 0..k-1);
-    5. otherwise the file is ambiguous and a ``ValueError`` lists the
-       columns after the cell ids and asks for ``column=``: a silent pick
-       could score the wrong column without any error. When the first of
-       two columns is an index that repeats a barcode (text without a
-       header, or 90% distinct), the ``ValueError`` names the repeated ids
-       instead.
+    4. the last of two columns when the first is unique ids, or the row
+       numbers of ``pd.concat([...]).to_csv(path)``;
+    5. otherwise ``ValueError``: a silent pick could score the wrong column.
 
     Parameters
     ----------
@@ -344,45 +331,25 @@ def _looks_like_ids(col: pd.Series) -> bool:
 
 
 def by_id_column(values, first, ids, *, what: str, name: str, target: str,
-                 order: str, no_ids: str, n_files: int = 1):
+                 order: str, no_ids: str):
     """Put a per-cell file in the order of ``ids`` by its first column.
 
-    ``values`` and ``first`` come from :func:`read_labels_ids`; ``ids`` are
-    the target's cell ids (``None`` when it has none, ``no_ids`` says why).
-    Returns ``(vector, aligned)``:
-
-    - a first column of text whose values are all cells of the target: the
-      file is aligned by it, and a repeated id or a cell without a row
-      raises ``ValueError``;
-    - unique text with a row for every cell and rows of other cells: the
-      file is aligned and the other rows are left out;
-    - unique text where some or all values are not cells, and some cell
-      has no row: ``ValueError`` naming a few of them;
-    - repeated text with no cell (a sample column), or a target without ids:
-      the file is matched by position (``aligned`` False), with a
-      ``UserWarning`` when the column is unique text. ``order`` names the
-      order the rows must then follow;
-    - numbers: R's row numbers ``1..n`` or pandas' ``0..n-1``. They align
-      the file only when they are exactly the target's ids in some order
-      (an AnnData with the default ``obs_names``); otherwise the file is
-      matched by position, silently.
-
-    ``n_files`` > 1 when ``name`` names several stacked files: the warnings
-    then speak of them in the plural.
-
+    ``values`` and ``first`` come from :func:`read_labels_ids`; ``ids`` are the
+    target's cell ids (``None`` when it has none, ``no_ids`` says why). Returns
+    ``(vector, aligned)``. Ids that are not cells, repeated ids, or cells
+    without a row raise ``ValueError``; a first column without ids (a sample
+    column, row numbers that are not the target's ids) or a target without ids
+    matches the file by position.
     """
     vals = np.asarray(values)
     if first is None:
         return vals, False
     text = _looks_like_ids(first)
-    by_position = (f"The file is matched by position. Check that its rows follow {order}"
-                   if n_files == 1 else
-                   f"These files are matched by position. Check that their rows follow "
-                   f"{order}")
     if ids is None:
         if text and first.is_unique:
             _text.warn(f"The first column of {name} looks like cell ids, but "
-                         f"{no_ids}. {by_position}.", UserWarning)
+                       f"{no_ids}. The rows are matched by position. Check that they "
+                       f"follow {order}.", UserWarning)
         return vals, False
     keys = pd.Index([str(v) for v in first])
     ids = pd.Index([str(i) for i in ids])
@@ -564,25 +531,13 @@ def _numbers_rows(x, ids) -> bool:
     return [str(i) for i in ids] != [str(i) for i in range(len(ids))]
 
 
-def _labels_look_measured(values) -> tuple[str, int, int] | None:
-    """``(reason, distinct, cells)`` when labels look like a number measured
-    per cell: ``"distinct"`` (20+ cells, more labels than half the cells) or
-    ``"fraction"`` (numbers that are not whole); else ``None``."""
+def _labels_look_measured(values) -> tuple[int, int] | None:
+    """``(distinct, cells)`` when labels look like a number measured per cell:
+    20 or more cells, and more distinct labels than half of them; else ``None``."""
     vals = np.asarray(values)
     n = len(vals)
-    if not n:
-        return None
     distinct = int(pd.Series(vals.astype(object)).nunique(dropna=True))
-    numbers = vals.dtype.kind == "f" or (vals.dtype == object and pd.api.types.infer_dtype(
-        vals, skipna=True) in ("floating", "mixed-integer-float"))
-    if numbers:
-        num = pd.to_numeric(pd.Series(vals.astype(object)), errors="coerce").to_numpy(float)
-        num = num[np.isfinite(num)]
-        if len(num) and bool((num != np.round(num)).any()):
-            return "fraction", distinct, n
-    if n >= 20 and distinct > n / 2:
-        return "distinct", distinct, n
-    return None
+    return (distinct, n) if n >= 20 and distinct > n / 2 else None
 
 
 def _own_dtype(x) -> np.ndarray:
@@ -625,7 +580,7 @@ def _read_csv_embedding(path: Path):
     return d.to_numpy(dtype=float), ids
 
 
-def as_matrix(output, *, obsm: str | None = None) -> np.ndarray:
+def as_matrix(output, *, obsm: str | None = None, what: str = "output") -> np.ndarray:
     """Coerce a run output / embedding to a 2-D float numpy array.
 
     Accepted forms:
@@ -638,7 +593,7 @@ def as_matrix(output, *, obsm: str | None = None) -> np.ndarray:
       ``.npy`` -> ``numpy.load``; ``.csv``/``.tsv`` -> numeric table (a
       leading index/barcode column is not part of the matrix;
       :func:`multibench.evaluate` keeps the barcodes as the cell ids). Any
-      other suffix is tried as HDF5 and otherwise rejected.
+      other suffix is rejected.
 
     Orientation is not decided here: :func:`read_embedding` orients HDF5
     files, and :func:`multibench.evaluate` orients everything else against the
@@ -653,6 +608,8 @@ def as_matrix(output, *, obsm: str | None = None) -> np.ndarray:
     obsm : str | None
         Key of ``.obsm`` to use for AnnData / ``.h5ad`` inputs (``'X'`` = ``.X``);
         ``None`` = ``X_emb``.
+    what : str
+        Names a path that does not exist in the error.
 
     Returns
     -------
@@ -668,21 +625,19 @@ def as_matrix(output, *, obsm: str | None = None) -> np.ndarray:
     if _is_anndata(output):
         return _anndata_matrix(output, obsm)
     if isinstance(output, (str, Path)):
-        p = _require_file(output, "output")
+        p = _require_file(output, what)
         suf = p.suffix.lower()
-        if suf in {".h5", ".hdf5", ".hdf"}:
+        if suf in {".h5", ".hdf5"}:
             return read_embedding(p)
         if suf == ".h5ad":
-            return _anndata_matrix(_read_h5ad(p, "output"), obsm)
+            return _anndata_matrix(_read_h5ad(p, what), obsm)
         if suf == ".npy":
             return _own_dtype(np.load(p))
         if suf in {".csv", ".tsv"}:
             return _read_csv_embedding(p)[0]
-        if h5py.is_hdf5(p):
-            return read_embedding(p)
         raise ValueError(
             f"output path {p} has unrecognised suffix {suf!r}; expected "
-            f".h5/.h5ad/.npy/.csv/.tsv (or an HDF5 file with dataset 'data')")
+            f".h5/.h5ad/.npy/.csv/.tsv")
     raise TypeError(
         "output must be a (cells x dims) ndarray/DataFrame/AnnData or a path to "
         f".h5/.h5ad/.npy/.csv; got {type(output).__name__}")

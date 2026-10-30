@@ -82,6 +82,21 @@ def test_the_table_of_examples():
     assert examples.__all__ == ["write_example"]
 
 
+
+def test_each_builder_makes_the_files_examples_lists(tmp_path, monkeypatch):
+    """The builders and EXAMPLES name the same files in the same order; checked on
+    stand-in objects, so no dataset is needed."""
+    cells = [f"c{i}" for i in range(2000)]
+    monkeypatch.setattr(examples, "_labels", lambda path: np.array(["t"] * len(cells)))
+
+    def read(path):
+        return ad.AnnData(np.ones((len(cells), 2)), obs=pd.DataFrame(index=cells))
+    for ds, (build, kw) in examples._BUILD.items():
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            made = build(tmp_path, read, **kw)
+        assert tuple(name for name, _, _ in made) == examples.EXAMPLES[ds], ds
+
 @pytest.mark.parametrize("ds", sorted(HOLDS))
 def test_files_and_contents(ds, tmp_path, monkeypatch):
     """Each file holds the object of the 0.3.4 data cell: the same matrix,

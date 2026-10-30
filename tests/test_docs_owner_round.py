@@ -120,10 +120,9 @@ def test_changes_list_the_new_messages():
     # the two signs are those of the rule
     assert ("With 20 cells or more, there are more distinct labels than half of the cells. "
             "Or the labels are numbers and some are not whole numbers.") in said
-    assert io._labels_look_measured(np.arange(20)) == ("distinct", 20, 20)
+    assert io._labels_look_measured(np.arange(20)) == (20, 20)
     assert io._labels_look_measured(np.arange(19)) is None
     assert io._labels_look_measured([0] * 10 + list(range(10))) is None      # half
-    assert io._labels_look_measured(np.array([0.5, 1.0])) == ("fraction", 2, 2)
     assert ("`export_dataset`, `evaluate` and `run_all` warn when `batch=` is a Series whose "
             "index is the row numbers `0` to `n-1` while the cells have barcodes.") in said
     assert ("`multibench evaluate --help` says that `--labels` and `--batch` can name a "

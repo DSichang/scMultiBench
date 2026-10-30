@@ -49,7 +49,8 @@ def test_one_method_warning_is_plain():
     _, msgs = _messages(_build_table,
                         pd.DataFrame(_rows("PCA_LSI_stack", (0.3, 0.4, 0.9))))
     assert msgs == [
-        "Only one method, PCA_LSI_stack: nothing to rank it against, so the fills are grey."]
+        "Only one method, PCA_LSI_stack: nothing to rank it against, so the fills are grey. "
+        "Plot it with other methods."]
 
 
 def test_equal_column_warning_is_plain():

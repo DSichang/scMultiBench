@@ -30,7 +30,7 @@ EMB = np.random.default_rng(0).normal(size=(CELLS, 5)) \
 PERM = np.random.default_rng(1).permutation(CELLS)
 MOVED = "evaluate: matched {0} to the rows of emb.csv by barcode.\n"
 NO_IDS = ("The first column of {0} looks like cell ids, but the embedding has no cell ids. "
-          "The file is matched by position. Check that its rows follow the rows of the "
+          "The rows are matched by position. Check that they follow the rows of the "
           "embedding.")
 NO_SUFFIX = [b.replace("-1", "") for b in BARS]          # the same cells, written differently
 
@@ -335,7 +335,7 @@ def test_repeated_barcodes_in_the_embedding_are_not_ids(tmp_path, seen):
         mtb.evaluate(str(path), labels=_labels(tmp_path), metrics=["ARI"])
     assert [str(w.message) for w in rec] == [
         "The first column of labels.csv looks like cell ids, but the embedding repeats cell "
-        "ids. The file is matched by position. Check that its rows follow the rows of the "
+        "ids. The rows are matched by position. Check that they follow the rows of the "
         "embedding."]
     assert seen["labels"] == list(TYPES)
 

@@ -339,7 +339,7 @@ def test_a_file_of_missing_words_warns_once(tmp_path):
     assert str(e.value) == _e1(" (obs.csv)")
     assert [str(w.message) for w in rec] == [
         "The first column of obs.csv looks like cell ids, but the embedding has no cell "
-        "ids. The file is matched by position. Check that its rows follow the rows of "
+        "ids. The rows are matched by position. Check that they follow the rows of "
         "the embedding."]
 
 

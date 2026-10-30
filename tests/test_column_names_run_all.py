@@ -80,8 +80,7 @@ def cite(tmp_path, monkeypatch):
 
 
 def _c1(what, given):
-    return (f"The {what} file {Path(given)} does not exist. From the working directory "
-            f"{Path.cwd()}, the path resolves to {Path(given).resolve()}.")
+    return f"The {what} file {Path(given)} does not exist (resolved: {Path(given).resolve()})."
 
 
 @pytest.mark.parametrize("given", ["donor", "obs:donor"])
@@ -107,11 +106,9 @@ def test_a_missing_csv_keeps_its_text(cite, tmp_path):
     data, calls = cite
     mtb.config.data_path = data
     kw = dict(methods=['totalVI'], verbose=False)
-    cwd = Path.cwd()
 
     def gone(name, what="batch"):
-        return (f"The {what} file {Path(name)} does not exist. From the working directory "
-                f"{cwd}, the path resolves to {Path(name).resolve()}.")
+        return f"The {what} file {Path(name)} does not exist (resolved: {Path(name).resolve()})."
     for name in ("missing.csv", "donor.tsv", "x.TXT", "sub/donor", "./donor"):
         with pytest.raises(FileNotFoundError) as e:
             mtb.run("MYCITE", "vertical", tmp_path / "out", batch=name, **kw)

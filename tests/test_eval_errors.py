@@ -5,6 +5,7 @@ a list of codes must fold case like every other metric argument, and a wrong or 
 the path, the working directory and - for a canonical INPUT matrix handed in
 as an output - what the file actually is.
 """
+import os
 import re
 
 import h5py
@@ -53,10 +54,10 @@ def test_metrics_folds_case_like_the_other_metric_arguments():
 
 
 def test_missing_output_file_names_path_and_cwd(tmp_path):
-    with pytest.raises(FileNotFoundError, match=r"^The output nothere\.h5 does not exist\. "
-                       r"From the working directory ") as e:
+    with pytest.raises(FileNotFoundError, match=r"^The embedding nothere\.h5 does not exist "
+                       r"\(resolved: ") as e:
         evaluate("nothere.h5", labels=["a", "b"])
-    assert "the path resolves to " in str(e.value)
+    assert str(e.value).endswith(f"{os.path.abspath('nothere.h5')}).")
     with pytest.raises(FileNotFoundError, match="is a folder, not a file"):
         evaluate(str(tmp_path), labels=["a", "b"])
     # an absolute path needs no working directory

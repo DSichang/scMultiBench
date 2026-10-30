@@ -145,9 +145,6 @@ def _lisi_helper_problem() -> str | None:
     return _probe_lisi_binary(exe)
 
 
-#: Leiden backends ``leiden_n_clusters`` / ``compute`` accept
-LEIDEN_FLAVORS = ("igraph", "leidenalg")
-
 #: metrics whose scIB definition is bounded by [0, 1] (scaled LISI, the ASW
 #: family, graph connectivity); ``compute`` clips them to that range
 BOUNDED_METRICS = ("ASW", "iASW", "cLISI", "ASW_batch", "ARI_batch", "NMI_batch",
@@ -174,55 +171,37 @@ def _tidy_value(name: str, value) -> float:
     return v
 
 
-_igraph_support: bool | None = None     # probed once per process; tests may set it
-
-
+@functools.cache
 def igraph_flavor_available() -> bool:
-    """Can this scanpy run ``sc.tl.leiden(flavor="igraph")``?
+    """Can this scanpy run ``sc.tl.leiden(flavor="igraph")``? scanpy accepts
+    ``flavor=`` from 1.10 on and the backend needs the ``igraph`` package."""
+    try:
+        import igraph  # noqa: F401
+    except Exception:  # noqa: BLE001 - an igraph that fails to import means "no"
+        return False
+    return _scanpy_has_flavor_kw()
 
-    scanpy accepts ``flavor=`` from 1.10 on and the backend needs the
-    ``igraph`` package. The answer is probed once per process.
-    """
-    global _igraph_support
-    if _igraph_support is None:
-        try:
-            import igraph  # noqa: F401
-            _igraph_support = _scanpy_has_flavor_kw()
-        except Exception:  # noqa: BLE001 - an igraph that fails to import means "no"
-            _igraph_support = False
-    return _igraph_support
+
+@functools.cache
+def _scanpy_has_flavor_kw() -> bool:
+    """Does this scanpy accept ``sc.tl.leiden(flavor=...)`` (>= 1.10)? Older
+    ones fail on the keyword."""
+    from importlib.metadata import version
+    from packaging.version import Version
+    # by version, not by signature: tests replace sc.tl.leiden with recorders
+    return Version(version("scanpy")) >= Version("1.10")
 
 
 _fallback_warned = False
-_flavor_kw: bool | None = None
 
 
-def _scanpy_has_flavor_kw() -> bool:
-    """Does this scanpy accept ``sc.tl.leiden(flavor=...)`` (>= 1.10)? Probed
-    once. Older ones fail on the keyword."""
-    global _flavor_kw
-    if _flavor_kw is None:
-        try:
-            from importlib.metadata import version
-            from packaging.version import Version
-            # by version, not by signature: tests replace sc.tl.leiden with
-            # recorders whose signature says nothing about the real backend
-            _flavor_kw = Version(version("scanpy")) >= Version("1.10")
-        except Exception:  # noqa: BLE001
-            _flavor_kw = False
-    return _flavor_kw
-
-
-def _resolve_flavor(flavor) -> str:
-    """The Leiden backend that will run: ``flavor``, else the configured
-    default, downgraded to ``"leidenalg"`` (one warning) where igraph cannot run."""
+def _resolve_flavor(flavor=None) -> str:
+    """The Leiden backend that will run: ``flavor``, else ``config.leiden_flavor``,
+    downgraded to ``"leidenalg"`` (one warning) where igraph cannot run."""
     global _fallback_warned
     if flavor is None:
         from .._settings import config
         flavor = config.leiden_flavor
-    if flavor not in LEIDEN_FLAVORS:
-        raise ValueError(
-            f"unknown leiden flavor {flavor!r}; valid: {'|'.join(LEIDEN_FLAVORS)}")
     if flavor == "igraph" and not igraph_flavor_available():
         if not _fallback_warned:
             from importlib.metadata import version
@@ -325,7 +304,7 @@ def _n_clusters(graph, n: int, flavor: str) -> np.ndarray:
     return out
 
 
-def leiden_n_clusters(emb, n: int, *, flavor=None) -> np.ndarray:
+def leiden_n_clusters(emb, n: int) -> np.ndarray:
     """Cluster an embedding with Leiden at the resolution that gives ``n`` clusters.
 
     The article's clustering: a kNN graph with scanpy's defaults (on the
@@ -339,10 +318,6 @@ def leiden_n_clusters(emb, n: int, *, flavor=None) -> np.ndarray:
         Embedding, cells x dims. NaN counts as 0.
     n : int
         Number of clusters wanted, such as the number of cell types.
-    flavor : {None, "igraph", "leidenalg"}
-        Leiden backend. ``None`` (default) reads ``config.leiden_flavor``
-        (``"igraph"``: scanpy's igraph backend with ``n_iterations=2``,
-        ``directed=False``; ``"leidenalg"``: scanpy's default before 1.10).
 
     Returns
     -------
@@ -350,13 +325,9 @@ def leiden_n_clusters(emb, n: int, *, flavor=None) -> np.ndarray:
         One cluster id (a string) per cell; those of the last step when no
         resolution gave ``n``.
 
-    Raises
-    ------
-    ValueError
-        ``flavor`` is neither ``"igraph"`` nor ``"leidenalg"``.
+    The Leiden backend is ``config.leiden_flavor``.
     """
-    flavor = _resolve_flavor(flavor)
-    return _n_clusters(_clustering_graph(emb), int(n), flavor)
+    return _n_clusters(_clustering_graph(emb), int(n), _resolve_flavor())
 
 
 def _isolated_labels_f1(adata, label_key, batch_key, cluster_key, iso_threshold):
@@ -383,7 +354,7 @@ def _isolated_labels_f1(adata, label_key, batch_key, cluster_key, iso_threshold)
 
 def compute(emb, celltype, cluster, batch, group: str = "clustering",
             slow_metrics: bool = False, only=None, *,
-            verbose: bool | None = None, flavor=None) -> pd.DataFrame:
+            verbose: bool | None = None) -> pd.DataFrame:
     """Compute scIB metrics for one embedding.
 
     Parameters
@@ -408,10 +379,7 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
     verbose : bool, keyword-only, optional
         Print one stderr line when the Leiden clustering starts. ``None``
         (default): only for embeddings with more than 2,000 cells; ``True``
-        always; ``False`` never.
-    flavor : {None, "igraph", "leidenalg"}
-        Leiden backend. ``None`` (default) reads
-        ``config.leiden_flavor``; see :func:`leiden_n_clusters`.
+        always; ``False`` never. The Leiden backend is ``config.leiden_flavor``.
 
     Returns
     -------
@@ -430,19 +398,10 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
     ``ARI_batch``, ``NMI_batch``, ``GC``, ``iLISI``) are clipped to that
     range, with values within ``1e-12`` of 1 recorded as ``1.0``. An iLISI of ``2.2e-16`` is therefore ``0.0``.
     """
+    import scib.metrics as me
+
     if only is not None:
         only = set(only)
-    if group not in {"clustering", "batch", "all"}:
-        raise ValueError(f"unknown group {group!r}; valid: clustering|batch|all")
-
-    try:
-        import scanpy as sc
-        import scib.metrics as me
-    except ImportError as e:
-        raise RuntimeError(
-            "metrics need scib and scanpy, which are not installed here - "
-            "run: pip install scib scanpy"
-        ) from e
 
     n = np.asarray(emb).shape[0]
     adata = _build_adata(emb, celltype, cluster, batch)
@@ -461,7 +420,7 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
     search_bat = want_bat and n_batches >= 2 and bool(wanted(_BATCH_CLUSTER_METRICS))
     leiden_ran = search_ct or search_bat
     if leiden_ran:
-        flavor = _resolve_flavor(flavor)
+        flavor = _resolve_flavor()
         if verbose or (verbose is None and n > _SWEEP_NOTICE_CELLS):
             import sys
             needs = ((wanted(_CLUSTER_METRICS) if search_ct else [])

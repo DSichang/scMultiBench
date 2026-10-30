@@ -156,8 +156,9 @@ def test_unknown_method_lists_the_table():
 def test_metric_alias_resolves():
     tbl = bubble._build_table(_three(), metrics=["ari", "nmi"])
     assert list(_matrix(tbl, "raw").columns) == ["ARI", "NMI"]
-    with pytest.raises(ValueError, match="more than once"):
-        bubble._build_table(_three(), metrics=["ARI", "ari"])
+    # a name given twice counts once
+    tbl = bubble._build_table(_three(), metrics=["ARI", "ari"])
+    assert list(_matrix(tbl, "raw").columns) == ["ARI"]
 
 
 def test_duplicate_rows_raise():
@@ -261,3 +262,8 @@ def test_python_bubble_titles_its_one_category_and_dataset():
         long = mtb.load_results("vertical", dataset="D11")
         assert mtb.plot.bubble(long).axes[0].get_title() == "vertical D11"
         assert mtb.plot.bubble(long, title="").axes[0].get_title() == ""
+
+
+def test_a_table_without_values_says_so():
+    with pytest.raises(ValueError, match=r"^The table has no values\.$"):
+        bubble._build_table(_three().assign(value=float("nan")))

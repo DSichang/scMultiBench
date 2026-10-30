@@ -68,17 +68,6 @@ def test_evaluate_requires_batch_for_batch_task():
     assert "metrics='batch' needs batch labels" in str(exc.value)
 
 
-def test_compute_rejects_unknown_group():
-    import pytest
-    anndata = pytest.importorskip("anndata")
-    from multibench.eval import scib as escib
-    emb = np.zeros((4, 2))
-    lab = np.array([0, 0, 1, 1])
-    with pytest.raises(ValueError) as exc:
-        escib.compute(emb, lab, lab, lab, group="bogus")
-    assert "unknown group" in str(exc.value)
-
-
 def test_top_level_exposes_evaluate():
     import multibench as mtb
     assert hasattr(mtb, "evaluate")

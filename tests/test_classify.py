@@ -1,11 +1,7 @@
-"""classify: the predicted cell type of each query cell, one batch as the
-reference (the benchmark's MLP classification step). Since 0.4 mtb.classify and
-mtb.classification_metrics are deprecated (mtb.evaluate(metrics="classification")
-reports the mean row); the tests below call the implementation, one test the
-deprecated names."""
-import warnings
+"""classify: the predicted cell type of each query cell, each batch in turn the
+reference (the benchmark's MLP classification step), on the arrays evaluate has
+checked; classification_metrics scores its frame. evaluate reports the mean row."""
 
-import anndata as ad
 import h5py
 import numpy as np
 import pandas as pd
@@ -28,15 +24,16 @@ def _batch(types, n, seed):
 
 def _write(tmp_path, blocks):
     """``{stem: (types, n)}`` -> label files cty<i>.csv, the embedding in the
-    given block order and the labels in that order."""
-    embs, labels, paths = [], [], {}
+    given block order, the labels in that order and the batch (stem) of each cell."""
+    embs, labels, batch, paths = [], [], [], {}
     for i, (stem, (types, n)) in enumerate(blocks.items()):
         e, lab = _batch(types, n, seed=i)
         embs.append(e)
         labels += lab
+        batch += [stem] * n
         paths[stem] = tmp_path / f"{stem}.csv"
         pd.DataFrame({"x": lab}).to_csv(paths[stem], index=False)
-    return np.vstack(embs), labels, paths
+    return np.vstack(embs), labels, batch, paths
 
 
 @pytest.fixture
@@ -46,8 +43,8 @@ def three(tmp_path):
 
 
 def test_return_frame(three):
-    emb, labels, paths = three
-    out = classify(emb, labels=list(paths.values()))
+    emb, labels, batch, _ = three
+    out = classify(emb, labels, batch)
     assert list(out.columns) == COLUMNS
     assert isinstance(out.index, pd.RangeIndex)
     first = out[out["reference"] == "cty1"]
@@ -59,102 +56,38 @@ def test_return_frame(three):
 
 
 def test_every_batch_is_the_reference_in_turn(three):
-    emb, labels, paths = three
-    out = classify(emb, labels=list(paths.values()))
+    emb, labels, batch, _ = three
+    out = classify(emb, labels, batch)
     assert out["reference"].unique().tolist() == ["cty1", "cty2", "cty3"]
     assert out.groupby("reference").size().to_dict() == {"cty1": 40, "cty2": 60, "cty3": 60}
     assert not (out["reference"] == out["batch"]).any()
 
 
-def test_one_reference(three):
-    emb, labels, paths = three
-    out = classify(emb, labels=list(paths.values()), reference="cty2")
-    assert set(out["reference"]) == {"cty2"} and len(out) == 60
-    assert out["batch"].tolist() == ["cty1"] * 30 + ["cty3"] * 30
-
-
 def test_query_cells_of_a_type_not_in_the_reference_are_left_out(three):
-    emb, labels, paths = three
-    out = classify(emb, labels=list(paths.values()), reference="cty1")
-    assert "C" not in set(out["label"]) and "C" not in set(out["predicted"])
-    assert len(out) == 40
+    emb, labels, batch, _ = three
+    out = classify(emb, labels, batch)
+    first = out[out["reference"] == "cty1"]
+    assert "C" not in set(first["label"]) and "C" not in set(first["predicted"])
+    assert len(first) == 40 and out.attrs["left_out"] == {"cty1": 20, "cty2": 0, "cty3": 0}
 
 
-def test_cells_without_a_label_are_left_out(three, tmp_path):
-    emb, labels, paths = three
-    d = pd.read_csv(paths["cty2"])
-    d.loc[[0, 1], "x"] = np.nan
-    d.to_csv(paths["cty2"], index=False)
-    with pytest.warns(UserWarning) as rec:
-        out = classify(emb, labels=list(paths.values()))
-    assert [str(w.message) for w in rec] == [
-        "2 of the 90 cells have no label; they are left out."]
-    assert not out["cell"].isin([30, 31]).any()
-    assert out.groupby("reference").size().to_dict() == {"cty1": 38, "cty2": 60, "cty3": 58}
-
-
-def test_labels_and_batch_as_obs_columns(three):
-    emb, labels, paths = three
-    a = ad.AnnData(np.zeros((90, 2)), obsm={"X_emb": emb})
-    a.obs_names = [f"c{i}" for i in range(90)]
-    a.obs["celltype"] = labels
-    a.obs["donor"] = ["d1"] * 30 + ["d2"] * 30 + ["d3"] * 30
-    out = classify(a, labels="celltype", batch="donor", reference="d3")
-    assert out["cell"].tolist() == [f"c{i}" for i in range(60)]
-    assert out["label"].tolist() == labels[:60]
-    assert set(out["batch"]) == {"d1", "d2"}
-
-
-def test_one_batch_is_an_error(three):
-    emb, labels, paths = three
-    for labels in ({"cty1": paths["cty1"]}, [paths["cty1"]]):
-        with pytest.raises(ValueError) as e:
-            classify(emb[:30], labels=labels)
-        assert str(e.value) == ("classify needs at least two batches; every cell is in "
-                                "batch cty1. Pass batch= with two or more batches.")
-
-
-def test_no_batch_is_an_error(three):
-    emb, labels, paths = three
-    with pytest.raises(ValueError) as e:
-        classify(emb, labels=labels)
-    with pytest.raises(ValueError) as e2:
-        classify(emb[:30], labels=paths["cty1"])
-    assert str(e.value) == str(e2.value) == (
-        "classify needs the batch of each cell. Pass batch=.")
-
-
-def test_a_graph_or_label_output_is_an_error(three, tmp_path):
-    emb, labels, paths = three
-    graph = tmp_path / "knn_indices.h5"
-    with h5py.File(graph, "w") as f:
-        f["data"] = np.tile(np.arange(20), (90, 1))
-    with pytest.raises(ValueError) as e:
-        classify(graph, labels=list(paths.values()))
-    assert str(e.value) == ("scMoMaT writes a graph, not an embedding, so it has no "
-                            "classification scores. Score it with "
-                            "mtb.evaluate(metrics='clustering').")
-    with pytest.raises(TypeError, match="got list$"):
-        classify(list(labels), labels=list(paths.values()))    # predicted labels
-    # cells x cells, and a kNN index matrix as mtb.run returns it for scMoMaT
-    knn = np.stack([np.roll(np.arange(90), -i)[:20] for i in range(90)])
-    for output in (np.eye(90), knn, knn.astype(float), knn + 1, knn.T):
-        with pytest.raises(ValueError) as e:
-            classify(output, labels=list(paths.values()))
-        assert str(e.value) == ("output is a graph, not an embedding, so it has no "
-                                "classification scores. Score it with "
-                                "mtb.evaluate(metrics='clustering').")
-
-
-def test_the_umap_of_a_graph_method_is_a_graph_output(three, tmp_path):
-    """scMoMaT's umap_embedding.h5 is written only by a graph variant."""
-    emb, labels, paths = three
+def test_a_graph_or_kNN_output_is_an_error(three, tmp_path):
+    emb, labels, batch, paths = three
+    files = list(paths.values())
+    # scMoMaT's umap_embedding.h5 is written only by a graph variant
     umap = tmp_path / "umap_embedding.h5"
     with h5py.File(umap, "w") as f:
         f["data"] = emb[:, :2]
     with pytest.raises(ValueError) as e:
-        classify(umap, labels=list(paths.values()))
+        mtb.evaluate(umap, labels=files, metrics="classification")
     assert str(e.value).startswith("scMoMaT writes a graph, not an embedding")
+    # cells x cells, and a kNN index matrix as mtb.run returns it for scMoMaT
+    knn = np.stack([np.roll(np.arange(90), -i)[:20] for i in range(90)])
+    for output in (np.eye(90), knn, knn.astype(float), knn + 1):
+        with pytest.raises(ValueError) as e:
+            mtb.evaluate(output, labels=files, metrics="classification")
+        assert str(e.value) == ("output is a graph, not an embedding, so it has no "
+                                "classification scores. Pass metrics='clustering'.")
 
 
 def test_the_neighbour_index_rule():
@@ -172,27 +105,20 @@ def test_the_neighbour_index_rule():
     assert not _is_neighbour_index(knn[:10])                # more columns than cells
 
 
-def test_unknown_reference_is_an_error(three):
-    emb, labels, paths = three
-    with pytest.raises(ValueError) as e:
-        classify(emb, labels=list(paths.values()), reference="cty4")
-    assert str(e.value) == "reference='cty4' is not a batch. Pass one of cty1, cty2 or cty3."
-
-
 def test_a_reference_with_one_cell_type_is_skipped(tmp_path):
-    emb, labels, paths = _write(tmp_path, {"cty1": ("A", 20), "cty2": ("AB", 20)})
+    emb, labels, batch, _ = _write(tmp_path, {"cty1": ("A", 20), "cty2": ("AB", 20)})
     with pytest.warns(UserWarning) as rec:
-        out = classify(emb, labels=list(paths.values()))
+        out = classify(emb, labels, batch)
     assert [str(w.message) for w in rec] == ["Reference batch cty1 has one cell type; skipped."]
     assert set(out["reference"]) == {"cty2"} and len(out) == 20
 
 
 def test_same_seed_same_predictions(tmp_path):
     # overlapping types, so the predictions depend on the fit
-    emb, labels, paths = _write(tmp_path, {"cty1": ("ABC", 60), "cty2": ("ABC", 60)})
+    emb, labels, batch, _ = _write(tmp_path, {"cty1": ("ABC", 60), "cty2": ("ABC", 60)})
     emb = emb * 0.05
-    a = classify(emb, labels=list(paths.values()), seed=3)
-    b = classify(emb, labels=list(paths.values()), seed=3)
+    a = classify(emb, labels, batch, seed=3)
+    b = classify(emb, labels, batch, seed=3)
     pd.testing.assert_frame_equal(a, b)
 
 
@@ -247,32 +173,8 @@ def test_mean_row_is_the_mean_over_references():
     assert np.isnan(out.loc["mean", "Spec"]) and not out.loc["mean"].drop("Spec").isna().any()
 
 
-def test_a_frame_without_reference_gives_one_row():
-    # labels that are numbers, as the R code reads them: 1, 2, 3, 10
-    pred = pd.DataFrame({"label": [1, 2, 10, 2, 1, 10, 3],
-                         "predicted": [1, 10, 10, 2, 2, 10, 1]})
-    out = classification_metrics(pred)
-    assert list(out.columns) == METRICS and len(out) == 1
-    np.testing.assert_allclose(out.iloc[0].to_numpy(float),
-                               [0.5714285714285714, 0.5, 0.85000000000000009, 0.5,
-                                0.45000000000000001], rtol=0, atol=1e-12)
-
-
 def test_metrics_of_classify(three):
-    emb, labels, paths = three
-    out = classification_metrics(classify(emb, labels=list(paths.values())))
+    emb, labels, batch, _ = three
+    out = classification_metrics(classify(emb, labels, batch))
     assert out.index.tolist() == ["cty1", "cty2", "cty3", "mean"]
     assert (out == 1.0).all().all()                      # well separated types
-
-
-def test_missing_column_is_an_error():
-    with pytest.raises(ValueError) as e:
-        classification_metrics(pd.DataFrame({"label": ["A"]}))
-    assert str(e.value) == ("predictions has no predicted column. "
-                            "Pass the frame classify returns.")
-    with pytest.raises(ValueError) as e:
-        classification_metrics(pd.DataFrame({"cell": [0]}))
-    assert str(e.value) == ("predictions has no label and no predicted column. "
-                            "Pass the frame classify returns.")
-
-

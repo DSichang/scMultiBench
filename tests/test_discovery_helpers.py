@@ -78,7 +78,7 @@ def test_rank_unknown_result_id_and_modalities(result_dir):
     assert set(r2.method) <= set(mtb.find_methods(category="vertical", modalities=["rna", "adt"]))
     # sciPENN / scMSI are RNA+ADT methods: asking for RNA+ATAC leaves nothing
     sub = long[long.method.isin(["sciPENN", "scMSI"])]
-    with pytest.raises(ValueError, match="consumes modalities"):
+    with pytest.raises(ValueError, match=r"^No scored method in vertical reads "):
         rank("vertical", long_df=sub, modalities=["rna", "atac"])
     with pytest.raises(ValueError, match=r"Unknown metrics= token bogus\."):
         rank("vertical", long_df=long, metrics="bogus")

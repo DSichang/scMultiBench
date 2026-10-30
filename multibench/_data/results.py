@@ -9,7 +9,6 @@ source, scored_with``, so they concatenate with :func:`multibench.evaluate`'s.
 """
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import pandas as pd
@@ -33,39 +32,9 @@ _RERUN_DIR = "rerun"
 _RERUN_GLOB = "long_all_*.csv"
 
 
-#: ``source`` of every row of the stored results (the files say ``rerun-<version>``);
-#: the stamp's version goes to ``attrs["rerun_version"]``. An unstamped file gets
-#: no version, not the running one, which did not produce its numbers
+#: ``source`` of every row of the stored results; the files say ``rerun-<version>``,
+#: and the version goes to ``attrs["rerun_version"]``
 _RERUN_SOURCE = "stored"
-
-#: a stamped re-run provenance value: ``rerun-<version>``
-_RERUN_TAG_RE = re.compile(r"^rerun-(.+)$")
-
-
-def _split_rerun_tag(source: pd.Series) -> tuple[pd.Series, set[str]]:
-    """Fold ``rerun-<version>`` and ``rerun`` values to ``"stored"``; return them
-    and the versions seen."""
-    col = source.astype(str)
-    m = col.str.extract(_RERUN_TAG_RE, expand=False)
-    versions = set(m.dropna().unique())
-    out = source.where(m.isna() & (col != "rerun"), _RERUN_SOURCE)
-    return out, versions
-
-
-def _version_attr(versions: set[str]):
-    """``attrs["rerun_version"]``: ``None``, the one version, or a sorted tuple
-    of several."""
-    if not versions:
-        return None
-    if len(versions) == 1:
-        return next(iter(versions))
-    return tuple(sorted(versions))
-
-
-def _versions_in(frame) -> tuple:
-    """The versions in ``frame.attrs["rerun_version"]`` (:func:`_version_attr`)."""
-    v = frame.attrs.get("rerun_version")
-    return v if isinstance(v, tuple) else ((v,) if v else ())
 
 
 def _as_list(x) -> list | None:
@@ -90,19 +59,15 @@ def _no_dataset_msg(category, missing, have) -> str:
 
 
 def _read_rerun_files(base: Path) -> list[tuple[Path, pd.DataFrame]]:
+    """``(file, rows)`` of each stored table; its one ``rerun-<version>`` stamp
+    goes to ``attrs["rerun_version"]``."""
     root = base / _RERUN_DIR
     out = []
     for f in sorted(root.glob(_RERUN_GLOB)) if root.is_dir() else []:
-        df = pd.read_csv(f)
-        if not {"metric", "value", "method", "dataset", "category"}.issubset(df.columns):
-            continue
-        versions: set[str] = set()
-        if "source" not in df.columns:
-            df["source"] = _RERUN_SOURCE
-        else:
-            df["source"], versions = _split_rerun_tag(df["source"])
-        df = df[COLUMNS]
-        df.attrs["rerun_version"] = _version_attr(versions)
+        df = pd.read_csv(f)[COLUMNS]
+        (stamp,) = df["source"].unique()
+        df["source"] = _RERUN_SOURCE
+        df.attrs["rerun_version"] = stamp.removeprefix("rerun-")
         out.append((f, df))
     return out
 
@@ -117,7 +82,6 @@ def _load_rerun(category: str | None, datasets: list | None, base: Path) -> pd.D
             f"No stored results ({_RERUN_GLOB}) under {root}. They ship inside the "
             f"multibench wheel: reinstall multibench-sc.")
     frames = []
-    versions: set[str] = set()
     for _, df in files:
         sel = df
         if category is not None:
@@ -127,7 +91,6 @@ def _load_rerun(category: str | None, datasets: list | None, base: Path) -> pd.D
         if sel.empty:
             continue
         frames.append(sel)
-        versions.update(_versions_in(df))
     if not frames:
         allf = pd.concat([df for _, df in files], ignore_index=True)
         if category is not None:
@@ -135,8 +98,14 @@ def _load_rerun(category: str | None, datasets: list | None, base: Path) -> pd.D
         have = sorted(allf["dataset"].astype(str).unique(), key=catalog._dataset_sort_key)
         raise FileNotFoundError(_no_dataset_msg(category, datasets or (), have))
     out = pd.concat(frames, ignore_index=True)
-    out.attrs["rerun_version"] = _version_attr(versions)
+    out.attrs["rerun_version"] = _one_version(frames)
     return out
+
+
+def _one_version(frames) -> str:
+    """The one package version that scored the stored ``frames``."""
+    (version,) = {f.attrs["rerun_version"] for f in frames}
+    return version
 
 
 def _check_methods(wanted: list, present) -> None:
@@ -219,10 +188,8 @@ def load_results(
     mtb.plot.bubble : draws the table.
     """
     out = _load_results(category, dataset=dataset, methods=methods, metrics=metrics)
-    version = out.attrs.get("rerun_version")
-    if isinstance(version, str) and (out["source"] == _RERUN_SOURCE).all():
-        # the stored re-runs were scored as evaluate scores: leidenalg, the search
-        out["scored_with"] = f"leidenalg/search/{version}"
+    # the stored re-runs were scored as evaluate scores: leidenalg, the search
+    out["scored_with"] = f"leidenalg/search/{out.attrs['rerun_version']}"
     return out
 
 
@@ -243,7 +210,6 @@ def _load_results(
     wanted_methods = _as_list(methods)
 
     base = _base_path()
-    rerun_versions: set[str] = set()
     cats = [category] if category is not None else list(_CATEGORIES)
     frames: list[pd.DataFrame] = []
     errors: list[str] = []
@@ -255,7 +221,6 @@ def _load_results(
                 raise
             errors.append(str(e).strip())
             continue
-        rerun_versions.update(_versions_in(rr))
         frames.append(rr)
     if not frames:
         avail = _list_datasets(None, base) if datasets else []
@@ -294,7 +259,7 @@ def _load_results(
                 f"Leave out metrics= to get the scores they have "
                 f"({', '.join(have_metrics)}).", UserWarning)
     out = out[COLUMNS].reset_index(drop=True)
-    out.attrs["rerun_version"] = _version_attr(rerun_versions)
+    out.attrs["rerun_version"] = _one_version(frames)
     return out
 
 
@@ -456,13 +421,7 @@ def rank(
         # your own methods are not package methods: the filter leaves them
         keep_methods = [m for m in keep_methods if registry.method_of(m) in allowed | {None}]
         if not keep_methods:
-            asked = " and ".join(
-                ([f"consumes modalities {list(modalities)}"] if modalities is not None
-                 else []) + ([f"reads atac={atac!r}"] if atac is not None else []))
-            raise ValueError(
-                f"no scored method in {category} {asked}; methods with results: "
-                f"{sorted(grand.index)}; methods matching the selection: "
-                f"{sorted(allowed)}")
+            raise ValueError(f"No scored method in {category} reads {list(modalities)}.")
 
     # methods run for the category without scores; of long_df's methods only
     in_frame = {catalog._canonical_id(m) for m in df["method"].unique()}
@@ -502,14 +461,6 @@ def rank(
             + ", ".join(f"{m} {int(n_ds.loc[m])} of {len(kept)}" for m in partial) + ".")
     if backend:
         notes.append(backend)
-    # rows only in dropped datasets is another reason than no rows
-    only_dropped = [m for m in missing if m in in_frame]
-    if only_dropped:
-        one = len(only_dropped) == 1
-        notes.append(
-            f"{_and_list(only_dropped)} {'has' if one else 'have'} scores only on "
-            f"datasets left out of the ranking, so {'it is' if one else 'they are'} "
-            f"listed last.")
     if notes:
         _text.warn(f"rank({category!r}):\n  - " + "\n  - ".join(notes), UserWarning)
     return out

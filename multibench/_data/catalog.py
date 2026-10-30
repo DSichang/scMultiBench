@@ -4,18 +4,16 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import NamedTuple
 
 import pandas as pd
 
 from .. import _settings
 from ..engine import registry
 
-#: display and result-folder spellings -> method id, for those the folding of
-#: :func:`_canonical_id` does not reach (Seurat v4 is no method id)
+#: display spellings -> method id, for those the folding of :func:`_canonical_id`
+#: does not reach
 _ALIASES = {
-    "seurat v4": "Seurat_v4",
-    "seurat_v4": "Seurat_v4",
-    "seurat.v4": "Seurat_v4",
     "seurat(wnn)": "Seurat_WNN",
     "mofa+": "MOFA2",
 }
@@ -82,18 +80,14 @@ def _canonical_metric(code: str) -> str | None:
     return _METRIC_CANON.get(key, str(code).strip())
 
 
-class MetricSelection:
+class MetricSelection(NamedTuple):
     """What a ``metrics=`` argument resolved to: ``family`` (the token, or for
     a list the family holding every code, else ``"all"``), ``codes`` (``None``
     = no restriction, else the canonical codes in request order) and
     ``explicit`` (a list was given)."""
-    __slots__ = ("family", "codes", "explicit")
-
-    def __init__(self, family: str, codes, explicit: bool):
-        self.family, self.codes, self.explicit = family, codes, explicit
-
-    def __repr__(self) -> str:
-        return f"MetricSelection(family={self.family!r}, codes={self.codes!r}, explicit={self.explicit})"
+    family: str
+    codes: list | None
+    explicit: bool
 
 
 def _unknown_metrics(kw: str, what: str) -> str:
@@ -207,15 +201,11 @@ def datasets(*, category: str | None = None) -> pd.DataFrame:
     from . import results
     from .fetch import AVAILABLE, DEMO_CATEGORIES
     cat_of: dict[str, list[str]] = {}
-    served: set[str] = set()
-    for cat in results._CATEGORIES:
-        try:
-            held = results._list_datasets(cat, results._base_path())
-            for ds in held:
-                cat_of.setdefault(ds, []).append(cat)
-            served.update(held)
-        except Exception:       # a broken/absent tree must not break the catalog
-            continue
+    for _, df in results._read_rerun_files(results._base_path()):
+        for ds, cat in df[["dataset", "category"]].drop_duplicates().astype(str).itertuples(
+                index=False):
+            cat_of.setdefault(ds, []).append(cat)
+    served = set(cat_of)
     for ds, cat in DEMO_CATEGORIES.items():
         cat_of.setdefault(ds, [cat])
     # the full datasets first, then the small ones of the tutorials
