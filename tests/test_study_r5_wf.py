@@ -149,11 +149,11 @@ def test_a_labels_series_with_foreign_ids_raises_before_scoring(swept, monkeypat
     monkeypatch.setattr(W, "_score_record",
                         lambda *a, **k: pytest.fail("a record was scored"))
     bad = pd.Series(CELLTYPE, index=[f"x{b}" for b in BARS])
-    with pytest.raises(ValueError, match=r"^labels: 120 ids are not cells of MYCITE "
-                                         r"\(first: \['xc0'"):
+    with pytest.raises(ValueError, match=r"^The labels' cell ids do not match MYCITE's "
+                                         r"\(MYCITE e\.g\. c0, labels e\.g\. xc"):
         res.rescore(labels=bad)
-    with pytest.raises(ValueError, match=r"have no id in labels .* Give a label for "
-                                         r"every cell\.$"):
+    with pytest.raises(ValueError, match=r"4 of MYCITE's 120 cells are missing from labels "
+                                         r".* Pass labels for every cell of MYCITE\.$"):
         res.rescore(labels=pd.Series(CELLTYPE, index=BARS).iloc[:-4])
 
 

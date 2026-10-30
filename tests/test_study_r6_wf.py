@@ -118,8 +118,8 @@ def test_a_folder_that_is_not_found_is_named(rel, monkeypatch):
     monkeypatch.chdir(root / "nb")
     back = mtb.load_run("../out")
     assert back.records[0]["data_path"] == str(root / "data")         # left as recorded
-    # the roots tried: the recorded data_path, then data_root (the same folder)
-    where = back.records[0]["data_root"]
+    # the roots tried: the recorded data_path, data_root (the same folder), config's
+    where = f"{back.records[0]['data_root']} or {os.path.abspath(mtb.config.data_path)}"
     with pytest.warns(UserWarning, match=re.escape(
             f"The labels Series is matched by position, because the dataset folder "
             f"MYCITE is not found in {where}. {MOVED}")):
@@ -367,3 +367,13 @@ def test_docstrings_state_the_new_rules():
             "``mtb.config.data_path``.") in flat["load_run"]
     assert "``batch_<hash>.csv``" in flat["save"]
     assert "data_path" not in inspect.signature(mtb.load_run).parameters
+
+
+def test_a_moved_folder_is_found_under_config_data_path(rel, monkeypatch):
+    # run was given a folder path: the fix the note gives must work
+    res, root = rel
+    shutil.move(str(root / "data"), str(root / "moved"))
+    monkeypatch.setattr(config, "data_path", root / "moved")
+    new = _quiet(mtb.load_run(root / "out").rescore, metrics=["ARI"])
+    assert new.records[0]["status"] == "scored"
+    assert _ari(new) == _ari(res)

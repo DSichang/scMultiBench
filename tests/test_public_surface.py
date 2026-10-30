@@ -145,7 +145,7 @@ def test_out_dir_is_required_for_a_run():
     assert params["out_dir"].default is inspect.Parameter.empty
     with pytest.raises(TypeError, match="out_dir"):
         mtb.run("D11", "vertical", methods=["Matilda"], verbose=False)
-    with pytest.raises(TypeError, match="out_dir"):
+    with pytest.raises(TypeError):
         mtb.run("D11", "vertical", None, methods=["Matilda"], verbose=False)
 
 

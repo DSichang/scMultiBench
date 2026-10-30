@@ -184,6 +184,6 @@ def test_a_complete_batch_runs(cite, tmp_path):
 
 
 def test_the_check_names_nothing_for_a_complete_vector():
-    assert W._check_batch(np.array(["d1", "d2"]), "X") is None
+    assert W._check_gaps(np.array(["d1", "d2"]), "X") is None
     assert W._has_gap([1, 2, 3]) is False and W._has_gap(["a", None]) is True
     assert W._has_gap(pd.Series(["a", "NA "])) is True and W._has_gap(["na", "0"]) is False

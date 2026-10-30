@@ -82,7 +82,7 @@ def test_repeated_barcodes_in_the_label_files_order_are_aligned(d28_like):
 def test_repeated_barcodes_in_another_order_are_refused(d28_like):
     folder, rna_bars, gas = d28_like
     s = pd.Series("x", index=gas + rna_bars)
-    with pytest.raises(ValueError, match=r"the index repeats 3 ids"):
+    with pytest.raises(ValueError, match=r"the Series index has 3 duplicated id"):
         W._cell_vector(s, "DD", folder.parent)
 
 

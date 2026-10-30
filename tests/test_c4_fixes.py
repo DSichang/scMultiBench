@@ -139,7 +139,7 @@ def test_your_own_cells_on_a_benchmark_name_are_told_to_take_a_name_of_their_own
         mtb.evaluate(emb, labels=lab, dataset="D11", method="PCA", metrics=["ASW"])
     assert str(e.value) == (
         "The label files of D11 hold 2,864 cells; the embedding has 1,718 rows. "
-        "For other cells, pass a dataset name of your own.")
+        "For other cells, pass labels= and another name, such as dataset='D11_subset'.")
     got = mtb.evaluate(emb, labels=lab, dataset="D11_subset", category="vertical",
                        method="PCA", metrics=["ASW"], verbose=False)
     assert set(got["dataset"]) == {"D11_subset"}
@@ -252,8 +252,7 @@ def test_skip_existing_without_a_saved_run_says_so(tmp_path):
         mtb.run("D11", "vertical", out_dir=str(tmp_path / "outs"), methods=["Matilda"],
                     skip_existing=True, verbose=False)
     assert str(e.value) == (
-        f"No saved output of Matilda in {tmp_path / 'outs'} (it would be "
-        f"{tmp_path / 'outs' / 'Matilda_D11'}). Pass the out_dir of the earlier run.")
+        f"No saved output in {tmp_path / 'outs'}. Pass the out_dir of the earlier run.")
 
 
 def test_a_renamed_run_keeps_its_language_chip():
@@ -264,13 +263,18 @@ def test_a_renamed_run_keeps_its_language_chip():
 
 
 # ------------------------------------------- rescore, embedding, export
-def test_rescore_of_a_folder_without_outputs_prints_no_status_line(tmp_path, capsys):
+def test_rescore_of_a_folder_without_outputs_says_so(tmp_path, capsys):
     res = mtb.RunResult([{"method": "Matilda", "status": "RUN_OK", "out_dir":
                             str(tmp_path / "Matilda_D11"), "modalities": ["rna", "adt"]}],
                           "D11", "vertical", out_dir=str(tmp_path))
     with pytest.raises(FileNotFoundError, match="^No method output in "):
         _quiet(res.rescore)
-    assert "[rescore] Matilda ->" not in capsys.readouterr().out
+    # each method still gets its line
+    assert "[rescore] Matilda -> ran" in capsys.readouterr().out
+    # a record without out_dir is looked for where run puts it
+    res.records[0].pop("out_dir")
+    with pytest.raises(FileNotFoundError, match="^No method output in "):
+        _quiet(res.rescore)
 
 
 def test_export_length_errors_name_the_fix(tmp_path):

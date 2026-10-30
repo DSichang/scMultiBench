@@ -158,14 +158,14 @@ def test_a_graph_output(three, tmp_path):
     df, said = _caught(mtb.evaluate, graph, labels=paths, metrics="all", verbose=False)
     assert _values(df)[CODES].isna().all()
     assert [m for m in said if "OCA" in m] == [
-        "OCA, ACA, Spec, Sens and F1 are NaN: scMoMaT writes a graph, not an embedding. "
-        "Pass metrics='clustering'."]
+        "OCA, ACA, Spec, Sens and F1 are NaN: scMoMaT writes a graph, not an embedding, so it "
+        "has no classification scores. Pass metrics='clustering'."]
     # cells x cells, by default
     df, said = _caught(mtb.evaluate, np.eye(90), labels=paths, verbose=False)
     assert _values(df)[CODES].isna().all()
     assert [m for m in said if "OCA" in m] == [
-        "OCA, ACA, Spec, Sens and F1 are NaN: output is a graph, not an embedding. "
-        "Pass metrics='clustering'."]
+        "OCA, ACA, Spec, Sens and F1 are NaN: output is a graph, not an embedding, so it "
+        "has no classification scores. Pass metrics='clustering'."]
 
 
 def _knn(n=90, k=20, seed=0):
@@ -187,8 +187,8 @@ def test_every_form_of_a_graph_output_is_treated_alike(three, tmp_path):
         df, said = _caught(mtb.evaluate, output, labels=paths, verbose=False)
         assert _values(df)[CODES].isna().all()
         assert [m for m in said if "OCA" in m] == [
-            f"OCA, ACA, Spec, Sens and F1 are NaN: {who}, not an embedding. "
-            f"Pass metrics='clustering'."]
+            f"OCA, ACA, Spec, Sens and F1 are NaN: {who}, not an embedding, so it has "
+            f"no classification scores. Pass metrics='clustering'."]
         with pytest.raises(ValueError) as e:
             mtb.evaluate(output, labels=paths, metrics=["OCA", "ARI"])
         assert str(e.value) == (f"{who}, not an embedding, so it has no classification "

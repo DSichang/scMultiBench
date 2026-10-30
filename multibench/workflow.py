@@ -1616,7 +1616,7 @@ class RunResult:
             status ``ran``, and ``reason`` says why.
         ValueError
             ``labels`` or ``batch`` holds ids that are not cells of the dataset,
-            or a cell has no batch.
+            or a cell has no batch or no label (also in the label files).
 
         Warns
         -----
@@ -1632,135 +1632,134 @@ class RunResult:
         mtb.evaluate : the scoring function applied per record.
         RunResult.save : persist the re-scored result.
         """
+        import copy
         with warnings.catch_warnings():
             # load_run chose the data folder: no note on a same-named one here
             warnings.filterwarnings("ignore", message=r"Using .*; \./.* also exists")
-            return self._rescore(batch=batch, labels=labels, metrics=metrics,
-                                 verbose=verbose)
-
-    def _rescore(self, *, batch, labels, metrics, verbose) -> "RunResult":
-        """:meth:`rescore`, without the note on a same-named folder here."""
-        import copy
-        new = RunResult([], self.dataset, self.category, out_dir=self.out_dir)
-        found = [_dataset_root(r, self.dataset) for r in self.records]
-        roots = [root for root, _ in found]
-        tried: dict = {}           # the roots searched, named when the folder is not found
-        for root, r in zip(roots, self.records):
-            tried.setdefault(root, _root_tries(r))
-        # labels and batch per data folder, before any record is scored: ids
-        # that are not cells of the dataset raise here
-        labels_at: dict = {}
-        batch_at: dict = {}
-        used = dict.fromkeys(root for root, r in zip(roots, self.records)
-                             if _status(r.get("status")) != "skipped")
-        for root in used:
-            if labels is not None:
-                labels_at[root] = _cell_vector(labels, self.dataset, root, what="labels",
-                                               order=_ROWS, moved=True,
-                                               tried=tried[root])
-            # a batch vector follows labels given in embedding row order
-            rows = labels is not None and not labels_at[root][1]
-            if batch is not None:
-                vec, by_cell = _cell_vector(batch, self.dataset, root, what="batch",
-                                            order=_ROWS if rows else None,
-                                            moved=True, tried=tried[root])
-                _check_batch(vec, self.dataset)
-                bad = not rows and not by_cell and _batch_length_problem(
-                    [(r.get("method"), r.get("modalities")) for r in self.records
-                     if _scorable(r)], vec, self.dataset, self.category, root)
-                if bad:
-                    raise ValueError(bad)
-                # saved with the result, unless it follows the embedding rows
-                file = None if rows and not by_cell else _batch_csv(vec, self.dataset, root)
-                batch_at[root] = (vec, by_cell, file)
-        if batch is None and _names_batch_metric(metrics):
-            _warn_unsaved_batch([r for r in self.records if _scorable(r)], self)
-        caveats = {root: _plan_caveats(self.dataset, self.category, root,
-                                       [r.get("method") for r in self.records
-                                        if _scorable(r)])
-                   for root in used}
-        no_output = []             # records whose saved output is not found
-        for r, (root, ok) in zip(self.records, found):
-            # n_tunable: a field of 0.3 records, stale since
-            rec = copy.deepcopy({k: v for k, v in r.items() if k not in ("_long", "n_tunable")})
-            rec["_long"] = None
-            method = rec.get("method")
-            if not _scorable(rec):
-                new.records.append(rec)
-                continue
-            rec["data_path"] = root
-            if ok and root is not None:
-                rec["data_root"] = root
-            # the plan's caveat as this version words it
-            plan = caveats.get(root)
-            if plan is not None:
-                rec["caveat"] = plan.get((method, tuple(rec.get("modalities") or ())), "")
-            try:
-                mods = rec.get("modalities") or []
-                variant = registry.get(method).select(self.category, set(mods))
-                try:
-                    if not rec.get("out_dir"):
-                        raise FileNotFoundError(
-                            f"The record of {method} has no out_dir, and "
-                            f"{Path(self.out_dir or '.') / f'{method}_{self.dataset}'} "
-                            f"does not exist.")
-                    emb = _load_embedding(Path(rec["out_dir"]), variant)
-                except FileNotFoundError:
-                    no_output.append(method)
-                    raise
-                if emb is None:
-                    rec["status"], rec["note"] = "ran", _RAN_REASON["RUN_OK_NO_EMBEDDING"]
+            new = RunResult([], self.dataset, self.category, out_dir=self.out_dir)
+            found = [_dataset_root(r, self.dataset) for r in self.records]
+            roots = [root for root, _ in found]
+            tried: dict = {}           # the roots searched, named when the folder is not found
+            for root, r in zip(roots, self.records):
+                tried.setdefault(root, _root_tries(r))
+            # labels and batch per data folder, before any record is scored: ids
+            # that are not cells of the dataset raise here
+            labels_at: dict = {}
+            batch_at: dict = {}
+            used = dict.fromkeys(root for root, r in zip(roots, self.records)
+                                 if _status(r.get("status")) != "skipped")
+            for root in used:
+                if labels is not None:
+                    labels_at[root] = _cell_vector(labels, self.dataset, root, what="labels",
+                                                   order=_ROWS, tried=tried[root])
+                    _check_gaps(labels_at[root][0], self.dataset, "labels")
                 else:
-                    label_ids, labels_by_cell = labels_at.get(root, (None, False))
-                    if batch is not None:
-                        batch_ids, batch_by_cell, file = batch_at[root]
-                        rec["batch_file"] = file and file[0]
+                    # a missing label would be scored as one more cell type
+                    unlabelled = _missing_labels_problem(self.dataset, root)
+                    if unlabelled:
+                        raise ValueError(unlabelled)
+                # a batch vector follows labels given in embedding row order
+                rows = labels is not None and not labels_at[root][1]
+                if batch is not None:
+                    vec, by_cell = _cell_vector(batch, self.dataset, root, what="batch",
+                                                order=_ROWS if rows else None,
+                                                tried=tried[root])
+                    _check_gaps(vec, self.dataset)
+                    bad = not rows and not by_cell and _batch_length_problem(
+                        [(r.get("method"), r.get("modalities")) for r in self.records
+                         if _scorable(r)], vec, self.dataset, self.category, root)
+                    if bad:
+                        raise ValueError(bad)
+                    # saved with the result, unless it follows the embedding rows
+                    file = None if rows and not by_cell else _batch_csv(vec, self.dataset, root)
+                    batch_at[root] = (vec, by_cell, file)
+            if batch is None and _names_batch_metric(metrics):
+                _warn_unsaved_batch([r for r in self.records if _scorable(r)], self)
+            caveats = {root: _plan_caveats(self.dataset, self.category, root,
+                                           [r.get("method") for r in self.records
+                                            if _scorable(r)])
+                       for root in used}
+            no_output = []             # records whose saved output is not found
+            for r, (root, ok) in zip(self.records, found):
+                # n_tunable: a field of 0.3 records, stale since
+                rec = copy.deepcopy({k: v for k, v in r.items()
+                                     if k not in ("_long", "n_tunable")})
+                rec["_long"] = None
+                method = rec.get("method")
+                if not _scorable(rec):
+                    new.records.append(rec)
+                    continue
+                rec["data_path"] = root
+                if ok and root is not None:
+                    rec["data_root"] = root
+                # the plan's caveat as this version words it
+                plan = caveats.get(root)
+                if plan is not None:
+                    rec["caveat"] = plan.get((method, tuple(rec.get("modalities") or ())), "")
+                try:
+                    mods = rec.get("modalities") or []
+                    variant = registry.get(method).select(self.category, set(mods))
+                    try:
+                        # a record without out_dir: the folder run names
+                        emb = _load_embedding(Path(rec.get("out_dir") or Path(self.out_dir or ".")
+                                                   / f"{method}_{self.dataset}"), variant)
+                    except FileNotFoundError:
+                        no_output.append(method)
+                        raise
+                    if emb is None:
+                        rec["status"], rec["note"] = "ran", _RAN_REASON["RUN_OK_NO_EMBEDDING"]
                     else:
-                        # the batch run was given, when it is saved
-                        text = self._batch_text(rec.get("batch_file"))
-                        file = text and (rec["batch_file"], text)
-                        batch_ids, batch_by_cell = ((_read_batch_csv(text)["batch"].to_numpy(), True) if text
-                                                    else (None, False))
-                    if file:
-                        new._batches[file[0]] = file[1]
-                    _score_record(rec, emb, self.dataset, self.category, root, variant,
-                                  batch=batch_ids, labels=label_ids, metrics=metrics,
-                                  labels_by_cell=labels_by_cell,
-                                  batch_by_cell=batch_by_cell,
-                                  batch_given=batch is not None,
-                                  on_rank=_rank_line(method) if verbose else None,
-                                  tried=tried[root])
-            except Exception as e:  # noqa: BLE001 - one bad record must not abort the rest
-                _drop_scores(rec)
-                rec["status"] = "ran"
-                rec["error"] = _clip_error(f"{type(e).__name__}: {e}")
-            if verbose and method not in no_output:      # its error says what is missing
-                print(f"[rescore] {method} -> {_status(rec['status'])} {_ari_tail(rec)}".rstrip(),
-                      flush=True)
-            if metrics is not None and batch is None and labels is None \
-                    and rec.get("metrics") and r.get("metrics"):
-                # the named metrics replace theirs; the other scores stay (not
-                # after new batches or labels: they were scored with the old ones)
-                rec["metrics"] = {**r["metrics"], **rec["metrics"]}
-                both = pd.concat([RunResult([r], self.dataset, self.category).long,
-                                  rec["_long"]], ignore_index=True)
-                rec["_long"] = both.drop_duplicates("metric", keep="last").set_index(
-                    "metric").loc[list(dict.fromkeys(both["metric"]))].reset_index()
-            new.records.append(rec)
-        # a saved batch that fits no label order: the batch metrics are gone
-        unused = next((r["note"] for r in new.records
-                       if str(r.get("note") or "").startswith("The saved batch is not used")),
-                      None)
-        if unused:
-            _text.warn(unused, UserWarning)
-        # a tree whose outputs are all gone (moved, or an older layout): nothing
-        # to score, so say so instead of returning a table without scores
-        tried_records = [r for r in new.records if _scorable(r)]
-        if tried_records and len(no_output) == len(tried_records):
-            raise FileNotFoundError(
-                f"No method output in {self.out_dir or '.'}. Load the folder that holds "
-                f"the method folders, or run the methods again.")
-        return new
+                        label_ids, labels_by_cell = labels_at.get(root, (None, False))
+                        if batch is not None:
+                            batch_ids, batch_by_cell, file = batch_at[root]
+                            rec["batch_file"] = file and file[0]
+                        else:
+                            # the batch run was given, when it is saved
+                            text = self._batch_text(rec.get("batch_file"))
+                            file = text and (rec["batch_file"], text)
+                            batch_ids, batch_by_cell = (
+                                (_read_batch_csv(text)["batch"].to_numpy(), True) if text
+                                else (None, False))
+                        if file:
+                            new._batches[file[0]] = file[1]
+                        _score_record(rec, emb, self.dataset, self.category, root, variant,
+                                      batch=batch_ids, labels=label_ids, metrics=metrics,
+                                      labels_by_cell=labels_by_cell,
+                                      batch_by_cell=batch_by_cell,
+                                      batch_given=batch is not None,
+                                      on_rank=_rank_line(method) if verbose else None,
+                                      tried=tried[root])
+                except Exception as e:  # noqa: BLE001 - one bad record must not abort the rest
+                    _drop_scores(rec)
+                    rec["status"] = "ran"
+                    rec["error"] = _clip_error(f"{type(e).__name__}: {e}")
+                if verbose:
+                    print(f"[rescore] {method} -> {_status(rec['status'])} "
+                          f"{_ari_tail(rec)}".rstrip(), flush=True)
+                if metrics is not None and batch is None and labels is None \
+                        and rec.get("metrics") and r.get("metrics"):
+                    # the named metrics replace theirs; the other scores stay (not
+                    # after new batches or labels: they were scored with the old ones)
+                    rec["metrics"] = {**r["metrics"], **rec["metrics"]}
+                    both = pd.concat([RunResult([r], self.dataset, self.category).long,
+                                      rec["_long"]], ignore_index=True)
+                    rec["_long"] = both.drop_duplicates("metric", keep="last").set_index(
+                        "metric").loc[list(dict.fromkeys(both["metric"]))].reset_index()
+                new.records.append(rec)
+            # a saved batch that fits no label order: the batch metrics are gone
+            unused = next((r["note"] for r in new.records
+                           if str(r.get("note") or "").startswith("The saved batch is not used")),
+                          None)
+            if unused:
+                _text.warn(unused, UserWarning)
+            # a tree whose outputs are all gone (moved, or an older layout): nothing
+            # to score, so say so instead of returning a table without scores
+            tried_records = [r for r in new.records if _scorable(r)]
+            if tried_records and len(no_output) == len(tried_records):
+                raise FileNotFoundError(
+                    f"No method output in {self.out_dir or '.'}. Load the folder that holds "
+                    f"the method folders, or run the methods again.")
+            return new
 
     def embedding(self, method: str):
         """The embedding of one method, as an AnnData.
@@ -2049,35 +2048,15 @@ def _error_tail(error, width: int = 200) -> str:
     return "..." + tail
 
 
-def _scan_hint(dataset: str, category: str, *, data_path=None, methods=None,
-               modalities=None, every: bool = False) -> str:
-    """The ``mtb.scan`` call that checks the rows of a ``run`` call, with every
-    non-default argument as the caller gave it. A folder outside the default
-    data path is named by its path, as the docs teach (relative to the working
-    directory when inside it)."""
-    if data_path is not None and (os.path.realpath(data_path)
-                                  != os.path.realpath(config.data_path)):
-        folder = os.path.join(os.fspath(data_path), str(dataset))
-        rel = os.path.relpath(folder)
-        dataset = folder if rel.startswith("..") else rel
-    py = [repr(dataset), repr(category)]
-    if methods:
-        py.append(f"methods={list(methods)}")
-    if modalities:
-        py.append(f"modalities={list(modalities)}")
-    elif every:
-        py.append('modalities="all"')
-    return f"mtb.scan({', '.join(py)})"
-
-
 def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame,
-                              methods, *, data_path=None, modalities=None, others=None,
+                              methods, *, given, modalities=None, others=None,
                               every: bool = False, note: str = "") -> str:
     """The ``ValueError`` text when no requested row can start (run's Notes): one
     line per blocked method with its reason (every named method, else the first 3
-    whose files are in place). Off Linux the platform blocks every row, so a method
-    is listed only for what else blocks it (``others``: each row's blocks besides
-    the platform)."""
+    whose files are in place), then the ``mtb.scan`` call of these arguments
+    (``given``: the dataset as the caller wrote it). Off Linux the platform blocks
+    every row, so a method is listed only for what else blocks it (``others``: each
+    row's blocks besides the platform)."""
     linux_only = envs.linux_only_text()
     platform = bool(linux_only) and not blocked["env_ok"].all()
     why = (others.reindex(blocked.index).fillna("") if platform and others is not None
@@ -2099,9 +2078,14 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
         lines += [f"  {_row_label(r)}: {r['_why']}" for r in shown]
     if note:
         lines.append(note)
-    where = _scan_hint(dataset, category, data_path=data_path, methods=methods,
-                       modalities=modalities, every=every)
-    lines.append(f"{where} says why." + ("" if platform else f" {_DOCTOR}"))
+    py = [repr(os.fspath(given)), repr(category)]
+    if methods:
+        py.append(f"methods={list(methods)}")
+    if modalities:
+        py.append(f"modalities={list(modalities)}")
+    elif every:
+        py.append('modalities="all"')
+    lines.append(f"mtb.scan({', '.join(py)}) says why." + ("" if platform else f" {_DOCTOR}"))
     return "\n".join(lines)
 
 
@@ -2134,10 +2118,6 @@ def _checked_args(category, methods, modalities, params, fn: str) -> tuple:
         methods = [registry.check_method(m) for m in methods]
     _check_params_shape(params, fn)
     params = {registry.check_method(m): v for m, v in (params or {}).items()}
-    stray = [m for m in params if methods is not None and m not in methods]
-    if stray:
-        raise ValueError(f"params names {_and_list(stray)}, which "
-                         f"{'is' if len(stray) == 1 else 'are'} not in methods=.")
     return methods, every, modalities, params
 
 
@@ -2251,11 +2231,11 @@ def _dataset_folder(dataset, data_path) -> Path:
 
 def _root_tries(rec: dict) -> list:
     """The data roots a saved record's dataset is looked up under: the recorded
-    ``data_path`` (``None`` = config's), then ``data_root``."""
+    ``data_path``, then ``data_root``, then config's (``None``)."""
     tries = [rec.get("data_path")]
     if rec.get("data_root"):
         tries.append(rec["data_root"])
-    return tries
+    return tries + [None]
 
 
 def _dataset_root(rec: dict, dataset: str) -> tuple:
@@ -2308,22 +2288,25 @@ def _read_batch_csv(text: str) -> pd.DataFrame:
     return pd.read_csv(io.StringIO(text), dtype=str, keep_default_na=False)
 
 
-def _dataset_cell_ids(dataset, data_path) -> list | None:
-    """The dataset's cell ids in ``labels_for(dataset)`` order (each label file's
-    data-file barcodes); ``None`` when some are missing or ids repeat."""
-    ids: list = []
+def _default_label_files(dataset, data_path) -> list:
+    """The label files of ``labels_for(dataset)``, in that order; ``[]`` when
+    there are none."""
     try:
         with warnings.catch_warnings():       # the default order is meant here
             warnings.simplefilter("ignore", UserWarning)
-            files = _resolve.labels_for(dataset, data_path=data_path)
-        for p in map(Path, files.values()):
-            n = len(_eio.read_labels(p))
-            bars = next((b for b in map(_resolve._barcodes_of, _label_data_files(p))
-                         if b is not None and len(b) == n), None)
-            if bars is None:
-                return None
-            ids.extend(bars)
+            return list(map(Path, _resolve.labels_for(dataset, data_path=data_path).values()))
     except Exception:  # noqa: BLE001 - no readable files: no ids
+        return []
+
+
+def _dataset_cell_ids(dataset, data_path) -> list | None:
+    """The dataset's cell ids in ``labels_for(dataset)`` order (each label file's
+    data-file barcodes); ``None`` when some are missing or ids repeat."""
+    from .eval.pipeline import _raw_barcodes
+    files = _default_label_files(dataset, data_path)
+    try:
+        ids = files and (_raw_barcodes(files) or [None])[0]
+    except Exception:  # noqa: BLE001 - an unreadable label file: no ids
         return None
     return ids if ids and len(set(ids)) == len(ids) else None
 
@@ -2333,23 +2316,23 @@ def _embedding_cell_ids(dataset, data_path) -> list:
     file's barcodes (D28's ``atac_gas.h5`` and ``atac_peak.h5`` differ in
     suffix), as they are and, when they repeat, prefixed by label file as
     :meth:`RunResult.embedding` names them."""
-    folder = _dataset_folder(dataset, data_path)
+    from .eval.pipeline import _raw_barcodes
+    files = _default_label_files(dataset, data_path)
     try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", UserWarning)
-            files = list(map(Path, _resolve.labels_for(dataset, data_path=data_path).values()))
         sizes = [len(_eio.read_labels(p)) for p in files]
-    except Exception:  # noqa: BLE001 - no readable files: no ids
+    except Exception:  # noqa: BLE001 - an unreadable label file: no ids
         return []
-    out = []
-    for read in [()] + [(f.name,) for f in sorted(folder.glob("*.h5"))]:
-        bars = [next((b for b in map(_resolve._barcodes_of, _label_data_files(p, read))
-                      if b is not None and len(b) == n), None) for p, n in zip(files, sizes)]
-        if any(b is None for b in bars):
+    out: list = []
+    if not files:
+        return out
+    for read in [()] + [(f.name,) for f in sorted(_dataset_folder(dataset, data_path)
+                                                  .glob("*.h5"))]:
+        raw = _raw_barcodes(files, sizes, read)
+        if raw is None:
             continue
-        ids = [str(i) for b in bars for i in b]
+        ids, stems = raw
         named = ids if len(set(ids)) == len(ids) else \
-            [f"{p.stem}:{i}" for p, b in zip(files, bars) for i in b]
+            [f"{s}:{i}" for s, i in zip(stems, ids)]
         out += [x for x in (ids, named) if x not in out]
     return out
 
@@ -2359,7 +2342,6 @@ _ROWS = "the embedding rows"
 
 
 def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | None = None,
-                 moved: bool = False,
                  tried=None) -> tuple[np.ndarray, bool]:
     """``(x per cell, aligned by id)``: an id-carrying Series, DataFrame or CSV in
     ``labels_for`` order."""
@@ -2368,10 +2350,9 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
         own_batches_only(dataset)
     order = order or f"the order of the label files of {dataset}"
     folder = _dataset_folder(dataset, data_path)
-    if not folder.is_dir():
-        why = _folder_missing(dataset, tried or [data_path])
-        fix = _MOVED_FIX if moved else f"Check that it follows {order}."
-        no_ids = f"{why}. {fix[:-1]}" if moved else why
+    if not folder.is_dir():      # only rescore: run's scan checked the folder
+        why, fix = _folder_missing(dataset, tried or [data_path]), _MOVED_FIX
+        no_ids = f"{why}. {fix[:-1]}"
     else:
         why = (f"the files of {dataset} have no usable cell ids (missing or "
                f"repeated barcodes)")
@@ -2404,34 +2385,8 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
         _text.warn(f"The {what} {type(x).__name__} is matched by position, because "
                      f"{why}. {fix}", UserWarning)
         return vals, False
-    if list(index) == ids:
-        return vals, True
-    # to_numpy() is right only for a vector already in that order
-    by_position = (f"pass {what}.to_numpy() only when {what} "
-                   + (f"already follows {order}" if order == _ROWS
-                      else f"is already in {order}"))
-    if not index.is_unique:
-        dup = index[index.duplicated()]
-        raise ValueError(f"{what}: the index repeats {_eio._n_ids(len(dup))} (first: "
-                         f"{list(dup[:3])}), so it cannot be aligned to the cells of "
-                         f"{dataset}. Give each cell one id, or {by_position}.")
-    foreign = index.difference(pd.Index(ids), sort=False)
-    missing = pd.Index(ids).difference(index, sort=False)
-    if len(foreign) and len(missing):
-        from .engine.ingest import suffix_fix
-        fix = suffix_fix(what, ids, list(index)) if len(foreign) == len(index) else ""
-        if fix:
-            raise ValueError(f"{what}: its ids are not cells of {dataset}.{fix}")
-        raise ValueError(f"{what}: {_eio._n_ids(len(foreign))} "
-                         f"{'is not a cell' if len(foreign) == 1 else 'are not cells'} "
-                         f"of {dataset} (first: {list(foreign[:3])}). Rename the index "
-                         f"to the dataset's barcodes, or {by_position}.")
-    if len(missing):
-        unit = "a batch id" if what == "batch" else "a label"
-        raise ValueError(f"{what}: {len(missing):,} of the {len(ids):,} cells of {dataset} "
-                         f"have no id in {what} (first: {list(missing[:3])}). Give "
-                         f"{unit} for every cell.")
-    return np.asarray(pd.Series(vals, index=index).reindex(ids).to_numpy()), True
+    return _eio._align_vector(pd.Series(vals, index=index), ids, what=what,
+                              target=dataset), True
 
 
 def _has_gap(values) -> bool:
@@ -2439,21 +2394,22 @@ def _has_gap(values) -> bool:
     return bool(_eio.missing_mask(pd.unique(np.asarray(values, dtype=object))).any())
 
 
-def _check_batch(vec, dataset: str) -> None:
-    """``ValueError`` when the batch vector has a cell without a batch."""
+def _check_gaps(vec, dataset: str, what: str = "batch") -> None:
+    """``ValueError`` when the ``batch`` or ``labels`` vector has a cell without one."""
     if not _has_gap(vec):
         return
     miss = _eio.missing_mask(vec)
+    one = "batch" if what == "batch" else "label"
     raise ValueError(
-        f"batch: {int(miss.sum()):,} of the "
-        f"{len(miss):,} cells of {dataset} have no batch{_eio._missing_example(vec)}. "
-        f"Give every cell a batch.")
+        f"{what}: {int(miss.sum()):,} of the "
+        f"{len(miss):,} cells of {dataset} have no {one}{_eio._missing_example(vec)}. "
+        f"Give every cell a {one}.")
 
 
 def _batch_vector(batch, dataset, data_path) -> np.ndarray:
     """``batch`` as one id per cell (:func:`_cell_vector`), checked for gaps."""
     vec = _cell_vector(batch, dataset, data_path, what="batch")[0]
-    _check_batch(vec, dataset)
+    _check_gaps(vec, dataset)
     return vec
 
 
@@ -2474,43 +2430,29 @@ def _label_gaps(dataset, data_path) -> dict:
     return gaps
 
 
-def _missing_labels_problem(dataset: str, data_path, rows: "pd.DataFrame",
-                            private: "pd.DataFrame", *, evaluate: bool) -> str:
-    """Why ``run`` does not start on label files with a missing label, or "".
-    Without ``evaluate`` only the ``rows`` that read such a file as an input stop it."""
+def _missing_labels_problem(dataset: str, data_path, rows: "pd.DataFrame | None" = None,
+                            private: "pd.DataFrame | None" = None, *,
+                            evaluate: bool = True) -> str:
+    """Why ``run`` or ``rescore`` does not start on label files with a missing
+    label, or "". Without ``evaluate`` only the ``rows`` that read such a file as
+    an input stop it."""
     gaps = _label_gaps(dataset, data_path)
-    # the methods that read a label file with a gap as an input, with those files
-    readers = {m: [n for n in private.at[i, "_label_inputs"] if n in gaps]
-               for i, m in rows["method"].items()}
-    readers = {m: read for m, read in readers.items() if read}
-    if not gaps or not (evaluate or readers):
+    if not gaps:
         return ""
     who = ""
     if not evaluate:
+        # the methods that read a label file with a gap as an input, with those files
+        readers = {m: [n for n in private.at[i, "_label_inputs"] if n in gaps]
+                   for i, m in rows["method"].items()}
+        readers = {m: read for m, read in readers.items() if read}
+        if not readers:
+            return ""
         who = f", and {next(iter(readers))} reads the label files"
         gaps = {k: g for k, g in gaps.items() if k in set().union(*readers.values())}
     name, (n, total, shown) = next(iter(gaps.items()))
     return (f"{name} of {dataset} has {n:,} of {total:,} cells without a label"
             f"{_eio._missing_example(shown)}{who}. Write the folder again with a label for "
             f"every cell.")
-
-
-def _unlabelled_error(cands, dataset, data_path, *, user: bool) -> str | None:
-    """The ``error`` of a record whose candidate labels have a gap, or ``None``;
-    ``user``: the labels came from the caller."""
-    for names, lab, _ in cands:
-        if not _has_gap(lab):
-            continue
-        miss, shown, files = _eio.missing_mask(lab), lab, "the labels you passed"
-        if not user:
-            folder = _dataset_folder(dataset, data_path)
-            files = _and_list(names)
-            shown = np.concatenate([np.asarray(_eio.read_labels(folder / k), dtype=object)
-                                    for k in names])
-        return (f"ValueError: {int(miss.sum()):,} of the {len(miss):,} labels in {files} "
-                f"are missing{_eio._missing_example(shown)}. Give every cell a label, then "
-                f"score again.")
-    return None
 
 
 def _inputs_on_disk(row, dataset, data_path) -> bool:
@@ -2630,8 +2572,8 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
     rec["emb_shape"] = list(emb.shape)
     embedding = variant.output.kind == "embedding"
     if not embedding and _without_classification(metrics, True) is None:
-        from .eval.classify import _graph_text
-        raise ValueError(_graph_text(rec.get("method")) + " Pass metrics='clustering'.")
+        from .eval.pipeline import _classification_error
+        raise ValueError(_classification_error(metrics, "graph", rec.get("method")))
     n = emb.shape[0]
     rows = labels is not None and not labels_by_cell      # labels in embedding row order
     segments = None
@@ -2700,11 +2642,6 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
         if not _dataset_folder(dataset, data_path).is_dir():
             why = _folder_missing(dataset, tried or [data_path])
             rec["note"] = f"{why[:1].upper()}{why[1:]}. {_MOVED_FIX}"
-        return rec
-    # not inside the ranking: it would take the error of each order and rank on
-    unlabelled = _unlabelled_error(cands, dataset, data_path, user=labels is not None)
-    if unlabelled:
-        rec["status"], rec["error"] = "ran", unlabelled
         return rec
     names, val, spread = _evaluate_best_order(emb, category, cands, metrics=metrics,
                                               user_batch=batch is not None,
@@ -2794,7 +2731,8 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
         of another dataset or category, or a ``batch`` that does not fit the
         cells; checked before anything runs.
     KeyError
-        Unknown method id, or a ``params`` key the method does not accept.
+        Unknown method id. A ``params`` key the method does not accept fails
+        that method (status ``failed``).
 
     Examples
     --------
@@ -2803,10 +2741,8 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
     >>> res = mtb.run("D11", "vertical", out_dir="out/", methods=["Matilda"],
     ...               params={"Matilda": {"epochs": 10}})
     """
+    given = dataset
     dataset, data_path = _resolve.split_dataset(dataset, None)
-    if not isinstance(out_dir, (str, os.PathLike)):
-        raise TypeError(f"out_dir must be a folder path, such as out_dir='out/'; "
-                        f"got {out_dir!r}.")
     out_dir = Path(out_dir).expanduser()
     # the arguments first, so a bad combination is not reported as an I/O error
     methods, every, modalities, params = _checked_args(category, methods, modalities,
@@ -2840,16 +2776,12 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
     blocked = plan_df[~plan_df["runnable"]]
     plan_df = plan_df[plan_df["runnable"]]
     if plan_df.empty and skip_existing:
-        first = blocked.iloc[0]["method"]
-        raise ValueError(
-            f"No saved output of {_and_list(dict.fromkeys(blocked['method']))} in {out_dir} "
-            f"(it would be {out_dir / f'{first}_{dataset}'}). Pass the out_dir of the "
-            "earlier run.")
+        raise ValueError(f"No saved output in {out_dir}. Pass the out_dir of the earlier run.")
     if plan_df.empty:
         # not one method could start: the request is wrong, and an empty result
         # would read "0 failed", as success
         raise ValueError(_nothing_runnable_message(
-            dataset, category, blocked, methods, data_path=data_path,
+            dataset, category, blocked, methods, given=given,
             modalities=modalities, others=private["_other"], every=every,
             note="" if methods else not_listed))
     if modalities is None:
@@ -2906,9 +2838,8 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
             # a saved run is scored again, as rescore does: its record is kept,
             # with its folder as found from here
             rec = (RunResult([dict(saved, out_dir=str(method_dir))], dataset, category,
-                               out_dir)._rescore(
-                batch=batch, labels=None, metrics=None, verbose=False).records[0]
-                if evaluate else dict(saved))
+                             out_dir).rescore(batch=batch, verbose=False).records[0]
+                   if evaluate else dict(saved))
             rec["reused"] = True
             if variant.output.kind == "embedding" and rec.get("emb_shape"):
                 _write_cell_names(rec, output, dataset, category, data_path)
@@ -2926,10 +2857,7 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
                 inputs = _resolve.inputs_for(dataset, category, method, modalities=mods or None,
                                              data_path=data_path, check=True)
                 reused = skip_existing and output.exists()
-                # on every path, also a reuse: an unknown key must fail, not be dropped
                 overrides = params.get(method)
-                if overrides:
-                    _runner.check_params(method, variant, overrides)
                 if reused:
                     if verbose:
                         print(f"[run]   reusing existing output in {method_dir}", flush=True)

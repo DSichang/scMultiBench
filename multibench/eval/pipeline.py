@@ -128,34 +128,17 @@ def _obs_choices(adata) -> list[str]:
     return names
 
 
-class _Table:
-    """A ``.csv`` / ``.tsv`` embedding whose first column gave the cell ids: its
-    file name, and the arguments put in its row order (``moved``)."""
-
-    def __init__(self, name: str):
-        self.name, self.moved = name, []
-
-
 def _read_output(output, obsm, what: str):
-    """``(emb, ids, adata, table)`` of an embedding argument: the matrix, its
-    cell ids, the AnnData it is (else ``None``) and the :class:`_Table` of a
-    ``.csv`` / ``.tsv`` with ids. ``what`` names a missing file."""
+    """``(emb, ids, adata)`` of an embedding argument: the matrix, its cell ids
+    and the AnnData it is (else ``None``). ``what`` names a missing file."""
     if isinstance(output, (str, Path)) and Path(output).suffix.lower() == ".h5ad":
         output = io._read_h5ad(output, what)   # once; keeps obs_names, obs
     adata = output if io._is_anndata(output) else None
     if not (isinstance(output, (str, Path)) and Path(output).suffix.lower() in {".csv", ".tsv"}):
         ids = _cell_ids(output)
-        return np.asarray(io.as_matrix(output, obsm=obsm, what=what)), ids, adata, None
-    file = io._require_file(output, what)
-    emb, ids = io._read_csv_embedding(file)
-    return emb, ids, adata, None if ids is None else _Table(file.name)
-
-
-def _reordered(keys, ids) -> bool:
-    """Whether the cell ids ``keys`` of an argument name cells of ``ids`` in
-    another order (for the line that says so)."""
-    keys, ids = pd.Index([str(k) for k in keys]), pd.Index([str(i) for i in ids])
-    return bool(keys.isin(ids).any()) and not keys.equals(ids)
+        return np.asarray(io.as_matrix(output, obsm=obsm, what=what)), ids, adata
+    emb, ids = io._read_csv_embedding(io._require_file(output, what))
+    return emb, ids, adata
 
 
 def _file_carries_ids(first, ids) -> bool:
@@ -166,14 +149,12 @@ def _file_carries_ids(first, ids) -> bool:
     return bool(first.is_unique or pd.Index(first.astype(str)).isin(ids).any())
 
 
-def _obs_or_vector(x, adata, *, what, column=None, ids=None, table=None, read=(),
-                   others=None):
+def _obs_or_vector(x, adata, *, what, column=None, ids=None, read=(), others=None):
     """One label-like argument as a 1-D array in the output's cell order: an obs
     column, a Series aligned by id, a file aligned by its id column, else by position.
 
-    ``table`` (a ``.csv`` embedding's barcodes) collects the arguments put in
-    its row order; ``read`` and ``others`` name the files whose barcodes name
-    the cells (:func:`_folder_ids`).
+    ``read`` and ``others`` name the files whose barcodes name the cells
+    (:func:`_folder_ids`).
     """
     if adata is not None and isinstance(x, str):
         col = _obs_column_name(x, adata)
@@ -194,9 +175,6 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, table=None, read=()
         vals, first = io.read_labels_ids(x, what=what)
         unique = ids is not None and pd.Index(ids).is_unique
         name = Path(x).name
-        if table is not None and unique and _file_carries_ids(first, ids) \
-                and _reordered(first, ids):
-            table.moved.append(name)
         if what == "labels" and first is None and _has_cell_ids(ids):
             # no ids: the dataset folder's matrix names the cells
             first = _folder_ids([x], [len(vals)], ids, read, others)
@@ -210,10 +188,6 @@ def _obs_or_vector(x, adata, *, what, column=None, ids=None, table=None, read=()
             no_ids=_no_ids(ids))[0]
     if _carries_ids(x):
         if ids is not None:
-            name = f"the {what} {type(x).__name__}"
-            if table is not None and x.index.is_unique and pd.Index(ids).is_unique \
-                    and _reordered(x.index, ids):
-                table.moved.append(name)
             return io._align_vector(x, ids, what=what, column=column)
         _text.warn(
             f"The {what} {type(x).__name__} is matched by position: the embedding has no "
@@ -248,24 +222,17 @@ def _file_barcodes(files, counts=None, read=()):
 def _raw_barcodes(files, counts=None, read=()):
     """``(barcodes, label file stem of each)`` of :func:`_file_barcodes`, the
     barcodes as the matrices write them; ``None`` when a file has no matrix."""
-    import h5py
+    from ..engine.resolve import _barcodes_of
     from ..workflow import _label_data_files      # workflow imports this module
     out, stems = [], []
     for i, f in enumerate(files):
         n = counts[i] if counts is not None else len(io.read_labels(f))
-        for m in (x for x in _label_data_files(Path(f), read) if x.is_file()):
-            try:
-                with h5py.File(m, "r") as h:
-                    bars = [b.decode() if isinstance(b, bytes) else str(b)
-                            for b in h["matrix/barcodes"][:]]
-            except (OSError, KeyError):
-                continue
-            if len(bars) == n:
-                out += bars
-                stems += [Path(f).stem] * n
-                break
-        else:
+        bars = next((b for b in map(_barcodes_of, _label_data_files(Path(f), read))
+                     if b is not None and len(b) == n), None)
+        if bars is None:
             return None
+        out += [str(b) for b in bars]
+        stems += [Path(f).stem] * n
     return out, stems
 
 
@@ -275,8 +242,8 @@ def _folder_ids(files, counts, ids, read=(), others=None):
     folder does not name its cells. The files a method read (``read``) name the
     cells first, as ``RunResult.embedding`` names them, then the folder's
     default files. Any other ids raise: by position, the labels would be a
-    guess. ``others()``: ``{read files: [package methods]}`` of the dataset,
-    to name the method whose output names the cells so."""
+    guess. ``others()``: the file sets the dataset's package methods read,
+    whose barcodes may name the cells (scJoint's ATAC cells by ``atac_gas.h5``)."""
     ids = [str(i) for i in ids]
     reads = list(dict.fromkeys((frozenset(read), frozenset())))
     found = [k for k in (_file_barcodes(files, counts, r) for r in reads) if k is not None]
@@ -284,9 +251,7 @@ def _folder_ids(files, counts, ids, read=(), others=None):
     for keys in found:
         if unique and set(ids) <= set(keys):
             return keys
-    # the names of the files another package method reads (a run's embedding.h5
-    # of scJoint names its ATAC cells by atac_gas.h5)
-    for r in (others() if others and unique else {}):
+    for r in (others() if others and unique else ()):
         keys = _file_barcodes(files, counts, r)
         if keys is not None and set(ids) <= set(keys):
             return keys
@@ -307,12 +272,11 @@ def _folder_ids_error(files, counts, ids, reads, found, others) -> str:
     if dup is not None:
         head = f"The embedding repeats cell ids, such as {dup!r}"
     elif len(miss) == len(ids):
-        head = f"None of the embedding's cell ids is a cell of {names}, such as {miss[0]!r}"
+        head = f"The embedding's cell ids are not the cell names of {names}, such as {miss[0]!r}"
     else:
-        head = (f"{len(miss):,} of the embedding's {len(ids):,} cell ids are not cells of "
-                f"{names}, such as {miss[0]!r}")
-    other = others() if others else {}
-    for read in dict.fromkeys([*reads, *other]):
+        head = (f"{len(miss):,} of the embedding's {len(ids):,} cell ids are not the cell "
+                f"names of {names}, such as {miss[0]!r}")
+    for read in dict.fromkeys([*reads, *(others() if others else ())]):
         raw = _raw_barcodes(files, counts, read)
         if raw is not None and len(raw[0]) == len(ids) and list(raw[0]) == ids:
             return (f"{head}. The cells are in the folder's order: pass the embedding as "
@@ -326,7 +290,7 @@ def _no_ids(ids) -> str:
             else "the embedding has no cell ids")
 
 
-def _stack_label_files(files, ids, table=None, read=(), others=None):
+def _stack_label_files(files, ids, read=(), others=None):
     """Several label files, stacked in order, and each row's file (1, 2, ...).
 
     When every file has a first column of cell ids, the rows are aligned to
@@ -343,9 +307,6 @@ def _stack_label_files(files, ids, table=None, read=(), others=None):
     if all(first is not None for _, first in rows):
         name = _and_list(names)
         keys = pd.concat([first for _, first in rows], ignore_index=True)
-        if table is not None and unique and _file_carries_ids(keys, ids) \
-                and _reordered(keys, ids):
-            table.moved.extend(names)
         pos, _ = io.by_id_column(np.arange(len(vals)), keys, ids if unique else None,
                                  what="labels", name=name, target="the embedding",
                                  order=order, no_ids=_no_ids(ids))
@@ -468,7 +429,8 @@ def _count_error(what: str, n: int, n_cells: int, cells: _Cells | None = None) -
     ``cells``: the labels are the label files of a dataset folder."""
     if cells is not None and what == "labels":
         fix = (f"Check that the embedding is the one of method= on {cells.dataset}."
-               if cells.method else "For other cells, pass a dataset name of your own.")
+               if cells.method else "For other cells, pass labels= and another name, "
+               f"such as dataset='{cells.dataset}_subset'.")
         return (f"The label files of {cells.dataset} hold {_n(n, 'cell')}; the embedding "
                 f"has {_n(n_cells, 'row')}. {fix}")
     one = {"labels": "label", "clusters": "cluster id", "batch": "batch"}[what]
@@ -542,8 +504,8 @@ def _classification_reason(why: str, what: str = "output") -> str:
     """Why the classification codes cannot be computed, and the fix: ``why`` is
     ``"no batch"``, ``"one batch"``, ``"graph"`` or ``"none scored"``."""
     if why == "graph":
-        who = "output is" if what == "output" else f"{what} writes"
-        return f"{who} a graph, not an embedding. Pass metrics='clustering'."
+        from .classify import _graph_text
+        return _graph_text(what) + " Pass metrics='clustering'."
     if why == "none scored":
         return "no batch has two cell types that another batch has. Check labels and batch."
     if why == "one batch":
@@ -553,10 +515,9 @@ def _classification_reason(why: str, what: str = "output") -> str:
 
 def _classification_error(metrics, why: str, what: str = "output") -> str:
     """evaluate()'s error when the codes ``metrics=`` names cannot be computed."""
-    if why == "graph":
-        from .classify import _graph_text
-        return _graph_text(what) + " Pass metrics='clustering'."
-    return f"{_metrics_spelling(metrics)} cannot be computed: {_classification_reason(why, what)}"
+    reason = _classification_reason(why, what)
+    return reason if why == "graph" else \
+        f"{_metrics_spelling(metrics)} cannot be computed: {reason}"
 
 
 def _classification_scores(request, emb, ct, cb, *, category, graph, metrics):
@@ -661,8 +622,7 @@ def evaluate(embedding, labels=None, *, dataset: str | None = None,
         ``.obsm`` key of an AnnData, MuData or ``.h5ad`` embedding; ``'X'``
         means ``.X``. ``None`` = ``X_emb``.
     verbose : bool
-        Print a line when the Leiden search starts on more than 2,000 cells
-        or labels are matched by barcode.
+        Print a line when the Leiden search starts on more than 2,000 cells.
 
     Returns
     -------
@@ -687,8 +647,6 @@ def evaluate(embedding, labels=None, *, dataset: str | None = None,
     >>> mtb.evaluate(adata, labels="celltype", batch="sample", obsm="X_pca",
     ...              method="PCA")
     """
-    if not isinstance(method, str) or not method.strip():
-        raise TypeError(f"method= takes a name, such as method='Matilda'; got {method!r}.")
     if isinstance(embedding, (str, Path)):
         embedding = Path(embedding).expanduser()
     name = cells = None
@@ -803,18 +761,14 @@ def _expected_cells(dataset, category, method, data_path, read, *,
                   data_path)
 
 
-def _method_reads(cells: _Cells, category) -> dict:
-    """``{names of the files read: [package methods]}`` of the methods of
-    ``category`` on ``cells.dataset``; for an error that names the method whose
-    output an embedding's cell names come from."""
+def _method_reads(cells: _Cells, category) -> list:
+    """The sets of file names the package methods of ``category`` read from
+    ``cells.dataset``, whose barcodes may name an embedding's cells."""
     from ..engine.registry import list_methods
     from ..workflow import _method_files
-    out: dict = {}
-    for m in list_methods(category=category) if category else ():
-        read = frozenset(_method_files(cells.dataset, category, m, None, cells.data_path))
-        if read:
-            out.setdefault(read, []).append(m)
-    return out
+    reads = (frozenset(_method_files(cells.dataset, category, m, None, cells.data_path))
+             for m in (list_methods(category=category) if category else ()))
+    return list(dict.fromkeys(r for r in reads if r))
 
 
 def _dataset_labels(dataset, category, method, data_path):
@@ -828,18 +782,12 @@ def _dataset_labels(dataset, category, method, data_path):
     if own is not None and category is None:
         raise ValueError(f"evaluate(dataset={dataset!r}, method={method!r}) needs category= "
                          f"to read {own}'s cell order: {_and_list(cats, 'or')}.")
-    own_fix = " For your own embedding, pass the label files as labels=."
     if own is not None and category not in cats:
         from ..engine.schema import no_category_message
-        raise ValueError(no_category_message(own, cats, category) + own_fix)
+        raise ValueError(no_category_message(own, cats, category))
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message=resolve.DEFAULT_ORDER_WARNING)
-        try:
-            labels = resolve.labels_for(dataset, category, own, data_path=data_path)
-        except KeyError as e:
-            if own is None or not e.args:
-                raise
-            raise KeyError(str(e.args[0]) + own_fix) from None
+        labels = resolve.labels_for(dataset, category, own, data_path=data_path)
     if not labels:
         raise ValueError(f"{dataset} has no label file. Pass labels=.")
     near = registry.closest_method(method) if own is None and category else None
@@ -871,16 +819,16 @@ def _check_finite(emb) -> None:
             f"embedding and the labels.")
 
 
-def _cell_labels(labels, emb, adata, ids, table, read=(), others=None):
+def _cell_labels(labels, emb, adata, ids, read=(), others=None):
     """``(emb, labels, origin)``: the labels in the cell order of the embedding,
     the label file of each cell (``None`` unless several files give them), and
     the embedding as cells x dims (many run outputs are dims x cells; the label
     count says which axis holds the cells)."""
     if io._is_label_path_list(labels):
-        ct, origin = _stack_label_files(labels, ids, table=table, read=read, others=others)
+        ct, origin = _stack_label_files(labels, ids, read=read, others=others)
     else:
-        ct, origin = _obs_or_vector(labels, adata, what="labels", ids=ids, table=table,
-                                    read=read, others=others), None
+        ct, origin = _obs_or_vector(labels, adata, what="labels", ids=ids, read=read,
+                                    others=others), None
     if emb.ndim == 2 and emb.shape[0] != len(ct) and emb.shape[1] == len(ct):
         emb = emb.T
     return emb, ct, origin
@@ -912,7 +860,7 @@ def _scores(
     if want_cls:
         from .classify import _graph_writer
         graph = _graph_writer(embedding)           # a file only graph methods write
-    emb, ids, adata, table = _read_output(embedding, obsm, "embedding")
+    emb, ids, adata = _read_output(embedding, obsm, "embedding")
     if cells is not None and cells.moved and not _follows_cells(labels, adata, cells):
         stems = ", ".join(cells.moved)
         raise ValueError(
@@ -923,11 +871,11 @@ def _scores(
     # the files whose barcodes name the cells: the method's, else the folder's default
     read = cells.read if cells is not None else ()
     others = (lambda: _method_reads(cells, category)) if cells is not None else None
-    if ids is None and table is None and cells is not None:
+    if ids is None and cells is not None:
         # an embedding without ids holds the dataset's cells in the method's order
         lab_ids, ba_ids = (_cells_ids(cells, emb.shape) if _gives_ids(x, adata) else None
                            for x in (labels, batch))
-    emb, ct, origin = _cell_labels(labels, emb, adata, lab_ids, table, read, others)
+    emb, ct, origin = _cell_labels(labels, emb, adata, lab_ids, read, others)
     _check_finite(emb)
     if want_cls and not graph:
         from .classify import _is_neighbour_index
@@ -936,8 +884,7 @@ def _scores(
     # the clusters of run's label-order screening, an array in the embedding's rows
     cl = None if clusters is None else np.asarray(clusters)
     if batch is not None:
-        ba = _obs_or_vector(batch, adata, what="batch", ids=ba_ids, table=table,
-                            read=read)
+        ba = _obs_or_vector(batch, adata, what="batch", ids=ba_ids, read=read)
     elif batch_from_files and group in {"batch", "all"}:
         # the label file of each cell (1, 2, ...), as run
         ba = origin
@@ -950,12 +897,6 @@ def _scores(
         sides = category == "diagonal" and origin is not None and len(set(origin)) > 1
         cb = _origin_names(labels, origin) if batch_from_files or sides else \
             ba if batch is not None else None
-    if verbose and table is not None and table.moved:
-        import sys
-        moved = table.moved[0] + (f" and {len(table.moved) - 1} more"
-                                  if len(table.moved) > 1 else "")
-        print(f"evaluate: matched {moved} to the rows of {table.name} by barcode.",
-              file=sys.stderr, flush=True)
 
     n_cells = emb.shape[0]
     if cells is not None and cells.whole:

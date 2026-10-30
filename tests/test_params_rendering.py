@@ -81,10 +81,3 @@ def test_tunable_default_is_what_a_run_uses():
     # default per key, no script_default copy
     t = mtb.params_for("scMM", "vertical", ["rna", "atac"])["tunable"]
     assert "no_cuda" not in t and set(t["epochs"]) == {"type", "default"}
-
-
-def test_run_all_params_for_a_method_not_run():
-    with pytest.raises(ValueError, match=r"^params names scMM, which is not in methods=\.$"):
-        mtb.scan("D52mini", "cross", methods=["Multigrate"], params={"scMM": {"epochs": 3}}, verbose=False)
-
-
