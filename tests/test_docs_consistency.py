@@ -862,7 +862,8 @@ def test_get_started_pages_keep_the_round2_facts():
     assert re.search(r"^    cell order\n    :   ", quick, re.M)
     assert '=== "Unpaired RNA + ATAC"' not in quick
     install = (docs / "installation.md").read_text()
-    for fact in ("multibench-sc>=0.4.0", "assume_gpu=True", "sbatch --gres=gpu:1 job.sh scMoMaT"):
+    import multibench as mtb
+    for fact in (f"multibench-sc>={mtb.__version__}", "assume_gpu=True", "sbatch --gres=gpu:1 job.sh scMoMaT"):
         assert fact in install, fact
     assert "#SBATCH --gres" not in install
 
