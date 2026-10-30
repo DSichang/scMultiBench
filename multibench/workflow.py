@@ -1100,7 +1100,12 @@ def _label_inputs(inputs: dict, variant, label_files: dict) -> tuple:
 def _label_candidates(dataset, n, data_path=None):
     """``[(file names, labels, batch per cell)]``: every label ordering of ``n``
     cells; length alone cannot pick one. The batch is each cell's label file."""
-    by_file = {p.name: _eio.read_labels(p) for p in _label_files(dataset, data_path)}
+    by_file = {}
+    for p in _label_files(dataset, data_path):
+        try:
+            by_file[p.name] = _eio.read_labels(p)
+        except Exception as e:  # noqa: BLE001 - say which file
+            raise ValueError(f"{p} cannot be read: {e}") from e
     cands = [([k], v) for k, v in by_file.items()]
     rna = [k for k in by_file if k.startswith("rna_cty")]
     atac = [k for k in by_file if k.startswith("atac_cty")]
