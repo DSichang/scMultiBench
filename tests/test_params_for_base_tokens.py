@@ -26,5 +26,5 @@ def test_several_variants_of_those_tokens_answer_together():
 
 
 def test_tokens_no_variant_reads_still_raise():
-    with pytest.raises(KeyError, match="no variant"):
+    with pytest.raises(KeyError, match="No vertical variant of totalVI reads atac"):
         mtb.params_for("totalVI", "vertical", ["atac"])

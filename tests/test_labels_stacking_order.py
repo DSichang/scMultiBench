@@ -145,23 +145,58 @@ def test_reference_first_is_derived_from_the_reference_const():
     assert v.stacked_roles()[1:3] == ["rna1", "adt1"]
 
 
+def _cell_order_problems(v) -> list[str]:
+    """What a variant's ``cell_order`` declares that it cannot honour."""
+    from multibench.engine.schema import _batch_of, is_label_role
+    mods = [r for r in v.roles() if not is_label_role(r) and r != "data_dir"]
+    order = v.output.cell_order
+    if order is None:
+        return []
+    if isinstance(order, list):
+        return ([f"{r} is not an input role" for r in order if r not in mods]
+                + (["a role is named twice"] if len(set(order)) != len(order) else []))
+    if order != "reference_first":
+        return [f"unknown cell_order {order!r}"]
+    refs = [a for a in v.args if a.role == "reference" and a.const]
+    if len(refs) != 1 or v.reference_batch is None:
+        return ["reference_first needs one `reference` const data<N>"]
+    bad = [] if any(_batch_of(r) == v.reference_batch for r in mods) else [
+        f"no input role is in batch {v.reference_batch}"]
+    # util.R names the batches data1..dataN by slot: slot k of a repeated flag is batch k
+    slots: dict = {}
+    for a in v.args:
+        entries = [str(e) for e in (a.roles or [a.role])]
+        if a.flag is None or not any(e.startswith("=") or _batch_of(e) is not None
+                                     for e in entries):
+            continue
+        slots[a.flag] = slots.get(a.flag, 0) + 1
+        bad += [f"slot {slots[a.flag]} of {a.flag} holds {e}" for e in entries
+                if not e.startswith("=") and _batch_of(e) != slots[a.flag]]
+    return bad
+
+
 @pytest.mark.parametrize("args,cell_order,match", [
-    (_STABMAP_ARGS, "reference_first", "no `reference` arg"),
+    (_STABMAP_ARGS, "reference_first", "data<N>"),
     (_STABMAP_ARGS + [{"role": "reference", "flag": "--reference", "const": "ref"}],
      "reference_first", "data<N>"),
     (_STABMAP_ARGS + [{"role": "reference", "flag": "--reference", "const": "data3"}],
      "reference_first", "batch 3"),
-    # slot k of a repeated flag must hold batch k: util.R names the slots data1..dataN
     ([{"role": "rna2", "flag": "--rna"}, {"role": "rna1", "flag": "--rna"},
       {"role": "reference", "flag": "--reference", "const": "data1"}],
      "reference_first", "slot 1 of --rna"),
-    (_STABMAP_ARGS, "atac_first", "cell_order"),
+    (_STABMAP_ARGS, "atac_first", "unknown cell_order"),
     (_STABMAP_ARGS, ["rna2", "atac9"], "atac9"),
     (_STABMAP_ARGS, ["rna2", "rna2"], "twice"),
 ])
-def test_a_cell_order_the_variant_cannot_honour_fails_at_load(args, cell_order, match):
-    with pytest.raises(ValueError, match=match):
-        registry._parse_variant(_variant(args, cell_order), "X")
+def test_the_cell_order_check_finds_a_bad_declaration(args, cell_order, match):
+    problems = _cell_order_problems(registry._parse_variant(_variant(args, cell_order), "X"))
+    assert any(match in p for p in problems), problems
+
+
+def test_every_declared_cell_order_can_be_honoured():
+    bad = {(s.id, registry._variant_key(v.when)): _cell_order_problems(v)
+           for s in registry.load() for v in s.variants}
+    assert {k: p for k, p in bad.items() if p} == {}
 
 
 def test_every_declared_cell_order_parses(root):

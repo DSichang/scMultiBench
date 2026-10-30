@@ -45,8 +45,8 @@ def test_params_for_lists_choices_and_a_value_outside_them_is_refused():
 
 
 def test_params_for_requires_disambiguation_when_multiple_variants():
-    with pytest.raises(KeyError):
-        mtb.params_for("Multigrate")          # 3 variants -> ambiguous
+    with pytest.raises(ValueError):
+        mtb.params_for("Multigrate")          # variants with other parameters
 
 
 def test_params_for_single_variant_needs_no_selector():
@@ -98,10 +98,12 @@ def test_params_for_modalities_only():
 
 
 def test_params_for_ambiguous_category_lists_the_options():
-    with pytest.raises(KeyError) as e:
+    with pytest.raises(ValueError) as e:
         mtb.params_for("Multigrate", "mosaic")     # 4 mosaic variants, other parameters
-    assert "Pass the modalities too" in str(e.value)
-    assert "Multigrate has 4 mosaic variants, rna1+rna2+adt2+adt3," in str(e.value)
+    assert str(e.value) == (
+        "Multigrate has variants that take other parameters. Pass the category and "
+        "modalities of one, for example "
+        "params_for('Multigrate', 'mosaic', ['rna1', 'rna2', 'adt2', 'adt3']).")
 
 
 def test_params_for_unknown_category_is_explicit():

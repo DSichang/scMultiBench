@@ -50,15 +50,14 @@ def test_params_for_ambiguity_is_valueerror_with_the_exact_call():
         "vertical:rna+adt, vertical:rna+atac and vertical:rna+adt+atac")
     with pytest.raises(ValueError) as e:
         mtb.params_for("Multigrate")
-    assert isinstance(e.value, AmbiguousVariantError) and isinstance(e.value, KeyError)
+    assert isinstance(e.value, AmbiguousVariantError)
     msg = str(e.value)
     assert ("Pass the category and modalities of one, for example "
             "params_for('Multigrate', 'mosaic', ['rna1', 'rna2', 'adt2', 'adt3']).") in msg
     with pytest.raises(ValueError) as e:
         mtb.params_for("Multigrate", "mosaic")
-    assert ("Pass the modalities too, for example "
+    assert ("Pass the category and modalities of one, for example "
             "params_for('Multigrate', 'mosaic', ['rna1', 'rna2', 'adt2', 'adt3']).") in str(e.value)
-    assert "Multigrate has 4 mosaic variants" in str(e.value)
     # scMM's vertical variant reads the atac role since 0.4.0 (X13); unknown
     # category stays KeyError
     assert mtb.params_for("scMM", "vertical", ["rna", "atac"])["variant"] == "vertical:rna+atac"

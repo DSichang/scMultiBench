@@ -12,12 +12,16 @@ def no_category_message(method: str, categories, category) -> str:
             + (f" Its categories: {cats}." if cats else ""))
 
 
-class AmbiguousVariantError(ValueError, KeyError):
-    """Several variants of a method fit; the message names the call that picks
-    one. A ``ValueError`` and a ``KeyError``; ``str(exc)`` is unquoted."""
+def no_variant_message(method: str, modalities, category=None) -> str:
+    """``"No vertical variant of totalVI reads atac and rna. ..."`` (internal)."""
+    where = f"{category} " if category else ""
+    mods = " and ".join(sorted(map(str, modalities)))
+    return (f"No {where}variant of {method} reads {mods}. "
+            f"mtb.method_info({method!r})['supports'] lists them.")
 
-    def __str__(self) -> str:
-        return str(self.args[0]) if self.args else ""
+
+class AmbiguousVariantError(ValueError):
+    """Several variants of a method fit; the message names the call that picks one."""
 
 
 # input roles that hold no modality (label roles: is_label_role)
@@ -85,7 +89,7 @@ class ArgSpec:
 
 @dataclass
 class OutputSpec:
-    kind: str               # embedding | graph | labels (io.load_output also accepts markers)
+    kind: str               # embedding | graph | labels
     file: str               # filename written into out_dir
     dataset: str | None = None  # in-file dataset name for h5 outputs
     # the order of the output's rows when it is not argument order:
@@ -154,65 +158,22 @@ class Variant:
           (StabMap: ``stabMap()`` stacks the reference dataset's cells before
           the others, and its util.R names the batches ``data1..dataN`` by
           slot, so slot ``k`` of each repeated flag must hold batch ``k``).
-
-        Raises
-        ------
-        ValueError
-            A ``cell_order`` this variant cannot honour; the registry loader
-            calls this, so a bad declaration fails when methods.yaml loads.
         """
         mods = [r for r in self.roles() if not is_label_role(r) and r != "data_dir"]
         order = self.output.cell_order
         if order is None:
             return mods
         if order == "reference_first":
-            batch = self._reference_batch(mods)
+            batch = self.reference_batch
             return ([r for r in mods if _batch_of(r) == batch]
                     + [r for r in mods if _batch_of(r) != batch])
-        if isinstance(order, str) or not isinstance(order, list):
-            raise ValueError(
-                f"output.cell_order must be a list of input roles or "
-                f"'reference_first'; got {order!r}")
-        unknown = [r for r in order if r not in mods]
-        if unknown:
-            raise ValueError(f"output.cell_order names {unknown}, which are not "
-                             f"input roles of this variant ({mods})")
-        if len(set(order)) != len(order):
-            raise ValueError(f"output.cell_order names a role twice: {order}")
         return list(order) + [r for r in mods if r not in order]
 
-    def _reference_batch(self, mods: list[str]) -> int:
-        """Batch ``N`` of the ``reference`` const ``data<N>``, checked against
-        the slots StabMap's util.R numbers."""
-        refs = [a for a in self.args if a.role == "reference" and a.const]
-        if len(refs) != 1:
-            raise ValueError(
-                f"output.cell_order 'reference_first' needs one `reference` arg "
-                f"with a const; found {len(refs)}"
-                + (" (no `reference` arg)" if not refs else ""))
-        const = str(refs[0].const)
-        if not (const.startswith("data") and const[4:].isdigit()):
-            raise ValueError(f"the `reference` const must be data<N> (the N-th batch) "
-                             f"for 'reference_first'; got {const!r}")
-        batch = int(const[4:])
-        if not any(_batch_of(r) == batch for r in mods):
-            raise ValueError(f"the `reference` const {const!r} names batch {batch}, "
-                             f"but no input role belongs to batch {batch} ({mods})")
-        slots: dict[str, int] = {}
-        for a in self.args:
-            entries = a.roles or [a.role]
-            if a.flag is None or not any(
-                    str(e).startswith("=") or _batch_of(str(e)) is not None
-                    for e in entries):
-                continue
-            slots[a.flag] = slots.get(a.flag, 0) + 1
-            for e in map(str, entries):
-                if not e.startswith("=") and _batch_of(e) != slots[a.flag]:
-                    raise ValueError(
-                        f"slot {slots[a.flag]} of {a.flag} holds {e!r}; with "
-                        f"'reference_first' slot k of a repeated flag must be "
-                        f"batch k (or an '=None' gap), because data<N> counts slots")
-        return batch
+    @property
+    def reference_batch(self) -> int | None:
+        """Batch ``N`` of the ``reference`` const ``data<N>``, else ``None``."""
+        ref = next((str(a.const) for a in self.args if a.role == "reference" and a.const), "")
+        return int(ref[4:]) if ref.startswith("data") and ref[4:].isdigit() else None
 
     @property
     def needs_labels(self) -> bool:
@@ -269,7 +230,6 @@ class MethodSpec:
     # moETM/scMM/iPOLNG declare role `atac_gas` yet read peak matrices
     atac: str | None = None
     setup_hint: str = ""
-    status: str = "declared"            # declared | verified
     variants: list[Variant] = field(default_factory=list)
     reference: dict = field(default_factory=dict)     # provenance (references.yaml)
     # the flags that turn CUDA off (merged by runner.cpu_params_for on a host
@@ -316,16 +276,6 @@ class MethodSpec:
         """True when any variant takes a cell-type-label role as input."""
         return any(v.needs_labels for v in self.variants)
 
-    @property
-    def modality_types(self) -> set[str]:
-        """Union of base modality types consumed across all variants."""
-        return set().union(*(v.modality_types for v in self.variants))
-
-    @property
-    def consumes_atac(self) -> bool:
-        """True when some variant takes an ATAC input."""
-        return any(v.consumes_atac for v in self.variants)
-
     def legacy_modalities(self, category: str, modalities) -> set | None:
         """The 0.4 spelling of a 0.3 role set, else ``None``: the vertical
         variants of scMM, scMDC, moETM, UnitedNet and iPOLNG read ``atac.h5``
@@ -340,13 +290,9 @@ class MethodSpec:
 
     def select(self, category: str, modalities: set[str], *,
                loose: bool = False) -> Variant:
-        """The variant declared for ``(category, modalities)``.
-
-        ``loose=True`` also accepts ``atac`` for ``atac_gas`` / ``atac_peak``
-        (:func:`modality_family`) when exactly one variant matches that way,
-        and raises :class:`AmbiguousVariantError` when several do. No match
-        raises ``KeyError`` listing the declared ``(category, modalities)``.
-        """
+        """The variant declared for ``(category, modalities)``; ``loose=True``
+        also accepts ``atac`` for ``atac_gas`` / ``atac_peak``
+        (:func:`modality_family`). No match raises ``KeyError``."""
         for v in self.variants:
             if v.matches(category, modalities):
                 return v
@@ -355,19 +301,10 @@ class MethodSpec:
             return self.select(category, legacy)
         if loose:
             want = {modality_family(m) for m in modalities}
-            hits = [v for v in self.variants
-                    if v.when.get("category") == category
-                    and {modality_family(m) for m in v.when.get("modalities", [])} == want]
-            if len(hits) == 1:
-                return hits[0]
-            if len(hits) > 1:
-                raise AmbiguousVariantError(
-                    f"{self.id}: modalities={sorted(modalities)} match {len(hits)} "
-                    f"{category!r} variants: {[v.when.get('modalities') for v in hits]}; "
-                    f"pass the exact role tokens (method_info({self.id!r})['supports'])")
+            for v in self.variants:
+                if (v.when.get("category") == category
+                        and {modality_family(m) for m in v.when.get("modalities", [])} == want):
+                    return v
         if category not in self.wired_categories:
             raise KeyError(no_category_message(self.id, self.wired_categories, category))
-        raise KeyError(
-            f"{self.id}: no variant for category={category!r} modalities={sorted(modalities)}; "
-            f"available: {[(v.when.get('category'), v.when.get('modalities')) for v in self.variants]}"
-        )
+        raise KeyError(no_variant_message(self.id, modalities, category))
