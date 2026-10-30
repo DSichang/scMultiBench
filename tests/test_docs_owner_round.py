@@ -49,15 +49,13 @@ def test_changes_say_how_a_csv_embedding_is_matched(tmp_path, capsys, monkeypatc
             "embedding only: for an AnnData it raises `ValueError`, as in 0.3.4.",
             "A Series indexed by barcode raises `ValueError` for such a file, as it does "
             "for an AnnData with repeated `obs_names`. 0.3.4 matched it by position.",
-            "With `verbose=False` the line is not printed.",
             "The first column of the embedding holds barcodes when it holds text: at least "
             "one of its values is not a number.",
             "A first column of numbers is read as in 0.3.4. Without a header it is left "
             "out as row numbers, and with a header it is a column of the embedding.",
             "The scores of `run_all` and `rescore` do not change."):
         assert sentence in said, sentence
-    # the line the page quotes is the line evaluate prints
-    line = re.search(r"such as `(evaluate: [^`]+)`", said).group(1)
+    # 0.4.0: no line says that the labels were put in the embedding's row order
     monkeypatch.setattr(escib, "compute", lambda *a, **k: pd.DataFrame(
         {"Value": [1.0]}, index=pd.Index(["ARI"], name="metric")))
     bars = [f"AAAC{i:04d}-1" for i in range(30)]
@@ -68,9 +66,6 @@ def test_changes_say_how_a_csv_embedding_is_matched(tmp_path, capsys, monkeypatc
     capsys.readouterr()
     mtb.evaluate(str(tmp_path / "emb.csv"), labels=str(tmp_path / "labels.csv"),
                  metrics=["ARI"])
-    assert capsys.readouterr().err == line + "\n"
-    mtb.evaluate(str(tmp_path / "emb.csv"), labels=str(tmp_path / "labels.csv"),
-                 metrics=["ARI"], verbose=False)
     assert capsys.readouterr().err == ""
     # the three cases of the page: some barcodes shared, none shared, a repeated barcode
     other = [b[:-2] for b in bars]
