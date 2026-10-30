@@ -18,7 +18,7 @@ import numpy as np
 from .. import _text
 
 from .._settings import config
-from .registry import ATAC_VALUES as _ATAC_KINDS, check_category
+from .registry import ATAC_VALUES as _ATAC_KINDS, check_category, check_id_list
 
 # peak ids come as chr_start_end, chr-start-end or chr:start-end; Signac needs the last
 _PEAK_RE = re.compile(r"^(.+?)[-_:](\d+)[-_](\d+)$")
@@ -860,6 +860,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
              if _is_mudata(data) else dict(given))
     _check_export_args(data, specs, given, atac_kind=atac_kind, labels=labels, batch=batch,
                        batch_index=batch_index, category=category)
+    check_id_list(adt_names, "adt_names")
     diagonal = category == "diagonal"
     sides, masters, master = _modality_sides(data, specs, atac_kind=atac_kind,
                                              adt_names=adt_names, category=category)
