@@ -757,8 +757,8 @@ def test_a_diagonal_folder_with_labels_for_one_side_is_not_scored(host, tmp_path
     atac = _cells(60, seed=1)
     atac.obs_names = [f"A{i:04d}-1" for i in range(60)]
     # export_dataset does not write the labels of one side alone
-    with pytest.raises(KeyError, match=r"not in obs of the ATAC object \(atac\); "
-                                       r"available: \[.*\]\.\"?$"):
+    with pytest.raises(KeyError, match=r"the obs of the ATAC object \(atac\) has no column "
+                                       r"'celltype'\. Columns: .*\.\"?$"):
         mtb.io.export_dataset(rna, "mydata/ONESIDE", atac=atac, atac_kind="gene_activity",
                               labels="obs:celltype", category="diagonal")
     assert not Path("mydata").exists()
@@ -885,15 +885,17 @@ def test_labels_later_on_a_diagonal_folder(key, host, tmp_path, monkeypatch):
     export, rescore = _later()
 
     # the line of the recipe, with the RNA object of the tutorial for adata
-    with pytest.raises(FileExistsError, match=r" of other data\. Export to a new folder\.$"):
+    with pytest.raises(FileExistsError, match=r" labels do not match the cells of .* To add "
+                                              r"labels, run the call that wrote the folder "
+                                              r"again with labels= and overwrite=True\.$"):
         _run_cell(export.replace("(adata,", f"({rna},"), dict(ns))
     assert _bytes(folder) == before
     # "Diagonal data needs the column in both files."
     one_side = dict(ns)
     one_side[atac] = ns[atac].copy()
     del one_side[atac].obs["celltype"]
-    with pytest.raises(KeyError, match=r"not in obs of the ATAC object \(atac\); "
-                                       r"available: \[.*\]\.\"?$"):
+    with pytest.raises(KeyError, match=r"the obs of the ATAC object \(atac\) has no column "
+                                       r"'celltype'\. Columns: .*\.\"?$"):
         _run_cell(export_cell, one_side)
     assert _bytes(folder) == before
 
@@ -1066,7 +1068,7 @@ def test_details_name_the_filter_error_and_the_files_of_other_data(tmp_path):
     both = _cells(60, genes=50)
     both.var_names = GENES[2:32] + PEAKS[:20]
     both.var["feature_types"] = ["Gene Expression"] * 30 + ["Peaks"] * 20
-    with pytest.raises(ValueError, match=r"^rna='X' selects features of 2 types, 'Gene Expression' and "
+    with pytest.raises(ValueError, match=r"^rna='X' selects features of 2 types, such as 'Gene Expression' and "
                                          r"'Peaks'\. Add a filter, as "
                                          r"rna='X\[feature_types=Gene Expression\]'\.$"):
         mtb.io.export_dataset(both, tmp_path / "ARC")

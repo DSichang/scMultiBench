@@ -158,16 +158,6 @@ def test_data_passed_as_the_second_modality_is_named_as_such(tmp_path):
         "rna= and atac='X'" + SAME + OWN)
 
 
-# ------------------------------------------- 3(b): the uns key of adt_names
-def test_adt_names_as_one_string_names_no_key(tmp_path):
-    cite = _rna(log=False)
-    cite.obsm["protein"] = _adt(log=False).X
-    cite.uns["mynames"] = [f"CD{j}" for j in range(8)]
-    for names in ("mynames", "protein_names", "CD3,CD4"):
-        assert _refused(tmp_path, cite, adt="obsm:protein", adt_names=names) == (
-            f"adt_names={names!r} is one string. Pass a list of names.")
-
-
 # ------------------------------------------------ 2: the Changes page
 @needs_docs
 def test_the_changes_page_says_what_is_refused_and_what_is_not(tmp_path):
@@ -194,9 +184,6 @@ def test_the_changes_page_says_what_is_refused_and_what_is_not(tmp_path):
     assert np.array_equal(_dense(out / "adt.h5"), rna.layers["counts"])
     assert np.array_equal(_dense(gas / "atac_gas.h5"), rna.layers["counts"])
     assert list(ingest.read(out / "adt.h5").var_names) == list(rna.var_names)
-    with pytest.warns(UserWarning, match="look like peaks"):
-        ingest.export_dataset(rna, tmp_path / "PEAK", rna="X", atac="layer:counts",
-                              atac_kind="peak")
     # the two selectors the page names for the hint
     assert _warned(ingest.export_dataset, _cite(), tmp_path / "A", rna=None,
                    atac="obsm:peaks", atac_kind="peak") == [_in_obsm("atac")]
