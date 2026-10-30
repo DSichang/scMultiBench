@@ -1707,8 +1707,7 @@ class RunResult:
             for root in used:
                 if labels is not None:
                     labels_at[root] = _cell_vector(labels, self.dataset, root, what="labels",
-                                                   order=_ROWS, moved=True,
-                                                   tried=tried[root])
+                                                   order=_ROWS, tried=tried[root])
                     _check_gaps(labels_at[root][0], self.dataset, "labels")
                 else:
                     # a missing label would be scored as one more cell type
@@ -1720,7 +1719,7 @@ class RunResult:
                 if batch is not None:
                     vec, by_cell = _cell_vector(batch, self.dataset, root, what="batch",
                                                 order=_ROWS if rows else None,
-                                                moved=True, tried=tried[root])
+                                                tried=tried[root])
                     _check_gaps(vec, self.dataset)
                     bad = not rows and not by_cell and _batch_length_problem(
                         [(r.get("method"), r.get("modalities")) for r in self.records
@@ -2396,7 +2395,6 @@ _ROWS = "the embedding rows"
 
 
 def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | None = None,
-                 moved: bool = False,
                  tried=None) -> tuple[np.ndarray, bool]:
     """``(x per cell, aligned by id)``: an id-carrying Series, DataFrame or CSV in
     ``labels_for`` order."""
@@ -2405,10 +2403,9 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
         own_batches_only(dataset)
     order = order or f"the order of the label files of {dataset}"
     folder = _dataset_folder(dataset, data_path)
-    if not folder.is_dir():
-        why = _folder_missing(dataset, tried or [data_path])
-        fix = _MOVED_FIX if moved else f"Check that it follows {order}."
-        no_ids = f"{why}. {fix[:-1]}" if moved else why
+    if not folder.is_dir():      # only rescore: run's scan checked the folder
+        why, fix = _folder_missing(dataset, tried or [data_path]), _MOVED_FIX
+        no_ids = f"{why}. {fix[:-1]}"
     else:
         why = (f"the files of {dataset} have no usable cell ids (missing or "
                f"repeated barcodes)")
