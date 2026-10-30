@@ -81,14 +81,14 @@ def test_export_from_loose_objects_without_data(tmp_path):
         ingest.export_dataset(None, tmp_path / "L3", rna=rna, labels=ser.iloc[:5])
     with pytest.raises(ValueError, match="nothing to export"):
         ingest.export_dataset(None, tmp_path / "L4")
-    with pytest.raises(ValueError, match="must be a selector string .* an AnnData"):
+    with pytest.raises(ValueError, match="takes a selector such as 'X', an AnnData"):
         ingest.export_dataset(rna, tmp_path / "L5", adt=42)
 
 
 def test_bare_array_needs_master_and_adt_names_warns(tmp_path):
     rna, _ = _pair()
     arr = np.ones((rna.n_obs, 4))
-    with pytest.raises(ValueError, match="cell barcodes are unknown"):
+    with pytest.raises(ValueError, match="is an array without cell barcodes"):
         ingest.export_dataset(None, tmp_path / "A", adt=arr)
     with pytest.warns(UserWarning, match="has no feature names; they are written as "
                                          "feature_0 to feature_3."):

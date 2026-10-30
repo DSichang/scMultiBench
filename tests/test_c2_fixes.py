@@ -279,11 +279,12 @@ def test_one_raw_counts_sentence_for_the_files_of_several_batches(tmp_path):
     assert out == ["UINMF needs raw counts. rna1.h5 and rna2.h5 hold non-integer values."]
 
 
-def test_the_shadow_folder_note_once_per_call(tmp_path, monkeypatch):
+def test_the_shadow_folder_note_once_a_session(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "D11").mkdir()
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
+        mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False)
         mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False)
     assert sum("also exists" in str(x.message) for x in w) == 1
 
@@ -317,17 +318,6 @@ def test_peaks_given_as_rna_are_refused(tmp_path):
     with pytest.raises(ValueError, match=r"^rna= holds peaks \(chr1:0-50\): pass it as "
                                          r"atac=\.$"):
         mtb.io.export_dataset(a, tmp_path / "P", labels="obs:celltype", category="vertical")
-
-
-def test_gene_named_atac_for_vertical_warns_at_export(tmp_path):
-    import anndata as ad
-    r = ad.AnnData(np.ones((20, 4)))
-    r.var_names = [f"G{i}" for i in range(4)]
-    r.obs["celltype"] = ["T", "B"] * 10
-    with pytest.warns(UserWarning, match="^Vertical methods need peak ATAC, and this ATAC "
-                                         "holds gene activity"):
-        mtb.io.export_dataset(r, tmp_path / "G", atac=r.copy(), labels="obs:celltype",
-                              category="vertical")
 
 
 # --------------------------------------------------------------- D18, C28

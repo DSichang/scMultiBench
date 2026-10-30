@@ -40,10 +40,10 @@ from tests.conftest import full_scan
 
 #: the caveat of a gene-activity method given peaks in atac.h5 (after the method)
 GAS_CAV = ("needs gene-activity ATAC. The features of atac.h5 look like chr:start-end, "
-           "so it holds peaks.")
+           "so it holds peaks. Export it with atac_kind='gene_activity'.")
 #: the caveat of a peak method given gene activity in atac2.h5 (after the method)
 GP_CAV = ("needs peak ATAC. The features of atac2.h5 do not look like chr:start-end, "
-          "so it seems to hold gene activity.")
+          "so it seems to hold gene activity. Export it with atac_kind='peak'.")
 
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 PEAKS = [f"chr1:{i * 100}-{i * 100 + 50}" for i in range(40)]
@@ -120,7 +120,7 @@ def test_scan_blocks_and_real_run_warns(tmp_path, pinned, monkeypatch, capsys,
     row = _quiet(mtb.scan, str(root / "MU_PEAK"), "vertical", methods=["Matilda"],
                  modalities=["rna", "atac"], verbose=False).iloc[0]
     assert row["reason"].startswith("Matilda needs gene-activity ATAC. The features of "
-                                    "atac.h5 look like chr:start-end, so it holds peaks."), \
+                                    "atac.h5 look like chr:start-end, so it holds peaks. Export it with atac_kind='gene_activity'."), \
         row["reason"]
 
     class Stop(Exception):
@@ -131,7 +131,7 @@ def test_scan_blocks_and_real_run_warns(tmp_path, pinned, monkeypatch, capsys,
     monkeypatch.setattr(R, "check_gpu_requirement", stop)
     with pytest.warns(UserWarning, match=r"^Matilda needs gene-activity ATAC\. The features "
                                          r"of atac\.h5 look like chr:start-end, so it holds "
-                                         r"peaks\.$"):
+                                         r"peaks\. Export it with atac_kind='gene_activity'\.$"):
         with pytest.raises(Stop):
             mtb.engine.runner.run("Matilda", "vertical", inputs=inp, out_dir=str(tmp_path / "o"))
     # the right representation: no note
@@ -301,7 +301,7 @@ def test_named_blocked_methods_are_logged_and_recorded(tmp_path, monkeypatch, ca
     assert "logger.py" in fails.loc["MIRA", "reason"]
     assert "needs an NVIDIA GPU" in fails.loc["UnitedNet", "reason"]
     # the ATAC sentence ends the reason, after the GPU sentence; no override (0.4.0)
-    assert fails.loc["UnitedNet", "reason"].endswith("so it holds peaks.")
+    assert fails.loc["UnitedNet", "reason"].endswith("so it holds peaks. Export it with atac_kind='gene_activity'.")
     assert "allow_atac_mismatch" not in fails.loc["UnitedNet", "reason"]
     disk = pd.read_csv(tmp_path / "out" / "summary.csv").set_index("method")
     assert disk.loc["MIRA", "status"] == "skipped"

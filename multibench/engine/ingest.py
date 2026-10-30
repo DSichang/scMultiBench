@@ -26,8 +26,7 @@ _PEAK_RE = re.compile(r"^(.+?)[-_:](\d+)[-_](\d+)$")
 #: :func:`export_dataset` warns when ``matrix/data`` (stored dense, features x
 #: cells) would exceed this many bytes uncompressed on disk.
 DENSE_WARN_BYTES = 10 ** 9
-#: Roles whose matrix must hold raw counts. Gene-activity scores (atac_gas)
-#: and the representation-free ``atac`` role are not checked.
+#: Roles whose matrix must hold raw counts; gene-activity scores are not checked.
 _COUNT_ROLES = ("rna", "adt", "atac_peak")
 #: Stored non-zero values sampled by the raw-count check.
 _COUNT_SAMPLE = 5000
@@ -49,27 +48,24 @@ def _has_fraction(vals) -> bool:
     return bool(np.any(np.abs(v - np.round(v)) > 1e-6))
 
 
-def _matrix_has_fraction(X) -> bool | None:
-    """Raw-count check of an in-memory matrix (cells x features): ``True``
-    when sampled stored values are not whole numbers, ``None`` when ``X``
-    cannot be read."""
+def _warn_not_counts(X, name: str) -> None:
+    """``UserWarning`` when sampled stored values of ``X`` (cells x features)
+    are not whole numbers, which look log-normalised; no verdict for storage
+    that cannot be read."""
     import scipy.sparse as sp
     try:
         if sp.issparse(X):
-            return _has_fraction(X.data if X.format in ("csr", "csc", "coo")
-                                 else X.tocsr().data)
-        arr = np.asarray(X)
-        if arr.ndim != 2 or arr.size == 0:
-            return None
-        rows = np.unique(np.linspace(0, arr.shape[0] - 1, min(arr.shape[0], 500)).astype(int))
-        return _has_fraction(arr[rows])
+            vals = X.data if X.format in ("csr", "csc", "coo") else X.tocsr().data
+        else:
+            arr = np.asarray(X)
+            if arr.ndim != 2 or arr.size == 0:
+                return
+            vals = arr[np.unique(np.linspace(0, arr.shape[0] - 1,
+                                             min(arr.shape[0], 500)).astype(int))]
+        fraction = _has_fraction(vals)
     except Exception:                   # backed or exotic storage: no verdict
-        return None
-
-
-def _warn_not_counts(X, name: str) -> None:
-    """``UserWarning`` when ``X`` holds non-integer values, which look log-normalised."""
-    if _matrix_has_fraction(X):
+        return
+    if fraction:
         _text.warn(f"The {name} values are not whole numbers, so they look log-normalised. "
                    f"Export raw counts.", UserWarning)
 
@@ -93,8 +89,6 @@ def _check_one_matrix_each(data, specs, given) -> None:
     for what, spec in specs.items():
         if spec is None:
             continue
-        if isinstance(spec, str) and not spec:
-            _select(data, spec, what=what)          # raises: '' names no matrix
         first = seen.setdefault(_matrix_key(data, spec), what)
         if first != what:
             pair = " and ".join(f"{w}={given[w]!r}" if isinstance(given[w], str) else f"{w}="
@@ -230,7 +224,7 @@ def _shown(spec) -> str:
 _TENX_TYPE = {"rna": "Gene Expression", "adt": "Antibody Capture", "atac": "Peaks"}   # wording only
 
 
-def _check_one_feature_type(adata, *, arg, spec, role) -> None:
+def _check_one_feature_type(adata, *, arg, spec) -> None:
     """``ValueError`` when ``var['feature_types']`` holds a 10x type name and
     another type: one file holds one modality. ``spec`` is the selector, or
     ``None`` for an object."""
@@ -240,9 +234,8 @@ def _check_one_feature_type(adata, *, arg, spec, role) -> None:
     if len(counts) < 2 or not set(counts.index) & set(_TENX_TYPE.values()):
         return
     types = [t for t, _ in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))]
-    head = (f"features of 2 types, {types[0]!r} and {types[1]!r}." if len(types) == 2
-            else f"features of {len(types)} types, for example {types[0]!r}.")
-    one = _TENX_TYPE.get(arg) if role != "atac_gas" else None   # 10x has no gene activity
+    head = f"features of {len(types)} types, such as {types[0]!r} and {types[1]!r}."
+    one = _TENX_TYPE.get(arg)
     one = one if one in counts.index else "<type>"
     if spec is not None and _split_var_filter(spec)[1] is None:
         raise ValueError(f"{arg}={spec!r} selects {head} Add a filter, as "
@@ -281,7 +274,7 @@ def _pick_matrix(adata, *, layer=None, obsm=None, feature_names=None, role, arg,
             if n_feat:                  # 0 features have no names, and are refused
                 _text.warn(_no_names_message(role, f"obsm[{obsm!r}]", n_feat), UserWarning)
         return X, names
-    _check_one_feature_type(adata, arg=arg, spec=spec, role=role)
+    _check_one_feature_type(adata, arg=arg, spec=spec)
     if layer is not None:
         if layer not in adata.layers:
             # anndata 0.13 lists X among the layers, under the key None
@@ -299,24 +292,10 @@ def _pick_matrix(adata, *, layer=None, obsm=None, feature_names=None, role, arg,
     return X, [str(v) for v in adata.var_names]
 
 
-def _duplicate_names_warning(feats, *, arg, spec) -> str | None:
-    """The warning for feature names repeated in one matrix, else ``None``."""
-    import pandas as pd
-
-    names = pd.Index([str(f) for f in feats])
-    dup = names[names.duplicated()].unique()
-    if not len(dup):
-        return None
-    return (f"{arg}={_shown(spec)} has {len(dup):,} repeated feature "
-            f"{'name' if len(dup) == 1 else 'names'}, for example {dup[0]}. Make them "
-            f"unique first.")
-
-
 def _adt_obsm_keys(adata) -> list:
     """The ``obsm`` keys that can hold a protein matrix: the ones that do not
     start with ``X_``, where scanpy keeps embeddings (``X_pca``, ``X_umap``)."""
-    # export_dataset may pass data=None
-    return [k for k in getattr(adata, "obsm", {}) if not str(k).startswith("X_")]
+    return [k for k in adata.obsm if not str(k).startswith("X_")]
 
 
 def _warn_dense_size(out: Path, n_feat: int, n_cell: int, dtype) -> None:
@@ -334,19 +313,6 @@ def _peak_fraction(feats) -> float:
     if not len(feats):
         return 0.0
     return sum(1 for x in feats if _PEAK_RE.match(x)) / len(feats)
-
-
-def _check_peak_names(role, feats):
-    """Warn when the feature names contradict the ATAC role."""
-    frac = _peak_fraction(feats)
-    if role == "atac_gas" and frac > 0.5:
-        _text.warn(f"{frac:.0%} of the ATAC feature names look like peaks such as "
-                   f"chr1:100-200, not genes. If the matrix holds peaks, pass "
-                   f"atac_kind='peak'.", UserWarning)
-    elif role == "atac_peak" and frac < 0.5:
-        _text.warn(f"Only {frac:.0%} of the ATAC feature names look like peaks such as "
-                   f"chr1:100-200. If they are genes, pass atac_kind='gene_activity'; if "
-                   f"peaks, rename them to chr:start-end.", UserWarning)
 
 
 #: the ATAC role of each ``atac_kind=``
@@ -555,29 +521,13 @@ def _mudata_selector(mdata, spec):
     return spec
 
 
-#: the warning for gene-activity ATAC written for vertical methods
-_VERTICAL_GAS = ("Vertical methods need peak ATAC, and this ATAC holds gene activity. "
-                 "Export the ATAC as peaks.")
-
-
-def _vertical_gene_activity_readers() -> list:
-    """The methods with a vertical variant that reads gene-activity ATAC."""
-    from . import registry
-    return [s.id for s in registry.load() if s.atac == "gene_activity"
-            and any(v.when.get("category") == "vertical"
-                    and any(str(m).startswith("atac") for m in v.when.get("modalities", []))
-                    for v in s.variants)]
-
-
-#: how a message names the obs of an AnnData passed in (not a variable name the
-#: caller may not use)
-_ADATA_OBS = "the AnnData's obs"
-
-
 def _obs_column(obs, col, *, what, spec, where):
+    """``obs[col]``; ``where`` names ``obs`` in the error."""
     if col not in obs.columns:
-        raise KeyError(f"{what}={spec!r}: column {col!r} not in obs: searched {where}; "
-                       f"available: {list(obs.columns)}")
+        cols = [str(c) for c in obs.columns]
+        more = f" and {len(cols) - 5:,} more" if len(cols) > 5 else ""
+        raise KeyError(f"{what}={spec!r}: {where} has no column {col!r}. Columns: "
+                       f"{', '.join(cols[:5]) or 'none'}{more}.")
     return obs[col]
 
 
@@ -585,8 +535,6 @@ def _select_obs(data, spec, *, what):
     """The Series an obs selector names: ``'obs:<col>'`` or ``'<col>'``
     (``data.obs``), ``'mod:<name>.obs:<col>'``, or for a MuData
     ``'<name>:<col>'`` (``mdata[name].obs``, then ``mdata.obs['<name>:<col>']``)."""
-    if not isinstance(spec, str) or not spec:
-        raise ValueError(f"{what}= must be 'obs:<col>' or 'mod:<name>.obs:<col>', got {spec!r}")
     mu = _is_mudata(data)
     if spec.startswith("mod:"):
         if not mu:
@@ -598,30 +546,17 @@ def _select_obs(data, spec, *, what):
             raise ValueError(f"{what}={spec!r}: use 'obs:<col>' (or 'mod:<name>.obs:<col>')")
         return _obs_column(data.mod[name].obs, rest[4:], what=what, spec=spec,
                            where=f"mdata[{name!r}].obs")
+    where = "mdata.obs" if mu else "the AnnData's obs"
     if spec.startswith("obs:"):
-        col = spec[4:]
-        return _obs_column(data.obs, col, what=what, spec=spec,
-                           where="mdata.obs" if mu else _ADATA_OBS)
+        return _obs_column(data.obs, spec[4:], what=what, spec=spec, where=where)
     if mu:
         name, _, col = spec.partition(":")
         if name in data.mod and col:
             obs = data.mod[name].obs
-            if col in obs.columns:
-                return obs[col]
-            if f"{name}:{col}" in data.obs.columns:
-                return data.obs[f"{name}:{col}"]
-            raise KeyError(f"{what}={spec!r}: column {col!r} not in obs: searched "
-                           f"mdata[{name!r}].obs and mdata.obs[{name + ':' + col!r}]; "
-                           f"mdata[{name!r}].obs has {list(obs.columns)}")
-    if spec in data.obs.columns:
-        return data.obs[spec]
-    cols = [str(c) for c in data.obs.columns]
-    raise ValueError(
-        f"{what}={spec!r} is not a column of "
-        + ("mdata.obs" if mu else _ADATA_OBS)
-        + (f". Columns: {', '.join(cols[:5])}"
-           f"{f' and {len(cols) - 5:,} more' if len(cols) > 5 else ''}."
-           if cols else ", which has no columns."))
+            if col not in obs.columns and spec in data.obs.columns:
+                return data.obs[spec]
+            return _obs_column(obs, col, what=what, spec=spec, where=f"mdata[{name!r}].obs")
+    return _obs_column(data.obs, spec, what=what, spec=spec, where=where)
 
 
 def _link_or_copy(src: Path, dst: Path):
@@ -645,9 +580,8 @@ def _as_modality(data, spec, *, what, master, feature_names=None):
 
     if isinstance(spec, str):
         if data is None:
-            raise ValueError(
-                f"{what}={spec!r} is a selector but data is None; pass the AnnData/"
-                f"MuData as the first argument, or give {what}= an AnnData / DataFrame")
+            raise ValueError(f"{what}={spec!r} selects from data, which is None. Pass the "
+                             f"AnnData as data.")
         return _select(data, spec, what=what)
     if _is_anndata(spec):
         return spec, {}
@@ -661,13 +595,8 @@ def _as_modality(data, spec, *, what, master, feature_names=None):
             raise ValueError(f"{what}= array must be 2-D (cells x features), got shape "
                              f"{getattr(spec, 'shape', None)}")
         if master is None:
-            raise ValueError(
-                f"{what}= is a bare array, so the cell barcodes are unknown; pass an "
-                f"AnnData/DataFrame for {what}= or give data= / another modality as "
-                f"an AnnData first")
-        if spec.shape[0] != len(master):
-            raise ValueError(f"{what}= array has {spec.shape[0]} rows for {len(master)} "
-                             f"cells (the master cell order)")
+            raise ValueError(f"{what}= is an array without cell barcodes. Pass an AnnData "
+                             f"or DataFrame.")
         a = ad.AnnData(spec if sp.issparse(spec) else np.asarray(spec, dtype=float))
         a.obs_names = list(master)
         if feature_names is None:
@@ -677,10 +606,8 @@ def _as_modality(data, spec, *, what, master, feature_names=None):
             feature_names = [f"feature_{i}" for i in range(n_feat)]
         a.var_names = [str(x) for x in feature_names]
         return a, {}
-    raise ValueError(
-        f"{what}= must be a selector string like 'X', 'obsm:<key>', 'layer:<key>' or "
-        f"'mod:<name>', an AnnData, a DataFrame (cells x features) or a 2-D array, "
-        f"got {type(spec).__name__}")
+    raise ValueError(f"{what}= takes a selector such as 'X', an AnnData, a DataFrame or an "
+                     f"array, not {type(spec).__name__}.")
 
 
 def _check_unique_barcodes(names) -> None:
@@ -737,6 +664,8 @@ def _align_cells(a, *, master, master_name, role, category=None):
     if names == master:
         return a
     pair = {role, master_name}
+    # the RNA is read from data, unless rna= says otherwise
+    ours, theirs = ("RNA" if master_name == "data" else master_name.upper()), role.upper()
     if master_name == "data":
         # the parameter name alone reads as "the data"
         master_name = "the object passed as data"
@@ -749,19 +678,16 @@ def _align_cells(a, *, master, master_name, role, category=None):
         lack = [x for x in master if x not in in_names]
         same = "All modalities of one dataset must hold the same cells."
         if len(stray) == len(names):            # no cell in common
-            if "atac" in pair and pair & {"rna", "data"}:
-                theirs, ours = (("ATAC", "RNA") if role == "atac" else ("RNA", "ATAC"))
-                head = (f"RNA and ATAC share no barcode ({ours} e.g. {master[0]}, {theirs} "
-                        f"e.g. {names[0]}).")
-                for longer, shorter, who in ((master, names, ours), (names, master, theirs)):
-                    cut = _strip_to_match(longer, shorter)
-                    if cut:
-                        raise ValueError(f"{head} They match after removing {cut!r} from "
-                                         f"the {who} names.")
-                raise ValueError(f"{head} Make the names match" + (
-                    ", or pass category='diagonal' for different cells." if category is None
-                    else "."))
-            raise ValueError(f"{role} and {master_name} have no cells in common. {same}")
+            head = (f"{ours} and {theirs} share no barcode ({ours} e.g. {master[0]}, "
+                    f"{theirs} e.g. {names[0]}).")
+            for longer, shorter, who in ((master, names, ours), (names, master, theirs)):
+                cut = _strip_to_match(longer, shorter)
+                if cut:
+                    raise ValueError(f"{head} They match after removing {cut!r} from the "
+                                     f"{who} names.")
+            raise ValueError(head + (" Make the names match, or pass category='diagonal' for "
+                                     "different cells." if "atac" in pair and category is None
+                                     else " Make the names match."))
         if stray:
             head = (f"{role} has {len(names):,} cells, and {len(stray):,} of them are not "
                     f"in {master_name}, for example {stray[:3]}.")
@@ -793,8 +719,8 @@ def _as_obs_vector(data, spec, *, what, master):
                     f"{what}={spec!r}: the cell names are not unique, so the {what} cannot "
                     f"be matched to the cells. Give each cell a unique name first.")
             if set(src_names) == set(master):
-                ser = ser.reindex([str(x) for x in master]) if ser.index.dtype == object \
-                    else ser.iloc[[src_names.index(str(x)) for x in master]]
+                pos = {k: i for i, k in enumerate(src_names)}
+                ser = ser.iloc[[pos[str(x)] for x in master]]
         vals = np.asarray(ser)
     elif isinstance(spec, pd.Series):
         if master is None:
@@ -816,7 +742,7 @@ def _as_obs_vector(data, spec, *, what, master):
         raise ValueError(
             f"{what}= Series index does not match the cell barcodes: {len(lack)} of "
             f"{len(m)} cells have no entry ({lack[:5]}{'...' if len(lack) > 5 else ''})."
-            + (fix or " Index it by obs_names, or pass a plain list in cell order."))
+            + (fix or " Index it by obs_names."))
     else:
         vals = np.asarray(spec)
         if vals.ndim != 1:
@@ -892,6 +818,8 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
 
     Raises
     ------
+    TypeError
+        ``data`` is not an AnnData, MuData or ``None``.
     ValueError
         Missing or conflicting arguments, a missing label or batch, or cells
         that do not pair across modalities.
@@ -904,7 +832,7 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     -----
     UserWarning
         Values that are not whole numbers, or feature names that are
-        missing, repeated or contradict ``atac_kind``.
+        missing or repeated.
 
     Examples
     --------
@@ -919,9 +847,8 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     --------
     mtb.scan : confirm the folder is found and which methods can run on it.
     """
-    if isinstance(data, (str, os.PathLike)):
-        raise TypeError("export_dataset takes an AnnData or MuData object, not a path: "
-                        "read the file first, e.g. anndata.read_h5ad(path).")
+    if data is not None and not (_is_anndata(data) or _is_mudata(data)):
+        raise TypeError(f"data= must be an AnnData or MuData, got {type(data).__name__}.")
     out = Path(dataset_dir).expanduser()
     category = check_category(category)
     if data is None and isinstance(rna, str) and rna == "X":
@@ -932,14 +859,13 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     specs = ({what: _mudata_selector(data, x) for what, x in given.items()}
              if _is_mudata(data) else dict(given))
     _check_export_args(data, specs, given, atac_kind=atac_kind, labels=labels, batch=batch,
-                       batch_index=batch_index, category=category, adt_names=adt_names)
+                       batch_index=batch_index, category=category)
     diagonal = category == "diagonal"
     sides, masters, master = _modality_sides(data, specs, atac_kind=atac_kind,
                                              adt_names=adt_names, category=category)
     if not masters:                     # labels only
         if master is None:
             # no object names the cells: a Series indexed by barcode does
-            labels, batch = (_rows_numbered(out, x) for x in (labels, batch))
             master = _series_cells(labels, batch)
         if master is not None:
             masters["rna"] = master
@@ -948,13 +874,14 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
     labels_by_side = _labels_by_side(data, labels, sides, masters, diagonal=diagonal)
     groups = _batch_groups(data, batch, batch_index, masters.get("rna"))
     # every matrix is selected and checked before any write
-    prepared = _prepare_matrices(data, sides, given, adt_names=adt_names, category=category)
+    prepared = _prepare_matrices(data, sides, given, adt_names=adt_names)
     plan, units = _plan_files(out, prepared, labels_by_side, masters, groups, category)
     existing = [pth.name for pth, _, _, _ in plan if pth.exists() or pth.is_symlink()]
     found = _leftovers(out, {pth.name for pth, _, _, _ in plan}, units, diagonal=diagonal,
                        by_column=batch is not None, batch_index=batch_index)
     if found:
-        raise FileExistsError(_leftover_message(out, found))
+        n_labels = None if prepared else sum(len(v) for v in labels_by_side.values())
+        raise FileExistsError(_leftover_message(out, found, n_labels))
     if existing and not overwrite:
         raise FileExistsError(
             f"{out} already holds {_text._and_list(existing)}. Pass overwrite=True to "
@@ -964,19 +891,14 @@ def export_dataset(data, dataset_dir: Path | str, *, rna="X",
 
 
 def _check_export_args(data, specs, given, *, atac_kind, labels, batch, batch_index,
-                       category, adt_names) -> None:
+                       category) -> None:
     """The checks of :func:`export_dataset` that need no matrix."""
     rna, adt, atac = specs["rna"], specs["adt"], specs["atac"]
     if atac_kind is not None and atac_kind not in _ATAC_KINDS:
         raise ValueError(f"atac_kind= must be 'peak' or 'gene_activity', got {atac_kind!r}.")
-    if category == "vertical" and atac is not None and atac_kind == "gene_activity" \
-            and not _vertical_gene_activity_readers():
-        _text.warn(_VERTICAL_GAS, UserWarning)
     if rna is None and adt is None and atac is None and labels is None:
         raise ValueError("nothing to export: give at least one of rna=, adt=, atac=, labels=")
     _check_batch_args(batch, batch_index, category)
-    if isinstance(adt_names, str):      # its letters would name the proteins
-        raise ValueError(f"adt_names={adt_names!r} is one string. Pass a list of names.")
     _check_one_matrix_each(data, specs, given)
     if category == "diagonal" and labels is not None and rna is None and adt is None \
             and atac is None:
@@ -1054,9 +976,11 @@ def _batch_groups(data, batch, batch_index, master) -> list:
     return [("", None)]
 
 
-def _prepare_matrices(data, sides, given, *, adt_names, category) -> list:
+def _prepare_matrices(data, sides, given, *, adt_names) -> list:
     """``[(side, role, X, feats, bars, what)]``: each matrix selected, with
     the content checks run and the ATAC role settled."""
+    import pandas as pd
+
     prepared = []
     for side, mats in sides.items():
         for role, a, kw, what, src in mats:
@@ -1071,10 +995,12 @@ def _prepare_matrices(data, sides, given, *, adt_names, category) -> list:
             if feats is not None and len(feats) == 0:
                 raise ValueError(f"The {what} matrix holds 0 features for "
                                  f"{len(a.obs_names):,} cells. Check {what}=.")
-            if feats is not None:
-                repeated = _duplicate_names_warning(feats, arg=what, spec=given[what])
-                if repeated:
-                    _text.warn(repeated, UserWarning)
+            names = pd.Index([str(f) for f in feats or ()])
+            dup = names[names.duplicated()].unique()
+            if len(dup):
+                _text.warn(f"{what}={_shown(given[what])} has {len(dup):,} repeated feature "
+                           f"{'name' if len(dup) == 1 else 'names'}, for example {dup[0]}. "
+                           f"Make them unique first.", UserWarning)
             if what == "rna" and feats is not None and _peak_fraction(feats) > 0.5:
                 raise ValueError(f"rna= holds peaks ({feats[0]}): pass it as atac=.")
             if what == "atac":
@@ -1082,13 +1008,6 @@ def _prepare_matrices(data, sides, given, *, adt_names, category) -> list:
                 rna_feats = next((f for _, r, _, f, _, _ in prepared if r == "rna"), None)
                 if role == "atac":
                     role = _atac_role(feats, rna_feats)
-                    if category == "vertical" and role == "atac_gas" \
-                            and not _vertical_gene_activity_readers():
-                        _text.warn(_VERTICAL_GAS, UserWarning)
-                _check_peak_names(role, feats)
-                if category == "mosaic" and role == "atac_gas":
-                    _text.warn("Every mosaic method reads peak ATAC. Export the ATAC as "
-                               "peaks (atac_kind='peak').", UserWarning)
             if role in _COUNT_ROLES:
                 _warn_not_counts(X, what)
             prepared.append((side, role, X, feats, [str(x) for x in a.obs_names], what))
@@ -1104,10 +1023,6 @@ def _plan_files(out: Path, prepared, labels_by_side, masters, groups, category):
     for number, mask in groups:
         for side, role, X, feats, bars, what in prepared:
             sub = X if mask is None else X[mask]
-            if np.ndim(sub) != 2:
-                # a backed sparse X: _write_canonical refuses it only after mkdir
-                raise ValueError(f"matrix must be 2-D (cells x features), got shape "
-                                 f"{np.asarray(sub).shape}")
             sub_bars = bars if mask is None else [bars[i] for i in mask]
             path = out / _export_filename(role, number, category)
             plan.append((path, "matrix", (sub, feats, sub_bars), (side, number)))
@@ -1289,11 +1204,16 @@ def _leftovers(out: Path, planned, units, *, diagonal, by_column, batch_index):
     return found
 
 
-def _leftover_message(out: Path, found) -> str:
-    """The error for the files ``found`` by :func:`_leftovers`."""
+def _leftover_message(out: Path, found, n_labels=None) -> str:
+    """The error for the files ``found`` by :func:`_leftovers`; ``n_labels``
+    for a call that writes labels only."""
     files = sorted(found, key=_layout_order)
     more = len(files) - 1
     names = files[0] + (f" and {more} more {'file' if more == 1 else 'files'}" if more else "")
+    if n_labels is not None:
+        return (f"The {n_labels:,} labels do not match the cells of {names} in {out}. To add "
+                f"labels, run the call that wrote the folder again with labels= and "
+                f"overwrite=True.")
     return f"{out} holds {names} of other data. Export to a new folder."
 
 
@@ -1381,40 +1301,6 @@ def _series_cells(*specs):
     return named[0]
 
 
-#: what pandas calls an index of numbers (``Index.inferred_type``)
-_NUMBER_INDEX = ("integer", "floating", "mixed-integer-float")
-
-
-def _rows_numbered(out: Path, spec):
-    """``spec`` with a ``RangeIndex`` when it is a Series indexed by numbers
-    that name no cell of ``out``: a filtered table's row numbers, not
-    barcodes. An object without barcodes names its cells ``'0'``, ``'1'``."""
-    import pandas as pd
-
-    if isinstance(spec, pd.Series) and not isinstance(spec.index, pd.RangeIndex) \
-            and spec.index.inferred_type in _NUMBER_INDEX \
-            and not _holds_a_cell(out, spec.index):
-        return spec.reset_index(drop=True)
-    return spec
-
-
-def _holds_a_cell(out: Path, names) -> bool:
-    """True when a layout matrix in ``out`` holds a cell of ``names``, with or
-    without the trailing ``-<n>`` of its barcode."""
-    if not out.is_dir():
-        return False
-    barcodes_of, _ = _folder_readers()
-    names = {str(x) for x in names}
-    for p, unit in _layout_files(out, False):
-        if not unit[2]:
-            continue
-        old = barcodes_of(p) or ()
-        if not names.isdisjoint(old) \
-                or not names.isdisjoint(_BARCODE_SUFFIX_RE.sub("", b) for b in old):
-            return True
-    return False
-
-
 def _first_master(data, specs, *, diagonal):
     """``(barcodes, name)`` of the paired cell order: ``data.obs_names``, else
     the first modality object's. A diagonal MuData has no single order (its
@@ -1469,26 +1355,14 @@ def _diagonal_labels(data, spec, sides) -> dict:
         else:
             if col_each is not None:
                 if not (spec.startswith("obs:") and mu and col_each in data.obs.columns):
-                    raise KeyError(
-                        f"labels={spec!r}: column {col_each!r} not in obs of the "
-                        f"{side.upper()} object ({src}); available: {list(a.obs.columns)}.")
+                    _obs_column(a.obs, col_each, what="labels", spec=spec,
+                                where=f"the obs of the {side.upper()} object ({src})")
                 ser = data.obs[col_each]
             elif isinstance(spec, str):
                 ser = _select_obs(data, spec, what="labels")
             else:
                 ser = spec
-            if isinstance(ser, pd.Series):
-                idx = {str(k): i for i, k in enumerate(ser.index)}
-                lack = [b for b in bars if b not in idx]
-                if lack:
-                    raise ValueError(
-                        f"labels={repr(spec) if isinstance(spec, str) else 'Series'}: "
-                        f"{len(lack)} of the {len(bars)} {side.upper()} cells have no label "
-                        f"({lack[:5]}{'...' if len(lack) > 5 else ''}). Give every cell a "
-                        f"label.")
-                out[side] = np.asarray(ser)[[idx[b] for b in bars]]
-            else:
-                out[side] = _as_obs_vector(None, ser, what="labels", master=bars)
+            out[side] = _as_obs_vector(None, ser, what="labels", master=bars)
         _check_labels_complete(out[side], spec=spec, where=f"the {side.upper()} cells ({src})")
     return out
 

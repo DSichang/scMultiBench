@@ -77,14 +77,14 @@ def test_export_dataset_selectors_and_errors(tmp_path):
         ingest.export_dataset(a, tmp_path / "E", rna="foo:bar")
     with pytest.raises(ValueError, match="'mod:<name>' selectors need a MuData"):
         ingest.export_dataset(a, tmp_path / "E", rna="mod:rna")
-    with pytest.raises(KeyError, match="column 'nope' not in obs"):
+    with pytest.raises(KeyError, match="has no column 'nope'"):
         ingest.export_dataset(a, tmp_path / "E", rna="X", labels="obs:nope")
     # a column is named with or without the obs: prefix
     bare = ingest.export_dataset(a, tmp_path / "BARE", rna="X", labels="ct")
     prefixed = ingest.export_dataset(a, tmp_path / "PREFIXED", rna="X", labels="obs:ct")
     assert pd.read_csv(bare / "cty.csv")["x"].tolist() \
         == pd.read_csv(prefixed / "cty.csv")["x"].tolist() == a.obs["ct"].astype(str).tolist()
-    with pytest.raises(ValueError, match="is not a column of the AnnData's obs"):
+    with pytest.raises(KeyError, match="the AnnData's obs has no column 'nope'"):
         ingest.export_dataset(a, tmp_path / "E", rna="X", labels="nope")
     with pytest.raises(ValueError, match="nothing to export"):
         ingest.export_dataset(a, tmp_path / "E", rna=None)
@@ -127,9 +127,6 @@ def test_export_dataset_atac_kinds(tmp_path):
         ingest.export_dataset(genes, tmp_path / "E2", rna=None, atac="X")
     with pytest.raises(ValueError, match="atac_kind= must be 'peak' or 'gene_activity', got 'gas'"):
         ingest.export_dataset(peaks, tmp_path / "E3", rna=None, atac="X", atac_kind="gas")
-    with pytest.warns(UserWarning, match="look like peaks such as chr1:100-200, not genes"):
-        ingest.export_dataset(peaks, tmp_path / "W", rna=None, atac="X",
-                              atac_kind="gene_activity")
 
 
 def test_export_dataset_rewrites_existing_atac_link(tmp_path):

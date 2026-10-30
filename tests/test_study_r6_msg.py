@@ -35,7 +35,7 @@ from tests.conftest import full_scan
 
 #: the caveat of a gene-activity method given peaks in atac.h5 (after the method)
 GAS_CAV = ("needs gene-activity ATAC. The features of atac.h5 look like chr:start-end, "
-           "so it holds peaks.")
+           "so it holds peaks. Export it with atac_kind='gene_activity'.")
 
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 GENES = [f"GENE{i}" for i in range(60)]
@@ -178,7 +178,7 @@ def test_the_atac_caveats_start_with_the_method(tmp_path, pinned, gas_matilda):
                      modalities=["rna", "atac"], data_path=tmp_path,
                      verbose=False).iloc[0]
     assert blocked["reason"] == ("Matilda needs gene-activity ATAC. The features of atac.h5 "
-                                 "look like chr:start-end, so it holds peaks.")
+                                 "look like chr:start-end, so it holds peaks. Export it with atac_kind='gene_activity'.")
 
 
 def test_scbridge_reason_is_a_sentence(tmp_path, pinned):

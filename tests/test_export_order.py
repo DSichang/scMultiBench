@@ -166,9 +166,7 @@ def test_a_label_series_without_an_object_follows_the_matrix(tmp_path, capsys):
 
 def test_an_index_of_integers_follows_the_matrix_whose_cells_it_names(tmp_path, capsys):
     """Cells named by numbers. An index of integers that names them is their
-    barcodes, so the rows follow the matrix. Integers that name no cell of
-    the folder are the row numbers of a table: its rows are written as they
-    come, as a list is."""
+    barcodes, so the rows follow the matrix."""
     a = _cells()
     a.obs_names = [str(7 * i) for i in range(a.n_obs)]
     labels = list(a.obs["celltype"])
@@ -181,23 +179,6 @@ def test_an_index_of_integers_follows_the_matrix_whose_cells_it_names(tmp_path, 
     ingest.export_dataset(None, f, labels=later)
     assert capsys.readouterr().err == _note("cty.csv", "rna.h5")
     assert _labels(f / "cty.csv") == labels
-    rows = pd.Series(list(later), index=[1000 + i for i in range(a.n_obs)])
-    ingest.export_dataset(None, f, labels=rows, overwrite=True)
-    assert capsys.readouterr().err == ""
-    assert _labels(f / "cty.csv") == list(later)
-    # row numbers next to a batch column indexed by barcode: row i of one is
-    # row i of the other, and the barcodes put both in the order of the folder
-    b = _cells()
-    g = tmp_path / "ROWS_AND_BARCODES"
-    ingest.export_dataset(b, g, rna="X", batch="obs:donor", category="cross")
-    capsys.readouterr()
-    mixed = _shuffled(b)
-    ingest.export_dataset(None, g, category="cross", batch=mixed.obs["donor"], labels=pd.Series(
-        list(mixed.obs["celltype"]), index=[1000 + i for i in range(b.n_obs)]))
-    assert capsys.readouterr().err == "".join(
-        _note(f"cty{n}.csv", f"rna{n}.h5") for n in (1, 2, 3))
-    for n in (1, 2, 3):
-        assert _labels(g / f"cty{n}.csv") == [f"type_of_{x}" for x in _bars(g / f"rna{n}.h5")]
 
 
 # ---- restored from before the 0.4 cut: kept behaviour

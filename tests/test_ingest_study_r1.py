@@ -143,7 +143,7 @@ def test_diagonal_export_writes_unpaired_rna_and_atac(tmp_path):
 def test_diagonal_label_column_missing_names_the_object(tmp_path):
     rna, atac = _rna(), _atac()
     del atac.obs["cell_type"]
-    with pytest.raises(KeyError, match="not in obs of the ATAC object"):
+    with pytest.raises(KeyError, match="the obs of the ATAC object"):
         ingest.export_dataset(rna, tmp_path / "L", atac=atac, atac_kind="peak",
                               labels="obs:cell_type", category="diagonal")
     assert not (tmp_path / "L").exists()
@@ -286,7 +286,7 @@ def test_mudata_global_obs_labels(tmp_path):
         ingest.export_dataset(m, tmp_path / "MU1", rna="rna", atac="atac", atac_kind="peak",
                               labels="rna:celltype", category="vertical")
     msg = str(ei.value)
-    assert "searched mdata['rna'].obs" in msg
+    assert "mdata['rna'].obs has no column 'celltype'" in msg
     assert not (tmp_path / "MU1").exists()
     d = ingest.export_dataset(m, tmp_path / "MU1", rna="rna", atac="atac", atac_kind="peak",
                               labels="obs:celltype", category="vertical")

@@ -138,6 +138,7 @@ def _no_archive_download(monkeypatch):
 def _fresh_session_notes(monkeypatch):
     from multibench.engine import resolve
     monkeypatch.setattr(resolve, "_ORDER_NOTED", set())
+    monkeypatch.setattr(resolve, "_NOTED", set())
 
 
 # ---- the settings a test changes are put back --------------------------------

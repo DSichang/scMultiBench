@@ -156,7 +156,7 @@ def test_global_obs_miss_names_the_modality_spelling(tmp_path):
         ingest.export_dataset(m, tmp_path / "B", rna="rna", atac="atac", atac_kind="peak",
                               labels="obs:cell_type", category="mosaic", batch_index=2)
     msg = str(ei.value)
-    assert "column 'cell_type' not in obs: searched mdata.obs" in msg and "use labels" not in msg
+    assert "mdata.obs has no column 'cell_type'" in msg and "use labels" not in msg
 
 
 def test_run_dry_run_note_names_the_install_check(monkeypatch, capsys):

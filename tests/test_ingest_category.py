@@ -59,11 +59,8 @@ def test_export_dataset_explicit_other_category_keeps_representation_names(tmp_p
                                 category="cross", batch_index=1)
     assert sorted(p.name for p in out.iterdir()) == ["atac_gas1.h5"]
     # mosaic: the atac<i>.h5 every mosaic variant reads, whatever the kind (L06)
-    with pytest.warns(UserWarning, match=r"^Every mosaic method reads peak ATAC\. Export "
-                                         r"the ATAC as peaks \(atac_kind='peak'\)\.$"):
-        out = ingest.export_dataset(g, tmp_path / "MG", rna=None, atac="X",
-                                    atac_kind="gene_activity", category="mosaic",
-                                    batch_index=2)
+    out = ingest.export_dataset(g, tmp_path / "MG", rna=None, atac="X",
+                                atac_kind="gene_activity", category="mosaic", batch_index=2)
     assert sorted(p.name for p in out.iterdir()) == ["atac2.h5"]
     # category=None: today's behaviour (atac_peak.h5 + hard-linked atac.h5)
     out = ingest.export_dataset(pk, tmp_path / "NP", rna=None, atac="X", atac_kind="peak")

@@ -37,7 +37,7 @@ from tests.conftest import full_scan
 
 #: the caveat of a gene-activity method given peaks in atac.h5 (after the method)
 GAS_CAV = ("needs gene-activity ATAC. The features of atac.h5 look like chr:start-end, "
-           "so it holds peaks.")
+           "so it holds peaks. Export it with atac_kind='gene_activity'.")
 
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 PEAKS = [f"chr1:{i * 100}-{i * 100 + 50}" for i in range(40)]
@@ -152,7 +152,7 @@ def test_a_gpu_blocked_row_ends_with_the_export_fix_and_no_override(
                  modalities=["rna", "atac"], data_path=root, verbose=False).iloc[0]
     assert not row["runnable"]
     assert "needs an NVIDIA GPU" in row["reason"]
-    assert row["reason"].endswith("so it holds peaks.")
+    assert row["reason"].endswith("so it holds peaks. Export it with atac_kind='gene_activity'.")
     assert "allow_atac_mismatch" not in row["reason"] and "anyway" not in row["reason"]
 
 

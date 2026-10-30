@@ -21,7 +21,7 @@ from multibench.engine import ingest, runner
 ad = pytest.importorskip("anndata")
 
 GENES, PEAKS, PROTEINS = 800, 1200, 12
-HEAD = "features of 2 types, 'Peaks' and 'Gene Expression'."      # the larger type first
+HEAD = "features of 2 types, such as 'Peaks' and 'Gene Expression'."      # the larger type first
 RECIPE = 'See the recipe "A 10x .h5 file" in the docs.'
 
 
@@ -79,7 +79,7 @@ def test_a_layer_selector(tmp_path):
 def test_adt_from_x_of_a_cite_seq_object(tmp_path):
     msg = _raises(tmp_path, _cite(), rna="X[feature_types=Gene Expression]", adt="X")
     assert msg == (
-        "adt='X' selects features of 2 types, 'Gene Expression' and 'Antibody Capture'. Add "
+        "adt='X' selects features of 2 types, such as 'Gene Expression' and 'Antibody Capture'. Add "
         "a filter, as adt='X[feature_types=Antibody Capture]'.")
 
 
@@ -149,23 +149,18 @@ def test_a_10x_name_of_another_modality_is_no_example(tmp_path):
     assert msg == f"adt='X' selects {HEAD} Add a filter, as adt='X[feature_types=<type>]'."
 
 
-def test_peaks_are_no_example_for_gene_activity(tmp_path):
-    """A 10x file has no type for gene-activity scores, so the filter for
-    atac_kind='gene_activity' is not filled in with the peaks."""
-    msg = _raises(tmp_path, _arc(), rna="X[feature_types=Gene Expression]", atac="X",
-                  atac_kind="gene_activity")
-    assert msg == f"atac='X' selects {HEAD} Add a filter, as atac='X[feature_types=<type>]'."
+def test_peaks_are_the_example_for_atac(tmp_path):
     msg = _raises(tmp_path, _arc(), rna="X[feature_types=Gene Expression]", atac="X",
                   atac_kind="peak")
     assert msg == f"atac='X' selects {HEAD} Add a filter, as atac='X[feature_types=Peaks]'."
 
 
 def test_many_types_are_counted(tmp_path):
-    """More than two types: their number, and the largest by name."""
+    """More than two types: their number, and the two largest."""
     # one 10x name among them: the features are of several modalities
     a = _mixed([(f"type{i}", 10 - i, f"T{i}_") for i in range(5)] + [("Peaks", 3, "P")])
     msg = _raises(tmp_path, a, rna="X")
-    assert msg == ("rna='X' selects features of 6 types, for example 'type0'. Add a filter, "
+    assert msg == ("rna='X' selects features of 6 types, such as 'type0' and 'type1'. Add a filter, "
                    "as rna='X[feature_types=<type>]'.")
 
 
@@ -201,7 +196,7 @@ def test_a_missing_type_is_a_type(tmp_path):
     a = _mixed([("Gene Expression", 30, "GENE")])
     a.var["feature_types"] = ["Gene Expression"] * 29 + [np.nan]
     msg = _raises(tmp_path, a, rna="X")
-    assert msg == ("rna='X' selects features of 2 types, 'Gene Expression' and 'nan'. Add a "
+    assert msg == ("rna='X' selects features of 2 types, such as 'Gene Expression' and 'nan'. Add a "
                    "filter, as rna='X[feature_types=Gene Expression]'.")
 
 
@@ -257,4 +252,4 @@ def test_the_10x_names_leave_out_the_advice_to_delete_the_column(tmp_path, capsy
     for text in texts:
         assert 'delete' not in text and 'If all of them' not in text
     mixed = _mixed([('Gene Expression', 30, 'GENE'), ('lncRNA', 50, 'LNC')])
-    assert _raises(tmp_path, mixed, rna='X') == "rna='X' selects features of 2 types, 'lncRNA' and 'Gene Expression'. Add a filter, as rna='X[feature_types=Gene Expression]'."
+    assert _raises(tmp_path, mixed, rna='X') == "rna='X' selects features of 2 types, such as 'lncRNA' and 'Gene Expression'. Add a filter, as rna='X[feature_types=Gene Expression]'."

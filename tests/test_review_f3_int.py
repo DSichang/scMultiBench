@@ -43,7 +43,7 @@ from tests.conftest import full_scan
 
 #: the caveat of a gene-activity method given peaks in atac.h5 (after the method)
 GAS_CAV = ("needs gene-activity ATAC. The features of atac.h5 look like chr:start-end, "
-           "so it holds peaks.")
+           "so it holds peaks. Export it with atac_kind='gene_activity'.")
 
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 
@@ -118,7 +118,7 @@ def test_gene_names_in_the_peak_file_block_glue_seurat_v3_and_multimap(tmp_path,
             f"atac_kind='gene_activity'."), m
     assert sc.loc["MultiMAP", "reason"] == (
         "MultiMAP needs peak ATAC. The features of atac_peak.h5 do not look like "
-        "chr:start-end, so it seems to hold gene activity.")
+        "chr:start-end, so it seems to hold gene activity. Export it with atac_kind='peak'.")
     # R4-01: naming the method keeps it blocked
     for m in ("GLUE", "Seurat_v3", "MultiMAP"):
         named = _quiet(full_scan, "LUNG_ga", "diagonal", methods=[m], data_path=root,

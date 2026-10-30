@@ -18,7 +18,7 @@ from tests.conftest import full_scan
 
 #: the caveat of a gene-activity method given peaks in atac.h5 (after the method)
 GAS_CAV = ("needs gene-activity ATAC. The features of atac.h5 look like chr:start-end, "
-           "so it holds peaks.")
+           "so it holds peaks. Export it with atac_kind='gene_activity'.")
 
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 PLAN_COLUMNS = ["method", "category", "modalities", "env", "output_kind", "caveat",

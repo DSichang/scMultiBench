@@ -4,8 +4,6 @@ from __future__ import annotations
 import functools
 import os
 import re
-import sys
-import warnings
 from pathlib import Path
 
 from .. import _text
@@ -15,9 +13,6 @@ from .._text import _and_list
 from . import registry
 from .schema import (_NON_MODALITY_ROLES, AmbiguousVariantError, _batch_of,
                      base_modality, is_label_role)
-
-#: The docs section that lists the files of a dataset folder, per category.
-LAYOUT_URL = "https://dsichang.github.io/scMultiBench/tutorials/run/#folder-layout"
 
 # file stems tried in order for a role; the first existing file wins
 _ROLE_FILE_CANDIDATES = {"atac_gas": ("atac_gas", "atac")}
@@ -207,8 +202,7 @@ def select_variant(spec, category: str, modalities, *, ds_dir: Path | None = Non
         if len(largest) == 1:
             return largest[0]
         if ok:
-            which = ("both" if len(ok) == len(candidates) == 2 else
-                     _and_list("+".join(v.when.get("modalities", [])) for v in ok))
+            which = _and_list("+".join(v.when.get("modalities", [])) for v in ok)
             folder_note = f" The folder {ds_dir} has every input file of {which}."
         else:
             names = sorted(q.name for q in Path(ds_dir).glob("*"))
@@ -232,40 +226,26 @@ def _ambiguous_message(method: str, category: str, candidates, folder_note="") -
     ``folder_note`` starts with a space."""
     mods = [list(v.when.get("modalities", [])) for v in candidates]
     names = _and_list("+".join(m) for m in mods)
-    spell = [f"modalities={m}" for m in mods]
-    pick = (f"Pass {spell[0]} or {spell[1]}." if len(spell) == 2 else
-            f"Pass the modalities of one, for example {spell[0]}.")
-    return f"{method} has {len(mods)} {category} variants, {names}.{folder_note} {pick}"
-
-
-_READS = {"peak": "peaks", "gene_activity": "gene activity"}
+    return (f"{method} has {len(mods)} {category} variants, {names}.{folder_note} Pass the "
+            f"modalities of one, for example modalities={mods[0]}.")
 
 
 def missing_dataset_message(base, dataset: str) -> str:
     """The error for a dataset folder that does not exist, listing the
-    folders ``base`` holds. A bare name that is a folder of the working directory,
-    not of the default data path, gets the path to pass instead."""
+    folders ``base`` holds."""
     base = Path(base)
-    here = Path(str(dataset))
-    default = Path(os.path.abspath(config.data_path))
-    near = next((p for p in (here, Path("data") / here) if p.is_dir()), None)
-    if len(here.parts) == 1 and near is not None and Path(os.path.abspath(base)) == default:
-        path = f"./{near}" if near == here else str(near)
-        return f"The folder {base / dataset} does not exist. {path} exists here: pass {path!r}."
     dirs = sorted(p.name for p in base.iterdir() if p.is_dir()) if base.is_dir() else []
     holds = (f"{base} holds {_and_list(dirs)}." if dirs else
              f"{base} holds no folders." if base.is_dir() else
              f"{base} does not exist either.")
     return (f"The folder {base / dataset} does not exist. {holds} dataset= is the "
-            f"folder's path, or its name under mtb.config.data_path. The folder layout "
-            f"is at {LAYOUT_URL}.")
+            f"folder's path, or its name under mtb.config.data_path.")
 
 
 def _note_local_folder(base: Path, name: str) -> None:
-    """A warning, at every call site (the default filter shows each line once),
-    when a bare dataset name resolves under the default data path while the
-    working directory holds a folder of the same name; none for a folder the
-    caller named by its path."""
+    """A warning, once a session, when a bare dataset name resolves under the
+    default data path while the working directory holds a folder of the same
+    name; none for a folder the caller named by its path."""
     here = Path(name)
     if len(here.parts) != 1 or not here.is_dir():
         return
@@ -273,22 +253,17 @@ def _note_local_folder(base: Path, name: str) -> None:
         return
     if os.path.abspath(here) == os.path.abspath(base / name):
         return
-    # once per call: a call resolves the name several times. The call is its
-    # outermost package frame, held so that no later call reuses its identity
-    outer, frame = None, sys._getframe(1)
-    while frame is not None and frame.f_code.co_filename.startswith(_text._PACKAGE):
-        outer, frame = frame, frame.f_back
     key = (os.path.abspath(base), name)
-    if _NOTED[0] is outer and _NOTED[1] == key:
+    if key in _NOTED:                   # a call resolves the name several times
         return
-    _NOTED[:] = [outer, key]
+    _NOTED.add(key)
     path = f"./{name}"
     _text.warn(f"Using {base / name}; {path} also exists: pass {path!r} for it.",
                UserWarning)
 
 
-#: the call that last got the note of :func:`_note_local_folder`
-_NOTED: list = [None, None]
+#: (data path, name) pairs :func:`_note_local_folder` already warned about
+_NOTED: set = set()
 
 
 def canonical_dataset(base, dataset: str) -> str:
@@ -366,11 +341,9 @@ def inputs_for(dataset: str, category: str, method: str, *,
         Unknown method, or no variant matches ``category`` and ``modalities``.
     ValueError
         Unknown category or modality token, or several variants fit
-        (``AmbiguousVariantError``).
-    ValueError
-        ``check=True``: a transposed matrix, or label rows differ from the cell count.
-    ValueError
-        ``check=True``: files that must hold the same cells, in one order, do not.
+        (``AmbiguousVariantError``); with ``check=True``, a transposed matrix,
+        label rows that differ from the cell count, or files that must hold the
+        same cells, in one order, that do not.
     FileNotFoundError
         ``check=True``: an input file is missing, or ``data_dir`` lacks a file the method names.
 
@@ -628,7 +601,7 @@ def _label_count_text(labels: str, n_lab: int, data: str, n_cell: int, *,
     """The error of a label file whose length is not its data file's cell count."""
     each = f"each cell of batch {batch}" if batch is not None else "each cell"
     return (f"{labels} has {n_lab} labels, but {data} has {n_cell} cells. Give {each} "
-            f"one label, in the order of the cells. The folder layout is at {LAYOUT_URL}.")
+            f"one label, in the order of the cells.")
 
 
 def _data_dir_files(variant, data_dir) -> dict:
@@ -656,14 +629,13 @@ def _check_data_dir(variant, data_dir, method: str = "The method") -> tuple[bool
 
 
 # Every caveat starts with the method name, so a clipped line still shows the problem.
-#: an ``atac_gas`` role fell back to a peak matrix in ``atac.h5``
-PEAK_IN_GAS_CAVEAT = ("{method} needs gene-activity ATAC. The features of atac.h5 look "
-                      "like chr:start-end, so it holds peaks.")
-#: the representation-mismatch caveats, when the method's ATAC is known
+#: the representation-mismatch caveats
 PEAK_FED_TO_GAS_CAVEAT = ("{method} needs gene-activity ATAC. The features of {file} "
-                          "look like chr:start-end, so it holds peaks.")
+                          "look like chr:start-end, so it holds peaks. Export it with "
+                          "atac_kind='gene_activity'.")
 GAS_FED_TO_PEAK_CAVEAT = ("{method} needs peak ATAC. The features of {file} do not look "
-                          "like chr:start-end, so it seems to hold gene activity.")
+                          "like chr:start-end, so it seems to hold gene activity. Export it "
+                          "with atac_kind='peak'.")
 #: names that are neither peaks nor the folder's genes (``peak_0``): the kind
 #: cannot be told, so these two do not block the row
 PEAK_NAMES_UNKNOWN_CAVEAT = ("{method} needs peak ATAC. {file} holds names such as "
@@ -803,7 +775,7 @@ GAS_OTHER_CELLS_REASON = ("{method} reads {gas} of {dataset}, which holds other 
                           "{peak}. The files hold {n_gas:,} and {n_peak:,} cells and share "
                           "{shared:,}. Both files need the same ATAC cells.")
 GAS_OTHER_ORDER_REASON = ("{method} reads {gas} of {dataset}, which lists the ATAC cells in "
-                          "another order than {peak}. atac_cty.csv follows {peak}. Write "
+                          "another order than {peak}. {labels} follows {peak}. Write "
                           "{gas} again with {write}.")
 
 
@@ -879,8 +851,8 @@ def _check_atac_gas_cells(method, dataset, resolved) -> None:
         if kind == "order":
             raise ValueError(GAS_OTHER_ORDER_REASON.format(
                 method=method, dataset=dataset, gas=gas.name, peak=peak.name,
-                write="mtb.io.export_dataset(..., atac_kind='gene_activity')"
-            ).replace("atac_cty.csv", f"atac_cty{digits}.csv"))
+                labels=f"atac_cty{digits}.csv",
+                write="mtb.io.export_dataset(..., atac_kind='gene_activity')"))
 
 
 #: the files of the dataset layout, with a batch number or without one:
@@ -976,7 +948,7 @@ def _atac_form_caveats(resolved, atac, renamed, who: str) -> list[str]:
         if p.name and p.stem != "atac_gas":
             frac = _peak_fraction_of(p)
             if frac is not None and frac >= 0.9:
-                out.append(PEAK_IN_GAS_CAVEAT.format(method=who))
+                out.append(PEAK_FED_TO_GAS_CAVEAT.format(method=who, file=p.name))
         return out
     stems = {r.rstrip("0123456789") for r in resolved}
     both = {"atac_peak", "atac_gas"} <= stems
@@ -1087,13 +1059,12 @@ DEFAULT_ORDER_WARNING = r"labels_for\(.*\) returns the files in the default orde
 
 def _reordering_methods(stems: list[str], category: str | None, dataset: str,
                         base: Path) -> list[tuple[str, str]]:
-    """``(method, category)`` of the methods whose files the folder holds (the
-    file check of ``mtb.scan``) and whose ``labels_for(dataset, category,
-    method)`` puts the label files ``stems`` in another order than the
+    """``(method, category)`` of the variants whose input files the folder
+    holds and that stack the label files ``stems`` in another order than the
     default one (the order of ``stems``); of ``category`` when given."""
     batches = {int(m.group(1)) for st in stems if (m := _NUMBERED_LABEL_RE.fullmatch(st))}
     ds_dir = base / dataset
-    cands: dict[tuple[str, str], list] = {}
+    cands: dict[tuple[str, str], None] = {}
     for spec in registry.load():
         for v in spec.variants:
             cat = v.when.get("category")
@@ -1108,28 +1079,8 @@ def _reordering_methods(stems: list[str], category: str | None, dataset: str,
                 continue
             if sorted(stems, key=lambda st: rank[st]) != list(stems) \
                     and _variant_satisfiable(v, ds_dir, spec.id):
-                cands.setdefault((spec.id, cat), []).append(v)
-    out = []
-    with warnings.catch_warnings():       # the calls below only probe the folder
-        warnings.simplefilter("ignore")
-        for (method, cat), variants in cands.items():
-            try:
-                order = list(labels_for(dataset, cat, method, data_path=base))
-            except Exception:  # noqa: BLE001 - no order to compare
-                continue
-            if sorted(order) != sorted(stems) or order == list(stems):
-                continue
-            for mods in [None] + [v.when.get("modalities") for v in variants]:
-                try:
-                    inputs_for(dataset, cat, method, modalities=mods, data_path=base,
-                               check=True)
-                except AmbiguousVariantError:
-                    continue
-                except Exception:  # noqa: BLE001 - the files fail scan's file check
-                    break
-                out.append((method, cat))
-                break
-    return out
+                cands[(spec.id, cat)] = None
+    return list(cands)
 
 
 #: (dataset folder, category) pairs labels_for already warned about

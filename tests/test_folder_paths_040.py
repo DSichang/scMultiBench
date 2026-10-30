@@ -27,9 +27,11 @@ def test_a_registered_data_path_folder_wins_over_one_here(here, monkeypatch):
 
 
 # ---- the Python part of tests that also ran the command line
-def test_a_bare_name_that_is_a_folder_here_names_the_path(here):
+def test_a_bare_name_names_a_folder_of_the_data_path(here):
     os.rename('data/MYCITE', 'MYCITE')
     with pytest.raises(FileNotFoundError) as e:
         mtb.scan('MYCITE', 'vertical', verbose=False)
-    assert str(e.value) == f"The folder {mtb.config.data_path / 'MYCITE'} does not exist. ./MYCITE exists here: pass './MYCITE'."
+    msg = str(e.value)
+    assert msg.startswith(f"The folder {mtb.config.data_path / 'MYCITE'} does not exist. ")
+    assert msg.endswith("dataset= is the folder's path, or its name under mtb.config.data_path.")
     assert len(mtb.scan('./MYCITE', 'vertical', verbose=False))
