@@ -223,9 +223,8 @@ def test_dry_run_unchanged_on_gpu_host(tmp_path, gpu):
 def test_explicit_param_wins_over_cpu_params(tmp_path, no_gpu):
     # r3 (X64): the CUDA switch is the package's, so params= cannot set it
     with pytest.raises(KeyError, match=r"scMDC does not accept \['device'\]"):
-        mtb.engine.runner.run("scMDC", "vertical", inputs=_cite_inputs(tmp_path),
-                              out_dir=str(tmp_path / "o"), params={"device": "cuda:1"})
-    assert not (tmp_path / "o").exists()
+        mtb.engine.runner.preview("scMDC", "vertical", inputs=_cite_inputs(tmp_path),
+                                  out_dir=str(tmp_path / "o"), params={"device": "cuda:1"})
 
 
 # ------------------------------------------------------------ runner: requires_gpu

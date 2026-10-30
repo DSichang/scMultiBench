@@ -24,7 +24,7 @@ def test_per_variant_semantics_on_a_synthetic_spec(monkeypatch):
                        args=[ArgSpec(role=r, flag=f"--{r}") for r in roles],
                        output=OutputSpec(kind="embedding", file="e.h5"))
     spec = MethodSpec(id="Fake", language="python", categories=["vertical", "mosaic"],
-                      tasks=["clustering"], atac=None, status="declared",
+                      tasks=["clustering"], atac=None,
                       variants=[var("vertical", ["rna", "adt"], ["rna", "adt"]),
                                 var("mosaic", ["rna1", "adt2"], ["rna1", "adt2", "cty1"])])
     monkeypatch.setattr(registry, "load", lambda: [spec])

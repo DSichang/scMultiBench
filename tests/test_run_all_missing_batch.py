@@ -45,10 +45,6 @@ def _h5(path, feats):
         g.create_dataset("barcodes", data=np.array(BARS, dtype="S32"))
 
 
-class _Res:
-    def __init__(self, out):
-        self.output = out
-
 
 @pytest.fixture
 def cite(tmp_path, monkeypatch):
@@ -74,7 +70,7 @@ def cite(tmp_path, monkeypatch):
         Path(out_dir).mkdir(parents=True, exist_ok=True)
         with h5py.File(Path(out_dir) / "embedding.h5", "w") as f:
             f.create_dataset("data", data=emb.T)
-        return _Res(emb)
+        return emb
     monkeypatch.setattr(W, "_run", fake_run)
     return tmp_path / "data", calls
 

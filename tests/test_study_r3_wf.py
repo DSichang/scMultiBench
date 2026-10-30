@@ -125,10 +125,6 @@ def test_scan_blocks_peak_methods_given_gene_activity(tmp_path):
     assert df.loc[sorted(GAS_METHODS), "runnable"].all()
 
 
-class _Res:
-    def __init__(self, out):
-        self.output = out
-
 
 def test_old_records_without_a_caveat_still_summarise():
     rec = {"method": "Matilda", "status": "RUN_OK", "run_sec": 1.0}

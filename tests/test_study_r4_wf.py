@@ -35,7 +35,6 @@ from multibench import _settings
 from multibench import config, discover
 from multibench import workflow as W
 from multibench.engine import envs, registry
-from multibench.engine import runner as R
 from tests.conftest import full_scan
 
 #: the caveat of a gene-activity method given peaks in atac.h5 (after the method)
@@ -107,33 +106,14 @@ def _vertical(root, name, atac_feats, n=60):
     return root
 
 
-class _Res:
-    def __init__(self, out):
-        self.output = out
-
-
-def test_scan_blocks_and_real_run_warns(tmp_path, pinned, monkeypatch, capsys,
-                                        gas_matilda):
+def test_scan_blocks_the_other_representation(tmp_path, pinned, gas_matilda):
     root = _vertical(tmp_path, "MU_PEAK", PEAKS)
-    inp = mtb.engine.resolve.inputs_for("MU_PEAK", "vertical", "Matilda", modalities=["rna", "atac"],
-                         data_path=root)
     row = _quiet(mtb.scan, str(root / "MU_PEAK"), "vertical", methods=["Matilda"],
                  modalities=["rna", "atac"], verbose=False).iloc[0]
     assert row["reason"].startswith("Matilda needs gene-activity ATAC. The features of "
                                     "atac.h5 look like chr:start-end, so it holds peaks. Export it with atac_kind='gene_activity'."), \
         row["reason"]
 
-    class Stop(Exception):
-        pass
-
-    def stop(spec):
-        raise Stop
-    monkeypatch.setattr(R, "check_gpu_requirement", stop)
-    with pytest.warns(UserWarning, match=r"^Matilda needs gene-activity ATAC\. The features "
-                                         r"of atac\.h5 look like chr:start-end, so it holds "
-                                         r"peaks\. Export it with atac_kind='gene_activity'\.$"):
-        with pytest.raises(Stop):
-            mtb.engine.runner.run("Matilda", "vertical", inputs=inp, out_dir=str(tmp_path / "o"))
     # the right representation: no note
     root2 = _vertical(tmp_path, "MU_GA", GENES)
     row = _quiet(mtb.scan, str(root2 / "MU_GA"), "vertical", methods=["Matilda"],
@@ -168,7 +148,7 @@ def cite(tmp_path, monkeypatch):
         Path(out_dir).mkdir(parents=True, exist_ok=True)
         with h5py.File(Path(out_dir) / "embedding.h5", "w") as f:
             f.create_dataset("data", data=emb.T)
-        return _Res(emb)
+        return emb
     monkeypatch.setattr(W, "_run", fake_run)
     shuffled = pd.Series(batch, index=bars).sample(frac=1.0, random_state=3)
     return tmp_path / "data", batch, shuffled
@@ -278,7 +258,7 @@ def _skip_setup(monkeypatch, tmp_path):
 
     def fake_run(method, category, inputs, out_dir, params=None):
         calls.append(method)
-        return _Res(np.zeros((60, 5)))
+        return np.zeros((60, 5))
     monkeypatch.setattr(W, "_run", fake_run)
     return calls
 

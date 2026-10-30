@@ -102,9 +102,8 @@ def test_a_named_method_without_its_environment_is_skipped_with_the_reason(
     monkeypatch.setattr(config, "repo_path", tmp_path / "no_scripts")
     monkeypatch.delenv(scripts.SCRIPTS_REF_VAR, raising=False)
 
-    class _Res:
-        output = np.zeros((2864, 5))
-    monkeypatch.setattr(W, "_run", lambda *a, **k: _Res())
+    _out = np.zeros((2864, 5))
+    monkeypatch.setattr(W, "_run", lambda *a, **k: _out)
     res = _quiet(mtb.run, "D11", "vertical", tmp_path / "out", methods=trio,
                  evaluate=False, verbose=False)
     status = res.summary.set_index("method")["status"]

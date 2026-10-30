@@ -159,11 +159,9 @@ def test_scripts_ref_problem_is_none_without_scripts_or_variable(tmp_path, monke
 def test_dry_runs_note_another_scripts_ref(scripts, monkeypatch, capsys, tmp_path):
     repo, head = scripts
     inp = mtb.engine.resolve.inputs_for('D11', 'vertical', 'Matilda')
-    assert not any("MULTIBENCH_SCRIPTS_REF" in n for n in mtb.engine.runner.preview(
-        'Matilda', 'vertical', inputs=inp, out_dir=str(tmp_path / 'o'))[1])
+    assert _scripts.scripts_ref_problem() is None
     monkeypatch.setenv(_scripts.SCRIPTS_REF_VAR, 'deadbeef')
-    assert _mismatch(head) in mtb.engine.runner.preview(
-        'Matilda', 'vertical', inputs=inp, out_dir=str(tmp_path / 'o'))[1]
+    assert _scripts.scripts_ref_problem() == _mismatch(head)
     mtb.scan('D11', 'vertical', methods=['Matilda'], verbose=False)
     mtb.scan('D11', 'vertical', methods=['Matilda'], verbose=True)
     assert capsys.readouterr().out.count(_mismatch(head)[:-1]) == 1

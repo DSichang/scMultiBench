@@ -208,17 +208,13 @@ def linux(monkeypatch, tmp_path):
     monkeypatch.delenv(scripts.SCRIPTS_REF_VAR, raising=False)
     calls = []
 
-    class _Res:
-        def __init__(self, out):
-            self.output = out
-
     def fake_run(method, category, inputs, out_dir, params=None):
         files = {role: Path(str(f)) for role, f in inputs.items()}
         calls.append((method, files))
         folder = next(iter(files.values())).parent
         labels = mtb.engine.resolve.labels_for(folder.name, category, method, data_path=folder.parent)
         n = sum(len(pd.read_csv(f)) for f in labels.values())
-        return _Res(np.random.default_rng(0).normal(size=(n, 4)))
+        return np.random.default_rng(0).normal(size=(n, 4))
     monkeypatch.setattr(W, "_run", fake_run)
     return calls
 

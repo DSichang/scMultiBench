@@ -23,7 +23,7 @@ from multibench.engine import scripts
 from multibench import _settings
 from multibench import config
 from multibench import workflow as W
-from multibench.engine import envs, registry, runner
+from multibench.engine import envs, registry
 
 ROOT = Path(__file__).resolve().parents[1]
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
@@ -71,16 +71,15 @@ def test_runtime_note_mentions_the_cpu_only_for_gpu_methods():
 
 # ====================================================================== M26
 PLAIN_REFUSAL = ("Methods run only on Linux, and this computer runs macOS. "
-                 "Run the install on a Linux machine, such as Colab. {force} tries anyway.")
+                 "Run the install on a Linux machine, such as Colab.")
 
 
 def test_install_refusal_is_plain_in_python(off_linux, monkeypatch):
     monkeypatch.setattr(envs, "installed_envs", lambda conda=None: [])
     monkeypatch.setattr(envs, "_run_all", lambda cmds: pytest.fail("a build was started"))
-    with pytest.raises(RuntimeError) as e:
-        envs.create_all(methods=["Matilda"], dry_run=False)
-    # the hidden force= is not offered since 0.4.0 (X33)
-    assert str(e.value) == PLAIN_REFUSAL.replace(" {force} tries anyway.", "")
+    with pytest.raises(OSError) as e:
+        envs.install(["Matilda"], build=True)
+    assert str(e.value) == PLAIN_REFUSAL
 
 
 def test_env_plan_fallback_line_agrees_in_number(monkeypatch):
@@ -158,18 +157,10 @@ def test_clone_failure_names_the_offline_route(tmp_path, monkeypatch):
         scripts.ensure_repo(target)
     msg = str(e.value)
     assert msg.startswith("Could not reach github.com to fetch the method scripts.")
-    assert "copy the folder" in msg and "set MULTIBENCH_REPO_PATH" in msg
+    assert msg.endswith("Copy the scripts folder from a machine with network and set "
+                        "MULTIBENCH_REPO_PATH.")
     assert "returned non-zero exit status" not in msg
     assert not target.exists() and not target.with_name("fresh.partial").exists()
-
-
-def test_run_result_carries_provenance(tmp_path, monkeypatch):
-    import dataclasses
-    names = {f.name for f in dataclasses.fields(runner.RunResult)}
-    assert {"scripts_commit", "env_flavor", "hostname"} <= names
-    # defaults keep the old constructor working
-    r = runner.RunResult(method="m", out_dir=tmp_path, cmd=[], output=None, extra={})
-    assert r.scripts_commit is None and r.env_flavor == "unknown" and r.hostname == ""
 
 
 def test_run_all_records_the_provenance(tmp_path, monkeypatch):
@@ -177,9 +168,8 @@ def test_run_all_records_the_provenance(tmp_path, monkeypatch):
     monkeypatch.setattr(scripts, "scripts_commit", lambda repo=None: "e" * 40)
     monkeypatch.setattr(envs, "installed_flavor", lambda env, conda=None: None)
 
-    class _Res:
-        output = np.zeros((2864, 5))
-    monkeypatch.setattr(W, "_run", lambda **kw: _Res())
+    _out = np.zeros((2864, 5))
+    monkeypatch.setattr(W, "_run", lambda **kw: _out)
     res = mtb.run("D11", "vertical", methods=["Matilda"], out_dir=str(tmp_path),
                       evaluate=False, verbose=False)
     rec = res.records[0]

@@ -305,7 +305,7 @@ methods:
     language: python
     gpu_use: not used   # params pass --no_cuda (see the variant comment)
     tasks: [batch, clustering]
-    # atac: role `atac_gas` is only the resolver alias for atac.h5; upstream main_scMM.py feeds the multiome peak matrix (D15/atac.h5) - see tools/atac_audit.py
+    # atac: role `atac_gas` is only the resolver alias for atac.h5; upstream main_scMM.py feeds the multiome peak matrix (D15/atac.h5)
     atac: peak
     status: verified
     variants:
@@ -350,7 +350,7 @@ methods:
   - id: scMDC
     language: python
     tasks: [batch, clustering]
-    # atac: upstream scMDC (ZINB on both views) was designed for gene-level ATAC; tools/atac_audit.py NEEDS_GENE_ACTIVITY
+    # atac: upstream scMDC (ZINB on both views) was designed for gene-level ATAC
     # the benchmark runs this method on peak matrices: its RNA + ATAC datasets (D12-D22,
     # D56) hold peaks only, and the script takes any feature matrix
     atac: peak
@@ -545,7 +545,7 @@ methods:
   - id: moETM
     language: python
     tasks: [clustering]
-    # atac: role `atac_gas` is only the resolver alias for atac.h5; upstream main_moETM_rna_atac.py:33 feeds the multiome peak matrix (D15/atac.h5) - see tools/atac_audit.py
+    # atac: role `atac_gas` is only the resolver alias for atac.h5; upstream main_moETM_rna_atac.py:33 feeds the multiome peak matrix (D15/atac.h5)
     atac: peak
     status: verified
     # GPU: every minibatch goes `.to('cuda')` unconditionally - main_moETM_rna_adt.py:109-111
@@ -954,7 +954,7 @@ methods:
     # src/interface.py:25); the argparse (:15-21) has no device flag.
     requires_gpu: true
     gpu_evidence: tools_scripts/UnitedNet/main_UnitedNet.py:32
-    # atac: not in tools/atac_audit.py; inferred from the upstream script's reference atacseq config (main_UnitedNet.py:174, ATAC input dim 13634 = gene-level features, is_binary_input False). Generic MLP encoders - runs on either representation
+    # atac: inferred from the upstream script's reference atacseq config (main_UnitedNet.py:174, ATAC input dim 13634 = gene-level features, is_binary_input False). Generic MLP encoders - runs on either representation
     # the benchmark runs this method on peak matrices: its RNA + ATAC datasets (D12-D22,
     # D56) hold peaks only, and the script takes any feature matrix
     atac: peak
@@ -1005,7 +1005,7 @@ methods:
     gpu_evidence: tools_scripts/iPOLNG/main_iPOLNG.py:41
     language: python
     tasks: [clustering]
-    # atac: role `atac_gas` is only the resolver alias for atac.h5; upstream main_iPOLNG.py:21 feeds the multiome peak matrix (D15/atac.h5) - see tools/atac_audit.py
+    # atac: role `atac_gas` is only the resolver alias for atac.h5; upstream main_iPOLNG.py:21 feeds the multiome peak matrix (D15/atac.h5)
     atac: peak
     status: verified
     variants:

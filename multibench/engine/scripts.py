@@ -15,8 +15,6 @@ from .._settings import REPO_PATH_VAR, config
 SCRIPTS_REF_VAR = "MULTIBENCH_SCRIPTS_REF"
 #: Where the method scripts are fetched from.
 SCRIPTS_URL = "https://github.com/PYangLab/scMultiBench.git"
-#: How to fetch the method scripts by hand, on a machine with network.
-FETCH_SCRIPTS = f"git clone --depth 1 {SCRIPTS_URL} <folder>"
 
 
 def _scripts_checkout() -> Path | None:
@@ -117,7 +115,7 @@ def scripts_ref_problem(repo=None) -> str | None:
     return _ref_mismatch(repo, ref)
 
 
-def run_provenance(env: str | None, repo=None) -> dict:
+def run_provenance(env: str | None) -> dict:
     """``scripts_commit``, ``env_flavor`` (from the env's install record, else
     ``'unknown'``) and ``hostname`` for a run record."""
     flavor = None
@@ -127,7 +125,7 @@ def run_provenance(env: str | None, repo=None) -> dict:
             flavor = envs.installed_flavor(env)
         except Exception:  # noqa: BLE001 - a record field must never fail a run
             flavor = None
-    return {"scripts_commit": scripts_commit(repo), "env_flavor": flavor or "unknown",
+    return {"scripts_commit": scripts_commit(), "env_flavor": flavor or "unknown",
             "hostname": socket.gethostname()}
 
 
@@ -212,14 +210,11 @@ def _clone(part: Path, ref: str | None) -> None:
                 (part / ".git" / _REF_RECORD).write_text(ref + "\n")
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         shutil.rmtree(part, ignore_errors=True)
-        if ref and not isinstance(e, FileNotFoundError):
-            raise RuntimeError(
-                f"Could not fetch the method scripts at {ref!r}. There is no network, "
-                f"or no such commit or tag. Offline, copy a fetched scripts folder and "
-                f"set {REPO_PATH_VAR}.") from e
-        first = ("Git is not installed. It is needed to fetch the method scripts."
-                 if isinstance(e, FileNotFoundError) else
-                 "Could not reach github.com to fetch the method scripts.")
-        raise RuntimeError(
-            f"{first} On a host without network, run {FETCH_SCRIPTS} "
-            f"on a connected machine, copy the folder and set {REPO_PATH_VAR}.") from e
+        folder = f"the scripts folder from a machine with network and set {REPO_PATH_VAR}."
+        if isinstance(e, FileNotFoundError):
+            raise RuntimeError(f"Git is not installed. Install git, or copy {folder}") from e
+        if ref:
+            raise RuntimeError(f"Could not fetch the method scripts at {ref!r}: no "
+                               f"network, or no such commit or tag.") from e
+        raise RuntimeError(f"Could not reach github.com to fetch the method scripts. "
+                           f"Copy {folder}") from e

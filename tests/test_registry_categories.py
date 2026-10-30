@@ -54,4 +54,16 @@ def test_loose_select_and_family_helper():
     with pytest.raises(KeyError):
         spec.select("vertical", {"rna", "atac_peak"})       # strict, as before
     e = AmbiguousVariantError("x")
-    assert isinstance(e, ValueError) and isinstance(e, KeyError) and str(e) == "x"
+    assert isinstance(e, ValueError) and str(e) == "x"
+
+
+
+def test_a_loose_select_has_one_answer():
+    # select(loose=True) returns the first variant whose ATAC forms collapse to the
+    # wanted set: no method may declare two such variants in one category
+    from multibench.engine.schema import modality_family
+    for spec in registry.load():
+        keys = [(v.when.get("category"),
+                 frozenset(modality_family(m) for m in v.when.get("modalities", [])))
+                for v in spec.variants]
+        assert len(keys) == len(set(keys)), spec.id

@@ -41,17 +41,12 @@ def _from_env(var: str) -> Path | None:
 @functools.lru_cache(maxsize=1)
 def _conda_envs_dir() -> Path | None:
     """The first writable envs dir of the conda/mamba on PATH, or ``None``; one
-    ``info --json`` subprocess per process (tests that fake conda clear the cache)."""
+    ``info --json`` subprocess per process."""
     exe = shutil.which("mamba") or shutil.which("conda")
     if exe is None:
         return None
     from .engine.envs import _envs_dir
     return _envs_dir(exe)
-
-
-def _default_envs_dir() -> Path:
-    """``$MULTIBENCH_ENVS_DIR``, else the conda envs folder, else the cache."""
-    return _from_env(ENVS_DIR_VAR) or _conda_envs_dir() or _CACHE / "envs"
 
 
 def _path(value) -> Path | None:
@@ -129,10 +124,8 @@ class Settings:
 
     @property
     def envs_dir(self) -> Path:
-        # the first default is kept: probing conda on every read would be slow
-        if self._envs_dir is None:
-            self._envs_dir = _default_envs_dir()
-        return self._envs_dir
+        return (self._envs_dir or _from_env(ENVS_DIR_VAR) or _conda_envs_dir()
+                or _CACHE / "envs")
 
     @envs_dir.setter
     def envs_dir(self, value):

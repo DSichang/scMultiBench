@@ -285,21 +285,21 @@ def test_install_packed_no_archive_returns_false(envs_dir, monkeypatch):
     assert not (envs_dir / "matilda").exists()
 
 
-def test_install_packed_platform_guard_precedes_download(envs_dir, monkeypatch):
+def test_install_platform_guard_precedes_download(envs_dir, monkeypatch):
     import urllib.request
     monkeypatch.setattr(envs, "host_system", lambda: "macOS")
     serve_archives(monkeypatch,
                         lambda url: pytest.fail("downloaded on a non-linux host"))
-    with pytest.raises(RuntimeError, match="this computer runs macOS"):
-        envs.install_packed("matilda")
+    with pytest.raises(OSError, match="this computer runs macOS"):
+        envs.install(["Matilda"])
 
 
 def test_install_packed_signature():
     import inspect
     sig = inspect.signature(envs.install_packed)
-    assert list(sig.parameters) == ["env", "envs_dir", "conda", "force", "flavor"]
+    assert list(sig.parameters) == ["env", "envs_dir", "conda", "flavor"]
     assert all(sig.parameters[k].kind is inspect.Parameter.KEYWORD_ONLY
-               for k in ("envs_dir", "conda", "force", "flavor"))
+               for k in ("envs_dir", "conda", "flavor"))
 
 
 # ---------------------------------------------------------------- scan env gate

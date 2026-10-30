@@ -62,10 +62,6 @@ def _with_gaps(n=N, na=7, empty=2):
 LABELS = np.array(["A"] * (N // 2) + ["B"] * (N // 2), dtype=object)
 
 
-class _Res:
-    def __init__(self, out):
-        self.output = out
-
 
 @pytest.fixture
 def host(monkeypatch, tmp_path):
@@ -85,7 +81,7 @@ def host(monkeypatch, tmp_path):
         Path(out_dir).mkdir(parents=True, exist_ok=True)
         with h5py.File(Path(out_dir) / "embedding.h5", "w") as f:
             f.create_dataset("data", data=emb.T)
-        return _Res(emb)
+        return emb
     monkeypatch.setattr(W, "_run", fake_run)
     return calls
 

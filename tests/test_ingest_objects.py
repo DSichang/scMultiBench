@@ -108,20 +108,12 @@ def test_bare_array_needs_master_and_adt_names_warns(tmp_path):
         ingest.export_dataset(rna, tmp_path / "E", adt="obsm:protein", adt_names=["a", "b"])
 
 
-def test_a_missing_run_input_names_path_and_cwd(tmp_path, monkeypatch):
-    from multibench.engine import runner
-    monkeypatch.chdir(tmp_path)
-    with pytest.raises(FileNotFoundError) as e:
-        runner._check_input("rna", "nothere.h5", real=True)
-    assert "nothere.h5" in str(e.value) and f"cwd {os.getcwd()}" in str(e.value)
-
-
 def test_a_run_input_without_matrix_data_is_refused(tmp_path):
     from multibench.engine import runner
     p = tmp_path / "embedding.h5"
     with h5py.File(p, "w") as f:
         f.create_dataset("data", data=np.zeros((4, 2)))
     with pytest.raises(ValueError, match="is not a canonical .h5: it has no 2-D matrix/data"):
-        runner._check_input("rna", str(p), real=True)
+        runner._check_input(str(p))
 
 

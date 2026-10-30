@@ -137,8 +137,11 @@ def test_install_packed_joins_parts_and_leaves_no_download(monkeypatch, tmp_path
 
 
 def test_the_plan_shows_the_first_part(monkeypatch):
-    assert envs._first_url(["h/a.001", "h/a.002"]) == "h/a.001"
-    assert envs._first_url("h/a.tar.gz") == "h/a.tar.gz"
+    monkeypatch.setattr(envs, "packed_manifest",
+                        lambda: {"matilda": ["h/m.001", "h/m.002"]})
+    monkeypatch.setattr(envs, "installed_envs", lambda conda=None: [])
+    row = envs._install_rows(["Matilda"], dry_run=True, flavor="gpu")[0]
+    assert row["packed_url"] == "h/m.001"
 
 
 def test_a_tiny_total_does_not_hang(monkeypatch, tmp_path):

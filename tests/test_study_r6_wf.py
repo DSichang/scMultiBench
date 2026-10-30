@@ -37,7 +37,7 @@ from multibench import workflow as W
 from multibench.engine import envs
 from multibench.eval import pipeline
 from tests.test_study_r4_wf import (ALL_ENVS, N, _batch_metrics, _h5, _quiet,  # noqa: F401
-                                    _Res, cite)
+                                    cite)
 
 pytest.importorskip("scib")
 
@@ -254,7 +254,7 @@ def cross(tmp_path, monkeypatch):
         Path(out_dir).mkdir(parents=True, exist_ok=True)
         with h5py.File(Path(out_dir) / "embedding.h5", "w") as f:
             f.create_dataset("data", data=emb.T)
-        return _Res(emb)
+        return emb
     monkeypatch.setattr(W, "_run", fake_run)
     return tmp_path / "data"
 

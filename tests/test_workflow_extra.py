@@ -47,15 +47,6 @@ import multibench as mtb
 from multibench.workflow import RunResult
 
 
-def test_runresult_is_documented():
-    import inspect
-    from multibench.engine.runner import RunResult
-    doc = inspect.getdoc(RunResult) or ""
-    assert len(doc) > 200, "RunResult is the return of run(); it needs real docs"
-    for word in ("out_dir", "output", "stderr", "extra"):
-        assert word in doc
-
-
 def test_run_all_raises_when_nothing_can_run(tmp_path, monkeypatch):
     """A per-method failure is recorded, but "not one method could start" means the
     REQUEST is wrong. Returning an empty result would report "0 failed", which reads

@@ -105,9 +105,8 @@ def test_a_named_skipped_method_has_its_reason_in_summary(tmp_path, monkeypatch)
     monkeypatch.setattr(config, "repo_path", tmp_path / "no_scripts")
     monkeypatch.delenv(scripts.SCRIPTS_REF_VAR, raising=False)
 
-    class _Res:
-        output = np.zeros((2864, 5))
-    monkeypatch.setattr(W, "_run", lambda *a, **k: _Res())
+    _out = np.zeros((2864, 5))
+    monkeypatch.setattr(W, "_run", lambda *a, **k: _out)
     res = _quiet(mtb.run, "D11", "vertical", tmp_path / "out", methods=trio,
                  evaluate=False, verbose=False)
     sm = res.summary

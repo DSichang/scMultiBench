@@ -89,12 +89,11 @@ def linux(monkeypatch, tmp_path):
     monkeypatch.delenv(scripts.SCRIPTS_REF_VAR, raising=False)
     calls = []
 
-    class _Res:
-        output = np.zeros((60, 5))
+    _out = np.zeros((60, 5))
 
     def fake_run(method, category, inputs, out_dir, params=None):
         calls.append(method)
-        return _Res()
+        return _out
     monkeypatch.setattr(W, "_run", fake_run)
     return calls
 

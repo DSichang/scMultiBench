@@ -6,7 +6,8 @@ from pathlib import Path
 
 from ._text import _and_list
 from .engine import registry, upstream, envs
-from .engine.schema import AmbiguousVariantError, is_label_role
+from .engine.schema import (AmbiguousVariantError, is_label_role, modality_family,
+                            no_category_message, no_variant_message)
 from .engine.schema import base_modality as _base_modality
 
 #: representation role tokens -> the ``atac=`` value they stand for
@@ -127,13 +128,6 @@ def _tunable(v) -> dict:
     return {k: {**(t or {}), "default": eff[k]} for k, t in v.tunable.items()}
 
 
-def _reference_batch(variant):
-    """Batch ``N`` of a variant's ``reference`` const ``data<N>``, else ``None``."""
-    ref = next((a.const for a in variant.args if a.role == "reference" and a.const), None)
-    ref = str(ref) if ref is not None else ""
-    return int(ref[4:]) if ref.startswith("data") and ref[4:].isdigit() else None
-
-
 def method_info(method: str) -> dict:
     """Return everything known about one method as a dict.
 
@@ -192,7 +186,7 @@ def method_info(method: str) -> dict:
                    "output_kind": v.output.kind,
                    "needs_labels": v.needs_labels,
                    "labels": [r for r in v.roles() if is_label_role(r)],
-                   "reference_batch": _reference_batch(v)}
+                   "reference_batch": v.reference_batch}
                   for v in s.variants],
         runtime=_runtime_hint(s.id), gpu=s.gpu, cpu_params=dict(s.cpu_params),
         setup_hint=s.setup_hint,
@@ -279,81 +273,30 @@ def params_for(method: str, category: str | None = None,
     method = s.id
     registry.check_category(category)
     modalities = registry.normalize_modalities(modalities)
-
-    def example(v):
-        mods = list(v.when.get("modalities", []))
-        return f"params_for({method!r}, {v.when.get('category')!r}, {mods})"
-
-    def mods_of(vs):
-        return _and_list("+".join(x.when.get("modalities", [])) for x in vs)
-
-    if category is None and modalities is None:
-        v = _one(s.variants,
-                 f"{method} has {len(s.variants)} variants, "
-                 f"{_and_list(_variant_key(x) for x in s.variants)}. Pass the "
-                 f"category and modalities of one, for example {example(s.variants[0])}.")
-    elif modalities is None:
-        # the only way to reach a data_dir variant (scBridge), which has no modalities
-        cands = [x for x in s.variants if x.when.get("category") == category]
-        if not cands:
-            from .engine.schema import no_category_message
-            raise KeyError(no_category_message(method, s.wired_categories, category))
-        v = _one(cands, f"{method} has {len(cands)} {category} variants, {mods_of(cands)}. "
-                        f"Pass the modalities too, for example {example(cands[0])}.")
-    elif category is None:
-        from .engine.schema import modality_family
+    cands = [v for v in s.variants if category in (None, v.when.get("category"))]
+    if not cands:
+        raise KeyError(no_category_message(method, s.wired_categories, category))
+    if modalities is not None:
         want = {modality_family(m) for m in modalities}
-        cands = ([x for x in s.variants if set(x.when.get("modalities", [])) == set(modalities)]
-                 or [x for x in s.variants
-                     if {modality_family(m) for m in x.when.get("modalities", [])} == want]
-                 or _same_types(s.variants, modalities))
+        cands = ([v for v in cands if set(v.when.get("modalities", [])) == set(modalities)]
+                 or [v for v in cands
+                     if {modality_family(m) for m in v.when.get("modalities", [])} == want]
+                 or _same_types(cands, modalities))
         if not cands:
-            keys = _and_list(_variant_key(x) for x in s.variants)
-            raise KeyError(
-                f"No variant of {method} takes the modalities "
-                f"{_and_list(sorted(modalities))}. Its variants: {keys}.")
-        v = _one(cands, f"The modalities {_and_list(sorted(modalities))} match "
-                        f"{len(cands)} variants of {method}, "
-                        f"{_and_list(_variant_key(x) for x in cands)}. Pass the category "
-                        f"too, for example {example(cands[0])}.")
-    else:
-        try:
-            v = s.select(category, set(modalities), loose=True)
-        except AmbiguousVariantError:
-            raise
-        except KeyError:
-            # base tokens, as find_methods takes them: rna + atac for rna1..3 + atac1..3
-            cands = _same_types([x for x in s.variants
-                                 if x.when.get("category") == category], modalities)
-            if not cands:
-                raise
-            v = _one(cands, f"{method} has {len(cands)} {category} variants of "
-                            f"{_and_list(sorted(modalities))}, {mods_of(cands)}. Pass the "
-                            f"modalities of one, for example {example(cands[0])}.")
+            raise KeyError(no_variant_message(method, modalities, category))
+    first = _tunable(cands[0])
+    if any(_tunable(v) != first for v in cands[1:]):
+        one = cands[0]
+        raise AmbiguousVariantError(
+            f"{method} has variants that take other parameters. Pass the category and "
+            f"modalities of one, for example params_for({method!r}, "
+            f"{one.when.get('category')!r}, {list(one.when.get('modalities', []))}).")
     up = upstream.knobs_for(s.id)
-    vs = v if isinstance(v, list) else [v]
-    return {"method": s.id, "variant": _and_list(_variant_key(x) for x in vs),
-            "tunable": _tunable(vs[0]),
+    return {"method": s.id, "variant": _and_list(_variant_key(v) for v in cands),
+            "tunable": first,
             "fixed_in_script": up["fixed_in_script"],
             "upstream_knobs": up["upstream_knobs"],
             "upstream_url": up["upstream_url"]}
-
-
-def _one(cands, ambiguous: str):
-    """The one variant of ``cands``, or all of them when they take the same
-    parameters; else ``AmbiguousVariantError(ambiguous)``."""
-    if len(cands) == 1:
-        return cands[0]
-    v = _agreed(cands)
-    if v is None:
-        raise AmbiguousVariantError(ambiguous) from None
-    return v
-
-
-def _agreed(variants) -> list | None:
-    """``variants`` when they take the same parameters, else ``None``."""
-    first = _tunable(variants[0])
-    return list(variants) if all(_tunable(x) == first for x in variants[1:]) else None
 
 
 def _same_types(variants, modalities) -> list:

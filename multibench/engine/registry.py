@@ -10,8 +10,7 @@ from pathlib import Path
 
 import yaml
 
-from .schema import (ArgSpec, MethodSpec, OutputSpec, Variant, base_modality,
-                     is_label_role)
+from .schema import ArgSpec, MethodSpec, OutputSpec, Variant
 
 _YAML = Path(__file__).resolve().parent / "methods.yaml"
 # the tunable hyperparams, generated from the upstream argparse
@@ -43,7 +42,7 @@ def _variant_key(when: dict) -> str:
 
 
 def _parse_variant(d: dict, method_id: str | None = None) -> Variant:
-    v = Variant(
+    return Variant(
         when=d["when"],
         entrypoint=d["entrypoint"],
         language=d.get("language", "python"),
@@ -66,12 +65,6 @@ def _parse_variant(d: dict, method_id: str | None = None) -> Variant:
         min_cells_per_batch=d.get("min_cells_per_batch"),
         min_genes=d.get("min_genes"),
     )
-    # labels_for orders label files by this: a bad declaration fails at load
-    try:
-        v.stacked_roles()
-    except ValueError as e:
-        raise ValueError(f"methods.yaml: {method_id!r} {_variant_key(v.when)}: {e}") from None
-    return v
 
 
 def _parse_method(d: dict) -> MethodSpec:
@@ -86,7 +79,7 @@ def _parse_method(d: dict) -> MethodSpec:
         id=d["id"], language=d.get("language", "python"),
         tasks=d.get("tasks", []),
         atac=d.get("atac"),
-        setup_hint=d.get("setup_hint", ""), status=d.get("status", "declared"),
+        setup_hint=d.get("setup_hint", ""),
         variants=variants,
         cpu_params=d.get("cpu_params") or {},
         requires_gpu=d.get("requires_gpu", False),
@@ -179,10 +172,10 @@ def known_modalities() -> set[str]:
     return toks | set(_BASE_MODALITIES)
 
 
-def normalize_modalities(modalities, *, base: bool = False) -> list[str]:
+def normalize_modalities(modalities) -> list[str]:
     """Map caller modality spellings (:data:`MODALITY_ALIASES`) to registry
-    tokens, in order, without duplicates; ``base=True`` reduces each to its
-    base type. An unknown token raises ``ValueError``; ``None`` -> ``None``.
+    tokens, in order, without duplicates. An unknown token raises
+    ``ValueError``; ``None`` -> ``None``.
     """
     if modalities is None:
         return None
@@ -193,11 +186,9 @@ def normalize_modalities(modalities, *, base: bool = False) -> list[str]:
     for tok in modalities:
         low = str(tok).lower()               # RNA, ADT: the tokens are lower case
         t = MODALITY_ALIASES.get(low, low)
-        if t not in known and not is_label_role(t):
+        if t not in known:
             raise ValueError(f"Unknown modality {tok}. Use rna, adt, atac, atac_peak or "
                              f"atac_gas (rna1, adt2 ... for batches).")
-        if base:
-            t = base_modality(t)
         if t not in out:
             out.append(t)
     return out

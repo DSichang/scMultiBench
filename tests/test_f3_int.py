@@ -54,16 +54,12 @@ def _diagonal(root, name):
     pd.DataFrame({"x": ["A"] * 20}).to_csv(d / "atac_cty.csv", index=False)
 
 
-class _Res:
-    def __init__(self, out):
-        self.output = out
-
 
 def test_glue_record_keeps_the_caveat_without_the_prepared_file_note(tmp_path, monkeypatch,
                                                                    capsys):
     _diagonal(tmp_path, "LUNG_us")
     monkeypatch.setattr(W, "_run", lambda method, category, inputs, out_dir, params=None:
-                        _Res(np.zeros((40, 5))))
+                        np.zeros((40, 5)))
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         row = full_scan("LUNG_us", "diagonal", methods=["GLUE"], data_path=tmp_path,

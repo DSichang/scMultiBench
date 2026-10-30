@@ -23,11 +23,14 @@ def test_run_dry_run_refuses_an_unknown_key():
     assert e.value.args[0] == f"Matilda does not accept ['epoch']; {ACCEPTS}"
 
 
-def test_a_real_run_refuses_before_anything_is_written(tmp_path):
-    with pytest.raises(KeyError, match=r"does not accept \['epoch'\]"):
-        mtb.engine.runner.run("Matilda", "vertical", inputs=INPUTS, out_dir=str(tmp_path / "o"),
-                params={"epoch": 3})
-    assert not (tmp_path / "o").exists()
+def test_a_real_run_refuses_before_the_method_starts(tmp_path, monkeypatch, linux_with_envs):
+    from multibench import workflow as W
+    monkeypatch.setattr(W, "_installed_envs", lambda: frozenset(linux_with_envs))
+    monkeypatch.setattr(W, "_run", lambda **k: pytest.fail("the method started"))
+    res = mtb.run("D11", "vertical", tmp_path / "o", methods=["Matilda"],
+                  params={"Matilda": {"epoch": 3}}, verbose=False)
+    row = res.summary.iloc[0]
+    assert row["status"] == "failed" and "does not accept ['epoch']" in row["reason"]
 
 
 def test_a_known_key_still_reaches_the_command():
