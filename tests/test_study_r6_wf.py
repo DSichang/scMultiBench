@@ -128,8 +128,8 @@ def test_a_folder_that_is_not_found_is_named(rel, monkeypatch):
     _shuffled_labels().to_frame("celltype").to_csv(csv)
     with pytest.warns(UserWarning, match=re.escape(
             f"The first column of labels.csv looks like cell ids, but the dataset "
-            f"folder MYCITE is not found in {where}. {MOVED[:-1]}. The file "
-            f"is matched by position.")):
+            f"folder MYCITE is not found in {where}. {MOVED[:-1]}. The rows "
+            f"are matched by position.")):
         back.rescore(labels=csv)
     new = _quiet(back.rescore, metrics=["ARI"])
     rec = new.records[0]

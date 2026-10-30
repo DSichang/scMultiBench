@@ -283,8 +283,9 @@ def read_labels_ids(path: Path | str, column: str | None = None, *,
         fix = "Pass column=<name>."
     else:
         # barcodes become the Series index; row numbers would not match any cell
-        call = ("pd.read_csv(path, index_col=0)['<column>']" if kind == "cell ids"
-                else "pd.read_csv(path)['<column>'].to_numpy()")
+        sep = ', sep="\\t"' if _sep_for(path) == "\t" else ""
+        call = (f"pd.read_csv(path{sep}, index_col=0)['<column>']" if kind == "cell ids"
+                else f"pd.read_csv(path{sep})['<column>'].to_numpy()")
         fix = f"Pass one of them, as {call}."
     raise ValueError(f"{head} has several columns{after}: {', '.join(names)}. {fix}")
 
