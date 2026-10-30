@@ -2441,34 +2441,8 @@ def _cell_vector(x, dataset, data_path, *, what: str = "batch", order: str | Non
         _text.warn(f"The {what} {type(x).__name__} is matched by position, because "
                      f"{why}. {fix}", UserWarning)
         return vals, False
-    if list(index) == ids:
-        return vals, True
-    # to_numpy() is right only for a vector already in that order
-    by_position = (f"pass {what}.to_numpy() only when {what} "
-                   + (f"already follows {order}" if order == _ROWS
-                      else f"is already in {order}"))
-    if not index.is_unique:
-        dup = index[index.duplicated()]
-        raise ValueError(f"{what}: the index repeats {_eio._n_ids(len(dup))} (first: "
-                         f"{list(dup[:3])}), so it cannot be aligned to the cells of "
-                         f"{dataset}. Give each cell one id, or {by_position}.")
-    foreign = index.difference(pd.Index(ids), sort=False)
-    missing = pd.Index(ids).difference(index, sort=False)
-    if len(foreign) and len(missing):
-        from .engine.ingest import suffix_fix
-        fix = suffix_fix(what, ids, list(index)) if len(foreign) == len(index) else ""
-        if fix:
-            raise ValueError(f"{what}: its ids are not cells of {dataset}.{fix}")
-        raise ValueError(f"{what}: {_eio._n_ids(len(foreign))} "
-                         f"{'is not a cell' if len(foreign) == 1 else 'are not cells'} "
-                         f"of {dataset} (first: {list(foreign[:3])}). Rename the index "
-                         f"to the dataset's barcodes, or {by_position}.")
-    if len(missing):
-        unit = "a batch id" if what == "batch" else "a label"
-        raise ValueError(f"{what}: {len(missing):,} of the {len(ids):,} cells of {dataset} "
-                         f"have no id in {what} (first: {list(missing[:3])}). Give "
-                         f"{unit} for every cell.")
-    return np.asarray(pd.Series(vals, index=index).reindex(ids).to_numpy()), True
+    return _eio._align_vector(pd.Series(vals, index=index), ids, what=what,
+                              target=dataset), True
 
 
 def _has_gap(values) -> bool:

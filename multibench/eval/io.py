@@ -505,9 +505,10 @@ def _one_column(x: pd.DataFrame, what: str, column: str | None) -> pd.Series:
         f"or column=<name>")
 
 
-def _align_vector(x, ids, *, what: str, column: str | None):
-    """``x`` (an indexed Series or DataFrame) reordered to the output's cell
-    ``ids``, for ``evaluate``."""
+def _align_vector(x, ids, *, what: str, column: str | None = None,
+                  target: str = "the embedding"):
+    """``x`` (an indexed Series or DataFrame) reordered to the cell ``ids`` of
+    ``target`` (the embedding of ``evaluate``, the dataset of ``run``)."""
     if isinstance(x, pd.DataFrame):
         x = _one_column(x, what, column)
     ids = pd.Index(ids)
@@ -528,23 +529,23 @@ def _align_vector(x, ids, *, what: str, column: str | None):
     missing = ids.difference(x.index, sort=False)
     if len(missing) and len(missing) == len(ids):
         head = (f"The {what}{chr(39) if what.endswith('s') else chr(39) + 's'} cell ids "
-                f"do not match the embedding's (embedding e.g. {ids[0]}, {what} e.g. "
-                f"{x.index[0]}).")
+                f"do not match {target}'s ({target.removeprefix('the ')} e.g. {ids[0]}, "
+                f"{what} e.g. {x.index[0]}).")
         # a 10x suffix such as -1 on one side only: the one fix
         from ..engine.ingest import suffix_fix
         fix = suffix_fix(what, list(ids), list(x.index))
         if fix:
             raise ValueError(head + fix)
-        raise ValueError(f"{head} Pass {what} indexed like the embedding, or "
+        raise ValueError(f"{head} Pass {what} indexed like {target}, or "
                          f"{what}.to_numpy() to match by position.")
     if len(missing):
         # ids the embedding lacks are left out: every cell has its value
         by_position = (f", or {what}.to_numpy() to match positionally"
                        if len(x) == len(ids) else "")
         raise ValueError(
-            f"{what}: cannot align by cell id - {len(missing)} of the embedding's "
+            f"{what}: cannot align by cell id - {len(missing)} of {target}'s "
             f"{len(ids)} cells are missing from {what} (first: {_first(missing)}). "
-            f"Pass {what} for every cell of the embedding{by_position}.")
+            f"Pass {what} for every cell of {target}{by_position}.")
     return np.asarray(x.reindex(ids).to_numpy())
 
 

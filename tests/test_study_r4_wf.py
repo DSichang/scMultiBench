@@ -210,14 +210,13 @@ def test_a_series_with_foreign_ids_raises(cite, tmp_path):
     bad = shuffled.rename(index=lambda b: "x" + b)
     mtb.config.data_path = data
     kw = dict(methods=['Matilda'], modalities=['rna', 'adt'], verbose=False)
-    with pytest.raises(ValueError, match=r"batch: 120 ids are not cells of MYCITE "
-                                         r"\(first: \['xc"):
+    with pytest.raises(ValueError, match=r"^The batch's cell ids do not match MYCITE's "):
         _quiet(mtb.run, "MYCITE", "vertical", tmp_path / "x", batch=bad, **kw)
     assert not (tmp_path / "x").exists()
     res = _quiet(mtb.run, "MYCITE", "vertical", tmp_path / "a", **kw)
-    with pytest.raises(ValueError, match="are not cells of MYCITE"):
+    with pytest.raises(ValueError, match="do not match MYCITE's"):
         _quiet(res.rescore, batch=bad)
-    with pytest.raises(ValueError, match=r"have no id in batch"):
+    with pytest.raises(ValueError, match=r"cells are missing from batch"):
         _quiet(res.rescore, batch=shuffled.iloc[:-5])
 
 

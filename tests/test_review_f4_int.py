@@ -195,10 +195,9 @@ def test_an_integer_index_gets_the_foreign_ids_error(mycite):
     with pytest.raises(ValueError) as e:
         W._batch_vector(sub, "MYCITE", root)
     msg = str(e.value)
-    assert msg.startswith("batch: 10 ids are not cells of MYCITE (first: ['0', '2', '4']). "
-                          "Rename the index to the dataset's barcodes, or "), msg
-    assert msg.endswith("only when batch is already in the order of the label files of "
-                        "MYCITE."), msg      # 0.4: labels_for is deprecated
+    assert msg == ("The batch's cell ids do not match MYCITE's (MYCITE e.g. c0, batch e.g. "
+                   "0). Pass batch indexed like MYCITE, or batch.to_numpy() to match by "
+                   "position."), msg
 
 
 def test_missing_and_foreign_ids_get_their_own_fix(mycite):
@@ -206,16 +205,14 @@ def test_missing_and_foreign_ids_get_their_own_fix(mycite):
     short = pd.Series([1] * 5, index=bars[:5])
     with pytest.raises(ValueError) as e:
         W._batch_vector(short, "MYCITE", root)
-    assert str(e.value).endswith("Give a batch id for every cell.")
+    assert str(e.value).endswith("Pass batch for every cell of MYCITE.")
     assert "to_numpy" not in str(e.value)
     foreign = pd.Series([1] * 20, index=[f"x{b}" for b in bars])
     with pytest.raises(ValueError) as e:
         W._batch_vector(foreign, "MYCITE", root)
-    assert str(e.value).startswith("batch: 20 ids are not cells of MYCITE")
-    assert "Rename the index to the dataset's barcodes, or pass batch.to_numpy() only " \
-           "when batch is already in the order of" in str(e.value)
+    assert str(e.value).startswith("The batch's cell ids do not match MYCITE's")
     one = pd.Series([1] * 20, index=bars[:19] + ["zz"])
-    with pytest.raises(ValueError, match=r"^batch: 1 id is not a cell of MYCITE"):
+    with pytest.raises(ValueError, match=r"^batch: cannot align by cell id - 1 of MYCITE's "):
         W._batch_vector(one, "MYCITE", root)
     assert "(s)" not in str(e.value)
 
