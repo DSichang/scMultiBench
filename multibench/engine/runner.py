@@ -7,86 +7,13 @@ import shlex
 import signal
 import subprocess
 import sys
-from dataclasses import dataclass
 from pathlib import Path
 
 from .. import _text
 
 from .._settings import config
 from . import builder, io, ingest, registry, envs, scripts
-from .schema import _batch_of, base_modality, is_label_role
-
-
-@dataclass
-class RunResult:
-    """What :func:`run` returns for one method.
-
-    Attributes
-    ----------
-    method : str
-        The method id that ran.
-    out_dir : Path
-        Folder holding everything the method wrote.
-    cmd : list[str]
-        The argv that ran; ``shlex.join(res.cmd)`` repeats the run by hand.
-    output : object
-        The primary output, loaded; an embedding array for most methods.
-    extra : dict
-        ``{filename: loaded object}`` for the variant's extra outputs.
-    stdout : str
-        Captured standard output of the method.
-    stderr : str
-        Captured standard error; read it first when a result looks wrong.
-    obs_names : list[str] | None
-        Cell barcodes of the output, in the method's cell order; ``None`` when
-        they could not be matched.
-    scripts_commit : str | None
-        Commit of the method scripts that ran; ``None`` when they are not a
-        git checkout.
-    env_flavor : str
-        ``'cpu'`` or ``'gpu'`` build of the method's environment, ``'single'``
-        when it has one build for both, else ``'unknown'``.
-    hostname : str
-        Name of the computer that ran the method.
-
-    Notes
-    -----
-    **Row order.** Rows follow the order of the method's label files
-    (``resolve.labels_for``). ``obs_names`` is
-    ``None``, with a ``UserWarning``, when the input barcodes do not match
-    the output's cells or the inputs are a folder (scBridge).
-
-    **Orientation.** When ``res.output.shape[0] != len(res.obs_names)`` the
-    output is dims x cells: store ``res.output.T``. ``mtb.evaluate`` orients
-    a raw array itself.
-
-    **Output kind.** Not every method returns an embedding: Seurat_WNN
-    writes only a neighbour graph, which ``mtb.run`` does not score.
-    """
-
-    method: str
-    out_dir: Path
-    cmd: list[str]
-    output: object
-    extra: dict
-    stdout: str = ""
-    stderr: str = ""
-    obs_names: list | None = None
-    scripts_commit: str | None = None
-    env_flavor: str = "unknown"
-    hostname: str = ""
-
-    def __repr__(self) -> str:
-        """One line: the method, the folder, the output's shape and the extra
-        files; not the data, stdout or the cell names."""
-        def shape(x):
-            sh = getattr(x, "shape", None)
-            return (f"{type(x).__name__} {tuple(sh)}" if sh is not None
-                    else type(x).__name__)
-        cells = "None" if self.obs_names is None else f"{len(self.obs_names):,} cells"
-        return (f"RunResult(method={self.method!r}, out_dir={str(self.out_dir)!r}, "
-                f"output={shape(self.output)}, extra={sorted(map(str, self.extra or {}))}, "
-                f"obs_names={cells})")
+from .schema import _NON_MODALITY_ROLES, is_label_role
 
 
 #: The environment variable that forces a run mode (``conda`` | ``prefix``).
@@ -135,11 +62,6 @@ def wrap_prefix(cmd: list[str], env: str, prefix: Path | str) -> list[str]:
     return ["bash", "-c", f"{prefix_activation(env, prefix)}; exec \"$@\"", "--", *cmd]
 
 
-# roles passed through as given: never checked as .h5, never select the variant
-_AUX_ROLES = {"data_dir", "source_data", "target_data", "cty", "source_cty", "target_cty",
-              "out_dir"}
-
-
 def normalize_paths(inputs: dict, out_dir) -> tuple[dict, str]:
     """``(inputs, out_dir)`` with every path absolute; ``out_dir``, ``data_dir``
     and any existing directory get a trailing separator.
@@ -169,24 +91,11 @@ def normalize_paths(inputs: dict, out_dir) -> tuple[dict, str]:
 
 def _is_modality_role(role: str) -> bool:
     """A role that selects the variant and must be a canonical ``.h5``."""
-    return role not in _AUX_ROLES and not is_label_role(role)
+    return role not in _NON_MODALITY_ROLES and not is_label_role(role)
 
 
 def _modality_roles(inputs: dict) -> set[str]:
     return {k for k in inputs if _is_modality_role(k)}
-
-
-def _check_input_cells(method: str, category: str, inputs: dict) -> None:
-    """The cell checks of ``inputs_for(check=True)`` on the input paths;
-    raises their ``ValueError``."""
-    from . import resolve
-    paths = {r: v for r, v in inputs.items() if isinstance(v, (str, os.PathLike))}
-    if not paths:
-        return
-    dataset = Path(next(iter(paths.values()))).parent.name or "inputs"
-    resolve._check_same_cells(method, dataset, paths)
-    if category == "diagonal":
-        resolve._check_atac_gas_cells(method, dataset, paths)
 
 
 def _repo_root_no_fetch() -> Path:
@@ -196,12 +105,8 @@ def _repo_root_no_fetch() -> Path:
 
 
 
-def missing_script_fix(repo) -> str:
-    """What to do about a method script missing from the checkout at ``repo``."""
-    if scripts.scripts_commit(repo) is not None:
-        return ("update it with git pull, or delete it so the next run fetches a "
-                "fresh copy")
-    return "that folder is not a git checkout; move it away so the next run fetches the scripts"
+#: What to do about a method script missing from the scripts folder.
+MISSING_SCRIPT_FIX = "delete or move that folder so the next run fetches the scripts"
 
 
 #: How the note that no method scripts are here begins; ``mtb.scan`` finds it by this text.
@@ -242,52 +147,31 @@ def provide_script_files(spec, variant, repo: Path) -> None:
 
 
 def script_notes(spec, variant, repo: Path) -> list[str]:
-    """Setup facts a preview shows before the real run fails on them.
-
-    The method's ``setup_hint`` first (unless its helper files are all in
-    place), then its ``size_hint``, then a note for a script that is not on
-    disk. Plain sentences: ``mtb.scan`` adds them to ``caveat``.
-    """
+    """Setup facts a scan shows before the real run fails on them: the
+    method's ``setup_hint`` (unless its helper files are all in place), its
+    ``size_hint``, and a note when no method scripts are here yet."""
     notes = []
-    entrypoint = Path(variant.entrypoint)
     helpers = variant.helpers
-    done = bool(helpers) and all((repo / entrypoint).parent.joinpath(h).exists()
-                                 or shipped_helper(spec.id, h) for h in helpers)
+    folder = (repo / variant.entrypoint).parent
+    done = bool(helpers) and all((folder / h).exists() or shipped_helper(spec.id, h)
+                                 for h in helpers)
     if spec.setup_hint and not done:
         notes.append(spec.setup_hint)
     if variant.size_hint:
         notes.append(variant.size_hint)
-    # a shipped script is copied in before the run
-    shipped = entrypoint.name in helpers and shipped_helper(spec.id, entrypoint.name)
-    if not (repo / entrypoint).exists():
-        if (repo / "tools_scripts").is_dir() and shipped:
-            pass
-        elif (repo / "tools_scripts").is_dir():
-            fix = missing_script_fix(repo)
-            notes.append(f"{spec.id}'s script {entrypoint} is not in the checkout at {repo}. "
-                         f"{fix[:1].upper()}{fix[1:]}.")
-        elif not scripts.scripts_folder_problem(repo):      # else preview() names it
-            notes.append(f"{SCRIPTS_NOT_HERE}{repo}. The first real run clones "
-                         f"PYangLab/scMultiBench with git. On a host without network, "
-                         f"run {scripts.FETCH_SCRIPTS} first.")
+    if not (repo / "tools_scripts").is_dir() and not scripts.scripts_folder_problem(repo):
+        notes.append(f"{SCRIPTS_NOT_HERE}{repo} yet. The first run fetches them.")
     return notes
 
 
-def _check_input(role: str, val, *, real: bool) -> None:
-    """Refuse a modality input that is not a canonical ``.h5`` file. A missing
-    path raises ``FileNotFoundError`` when ``real``; a preview may name the
-    files of another host."""
-    if not isinstance(val, (str, os.PathLike)):
-        raise TypeError(f"inputs[{role!r}] must be a file path, got {type(val).__name__}")
-    path = Path(val)
-    if not path.exists():
-        if real:
-            raise FileNotFoundError(f"input file does not exist: {path} (cwd {os.getcwd()})")
-        return
-    ingest._check_canonical(path)
+def _check_input(val) -> None:
+    """Refuse a modality input that is not a canonical ``.h5`` file; a path
+    that is not on this host (a preview's) passes."""
+    if Path(val).exists():
+        ingest._check_canonical(val)
 
 
-def _plan_inputs(variant, inputs: dict, inputs_dir: Path, *, real: bool) -> dict:
+def _plan_inputs(variant, inputs: dict, inputs_dir: Path) -> dict:
     """``{role: {"value", "normpeaks_from"}}``: the file each role hands the
     script, for the run and scan. A ``normalize_peaks`` role reads
     ``inputs/<role>_normpeaks.h5``. Nothing is written; the format checks run.
@@ -296,7 +180,7 @@ def _plan_inputs(variant, inputs: dict, inputs_dir: Path, *, real: bool) -> dict
     for role, val in inputs.items():
         step = {"value": val, "normpeaks_from": None}
         if _is_modality_role(role):
-            _check_input(role, val, real=real)
+            _check_input(val)
             step["value"] = str(val)
         plan[role] = step
     for role in variant.normalize_peaks:
@@ -304,73 +188,6 @@ def _plan_inputs(variant, inputs: dict, inputs_dir: Path, *, real: bool) -> dict
             plan[role]["normpeaks_from"] = plan[role]["value"]
             plan[role]["value"] = str(inputs_dir / f"{role}_normpeaks.h5")
     return plan
-
-
-def _cell_group_roles(variant) -> list[list[str]]:
-    """The input roles grouped by the cells they hold, in stacking order.
-
-    Vertical: one group. Diagonal: one per base modality and batch number
-    (``atac_peak`` and ``atac_gas`` share cells). Mosaic and cross: one per batch.
-    """
-    category = variant.when.get("category")
-    groups: dict = {}
-    for r in variant.stacked_roles():
-        if category == "vertical":
-            key = "cells"
-        elif category == "diagonal":
-            key = (base_modality(r), _batch_of(r))
-        else:
-            key = _batch_of(r) if _batch_of(r) is not None else r
-        groups.setdefault(key, []).append(r)
-    return list(groups.values())
-
-
-def _read_barcodes(path) -> list[str]:
-    import h5py
-    with h5py.File(path, "r") as f:
-        return ingest._strings(f["matrix/barcodes"][:])
-
-
-def _obs_names(method: str, variant, values: dict, output) -> list[str] | None:
-    """The input barcodes in the output's cell order, or ``None`` with a warning.
-
-    Each cell group gives the barcodes of its first readable canonical file;
-    the list is kept when its length matches one axis of ``output``.
-    """
-    why = None
-    names: list[str] = []
-    # only roles the call was given hold cells (a const such as 'NULL' does not)
-    groups = [[r for r in g if r in values] for g in _cell_group_roles(variant)]
-    groups = [g for g in groups if g]
-    if not groups:
-        why = "the method reads a folder, not modality files"
-    for roles in groups:
-        barcodes = None
-        for r in roles:
-            v = values[r]
-            if isinstance(v, (str, os.PathLike)) and str(v).endswith(".h5"):
-                try:
-                    barcodes = _read_barcodes(v)
-                    break
-                except (OSError, KeyError):
-                    continue
-        if barcodes is None:
-            why = f"no barcodes readable for input role(s) {roles}"
-            break
-        names += barcodes
-    if why is None:
-        shape = tuple(getattr(output, "shape", ()) or ())
-        if not shape and isinstance(output, (list, tuple)):
-            shape = (len(output),)
-        if len(names) not in shape[:2]:
-            why = (f"the inputs hold {len(names)} cells but the output has shape "
-                   f"{shape}")
-    if why is None:
-        return names
-    _text.warn(f"{method}: RunResult.obs_names is None ({why}); the rows follow "
-                 f"the order of {method}'s label files",
-                 UserWarning)
-    return None
 
 
 def _host_run_env(run_env: dict | None) -> dict:
@@ -512,67 +329,16 @@ def check_gpu_requirement(spec) -> None:
 
 def run(method: str, category: str, *, inputs: dict, out_dir: str,
         params: dict | None = None):
-    """Run one method on explicit inputs and load its output (internal:
-    ``mtb.run`` calls it for each runnable method of a dataset folder).
-
-    Parameters
-    ----------
-    method : str
-        Method id, e.g. ``"Matilda"``; see ``mtb.find_methods()``.
-    category : str
-        Integration category of the variant: ``vertical``, ``diagonal``,
-        ``mosaic`` or ``cross``.
-    inputs : dict
-        ``{role: path}``, from ``resolve.inputs_for``; its
-        modality roles select the variant.
-    out_dir : str
-        Folder the method writes into; created if missing.
-    params : dict | None
-        Hyperparameter overrides merged over the variant's defaults, keyed
-        by parameter name (``mtb.params_for``); ``None`` = the defaults.
-
-    Returns
-    -------
-    RunResult
-        Read ``output`` (the primary output, loaded), ``obs_names`` (its cell
-        barcodes) and ``stderr``.
-
-    Raises
-    ------
-    KeyError
-        Unknown method, no variant fits ``category`` and the input roles, or
-        a ``params`` key the variant does not accept.
-    ValueError
-        A modality input that is not a canonical ``.h5`` file.
-    ValueError
-        Input files that must hold the same cells, in one order, do not.
-    ValueError
-        ``MULTIBENCH_RUN_MODE`` is set to anything but ``conda`` or ``prefix``.
-    OSError
-        The method needs a GPU this host lacks, its env is not installed, or
-        this host is not Linux.
-    RuntimeError
-        The method exited with a non-zero status, or its scripts could not be fetched.
-
-    Warns
-    -----
-    UserWarning
-        The input barcodes do not match the output's cells; ``obs_names`` is ``None``.
-    UserWarning
-        An ATAC input holds the other representation or peak names the method cannot read.
-
-    """
-    method = registry.check_method(method)
+    """Run one method and return its primary output, loaded (internal:
+    ``mtb.run`` calls it after ``inputs_for(check=True)`` and
+    :func:`check_params`). ``inputs`` is ``{role: path}``; its modality roles
+    select the variant. ``OSError`` when the method needs a GPU this host
+    lacks, its env is not installed, or this host is not Linux;
+    ``RuntimeError`` when the method fails or does not write a declared extra
+    output."""
     spec = registry.get(method)
+    method = spec.id
     variant = spec.select(category, _modality_roles(inputs))
-    check_params(method, variant, params)
-    _check_input_cells(method, category, inputs)
-    from ..workflow import _atac_mismatch_caveats     # workflow imports this module
-    mismatch = _atac_mismatch_caveats(method, category, inputs)
-    if mismatch:
-        # one sentence per file: the peak-name caveat already ends with its fix
-        _text.warn(" ".join(m if m.endswith(".") else m + "." for m in mismatch),
-                     UserWarning)
     params, applied = cpu_params_for(spec, params)
     check_gpu_requirement(spec)
     if applied:
@@ -585,7 +351,7 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     out = Path(out_str)
     inputs_dir = out / "inputs"
     # every input-format check before anything is written or fetched
-    plan = _plan_inputs(variant, inputs, inputs_dir, real=True)
+    plan = _plan_inputs(variant, inputs, inputs_dir)
     repo = scripts.ensure_repo()
     provide_script_files(spec, variant, repo)
     out.mkdir(parents=True, exist_ok=True)
@@ -598,15 +364,12 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
             ingest._normalize_peak_names(step["normpeaks_from"], step["value"])
         values[role] = step["value"]
     cmd = _argv(variant, method, values, out_str, repo, params)
-    provenance = scripts.run_provenance(env_name, repo)
     cwd = (repo / variant.entrypoint).parent if variant.cwd_at_script else out
-    stdout, stderr = _execute(method, cmd, str(cwd), variant.run_env)
-    primary = io.load_output(out, variant.output)
-    extra = {o.file: io.load_output(out, o) for o in variant.extra_outputs}
-    return RunResult(method=method, out_dir=out, cmd=cmd, output=primary, extra=extra,
-                     stdout=stdout, stderr=stderr,
-                     obs_names=_obs_names(method, variant, values, primary),
-                     **provenance)
+    _execute(method, cmd, str(cwd), variant.run_env)
+    missing = [o.file for o in variant.extra_outputs if not (out / o.file).is_file()]
+    if missing:
+        raise RuntimeError(f"{method} did not write {_text._and_list(missing)} in {out}.")
+    return io.load_output(out, variant.output)
 
 
 def _check_env(method: str, env_name: str) -> None:
@@ -633,9 +396,9 @@ def _check_env(method: str, env_name: str) -> None:
             f"mtb.env.install([{method!r}]).")
 
 
-def _execute(method: str, cmd: list[str], cwd: str, run_env: dict | None) -> tuple[str, str]:
-    """``(stdout, stderr)`` of the method's ``cmd`` run in ``cwd``; a non-zero
-    exit raises ``RuntimeError`` with the tails of both."""
+def _execute(method: str, cmd: list[str], cwd: str, run_env: dict | None) -> None:
+    """Run the method's ``cmd`` in ``cwd``; a non-zero exit raises
+    ``RuntimeError`` with the tails of stdout and stderr."""
     # user site-packages (~/.local) can shadow the env's packages, and so can
     # the user's personal R library: our env holds every package it needs
     env = {**envs.without_user_r_library(os.environ), "PYTHONNOUSERSITE": "1",
@@ -664,33 +427,23 @@ def _execute(method: str, cmd: list[str], cwd: str, run_env: dict | None) -> tup
             f"stdout tail:\n{stdout[-1500:]}\n"
             f"stderr tail:\n{stderr[-2500:]}"
         )
-    return stdout, stderr
 
 
 def preview(method: str, category: str, *, inputs: dict, out_dir, params=None,
-            repo_path=None,
-            gpu: bool | None = None) -> tuple[list[str], list[str]]:
-    """``(argv, notes)`` a run would execute and show, for ``mtb.scan``;
-    nothing is written, fetched or launched.
-
-    The notes: a scripts checkout problem first, then :func:`script_notes`,
-    then the prepared-files note. ``gpu`` goes to :func:`cpu_params_for`.
-    """
+            gpu: bool | None = None) -> tuple[list[str], str | None]:
+    """``(argv, prepared)`` for ``mtb.scan``: the argv a run would execute and
+    :func:`_prepared_note`; nothing is written, fetched or launched. ``gpu``
+    goes to :func:`cpu_params_for`."""
     spec = registry.get(method)
     method = spec.id
     variant = spec.select(category, _modality_roles(inputs))
-    check_params(method, variant, params)            # as the run checks them
+    check_params(method, variant, params)            # as mtb.run checks them
     params, _ = cpu_params_for(spec, params, gpu=gpu)
     values, out_str = normalize_paths(inputs, out_dir)
-    plan = _plan_inputs(variant, values, Path(out_str) / "inputs", real=False)
+    plan = _plan_inputs(variant, values, Path(out_str) / "inputs")
     values = {role: step["value"] for role, step in plan.items()}
-    repo = Path(repo_path) if repo_path else _repo_root_no_fetch()
-    argv = _argv(variant, method, values, out_str, repo, params)
-    # the real run refuses these (scripts.ensure_repo)
-    ref = scripts.scripts_ref_problem(repo) or scripts.scripts_folder_problem(repo)
-    notes = ([ref] if ref else []) + script_notes(spec, variant, repo)
-    prepared = _prepared_note(plan, out_str, spec.id)
-    return argv, notes + ([prepared] if prepared else [])
+    argv = _argv(variant, method, values, out_str, _repo_root_no_fetch(), params)
+    return argv, _prepared_note(plan, out_str, spec.id)
 
 
 #: what :func:`_prepared_note` says after the method name; :func:`_prepared_at`

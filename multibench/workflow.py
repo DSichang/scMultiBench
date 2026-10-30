@@ -199,7 +199,7 @@ def _missing_script(variant, *, method: str | None = None) -> str:
                        and _runner.shipped_helper(method, entry.name))
             if not (root / entry).exists() and not shipped:
                 return (f"method script {entry} is missing from the reference checkout at "
-                        f"{root}: " + _runner.missing_script_fix(root))
+                        f"{root}: " + _runner.MISSING_SCRIPT_FIX)
             gone = [h for h in variant.helpers
                     if not (root / entry).parent.joinpath(h).exists()
                     and not (method and _runner.shipped_helper(method, h))]
@@ -386,19 +386,6 @@ def _wrong_atac_reason(caveats) -> str:
     return next(iter(_blocking_caveats(caveats)), "")
 
 
-def _atac_mismatch_caveats(method: str, category: str, inputs) -> list[str]:
-    """The blocking caveats of the files in a ``run`` call's ``inputs``; ``[]`` when
-    none or unreadable. In-memory inputs are not checked."""
-    try:
-        spec = registry.get(method)
-        paths = {r: str(p) for r, p in inputs.items()
-                 if isinstance(p, (str, os.PathLike)) and Path(p).exists()}
-        return _blocking_caveats(_resolve._preflight_caveats(
-            paths, atac=spec.atac, category=category, method=method))
-    except Exception:  # noqa: BLE001 - a check must never stop the run
-        return []
-
-
 def _run_caveat(caveat) -> str:
     """A scan ``caveat`` without the trailing notes on starting the method
     (scripts not here, a prepared input), which ``run`` handles itself."""
@@ -520,11 +507,10 @@ def _command_line(method: str, category: str, inputs: dict, *, out_dir, dataset:
     files that ``run`` writes first; ``(no preview: ...)`` when it cannot be built."""
     try:
         # runner.preview, not _run: a preview is not a dispatch
-        argv, notes = _runner.preview(method, category, inputs=inputs,
-                                      out_dir=Path(out_dir) / f"{method}_{dataset}",
-                                      params=params, gpu=gpu)
-        prepared = [n for n in notes if _runner._prepared_at(n) == 0]
-        return shlex.join(argv), prepared
+        argv, prepared = _runner.preview(method, category, inputs=inputs,
+                                         out_dir=Path(out_dir) / f"{method}_{dataset}",
+                                         params=params, gpu=gpu)
+        return shlex.join(argv), [prepared] if prepared else []
     except Exception as e:  # noqa: BLE001 - a preview must never abort the scan
         return f"(no preview: {type(e).__name__}: {e})", []
 
@@ -2991,17 +2977,11 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
                         print(f"[run]   reusing existing output in {method_dir}", flush=True)
                     res = None
                 else:
-                    with warnings.catch_warnings():
-                        # an allowed ATAC caveat is already in the log and the record
-                        warnings.filterwarnings(
-                            "ignore", category=UserWarning,
-                            message=re.escape(f"{method} ") + rf"({_WRONG_ATAC_BODY}"
-                                    rf"|{re.escape(PEAK_NAMES_REASON)})")
-                        res = _run(method=method, category=category, inputs=inputs,
-                                   out_dir=str(method_dir), params=overrides)
+                    res = _run(method=method, category=category, inputs=inputs,
+                               out_dir=str(method_dir), params=overrides)
                 rec["reused"] = bool(reused)
                 rec["run_sec"] = round(time.time() - start, 1)
-                emb = (_cells_first(np.asarray(res.output))
+                emb = (_cells_first(np.asarray(res))
                        if variant.output.kind == "embedding" and res is not None
                        else _load_embedding(method_dir, variant))
                 if emb is None:

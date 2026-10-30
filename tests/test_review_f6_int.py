@@ -36,7 +36,7 @@ from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs
 from tests.test_docs_r4 import _flat, needs_docs
-from tests.test_study_r4_wf import ALL_ENVS, _h5, _quiet, _Res, cite  # noqa: F401
+from tests.test_study_r4_wf import ALL_ENVS, _h5, _quiet, cite  # noqa: F401
 from tests.test_study_r6_msg import _lung_ids, needs_git, pinned, wrong_ref
 from tests.test_study_r6_wf import KW, _shuffled_labels, rel  # noqa: F401
 
@@ -89,7 +89,7 @@ def stacked(tmp_path, monkeypatch):
         Path(out_dir).mkdir(parents=True, exist_ok=True)
         with h5py.File(Path(out_dir) / "embedding.h5", "w") as f:
             f.create_dataset("data", data=emb.T)
-        return _Res(emb)
+        return emb
     monkeypatch.setattr(W, "_run", fake_run)
     monkeypatch.chdir(tmp_path)
     donor = np.concatenate([_donor(b, n) for b, n in SIZES.items()])

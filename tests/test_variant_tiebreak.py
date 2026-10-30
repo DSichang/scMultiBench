@@ -105,15 +105,11 @@ def test_a_smaller_folder_still_picks_its_own_variant(tmp_path):
 
 
 # ------------------------------------------------------------- scan and run
-class _Res:
-    def __init__(self, out):
-        self.output = out
-
 
 def _fake_run(calls, n_cells=24):
     def _inner(method, category, inputs, out_dir, params=None):
         calls.append((method, sorted(inputs)))
-        return _Res(np.zeros((n_cells, 5)))
+        return np.zeros((n_cells, 5))
     return _inner
 
 

@@ -83,9 +83,7 @@ def test_run_all_names_out_dir_and_records_after_the_folder(tmp_path, monkeypatc
     def fake_run(method, category, inputs, out_dir, params=None):
         calls.append(out_dir)
 
-        class R:
-            output = np.zeros((40, 5))
-        return R()
+        return np.zeros((40, 5))
     monkeypatch.setattr(W, "_run", fake_run)
     _cite(tmp_path, "MYCITE")
     with warnings.catch_warnings(record=True) as w:

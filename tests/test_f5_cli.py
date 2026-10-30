@@ -50,19 +50,6 @@ def _strings(node):
                     yield part.value
 
 
-def test_peak_name_note_and_warning_end_with_the_fix(tmp_path, pinned, capsys):
-    root = _diagonal(tmp_path, "LUNG_ids", [f"peak_{i}" for i in range(60)])
-    d = root / "LUNG_ids"
-    inputs = {"rna": str(d / "rna.h5"), "atac_peak": str(d / "atac_peak.h5")}
-    note = ("GLUE reads peak names such as chr1:100-200. atac_peak.h5 holds other names, "
-            "for example peak_0. Rename them to chr:start-end, or export gene activity with "
-            "atac_kind='gene_activity'.")
-    with pytest.warns(UserWarning) as rec:
-        with pytest.raises(Exception):
-            mtb.engine.runner.run("GLUE", "diagonal", inputs=inputs, out_dir=tmp_path / "o2")
-    assert note in [str(w.message) for w in rec]
-
-
 def test_scan_reason_is_sentences_with_their_own_subjects(tmp_path, monkeypatch):
     monkeypatch.setattr(envs, "host_system", lambda: "macOS")
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())

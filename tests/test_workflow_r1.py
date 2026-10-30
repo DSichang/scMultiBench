@@ -4,8 +4,7 @@ One block per ledger item: L13 (one rule for ``modalities``), L17 (setup
 steps in scan and the dry run), L18 (Linux-only wording off Linux), L20
 (method scripts not on this machine), L25 (several jobs, one out_dir), L30
 (the dry run names the files the run passes), L31 (reasons never cut a
-path), L32 (the atac column), L53 (``RunResult.obs_names``), L61 (plain
-wording).
+path), L32 (the atac column), L61 (plain wording).
 
 Host-independent: the platform is pinned to Linux by conftest; the tests of
 the other hosts patch ``envs.host_system`` themselves.
@@ -134,12 +133,13 @@ def test_scan_caveat_carries_the_first_sentence_of_the_setup_hint():
 
 
 def test_preview_names_the_setup_hint_once(capsys):
-    inp = mtb.engine.resolve.inputs_for("D28", "diagonal", "GLUE")
-    argv, notes = mtb.engine.runner.preview("GLUE", "diagonal", inputs=inp,
-                                            out_dir="/tmp/unused/GLUE")
+    spec = mtb.engine.registry.get("GLUE")
+    notes = runner.script_notes(spec, spec.variants[0], runner._repo_root_no_fetch())
     assert sum(n.startswith("GLUE reads the GENCODE v43 human annotation")
                for n in notes) == 1
-    assert isinstance(argv, list) and capsys.readouterr().err == ""
+    inp = mtb.engine.resolve.inputs_for("D28", "diagonal", "GLUE")
+    mtb.engine.runner.preview("GLUE", "diagonal", inputs=inp, out_dir="/tmp/unused/GLUE")
+    assert capsys.readouterr().err == ""
     # scan previews every row without printing
     full_scan("D28", "diagonal", methods=["GLUE"], verbose=False)
     assert capsys.readouterr().err == ""
@@ -184,11 +184,12 @@ def no_scripts(tmp_path, monkeypatch):
 
 def test_preview_says_when_the_method_scripts_are_not_here(no_scripts):
     inp = mtb.engine.resolve.inputs_for("D11", "vertical", "totalVI")
-    notes = " ".join(mtb.engine.runner.preview("totalVI", "vertical", inputs=inp,
-                                               out_dir="/tmp/unused/t")[1])
-    assert f"The method scripts are not in {no_scripts}. The first real run clones " \
-           f"PYangLab/scMultiBench with git." in notes
-    assert "git clone --depth 1 https://github.com/PYangLab/scMultiBench.git <folder>" in notes
+    spec = mtb.engine.registry.get("totalVI")
+    variant = spec.select("vertical", {"rna", "adt"})
+    notes = mtb.engine.runner.script_notes(spec, variant, no_scripts)
+    assert f"The method scripts are not in {no_scripts} yet. The first run fetches them." \
+        in notes
+    mtb.engine.runner.preview("totalVI", "vertical", inputs=inp, out_dir="/tmp/unused/t")
     assert not no_scripts.exists()                   # nothing fetched or created
 
 
@@ -204,7 +205,7 @@ def test_real_run_without_network_names_the_fetch_command(tmp_path, monkeypatch,
         raise subprocess.CalledProcessError(128, cmd)
     monkeypatch.setattr(subprocess, "run", offline)
     monkeypatch.setattr(mtb.config, "repo_path", tmp_path / "scripts")
-    with pytest.raises(RuntimeError, match="git clone --depth 1") as e:
+    with pytest.raises(RuntimeError, match="^Could not reach github.com") as e:
         mtb.engine.runner.run("totalVI", "vertical", inputs=mtb.engine.resolve.inputs_for("D11", "vertical", "totalVI"),
                 out_dir=str(tmp_path / "out"))
     assert isinstance(e.value.__cause__, subprocess.CalledProcessError)
@@ -253,20 +254,6 @@ def test_run_all_refuses_a_mismatched_out_dir_before_any_method(tmp_path, monkey
 
 
 # ----------------------------------------------------------------- L30: dry-run plan
-@pytest.mark.parametrize("kind", ["anndata", "mudata"])
-def test_preview_refuses_an_object_like_the_real_run(tmp_path, kind, linux_with_envs):
-    import anndata as ad
-    bad = ad.AnnData(np.ones((4, 2)))
-    if kind == "mudata":
-        mudata = pytest.importorskip("mudata")
-        bad = mudata.MuData({"rna": bad})
-    for call in (mtb.engine.runner.preview, mtb.engine.runner.run):
-        with pytest.raises(TypeError, match=r"inputs\['rna'\] must be a file path"):
-            call("scMVP", "vertical", inputs={"rna": bad, "atac": bad},
-                 out_dir=str(tmp_path / "o"))
-    assert not (tmp_path / "o").exists()
-
-
 def test_dry_run_names_the_renamed_peak_copy(tmp_path):
     inp = mtb.engine.resolve.inputs_for("D28", "diagonal", "Seurat_v3")
     argv = mtb.engine.runner.preview("Seurat_v3", "diagonal", inputs=inp, out_dir=str(tmp_path / "o"))[0]
@@ -308,8 +295,8 @@ def test_preview_argv_is_the_real_command(tmp_path, monkeypatch, linux_with_envs
     preview = mtb.engine.runner.preview("scMVP", "vertical", **kw)[0]
     calls = {}
     monkeypatch.setattr(runner.subprocess, "Popen", _fake_popen(6, calls))
-    res = mtb.engine.runner.run("scMVP", "vertical", **kw)
-    assert calls["cmd"] == preview == res.cmd
+    mtb.engine.runner.run("scMVP", "vertical", **kw)
+    assert calls["cmd"] == preview
 
 
 # ----------------------------------------------------------------- L31: full reasons
@@ -342,12 +329,6 @@ def test_atac_column_is_none_for_a_variant_without_atac():
     by = df.set_index("modalities")["atac"]
     assert by["rna+adt"] is None or pd.isna(by["rna+adt"])
     assert by["rna+atac"] == "peak"
-
-
-def test_runresult_documents_obs_names_and_row_order():
-    doc = inspect.getdoc(runner.RunResult)
-    assert "obs_names" in doc and "labels_for" in doc
-    assert runner.RunResult("m", Path("."), [], None, {}).obs_names is None   # positional OK
 
 
 # ----------------------------------------------------------------- L61: plain wording
@@ -399,61 +380,8 @@ def test_setup_note_is_dropped_once_the_helper_file_is_in_place(tmp_path, monkey
     assert runner.script_notes(spec, v, tmp_path) == [v.size_hint]
 
 
-# ----------------------------------------------------------------- L53: obs_names
-def _barcodes(path):
-    with h5py.File(path, "r") as f:
-        return [b.decode() for b in f["matrix/barcodes"][:]]
-
-
-def _fake_run(monkeypatch, tmp_path, method, category, dataset, n):
-    """Run ``method`` on a demo dataset with a fake process that writes an
-    ``n`` x 4 embedding into out_dir."""
-    inp = mtb.engine.resolve.inputs_for(dataset, category, method)
-    repo = tmp_path / "repo"
-    (repo / "tools_scripts").mkdir(parents=True, exist_ok=True)
-    calls = {}
-    monkeypatch.setattr(runner.subprocess, "Popen", _fake_popen(n, calls))
-    monkeypatch.setattr(config, "repo_path", repo)
-    monkeypatch.setattr("multibench.engine.envs.host_system", lambda: None)
-    monkeypatch.setattr(envs, "installed_envs", lambda conda=None: {envs.group_for(method)})
-    monkeypatch.setattr(runner, "run_mode", lambda env: ("conda", None))
-    return inp, mtb.engine.runner.run(method, category, inputs=inp, out_dir=str(tmp_path / method))
-
-
-def test_obs_names_vertical_are_the_paired_barcodes(tmp_path, monkeypatch):
-    inp = mtb.engine.resolve.inputs_for("D11", "vertical", "totalVI")
-    bars = _barcodes(inp["rna"])
-    _, res = _fake_run(monkeypatch, tmp_path, "totalVI", "vertical", "D11", n=len(bars))
-    assert res.obs_names == bars and res.output.shape[0] == len(res.obs_names)
-
-
-@pytest.mark.parametrize("method,first", [("SCALEX", "rna"), ("uniPort", "atac_gas")])
-def test_obs_names_diagonal_follow_the_stacking_order(tmp_path, monkeypatch, method, first):
-    inp = mtb.engine.resolve.inputs_for("D28", "diagonal", method)
-    rna, atac = _barcodes(inp["rna"]), _barcodes(inp["atac_gas"])
-    want = rna + atac if first == "rna" else atac + rna
-    _, res = _fake_run(monkeypatch, tmp_path, method, "diagonal", "D28", n=len(want))
-    assert res.obs_names == want
-    # the same order labels_for gives the label files
-    order = list(mtb.engine.resolve.labels_for("D28", "diagonal", method))
-    assert order[0].startswith(first.split("_")[0])
-
-
-def test_obs_names_mosaic_one_block_per_batch(tmp_path, monkeypatch):
-    inp = mtb.engine.resolve.inputs_for("D46", "mosaic", "StabMap")
-    want = sum((_barcodes(inp[r]) for r in ("rna1", "rna2", "rna3")), [])
-    _, res = _fake_run(monkeypatch, tmp_path, "StabMap", "mosaic", "D46", n=len(want))
-    assert res.obs_names == want
-
-
-def test_obs_names_none_with_a_warning_when_counts_differ(tmp_path, monkeypatch):
-    with pytest.warns(UserWarning, match="obs_names is None"):
-        _, res = _fake_run(monkeypatch, tmp_path, "totalVI", "vertical", "D11", n=7)
-    assert res.obs_names is None
-
-
 @pytest.mark.parametrize("obj", [mtb.scan, mtb.run, mtb.engine.runner.run, mtb.load_run,
-                                 mtb.RunResult, runner.RunResult,
+                                 mtb.RunResult,
                                  mtb.RunResult.save, mtb.data.fetch])
 def test_docstrings_use_plain_wording(obj):
     doc = inspect.getdoc(obj)

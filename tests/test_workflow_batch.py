@@ -37,10 +37,6 @@ def cite(tmp_path, monkeypatch):
     pd.DataFrame({"x": labels}).to_csv(d / "cty.csv", index=False)
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
 
-    class _Res:
-        def __init__(self, out):
-            self.output = out
-
     def _fake_run(method, category, inputs, out_dir, params=None):
         rng = np.random.default_rng(7)
         emb = rng.normal(size=(N, 4))
@@ -49,7 +45,7 @@ def cite(tmp_path, monkeypatch):
         Path(out_dir).mkdir(parents=True, exist_ok=True)   # run() creates it
         with h5py.File(Path(out_dir) / "embedding.h5", "w") as f:
             f.create_dataset("data", data=emb.T)     # dims x cells, like many methods
-        return _Res(emb)
+        return emb
 
     monkeypatch.setattr(W, "_run", _fake_run)
     return tmp_path / "data", labels

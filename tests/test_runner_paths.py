@@ -56,12 +56,12 @@ def test_run_hands_the_child_absolute_input_paths(tmp_path, monkeypatch, linux_w
         ingest._write_canonical(tmp_path / "data" / name, np.ones((6, n)),
                                 [f"G{i}" for i in range(n)], bars, dtype="float64",
                                 compression=None, block=1024)
-    res = mtb.engine.runner.run('SCALEX', 'diagonal', out_dir='out/y',
+    out = mtb.engine.runner.run('SCALEX', 'diagonal', out_dir='out/y',
                                 inputs={'rna': 'data/rna.h5', 'atac_gas': 'data/atac_gas.h5'})
     cmd = calls["cmd"]
     p1 = cmd[cmd.index("--path1") + 1]
     assert os.path.isabs(p1) and p1 == str(tmp_path / "data" / "rna.h5")
-    assert res.output.shape == (6, 3)
+    assert out.shape == (6, 3)
 
 
 def test_run_help_has_no_v1_or_reserved_wording():

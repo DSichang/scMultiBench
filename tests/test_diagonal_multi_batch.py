@@ -9,8 +9,6 @@ ATAC batches. Before these roles were known to the resolver:
   rna_cty1..3``), so every score was computed against misordered labels;
 * ``labels_for`` and ``inputs_for`` reported the folder as a per-batch
   export of single-batch data;
-* ``RunResult.obs_names`` was dropped, because ``rna1, rna2, rna3`` counted
-  as one set of cells;
 * a truncated ``rna_cty2.csv`` passed the file check.
 """
 import warnings
@@ -22,7 +20,7 @@ import pytest
 
 import multibench as mtb
 from multibench import workflow as W
-from multibench.engine import registry, resolve, runner
+from multibench.engine import registry, resolve
 from multibench.eval import pipeline
 from tests.conftest import full_scan
 
@@ -172,30 +170,6 @@ def test_scan_finds_the_four_rows_and_no_export_advice(tmp_path, no_envs):
     assert all(m.startswith("rna1+rna2+rna3+atac_") for m in ok["modalities"])
     assert not df["reason"].str.contains("per-batch files").any()
     assert not df["caveat"].str.contains("not used").any()
-
-
-# ------------------------------------------------------------------ cell groups
-@pytest.mark.parametrize("method", METHODS)
-def test_each_file_is_its_own_cell_group(tmp_path, method):
-    d = _folder(tmp_path)
-    variant = _variant(method, d)
-    kind = "atac_peak" if method == "GLUE" else "atac_gas"
-    roles = [f"rna{i}" for i in (1, 2, 3)] + [f"{kind}{i}" for i in (1, 2, 3)]
-    assert runner._cell_group_roles(variant) == [[r] for r in roles]
-    inputs = mtb.engine.resolve.inputs_for("MB", "diagonal", method, data_path=tmp_path)
-    n = sum(RNA_CELLS) + sum(ATAC_CELLS)
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        names = runner._obs_names(method, variant, inputs, np.zeros((n, 4)))
-    want = [f"r{i}_{k}" for i, c in enumerate(RNA_CELLS, 1) for k in range(c)]
-    want += [f"a{i}_{k}" for i, c in enumerate(ATAC_CELLS, 1) for k in range(c)]
-    assert names == want
-
-
-def test_single_batch_diagonal_groups_are_unchanged():
-    v = registry.get("MultiMAP").select("diagonal", {"rna", "atac_peak", "atac_gas"})
-    groups = runner._cell_group_roles(v)
-    assert sorted(map(sorted, groups)) == [["atac_gas", "atac_peak"], ["rna"]]
 
 
 # ------------------------------------------------------------ label length check

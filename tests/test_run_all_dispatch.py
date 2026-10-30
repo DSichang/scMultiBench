@@ -37,15 +37,11 @@ def fake_env_gate(monkeypatch):
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
 
 
-class _FakeRes:
-    def __init__(self, out):
-        self.output = out
-
 
 def _fake_run(calls, n_cells=2864, dims=20):
     def _inner(method, category, inputs, out_dir, params=None):
         calls.append({"method": method, "params": params, "out_dir": out_dir})
-        return _FakeRes(np.zeros((n_cells, dims), dtype=float))
+        return np.zeros((n_cells, dims), dtype=float)
     return _inner
 
 

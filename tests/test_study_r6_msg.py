@@ -30,7 +30,6 @@ from multibench import _settings
 from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, ingest, registry
-from multibench.engine import runner as R
 from tests.conftest import full_scan
 
 #: the caveat of a gene-activity method given peaks in atac.h5 (after the method)
@@ -150,13 +149,12 @@ def test_the_glue_uinmf_and_raw_count_caveats_read_as_sentences(tmp_path, pinned
         "atac_kind='gene_activity'. GLUE reads the GENCODE v43 human "
         "annotation (gencode.v43.chr_patch_hapl_scaff.annotation.gtf.gz, 53 MB) from "
         "<repo_path>/tools_scripts/GLUE/: on a host without network, put the file there. "
-        f"{SCRIPTS_NOTE}{pinned}. The first real run clones PYangLab/scMultiBench with "
-        f"git. On a host without network, run {GIT} first. GLUE reads "
+        f"{SCRIPTS_NOTE}{pinned} yet. The first run fetches them. GLUE reads "
         "inputs/atac_peak_normpeaks.h5."), glue["caveat"]
     uinmf = _quiet(full_scan, "D52", "cross", methods=["UINMF"], data_path=root / "data",
                    modalities=["rna1", "rna2", "adt1", "adt2"], verbose=False).iloc[0]
     assert uinmf["caveat"].startswith("UINMF reads batches 1-2 of 3. Batch 3 is not used. "
-                                      f"{SCRIPTS_NOTE}{pinned}.")
+                                      f"{SCRIPTS_NOTE}{pinned} yet.")
     tv = _quiet(full_scan, "LOGCITE", "vertical", methods=["totalVI"],
                 data_path=_log_cite(tmp_path / "b"), verbose=False).iloc[0]
     assert tv["caveat"].startswith("totalVI needs raw counts. rna.h5 holds non-integer "
@@ -322,8 +320,8 @@ def test_notes_passages_have_no_dash_insertions():
 
 
 # ---- the Python part of tests that also ran the command line
-def test_callers_print_the_method_name_once(tmp_path, pinned, root, monkeypatch, capsys, gas_matilda):
-    """run's log, both dry runs and run's warning print the caveat alone.
+def test_callers_print_the_method_name_once(tmp_path, pinned, root, monkeypatch, capsys):
+    """run's log and both dry runs print the caveat alone.
     UINMF's two-batch variant is named: on D52's three batches the folder
     picks its three-batch one, which skips nothing."""
     data = root / 'data'
@@ -339,21 +337,6 @@ def test_callers_print_the_method_name_once(tmp_path, pinned, root, monkeypatch,
     _quiet(mtb.run, 'D52', 'cross', tmp_path / 'out', methods=['UINMF'], modalities=two, evaluate=False)
     log = capsys.readouterr().out
     assert '[run]   UINMF reads batches 1-2 of 3. Batch 3 is not used.\n' in log
-    mu = _mu_peak(tmp_path / 'mu')
-    inp = mtb.engine.resolve.inputs_for('MU_PEAK', 'vertical', 'Matilda', modalities=['rna', 'atac'], data_path=mu)
-
-    class Stop(Exception):
-        pass
-
-    def stop(spec):
-        raise Stop
-    monkeypatch.setattr(R, 'check_gpu_requirement', stop)
-    with warnings.catch_warnings(record=True) as rec:
-        warnings.simplefilter('always')
-        with pytest.raises(Stop):
-            mtb.engine.runner.run('Matilda', 'vertical', inputs=inp, out_dir=str(tmp_path / 'o'))
-    msgs = [str(w.message) for w in rec if 'ATAC' in str(w.message)]
-    assert msgs and msgs[0].startswith('Matilda needs gene-activity ATAC. '), msgs
 
 
 def test_strict_counts_are_unchanged(tmp_path, pinned, root, capsys):
