@@ -157,7 +157,8 @@ def test_clone_failure_names_the_offline_route(tmp_path, monkeypatch):
         scripts.ensure_repo(target)
     msg = str(e.value)
     assert msg.startswith("Could not reach github.com to fetch the method scripts.")
-    assert "copy the folder" in msg and "set MULTIBENCH_REPO_PATH" in msg
+    assert msg.endswith("Copy the scripts folder from a machine with network and set "
+                        "MULTIBENCH_REPO_PATH.")
     assert "returned non-zero exit status" not in msg
     assert not target.exists() and not target.with_name("fresh.partial").exists()
 
