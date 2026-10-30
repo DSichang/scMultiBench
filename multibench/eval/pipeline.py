@@ -248,24 +248,17 @@ def _file_barcodes(files, counts=None, read=()):
 def _raw_barcodes(files, counts=None, read=()):
     """``(barcodes, label file stem of each)`` of :func:`_file_barcodes`, the
     barcodes as the matrices write them; ``None`` when a file has no matrix."""
-    import h5py
+    from ..engine.resolve import _barcodes_of
     from ..workflow import _label_data_files      # workflow imports this module
     out, stems = [], []
     for i, f in enumerate(files):
         n = counts[i] if counts is not None else len(io.read_labels(f))
-        for m in (x for x in _label_data_files(Path(f), read) if x.is_file()):
-            try:
-                with h5py.File(m, "r") as h:
-                    bars = [b.decode() if isinstance(b, bytes) else str(b)
-                            for b in h["matrix/barcodes"][:]]
-            except (OSError, KeyError):
-                continue
-            if len(bars) == n:
-                out += bars
-                stems += [Path(f).stem] * n
-                break
-        else:
+        bars = next((b for b in map(_barcodes_of, _label_data_files(Path(f), read))
+                     if b is not None and len(b) == n), None)
+        if bars is None:
             return None
+        out += [str(b) for b in bars]
+        stems += [Path(f).stem] * n
     return out, stems
 
 

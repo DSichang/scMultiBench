@@ -2344,22 +2344,25 @@ def _read_batch_csv(text: str) -> pd.DataFrame:
     return pd.read_csv(io.StringIO(text), dtype=str, keep_default_na=False)
 
 
-def _dataset_cell_ids(dataset, data_path) -> list | None:
-    """The dataset's cell ids in ``labels_for(dataset)`` order (each label file's
-    data-file barcodes); ``None`` when some are missing or ids repeat."""
-    ids: list = []
+def _default_label_files(dataset, data_path) -> list:
+    """The label files of ``labels_for(dataset)``, in that order; ``[]`` when
+    there are none."""
     try:
         with warnings.catch_warnings():       # the default order is meant here
             warnings.simplefilter("ignore", UserWarning)
-            files = _resolve.labels_for(dataset, data_path=data_path)
-        for p in map(Path, files.values()):
-            n = len(_eio.read_labels(p))
-            bars = next((b for b in map(_resolve._barcodes_of, _label_data_files(p))
-                         if b is not None and len(b) == n), None)
-            if bars is None:
-                return None
-            ids.extend(bars)
+            return list(map(Path, _resolve.labels_for(dataset, data_path=data_path).values()))
     except Exception:  # noqa: BLE001 - no readable files: no ids
+        return []
+
+
+def _dataset_cell_ids(dataset, data_path) -> list | None:
+    """The dataset's cell ids in ``labels_for(dataset)`` order (each label file's
+    data-file barcodes); ``None`` when some are missing or ids repeat."""
+    from .eval.pipeline import _raw_barcodes
+    files = _default_label_files(dataset, data_path)
+    try:
+        ids = files and (_raw_barcodes(files) or [None])[0]
+    except Exception:  # noqa: BLE001 - an unreadable label file: no ids
         return None
     return ids if ids and len(set(ids)) == len(ids) else None
 
@@ -2369,23 +2372,23 @@ def _embedding_cell_ids(dataset, data_path) -> list:
     file's barcodes (D28's ``atac_gas.h5`` and ``atac_peak.h5`` differ in
     suffix), as they are and, when they repeat, prefixed by label file as
     :meth:`RunResult.embedding` names them."""
-    folder = _dataset_folder(dataset, data_path)
+    from .eval.pipeline import _raw_barcodes
+    files = _default_label_files(dataset, data_path)
     try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", UserWarning)
-            files = list(map(Path, _resolve.labels_for(dataset, data_path=data_path).values()))
         sizes = [len(_eio.read_labels(p)) for p in files]
-    except Exception:  # noqa: BLE001 - no readable files: no ids
+    except Exception:  # noqa: BLE001 - an unreadable label file: no ids
         return []
-    out = []
-    for read in [()] + [(f.name,) for f in sorted(folder.glob("*.h5"))]:
-        bars = [next((b for b in map(_resolve._barcodes_of, _label_data_files(p, read))
-                      if b is not None and len(b) == n), None) for p, n in zip(files, sizes)]
-        if any(b is None for b in bars):
+    out: list = []
+    if not files:
+        return out
+    for read in [()] + [(f.name,) for f in sorted(_dataset_folder(dataset, data_path)
+                                                  .glob("*.h5"))]:
+        raw = _raw_barcodes(files, sizes, read)
+        if raw is None:
             continue
-        ids = [str(i) for b in bars for i in b]
+        ids, stems = raw
         named = ids if len(set(ids)) == len(ids) else \
-            [f"{p.stem}:{i}" for p, b in zip(files, bars) for i in b]
+            [f"{s}:{i}" for s, i in zip(stems, ids)]
         out += [x for x in (ids, named) if x not in out]
     return out
 
