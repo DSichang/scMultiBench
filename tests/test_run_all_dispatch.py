@@ -72,11 +72,10 @@ def test_no_timeout_path_dispatches_exactly_once(monkeypatch, tmp_path):
 
 
 def test_unknown_override_rejected_on_the_timeout_path(monkeypatch, tmp_path):
-    """Validation used to be skipped whenever `timeout` was set. The runner checks
-    the params before it reads an input."""
-    from multibench.engine import runner
+    """Validation used to be skipped whenever `timeout` was set. The params are
+    checked before the method starts."""
     calls = []
-    monkeypatch.setattr(runner, "_check_input_cells", lambda *a, **k: calls.append(a))
+    monkeypatch.setattr(W, "_run", lambda **k: calls.append(k))
     res = mtb.run("D11", "vertical", methods=["Matilda"],
                       params={"Matilda": {"not_a_real_parameter": 1}},
                       out_dir=str(tmp_path), timeout=600,

@@ -2858,6 +2858,7 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
                                              data_path=data_path, check=True)
                 reused = skip_existing and output.exists()
                 overrides = params.get(method)
+                _runner.check_params(method, variant, overrides)   # before the method starts
                 if reused:
                     if verbose:
                         print(f"[run]   reusing existing output in {method_dir}", flush=True)
