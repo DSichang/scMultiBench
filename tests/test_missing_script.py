@@ -17,7 +17,7 @@ def _variant(entrypoint):
 def test_relative_entrypoint_missing_from_a_present_checkout(tmp_path, monkeypatch):
     (tmp_path / "tools_scripts").mkdir()
     monkeypatch.setattr(workflow.config, "repo_path", tmp_path)
-    why = workflow._missing_script(_variant("tools_scripts/Gone/main_Gone.py"))
+    why = workflow._missing_script(_variant("tools_scripts/Gone/main_Gone.py"), "Gone")
     assert "missing from the reference checkout" in why
 
 
@@ -26,13 +26,13 @@ def test_relative_entrypoint_present_in_the_checkout(tmp_path, monkeypatch):
     script.parent.mkdir(parents=True)
     script.write_text("print(1)")
     monkeypatch.setattr(workflow.config, "repo_path", tmp_path)
-    assert workflow._missing_script(_variant("tools_scripts/Here/main_Here.py")) == ""
+    assert workflow._missing_script(_variant("tools_scripts/Here/main_Here.py"), "Here") == ""
 
 
 def test_no_checkout_yet_reports_nothing(tmp_path, monkeypatch):
     """run()/run() fetch the scripts; flagging them first would be wrong."""
     monkeypatch.setattr(workflow.config, "repo_path", tmp_path / "absent")
     monkeypatch.setattr(workflow._settings, "_ROOT", tmp_path / "pkg")
-    assert workflow._missing_script(_variant("tools_scripts/Any/main_Any.py")) == ""
+    assert workflow._missing_script(_variant("tools_scripts/Any/main_Any.py"), "Any") == ""
 
 

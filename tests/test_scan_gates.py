@@ -21,10 +21,9 @@ GAS_CAV = ("needs gene-activity ATAC. The features of atac.h5 look like chr:star
            "so it holds peaks.")
 
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
-OLD_COLUMNS = ["method", "category", "modalities", "env", "output_kind", "n_tunable",
-               "runtime_tier", "observed_worst_sec", "caveat", "runnable", "reason"]
-NEW_COLUMNS = ["files_ok", "files_reason", "env_ok", "env_reason", "needs_labels", "atac",
-               "command"]
+PLAN_COLUMNS = ["method", "category", "modalities", "env", "output_kind", "caveat",
+                "runnable", "reason", "files_ok", "files_reason", "env_ok", "env_reason",
+                "command"]
 
 
 def _h5(path, n_feat, n_cells, prefix="g"):
@@ -123,20 +122,10 @@ def test_scan_env_reason_names_method_and_category(no_envs):
     assert not row["env_ok"]
 
 
-def test_scan_new_columns_present_and_old_order_kept(all_envs):
+def test_scan_plan_columns(all_envs):
     df = full_scan("D11", modalities="all")
-    assert list(df.columns[:len(OLD_COLUMNS)]) == OLD_COLUMNS
-    assert list(df.columns) == W.PLAN_COLUMNS == OLD_COLUMNS + NEW_COLUMNS
-    assert set(df["atac"].dropna()) <= {"peak", "gene_activity"}
-    assert df["needs_labels"].dtype == bool
+    assert list(df.columns) == W.PLAN_COLUMNS == PLAN_COLUMNS
     assert df["files_ok"].dtype == bool and df["env_ok"].dtype == bool
-    # needs_labels is PER VARIANT (what the runner will demand for that row)
-    mat = df[(df["method"] == "Matilda") & (df["modalities"] == "rna+adt")].iloc[0]
-    assert bool(mat["needs_labels"]) is True
-    # atac is None for variants that take no ATAC input
-    assert mat["atac"] is None or pd.isna(mat["atac"])
-    glue = df[df["method"] == "GLUE"].iloc[0]
-    assert glue["atac"] == "peak"
 
 
 def test_scan_methods_filter_and_unknown_raises():
@@ -196,7 +185,8 @@ def test_scan_atac_gas_peak_caveat(tmp_path, all_envs):
     assert f"Portal {GAS_CAV}" in portal["caveat"]
     assert "chr:start-end" in portal["caveat"]
     # a method that WANTS peaks behind the atac_gas role gets no caveat
-    peak_wanters = df[(df["atac"] == "peak") & df["modalities"].str.contains("atac_gas")]
+    peak_wanters = df[[registry.get(m).atac == "peak" and "atac_gas" in mods
+                       for m, mods in zip(df["method"], df["modalities"])]]
     assert len(peak_wanters) > 0
     assert not peak_wanters["caveat"].str.contains("peak matrix").any()
 
