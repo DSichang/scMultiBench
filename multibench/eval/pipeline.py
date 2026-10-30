@@ -242,8 +242,8 @@ def _folder_ids(files, counts, ids, read=(), others=None):
     folder does not name its cells. The files a method read (``read``) name the
     cells first, as ``RunResult.embedding`` names them, then the folder's
     default files. Any other ids raise: by position, the labels would be a
-    guess. ``others()``: ``{read files: [package methods]}`` of the dataset,
-    to name the method whose output names the cells so."""
+    guess. ``others()``: the file sets the dataset's package methods read,
+    whose barcodes may name the cells (scJoint's ATAC cells by ``atac_gas.h5``)."""
     ids = [str(i) for i in ids]
     reads = list(dict.fromkeys((frozenset(read), frozenset())))
     found = [k for k in (_file_barcodes(files, counts, r) for r in reads) if k is not None]
@@ -251,9 +251,7 @@ def _folder_ids(files, counts, ids, read=(), others=None):
     for keys in found:
         if unique and set(ids) <= set(keys):
             return keys
-    # the names of the files another package method reads (a run's embedding.h5
-    # of scJoint names its ATAC cells by atac_gas.h5)
-    for r in (others() if others and unique else {}):
+    for r in (others() if others and unique else ()):
         keys = _file_barcodes(files, counts, r)
         if keys is not None and set(ids) <= set(keys):
             return keys
@@ -274,12 +272,11 @@ def _folder_ids_error(files, counts, ids, reads, found, others) -> str:
     if dup is not None:
         head = f"The embedding repeats cell ids, such as {dup!r}"
     elif len(miss) == len(ids):
-        head = f"None of the embedding's cell ids is a cell of {names}, such as {miss[0]!r}"
+        head = f"The embedding's cell ids are not the cell names of {names}, such as {miss[0]!r}"
     else:
-        head = (f"{len(miss):,} of the embedding's {len(ids):,} cell ids are not cells of "
-                f"{names}, such as {miss[0]!r}")
-    other = others() if others else {}
-    for read in dict.fromkeys([*reads, *other]):
+        head = (f"{len(miss):,} of the embedding's {len(ids):,} cell ids are not the cell "
+                f"names of {names}, such as {miss[0]!r}")
+    for read in dict.fromkeys([*reads, *(others() if others else ())]):
         raw = _raw_barcodes(files, counts, read)
         if raw is not None and len(raw[0]) == len(ids) and list(raw[0]) == ids:
             return (f"{head}. The cells are in the folder's order: pass the embedding as "
@@ -509,8 +506,8 @@ def _classification_reason(why: str, what: str = "output") -> str:
     """Why the classification codes cannot be computed, and the fix: ``why`` is
     ``"no batch"``, ``"one batch"``, ``"graph"`` or ``"none scored"``."""
     if why == "graph":
-        who = "output is" if what == "output" else f"{what} writes"
-        return f"{who} a graph, not an embedding. Pass metrics='clustering'."
+        from .classify import _graph_text
+        return _graph_text(what) + " Pass metrics='clustering'."
     if why == "none scored":
         return "no batch has two cell types that another batch has. Check labels and batch."
     if why == "one batch":
@@ -520,10 +517,9 @@ def _classification_reason(why: str, what: str = "output") -> str:
 
 def _classification_error(metrics, why: str, what: str = "output") -> str:
     """evaluate()'s error when the codes ``metrics=`` names cannot be computed."""
-    if why == "graph":
-        from .classify import _graph_text
-        return _graph_text(what) + " Pass metrics='clustering'."
-    return f"{_metrics_spelling(metrics)} cannot be computed: {_classification_reason(why, what)}"
+    reason = _classification_reason(why, what)
+    return reason if why == "graph" else \
+        f"{_metrics_spelling(metrics)} cannot be computed: {reason}"
 
 
 def _classification_scores(request, emb, ct, cb, *, category, graph, metrics):
@@ -770,18 +766,14 @@ def _expected_cells(dataset, category, method, data_path, read, *,
                   data_path)
 
 
-def _method_reads(cells: _Cells, category) -> dict:
-    """``{names of the files read: [package methods]}`` of the methods of
-    ``category`` on ``cells.dataset``; for an error that names the method whose
-    output an embedding's cell names come from."""
+def _method_reads(cells: _Cells, category) -> list:
+    """The sets of file names the package methods of ``category`` read from
+    ``cells.dataset``, whose barcodes may name an embedding's cells."""
     from ..engine.registry import list_methods
     from ..workflow import _method_files
-    out: dict = {}
-    for m in list_methods(category=category) if category else ():
-        read = frozenset(_method_files(cells.dataset, category, m, None, cells.data_path))
-        if read:
-            out.setdefault(read, []).append(m)
-    return out
+    reads = (frozenset(_method_files(cells.dataset, category, m, None, cells.data_path))
+             for m in (list_methods(category=category) if category else ()))
+    return list(dict.fromkeys(r for r in reads if r))
 
 
 def _dataset_labels(dataset, category, method, data_path):
@@ -795,18 +787,12 @@ def _dataset_labels(dataset, category, method, data_path):
     if own is not None and category is None:
         raise ValueError(f"evaluate(dataset={dataset!r}, method={method!r}) needs category= "
                          f"to read {own}'s cell order: {_and_list(cats, 'or')}.")
-    own_fix = " For your own embedding, pass the label files as labels=."
     if own is not None and category not in cats:
         from ..engine.schema import no_category_message
-        raise ValueError(no_category_message(own, cats, category) + own_fix)
+        raise ValueError(no_category_message(own, cats, category))
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message=resolve.DEFAULT_ORDER_WARNING)
-        try:
-            labels = resolve.labels_for(dataset, category, own, data_path=data_path)
-        except KeyError as e:
-            if own is None or not e.args:
-                raise
-            raise KeyError(str(e.args[0]) + own_fix) from None
+        labels = resolve.labels_for(dataset, category, own, data_path=data_path)
     if not labels:
         raise ValueError(f"{dataset} has no label file. Pass labels=.")
     near = registry.closest_method(method) if own is None and category else None

@@ -165,7 +165,7 @@ def test_repeated_or_partly_matching_ids_are_refused_not_matched_by_position():
     with pytest.raises(ValueError) as err:
         _quiet(mtb.evaluate, _named(x, rna_side, atac_first), **KW28)
     assert str(err.value) == (
-        f"4,606 of the embedding's 11,014 cell ids are not cells of rna_cty.csv and "
+        f"4,606 of the embedding's 11,014 cell ids are not the cell names of rna_cty.csv and "
         f"atac_cty.csv, such as 'atac_{gas[0]}'. {fix}")
 
 
@@ -185,7 +185,7 @@ def test_cells_in_the_folders_order_are_told_to_pass_an_array():
 
 def test_own_names_are_told_the_folders_names():
     x, rna, gas = _d28_raw()
-    with pytest.raises(ValueError, match=r"^None of the embedding's cell ids is a cell of "
+    with pytest.raises(ValueError, match=r"^The embedding's cell ids are not the cell names of "
                                          r"rna_cty\.csv and atac_cty\.csv, such as 'cell0'\. "
                                          r"Name the embedding's cells as the folder does"):
         _quiet(mtb.evaluate, _named(x, [f"cell{i}" for i in range(len(x))],

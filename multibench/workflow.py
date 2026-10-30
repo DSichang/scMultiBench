@@ -2628,8 +2628,8 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
     rec["emb_shape"] = list(emb.shape)
     embedding = variant.output.kind == "embedding"
     if not embedding and _without_classification(metrics, True) is None:
-        from .eval.classify import _graph_text
-        raise ValueError(_graph_text(rec.get("method")) + " Pass metrics='clustering'.")
+        from .eval.pipeline import _classification_error
+        raise ValueError(_classification_error(metrics, "graph", rec.get("method")))
     n = emb.shape[0]
     rows = labels is not None and not labels_by_cell      # labels in embedding row order
     segments = None
