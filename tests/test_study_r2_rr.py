@@ -187,7 +187,6 @@ def test_unitednet_reason_names_atac_first_then_cty(tmp_path):
 # --- M22 / R6-10: caveats start with the method, then the problem --------------
 def test_every_caveat_leads_with_its_warning():
     heads = {
-        resolve.PEAK_IN_GAS_CAVEAT: "needs gene-activity ATAC.",
         resolve.PEAK_FED_TO_GAS_CAVEAT: "needs gene-activity ATAC.",
         resolve.GAS_FED_TO_PEAK_CAVEAT: "needs peak ATAC.",
         resolve.NOT_COUNTS_CAVEAT: "needs raw counts.",

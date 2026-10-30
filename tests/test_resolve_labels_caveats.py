@@ -17,7 +17,7 @@ from multibench.engine import resolve
 
 #: the caveat of a gene-activity method given peaks in atac.h5 (after the method)
 GAS_CAV = ("needs gene-activity ATAC. The features of atac.h5 look like chr:start-end, "
-           "so it holds peaks.")
+           "so it holds peaks. Export it with atac_kind='gene_activity'.")
 
 
 def _h5(path, n_feat, n_cell, feats=None):
@@ -98,7 +98,7 @@ def test_gas_fed_to_peak_method_is_flagged(tmp_path):
     got = {"rna": str(d / "rna.h5"), "atac": str(d / "atac_gas.h5")}
     cav = resolve._preflight_caveats(got, atac="peak", method="moETM")
     assert cav == ["moETM needs peak ATAC. The features of atac_gas.h5 do not look like "
-                   "chr:start-end, so it seems to hold gene activity."]
+                   "chr:start-end, so it seems to hold gene activity. Export it with atac_kind='peak'."]
     # legacy call (no atac=): today's single check, nothing for this case
     assert resolve._preflight_caveats(got) == []
     # a peak file satisfies a peak method
@@ -120,7 +120,7 @@ def test_peak_fed_to_gas_method_is_flagged_on_the_plain_atac_role(tmp_path):
     _h5(d / "atac.h5", 40, 50, feats=PEAKS)
     got2 = resolve.inputs_for("PK", "diagonal", "Portal", data_path=tmp_path)
     assert resolve._preflight_caveats(got2) == [
-        resolve.PEAK_IN_GAS_CAVEAT.format(method="The method")]
+        resolve.PEAK_FED_TO_GAS_CAVEAT.format(method="The method", file="atac.h5")]
     assert resolve._preflight_caveats(got2, atac="gene_activity", method="Portal") == [
         resolve.PEAK_FED_TO_GAS_CAVEAT.format(method="Portal", file="atac.h5")]
     # mixed names (10-90 %) -> no verdict either way

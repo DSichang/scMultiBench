@@ -70,8 +70,8 @@ def test_ambiguity_is_a_valueerror_listing_the_folder(tmp_path):
     msg = str(e.value)
     assert isinstance(e.value, AmbiguousVariantError) and isinstance(e.value, KeyError)
     assert msg.startswith("VIMCCA has 2 vertical variants, rna+adt and rna+atac.")
-    assert f"The folder {tmp_path / 'D11'} has every input file of both." in msg
-    assert msg.endswith("Pass modalities=['rna', 'adt'] or modalities=['rna', 'atac'].")
+    assert f"The folder {tmp_path / 'D11'} has every input file of rna+adt and rna+atac." in msg
+    assert msg.endswith("Pass the modalities of one, for example modalities=['rna', 'adt'].")
     assert not msg.startswith('"')          # plain message, no KeyError quoting
     # Matilda's rna+adt and rna+atac are inside its rna+adt+atac: the largest one
     assert set(mtb.engine.resolve.inputs_for("D11", "vertical", "Matilda", data_path=tmp_path)) == {
@@ -83,7 +83,7 @@ def test_ambiguity_is_a_valueerror_listing_the_folder(tmp_path):
     assert (f"None of them has every input file in {tmp_path / 'D12'}. It holds cty.csv "
             f"and rna.h5.") in str(e.value)
     # nothing on disk -> same error, no folder note
-    with pytest.raises(ValueError, match=r"variants, rna\+adt and rna\+atac\. Pass modalities="):
+    with pytest.raises(ValueError, match=r"variants, rna\+adt and rna\+atac\. Pass the modalities"):
         mtb.engine.resolve.inputs_for("D99", "vertical", "VIMCCA", data_path=tmp_path)
 
 

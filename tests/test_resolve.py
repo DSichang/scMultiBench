@@ -127,7 +127,7 @@ def test_label_length_mismatch_reported(tmp_path):
                            data_path=tmp_path, check=True)
     msg = str(e.value)
     assert "cty.csv has 59 labels" in msg and "60 cells" in msg
-    assert msg.endswith(f"The folder layout is at {resolve.LAYOUT_URL}.")
+    assert msg.endswith("Give each cell one label, in the order of the cells.")
     # check=None / False do not raise (best-effort paths)
     resolve.inputs_for("D11", "vertical", "Matilda", modalities=["rna", "adt"],
                        data_path=tmp_path, check=False)
@@ -153,9 +153,9 @@ def test_atac_gas_peak_caveat(tmp_path):
     assert got["atac_gas"].endswith("atac.h5")
     assert resolve._preflight_caveats(got) == [
         "The method needs gene-activity ATAC. The features of atac.h5 look like "
-        "chr:start-end, so it holds peaks."]
+        "chr:start-end, so it holds peaks. Export it with atac_kind='gene_activity'."]
     assert resolve._preflight_caveats(got, method="Portal") == [
-        resolve.PEAK_IN_GAS_CAVEAT.format(method="Portal")]
+        resolve.PEAK_FED_TO_GAS_CAVEAT.format(method="Portal", file="atac.h5")]
     # a real atac_gas.h5 (gene names) -> no caveat; so does gene-named atac.h5
     _h5(d / "atac_gas.h5", 40, 45)
     assert resolve._preflight_caveats(resolve.inputs_for("PK", "diagonal", "Portal",

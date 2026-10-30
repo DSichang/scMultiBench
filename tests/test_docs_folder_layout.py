@@ -1,8 +1,8 @@
 """The run guide's "Dataset folder layout" section against the registry.
 
 The section lists the files of a dataset folder, the ATAC files of each
-diagonal method and the batch patterns of mosaic and cross. Messages point to
-it (``resolve.LAYOUT_URL``). Its method lists are copies of the registry, so
+diagonal method and the batch patterns of mosaic and cross; export_dataset's
+docstring points to it. Its method lists are copies of the registry, so
 these tests fail when a method is added or changes what it reads.
 
 Needs the docs source (SCMULTIBENCH_DOCS=<docs dir>); skipped without it.
@@ -57,10 +57,6 @@ def _rows(first: str) -> list[list[str]]:
         if line.startswith("|") and cells[0] == first:
             out.append(cells)
     return out
-
-
-def test_messages_point_to_the_section():
-    assert resolve.LAYOUT_URL.endswith("/tutorials/run/#folder-layout")
 
 
 @pytest.mark.parametrize("category", ["mosaic", "cross"])

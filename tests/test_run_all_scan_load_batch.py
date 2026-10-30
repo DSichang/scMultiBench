@@ -141,7 +141,7 @@ def test_x11_a_local_folder_shadowed_by_the_data_path_is_named(tmp_path, monkeyp
             "'./D11' for it.")
     assert msgs.count(want) == 1, msgs
     _, msgs = _messages(mtb.engine.resolve.inputs_for, "D11", "vertical", "Matilda")
-    assert msgs.count(want) == 1, msgs                       # every call (R-4)
+    assert msgs.count(want) == 0, msgs                       # once a session
 
 
 def test_x13_vertical_peak_methods_read_the_atac_role():
@@ -164,11 +164,13 @@ def test_scan_shows_the_variant_run_all_runs():
 
 
 # Y21: a bare name that is data/<name> here gets that path
-def test_scan_names_data_folder_here(tmp_path, monkeypatch):
+def test_scan_of_a_missing_folder_says_what_dataset_is(tmp_path, monkeypatch):
     (tmp_path / "data" / "CITE").mkdir(parents=True)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(mtb.config, "data_path", tmp_path / "cache")
-    with pytest.raises(FileNotFoundError, match=r"data/CITE exists here: pass 'data/CITE'\."):
+    with pytest.raises(FileNotFoundError, match=r"does not exist either\. dataset= is the "
+                                                r"folder's path, or its name under "
+                                                r"mtb\.config\.data_path\.$"):
         mtb.scan("CITE", "vertical")
 
 

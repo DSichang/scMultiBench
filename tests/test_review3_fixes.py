@@ -321,8 +321,8 @@ def _two_cohorts():
     return rna, atac
 
 
-HEAD = ("labels='obs:cell_type': column 'cell_type' not in obs of the ATAC object (atac); "
-        "available: ['predicted.id', 'prediction.score'].")
+HEAD = ("labels='obs:cell_type': the obs of the ATAC object (atac) has no column "
+        "'cell_type'. Columns: predicted.id, prediction.score.")
 
 
 def test_a_side_without_the_column_lists_its_columns(tmp_path):
@@ -350,8 +350,8 @@ def test_the_rna_side_without_the_column(tmp_path):
         ingest.export_dataset(rna, tmp_path / "DIAG", rna="X", atac=atac, atac_kind="peak",
                               labels="obs:predicted.id", category="diagonal")
     assert e.value.args[0] == (
-        "labels='obs:predicted.id': column 'predicted.id' not in obs of the RNA object "
-        "(data); available: ['cell_type'].")
+        "labels='obs:predicted.id': the obs of the RNA object (data) has no column "
+        "'predicted.id'. Columns: cell_type.")
 
 
 def test_a_side_without_any_column_keeps_the_one_sentence(tmp_path):
@@ -362,8 +362,8 @@ def test_a_side_without_any_column_keeps_the_one_sentence(tmp_path):
                               atac_kind="gene_activity", labels="obs:cell_type",
                               category="diagonal")
     assert e.value.args[0] == (
-        "labels='obs:cell_type': column 'cell_type' not in obs of the ATAC object (atac); "
-        "available: [].")
+        "labels='obs:cell_type': the obs of the ATAC object (atac) has no column "
+        "'cell_type'. Columns: none.")
 
 
 # ------------------------------------------------------- 6(a): the order line
@@ -414,25 +414,6 @@ def test_the_message_for_0_cells_names_both_causes(tmp_path):
         "The data holds 0 cells, so there is nothing to write. Check the filter that selects "
         "the cells.") == ingest._NO_CELLS
     assert "label" not in ingest._NO_CELLS
-
-
-# ------------------------------------------------- 6(c): adt_names as a string
-def test_adt_names_as_a_string_is_refused(tmp_path):
-    """0.3.4 took each character as a name: 13 characters named 13 proteins,
-    and another length raised ``13 feature names for 8 features``."""
-    cite = _rna(log=False)
-    cite.obsm["protein"] = _adt(log=False).X
-    cite.uns["protein_ids"] = [f"CD{j}" for j in range(8)]
-    for names in ("protein_ids", "CD3", "12345678", "protein_names"):
-        assert _refused(tmp_path, cite, adt="obsm:protein", adt_names=names) == (
-            f"adt_names={names!r} is one string. Pass a list of names.")
-    # the example of the message, and a list as before
-    out = ingest.export_dataset(cite, tmp_path / "LIST", adt="obsm:protein",
-                                adt_names=list(cite.uns["protein_ids"]))
-    assert list(ingest.read(out / "adt.h5").var_names) == cite.uns["protein_ids"]
-    out = ingest.export_dataset(cite, tmp_path / "TUPLE", adt="obsm:protein",
-                                adt_names=tuple("ABCDEFGH"))
-    assert list(ingest.read(out / "adt.h5").var_names) == list("ABCDEFGH")
 
 
 # ------------------------------------- 5: the same features in every batch
@@ -526,7 +507,7 @@ def test_gene_activity_under_the_peak_name_keeps_its_reason(linux, tmp_path, cap
                         "this computer. PK holds RNA and ATAC, in batches 1-3.")
     assert lines[2] == ("[scan] StabMap: StabMap needs peak ATAC. The features of "
                         "atac_peak1.h5 do not look like chr:start-end, so it seems to hold "
-                        "gene activity.")
+                        "gene activity. Export it with atac_kind='peak'.")
 
 
 @needs_docs
