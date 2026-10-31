@@ -120,8 +120,9 @@ class _Recorder:
 
 
 def test_end_to_end_evaluates_with_the_default_backend(monkeypatch):
-    """Section 7 scores with the default Leiden backend (0.4 stops teaching the
-    leidenalg override, now the default) and says a run's scores differ a little."""
+    """Section 6 scores with the default Leiden backend (0.4 stops teaching the
+    leidenalg override, now the default) and says why this run's scores differ
+    from the stored ones: it trains Matilda for fewer epochs than the default."""
     import numpy as np
     import pandas as pd
     import multibench as mtb
@@ -130,8 +131,11 @@ def test_end_to_end_evaluates_with_the_default_backend(monkeypatch):
     ns = {"mtb": _Recorder(mtb, seen), "pd": pd, "emb": np.zeros((3, 2))}
     exec(_e2e_cell("mtb.evaluate("), ns)
     assert seen == ["igraph"]
-    md = " ".join(_markdown(E2E, "## 7. Score").split())
-    assert "differ a little from the stored ones" in md
+    md = " ".join(_markdown(E2E, "## 6. Score").split())
+    default = mtb.params_for("Matilda", "vertical", ["rna", "adt"])["tunable"]["epochs"]["default"]
+    assert (f"This run trains Matilda for 10 epochs instead of its default {default}, so its "
+            "scores differ from the stored ones.") in md
+    assert '{"Matilda": {"epochs": 10}}' in _e2e_cell("mtb.run(")
     assert "leidenalg" not in md
 
 
