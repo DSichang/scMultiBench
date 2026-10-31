@@ -905,8 +905,8 @@ def _check_export_args(data, specs, given, *, atac_kind, labels, batch, batch_in
             and atac is None:
         raise ValueError("category='diagonal' with labels= needs rna= or atac=.")
     if category in ("mosaic", "cross") and batch is None and batch_index is None:
-        _text.warn(f"category={category!r} methods read numbered files: pass batch_index= "
-                   f"or batch=.", UserWarning)
+        raise ValueError(f"category={category!r} methods read one file per batch: pass "
+                         f"batch= (the batch column) or batch_index=.")
 
 
 def _modality_sides(data, specs, *, atac_kind, adt_names, category):
