@@ -102,7 +102,8 @@ def test_env_plan_size_lines_name_the_envs():
     assert text == "2 envs: 1.8 GB to download, at least 2.6 GB on disk"
 
 
-def test_fetch_progress_line_is_a_sentence(tmp_path, monkeypatch, capsys):
+def test_fetch_prints_no_progress_line(tmp_path, monkeypatch, capsys):
+    """The fetch takes about a second: it prints nothing."""
     import subprocess
 
     def fake_run(argv, check=True, **kw):
@@ -113,10 +114,9 @@ def test_fetch_progress_line_is_a_sentence(tmp_path, monkeypatch, capsys):
     fresh = tmp_path / "fresh"
     try:
         scripts.ensure_repo(fresh)
-    except Exception:  # noqa: BLE001 - only the progress line is checked here
+    except Exception:  # noqa: BLE001 - only the output is checked here
         pass
-    assert capsys.readouterr().out.startswith(
-        "[run] downloading the method scripts, once ...")
+    assert "downloading the method scripts" not in capsys.readouterr().out
 
 
 def test_error_tail_is_clipped_at_a_word_boundary():
