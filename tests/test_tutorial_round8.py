@@ -83,7 +83,7 @@ def test_split_sentences_keep_their_facts():
         if GEN.TASKS[key]["cat"] != "mosaic":
             continue
         md = "\n".join(src for kind, src in _cells(f"tutorial_{key}") if kind == "markdown")
-        assert "writes one batch per call. Number the batches as below: " in md, key
+        assert "a cell type for each cell. Number the batches as below: " in md, key
         assert f"[The folder layout]({GEN.LAYOUT}) lists the batch patterns" in md, key
 
 

@@ -105,8 +105,14 @@ def test_stored_scores_section_states_the_measured_counts(key):
     full = "the full " if ds != shown and ds in shown else ""
     assert (f"The package ships stored results for {rerun.method.nunique()} methods "
             f"on {full}`{ds}`.") in md
-    # a run on the subset differs from the full dataset's scores by more than a little
-    assert ("differ a little from the stored ones" in md) == (not full)
+    # only a run on the stored dataset itself differs from its scores a little
+    assert ("differ a little from the stored ones" in md) == (ds == shown)
+    # the methods of the figure that train on the cell types they are scored against
+    trained = sorted((m for m in rerun.method.unique() if mtb.method_info(m)["needs_labels"]),
+                     key=str.lower)
+    if trained:
+        verb = "trains" if len(trained) == 1 else "train"
+        assert f"{GEN.and_list(trained)} {verb} on the cell types" in md
     assert stored[stored.dataset == ds].method.nunique() == rerun.method.nunique()
     assert set(rerun.source) == {"stored"}
     assert "own runs" not in md

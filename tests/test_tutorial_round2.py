@@ -74,10 +74,12 @@ def test_export_dataset_takes_every_keyword_the_notebooks_pass():
 # ------------------------------------------------------- generated tutorials
 @pytest.mark.parametrize("name", TUTORIALS)
 def test_plot_details_say_constant_columns_are_grey(name):
-    """M02: a column whose rows all hold one value is drawn grey; the Plot
-    section says so."""
+    """M02: a column with fewer than two different values is drawn grey; the
+    Plot section says so. bubble warns only where two or more rows hold the one
+    value, so the text promises no warning."""
     md = _markdown(name, "## 4. Plot")
-    assert "A column whose rows all hold the same value is drawn grey" in md
+    assert "A column with fewer than two different values is drawn grey." in md
+    assert "a warning names it" not in md
 
 
 def test_uinmf_reads_every_batch_of_d52_and_its_two_batch_variant_says_what_it_skips():

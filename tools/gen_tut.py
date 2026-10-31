@@ -207,9 +207,10 @@ TASKS = {
    methods=["iNMF", "online_iNMF"],
    blurb=("Diagonal integration combines RNA and ATAC measured in different cells, "
           "with no pairing between them. If your RNA and ATAC come from the same "
-          "cells, as in 10x Multiome, use the vertical tutorial. This tutorial runs "
-          "{methods} on `D27mini`, 3,000 RNA and 3,000 ATAC profiles of the "
-          "benchmark dataset `D27`, then on data in your own format."),
+          "cells, as in 10x Multiome, use [the vertical tutorial](" + COLAB
+          + "tutorial_vertical_rna_atac.ipynb). This tutorial runs {methods} on "
+          "`D27mini`, the RNA and ATAC of 3,000 cells of the benchmark dataset `D27` "
+          "with the pairing left out, then on data in your own format."),
  ),
  "diagonal_multi": dict(
    cat="diagonal", label="[multiple RNA, multiple ATAC]", ds="D37mini",
@@ -218,8 +219,8 @@ TASKS = {
    blurb=("Diagonal integration combines RNA and ATAC measured in different cells, "
           "with no pairing between them. This tutorial is for data in several "
           "batches: three RNA batches and three ATAC batches. It runs {methods} on "
-          "`D37mini`, 3,000 RNA and 3,000 ATAC profiles of the benchmark dataset "
-          "`D37`, then on data in your own format."),
+          "`D37mini`, the RNA and ATAC of 3,000 cells of the benchmark dataset `D37` "
+          "with the pairing left out, then on data in your own format."),
  ),
  "mosaic_rna_adt": dict(
    cat="mosaic", label="[RNA, RNA + ADT, ADT]", ds="D38mini",
@@ -387,8 +388,8 @@ def diagonal_multi_sentence(key):
 # The paragraphs of the collapsed block, in the order they appear.
 WHERE = ("The names in quotes say where your file holds each part. `\"X\"` is the main "
          "matrix, `\"obsm:{obsm}\"` the matrix `obsm[\"{obsm}\"]`, `\"layer:counts\"` the "
-         "layer `layers[\"counts\"]`, and `\"obs:celltype\"` the column `obs[\"celltype\"]`, "
-         "which `\"celltype\"` alone names too. A wrong name after `obsm:`, `layer:` or "
+         "layer `layers[\"counts\"]`, and `\"obs:celltype\"` the column `obs[\"celltype\"]`. "
+         "A wrong name after `obsm:`, `layer:` or "
          "`obs:` raises an error that lists the names the file has.")
 PROTEIN_NAMES = ("The example keeps the protein names in `adata.uns[\"protein_names\"]`. A "
                  "DataFrame in `adata.obsm[\"protein\"]` brings its own names in its columns.")
@@ -409,8 +410,6 @@ MUDATA_NOTE = ("A 10x Multiome MuData goes in with one call. Here the labels are
                "```")
 DIAG_ONE_SIDE = ("`labels=` needs the column in both files. With cell types for the RNA "
                  "cells only, leave `labels=` out and follow the recipe for no labels.")
-DIAG_PEAK = ("For ATAC as a peak matrix, pass `atac_kind=\"peak\"`. {peak_only} read "
-             "peaks. [The folder layout](" + LAYOUT + ") lists the files each method needs.")
 def multi_numbering():
     """The batch-count paragraph of the several-batch diagonal tutorial, from
     the number of batches its methods read."""
@@ -420,10 +419,9 @@ def multi_numbering():
     return (f"The RNA batches and the ATAC batches are numbered separately. RNA batch 1 "
             f"and ATAC batch 1 need not come from the same sample. "
             f"{and_list(_several_batch_diagonal_methods())} read exactly {n} RNA and {n} "
-            f"ATAC batches. For another number, such as two donors, write one `rna.h5` "
-            f"and one ATAC file with every cell, and pass the batches to `run` as `batch=`, "
-            f"one per RNA and ATAC cell, as in "
-            f"[Another number of donors]({SITE}tutorials/run/#recipe-donors).")
+            f"ATAC batches. For another number, such as two donors, export `rna` and "
+            f"`atac` with every cell, without `batch_index=`, and pass the batches to "
+            f"`run` as `batch=`, one per RNA and ATAC cell, as in {RECIPES['donors']}.")
 MULTI_PEAK = ("For ATAC as a peak matrix, pass `atac_kind=\"peak\"`. {multi_peak} "
               "the peak matrix.")
 MOSAIC_LAYOUT = ("[The folder layout](" + LAYOUT + ") lists the batch patterns and the methods "
@@ -437,8 +435,7 @@ CHECK_NOTE = ("Without `methods=`, `scan` lists every method that reads the moda
 
 
 MOSAIC_NEEDS = ("Your data needs raw counts, with one `.h5ad` file per batch and modality and "
-                "a cell type for each cell. `mtb.io.export_dataset` with `batch_index=` "
-                "writes one batch per call. Number the batches as below:")
+                "a cell type for each cell. Number the batches as below:")
 NUMBER = {2: "two", 3: "three", 4: "four", 5: "five", 6: "six"}
 
 # The recipes of the run guide, for data that does not come as the files of
@@ -486,8 +483,7 @@ mtb.io.export_dataset(adata, "mydata/" + NAME,
  "vertical_rna_atac": dict(
    name="MYMULTIOME",
    needs=("Your data needs raw RNA counts, an ATAC matrix of the same cells and a cell "
-          "type for each cell, as two `.h5ad` files. Every method of this task reads "
-          "ATAC as peaks, so the folder holds peaks."),
+          "type for each cell, as two `.h5ad` files."),
    example=("two small example files, `my_rna.h5ad` and `my_atac.h5ad`, from 60% of the "
             "cells of `D27mini_vertical`"),
    n_files=2,
@@ -552,14 +548,12 @@ mtb.io.export_dataset(rna, "mydata/" + NAME,
                       atac_kind="gene_activity",  # <- or "peak"
                       labels="obs:celltype",      # <- the column in both files
                       category="diagonal", overwrite=True)''',
-   notes=[DIAG_ONE_SIDE, DIAG_PEAK],
+   notes=[DIAG_ONE_SIDE],
  ),
  "diagonal_multi": dict(
    name="MYDIAG_BATCHES",
    needs=("Your data needs raw RNA counts and ATAC as one `.h5ad` file per batch, with a "
-          "cell type for each cell. `mtb.io.export_dataset` with `batch_index=` writes one "
-          "RNA batch and one ATAC batch per call. online_iNMF needs about 5,000 cells in "
-          "total."),
+          "cell type for each cell. online_iNMF needs about 5,000 cells in total."),
    example=("six small example files, `my_rna1.h5ad` to `my_rna3.h5ad` and "
             "`my_atac1.h5ad` to `my_atac3.h5ad`, from the first 900 RNA profiles and the "
             "first 900 ATAC profiles of each batch of `D37mini`"),
@@ -755,8 +749,7 @@ mtb.io.export_dataset(rna, "mydata/" + NAME,
  "cross_adt_atac": dict(
    name="MYCROSS_ADT_ATAC",
    needs=("Your data needs raw ADT counts in one `.h5ad` file and an ATAC peak matrix of "
-          "the same cells in another, with a cell type and a batch for each cell. "
-          "`rna=None` says that the data has no RNA."),
+          "the same cells in another, with a cell type and a batch for each cell."),
    example=("two small example files, `my_adt.h5ad` and `my_atac.h5ad`, from 60% of the "
             "cells of `D58mini`, with a batch column"),
    n_files=2,
@@ -843,7 +836,12 @@ def cross_batches_sentence(key):
         shape = {n: sorted(ms) for n, ms in sorted(reads.items())}
         raise SystemExit(f"{key}: the batches each method reads are {shape}: reword "
                          f"cross_batches_sentence")
-    return f"The methods of this task read {NUMBER[most]} batches."
+    also = ""
+    if fewer:
+        few = sorted(reads[fewer[0]])
+        also = (f", and {and_list(few)} also read{'s' if len(few) == 1 else ''} "
+                f"{NUMBER[fewer[0]]}")
+    return f"The methods of this task read {NUMBER[most]} batches{also}."
 
 
 def check_own(key):
@@ -899,20 +897,18 @@ def check_own(key):
 def own_cells(key):
     """Section 5 of a task tutorial as ``[(kind, source), ...]``: the heading
     with its collapsed block, then a sentence and a code cell each for the
-    example files, the read, the export with its check, and the run, and the
+    example files, the read and the export with its check, then the run and the
     plot. The selector example of the collapsed block names the protein matrix
     where the task has ADT, else the ATAC one."""
     t, own = TASKS[key], OWN[key]
-    cat, methods, export = t["cat"], t["methods"], own["export"]
+    cat, export = t["cat"], own["export"]
     one = own["n_files"] == 1
-    same = "the same method" if len(methods) == 1 else "the same methods"
-    peak_only = and_list(atac_forms("diagonal")[1])
     multi_peak = [m for m, v in task_variants(key) if "atac_peak1" in v.when["modalities"]]
     multi_peak = and_list(multi_peak) + (" reads" if len(multi_peak) == 1 else " read") \
         if multi_peak else ""
     has_adt = any(r.startswith("adt") for v in t["variants"] for r in v)
     notes = [WHERE.replace("{obsm}", "protein" if has_adt else "atac")] + [
-        n.replace("{peak_only}", peak_only).replace("{multi_peak}", multi_peak)
+        n.replace("{multi_peak}", multi_peak)
          .replace("{name}", own["name"]) for n in own["notes"]]
     # a paragraph of its own between the needs and the recipes: how many
     # batches the methods read, or what the batches' files must share
@@ -951,7 +947,6 @@ def own_cells(key):
         ("code", own["read"]),
         ("markdown", write),
         ("code", f'{export}\nmtb.scan("mydata/" + NAME, "{cat}", methods=METHODS)'),
-        ("markdown", f"Run {same} on the folder:"),
         ("code", f'mine = mtb.run("mydata/" + NAME, "{cat}", methods=METHODS,\n'
                  f'                   out_dir="out/" + NAME)\n'
                  f'mine.summary'),
@@ -981,7 +976,7 @@ def _install(md, code, methods):
     GPU: for the others both runtimes download the same and run alike."""
     gpu = any(mtb.method_info(m)["gpu"] != "not used" for m in methods)
     md("## 1. Install\n\n"
-       "This cell installs `multibench-sc`. It needs no restart."
+       "This cell installs `multibench-sc`."
        + (" On Colab, choose a T4 GPU runtime first (Runtime -> Change runtime type), "
           "because changing it later loses the downloads." if gpu else ""))
     code(INSTALL_CELL)
@@ -1016,17 +1011,21 @@ def trained_on_labels_sentence(methods):
 
 def no_classification_sentence(key, methods):
     """The sentence after ``SCORED_TOO`` for a tutorial that runs a method
-    whose output is a graph: run scores no classification for it."""
+    whose output is a graph: run scores the UMAP it writes next to the graph
+    (scMoMaT's script fixes ``n_components = 2``), with no classification."""
     graphs = sorted({m for m, v in task_variants(key)
                      if m in methods and v.output.kind == "graph"})
     if not graphs:
         return ""
-    one = len(graphs) == 1
-    return (f" {and_list(graphs)} write{'s' if one else ''} a graph, so "
-            f"{'it gets' if one else 'they get'} no classification scores.")
+    if graphs != ["scMoMaT"]:
+        raise SystemExit(f"{key}: {and_list(graphs)} write a graph: reword "
+                         f"no_classification_sentence")
+    return (" scMoMaT writes a graph: `run` scores its 2-D UMAP, with no "
+            "classification scores.")
 
-PLOT_TEXT = ("`res.plot()` draws the scores as a bubble table. Each column is scaled on its "
-             "own: its lightest fill is that column's lowest value, not zero.")
+PLOT_TEXT = ("`res.plot()` draws the scores as a bubble table. The fills and Overall bars "
+             "rank the rows within each column, so a small gap can look large: "
+             "`res.summary` has the values.")
 
 
 def plot_details(cat):
@@ -1039,8 +1038,8 @@ def plot_details(cat):
         f"Metrics are grouped by family: blue for clustering{more}. Each family starts "
         "with an `Overall` bar: each row's mean rank over the family's metrics, scaled so "
         "that the lowest gets the shortest bar.",
-        "A column whose rows all hold the same value is drawn grey, and a warning "
-        "names it. A figure of one method is grey everywhere.")
+        "A column with fewer than two different values is drawn grey. A figure of one "
+        "method is grey everywhere.")
 
 
 def build_tutorial(key):
@@ -1072,11 +1071,7 @@ mtb.data.fetch("{ds}")
 METHODS = {json.dumps(methods)}
 envs = mtb.env.install(METHODS)''')
 
-    run_notes = []
-    if "scMoMaT" in methods:
-        run_notes.append("scMoMaT writes a graph instead of an embedding. `run` scores "
-                         "its UMAP.")
-    run_notes += [
+    run_notes = [
         "`params={\"Method\": {\"key\": value}}` "
         "sets a method's parameters, and `mtb.params_for` lists them. Many methods "
         "take none.",
@@ -1086,9 +1081,11 @@ envs = mtb.env.install(METHODS)''')
     scored_too = "" if cat == "vertical" else (
         (SCORED_TOO_PAIR if key == "diagonal_rna_atac" else SCORED_TOO)
         + no_classification_sentence(key, methods))
+    # the classification scores come from the package's own classifier, not scIB
+    scib = " with the scIB metrics" if cat == "vertical" else ""
     md(f"""## 3. Run the method{'s' if len(methods) > 1 else ''}
 
-`run` runs each method on `{ds}` and scores its output with the scIB metrics. {CLUSTERING_WORDS}{scored_too}{trained_on_labels_sentence(methods)} `res.summary` has one row per method with its status, run time and scores. Higher is better for every metric.
+`run` runs each method on `{ds}` and scores its output{scib}. {CLUSTERING_WORDS}{scored_too}{trained_on_labels_sentence(methods)} Higher is better for every metric.
 
 """ + details(*run_notes))
     code(f'''res = mtb.run("{ds}", "{cat}", methods=METHODS,
@@ -1112,10 +1109,14 @@ res.summary''')
         if not full and stored_ds != ds:
             stored_notes.append(f"There are no stored results for `{ds}`. `{stored_ds}` is another "
                                 f"benchmark dataset of the same task.")
-        if not full:
+        if stored_ds == ds:
             stored_notes.append(
                 "Scores of your runs differ a little from the stored ones: some methods, such "
                 "as sciPENN, give a slightly different embedding on each run.")
+        stored_methods = mtb.load_results(cat, dataset=stored_ds).method.unique()
+        trained = trained_on_labels_sentence(sorted(stored_methods, key=str.lower))
+        if trained:
+            stored_notes.append(trained.strip())
         md(f"""## {section}. Stored results
 
 The package ships stored results for {n_stored} methods on {'the full ' if full else ''}`{stored_ds}`. `load_results` reads them and `mtb.plot.bubble` draws them, without running anything."""
@@ -1138,8 +1139,6 @@ mtb.plot.bubble(long)''')
         """| symptom | fix |
 |---|---|
 | a method fails on a small dataset | `mtb.scan` names what the method needs from the data's size in its `caveat` column |
-| a warning that values are not whole numbers | export raw counts, for example with `rna="layer:counts"` |
-| `... matrix/data as cells x features` | the matrix is transposed: export it again with `mtb.io.export_dataset` |
 | a method times out | raise `timeout=` in `run` |
 | batch metrics use the wrong batches | `res.rescore(batch=my_vector)` scores again without running the methods |"""))
 

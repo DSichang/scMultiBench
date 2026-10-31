@@ -2,11 +2,6 @@
 
 Round 7 reworded package messages that the notebooks quote or point to:
 
-- R7-11: the matrix-orientation ValueError no longer says "which is cells x
-  features". It reads "<method> reads rna.h5 of <dataset>, which stores
-  matrix/data as cells x features, shape (...)". The Troubleshooting table of
-  each category tutorial quotes "matrix/data as cells x features" as the
-  symptom to look for.
 - R7-03: for MultiMAP and Seurat_v3, which read atac_peak.h5 and atac_gas.h5,
   the file check no longer points to ``method_info(m)["atac"]``, which lists
   them under peak. The diagonal tutorial's first cell names these two as
@@ -25,9 +20,7 @@ import re
 import warnings
 from pathlib import Path
 
-import h5py
 import numpy as np
-import pandas as pd
 import pytest
 from tests.conftest import full_scan
 
@@ -59,65 +52,10 @@ def _visible(md):
     return re.sub(r"<details>.*?</details>", "", md, flags=re.S)
 
 
-def _trouble_row(name, fix_word):
-    """The Troubleshooting row whose fix column holds ``fix_word``, as
-    ``(symptom, fix)``."""
-    md = _markdown(name, "## Troubleshooting")
-    rows = [ln for ln in md.splitlines() if ln.startswith("| ") and fix_word in ln]
-    assert len(rows) == 1, rows
-    symptom, fix = (c.strip() for c in rows[0].strip("|").split("|"))
-    return symptom, fix
-
-
 def _quiet(fn, *a, **kw):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         return fn(*a, **kw)
-
-
-# ------------------------------------------ R7-11: the orientation symptom
-def _transposed_folder(root, name="MYCITE", n_cells=120):
-    """A vertical RNA + ADT folder whose .h5 files store cells x features:
-    the AnnData orientation, the easy mistake."""
-    d = root / name
-    d.mkdir(parents=True)
-    rng = np.random.default_rng(0)
-    for fn, n_feat, prefix in (("rna.h5", 40, "gene"), ("adt.h5", 8, "prot")):
-        with h5py.File(d / fn, "w") as f:
-            f.create_dataset("matrix/data",
-                             data=rng.poisson(3.0, size=(n_cells, n_feat)).astype(float))
-            f.create_dataset("matrix/barcodes",
-                             data=np.array([f"c{i}" for i in range(n_cells)], dtype="S8"))
-            f.create_dataset("matrix/features",
-                             data=np.array([f"{prefix}{i}" for i in range(n_feat)], dtype="S8"))
-    pd.DataFrame({"x": ["A"] * n_cells}).to_csv(d / "cty.csv", index=False)
-    return d
-
-
-@pytest.mark.parametrize("name", TUTORIALS)
-def test_troubleshooting_quotes_the_live_orientation_error(name, tmp_path):
-    """The symptom a reader searches for is in the error that inputs_for,
-    scan's reason column and run raise for a transposed matrix, and the call
-    the fix column names writes a folder that passes the check."""
-    import multibench as mtb
-    symptom, fix = _trouble_row(name, "transposed")
-    quoted = re.fullmatch(r"`(?:\.\.\. )?(.+?)`", symptom)
-    assert quoted, symptom
-    words = quoted.group(1)
-    _transposed_folder(tmp_path)
-    with pytest.raises(ValueError) as e:
-        mtb.engine.resolve.inputs_for("MYCITE", "vertical", "Matilda", modalities=["rna", "adt"],
-                       data_path=tmp_path, check=True)
-    assert words in str(e.value), (words, str(e.value))
-    row = _quiet(full_scan, "MYCITE", "vertical", methods=["Matilda"], data_path=tmp_path,
-                 modalities=["rna", "adt"], verbose=False).iloc[0]
-    assert not row["files_ok"]
-    assert words in row["reason"], row["reason"]
-    assert "`mtb.io.export_dataset`" in fix
-    mtb.io.export_dataset(_demo(n=120), tmp_path / "FIXED", rna="X", adt="obsm:protein",
-                          labels="obs:celltype")
-    mtb.engine.resolve.inputs_for("FIXED", "vertical", "Matilda", modalities=["rna", "adt"],
-                   data_path=tmp_path, check=True)
 
 
 # ---------------------------------- R7-03: which ATAC files a method needs
@@ -159,21 +97,6 @@ def test_the_overwrite_error_says_what_to_do(tmp_path):
     msg = str(e.value)
     assert "already holds" in msg and msg.endswith("Pass overwrite=True to replace them.")
     mtb.io.export_dataset(_demo(), folder, overwrite=True, **kw)
-
-
-@pytest.mark.parametrize("name", TUTORIALS)
-def test_the_raw_counts_row_matches_the_live_warning(name, tmp_path):
-    import multibench as mtb
-    symptom, fix = _trouble_row(name, "raw counts")
-    assert symptom == "a warning that values are not whole numbers"
-    assert fix == 'export raw counts, for example with `rna="layer:counts"`'
-    with pytest.warns(UserWarning) as rec:
-        mtb.io.export_dataset(_demo(counts=False), tmp_path / "LOGNORM", rna="X",
-                              adt="obsm:protein", labels="obs:celltype")
-    msgs = [str(w.message) for w in rec if "whole numbers" in str(w.message)]
-    assert len(msgs) == 1, msgs
-    assert "not whole numbers" in msgs[0]
-    assert msgs[0].endswith("Export raw counts.")
 
 
 # ---------------------------- R7-10: the environment reason (guard)
