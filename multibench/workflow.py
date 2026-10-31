@@ -68,7 +68,7 @@ def load_run(out_dir, *, methods=None) -> "RunResult":
     -----
     UserWarning
         The scores were made by multibench 0.3.x; ``res.rescore()`` scores
-        them as 0.4.0 does.
+        them as this version does.
 
     Examples
     --------
@@ -152,7 +152,7 @@ def _run_record_for(path, dataset: str) -> dict | None:
 
 #: load_run's warning for a folder scored before 0.4.0
 OLD_TREE = ("These scores come from multibench 0.3.x. res.rescore() scores them as "
-            "0.4.0 does.")
+            "this version does.")
 
 
 def _scored_before_040(long_table, records) -> bool:
