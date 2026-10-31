@@ -240,14 +240,7 @@ def read_labels_ids(path: Path | str, column: str | None = None, *,
     ambiguous file's error then asks for one column as values, else for
     ``column=``.
     """
-    try:
-        path = _require_file(path, f"{what} file" if what else "labels file")
-    except FileNotFoundError as e:
-        if Path(path).suffix:
-            raise
-        # a name without a suffix, such as "obs:donor", is meant as a column
-        raise FileNotFoundError(f"{e} Pass a file, or the values themselves, as "
-                                f"adata.obs[\"<column>\"].") from None
+    path = _require_file(path, f"{what} file" if what else "labels file")
     d = _read_table(path, _sep_for(path))
     head = f"The {what} file {path.name}" if what else str(path)
     first = d.iloc[:, 0] if d.shape[1] > 1 else None
