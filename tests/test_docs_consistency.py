@@ -849,8 +849,7 @@ def test_get_started_pages_keep_the_round2_facts():
     """Quickstart: the laptop tab compares an RNA PCA on 2,000 genes with an
     ADT PCA, says a new run's scores differ a little from the stored ones, links the
     peaks-only section and defines cell order; the unpaired tab lives on
-    tutorials/run only. Installation: the cluster recipe checks with
-    assume_gpu=True and asks for a GPU only for the GPU method (M05-M07)."""
+    tutorials/run only."""
     docs = _docs_root()
     quick = (docs / "quickstart.md").read_text()
     for fact in ("highly_variable_genes(pc, n_top_genes=2000)", '"ADT PCA"',
@@ -858,11 +857,6 @@ def test_get_started_pages_keep_the_round2_facts():
         assert fact in quick, fact
     assert re.search(r"^    cell order\n    :   ", quick, re.M)
     assert '=== "Unpaired RNA + ATAC"' not in quick
-    install = (docs / "installation.md").read_text()
-    import multibench as mtb
-    for fact in (f"multibench-sc>={mtb.__version__}", "assume_gpu=True", "sbatch --gres=gpu:1 job.sh scMoMaT"):
-        assert fact in install, fact
-    assert "#SBATCH --gres" not in install
 
 
 @needs_docs

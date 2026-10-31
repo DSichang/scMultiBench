@@ -111,19 +111,10 @@ def test_quickstart_batch_lines_name_run_all_as_the_guides_do():
 
 
 @needs_docs
-def test_cluster_recipe_pins_scripts_and_reads_strict():
-    """R3-26: the login node clones the scripts, then prepares in Python; the
-    job script calls Python (0.4.0: no command line)."""
-    install = _read("installation.md")
-    cluster = install.split("## On a cluster with offline compute nodes", 1)[1].split("\n## ", 1)[0]
-    login = cluster.split('```bash title="login node"', 1)[1].split("```", 1)[0]
-    assert login.index("git clone --depth 1") < login.index("python prepare.py")
-    prepare = cluster.split('```python title="prepare.py"', 1)[1].split("```", 1)[0]
-    assert 'mtb.scan("LAB", "mosaic"' in prepare and "assume_gpu=True" in prepare
-    job = cluster.split('```bash title="job.sh (Slurm)"', 1)[1].split("```", 1)[0]
-    assert 'python run_one.py "$1"' in job
-    assert "--strict" not in cluster and "multibench run" not in cluster
-    assert "Check it with `du` after the first install." in cluster
+def test_installation_has_no_cluster_recipe():
+    """The owner dropped the offline-cluster recipe (2026-11-01); no page links it."""
+    assert "On a cluster" not in _read("installation.md")
+    assert "on-a-cluster" not in _read("tutorials/run.md")
 
 
 @needs_docs

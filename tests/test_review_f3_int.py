@@ -332,18 +332,6 @@ def test_pages_state_the_donor_count_cross_reads():
 
 
 @needs_docs
-@pytest.mark.skipif(shutil.which("bash") is None, reason="bash not installed")
-def test_job_script_is_valid_bash(tmp_path):
-    text = (_docs_root() / "installation.md").read_text()
-    job = text.split('```bash title="job.sh (Slurm)"', 1)[1].split("```", 1)[0]
-    script = tmp_path / "job.sh"
-    script.write_text(job)
-    res = subprocess.run(["bash", "-n", str(script)], capture_output=True, text=True)
-    assert res.returncode == 0, res.stderr
-    assert 'python run_one.py "$1"' in job
-
-
-@needs_docs
 def test_changes_page_follows_the_review_fixes():
     text = _flat("changes.md")
     for phrase in ("wrong ATAC kind, unreadable peak names and scripts not at "
