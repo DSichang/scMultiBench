@@ -66,6 +66,14 @@ def test_equal_column_warning_is_plain():
                     "columns are grey. Leave them out with metrics=."]
 
 
+def test_a_column_one_method_has_is_not_called_equal():
+    # a graph method has no classification scores: OCA is not "0.790 for every method"
+    df = pd.DataFrame(_rows("A", (0.3, 0.4, 0.9)) + _rows("B", (0.5, 0.2, 0.8))
+                      + [{"method": "A", "metric": "OCA", "value": 0.79}])
+    _, msgs = _messages(_build_table, df)
+    assert not any("for every method" in m for m in msgs), msgs
+
+
 # --- R5-11 (c): the CLI overlay line -----------------------------------------
 
 # --- R5-11 (d): na='raise' does not describe the figure it does not draw -------

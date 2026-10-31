@@ -229,7 +229,8 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None) -> Bubble
         _text.warn(_na_message(missing), UserWarning)
 
     raw = pd.concat([b.raw for b in blocks], axis=1)
-    msg = _no_comparison_message(rows, style.constant_columns(raw))
+    # a column only one method has a value in is not "equal for every method"
+    msg = _no_comparison_message(rows, style.constant_columns(raw.loc[:, raw.notna().sum() > 1]))
     if msg:
         _text.warn(msg, UserWarning)
 
