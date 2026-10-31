@@ -998,17 +998,6 @@ SCORED_TOO_PAIR = (" The batch metrics measure how well the RNA and ATAC cells m
                    "of them are predicted in the other.")
 
 
-def trained_on_labels_sentence(methods):
-    """The sentence for methods that train on the cell types they are scored
-    against (``method_info(m)["needs_labels"]``), or ""."""
-    lab = [m for m in methods if mtb.method_info(m)["needs_labels"]]
-    if not lab:
-        return ""
-    one = len(lab) == 1
-    return (f" {and_list(lab)} train{'s' if one else ''} on the cell types "
-            f"{'it is' if one else 'they are'} scored against.")
-
-
 def no_classification_sentence(key, methods):
     """The sentence after ``SCORED_TOO`` for a tutorial that runs a method
     whose output is a graph: run scores the UMAP it writes next to the graph
@@ -1085,7 +1074,7 @@ envs = mtb.env.install(METHODS)''')
     scib = " with the scIB metrics" if cat == "vertical" else ""
     md(f"""## 3. Run the method{'s' if len(methods) > 1 else ''}
 
-`run` runs each method on `{ds}` and scores its output{scib}. {CLUSTERING_WORDS}{scored_too}{trained_on_labels_sentence(methods)} Higher is better for every metric.
+`run` runs each method on `{ds}` and scores its output{scib}. {CLUSTERING_WORDS}{scored_too} Higher is better for every metric.
 
 """ + details(*run_notes))
     code(f'''res = mtb.run("{ds}", "{cat}", methods=METHODS,
@@ -1113,10 +1102,6 @@ res.summary''')
             stored_notes.append(
                 "Scores of your runs differ a little from the stored ones: some methods, such "
                 "as sciPENN, give a slightly different embedding on each run.")
-        stored_methods = mtb.load_results(cat, dataset=stored_ds).method.unique()
-        trained = trained_on_labels_sentence(sorted(stored_methods, key=str.lower))
-        if trained:
-            stored_notes.append(trained.strip())
         md(f"""## {section}. Stored results
 
 The package ships stored results for {n_stored} methods on {'the full ' if full else ''}`{stored_ds}`. `load_results` reads them and `mtb.plot.bubble` draws them, without running anything."""

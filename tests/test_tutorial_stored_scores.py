@@ -38,7 +38,7 @@ GENERATED = [f"tutorial_{k}{suffix}" for k in KEYS for suffix in ("", "_all")
              if not suffix or GEN.has_all(k)]
 NOTEBOOKS = GENERATED + ["tutorial_end_to_end", "colab_quickstart"]
 # the notebooks that draw stored scores
-DRAWING = [f"tutorial_{k}" for k in STORED] + ["tutorial_end_to_end", "colab_quickstart"]
+DRAWING = [f"tutorial_{k}" for k in STORED] + ["colab_quickstart"]
 
 
 def _cells(name):
@@ -107,12 +107,8 @@ def test_stored_scores_section_states_the_measured_counts(key):
             f"on {full}`{ds}`.") in md
     # only a run on the stored dataset itself differs from its scores a little
     assert ("differ a little from the stored ones" in md) == (ds == shown)
-    # the methods of the figure that train on the cell types they are scored against
-    trained = sorted((m for m in rerun.method.unique() if mtb.method_info(m)["needs_labels"]),
-                     key=str.lower)
-    if trained:
-        verb = "trains" if len(trained) == 1 else "train"
-        assert f"{GEN.and_list(trained)} {verb} on the cell types" in md
+    # the owner dropped the sentence on the methods that train on the cell types
+    assert "on the cell types" not in md
     assert stored[stored.dataset == ds].method.nunique() == rerun.method.nunique()
     assert set(rerun.source) == {"stored"}
     assert "own runs" not in md

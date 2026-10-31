@@ -123,8 +123,8 @@ class _Recorder:
 
 def test_end_to_end_evaluates_with_the_default_backend(monkeypatch):
     """Section 6 scores with the default Leiden backend (0.4 stops teaching the
-    leidenalg override, now the default) and says why this run's scores differ
-    from the stored ones: it trains Matilda for fewer epochs than the default."""
+    leidenalg override, now the default); with no stored results to compare,
+    it no longer explains a difference from them."""
     import numpy as np
     import pandas as pd
     import multibench as mtb
@@ -134,56 +134,14 @@ def test_end_to_end_evaluates_with_the_default_backend(monkeypatch):
     exec(_e2e_cell("mtb.evaluate("), ns)
     assert seen == ["igraph"]
     md = " ".join(_markdown(E2E, "## 6. Score").split())
-    default = mtb.params_for("Matilda", "vertical", ["rna", "adt"])["tunable"]["epochs"]["default"]
-    assert (f"This run trains Matilda for 10 epochs instead of its default {default}, so its "
-            "scores differ from the stored ones.") in md
+    assert "stored" not in md
     assert '{"Matilda": {"epochs": 10}}' in _e2e_cell("mtb.run(")
     assert "leidenalg" not in md
 
 
-def _scores_like_evaluate(flavor):
-    """Matilda's stored D11 scores in the shape section 7's evaluate returns
-    (0.4.0: the long table, its rows named "Matilda (this run)"), with the
-    scoring record evaluate attaches."""
-    import pandas as pd
-    import multibench as mtb
-    from multibench.eval import pipeline
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        stored = mtb.load_results("vertical", dataset="D11", methods=["Matilda"])
-    df = pd.DataFrame({"Value": dict(zip(stored.metric, stored.value))})
-    # the clusters part 0.4.0's evaluate records ("sweep" was 0.3's)
-    df.attrs = {"leiden_flavor": flavor, "clustering": "search",
-                "multibench_version": mtb.__version__, "scib_version": "1.1.7"}
-    return pipeline._long_table(df, method="Matilda (this run)", dataset="D11",
-                                category="vertical")
-
-
-def _run_plot_cell(scores):
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    import pandas as pd
-    import multibench as mtb
-    ns = {"mtb": mtb, "pd": pd, "scores": scores}
-    with warnings.catch_warnings(record=True) as seen:
-        warnings.simplefilter("always")
-        exec(_e2e_cell("mtb.plot.bubble("), ns)
-    plt.close("all")
-    ours = [str(w.message) for w in seen if issubclass(w.category, UserWarning)]
-    return ns, ours
-
-
-def test_end_to_end_plot_compares_this_run_with_the_stored_table():
-    """M02 greys a one-method figure and warns: section 8 plots this run as
-    its own row next to the stored D11 results, with no multibench warning
-    when section 7 used the stored scores' backend. With igraph scores the
-    M03 warning fires, which is why section 7 sets leidenalg."""
-    import pandas as pd
-    ns, ours = _run_plot_cell(_scores_like_evaluate("leidenalg"))
-    long = pd.concat([ns["stored"], ns["scores"]], ignore_index=True)
-    assert "Matilda (this run)" in set(long.method) and "Matilda" in set(long.method)
-    assert long.method.nunique() == ns["stored"].method.nunique() + 1
-    assert ours == [], ours
-    _, ours = _run_plot_cell(_scores_like_evaluate("igraph"))
-    assert any("clustered with igraph" in m for m in ours), ours
+def test_end_to_end_has_no_stored_results():
+    """The owner dropped the comparison with the stored results (2026-11-01): one
+    method has nothing to rank against, so end_to_end ends at its scores."""
+    code = "\n".join(_code(E2E))
+    assert "load_results" not in code and "mtb.plot" not in code
+    assert "(this run)" not in code
