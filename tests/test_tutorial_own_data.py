@@ -75,10 +75,10 @@ SHARED_IN_0_3_4 = {"MYDIAG", "MYMOSAIC", "MYCROSS"}
 NAME_MARK = "# <- a new name for your own data"
 
 KINDS = ["markdown", "markdown", "code", "markdown", "code", "markdown", "code",
-         "markdown", "code", "code"]
+         "code", "code"]
 # positions in what _sources returns, counted from 0: the export cell ends with
 # the check, and _sources gives the check a place of its own
-EXAMPLE, READ, EXPORT, CHECK, RUN = 2, 4, 6, 7, 9
+EXAMPLE, READ, EXPORT, CHECK, RUN = 2, 4, 6, 7, 8
 
 RECIPES = "https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-"
 LINKS = {"10x-h5": "a 10x `.h5` file", "labels-csv": "labels in a CSV file",
@@ -211,9 +211,9 @@ def linux(monkeypatch, tmp_path):
     return calls
 
 
-# ------------------------------------------------------------- the twelve cells
+# -------------------------------------------------------------- the nine cells
 @pytest.mark.parametrize("key", KEYS)
-def test_section_5_has_the_ten_cells(key):
+def test_section_5_has_the_nine_cells(key):
     t = GEN.TASKS[key]
     section = _section(key)
     assert [kind for kind, _ in section] == KINDS
@@ -231,7 +231,7 @@ def test_section_5_has_the_ten_cells(key):
     assert src[RUN] == (f'mine = mtb.run("mydata/" + NAME, "{t["cat"]}", methods=METHODS,\n'
                         f'                   out_dir="out/" + NAME)\n'
                         f'mine.summary')
-    assert src[10] == "mine.plot()"
+    assert src[RUN + 1] == "mine.plot()"
     # the folder is named once, in NAME: no later cell spells it out
     for later in src[EXPORT + 1:]:
         assert NAMES[key] not in later
@@ -894,8 +894,8 @@ def test_a_wrong_name_after_a_prefix_lists_the_names(tmp_path, monkeypatch):
 
 # ------------------------------------------------------ the generator's checks
 CROSS_BATCHES = {
-    "cross_rna_adt": "The methods of this task read three batches.",
-    "cross_rna_atac": "The methods of this task read three batches.",
+    "cross_rna_adt": "The methods of this task read three batches, and UINMF also reads two.",
+    "cross_rna_atac": "The methods of this task read three batches, and UINMF also reads two.",
     "cross_adt_atac": "The methods of this task read two batches.",
     "cross_rna_adt_atac": "The methods of this task read two batches.",
 }

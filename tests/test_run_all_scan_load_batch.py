@@ -67,7 +67,7 @@ def _tree(tmp_path, scored_with="leidenalg/search/0.4.0", version="0.4.0"):
 def test_x01_load_batch_warns_for_scores_before_040(tmp_path, scored_with, warns):
     _, msgs = _messages(mtb.load_run, _tree(tmp_path, scored_with))
     hit = "These scores come from multibench 0.3.x. res.rescore() scores them as " \
-          "0.4.0 does."
+          "this version does."
     assert (hit in msgs) is warns, msgs
 
 
@@ -210,7 +210,7 @@ def test_a_stored_tree_of_0_3_says_to_rescore(tmp_path):
     tree = tmp_path / "outputs" / "D11"
     _write_tree(tree)                               # long.csv without scored_with
     with pytest.warns(UserWarning, match=r"^These scores come from multibench 0\.3\.x\. "
-                      r"res\.rescore\(\) scores them as 0\.4\.0 does\.$"):
+                      r"res\.rescore\(\) scores them as this version does\.$"):
         mtb.load_run(tree)
 
 
