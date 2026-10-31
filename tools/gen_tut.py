@@ -1023,7 +1023,7 @@ def no_classification_sentence(key, methods):
     return (" scMoMaT writes a graph: `run` scores its 2-D UMAP, with no "
             "classification scores.")
 
-PLOT_TEXT = ("`res.plot()` draws the scores as a bubble table. The fills and Overall bars "
+PLOT_TEXT = ("`res.plot()` draws the scores as a bubble table. The bubbles and Overall bars "
              "rank the rows within each column, so a small gap can look large: "
              "`res.summary` has the values.")
 
