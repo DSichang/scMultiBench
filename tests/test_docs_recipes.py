@@ -77,7 +77,7 @@ FENCES = {
                       'mine = mtb.run("mydata/" + NAME, "diagonal", methods=METHODS,',
                       'print(adata.obs["donor"].value_counts())   # the names in your file',
                       'adata = adata[adata.obs["donor"].isin(["A", "B", "C"])].copy()'
-                      '   # <- three donors'],
+                      '   # <- the donors to keep'],
 }
 #: the names in the list of the block that keeps three donors, as the page
 #: writes them: they stand for the names of the reader's file
