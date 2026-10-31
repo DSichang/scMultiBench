@@ -423,8 +423,8 @@ def download_archive(urls: list[str], target: Path, *, label: str,
                      timeout: float = 60) -> int:
     """Stream ``urls`` in order into ``target``; return the bytes written.
 
-    Prints a line at the start and per tenth of ``total`` (per 500 MB when it
-    is unknown). A dropped or stalled connection or an HTTP 5xx resumes where
+    Prints a line at the start, then one progress line that is rewritten per
+    tenth of ``total`` (per 500 MB when it is unknown). A dropped or stalled connection or an HTTP 5xx resumes where
     it stopped, up to ``attempts`` times per URL; another HTTP error raises.
     """
     import time
@@ -444,8 +444,8 @@ def download_archive(urls: list[str], target: Path, *, label: str,
             done += len(chunk)
             if done >= mark:
                 rate = done / max(time.monotonic() - t0, 1e-3) / 1e6
-                print(f"[env]   {fmt(done)}" + (f" of {fmt(total)}" if total else "")
-                      + f" ({rate:.0f} MB/s)", flush=True)
+                print(f"\r[env]   {fmt(done)}" + (f" of {fmt(total)}" if total else "")
+                      + f" ({rate:.0f} MB/s)", end="", flush=True)
                 mark = (done // step + 1) * step
 
     with open(target, "wb") as out:
@@ -468,9 +468,10 @@ def download_archive(urls: list[str], target: Path, *, label: str,
                     final = isinstance(e, urllib.error.HTTPError) and e.code < 500
                     if final or attempt == attempts:
                         raise
-                    print(f"[env]   connection lost ({type(e).__name__}); resuming",
+                    print(f"\n[env]   connection lost ({type(e).__name__}); resuming",
                           flush=True)
                     time.sleep(3 * attempt)
+    print(flush=True)                   # ends the progress line
     return done
 
 
@@ -676,9 +677,11 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
             ("single" if build == "single" else installed) + "\n")
         _conda_prefixes.cache_clear()
         return True
-    except Exception as e:  # noqa: BLE001 - degrade to the lockfile build
+    except BaseException as e:  # noqa: BLE001 - degrade to the lockfile build
         shutil.rmtree(part, ignore_errors=True)
         shutil.rmtree(dest, ignore_errors=True)
+        if not isinstance(e, Exception):    # an interrupt leaves no half env
+            raise
         print(f"[env] prebuilt {env} failed ({type(e).__name__}: "
               f"{str(e)[:120]}); falling back to the lockfile build",
               flush=True)

@@ -170,8 +170,7 @@ def ensure_repo(path=None):
     if problem:
         raise RuntimeError(problem + ".")
     at = f" at {ref}" if ref else ""
-    print(f"Fetching the method scripts from PYangLab/scMultiBench{at} into {p} ...",
-          flush=True)
+    print(f"[run] downloading the method scripts{at}, once ...", flush=True)
     # an existing empty folder is cloned into from the inside, then its
     # contents are moved up: the folder stays, and its parent need not be
     # writable (a folder made for the user on shared storage)

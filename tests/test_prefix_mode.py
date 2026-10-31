@@ -273,6 +273,21 @@ def test_install_packed_unpack_failure_cleans_up(envs_dir, tmp_path, monkeypatch
     assert envs.installed_envs() == []
 
 
+def test_install_packed_interrupted_unpack_leaves_no_env(envs_dir, tmp_path, monkeypatch):
+    """A kernel interrupt during conda-unpack must not leave a folder that the
+    next install refuses as not made by multibench."""
+    tgz = _tiny_archive(tmp_path / "x.tar.gz")
+    monkeypatch.setattr(envs, "host_system", lambda: None)
+    serve_archives(monkeypatch, lambda url: (str(tgz), None))
+
+    def interrupted(prefix):
+        raise KeyboardInterrupt
+    monkeypatch.setattr(envs, "_conda_unpack", interrupted)
+    with pytest.raises(KeyboardInterrupt):
+        envs.install_packed("matilda")
+    assert not (envs_dir / "matilda").exists() and not (envs_dir / "matilda.partial").exists()
+
+
 def test_install_packed_no_archive_returns_false(envs_dir, monkeypatch):
     import urllib.error
     import urllib.request

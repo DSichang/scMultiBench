@@ -116,7 +116,7 @@ def test_fetch_progress_line_is_a_sentence(tmp_path, monkeypatch, capsys):
     except Exception:  # noqa: BLE001 - only the progress line is checked here
         pass
     assert capsys.readouterr().out.startswith(
-        f"Fetching the method scripts from PYangLab/scMultiBench into {fresh} ...")
+        "[run] downloading the method scripts, once ...")
 
 
 def test_error_tail_is_clipped_at_a_word_boundary():
