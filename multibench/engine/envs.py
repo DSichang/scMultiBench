@@ -150,8 +150,9 @@ def archive_for(env: str, flavor: str = "auto", *, manifest: dict | None = None,
         ``('<env>-cpu', 'cpu')`` when a CPU build is wanted and published (in
         the manifest with a measured size; a ``null`` size marks an archive
         not uploaded yet), else ``('<env>', 'gpu')``, which every env has.
+        An env whose methods never use a GPU wants its CPU build on any host.
     """
-    wanted = resolve_flavor(flavor)
+    wanted = "cpu" if _never_uses_gpu(env) else resolve_flavor(flavor)
     if wanted == "cpu":
         key = archive_key(env, "cpu")
         manifest = packed_manifest() if manifest is None else manifest
@@ -159,6 +160,13 @@ def archive_for(env: str, flavor: str = "auto", *, manifest: dict | None = None,
         if key in manifest and (sizes.get(key) or {}).get("archive_bytes") is not None:
             return key, "cpu"
     return env, "gpu"
+
+
+def _never_uses_gpu(env: str) -> bool:
+    """``True`` when every method ``env`` serves has ``gpu_use: not used``
+    (scMM runs with ``--no_cuda``): a GPU build would only download CUDA."""
+    uses = [m.gpu_use for m in registry.load() if group_for(m.id) == env]
+    return bool(uses) and all(u == "not used" for u in uses)
 
 
 def _single_build(env: str, *, manifest: dict | None = None) -> bool:
@@ -880,7 +888,8 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
         ``True`` = install nothing and return each env's state and size.
     flavor : str
         ``'cpu'``, ``'gpu'`` or ``'auto'`` (``'gpu'`` when an NVIDIA GPU is
-        visible): the archive build of each env.
+        visible): the archive build of each env. An env whose methods never
+        use a GPU takes its CPU build whatever ``flavor`` is.
     build : bool
         ``True`` = build every env from its lockfile instead of unpacking the
         archive.

@@ -157,6 +157,21 @@ def test_archive_for_every_flavour(fake_tables, monkeypatch):
     assert envs.archive_for("matilda", "cpu", manifest={}, sizes={}) == ("matilda", "gpu")
 
 
+
+def test_an_env_that_never_uses_a_gpu_takes_its_cpu_build_on_a_gpu_host(monkeypatch):
+    # scMM runs with --no_cuda: its GPU build would only add CUDA to the download
+    monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
+    manifest = {"scmb_scmm2": "https://x/g", "scmb_scmm2-cpu": "https://x/c"}
+    sizes = {"scmb_scmm2": {"archive_bytes": 2}, "scmb_scmm2-cpu": {"archive_bytes": 1}}
+    for flavor in ("auto", "gpu", "cpu"):
+        assert envs.archive_for("scmb_scmm2", flavor, manifest=manifest, sizes=sizes) == (
+            "scmb_scmm2-cpu", "cpu")
+    # one that uses the GPU when present keeps the GPU build there
+    manifest = {"matilda": "https://x/g", "matilda-cpu": "https://x/c"}
+    sizes = {"matilda": {"archive_bytes": 2}, "matilda-cpu": {"archive_bytes": 1}}
+    assert envs.archive_for("matilda", "auto", manifest=manifest, sizes=sizes) == ("matilda", "gpu")
+
+
 # ---------------------------------------------------------------- install_packed
 def _fetch(monkeypatch, tgz):
     fetched = []
