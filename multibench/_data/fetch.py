@@ -122,7 +122,7 @@ def fetch(*datasets: str, verbose: bool = True) -> "Path | list[Path]":
                 "see 'Get the data' in the installation guide for the full collection")
         url = f"{RELEASE_URL}/{ds}.tar.gz"
         if verbose:
-            print(f"downloading {ds} ({AVAILABLE[ds]}) from {url} ...", flush=True)
+            print(f"downloading {ds} ({AVAILABLE[ds]}) ...", flush=True)
         tgz = _download_or_explain(
             url, ds, f"download the file by hand and unpack it into {root}, as shown "
                      "under 'Get the data' in the installation guide.")

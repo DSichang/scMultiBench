@@ -422,7 +422,7 @@ SAME_FEATURES = {
                       "protein names, in the same order.",
     "mosaic_rna_atac": "Every RNA file needs the same gene names and every ATAC file the "
                        "same peaks, in the same order.",
-    "mosaic_shared": "Every RNA file needs the same gene names, in the same order.",
+    "mosaic_shared": "Every RNA file needs the same gene names.",
     "mosaic_unshared": "Every RNA file needs the same gene names and every ADT file the "
                        "same protein names, in the same order.",
 }
@@ -431,12 +431,17 @@ SAME_FEATURES = {
 @pytest.mark.parametrize("key", sorted(SAME_FEATURES))
 def test_a_mosaic_tutorial_says_that_the_batches_need_the_same_features(key):
     """Visible in section 5, for the modalities that the task has in more
-    than one batch, with the reason: one method takes the features by their
-    position, and the check does not compare the names across batches."""
+    than one batch. Where the notebook runs scMoMaT, with the order and the
+    reason: scMoMaT takes the features by their position, and the check does
+    not compare the names across batches."""
     from tests.test_tutorial_round3 import GEN, OWN_DATA, _markdown, _visible
     text = " ".join(_visible(_markdown(f"tutorial_{key}", OWN_DATA)).split())
-    assert (SAME_FEATURES[key] + " scMoMaT matches the features of two batches by position, "
-            "and the check does not compare their names across batches.") in text
+    momat = "scMoMaT" in GEN.TASKS[key]["methods"]
+    assert ("in the same order." in SAME_FEATURES[key]) == momat, key
+    assert (SAME_FEATURES[key] + (" scMoMaT matches the features of two batches by position, "
+            "and the check does not compare their names across batches." if momat else "")
+            ) in text
+    assert ("scMoMaT" in text) == momat, key
     roles = GEN.TASKS[key]["variants"][0]
     for fam, word in (("rna", "RNA file"), ("adt", "ADT file"), ("atac", "ATAC file")):
         several = sum(r.rstrip("0123456789") == fam for r in roles) > 1

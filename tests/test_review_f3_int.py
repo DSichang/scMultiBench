@@ -426,10 +426,12 @@ def test_a_representation_token_that_drops_a_named_method_says_where_to_look(pin
                                 "mtb.method_info('moETM')['supports'] lists what moETM reads.")
 
 
-def test_scan_names_the_missing_scripts_and_no_start_notes(pinned, capsys):
+def test_scan_says_nothing_of_missing_scripts_and_no_start_notes(pinned, capsys):
     plan = _quiet(mtb.scan, 'D11', 'vertical')
     ok = plan[plan["runnable"]]
-    assert len(ok) and ok["caveat"].str.contains('The method scripts are not in').all()
+    # run fetches the scripts and says so: a runnable row has no reason
+    assert len(ok) and (ok["reason"] == "").all()
+    assert not ok["caveat"].str.contains('scripts are not in').any()
     _quiet(mtb.scan, 'D28', 'diagonal')
     out = capsys.readouterr().out
     assert 'the command reads' not in out and 'start the method with' not in out

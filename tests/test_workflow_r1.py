@@ -182,21 +182,21 @@ def no_scripts(tmp_path, monkeypatch):
     return empty
 
 
-def test_preview_says_when_the_method_scripts_are_not_here(no_scripts):
+def test_preview_fetches_nothing_and_notes_no_missing_scripts(no_scripts):
+    # run fetches the scripts and says so; scan and preview add no note
     inp = mtb.engine.resolve.inputs_for("D11", "vertical", "totalVI")
     spec = mtb.engine.registry.get("totalVI")
     variant = spec.select("vertical", {"rna", "adt"})
     notes = mtb.engine.runner.script_notes(spec, variant, no_scripts)
-    assert f"The method scripts are not in {no_scripts} yet. The first run fetches them." \
-        in notes
+    assert not any("scripts are not in" in n for n in notes)
     mtb.engine.runner.preview("totalVI", "vertical", inputs=inp, out_dir="/tmp/unused/t")
     assert not no_scripts.exists()                   # nothing fetched or created
 
 
-def test_scan_notes_missing_scripts_in_caveat_not_files_ok(no_scripts):
+def test_scan_without_scripts_keeps_files_ok_and_no_note(no_scripts):
     df = full_scan("D11", "vertical", modalities=["rna", "adt"], verbose=False)
     assert df["files_ok"].all()
-    assert df["caveat"].str.contains("The method scripts are not in").all()
+    assert not df["caveat"].str.contains("scripts are not in").any()
 
 
 def test_real_run_without_network_names_the_fetch_command(tmp_path, monkeypatch,

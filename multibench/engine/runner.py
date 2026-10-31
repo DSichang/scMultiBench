@@ -109,10 +109,6 @@ def _repo_root_no_fetch() -> Path:
 MISSING_SCRIPT_FIX = "delete or move that folder so the next run fetches the scripts"
 
 
-#: How the note that no method scripts are here begins; ``mtb.scan`` finds it by this text.
-SCRIPTS_NOT_HERE = "The method scripts are not in "
-
-
 #: Files the package ships for scripts that import them from their own folder.
 HELPERS_DIR = Path(__file__).resolve().parent / "helpers"
 
@@ -148,8 +144,9 @@ def provide_script_files(spec, variant, repo: Path) -> None:
 
 def script_notes(spec, variant, repo: Path) -> list[str]:
     """Setup facts a scan shows before the real run fails on them: the
-    method's ``setup_hint`` (unless its helper files are all in place), its
-    ``size_hint``, and a note when no method scripts are here yet."""
+    method's ``setup_hint`` (unless its helper files are all in place) and its
+    ``size_hint``. Scripts not fetched yet get no note: ``run`` fetches them
+    and says so."""
     notes = []
     helpers = variant.helpers
     folder = (repo / variant.entrypoint).parent
@@ -159,8 +156,6 @@ def script_notes(spec, variant, repo: Path) -> list[str]:
         notes.append(spec.setup_hint)
     if variant.size_hint:
         notes.append(variant.size_hint)
-    if not (repo / "tools_scripts").is_dir() and not scripts.scripts_folder_problem(repo):
-        notes.append(f"{SCRIPTS_NOT_HERE}{repo} yet. The first run fetches them.")
     return notes
 
 

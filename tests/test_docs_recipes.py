@@ -74,7 +74,7 @@ FENCES = {
                          'mtb.io.export_dataset(adata, "mydata/" + NAME, rna=None, '
                          'labels="obs:celltype",'],
     "recipe-donors": ['NAME = "MYDONORS"   # <- a name for your data',
-                      'mine = mtb.run("mydata/" + NAME, "diagonal", methods=METHODS,',
+                      'import pandas as pd',
                       'print(adata.obs["donor"].value_counts())   # the names in your file',
                       'adata = adata[adata.obs["donor"].isin(["A", "B", "C"])].copy()'
                       '   # <- the donors to keep'],
@@ -1162,7 +1162,7 @@ def test_two_diagonal_donors_run_from_one_rna_and_one_atac_file(host, tmp_path, 
         n = ns[name].n_obs
         ns[name].obs["donor"] = np.where(np.arange(n) < n // 2, "P01", "P02")
     _diagonal = _fences("recipe-donors")[1]
-    _quiet(_run_cell, "import pandas as pd\n" + _diagonal, ns)
+    _quiet(_run_cell, _diagonal, ns)       # the block imports pandas itself
     summary = ns["mine"].summary
     assert set(summary["status"]) == {"scored"}, summary
     assert {r["n_batches"] for r in ns["mine"].records} == {2}

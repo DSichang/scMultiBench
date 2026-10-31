@@ -163,10 +163,10 @@ def test_an_empty_bar_table_is_plain():
 
 
 # ================================================================ fetch error
-def test_scan_names_a_missing_scripts_checkout_in_the_caveat(monkeypatch, tmp_path):
+def test_scan_says_nothing_of_a_missing_scripts_checkout(monkeypatch, tmp_path):
     monkeypatch.setattr(R, "_repo_root_no_fetch", lambda: tmp_path / "no_scripts")
     plan = full_scan("D28", "diagonal", methods=["uniPort"], verbose=False)
-    assert plan.loc[0, "caveat"].startswith(R.SCRIPTS_NOT_HERE)
+    assert "scripts are not in" not in plan.loc[0, "caveat"]
 
 
 # ============================================================ Changes page

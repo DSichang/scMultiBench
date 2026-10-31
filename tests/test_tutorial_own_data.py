@@ -45,9 +45,8 @@ ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 
 
 def _ready(reason) -> bool:
-    """A runnable row's reason: empty, or (0.4) the note that the method scripts
-    are not fetched yet, which the test hosts lack."""
-    return reason == "" or reason.startswith("The method scripts are not in ")
+    """A runnable row's reason: empty."""
+    return reason == ""
 
 def _load_gen_tut():
     spec = importlib.util.spec_from_file_location("gen_tut", ROOT / "tools" / "gen_tut.py")
@@ -667,19 +666,10 @@ READ_SEVERAL = ("Read your files. For your own data, change every file name mark
                 "Colab, upload the files first: click the folder icon on the left, then the "
                 "upload icon.")
 
-WRITE = ("Write the dataset folder. Change each name in quotes marked `# <-`: give `NAME` a new "
-         "value, and write the names that your {files} for the other parts. The printout above "
-         "lists the names in {printed}. Write a name listed after `obs:` with that prefix, as "
-         "`\"obs:celltype\"`{obsm}.")
+WRITE = ("Write the dataset folder. Change each name in quotes marked `# <-`. The printout "
+         "above lists the names in {printed}. Write a name listed after `obs:` with that "
+         "prefix, as `\"obs:celltype\"`{obsm}.")
 WRITE_OBSM = ", and one after `obsm:` as `\"obsm:protein\"`"
-#: what the sentence adds where the cell writes batches, by category or by tutorial
-WRITE_BATCHES = {
-    "mosaic": " Each call writes one batch.",
-    "diagonal_multi": " The loop writes one RNA batch and one ATAC batch per call.",
-}
-
-#: the sentence on the check, the last paragraph above the export cell
-CHECK_TEXT = "Compare the cell counts above the table with your data."
 
 SMALL_DATASET_ROW = ("| a method fails on a small dataset | `mtb.scan` "
                      "names what the method needs from the data's size in its `caveat` column |")
@@ -743,8 +733,7 @@ def test_the_write_sentence_speaks_of_the_file_that_was_read(key, tmp_path, monk
     in the printout of the read cell, which lists the names of the files
     that were read. It counts the files that the cell shows, and it names
     ``obsm:`` where the export cell takes a matrix from there. The names it
-    quotes are those the printout shows for the example. The sentence on the
-    check follows it."""
+    quotes are those the printout shows for the example."""
     ds = _on_disk(key)
     assert "the names of the example" not in "\n".join(s for _, s in _cells(key))
     monkeypatch.chdir(tmp_path)
@@ -756,18 +745,18 @@ def test_the_write_sentence_speaks_of_the_file_that_was_read(key, tmp_path, monk
     n_read, n_shown = len(EXAMPLES[ds]), printout.count("AnnData object with n_obs")
     assert n_shown == min(n_read, 2)
     printed = ("your file" if n_read == 1 else "your files" if n_shown == n_read else
-               "two of your files. The other files need the same names")
-    obsm = '"obsm:' in src[EXPORT]
-    assert src[EXPORT - 1] == WRITE.format(
-        files="file uses" if n_read == 1 else "files use", printed=printed,
-        obsm=WRITE_OBSM if obsm else "") + WRITE_BATCHES.get(
-            key, WRITE_BATCHES.get(GEN.TASKS[key]["cat"], "")) + "\n\n" + CHECK_TEXT, key
+               "two of your files")
+    # a matrix the export takes from obsm, not one a code comment names
+    obsm = any('"obsm:' in ln.split("#")[0] for ln in src[EXPORT].splitlines())
+    assert src[EXPORT - 1] == WRITE.format(printed=printed,
+                                           obsm=WRITE_OBSM if obsm else ""), key
     lines = [ln.strip() for ln in printout.splitlines()]
     listed = [ln for ln in lines if ln.startswith("obs: ")]
     assert len(listed) == n_shown and all(ln.startswith("obs: 'celltype'") for ln in listed)
     assert [ln for ln in lines if ln.startswith("obsm: ")] == (["obsm: 'protein'"] if obsm
                                                                 else [])
-    assert ('"obs:celltype"' in src[EXPORT]) and (obsm == ('"obsm:protein"' in src[EXPORT]))
+    code = "\n".join(ln.split("#")[0] for ln in src[EXPORT].splitlines())
+    assert ('"obs:celltype"' in src[EXPORT]) and (obsm == ('"obsm:protein"' in code))
     if key != "vertical_rna_adt":
         return
     # a file of the reader: the printout is that of the file, with its names
@@ -797,10 +786,8 @@ def test_the_check_names_missing_and_unused_batches(linux, tmp_path, monkeypatch
     """The check prints two lines on the folder and then a line for each
     method that cannot run or that leaves part of the folder out: in a cross
     tutorial, the files of a batch that is not there, or the batches that
-    are not used. The text above the cell asks only for a look at the cell
-    counts."""
+    are not used."""
     for key in KEYS:
-        assert _sources(key)[EXPORT - 1].endswith("\n\n" + CHECK_TEXT), key
         everything = "\n".join(s for _, s in _cells(key))
         assert "A further line" not in everything and "The two lines above" not in everything
     key = "cross_rna_adt"

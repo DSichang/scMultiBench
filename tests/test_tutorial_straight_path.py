@@ -58,8 +58,6 @@ ARTICLE_TASKS = {
     "cross_adt_atac": ("cross", "Multiple ADT + ATAC"),
     "cross_rna_adt_atac": ("cross", "Multiple RNA + ADT + ATAC"),
 }
-# the methods the article evaluates on a task and the package does not run
-NOT_WRAPPED = {"diagonal_multi": ["Conos"]}
 
 
 def _flat(text):
@@ -247,28 +245,6 @@ def test_every_method_variant_of_the_four_categories_is_in_exactly_one_task():
 
 
 @pytest.mark.parametrize("key", KEYS)
-def test_not_wrapped_sentence(key):
-    """One sentence, in the tutorial's "Every method of this task" section,
-    names the methods the article evaluates on the task and the package does
-    not run there. They are no methods of the task in the registry. Conos on
-    several RNA and ATAC batches is the only one."""
-    names = GEN.TASKS[key].get("not_wrapped", [])
-    assert names == NOT_WRAPPED.get(key, [])
-    assert not set(names) & set(GEN.task_methods(key))
-    section = next(src for kind, src in _cells(f"tutorial_{key}")
-                   if kind == "markdown" and "Every method of this task" in src)
-    everything = "\n".join(src for _, src in _cells(f"tutorial_{key}"))
-    if not names:
-        assert "The article also evaluates" not in everything
-        return
-    sentence = ("The article also evaluates Conos on this task. Its published script reads "
-                "a third input file in another format, so the package does not run it on "
-                "more than two files.")
-    assert sentence in section
-    assert everything.count("The article also evaluates") == 1
-
-
-@pytest.mark.parametrize("key", KEYS)
 def test_every_method_reads_every_batch(key):
     """No method of a task reads fewer batches than its dataset holds: UINMF
     runs its three-batch variant on the cross datasets with three. No
@@ -297,9 +273,9 @@ def test_every_method_section_lists_the_task_and_links_the_all_page(key):
     md = cells[i][1]
     everyone = GEN.task_methods(key)
     n = len(everyone)
-    assert f"{n} method{'s have' if n > 1 else ' has'} a variant for this task." in md
+    assert f"{n} method{'s run' if n > 1 else ' runs'} this task." in md
     assert "| Method |" not in md and "set `METHODS`" not in md
-    assert (f"runs them all. It downloads {GEN.env_size_text(methods=everyone)}." in md) \
+    assert (f"runs them all. It downloads {GEN.env_size_text(everyone)}." in md) \
         == GEN.has_all(key)
     # the site has no every-method page: the link opens the notebook in Colab
     assert f"{GEN.SITE}tutorials/{key}_all" not in md
@@ -357,7 +333,7 @@ def test_all_methods_title_names_the_methods_and_links_the_tutorial(key):
     assert f"on `{t['ds']}`: {GEN.and_list(everyone)}." in first
     assert f"[tutorial]({GEN.SITE}tutorials/{key}/)" in first
     assert f"runs {GEN.and_list(t['methods'])} only." in first
-    assert f"The environments are {GEN.env_size_text(methods=everyone)}." in first
+    assert f"The environments are {GEN.env_size_text(everyone)}." in first
 
 
 def test_quickstart_links_every_task_tutorial():

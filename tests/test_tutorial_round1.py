@@ -122,17 +122,17 @@ def _holds_atac(key):
     return any(r.startswith("atac") for v in GEN.TASKS[key]["variants"] for r in v)
 
 
-def test_diagonal_title_of_several_batches_names_the_atac_form_of_each_method():
-    """The several-batch diagonal title says which of its methods read gene
-    activity and which read peaks, from the modalities of their variants."""
+def test_diagonal_title_of_several_batches_names_the_atac_form_of_its_methods():
+    """The several-batch diagonal title says that the notebook's methods read
+    gene activity, from the modalities of their variants, and names no method
+    it does not run."""
     title = _visible(_cells("tutorial_diagonal_multi")[0][1])
-    gas = sorted({m for m, v in GEN.task_variants("diagonal_multi")
-                  if "atac_gas1" in v.when["modalities"]})
-    peak = sorted({m for m, v in GEN.task_variants("diagonal_multi")
-                   if "atac_peak1" in v.when["modalities"]})
-    assert gas and peak and sorted(gas + peak) == GEN.task_methods("diagonal_multi")
-    assert f"{GEN.and_list(gas)} read ATAC as gene-activity scores" in title
-    assert f"{GEN.and_list(peak)} reads the peak matrix." in title
+    methods = GEN.TASKS["diagonal_multi"]["methods"]
+    gas = {m for m, v in GEN.task_variants("diagonal_multi")
+           if "atac_gas1" in v.when["modalities"]}
+    assert set(methods) <= gas
+    assert f"{GEN.and_list(methods)} read ATAC as gene-activity scores" in title
+    assert "peak" not in title
 
 
 def test_mosaic_and_cross_titles_say_what_the_methods_read():
