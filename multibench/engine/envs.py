@@ -563,7 +563,7 @@ def _ensure_layer(name: str, info: dict, envs_root: Path) -> Path:
         try:
             download_archive(list(entry["urls"]), tgz, label=f"{name} (shared layer)",
                              total=entry.get("archive_bytes"))
-            print(f"[env] unpacking {name} -> {dest} ...", flush=True)
+            print(f"[env] unpacking {name} ...", flush=True)
             shutil.rmtree(part, ignore_errors=True)
             shutil.rmtree(dest, ignore_errors=True)
             part.mkdir(parents=True)
@@ -646,7 +646,7 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
     envs_root.mkdir(parents=True, exist_ok=True)
     tgz = envs_root / f".{key}.tar.gz.download"
     try:
-        download_archive(urls, tgz, label=f"{env} ({build} build)",
+        download_archive(urls, tgz, label=env if build == "single" else f"{env} ({build} build)",
                          total=(sizes.get(key) or {}).get("archive_bytes"))
     except urllib.error.HTTPError:
         tgz.unlink(missing_ok=True)
@@ -654,7 +654,7 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
     except BaseException:
         tgz.unlink(missing_ok=True)
         raise
-    print(f"[env] unpacking {env} -> {dest} ...", flush=True)
+    print(f"[env] unpacking {env} ...", flush=True)
     from .._data.fetch import safe_extract
     part = dest.with_name(dest.name + ".partial")
     try:

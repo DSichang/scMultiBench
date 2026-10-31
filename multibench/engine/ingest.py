@@ -210,6 +210,8 @@ def _check_canonical(path) -> None:
 def _no_names_message(what: str, source: str, n_feat: int) -> str:
     """The warning for a matrix written with the fallback names ``feature_<i>``."""
     return (f"The {what} matrix {source} has no feature names; they are written as "
+            f"feature_0 to feature_{n_feat - 1}. Pass the names with {what}_names=."
+            if what == "adt" else
             f"feature_0 to feature_{n_feat - 1}.")
 
 

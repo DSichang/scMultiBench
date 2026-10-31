@@ -450,8 +450,6 @@ HOLDS = {
 #: the tutorials whose run still says that rows of other variants lack files,
 #: with the number of rows: the folder holds the modalities of those variants
 # diagonal_rna_atac: its one-batch folder lists no row for numbered batches (X80)
-MORE_ROWS = {"diagonal_multi": 2, "mosaic_shared": 3,
-             "mosaic_unshared": 6, "cross_rna_adt_atac": 4}
 
 
 @pytest.mark.parametrize("key", KEYS)
@@ -492,8 +490,7 @@ def test_one_name_drives_the_three_cells(key, linux, tmp_path, monkeypatch, caps
     _run_cell(src[RUN], ns)
     log = capsys.readouterr().out.splitlines()
     more = [ln for ln in log if "more rows" in ln]
-    assert more == ([f"[run] {MORE_ROWS[key]} more rows need files this folder does not "
-                     f"have. mtb.scan shows them."] if key in MORE_ROWS else [])
+    assert more == []           # the run names its methods: no other rows are counted
     mine = ns["mine"]
     assert (mine.dataset, mine.category) == ("MINE", t["cat"])
     assert Path(mine.out_dir).resolve() == Path("out/MINE").resolve()

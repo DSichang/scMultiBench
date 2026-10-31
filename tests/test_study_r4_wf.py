@@ -332,9 +332,9 @@ def test_a_named_method_with_a_runnable_mosaic_variant_is_not_a_failure(
                  evaluate=False, modalities="all")
     log = capsys.readouterr().out
     assert [r["status"] for r in res.records] == ["ran"]
-    # Multigrate's three other mosaic rows are for patterns D45 does not hold
-    assert ("[run] 3 more rows need files this folder does not have. mtb.scan shows "
-            "them.") in log
+    # Multigrate's three other mosaic rows are for patterns D45 does not hold:
+    # with methods=, they are not counted
+    assert "more row" not in log
     assert "skipping Multigrate" not in log
 
 

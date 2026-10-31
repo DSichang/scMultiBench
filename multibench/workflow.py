@@ -2811,7 +2811,7 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
         for r, _ in shown:
             mods = f" ({r['modalities']})" if several[r["method"]] > 1 else ""
             print(f"[run] skipping {r['method']}{mods}: {r['reason']}", flush=True)
-        if others:
+        if others and not methods:      # with methods=, only other variants of those
             rows = "row needs" if others == 1 else "rows need"
             print(f"[run] {others} more {rows} files this folder does not have. "
                   f"mtb.scan shows {'it' if others == 1 else 'them'}.", flush=True)

@@ -152,7 +152,7 @@ def test_single_build_install_does_not_warn_and_unpacks_as_single(
         warnings.simplefilter("error")
         assert envs.install_packed("scmb_r", envs_dir=tmp_path / "envs") is True
     out = capsys.readouterr().out
-    assert "[env] downloading scmb_r (single build) 900 MB ..." in out
+    assert "[env] downloading scmb_r 900 MB ..." in out
     assert "gpu build" not in out.lower()
 
 

@@ -244,10 +244,11 @@ def test_the_log_of_a_real_run_names_the_listed_variants_only(linux, tmp_path, c
     assert "more row" not in log
     _quiet(mtb.run, "D11", "vertical", tmp_path / "out_all", modalities="all", **kw)
     log = capsys.readouterr().out.splitlines()
-    assert log[:3] == [
+    assert log[:2] == [
         f"[run] skipping moETM (rna+adt): {gpu}",
-        f"[run] skipping moETM (rna+atac): moETM needs peak ATAC (atac.h5). {gpu}",
-        "[run] 2 more rows need files this folder does not have. mtb.scan shows them."]
+        f"[run] skipping moETM (rna+atac): moETM needs peak ATAC (atac.h5). {gpu}"]
+    # with methods=, the other rows are only other variants of those methods
+    assert not any("more row" in l for l in log)
 
 
 # ------------------------------------------------------------------ no filter
