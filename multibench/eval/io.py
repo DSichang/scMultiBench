@@ -243,7 +243,9 @@ def read_labels_ids(path: Path | str, column: str | None = None, *,
     try:
         path = _require_file(path, f"{what} file" if what else "labels file")
     except FileNotFoundError as e:
-        # "obs:<column>" names a column only in export_dataset
+        if Path(path).suffix:
+            raise
+        # a name without a suffix, such as "obs:donor", is meant as a column
         raise FileNotFoundError(f"{e} Pass a file, or the values themselves, as "
                                 f"adata.obs[\"<column>\"].") from None
     d = _read_table(path, _sep_for(path))
