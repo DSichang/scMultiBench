@@ -160,17 +160,11 @@ def test_some_tutorial_environment_has_a_single_build():
 def test_troubleshooting_does_not_hand_out_the_dry_run_command_to_run_alone(name):
     md = _markdown(name)
     assert "prints the command to run there" not in md
-    row = next(line for line in md.splitlines()
-               if line.startswith("| `env.install` refuses on macOS or Windows |"))
-    assert row.endswith("| methods run only on Linux: use Colab or a Linux machine |"), row
 
 
 def test_end_to_end_does_not_say_the_printed_command_runs_on_its_own():
     md = _markdown("tutorial_end_to_end")
     assert "prepare the command on a laptop and run it on Linux" not in md
-    # scan returns the command (d1); 0.4.0 runs Matilda with run
-    assert ('`mtb.scan("D11", "vertical", methods=["Matilda"])` returns the plan and the '
-            'command without running anything. It works on any computer.') in md
 
 
 def test_a_dry_run_command_alone_can_fail():
@@ -185,23 +179,9 @@ def test_a_dry_run_command_alone_can_fail():
 
 
 # ---------------------------------------------- R4-13 / R4-02: batch advice
-# Since 0.3.5 the visible text of section 5 shows the call with the column
-# itself, on an object that the tutorial's read cell assigns.
-BATCH_ADVICE = ("Several donors or samples in the file? Keep them in one folder, without "
-                "`batch=` in `export_dataset`, and give `run` the column itself: "
-                "`mtb.run(..., batch={obj}.obs[\"donor\"])`. The summary then has the "
-                "scores for how well they mix.")
-
-
-@pytest.mark.parametrize("key,obj", [("vertical_rna_adt", "adata"), ("vertical_rna_atac", "rna"),
-                                     ("vertical_rna_adt_atac", "adata")])
-def test_vertical_export_note_names_the_batch_call(key, obj):
-    assert BATCH_ADVICE.format(obj=obj) in _visible(_markdown(f"tutorial_{key}"))
-
-
 def test_the_package_gives_the_same_batch_advice(tmp_path):
     """export_dataset(batch=) on a vertical dataset names the run call of
-    the tutorials, with the column itself."""
+    the donors recipe, with the column itself."""
     import anndata as ad
     import multibench as mtb
     rng = np.random.default_rng(0)

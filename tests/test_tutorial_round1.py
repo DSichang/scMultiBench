@@ -79,10 +79,11 @@ def test_notebooks_use_plain_vocabulary_and_the_public_api(name):
 def test_details_blocks_carry_plain_paragraphs(name):
     """No '**Label.** sentence' template: each paragraph of a collapsed block
     opens with a plain sentence (the contract allows bold lead-ins only in a
-    block of 4 or more parallel entries; no block here needs them)."""
+    block of 4 or more parallel entries; no block here needs them). The
+    every-method notebooks have no collapsed block."""
     md = "\n\n".join(src for kind, src in _cells(name) if kind == "markdown")
     blocks = _details_paragraphs(md)
-    assert blocks, f"{name}: no collapsed block found"
+    assert bool(blocks) != name.endswith("_all"), name
     for paras in blocks:
         for p in paras:
             assert not p.lstrip().startswith("**"), f"{name}: bold lead-in label: {p[:70]!r}"

@@ -96,9 +96,6 @@ def test_env_install_cell_follows_pip_and_needs_no_conda():
         i_pip, i_env = src.index(pip), env_cells[0]
         assert i_env > i_pip, f"{name}: the env cell must come after the pip cell"
         assert "packed=False" not in src[i_env] and "conda=" not in src[i_env]
-        section = next(c for c in src if c.startswith("## 2. Download the data and the environments"))
-        if not name.endswith("_all"):          # the tutorial explains the step
-            assert "with no conda needed" in section and "mtb.config.envs_dir" in section
         assert "condacolab" not in "\n".join(src).lower(), f"{name}: no condacolab anywhere"
         assert "multibench env install" not in "\n".join(_code_cells(path)), \
             f"{name}: the notebook installs through the Python API, not a shell line"

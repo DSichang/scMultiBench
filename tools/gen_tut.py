@@ -92,15 +92,15 @@ def _gb(rows):
 
 
 def env_size_text(category=None, methods=None):
-    """``"<n> envs, <x> GB to download on a CPU host, <y> GB on a GPU host"``
+    """``"<n> envs, <x> GB on a CPU host, <y> GB on a GPU host"``
     for a category / method set, from the dry-run plans ``mtb.env.install(...)``
     returns at generation time for each archive flavour."""
     # dry_run=True: nothing is built
     rows = {f: mtb.env.install(methods, category=category, flavor=f, dry_run=True)
             for f in ("cpu", "gpu")}
     n = len(rows["cpu"])
-    return (f"{n} env{'s' if n != 1 else ''}, {_gb(rows['cpu'])} to download on a CPU "
-            f"host, {_gb(rows['gpu'])} on a GPU host")
+    return (f"{n} env{'s' if n != 1 else ''}, {_gb(rows['cpu'])} on a CPU host, "
+            f"{_gb(rows['gpu'])} on a GPU host")
 
 
 def env_download_sentence(methods):
@@ -148,13 +148,10 @@ def diagonal_atac_sentence():
     gas, peak_only, both = atac_forms("diagonal")
     if not (peak_only and both and len(gas) > len(peak_only) + len(both)):
         raise SystemExit("diagonal ATAC forms changed: reword the diagonal title cell")
-    if "same cells" not in mtb.method_info("Seurat_v5")["setup_hint"]:
-        raise SystemExit("Seurat_v5's setup hint changed: reword the diagonal title cell")
     return (f"Most diagonal methods read ATAC as gene-activity scores, made beforehand "
             f"with a tool such as Signac or ArchR. {and_list(peak_only)} read the peak "
-            f"matrix, and {and_list(both)} need both. Seurat_v5 also needs RNA and ATAC "
-            f"from the same cells. [The folder layout]({LAYOUT}) lists each method's "
-            f"ATAC files.")
+            f"matrix, and {and_list(both)} need both. [The folder layout]({LAYOUT}) lists "
+            f"each method's ATAC files.")
 
 
 # The install cell of every notebook (the module docstring says why it pins numpy
@@ -162,10 +159,6 @@ def diagonal_atac_sentence():
 INSTALL_CELL = ('import numpy, pandas\n'
                 'pins = f"numpy=={numpy.__version__} pandas=={pandas.__version__}"\n'
                 f'%pip install -q "multibench-sc>={mtb.__version__}" {{pins}}')
-
-COLAB_GPU_NOTE = ("On Colab, choose a GPU runtime before you run the notebook: Runtime -> "
-                  "Change runtime type -> T4 GPU. On a CPU runtime, an environment that has a "
-                  "smaller CPU build gets that build, and training methods run slower.")
 
 # One notebook per integration task, and one dataset per task: every method of
 # the task runs on it (tools/make_tutorial_data.py). The keys, their order and
@@ -414,7 +407,7 @@ def diagonal_multi_sentence(key):
 #
 # The paragraphs of the collapsed block, in the order they appear.
 WHERE = ("The names in quotes say where your file holds each part. `\"X\"` is the main "
-         "matrix, `\"obsm:protein\"` the matrix `obsm[\"protein\"]`, `\"layer:counts\"` the "
+         "matrix, `\"obsm:{obsm}\"` the matrix `obsm[\"{obsm}\"]`, `\"layer:counts\"` the "
          "layer `layers[\"counts\"]`, and `\"obs:celltype\"` the column `obs[\"celltype\"]`, "
          "which `\"celltype\"` alone names too. A wrong name after `obsm:`, `layer:` or "
          "`obs:` raises an error that lists the names the file has.")
@@ -462,42 +455,12 @@ CROSS_ORDER = ("The batches are numbered in the sorted order of their names, rea
                "donors `A`, `B` and `C` become batches 1, 2 and 3, and `10` comes before `2`.")
 CROSS_INDEX = ("For one AnnData per batch, call `export_dataset` once per batch with "
                "`batch_index=N` instead of `batch=`.")
-FOLDER_NOTE = ("`\"mydata/\" + NAME` is the dataset folder that `scan` and `run` read. "
-               "With a new value of `NAME`, the folder holds the files of your data only.")
-CHECK_NOTE = ("The check lists the methods you name. Without `methods=`, it lists every "
-              "method that reads the modalities in the folder. Its `command` column holds "
-              "the line `run` would execute for each method.")
-LEFTOVER = ("`export_dataset` raises `FileExistsError` when the folder holds files of other "
-            "cells that the call does not write. `overwrite=True` does not remove them. Give "
-            "`NAME` a new value.")
-LEFTOVER_BATCH = ("After `batch=`, the files of batch numbers that the call does not write "
-                  "count as well.")
-LEFTOVER_INDEX = ("A call with `batch_index=` checks the files of its own batch number. Files "
-                  "of other batch numbers stay: for data with fewer batches, give `NAME` a "
-                  "new value.")
-OVERWRITE_NOTE = ("`overwrite=True` replaces the files of an earlier run of this cell. "
-                  "Without it, `export_dataset` raises `FileExistsError` rather than "
-                  "replace a file.")
-
-
-def batch_advice(obj):
-    """What a vertical tutorial says on samples or donors, as ``(visible,
-    collapsed)``: the sentence of the first cell with the call, and the
-    paragraph of the collapsed block. ``obj`` is the variable of the read
-    cell whose ``obs`` holds the column."""
-    return (("Several donors or samples in the file? Keep them in one folder, without "
-             "`batch=` in `export_dataset`, and give `run` the column itself: "
-             f"`mtb.run(..., batch={obj}.obs[\"donor\"])`. The summary then has the "
-             "scores for how well they mix."),
-            ("The donors that `run` gets as `batch=` are matched to the cells by "
-             "barcode, and every cell needs a donor. A column name alone is not enough "
-             "there, because `run` reads the folder and the folder holds no `obs` "
-             "columns."))
+CHECK_NOTE = ("Without `methods=`, `scan` lists every method that reads the modalities in "
+              "the folder.")
 
 
 # Words the visible sentences share.
 BATCH_WORD = "A batch is a donor, a sample or an experiment."
-ADT_WORD = "ADT means the protein counts."
 GAS_WORD = ("Gene-activity scores are an ATAC matrix with one column per gene, as Signac or "
             "ArchR compute it.")
 PER_BATCH = "`mtb.io.export_dataset` with `batch=` writes one set of files per batch."
@@ -527,13 +490,12 @@ RECIPES_OF = {"vertical": ["10x", "csv", "no_labels", "donors_vertical"],
 # and none that a 0.3.4 tutorial wrote another layout under; `needs` is the
 # visible sentence; `example` says what the example cell writes and `n_files`
 # how many files that is; `read` and `export` are the two cells a reader
-# edits; `notes` are the task's paragraphs of the collapsed block; `donors`
-# is the variable of the read cell that `batch_advice` names.
+# edits; `notes` are the task's paragraphs of the collapsed block.
 OWN = {
  "vertical_rna_adt": dict(
    name="MYCITE",
    needs=("Your data needs raw counts for both modalities and a cell type for each "
-          f"cell, in one `.h5ad` file. {ADT_WORD}"),
+          f"cell, in one `.h5ad` file."),
    example="a small example file, `my_file.h5ad`, from 60% of the cells of `D11`",
    n_files=1,
    read='''import anndata as ad
@@ -542,11 +504,12 @@ adata = ad.read_h5ad("my_file.h5ad")   # <- your file
 adata''',
    export='''NAME = "MYCITE"   # <- a new name for your own data
 mtb.io.export_dataset(adata, "mydata/" + NAME,
-                      rna="X",                # <- where the RNA counts are
+                      rna="X",                # <- where the RNA counts are:
+                                              #    "X" or "layer:counts"
                       adt="obsm:protein",     # <- where the proteins (ADT) are
                       labels="obs:celltype",  # <- the cell-type column
                       overwrite=True)''',
-   notes=[PROTEIN_NAMES], donors="adata",
+   notes=[PROTEIN_NAMES],
  ),
  "vertical_rna_atac": dict(
    name="MYMULTIOME",
@@ -564,12 +527,13 @@ print(rna)
 print(atac)''',
    export='''NAME = "MYMULTIOME"   # <- a new name for your own data
 mtb.io.export_dataset(rna, "mydata/" + NAME,
-                      rna="X",                # <- where the RNA counts are
+                      rna="X",                # <- where the RNA counts are:
+                                              #    "X" or "layer:counts"
                       atac=atac,              # the ATAC file, peak counts in X
                       atac_kind="peak",       # the methods here read peaks
                       labels="obs:celltype",  # <- the cell-type column
                       overwrite=True)''',
-   notes=[TENX_NOTE, MUDATA_NOTE], donors="rna",
+   notes=[TENX_NOTE, MUDATA_NOTE],
  ),
  "vertical_rna_adt_atac": dict(
    name="MYTRI",
@@ -586,13 +550,14 @@ print(adata)
 print(atac)''',
    export='''NAME = "MYTRI"   # <- a new name for your own data
 mtb.io.export_dataset(adata, "mydata/" + NAME,
-                      rna="X",                # <- where the RNA counts are
+                      rna="X",                # <- where the RNA counts are:
+                                              #    "X" or "layer:counts"
                       adt="obsm:protein",     # <- where the proteins (ADT) are
                       atac=atac,              # the ATAC file, peak counts in X
                       atac_kind="peak",       # the methods here read peaks
                       labels="obs:celltype",  # <- the cell-type column
                       overwrite=True)''',
-   notes=[PROTEIN_NAMES], donors="adata",
+   notes=[PROTEIN_NAMES],
  ),
  "diagonal_rna_atac": dict(
    name="MYDIAG_RNA_ATAC",
@@ -611,7 +576,8 @@ print(rna)
 print(atac)''',
    export='''NAME = "MYDIAG_RNA_ATAC"   # <- a new name for your own data
 mtb.io.export_dataset(rna, "mydata/" + NAME,
-                      rna="X",                    # <- where the RNA counts are
+                      rna="X",                    # <- where the RNA counts are:
+                                                  #    "X" or "layer:counts"
                       atac=atac,                  # the ATAC file, values in X
                       atac_kind="gene_activity",  # <- or "peak"
                       labels="obs:celltype",      # <- the column in both files
@@ -644,7 +610,8 @@ rna = [rna1, rna2, rna3]       # <- your RNA batches
 atac = [atac1, atac2, atac3]   # <- your ATAC batches
 for b in range(len(rna)):      # one call per batch
     mtb.io.export_dataset(rna[b], "mydata/" + NAME,
-                          rna="X",                    # <- the RNA counts
+                          rna="X",                    # <- the RNA counts:
+                                                      #    "X" or "layer:counts"
                           atac=atac[b],               # the ATAC batch
                           atac_kind="gene_activity",  # <- or "peak"
                           labels="obs:celltype",      # <- the cell-type column
@@ -654,7 +621,7 @@ for b in range(len(rna)):      # one call per batch
  ),
  "mosaic_rna_adt": dict(
    name="MYMOSAIC_RNA_ADT",
-   needs=f"{MOSAIC_NEEDS} RNA, then RNA + ADT, then ADT. {ADT_WORD}",
+   needs=f"{MOSAIC_NEEDS} RNA, then RNA + ADT, then ADT.",
    example=("four small example files, one per batch and modality, from the first 1,500 "
             "cells of each batch of `D38mini`"),
    n_files=4,
@@ -712,8 +679,7 @@ mtb.io.export_dataset(atac3, out, rna=None, atac="X", atac_kind="peak",
  ),
  "mosaic_shared": dict(
    name="MYMOSAIC_SHARED",
-   needs=(f"{MOSAIC_NEEDS} RNA + ADT, then RNA + ATAC, then RNA. Give ATAC as peaks. "
-          f"{ADT_WORD}"),
+   needs=(f"{MOSAIC_NEEDS} RNA + ADT, then RNA + ATAC, then RNA. Give ATAC as peaks."),
    example=("five small example files, one per batch and modality, from the first 1,000 "
             "cells of each batch of `D46mini`"),
    n_files=5,
@@ -743,8 +709,7 @@ mtb.io.export_dataset(rna3, out, rna="X", labels=celltype,
  ),
  "mosaic_unshared": dict(
    name="MYMOSAIC_UNSHARED",
-   needs=(f"{MOSAIC_NEEDS} RNA + ADT, then RNA + ATAC, then ADT. Give ATAC as peaks. "
-          f"{ADT_WORD}"),
+   needs=(f"{MOSAIC_NEEDS} RNA + ADT, then RNA + ATAC, then ADT. Give ATAC as peaks."),
    example=("five small example files, one per batch and modality, from the first 1,000 "
             "cells of each batch of `D49mini`"),
    n_files=5,
@@ -775,7 +740,7 @@ mtb.io.export_dataset(adt3, out, rna=None, adt="X", labels=celltype,
  "cross_rna_adt": dict(
    name="MYCROSS_RNA_ADT",
    needs=("Your data needs raw RNA and ADT counts in one `.h5ad` file, with a cell type "
-          f"and a batch for each cell. {ADT_WORD} {BATCH_WORD} {PER_BATCH}"),
+          f"and a batch for each cell. {BATCH_WORD} {PER_BATCH}"),
    example=("a small example file, `my_file.h5ad`, from 60% of the cells of `D52mini`, "
             "with a batch column"),
    n_files=1,
@@ -785,7 +750,8 @@ adata = ad.read_h5ad("my_file.h5ad")   # <- your file, every batch in it
 adata''',
    export='''NAME = "MYCROSS_RNA_ADT"   # <- a new name for your own data
 mtb.io.export_dataset(adata, "mydata/" + NAME,
-                      rna="X",                # <- where the RNA counts are
+                      rna="X",                # <- where the RNA counts are:
+                                              #    "X" or "layer:counts"
                       adt="obsm:protein",     # <- where the proteins (ADT) are
                       labels="obs:celltype",  # <- the cell-type column
                       batch="obs:batch",      # <- the batch or donor column
@@ -808,7 +774,8 @@ print(rna)
 print(atac)''',
    export='''NAME = "MYCROSS_RNA_ATAC"   # <- a new name for your own data
 mtb.io.export_dataset(rna, "mydata/" + NAME,
-                      rna="X",                # <- where the RNA counts are
+                      rna="X",                # <- where the RNA counts are:
+                                              #    "X" or "layer:counts"
                       atac=atac,              # the ATAC file, peak counts in X
                       atac_kind="peak",       # the methods here read peaks
                       labels="obs:celltype",  # <- the cell-type column
@@ -820,7 +787,7 @@ mtb.io.export_dataset(rna, "mydata/" + NAME,
    name="MYCROSS_ADT_ATAC",
    needs=("Your data needs raw ADT counts in one `.h5ad` file and an ATAC peak matrix of "
           "the same cells in another, with a cell type and a batch for each cell. "
-          f"{ADT_WORD} {BATCH_WORD} {PER_BATCH} `rna=None` says that the data has no RNA."),
+          f"{BATCH_WORD} {PER_BATCH} `rna=None` says that the data has no RNA."),
    example=("two small example files, `my_adt.h5ad` and `my_atac.h5ad`, from 60% of the "
             "cells of `D58mini`, with a batch column"),
    n_files=2,
@@ -845,7 +812,7 @@ mtb.io.export_dataset(adt, "mydata/" + NAME,
    name="MYCROSS_TRI",
    needs=("Your data needs raw RNA and ADT counts in one `.h5ad` file and an ATAC peak "
           "matrix of the same cells in another, with a cell type and a batch for each "
-          f"cell. {ADT_WORD} {BATCH_WORD} {PER_BATCH}"),
+          f"cell. {BATCH_WORD} {PER_BATCH}"),
    example=("two small example files, `my_file.h5ad` and `my_atac.h5ad`, from 60% of the "
             "cells of `D59mini`, with a batch column"),
    n_files=2,
@@ -857,7 +824,8 @@ print(adata)
 print(atac)''',
    export='''NAME = "MYCROSS_TRI"   # <- a new name for your own data
 mtb.io.export_dataset(adata, "mydata/" + NAME,
-                      rna="X",                # <- where the RNA counts are
+                      rna="X",                # <- where the RNA counts are:
+                                              #    "X" or "layer:counts"
                       adt="obsm:protein",     # <- where the proteins (ADT) are
                       atac=atac,              # the ATAC file, peak counts in X
                       atac_kind="peak",       # the methods here read peaks
@@ -903,12 +871,7 @@ def cross_batches_sentence(key):
         shape = {n: sorted(ms) for n, ms in sorted(reads.items())}
         raise SystemExit(f"{key}: the batches each method reads are {shape}: reword "
                          f"cross_batches_sentence")
-    text = f"The methods of this task read {NUMBER[most]} batches"
-    if fewer:
-        also = sorted(reads[fewer[0]])
-        text += (f", and {and_list(also)} also read{'s' if len(also) == 1 else ''} "
-                 f"{NUMBER[fewer[0]]}")
-    return text + ". The recipe for another number of donors covers the other cases."
+    return f"The methods of this task read {NUMBER[most]} batches."
 
 
 def check_own(key):
@@ -921,7 +884,6 @@ def check_own(key):
     import io
     import tempfile
     import warnings
-    import pandas as pd
     t, own = TASKS[key], OWN[key]
     files = EXAMPLES[t["ds"]]
     read = re.findall(r'"(my_\w+\.h5ad)"', own["read"])
@@ -941,7 +903,7 @@ def check_own(key):
     with tempfile.TemporaryDirectory() as tmp:
         os.chdir(tmp)
         try:
-            ns = {"mtb": mtb, "pd": pd, "METHODS": list(t["methods"])}
+            ns = {"mtb": mtb, "METHODS": list(t["methods"])}
             with warnings.catch_warnings(record=True) as seen, \
                     contextlib.redirect_stdout(io.StringIO()):
                 warnings.simplefilter("always")
@@ -965,8 +927,9 @@ def check_own(key):
 def own_cells(key):
     """Section 5 of a task tutorial as ``[(kind, source), ...]``: the heading
     with its collapsed block, then a sentence and a code cell each for the
-    example files, the read, the export, the check and the run, and the
-    plot."""
+    example files, the read, the export with its check, and the run, and the
+    plot. The selector example of the collapsed block names the protein matrix
+    where the task has ADT, else the ATAC one."""
     t, own = TASKS[key], OWN[key]
     cat, methods, export = t["cat"], t["methods"], own["export"]
     one = own["n_files"] == 1
@@ -975,29 +938,20 @@ def own_cells(key):
     multi_peak = [m for m, v in task_variants(key) if "atac_peak1" in v.when["modalities"]]
     multi_peak = and_list(multi_peak) + (" reads" if len(multi_peak) == 1 else " read") \
         if multi_peak else ""
-    notes = [WHERE] + [n.replace("{peak_only}", peak_only).replace("{multi_peak}", multi_peak)
-                       .replace("{name}", own["name"]) for n in own["notes"]]
-    # a paragraph of its own between the needs and the recipes: what to do
-    # with a donor column, or how many batches the methods read
+    has_adt = any(r.startswith("adt") for v in t["variants"] for r in v)
+    notes = [WHERE.replace("{obsm}", "protein" if has_adt else "atac")] + [
+        n.replace("{peak_only}", peak_only).replace("{multi_peak}", multi_peak)
+         .replace("{name}", own["name"]) for n in own["notes"]]
+    # a paragraph of its own between the needs and the recipes: how many
+    # batches the methods read, or what the batches' files must share
     also = ""
-    if cat == "vertical":
-        also, donors_note = batch_advice(own["donors"])
-        notes.append(donors_note)
-    elif cat == "cross":
+    if cat == "cross":
         also = cross_batches_sentence(key)
         notes += [CROSS_ORDER, CROSS_INDEX]
     elif cat == "mosaic":
         also = mosaic_features_sentence(key)
-    leftover = LEFTOVER
-    if cat == "cross":
-        leftover += " " + LEFTOVER_BATCH
-    elif "batch_index=" in export:
-        leftover += " " + LEFTOVER_INDEX
-    notes += [FOLDER_NOTE, CHECK_NOTE, leftover, OVERWRITE_NOTE]
+    notes.append(CHECK_NOTE)
     recipes = and_list([RECIPES[r] for r in RECIPES_OF[cat]])
-    tenx = (" The cell reads `.h5ad` files. A 10x `.h5` file is read another way: see the "
-            "recipe for a 10x `.h5` file, linked at the top of this section."
-            if "10x" in RECIPES_OF[cat] else "")
     # the read cell shows one object where it ends in a name, else one per print
     shown = len(re.findall(r"^print\(", own["read"], re.M)) or 1
     printed = ("your file" if one else "your files" if shown == own["n_files"] else
@@ -1013,22 +967,8 @@ def own_cells(key):
         write += " Each call writes one batch."
     elif "batch_index=b + 1" in export:
         write += " The loop writes one RNA batch and one ATAC batch per call."
-    elif cat == "cross":
-        write += (" When the folder holds batches that your data does not have, "
-                  "`export_dataset` stops and names the files. A new value of `NAME` "
-                  "avoids that.")
-    check = ("Check the folder before you run anything. `runnable` says whether a method "
-             "can run on your data on this computer, and `reason` says why not. The first "
-             "two lines above the table say what the folder holds and how many cells each "
-             "file has. Compare them with your data.")
-    if 'atac_kind="peak"' in export and "category=" not in export:
-        # without a category, the export writes the peaks under both names
-        check += " `atac.h5` and `atac_peak.h5` are one matrix under two names."
-    check += (" A further line is about one method: why it cannot run, or what it does not "
-              "read or needs from your data.")
-    if cat == "cross":
-        check += (" With fewer batches than the methods read, such a line names the files "
-                  "that are not there. With more, it says which batches are not used.")
+    # the export cell ends with the check, so no folder path is echoed
+    check = "Compare the cell counts above the table with your data."
     return [
         ("markdown", f"## 5. Your own data\n\n{own['needs']}\n\n"
                      + (f"{also}\n\n" if also else "")
@@ -1036,19 +976,15 @@ def own_cells(key):
                      + details(*notes, label="Details: export")),
         ("markdown", f"The cells below read your data, write it as a dataset folder, check "
                      f"the folder and run {same} on it. So that the notebook runs as it "
-                     f"is, the next cell writes {own['example']}. It leaves a file of your "
-                     f"own with {'that name' if one else 'one of those names'} as it is."),
+                     f"is, the next cell writes {own['example']}."),
         ("code", f'mtb.data.write_example("{t["ds"]}")'),
         ("markdown", f"Read {'your file' if one else 'your files'}. For your own data, "
-                     f"change {'the file name' if one else 'every file name'} marked `# <-`."
-                     + ("" if one else " A name that you leave is read from the example.")
-                     + f" On Colab, upload {'the file' if one else 'the files'} first: click "
-                       f"the folder icon on the left, then the upload icon." + tenx),
+                     f"change {'the file name' if one else 'every file name'} marked `# <-`. "
+                     f"On Colab, upload {'the file' if one else 'the files'} first: click "
+                     f"the folder icon on the left, then the upload icon."),
         ("code", own["read"]),
-        ("markdown", write),
-        ("code", export),
-        ("markdown", check),
-        ("code", f'mtb.scan("mydata/" + NAME, "{cat}", methods=METHODS)'),
+        ("markdown", f"{write}\n\n{check}"),
+        ("code", f'{export}\nmtb.scan("mydata/" + NAME, "{cat}", methods=METHODS)'),
         ("markdown", f"Run {same} on the folder:"),
         ("code", f'mine = mtb.run("mydata/" + NAME, "{cat}", methods=METHODS,\n'
                  f'                   out_dir="out/" + NAME)\n'
@@ -1076,13 +1012,18 @@ def _title(key, suffix=""):
 
 def _install(md, code):
     md("## 1. Install\n\n"
-       "This cell installs `multibench-sc`. It keeps the numpy and pandas that are "
-       "already installed, so Colab needs no restart.\n\n" + details(COLAB_GPU_NOTE))
+       "This cell installs `multibench-sc`. On Colab, choose a T4 GPU runtime first "
+       "(Runtime -> Change runtime type), because changing it later loses the downloads.")
     code(INSTALL_CELL)
 
 
-#: what run scores besides the scIB metrics on data in several batches
-SCORED_TOO = " and the classification scores (OCA, ACA, Spec, Sens, F1)"
+#: what the metric families measure; vertical data has one batch, so its
+#: tutorials run neither the batch metrics nor the classification
+CLUSTERING_WORDS = ("The clustering metrics measure how well the embedding separates the "
+                    "cell types.")
+SCORED_TOO = (" The batch metrics measure how well the batches mix. The classification "
+              "scores measure how well the cell types learned on one batch are predicted "
+              "in the other batches.")
 
 
 def no_classification_sentence(key, methods):
@@ -1096,9 +1037,8 @@ def no_classification_sentence(key, methods):
     return (f" {and_list(graphs)} write{'s' if one else ''} a graph, so "
             f"{'it gets' if one else 'they get'} no classification scores.")
 
-PLOT_TEXT = ("`res.plot()` draws the scores as a bubble table. Circle size shows the rank "
-             "within a column, and bigger is better. The fill compares a value with the "
-             "other rows in the same column.")
+PLOT_TEXT = ("`res.plot()` draws the scores as a bubble table. The lightest fill is the "
+             "lowest value in this figure, not zero.")
 
 
 def plot_details(cat):
@@ -1106,7 +1046,6 @@ def plot_details(cat):
     several batches (every category but vertical) has the classification family."""
     pink = ", pink for classification" if cat != "vertical" else ""
     return (
-        "The lightest fill is the lowest value in this figure, not zero.",
         "Metrics are grouped by family: blue for clustering, "
         f"green for batch correction{pink}. Each family starts with an `Overall` bar. "
         "Its length and colour both show the family score.",
@@ -1136,36 +1075,18 @@ def build_tutorial(key):
 
     md(f"""## 2. Download the data and the environments
 
-`mtb.data.fetch` downloads `{ds}` ({download_size([ds])}) once. Each method runs in its own environment. `mtb.env.install` downloads the environment{'s' if len(methods) > 1 else ''} for {names}, with no conda needed. {env_download_sentence(methods)}
+`mtb.data.fetch` downloads `{ds}` ({download_size([ds])}) once. `mtb.env.install` downloads the environment{'s' if len(methods) > 1 else ''} for {names}. {env_download_sentence(methods)}""")
+    code(f'''import multibench as mtb
 
-""" + details(
-        "`state` is `PACKED` for an environment downloaded now and `have` for one that "
-        "was already there. With `dry_run=True`, `mtb.env.install` downloads "
-        "nothing and returns the plan with its sizes.",
-        "Environments go to `mtb.config.envs_dir`. To use another disk, set it "
-        "before this cell."))
-    code(f'''import pandas as pd
-import multibench as mtb
+mtb.data.fetch("{ds}")
+METHODS = {json.dumps(methods)}
+envs = mtb.env.install(METHODS)''')
 
-mtb.data.fetch("{ds}")''')
-    code(f'''METHODS = {json.dumps(methods)}
-envs = mtb.env.install(METHODS)
-envs[["env", "methods", "state"]]''')
-
-    run_notes = [
-        f"Each method writes an embedding: a table of numbers with one row per cell. "
-        f"`run` scores it against the cell-type labels of `{ds}`.",
-        "The clustering metrics `ARI`, `NMI`, `ASW`, `iASW`, `iF1` and `cLISI` measure "
-        "how well the embedding separates the cell types. The batch metrics "
-        "`ASW_batch`, `ARI_batch`, `NMI_batch`, `GC` and `iLISI` measure how well the "
-        "batches mix. They appear "
-        "only when the data has several batches.",
-    ]
+    run_notes = []
     if "scMoMaT" in methods:
         run_notes.append("scMoMaT writes a graph instead of an embedding. `run` scores "
                          "its UMAP.")
     run_notes += [
-        "The `reason` column of `res.summary` says why a method failed. "
         "`params={\"Method\": {\"key\": value}}` "
         "sets a method's parameters, and `mtb.params_for` lists them. Many methods "
         "take none.",
@@ -1174,7 +1095,7 @@ envs[["env", "methods", "state"]]''')
     ]
     md(f"""## 3. Run the method{'s' if len(methods) > 1 else ''}
 
-`run` runs each method on `{ds}` and scores its output with the scIB metrics{SCORED_TOO + "." + no_classification_sentence(key, methods) if cat != "vertical" else "."} `res.summary` has one row per method with its status, run time and scores. Higher is better for every metric.
+`run` runs each method on `{ds}` and scores its output with the scIB metrics. {CLUSTERING_WORDS}{SCORED_TOO + no_classification_sentence(key, methods) if cat != "vertical" else ""} `res.summary` has one row per method with its status, run time and scores. Higher is better for every metric.
 
 """ + details(*run_notes))
     code(f'''res = mtb.run("{ds}", "{cat}", methods=METHODS,
@@ -1191,20 +1112,24 @@ res.summary''')
     stored_ds = t.get("stored_ds")
     if stored_ds:
         n_stored = stored_method_count(cat, stored_ds)
+        # the full dataset of a mini one: its scores differ from a run on the
+        # mini one by more than a little
+        full = stored_ds != ds and stored_ds in ds
         stored_notes = []
-        if stored_ds != ds and stored_ds in ds:
+        if full:
             stored_notes.append(f"The stored results are for the full `{stored_ds}`, the benchmark "
                                 f"dataset `{ds}` is drawn from.")
         elif stored_ds != ds:
             stored_notes.append(f"There are no stored results for `{ds}`. `{stored_ds}` is another "
                                 f"benchmark dataset of the same task.")
         stored_notes.append("The stored results are the package's own runs of the methods.")
-        stored_notes.append(
-            "Scores of your runs differ a little from the stored ones: most methods give "
-            "a slightly different embedding on each run.")
+        if not full:
+            stored_notes.append(
+                "Scores of your runs differ a little from the stored ones: most methods give "
+                "a slightly different embedding on each run.")
         md(f"""## {section}. Stored results
 
-The package ships stored results for {n_stored} methods on `{stored_ds}`. `load_results` reads them and `mtb.plot.bubble` draws them, without running anything.
+The package ships stored results for {n_stored} methods on {'the full ' if full else ''}`{stored_ds}`. `load_results` reads them and `mtb.plot.bubble` draws them, without running anything.
 
 """ + details(*stored_notes))
         code(f'''long = mtb.load_results("{cat}", dataset="{stored_ds}")
@@ -1213,15 +1138,11 @@ mtb.plot.bubble(long)''')
 
     more = not_wrapped_sentence(key)
     more = "\n\n" + more if more else ""
-    colab_all = (f" [This notebook]({COLAB}tutorial_{key}_all.ipynb) does the same in Colab."
-                 if has_all(key) else "")
+    colab_all = (f" [This notebook]({COLAB}tutorial_{key}_all.ipynb) runs them all. It downloads "
+                 f"{env_size_text(methods=everyone)}." if has_all(key) else "")
     md(f"""## {section}. Every method of this task
 
-{len(everyone)} method{'s have' if len(everyone) > 1 else ' has'} a variant for {t['cat']} {t['label']}. Each ran on `{ds}` in the package's own check, on a server with a GPU:
-
-{runs_table(key)}
-
-To run them all, set `METHODS` to these names in section 2 and run the notebook again. That downloads {env_size_text(methods=everyone)}.{colab_all}{more}""")
+{len(everyone)} method{'s have' if len(everyone) > 1 else ' has'} a variant for this task.{colab_all}{more}""")
 
     md("""## Troubleshooting
 
@@ -1230,8 +1151,6 @@ To run them all, set `METHODS` to these names in section 2 and run the notebook 
 """ + details(
         """| symptom | fix |
 |---|---|
-| `env.install` refuses on macOS or Windows | methods run only on Linux: use Colab or a Linux machine |
-| a method needs an NVIDIA GPU | choose a GPU runtime on Colab, or a machine with a GPU |
 | a method fails on a small dataset | `mtb.scan` names what the method needs from the data's size in its `caveat` column |
 | a warning that values are not whole numbers | export raw counts, for example with `rna="layer:counts"` |
 | `... matrix/data as cells x features` | the matrix is transposed: export it again with `mtb.io.export_dataset` |
@@ -1240,7 +1159,6 @@ To run them all, set `METHODS` to these names in section 2 and run the notebook 
 
     md(f"""## Next steps
 
-- The other tutorials: {", ".join(f"[{TASKS[k]['cat']} {TASKS[k]['label']}]({SITE}tutorials/{k}/)" for k in TASKS if k != key)}.
 - The guides: [run]({SITE}tutorials/run/), [evaluate]({SITE}tutorials/evaluate/), [plot]({SITE}tutorials/plot/) and [discover methods]({SITE}tutorials/discover/).
 - The [interactive explorer](https://shiny.maths.usyd.edu.au/scMultiBench/) has the full benchmark's rankings, with no install needed.""")
     return cells
@@ -1250,29 +1168,6 @@ def has_all(key):
     """Whether the task has methods beyond the tutorial's defaults, and so a
     notebook that runs every method."""
     return set(task_methods(key)) != set(TASKS[key]["methods"])
-
-
-#: what a run status means to a reader
-RUN_WORDS = {"CHAIN_OK": "scored",
-             "CHAIN_OK_GRAPH_METHOD": "scored on the UMAP it writes",
-             "RUN_OK_NO_EMBEDDING": "ran, graph output not scored"}
-
-
-def runs_table(key):
-    """The run of every method of the task on its dataset, as a table: status
-    and seconds, read from ``tools/all_method_runs.json`` (the package's check
-    of the every-method notebooks on the benchmark host). No scores."""
-    here = os.path.dirname(os.path.abspath(__file__))
-    with open(os.path.join(here, "all_method_runs.json")) as f:
-        runs = json.load(f)[key]
-    everyone = task_methods(key)
-    if sorted(runs) != everyone:
-        raise SystemExit(f"all_method_runs.json[{key}] lists {sorted(runs)}, the task has {everyone}")
-    rows = ["| Method | Result | Seconds |", "|---|---|---|"]
-    for m in everyone:
-        status, sec = runs[m]
-        rows.append(f"| {m} | {RUN_WORDS[status]} | {sec} |")
-    return "\n".join(rows)
 
 
 def graph_methods(key):
@@ -1297,10 +1192,6 @@ This notebook runs every method that has a variant for {cat} {t['label']} on `{d
 Methods run on Linux. The environments are {env_size_text(methods=everyone)}.""")
     _install(md, code)
     md("## 2. Download the data and the environments")
-    code(f'''import pandas as pd
-import multibench as mtb
-
-mtb.data.fetch("{ds}")''')
     lines, cur = [], "METHODS = ["
     for m in everyone:
         piece = json.dumps(m) + ", "
@@ -1309,9 +1200,10 @@ mtb.data.fetch("{ds}")''')
             cur = "           "
         cur += piece
     lines.append(cur.rstrip(", ") + "]")
-    code("\n".join(lines) + '''
-envs = mtb.env.install(METHODS)
-envs[["env", "methods", "state"]]''')
+    code(f'''import multibench as mtb
+
+mtb.data.fetch("{ds}")
+''' + "\n".join(lines) + "\nenvs = mtb.env.install(METHODS)")
     graphs = graph_methods(key)
     note = ""
     if graphs:

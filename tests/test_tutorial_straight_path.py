@@ -288,8 +288,8 @@ def test_every_method_reads_every_batch(key):
 
 @pytest.mark.parametrize("key", KEYS)
 def test_every_method_section_lists_the_task_and_links_the_all_page(key):
-    """Markdown only: the section shows the run of every method of the task as
-    a table, says to set METHODS, and links the notebook that runs them all."""
+    """Markdown only: the section counts the methods of the task and links the
+    notebook that runs them all, with its download size."""
     t = GEN.TASKS[key]
     cells = _cells(f"tutorial_{key}")
     i = next(i for i, (kind, src) in enumerate(cells)
@@ -297,15 +297,10 @@ def test_every_method_section_lists_the_task_and_links_the_all_page(key):
     md = cells[i][1]
     everyone = GEN.task_methods(key)
     n = len(everyone)
-    assert (f"{n} method{'s have' if n > 1 else ' has'} a variant for {t['cat']} "
-            f"{t['label']}. Each ran on `{t['ds']}` in the package's own check") in md
-    # one table row per method: what the run gave and its seconds, no scores
-    rows = [line for line in md.split("\n") if line.startswith("| ") and "Method" not in line]
-    assert [r.split("|")[1].strip() for r in rows] == everyone
-    assert all(r.split("|")[2].strip() in GEN.RUN_WORDS.values() for r in rows)
-    assert all(r.split("|")[3].strip().isdigit() for r in rows)
-    assert "set `METHODS` to these names in section 2" in md
-    assert f"That downloads {GEN.env_size_text(methods=everyone)}." in md
+    assert f"{n} method{'s have' if n > 1 else ' has'} a variant for this task." in md
+    assert "| Method |" not in md and "set `METHODS`" not in md
+    assert (f"runs them all. It downloads {GEN.env_size_text(methods=everyone)}." in md) \
+        == GEN.has_all(key)
     # the site has no every-method page: the link opens the notebook in Colab
     assert f"{GEN.SITE}tutorials/{key}_all" not in md
     assert (f"]({GEN.COLAB}tutorial_{key}_all.ipynb)" in md) == GEN.has_all(key)
@@ -365,14 +360,12 @@ def test_all_methods_title_names_the_methods_and_links_the_tutorial(key):
     assert f"The environments are {GEN.env_size_text(methods=everyone)}." in first
 
 
-def test_quickstart_and_next_steps_link_every_task_tutorial():
+def test_quickstart_links_every_task_tutorial():
     quick = _markdown("colab_quickstart")
     for key in KEYS:
         assert f"]({GEN.COLAB}tutorial_{key}.ipynb)" in quick, key
         last = _cells(f"tutorial_{key}")[-1][1]
         assert last.startswith("## Next steps")
-        for other in KEYS:
-            assert (f"]({GEN.SITE}tutorials/{other}/)" in last) == (other != key), (key, other)
 
 
 def test_colab_quickstart_runs_nothing():
@@ -418,7 +411,7 @@ def test_download_sentence_matches_the_plans(key):
               if kind == "markdown" and src.startswith("## 2. Download the data"))
     assert GEN.env_download_sentence(t["methods"]) in md
     assert f"`mtb.data.fetch` downloads `{t['ds']}` ({GEN.download_size([t['ds']])}) once." in md
-    assert f"for {GEN.and_list(t['methods'])}, with no conda needed." in md
+    assert f"for {GEN.and_list(t['methods'])}. " in md
 
 
 def test_end_to_end_download_sentence_matches_the_plan():
