@@ -59,8 +59,9 @@ def _reads_atac(key):
 
 @pytest.mark.parametrize("key", KEYS)
 def test_section_5_states_the_atac_form_where_the_task_reads_atac(key):
-    """Visible, above the own-data demo: the ATAC form the tutorial's methods
-    read. A task without ATAC does not bring it up."""
+    """Above the own-data demo: the ATAC form the tutorial's methods read,
+    in the visible text or, where the title says it (diagonal), as the
+    export cell's ``atac_kind``. A task without ATAC does not bring it up."""
     import multibench as mtb
     md = _visible(_markdown(f"tutorial_{key}", OWN_DATA))
     if not _reads_atac(key):
@@ -68,7 +69,9 @@ def test_section_5_states_the_atac_form_where_the_task_reads_atac(key):
         return
     forms = {mtb.method_info(m)["atac"] for m in GEN.TASKS[key]["methods"]}
     assert len(forms) == 1, (key, forms)
-    assert "ATAC" in md and FORM_WORDS[forms.pop()] in md, md
+    form = forms.pop()
+    assert "ATAC" in md, md
+    assert FORM_WORDS[form] in md or f'atac_kind="{form}"' in GEN.OWN[key]["export"], md
 
 
 def test_the_tasks_that_read_atac_are_the_ones_labelled_so():

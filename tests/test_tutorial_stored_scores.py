@@ -98,10 +98,7 @@ def test_stored_scores_section_states_the_measured_counts(key):
     if ds != shown:
         # a tutorial-size subset: its own scores are never stored
         assert shown not in set(stored.dataset)
-        if ds in shown:
-            assert (f"The stored results are for the full `{ds}`, the benchmark dataset "
-                    f"`{shown}` is drawn from.") in md
-        else:
+        if ds not in shown:
             assert (f"There are no stored results for `{shown}`. `{ds}` is another "
                     f"benchmark dataset of the same task.") in md
     rerun = _quiet(mtb.load_results, cat, dataset=ds)
@@ -112,7 +109,7 @@ def test_stored_scores_section_states_the_measured_counts(key):
     assert ("differ a little from the stored ones" in md) == (not full)
     assert stored[stored.dataset == ds].method.nunique() == rerun.method.nunique()
     assert set(rerun.source) == {"stored"}
-    assert "The stored results are the package's own runs of the methods." in md
+    assert "own runs" not in md
     assert "published" not in md and "source=" not in md
 
 
