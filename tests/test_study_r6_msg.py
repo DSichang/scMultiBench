@@ -39,7 +39,6 @@ GAS_CAV = ("needs gene-activity ATAC. The features of atac.h5 look like chr:star
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 GENES = [f"GENE{i}" for i in range(60)]
 PEAKS = [f"chr1:{i * 100}-{i * 100 + 50}" for i in range(40)]
-SCRIPTS_NOTE = "The method scripts are not in "
 
 
 @pytest.fixture
@@ -126,12 +125,11 @@ def test_no_scan_caveat_has_a_semicolon_or_starts_in_lower_case(tmp_path, pinned
     frames.append(_quiet(full_scan, "D45", "mosaic", data_path=root / "data",
                          verbose=False, assume_gpu=True))
     seen = [mc for df in frames for mc in _caveats(df)]
-    assert len(seen) > 20
+    assert len(seen) >= 20
     for m, cav in seen:
         assert "; " not in cav and ";" not in cav, (m, cav)
-        # the method name leads (moETM, scMoMaT: as the registry spells it), or
-        # the note about the scripts of every method
-        assert cav.startswith((f"{m} ", SCRIPTS_NOTE)), (m, cav)
+        # the method name leads (moETM, scMoMaT: as the registry spells it)
+        assert cav.startswith(f"{m} "), (m, cav)
         # no sentence starts with a verb or a label that has lost its subject
         for s in re.split(r"(?<=\.) (?=\S)", cav):
             assert not re.match(r"(reads|expects|needs|assumes|setup|method)\b", s), \
@@ -149,28 +147,26 @@ def test_the_glue_uinmf_and_raw_count_caveats_read_as_sentences(tmp_path, pinned
         "atac_kind='gene_activity'. GLUE reads the GENCODE v43 human "
         "annotation (gencode.v43.chr_patch_hapl_scaff.annotation.gtf.gz, 53 MB) from "
         "<repo_path>/tools_scripts/GLUE/: on a host without network, put the file there. "
-        f"{SCRIPTS_NOTE}{pinned} yet. The first run fetches them. GLUE reads "
-        "inputs/atac_peak_normpeaks.h5."), glue["caveat"]
+        "GLUE reads inputs/atac_peak_normpeaks.h5."), glue["caveat"]
     uinmf = _quiet(full_scan, "D52", "cross", methods=["UINMF"], data_path=root / "data",
                    modalities=["rna1", "rna2", "adt1", "adt2"], verbose=False).iloc[0]
-    assert uinmf["caveat"].startswith("UINMF reads batches 1-2 of 3. Batch 3 is not used. "
-                                      f"{SCRIPTS_NOTE}{pinned} yet.")
+    assert uinmf["caveat"].startswith("UINMF reads batches 1-2 of 3. Batch 3 is not used.")
     tv = _quiet(full_scan, "LOGCITE", "vertical", methods=["totalVI"],
                 data_path=_log_cite(tmp_path / "b"), verbose=False).iloc[0]
     assert tv["caveat"].startswith("totalVI needs raw counts. rna.h5 holds non-integer "
-                                   "values. ")
+                                   "values.")
     monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
     smile = _quiet(full_scan, "D45", "mosaic", methods=["SMILE"], data_path=root / "data",
                    verbose=False, assume_gpu=True).iloc[0]
     assert smile["caveat"].startswith("SMILE needs an NVIDIA GPU. This check assumes the "
-                                      "job runs on a GPU node. ")
+                                      "job runs on a GPU node.")
 
 
 def test_the_atac_caveats_start_with_the_method(tmp_path, pinned, gas_matilda):
     sc = _quiet(full_scan, "MU_PEAK", "vertical", methods=["Matilda", "scMVP"],
                 modalities=["rna", "atac"], data_path=_mu_peak(tmp_path),
                 verbose=False).set_index("method")
-    assert sc.loc["Matilda", "caveat"].startswith(f"Matilda {GAS_CAV} ")
+    assert sc.loc["Matilda", "caveat"].startswith(f"Matilda {GAS_CAV}")
     # the reason the row carries without the override is unchanged
     blocked = _quiet(full_scan, "MU_PEAK", "vertical", methods=["Matilda"],
                      modalities=["rna", "atac"], data_path=tmp_path,

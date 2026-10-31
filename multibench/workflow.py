@@ -368,23 +368,11 @@ def _blocking_caveats(caveats) -> list[str]:
 
 
 def _run_caveat(caveat) -> str:
-    """A scan ``caveat`` without the trailing notes on starting the method
-    (scripts not here, a prepared input), which ``run`` handles itself."""
+    """A scan ``caveat`` without the trailing note on a prepared input, which
+    ``run`` handles itself."""
     text = str(caveat or "")
-    cuts = [i for i in (text.find(_runner.SCRIPTS_NOT_HERE), _runner._prepared_at(text))
-            if i >= 0]
-    return text[:min(cuts)].rstrip() if cuts else text
-
-
-def _scripts_caveat(caveat) -> str:
-    """The sentences of a scan ``caveat`` that say the method scripts are not
-    fetched yet (:data:`runner.SCRIPTS_NOT_HERE`), else ``""``."""
-    text = str(caveat or "")
-    start = text.find(_runner.SCRIPTS_NOT_HERE)
-    if start < 0:
-        return ""
-    end = _runner._prepared_at(text[start:])
-    return (text[start:][:end] if end >= 0 else text[start:]).rstrip()
+    cut = _runner._prepared_at(text)
+    return text[:cut].rstrip() if cut >= 0 else text
 
 
 def _would_run(row) -> bool:
@@ -963,9 +951,7 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
             # the variant run runs: the one with the most modalities
             i = max(group.index[group["runnable"].to_numpy().astype(bool)],
                     key=lambda i: len(str(group.at[i, "modalities"]).split("+")))
-            # the first run fetches the scripts: say so where nothing else does
-            rows.append((method, cat, group.at[i, "modalities"], True,
-                         _scripts_caveat(group.at[i, "caveat"]),
+            rows.append((method, cat, group.at[i, "modalities"], True, "",
                          *group.loc[i, ["env", "caveat", "command"]]))
             continue
         # the row that speaks for the method: files on disk, the folder's number of
