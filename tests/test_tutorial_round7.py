@@ -147,15 +147,11 @@ def _demo(n=60, counts=True):
     return a
 
 
-@pytest.mark.parametrize("name", TUTORIALS)
-def test_the_overwrite_sentences_match_the_live_error(name, tmp_path):
-    """The export details say that without ``overwrite=True`` a second export
-    raises FileExistsError, and that ``overwrite=True`` replaces the files."""
+def test_the_overwrite_error_says_what_to_do(tmp_path):
+    """Without ``overwrite=True`` a second export raises FileExistsError and
+    says to pass it; with it, the export replaces the files. The tutorials
+    leave this to the error."""
     import multibench as mtb
-    export = [src for kind, src in _cells(name) if kind == "markdown"
-              and "<summary>Details: export</summary>" in src]
-    assert len(export) == 1 and GEN.OVERWRITE_NOTE in export[0]
-    assert "raises `FileExistsError`" in GEN.OVERWRITE_NOTE
     kw = dict(rna="X", adt="obsm:protein", labels="obs:celltype")
     folder = mtb.io.export_dataset(_demo(), tmp_path / "MYCITE", **kw)
     with pytest.raises(FileExistsError) as e:

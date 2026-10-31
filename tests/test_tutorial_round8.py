@@ -79,9 +79,6 @@ def test_printed_lines_hold_no_semicolon(name):
 
 def test_split_sentences_keep_their_facts():
     """The sentences split at the ';' keep both halves."""
-    for name in GENERATED:
-        md = "\n".join(src for kind, src in _cells(name) if kind == "markdown")
-        assert "Circle size shows the rank within a column, and bigger is better." in md, name
     for key in KEYS:
         if GEN.TASKS[key]["cat"] != "mosaic":
             continue

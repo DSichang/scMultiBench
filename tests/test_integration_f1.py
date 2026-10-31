@@ -117,10 +117,10 @@ def test_vertical_tutorial_export_demo_writes_counts(root, tmp_path, monkeypatch
     nb = json.loads((root / "notebooks" / "tutorial_vertical_rna_adt.ipynb").read_text())
     code = ["".join(c["source"]) for c in nb["cells"] if c["cell_type"] == "code"]
     i = next(i for i, src in enumerate(code) if "mtb.io.export_dataset(adata" in src)
-    export = code[i]                       # the check and run have a cell each
+    export, check = code[i].rsplit("\n", 1)   # the export cell ends with the check
     assert "run" not in export and export.startswith('NAME = "MYCITE"')
-    assert code[i + 1].startswith("mtb.scan(\"mydata/\" + NAME, ")
-    assert code[i + 2].startswith("mine = mtb.run(\"mydata/\" + NAME")
+    assert check.startswith("mtb.scan(\"mydata/\" + NAME, ")
+    assert code[i + 1].startswith("mine = mtb.run(\"mydata/\" + NAME")
     monkeypatch.setattr(mtb.config, "data_path", root / "data")
     monkeypatch.chdir(tmp_path)
     ns = {"mtb": mtb, "pd": pd}

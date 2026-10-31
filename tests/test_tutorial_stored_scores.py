@@ -105,8 +105,11 @@ def test_stored_scores_section_states_the_measured_counts(key):
             assert (f"There are no stored results for `{shown}`. `{ds}` is another "
                     f"benchmark dataset of the same task.") in md
     rerun = _quiet(mtb.load_results, cat, dataset=ds)
+    full = "the full " if ds != shown and ds in shown else ""
     assert (f"The package ships stored results for {rerun.method.nunique()} methods "
-            f"on `{ds}`.") in md
+            f"on {full}`{ds}`.") in md
+    # a run on the subset differs from the full dataset's scores by more than a little
+    assert ("differ a little from the stored ones" in md) == (not full)
     assert stored[stored.dataset == ds].method.nunique() == rerun.method.nunique()
     assert set(rerun.source) == {"stored"}
     assert "The stored results are the package's own runs of the methods." in md

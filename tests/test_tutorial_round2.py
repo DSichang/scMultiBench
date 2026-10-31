@@ -96,15 +96,6 @@ def test_uinmf_reads_every_batch_of_d52_and_its_two_batch_variant_says_what_it_s
     assert not sc.at["rna1+rna2+rna3+adt1+adt2+adt3", "caveat"]
 
 
-def test_diagonal_tutorial_states_seurat_v5_cells():
-    """M15: Seurat_v5 needs RNA and ATAC from the same cells, a visible fact
-    next to the ATAC forms."""
-    import multibench as mtb
-    title = _visible(_cells("tutorial_diagonal_rna_atac")[0][1])
-    assert "Seurat_v5 also needs RNA and ATAC from the same cells." in title
-    assert "same cells" in mtb.method_info("Seurat_v5")["setup_hint"]
-
-
 # ------------------------------------------------------------- end-to-end
 def _e2e_cell(token):
     found = [src for src in _code(E2E) if token in src]

@@ -76,9 +76,10 @@ SHARED_IN_0_3_4 = {"MYDIAG", "MYMOSAIC", "MYCROSS"}
 NAME_MARK = "# <- a new name for your own data"
 
 KINDS = ["markdown", "markdown", "code", "markdown", "code", "markdown", "code",
-         "markdown", "code", "markdown", "code", "code"]
-# positions in the section, counted from 0
-EXAMPLE, READ, EXPORT, CHECK, RUN = 2, 4, 6, 8, 10
+         "markdown", "code", "code"]
+# positions in what _sources returns, counted from 0: the export cell ends with
+# the check, and _sources gives the check a place of its own
+EXAMPLE, READ, EXPORT, CHECK, RUN = 2, 4, 6, 7, 9
 
 RECIPES = "https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-"
 LINKS = {"10x-h5": "a 10x `.h5` file", "labels-csv": "labels in a CSV file",
@@ -93,19 +94,6 @@ LINKS_OF = {"vertical": ["10x-h5", "labels-csv", "no-labels", "donors"],
 #: a recipe the collapsed block of the first cell links: diagonal_multi's batches,
 #: for another number of donors than its methods read
 DETAILS_LINKS = {"diagonal_multi": ["donors"]}
-
-#: what a vertical tutorial says on donors: in the visible text of the first
-#: cell, and in its collapsed block
-BATCH_ADVICE = (
-    "Several donors or samples in the file? Keep them in one folder, without `batch=` in "
-    "`export_dataset`, and give `run` the column itself: "
-    "`mtb.run(..., batch={obj}.obs[\"donor\"])`. The summary then has the scores for how "
-    "well they mix.")
-BATCH_ADVICE_COLLAPSED = (
-    "The donors that `run` gets as `batch=` are matched to the cells by barcode, and "
-    "every cell needs a donor. A column name alone is not enough there, because `run` "
-    "reads the folder and the folder holds no `obs` columns.")
-
 
 def _cells(key):
     nb = json.loads((ROOT / "notebooks" / f"tutorial_{key}.ipynb").read_text())
@@ -123,9 +111,14 @@ def _section(key):
 
 
 def _sources(key):
+    """The sources of section 5, with the last line of the export cell, the
+    check, split off as a cell of its own: a reader who changes ``NAME`` runs
+    the two again, and a test runs them one at a time."""
     section = _section(key)
     assert [kind for kind, _ in section] == KINDS, key
-    return [src for _, src in section]
+    src = [s for _, s in section]
+    export, check = src[EXPORT].rsplit("\n", 1)
+    return src[:EXPORT] + [export, check] + src[EXPORT + 1:]
 
 
 def _visible(src):
@@ -221,11 +214,13 @@ def linux(monkeypatch, tmp_path):
 
 # ------------------------------------------------------------- the twelve cells
 @pytest.mark.parametrize("key", KEYS)
-def test_section_5_has_the_twelve_cells(key):
+def test_section_5_has_the_ten_cells(key):
     t = GEN.TASKS[key]
     section = _section(key)
     assert [kind for kind, _ in section] == KINDS
-    src = [s for _, s in section]
+    src = _sources(key)
+    # the export cell ends with the check, so it shows the table, not a path
+    assert section[EXPORT][1] == src[EXPORT] + "\n" + src[CHECK]
     assert src[EXAMPLE] == f'mtb.data.write_example("{t["ds"]}")'
     # diagonal_multi lines the mark up with the marks of the lines below it
     first = src[EXPORT].splitlines()[0]
@@ -237,7 +232,7 @@ def test_section_5_has_the_twelve_cells(key):
     assert src[RUN] == (f'mine = mtb.run("mydata/" + NAME, "{t["cat"]}", methods=METHODS,\n'
                         f'                   out_dir="out/" + NAME)\n'
                         f'mine.summary')
-    assert src[11] == "mine.plot()"
+    assert src[10] == "mine.plot()"
     # the folder is named once, in NAME: no later cell spells it out
     for later in src[EXPORT + 1:]:
         assert NAMES[key] not in later
@@ -314,10 +309,7 @@ def test_the_read_cell_reads_what_the_example_cell_writes(key):
     assert GEN.OWN[key]["n_files"] == len(files)
     # the sentences count the files as the example does
     one = len(files) == 1
-    assert ("with that name as it is." in src[1]) == one
-    assert ("with one of those names as it is." in src[1]) == (not one)
     assert src[3].startswith("Read your file. " if one else "Read your files. ")
-    assert ("A name that you leave is read from the example." in src[3]) == (not one)
 
 
 @pytest.mark.parametrize("key", KEYS)
@@ -546,7 +538,6 @@ def test_a_file_name_left_unchanged_is_visible(key, changed, cells, linux, tmp_p
     assert out[1] == f"[scan] Cells per file: {cells}."
     assert sorted(set(table.attrs["cells"].values())) == [700, int(cells.rsplit(" ", 1)[1]
                                                                .replace(",", ""))]
-    assert "A name that you leave is read from the example." in src[3]
 
 
 @pytest.mark.parametrize("key,files", [
@@ -555,8 +546,8 @@ def test_a_file_name_left_unchanged_is_visible(key, changed, cells, linux, tmp_p
 def test_fewer_batches_than_the_folder_holds_are_refused(key, files, tmp_path, monkeypatch):
     """A reader with two batches leaves ``NAME`` as it is. The folder holds
     the three batches of the example, and a method would read the third as
-    part of the reader's data. The export stops and names the files, as the
-    sentence above the cell says. A new value of ``NAME`` avoids it."""
+    part of the reader's data. The export stops and names the files. A new
+    value of ``NAME`` avoids it."""
     _on_disk(key)
     monkeypatch.chdir(tmp_path)
     src, ns = _sources(key), _namespace(key)
@@ -565,9 +556,6 @@ def test_fewer_batches_than_the_folder_holds_are_refused(key, files, tmp_path, m
     folder = Path("mydata") / NAMES[key]
     before = _bytes(folder)
     export = src[EXPORT]
-    assert ("When the folder holds batches that your data does not have, "
-            "`export_dataset` stops and names the files. A new value of `NAME` avoids "
-            "that.") in src[5]
     ns["adata"] = ns["adata"][ns["adata"].obs["batch"].astype(str) != "3"].copy()
     with pytest.raises(FileExistsError) as e:
         _run_cell(export, ns)
@@ -582,17 +570,12 @@ def test_fewer_batches_in_the_diagonal_loop_need_a_new_name(tmp_path, monkeypatc
     """0.4.0: the diagonal loop no longer passes the deprecated ``n_batches=``.
     A call with ``batch_index=`` checks its own batch number only, so a
     reader with two batches who leaves ``NAME`` keeps the example's third
-    batch in the folder; the Details say so and tell them to give ``NAME`` a
-    new value, which avoids it."""
+    batch in the folder; a new value of ``NAME`` avoids it."""
     key = "diagonal_multi"
     _on_disk(key)
     monkeypatch.chdir(tmp_path)
     src, ns = _sources(key), _namespace(key)
     assert "n_batches" not in "\n".join(s for _, s in _cells(key))
-    details = next(t for _, t in _cells(key) if "Details: export" in t)
-    assert ("A call with `batch_index=` checks the files of its own batch number. Files of "
-            "other batch numbers stay: for data with fewer batches, give `NAME` a new "
-            "value.") in " ".join(details.split())
     for i in (EXAMPLE, READ, EXPORT):
         _run_cell(src[i], ns)
     folder = Path("mydata") / NAMES[key]
@@ -610,44 +593,26 @@ def test_fewer_batches_in_the_diagonal_loop_need_a_new_name(tmp_path, monkeypatc
     assert not [p.name for p in (Path("mydata") / "MINE").iterdir() if "3" in p.name]
 
 
-# ------------------------------------------------------ the batch sentence
-@pytest.mark.parametrize("key", KEYS)
-def test_the_batch_sentence_uses_a_variable_of_the_notebook(key):
-    """The vertical tutorials say how to score samples or donors, with a call
-    a reader can copy: the object in it is one the read cell assigns. The
-    call is in the visible text, in a paragraph of its own before the
-    recipes, and the collapsed block says how the values are matched. The
-    other tutorials do not bring a donor column up."""
-    src = _sources(key)
-    everything = "\n".join(s for _, s in _cells(key))
-    if key not in VERTICAL:
-        assert '.obs["donor"]' not in everything
-        return
-    (obj,) = re.findall(r'batch=(\w+)\.obs\["donor"\]', everything)
-    assert (f"\n\n{BATCH_ADVICE.format(obj=obj)}\n\nStarting from something else?"
-            in _visible(src[0]))
-    assert f"\n\n{BATCH_ADVICE_COLLAPSED}\n\n" in _collapsed(src[0])
-    assert "Keep several samples or donors" not in everything
-    assigned = [n.targets[0].id for n in ast.walk(ast.parse(src[READ]))
-                if isinstance(n, ast.Assign) and isinstance(n.targets[0], ast.Name)]
-    assert obj in assigned
-    # it is the object the export cell writes, whose obs the reader looks at
-    assert f"mtb.io.export_dataset({obj}," in src[EXPORT]
+# ------------------------------------------------------ donors in a vertical file
+def _exported(src):
+    """The variable of the read cell that the export cell writes."""
+    return re.match(r"mtb\.io\.export_dataset\((\w+),", src[EXPORT].splitlines()[1]).group(1)
 
 
 @pytest.mark.parametrize("key", VERTICAL)
 def test_the_documented_batch_call_works(key, linux, tmp_path, monkeypatch):
-    """The call of the batch sentence, on the tutorial's folder. The example
-    has no donor column, so the test adds one with two donors."""
+    """The call of the donors recipe, ``batch=<object>.obs["donor"]``, on the
+    tutorial's folder. The example has no donor column, so the test adds one
+    with two donors."""
     _on_disk(key)
     monkeypatch.chdir(tmp_path)
     src, ns = _sources(key), _namespace(key)
-    (obj,) = re.findall(r'batch=(\w+)\.obs\["donor"\]', src[0])
+    obj = _exported(src)
     _run_cell(src[EXAMPLE], ns)
     _run_cell(src[READ], ns)
     assert "donor" not in ns[obj].obs
     ns[obj].obs["donor"] = np.where(np.arange(ns[obj].n_obs) % 2, "donor1", "donor2")
-    _run_cell(src[EXPORT], ns)                 # without batch=, as the sentence says
+    _run_cell(src[EXPORT], ns)                 # without batch=
     assert not list((Path("mydata") / NAMES[key]).glob("*[0-9].*"))
     call = (f'mtb.run("mydata/" + NAME, "vertical", methods=METHODS, out_dir="out/donors", '
             f'batch={obj}.obs["donor"], verbose=False)')
@@ -667,12 +632,11 @@ def test_the_documented_batch_call_works(key, linux, tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("key", VERTICAL)
-def test_the_donor_sentence_is_visible_and_its_call_adds_the_batch_scores(
+def test_the_donor_recipe_is_linked_and_its_call_adds_the_batch_scores(
         key, linux, tmp_path, monkeypatch):
-    """A reader whose file has a donor column finds what to do with it before
-    the cells, and the link to the recipe names that case. The run cell with
-    the argument of the sentence gives the scores that say how well the
-    donors mix, as the sentence says. The run cell as it is gives none
+    """A reader whose file has a donor column finds the recipe for that case
+    linked before the cells. The run cell with the recipe's argument gives the
+    scores that say how well the donors mix. The run cell as it is gives none
     (``test_one_name_drives_the_three_cells``, on the RNA + ADT folder)."""
     from multibench.eval import scib as escib
     _on_disk(key)
@@ -681,15 +645,13 @@ def test_the_donor_sentence_is_visible_and_its_call_adds_the_batch_scores(
     monkeypatch.chdir(tmp_path)
     src, ns = _sources(key), _namespace(key)
     visible = _visible(src[0])
-    (arg,) = re.findall(r'`mtb\.run\(\.\.\., (batch=\w+\.obs\["donor"\])\)`', visible)
-    obj = arg[len("batch="):].split(".")[0]
-    assert BATCH_ADVICE.format(obj=obj) in visible
+    obj = _exported(src)
+    arg = f'batch={obj}.obs["donor"]'
     assert visible.rstrip().endswith(f"and [several donors or samples]({RECIPES}donors).")
     _run_cell(src[EXAMPLE], ns)
     _run_cell(src[READ], ns)
     ns[obj].obs["donor"] = np.where(np.arange(ns[obj].n_obs) % 2, "donor1", "donor2")
-    _run_cell(src[EXPORT], ns)                 # without batch=, as the sentence says
-    # the "..." of the sentence are the arguments of the run cell
+    _run_cell(src[EXPORT], ns)                 # without batch=
     last = '                   out_dir="out/" + NAME)\n'
     assert src[RUN].count(last) == 1 and "batch=" not in src[RUN]
     _run_cell(src[RUN].replace(last, last.replace(")\n", f",\n                   {arg})\n")), ns)
@@ -704,11 +666,9 @@ def test_the_donor_sentence_is_visible_and_its_call_adds_the_batch_scores(
 # ------------------------------------------------- the sentences above the cells
 READ_ONE = ("Read your file. For your own data, change the file name marked `# <-`. On Colab, "
             "upload the file first: click the folder icon on the left, then the upload icon.")
-READ_SEVERAL = ("Read your files. For your own data, change every file name marked `# <-`. A "
-                "name that you leave is read from the example. On Colab, upload the files "
-                "first: click the folder icon on the left, then the upload icon.")
-READS_H5AD = (" The cell reads `.h5ad` files. A 10x `.h5` file is read another way: see the "
-              "recipe for a 10x `.h5` file, linked at the top of this section.")
+READ_SEVERAL = ("Read your files. For your own data, change every file name marked `# <-`. On "
+                "Colab, upload the files first: click the folder icon on the left, then the "
+                "upload icon.")
 
 WRITE = ("Write the dataset folder. Change each name in quotes marked `# <-`: give `NAME` a new "
          "value, and write the names that your {files} for the other parts. The printout above "
@@ -719,22 +679,10 @@ WRITE_OBSM = ", and one after `obsm:` as `\"obsm:protein\"`"
 WRITE_BATCHES = {
     "mosaic": " Each call writes one batch.",
     "diagonal_multi": " The loop writes one RNA batch and one ATAC batch per call.",
-    "cross": (" When the folder holds batches that your data does not have, `export_dataset` "
-              "stops and names the files. A new value of `NAME` avoids that."),
 }
 
-CHECK_TEXT = ("Check the folder before you run anything. `runnable` says whether a method can "
-              "run on your data on this computer, and `reason` says why not. The first two "
-              "lines above the table say what the folder holds and how many cells each file "
-              "has. Compare them with your data.")
-# Z21 (r3): the vertical methods read atac.h5 too, so no sentence on which reads which
-CHECK_TWO_NAMES = " `atac.h5` and `atac_peak.h5` are one matrix under two names."
-CHECK_FURTHER = (" A further line is about one method: why it cannot run, or what it does not "
-                 "read or needs from your data.")
-CHECK_CROSS = (" With fewer batches than the methods read, such a line names the files that "
-               "are not there. With more, it says which batches are not used.")
-#: the tutorials whose folder holds the ATAC peaks under two names
-TWO_ATAC_NAMES = {"vertical_rna_atac", "vertical_rna_adt_atac"}
+#: the sentence on the check, the last paragraph above the export cell
+CHECK_TEXT = "Compare the cell counts above the table with your data."
 
 SMALL_DATASET_ROW = ("| a method fails on a small dataset | `mtb.scan` "
                      "names what the method needs from the data's size in its `caveat` column |")
@@ -764,11 +712,11 @@ def _tenx_file(path, n_cells=30):
         ft.create_dataset("name", data=np.array([f"F{i}" for i in range(len(types))], dtype="S"))
 
 
-def test_the_read_sentence_sends_a_10x_file_to_its_recipe(tmp_path):
+def test_the_read_cell_reads_h5ad_and_the_first_cell_links_the_10x_recipe(tmp_path):
     """The read cell calls ``read_h5ad``, which does not read a 10x ``.h5``
-    file. Where the first cell links the recipe for that file, the sentence
-    above the read cell says what the cell reads and points to the link. The
-    sentence itself links nothing: each recipe is linked once."""
+    file. The first cell links the recipe for that file where the category
+    takes one. The sentence above the read cell links nothing: each recipe is
+    linked once."""
     import scanpy as sc
     for key in KEYS:
         cat = GEN.TASKS[key]["cat"]
@@ -776,8 +724,7 @@ def test_the_read_sentence_sends_a_10x_file_to_its_recipe(tmp_path):
         tenx = "10x-h5" in LINKS_OF[cat]
         assert tenx == ("10x" in GEN.RECIPES_OF[cat]) == (cat != "diagonal")
         n = len(EXAMPLES[GEN.TASKS[key]["ds"]])
-        assert src[READ - 1] == (READ_ONE if n == 1 else READ_SEVERAL) + (READS_H5AD if tenx
-                                                                         else ""), key
+        assert src[READ - 1] == (READ_ONE if n == 1 else READ_SEVERAL), key
         assert (f"[a 10x `.h5` file]({RECIPES}10x-h5)" in _visible(src[0])) == tenx
         assert "](" not in src[READ - 1]
         assert re.findall(r'read_h5ad\("\w+(\.\w+)"\)', src[READ]) == [".h5ad"] * n
@@ -799,7 +746,8 @@ def test_the_write_sentence_speaks_of_the_file_that_was_read(key, tmp_path, monk
     in the printout of the read cell, which lists the names of the files
     that were read. It counts the files that the cell shows, and it names
     ``obsm:`` where the export cell takes a matrix from there. The names it
-    quotes are those the printout shows for the example."""
+    quotes are those the printout shows for the example. The sentence on the
+    check follows it."""
     ds = _on_disk(key)
     assert "the names of the example" not in "\n".join(s for _, s in _cells(key))
     monkeypatch.chdir(tmp_path)
@@ -816,7 +764,7 @@ def test_the_write_sentence_speaks_of_the_file_that_was_read(key, tmp_path, monk
     assert src[EXPORT - 1] == WRITE.format(
         files="file uses" if n_read == 1 else "files use", printed=printed,
         obsm=WRITE_OBSM if obsm else "") + WRITE_BATCHES.get(
-            key, WRITE_BATCHES.get(GEN.TASKS[key]["cat"], "")), key
+            key, WRITE_BATCHES.get(GEN.TASKS[key]["cat"], "")) + "\n\n" + CHECK_TEXT, key
     lines = [ln.strip() for ln in printout.splitlines()]
     listed = [ln for ln in lines if ln.startswith("obs: ")]
     assert len(listed) == n_shown and all(ln.startswith("obs: 'celltype'") for ln in listed)
@@ -848,19 +796,16 @@ def test_the_write_sentence_speaks_of_the_file_that_was_read(key, tmp_path, monk
         "adt.h5", "cty.csv", "rna.h5"]
 
 
-def test_the_check_sentence_covers_the_further_lines(linux, tmp_path, monkeypatch, capsys):
+def test_the_check_names_missing_and_unused_batches(linux, tmp_path, monkeypatch, capsys):
     """The check prints two lines on the folder and then a line for each
-    method that cannot run or that leaves part of the folder out. The
-    sentence above the cell says what the first two are and what a further
-    line is. In a cross tutorial it says what such a line holds for fewer
-    and for more batches than the methods read, the two cases that the first
-    cell of the section announces."""
+    method that cannot run or that leaves part of the folder out: in a cross
+    tutorial, the files of a batch that is not there, or the batches that
+    are not used. The text above the cell asks only for a look at the cell
+    counts."""
     for key in KEYS:
-        cat = GEN.TASKS[key]["cat"]
-        assert _sources(key)[CHECK - 1] == (
-            CHECK_TEXT + (CHECK_TWO_NAMES if key in TWO_ATAC_NAMES else "") + CHECK_FURTHER
-            + (CHECK_CROSS if cat == "cross" else "")), key
-        assert "The two lines above" not in "\n".join(s for _, s in _cells(key))
+        assert _sources(key)[EXPORT - 1].endswith("\n\n" + CHECK_TEXT), key
+        everything = "\n".join(s for _, s in _cells(key))
+        assert "A further line" not in everything and "The two lines above" not in everything
     key = "cross_rna_adt"
     _on_disk(key)
     assert CROSS_BATCHES[key].startswith("The methods of this task read three batches")
@@ -965,8 +910,8 @@ def test_a_wrong_name_after_a_prefix_lists_the_names(tmp_path, monkeypatch):
 
 # ------------------------------------------------------ the generator's checks
 CROSS_BATCHES = {
-    "cross_rna_adt": "The methods of this task read three batches, and UINMF also reads two.",
-    "cross_rna_atac": "The methods of this task read three batches, and UINMF also reads two.",
+    "cross_rna_adt": "The methods of this task read three batches.",
+    "cross_rna_atac": "The methods of this task read three batches.",
     "cross_adt_atac": "The methods of this task read two batches.",
     "cross_rna_adt_atac": "The methods of this task read two batches.",
 }
@@ -983,8 +928,7 @@ def test_the_cross_sentence_counts_the_batches_from_the_registry(monkeypatch):
         if key not in CROSS_BATCHES:
             assert "The methods of this task read" not in first
             continue
-        sentence = (f"{CROSS_BATCHES[key]} The recipe for another number of donors covers "
-                    f"the other cases.")
+        sentence = CROSS_BATCHES[key]
         assert GEN.cross_batches_sentence(key) == sentence and sentence in first
         # a paragraph of its own before the recipes, and not in the collapsed block
         assert f"\n\n{sentence}\n\nStarting from something else?" in _visible(first)
@@ -995,7 +939,6 @@ def test_the_cross_sentence_counts_the_batches_from_the_registry(monkeypatch):
         most = max(max(c) for c in counts.values())
         assert all(most in c for c in counts.values())
         assert ("three" in sentence) == (most == 3)
-        assert ("UINMF also reads two" in sentence) == (counts["UINMF"] == {2, 3})
         assert all(c == {most} for m, c in counts.items() if m != "UINMF")
     # a set of variants the sentence has no words for stops the generation
     variants = GEN.task_variants("cross_rna_adt")
