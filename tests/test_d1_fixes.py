@@ -67,7 +67,7 @@ def _names(path):
 # ------------------------------------------------------------------ one check, one run
 def test_scan_returns_the_plan_and_run_has_no_dry_run():
     plan = mtb.scan("D11", "vertical", methods=["Matilda"],
-                    params={"Matilda": {"epochs": 7}}, verbose=False)
+                    params={"Matilda": {"epochs": 7}}, verbose=False, command=True)
     assert list(plan.columns) == ["method", "modalities", "runnable", "reason", "env",
                                   "caveat", "command"]
     assert "--epochs 7" in plan["command"].iloc[0]

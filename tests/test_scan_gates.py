@@ -194,7 +194,7 @@ def test_scan_atac_gas_peak_caveat(tmp_path, all_envs):
 # --- run(dry_run=True) is the scan frame, never silently empty ------------
 
 def test_run_all_dry_run_keeps_blocked_rows_with_reason(no_envs):
-    plan = mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False)
+    plan = mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False, command=True)
     assert len(plan) >= 1
     assert not plan["runnable"].any()
     assert plan["reason"].str.contains("not installed").all()
@@ -214,7 +214,7 @@ def test_run_all_dry_run_never_returns_empty():
 
 
 def test_scan_has_the_command_with_a_placeholder_out_dir():
-    plan = mtb.scan("D11", "vertical", methods=["Matilda", "totalVI"], verbose=False)
+    plan = mtb.scan("D11", "vertical", methods=["Matilda", "totalVI"], verbose=False, command=True)
     # d1: scan is the plan, its command written for <out_dir>
     assert list(plan.columns) == ["method", "modalities", "runnable", "reason", "env", "caveat", "command"]
     full = full_scan("D11", "vertical", methods=["Matilda", "totalVI"], verbose=False)
@@ -237,7 +237,7 @@ def test_run_all_dry_run_missing_dataset_raises_filenotfound():
 
 def test_scan_is_the_plan_frame(no_envs):
     a = full_scan("D11", "vertical", methods=["Matilda"], verbose=False)
-    b = mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False)
+    b = mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False, command=True)
     pd.testing.assert_frame_equal(a[["method", "modalities", "runnable", "reason", "env", "caveat", "command"]], b)
     assert len(a) >= 1 and not a["runnable"].any()
     with pytest.raises(ValueError, match="Matilda does not run on diagonal data"):

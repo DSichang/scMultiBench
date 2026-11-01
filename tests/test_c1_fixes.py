@@ -69,7 +69,7 @@ def test_method_info_without_repeated_keys():
 
 
 def test_the_dry_run_plan_has_seven_columns():
-    plan = mtb.scan("D11", "vertical", verbose=False)
+    plan = mtb.scan("D11", "vertical", verbose=False, command=True)
     assert list(plan.columns) == ["method", "modalities", "runnable", "reason", "env",
                                   "caveat", "command"]
 

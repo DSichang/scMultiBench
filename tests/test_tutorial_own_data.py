@@ -854,8 +854,9 @@ def test_the_small_dataset_row_names_the_scan_that_has_the_column(tmp_path, monk
     for i in (EXAMPLE, READ, EXPORT):
         _run_cell(src[i], ns)
     full = _run_cell(src[CHECK], ns)
+    # the command is shown only when asked for (command=True)
     assert list(full.columns) == ["method", "modalities", "runnable", "reason", "env",
-                                  "caveat", "command"]
+                                  "caveat"]
     capsys.readouterr()
     needs = "online_iNMF needs about 5,000 cells in total. On fewer it stops with std::exception."
     assert needs in [v.size_hint for v in registry.get("online_iNMF").variants]

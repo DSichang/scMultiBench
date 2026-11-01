@@ -136,7 +136,7 @@ def test_the_benchmarks_own_mosaic_batches_hold_the_same_cells():
 
 
 def test_the_dry_run_command_keeps_the_out_dir_placeholder():
-    plan = mtb.scan("D28", "diagonal", methods=["iNMF"], verbose=False)
+    plan = mtb.scan("D28", "diagonal", methods=["iNMF"], verbose=False, command=True)
     assert plan["command"].iloc[0].endswith("'<out_dir>/iNMF_D28/'")
 
 

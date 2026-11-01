@@ -16,7 +16,7 @@ def test_a_value_outside_the_choices_is_refused_in_the_dry_run():
 
 
 def test_a_listed_value_passes():
-    plan = mtb.scan("D27mini_vertical", "vertical", methods=["MIRA"], params={"MIRA": {"acc": "cpu"}}, verbose=False)
+    plan = mtb.scan("D27mini_vertical", "vertical", methods=["MIRA"], params={"MIRA": {"acc": "cpu"}}, verbose=False, command=True)
     assert "--acc cpu" in plan["command"].iloc[0]
 
 

@@ -27,7 +27,7 @@ SIGNATURES = {
     "method_info": ["method"],
     "params_for": ["method", "category", "modalities"],
     "scan": ["dataset", "category", "methods", "modalities", "params", "assume_gpu",
-             "verbose"],
+             "verbose", "command"],
     "run": ["dataset", "category", "out_dir", "methods", "modalities", "params", "batch",
             "evaluate", "timeout", "skip_existing", "verbose"],
     "load_run": ["out_dir", "methods"],

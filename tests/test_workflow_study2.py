@@ -75,7 +75,7 @@ def test_scan_docs_name_the_seven_columns():
     returns = " ".join(inspect.getdoc(mtb.scan).split("Returns", 1)[1].split("Raises")[0].split())
     assert ("``method``, ``modalities`` (of the variant ``run`` would run, ``+``-joined), "
             "``runnable``, ``reason`` (why it cannot run), ``env``, ``caveat`` (what to know "
-            "before running it) and ``command``") in returns
+            "before running it), and ``command`` with ``command=True``") in returns
 
 
 # ----------------------------------------------------------------- P17: str is not a list

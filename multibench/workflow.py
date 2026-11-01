@@ -614,7 +614,8 @@ def scan(dataset: str, category: str | None = None, *,
          modalities: list[str] | str | None = None,
          params: dict | None = None,
          assume_gpu: bool = False,
-         verbose: bool = True) -> pd.DataFrame:
+         verbose: bool = True,
+         command: bool = False) -> pd.DataFrame:
     """Check which methods can run on a dataset, and how ``run`` would run them.
 
     Nothing is executed and no file is written. Call it first on a new
@@ -637,12 +638,15 @@ def scan(dataset: str, category: str | None = None, *,
         combination.
     params : dict | None
         Hyperparameters per method, as ``run`` takes them; they are checked
-        and appear in ``command``.
+        and appear in ``command`` when it is asked for.
     assume_gpu : bool
         ``True`` = skip this host's GPU test, to check a job for a GPU node
         from a login node.
     verbose : bool
         Print what the folder holds, the cells per file and each reason.
+    command : bool
+        ``True`` = add the ``command`` column: the line ``run`` would execute,
+        with ``<out_dir>`` for the output folder.
 
     Returns
     -------
@@ -651,8 +655,7 @@ def scan(dataset: str, category: str | None = None, *,
         ``None``), runnable methods first: ``method``, ``modalities`` (of the
         variant ``run`` would run, ``+``-joined), ``runnable``, ``reason``
         (why it cannot run), ``env``, ``caveat`` (what to know before
-        running it) and ``command`` (the line ``run`` would execute, with
-        ``<out_dir>`` for the output folder).
+        running it), and ``command`` with ``command=True``.
 
     Raises
     ------
@@ -669,7 +672,7 @@ def scan(dataset: str, category: str | None = None, *,
     >>> import multibench as mtb
     >>> mtb.scan("D11", "vertical")
     >>> mtb.scan("data/MYCITE", "vertical", methods=["Matilda"],
-    ...          params={"Matilda": {"epochs": 10}}).command[0]
+    ...          params={"Matilda": {"epochs": 10}}, command=True).command[0]
 
     See Also
     --------
@@ -679,8 +682,10 @@ def scan(dataset: str, category: str | None = None, *,
         category = known_category(dataset)
     df, private = _scan(dataset, category, methods=methods, modalities=modalities,
                         params=params, assume_gpu=assume_gpu)
-    return _per_method(df, private, verbose=verbose,
-                       nested=not isinstance(modalities, (list, tuple)))
+    out = _per_method(df, private, verbose=verbose,
+                      nested=not isinstance(modalities, (list, tuple)))
+    # a long line, for troubleshooting: shown when asked for
+    return out if command else out.drop(columns=["command"])
 
 
 def known_category(dataset) -> str | None:

@@ -63,7 +63,7 @@ def _():
 @check("scan: the plan, with each command")
 def _():
     t = mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False)
-    plan = mtb.scan("D52", "cross", methods=["totalVI"], verbose=False)
+    plan = mtb.scan("D52", "cross", methods=["totalVI"], verbose=False, command=True)
     return f"{list(t.columns)}; {plan.command.iloc[0][:40]}"
 
 # ---------------- catalog / config ----------------

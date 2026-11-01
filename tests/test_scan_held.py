@@ -177,7 +177,7 @@ def test_scan_rows_are_rows_of_the_plan(ds, cat, mods, capsys):
     command."""
     _on_disk(ds)
     plan = W._shown_modalities(_quiet(full_scan, ds, cat, modalities=mods, verbose=False))
-    scan = _quiet(mtb.scan, ds, cat, modalities=mods, verbose=False)
+    scan = _quiet(mtb.scan, ds, cat, modalities=mods, verbose=False, command=True)
     assert list(scan.columns) == [c for c in W.SCAN_COLUMNS if c != "category"]
     assert len(scan) == scan["method"].nunique() == plan["method"].nunique()
     both = scan.merge(plan, on=["method", "modalities"], suffixes=("", "_plan"))

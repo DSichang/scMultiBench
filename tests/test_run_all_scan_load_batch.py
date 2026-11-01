@@ -82,7 +82,7 @@ def test_x35_summary_puts_the_scores_first(tmp_path):
 def test_x63_param_values_are_type_checked(value):
     with pytest.raises(TypeError, match=r"^Multigrate: epochs takes a whole number, got "):
         mtb.scan("D52mini", "cross", methods=["Multigrate"], params={"Multigrate": {"epochs": value}}, verbose=False)
-    plan = mtb.scan("D52mini", "cross", methods=["Multigrate"], params={"Multigrate": {"epochs": "3"}}, verbose=False)
+    plan = mtb.scan("D52mini", "cross", methods=["Multigrate"], params={"Multigrate": {"epochs": "3"}}, verbose=False, command=True)
     assert "--epochs 3 " in plan.command.iloc[0] + " "
 
 

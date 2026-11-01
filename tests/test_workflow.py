@@ -36,7 +36,7 @@ def test_scan_is_one_row_per_method_of_the_full_plan():
     for ds, cat in [("D11", "vertical"), ("D52", "cross"), ("D45", "mosaic")]:
         if not _has_dataset(ds):
             continue
-        plan = mtb.scan(ds, cat, verbose=False)
+        plan = mtb.scan(ds, cat, verbose=False, command=True)
         assert list(plan.columns)[-1] == "command"
         full = full_scan(ds, cat, verbose=False)
         assert plan["method"].is_unique and set(plan["method"]) == set(full["method"])

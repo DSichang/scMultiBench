@@ -1164,7 +1164,7 @@ def test_evaluate_guide_names_both_column_spellings_and_the_missing_values():
 def test_discover_guide_says_which_rows_scan_lists(tmp_path, monkeypatch):
     """The guide names the default rows of ``scan`` and the argument that lists
     every method. On a folder with RNA and ADT, the calls as the guide spells
-    them list those rows, with the command of each."""
+    them list those rows; the command of each only with ``command=True``."""
     pytest.importorskip("anndata")
     import multibench as mtb
     from multibench import workflow as W
@@ -1185,7 +1185,7 @@ def test_discover_guide_says_which_rows_scan_lists(tmp_path, monkeypatch):
     assert {m for mods in default["modalities"] for m in mods.split("+")} == {"rna", "adt"}
     # every method of the category
     assert set(full["method"]) == set(mtb.find_methods("vertical")) > set(default["method"])
-    assert {"runnable", "reason", "command"} <= set(default.columns)
+    assert {"runnable", "reason"} <= set(default.columns) and "command" not in default.columns
 
 
 @needs_docs
