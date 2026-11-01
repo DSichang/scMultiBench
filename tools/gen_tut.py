@@ -431,7 +431,7 @@ CROSS_ORDER = ("The batches are numbered in the sorted order of their names, rea
 CROSS_INDEX = ("For one AnnData per batch, call `export_dataset` once per batch with "
                "`batch_index=N` instead of `batch=`.")
 #: the folder holds each matrix dense (engine/ingest.py), so a real file can be large;
-#: {features} is "genes", or "genes or peaks" where the task reads ATAC
+#: {features} names the large matrices of the task: genes (RNA), peaks (ATAC)
 CHECK_NOTE = "The folder stores each matrix dense, so drop the {features} you do not need first."
 
 
@@ -919,8 +919,10 @@ def own_cells(key):
         notes += [CROSS_ORDER, CROSS_INDEX]
     elif cat == "mosaic":
         also = mosaic_features_sentence(key)
-    atac = any(r.startswith("atac") for v in t["variants"] for r in v)
-    notes.append(CHECK_NOTE.replace("{features}", "genes or peaks" if atac else "genes"))
+    roles = {r for v in t["variants"] for r in v}
+    features = [name for prefix, name in (("rna", "genes"), ("atac", "peaks"))
+                if any(r.startswith(prefix) for r in roles)]
+    notes.append(CHECK_NOTE.replace("{features}", " or ".join(features)))
     recipes = and_list([RECIPES[r] for r in RECIPES_OF[cat]])
     # the read cell shows one object where it ends in a name, else one per print
     shown = len(re.findall(r"^print\(", own["read"], re.M)) or 1
