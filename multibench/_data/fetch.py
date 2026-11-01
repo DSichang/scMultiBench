@@ -16,12 +16,21 @@ from .._settings import config
 def safe_extract(tar: tarfile.TarFile, dest) -> None:
     """``extractall`` that refuses an entry or link writing outside ``dest``.
 
-    Every tarball the package opens goes through here. Where ``tarfile`` has
-    the extraction filters (PEP 706) the ``'data'`` filter is passed too: the
-    bare call warns on 3.12/3.13 and changes behaviour on 3.14.
+    Every tarball the package opens goes through here, into a temporary
+    folder its caller removes on failure. Where ``tarfile`` has the extraction
+    filters (PEP 706) the ``'data'`` filter makes the checks during the one
+    pass over the archive; a scan of the members first would decompress a
+    ``.tar.gz`` twice (about a third of an environment's unpack time).
     """
     dest = Path(dest).resolve()
-    for m in tar.getmembers():
+    if hasattr(tarfile, "data_filter"):
+        try:
+            tar.extractall(dest, filter="data")
+        except (tarfile.OutsideDestinationError, tarfile.AbsolutePathError,
+                tarfile.LinkOutsideDestinationError, tarfile.AbsoluteLinkError) as e:
+            raise RuntimeError(f"archive entry escapes target dir: {e.tarinfo.name!r}") from e
+        return
+    for m in tar.getmembers():               # pragma: no cover - pre-filter Pythons
         target = (dest / m.name).resolve()
         if not str(target).startswith(str(dest) + os.sep) and target != dest:
             raise RuntimeError(f"archive entry escapes target dir: {m.name!r}")
@@ -29,10 +38,7 @@ def safe_extract(tar: tarfile.TarFile, dest) -> None:
             link = (target.parent / m.linkname).resolve() if not m.linkname.startswith("/") else Path(m.linkname)
             if not str(link).startswith(str(dest) + os.sep):
                 raise RuntimeError(f"archive link escapes target dir: {m.name!r}")
-    if hasattr(tarfile, "data_filter"):
-        tar.extractall(dest, filter="data")
-    else:                                 # pragma: no cover - pre-filter Pythons
-        tar.extractall(dest)
+    tar.extractall(dest)
 
 
 RELEASE_URL = "https://github.com/DSichang/scMultiBench/releases/download/data-v1"
