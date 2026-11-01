@@ -29,8 +29,10 @@ from tests.test_prefix_mode import (_tiny_archive, envs_dir, make_prefix,  # noq
 from _serve import serve_archives
 
 ROOT = Path(__file__).resolve().parents[1]
-CPU_ENVS = ["env_sciPENN", "matilda", "scmb_scjoint", "scmb_torch", "scmb_scmm2"]
+CPU_ENVS = ["env_sciPENN", "matilda", "scmb_scjoint", "scmb_torch", "scmb_scmm2", "scmb_multigrate2"]
 RELEASE = "https://github.com/DSichang/scMultiBench/releases/download/envs-v1"
+#: the release of each CPU build that is not on envs-v1
+CPU_RELEASE = {"scmb_multigrate2": RELEASE.replace("envs-v1", "envs-v2")}
 
 # a manifest where matilda's CPU archive IS published (listed + measured),
 # scmb_torch's is a placeholder (listed, size still null) and scmb_r has none
@@ -373,12 +375,12 @@ def test_install_signature_and_docs():
 
 
 # ---------------------------------------------------------------- the shipped placeholders
-def test_manifests_carry_the_five_cpu_placeholders():
+def test_manifests_carry_the_cpu_builds():
     urls = json.loads((ROOT / "multibench/engine/packed_urls.json").read_text())
     sizes = json.loads((ROOT / "multibench/engine/packed_sizes.json").read_text())
     for env in CPU_ENVS:
         assert env in urls, env
-        assert urls[f"{env}-cpu"] == f"{RELEASE}/{env}-cpu.tar.gz"
+        assert urls[f"{env}-cpu"] == f"{CPU_RELEASE.get(env, RELEASE)}/{env}-cpu.tar.gz"
         assert f"{env}-cpu" in sizes and set(sizes[f"{env}-cpu"]) == {"archive_bytes", "unpacked_bytes"}
     # until the orchestrator fills a size the placeholder is inert: every
     # flavour resolves to the GPU archive, so nothing changes on any host

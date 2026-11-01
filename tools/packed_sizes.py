@@ -80,7 +80,8 @@ def build(urls: dict, *, previous: dict | None = None, envs_dir: Path | None = N
         "written_by": "tools/packed_sizes.py",
         "note": "archive_bytes = Content-Length of the packed archive in packed_urls.json "
                 "(a HEAD request); unpacked_bytes = size on disk after conda-unpack. "
-                "null = not measured yet; rerun the tool after republishing an archive.",
+                "null = not measured yet; rerun the tool after republishing an archive. An env "
+                "built on a layer of packed_layers.json counts its own files only.",
         "measured": today or _dt.date.today().isoformat(),
     }}
     for env in sorted(urls):

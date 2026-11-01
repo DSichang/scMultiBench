@@ -57,5 +57,6 @@
     "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/unitednet.tar.gz.002",
     "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/unitednet.tar.gz.003",
     "https://github.com/DSichang/scMultiBench/releases/download/envs-v1/unitednet.tar.gz.004"
-  ]
+  ],
+  "scmb_multigrate2-cpu": "https://github.com/DSichang/scMultiBench/releases/download/envs-v2/scmb_multigrate2-cpu.tar.gz"
 }

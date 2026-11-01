@@ -52,6 +52,10 @@
     "archive_bytes": 458911917,
     "unpacked_bytes": 1504795715
   },
+  "scmb_multigrate2-cpu": {
+    "archive_bytes": 641534636,
+    "unpacked_bytes": 2086137506
+  },
   "scmb_multivi": {
     "archive_bytes": 431872416,
     "unpacked_bytes": 1424315472
