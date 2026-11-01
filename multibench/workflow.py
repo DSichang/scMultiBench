@@ -1186,7 +1186,7 @@ def _evaluate_best_order(emb, category, cands, *, metrics=None, user_batch=False
     # alone: cluster once per number, rank every order on it, and compute the full
     # metric set only for the winner.
     import anndata as ad
-    import scib.metrics
+    scib = _escib.import_scib()
 
     if on_rank is not None:
         on_rank(len(cands), emb.shape[0])

@@ -18,6 +18,18 @@ import pandas as pd
 from .. import _text
 
 #: metrics that run scib's prebuilt LISI helper binary
+def import_scib():
+    """``scib``, with ``scib.metrics``, imported under the caller's warning
+    filters: scib 1.1.7 calls ``warnings.simplefilter("default")`` on import
+    (``_package_tools.py``), which shows every warning of the session from then
+    on, such as Colab's own DeprecationWarnings in the output of ``run``."""
+    import sys
+    if "scib.metrics" not in sys.modules:
+        with warnings.catch_warnings():
+            import scib.metrics  # noqa: F401
+    return sys.modules["scib"]
+
+
 _LISI_METRICS = ("cLISI", "iLISI")
 
 #: C++ compilers tried, in order, when the shipped LISI helper cannot execute
@@ -101,7 +113,7 @@ def _lisi_fallback_message(name: str, problem: str) -> str:
     ``g++`` build line."""
     from pathlib import Path
 
-    import scib
+    scib = import_scib()
     kg = Path(scib.__file__).parent / "knn_graph"
     return (f"scib metric {name!r} needs scib's LISI helper binary, which "
             f"cannot run here: {problem}. Recording NaN. To fix it, rebuild the "
@@ -122,7 +134,7 @@ def _lisi_helper_problem() -> str | None:
     from pathlib import Path
 
     try:
-        import scib
+        scib = import_scib()
     except Exception as exc:  # noqa: BLE001 - absence is the caller's problem
         return f"scib is not importable ({type(exc).__name__})"
     kg = Path(scib.__file__).parent / "knn_graph"
@@ -336,6 +348,7 @@ def _isolated_labels_f1(adata, label_key, batch_key, cluster_key, iso_threshold)
     ``isolated_labels_f1`` with that clustering precomputed (pinned in
     ``tests/test_eval_isolated_f1.py``)."""
     from sklearn.metrics import f1_score
+    import_scib()
     from scib.metrics.isolated_labels import get_isolated_labels
 
     labels = get_isolated_labels(adata, label_key, batch_key, iso_threshold,
@@ -398,7 +411,7 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
     ``ARI_batch``, ``NMI_batch``, ``GC``, ``iLISI``) are clipped to that
     range, with values within ``1e-12`` of 1 recorded as ``1.0``. An iLISI of ``2.2e-16`` is therefore ``0.0``.
     """
-    import scib.metrics as me
+    me = import_scib().metrics
 
     if only is not None:
         only = set(only)

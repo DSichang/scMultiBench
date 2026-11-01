@@ -31,8 +31,8 @@ def _scib_version() -> str | None:
         return version("scib")
     except Exception:  # noqa: BLE001 - no metadata: ask the module
         try:
-            import scib
-            return getattr(scib, "__version__", None)
+            from .scib import import_scib
+            return getattr(import_scib(), "__version__", None)
         except Exception:  # noqa: BLE001
             return None
 
