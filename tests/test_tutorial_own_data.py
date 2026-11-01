@@ -229,7 +229,7 @@ def test_section_5_has_the_nine_cells(key):
     assert src[CHECK] == f'mtb.scan("mydata/" + NAME, "{t["cat"]}", methods=METHODS)'
     assert src[RUN].startswith('mine = mtb.run("mydata/" + NAME,')
     assert src[RUN] == (f'mine = mtb.run("mydata/" + NAME, "{t["cat"]}", methods=METHODS,\n'
-                        f'                   out_dir="out/" + NAME)\n'
+                        f'               out_dir="out/" + NAME)\n'   # under the first argument
                         f'mine.summary')
     assert src[RUN + 1] == "mine.plot()"
     # the folder is named once, in NAME: no later cell spells it out
@@ -648,7 +648,7 @@ def test_the_donor_recipe_is_linked_and_its_call_adds_the_batch_scores(
     _run_cell(src[READ], ns)
     ns[obj].obs["donor"] = np.where(np.arange(ns[obj].n_obs) % 2, "donor1", "donor2")
     _run_cell(src[EXPORT], ns)                 # without batch=
-    last = '                   out_dir="out/" + NAME)\n'
+    last = '               out_dir="out/" + NAME)\n'
     assert src[RUN].count(last) == 1 and "batch=" not in src[RUN]
     _run_cell(src[RUN].replace(last, last.replace(")\n", f",\n                   {arg})\n")), ns)
     summary = ns["mine"].summary

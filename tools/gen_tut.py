@@ -947,9 +947,8 @@ def own_cells(key):
         ("code", own["read"]),
         ("markdown", write),
         ("code", f'{export}\nmtb.scan("mydata/" + NAME, "{cat}", methods=METHODS)'),
-        ("code", f'mine = mtb.run("mydata/" + NAME, "{cat}", methods=METHODS,\n'
-                 f'                   out_dir="out/" + NAME)\n'
-                 f'mine.summary'),
+        ("code", _run_call("mine", '"mydata/" + NAME', cat, '"out/" + NAME')
+                 + "\nmine.summary"),
         ("code", "mine.plot()"),
     ]
 
@@ -969,6 +968,17 @@ def _notebook(cells, name):
 def _title(key, suffix=""):
     t = TASKS[key]
     return f"# {t['cat'].capitalize()} integration: {t['label']}{suffix}"
+
+
+def _run_call(var, dataset, cat, out_dir):
+    """``<var> = mtb.run(...)`` on one line, or with ``out_dir=`` on a second
+    line aligned under the first argument when one line passes 79 characters."""
+    head = f"{var} = mtb.run("
+    args = f'{dataset}, "{cat}", methods=METHODS'
+    one = f"{head}{args}, out_dir={out_dir})"
+    if len(one) <= 79:
+        return one
+    return f"{head}{args},\n{' ' * len(head)}out_dir={out_dir})"
 
 
 def _install(md, code, methods, *, every=False):
@@ -1081,9 +1091,7 @@ envs = mtb.env.install(METHODS)''')
 `run` runs each method on `{ds}` and scores its output{scib}. {CLUSTERING_WORDS}{scored_too} Higher is better for every metric.
 
 """ + details(*run_notes))
-    code(f'''res = mtb.run("{ds}", "{cat}", methods=METHODS,
-                  out_dir="out/{ds}")
-res.summary''')
+    code(_run_call("res", f'"{ds}"', cat, f'"out/{ds}"') + "\nres.summary")
 
     md("## 4. Plot\n\n" + PLOT_TEXT + "\n\n" + details(*plot_details(cat)))
     code("res.plot()")
@@ -1187,9 +1195,7 @@ mtb.data.fetch("{ds}")
                 "`ran` and no scores, and the figure leaves "
                 f"{'it' if len(graphs) == 1 else 'them'} out.")
     md(f"## 3. Run the method{'s' if len(everyone) > 1 else ''}" + note)
-    code(f'''res = mtb.run("{ds}", "{cat}", methods=METHODS,
-                  out_dir="out/{ds}_all")
-res.summary''')
+    code(_run_call("res", f'"{ds}"', cat, f'"out/{ds}_all"') + "\nres.summary")
     md("## 4. Plot\n\n" + PLOT_TEXT)
     code("res.plot()")
     return cells
