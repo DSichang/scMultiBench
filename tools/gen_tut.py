@@ -971,10 +971,14 @@ def _title(key, suffix=""):
     return f"# {t['cat'].capitalize()} integration: {t['label']}{suffix}"
 
 
-def _install(md, code, methods):
-    """Section 1. The T4 sentence only where a method of ``methods`` uses a
-    GPU: for the others both runtimes download the same and run alike."""
-    gpu = any(mtb.method_info(m)["gpu"] != "not used" for m in methods)
+def _install(md, code, methods, *, every=False):
+    """Section 1. The T4 sentence where a method of ``methods`` needs a GPU,
+    and in an ``every``-method notebook where one uses it: the task tutorials
+    ran on a 2-core CPU runtime in about the time they take with a T4, whose
+    CUDA builds download several times more (owner, 2026-11-01, measured on
+    kserver); the every-method notebooks were not timed on a CPU."""
+    gpu = any(mtb.method_info(m)["gpu"] == "required"
+              or (every and mtb.method_info(m)["gpu"] != "not used") for m in methods)
     md("## 1. Install\n\n"
        "This cell installs `multibench-sc`."
        + (" On Colab, choose a T4 GPU runtime first (Runtime -> Change runtime type), "
@@ -1160,7 +1164,7 @@ def build_all_methods(key):
 This notebook runs every method that has a variant for {cat} {t['label']} on `{ds}`: {and_list(everyone)}. The [tutorial]({SITE}tutorials/{key}/) explains each step and runs {and_list(t['methods'])} only.
 
 Methods run on Linux. The environments are {env_size_text(everyone)}.""")
-    _install(md, code, everyone)
+    _install(md, code, everyone, every=True)
     md("## 2. Download the data and the environments")
     lines, cur = [], "METHODS = ["
     for m in everyone:
