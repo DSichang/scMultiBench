@@ -175,19 +175,6 @@ def _single_build(env: str, *, manifest: dict | None = None) -> bool:
     return archive_key(env, "cpu") not in manifest
 
 
-def auto_flavor_note(flavor: str, *, dry_run: bool = False) -> str | None:
-    """The stderr note for ``flavor='auto'`` on a host without a GPU, else
-    ``None``: pass ``'gpu'`` when the jobs run on GPU nodes. ``dry_run`` says
-    what would be installed."""
-    if flavor != "auto" or resolve_flavor(flavor) != "cpu" or host_system():
-        # off Linux nothing is installed here: no GPU node to plan for
-        return None
-    gpu = "flavor='gpu'"
-    verb = "would install" if dry_run else "installing"
-    return (f"# {verb} CPU builds (no NVIDIA GPU on this host); if the jobs run on GPU "
-            f"nodes, pass {gpu}")
-
-
 def installed_flavor(env: str, conda: str | None = None) -> str | None:
     """Which archive flavour an installed env came from.
 
@@ -970,11 +957,6 @@ def _install_rows(methods: list[str] | None = None, *, category: str | None = No
                                    if key in manifest else None),
                     "archive_bytes": size.get("archive_bytes"),
                     "unpacked_bytes": size.get("unpacked_bytes"), "flavor": flav})
-    if dry_run and packed and any(not r["exists"] and r["flavor"] == "cpu"
-                                  and r["state"] != "name taken" for r in out):
-        note = auto_flavor_note(flavor, dry_run=True)
-        if note:
-            print(note, file=sys.stderr, flush=True)
     return out
 
 
@@ -997,12 +979,6 @@ def _install_missing(category, methods, *, packed, manifest, sizes, conda,
                            f"unpack the published archives.")
     if not packed:
         return set()
-    # said only when a CPU build is taken
-    if any(archive_for(env, flavor, manifest=manifest, sizes=sizes)[1] == "cpu"
-           for env in missing):
-        note = auto_flavor_note(flavor)
-        if note:
-            print(note, file=sys.stderr, flush=True)
     return {env for env in missing if install_packed(env, conda=conda, flavor=flavor)}
 
 
