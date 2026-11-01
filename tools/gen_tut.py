@@ -970,6 +970,16 @@ def _title(key, suffix=""):
     return f"# {t['cat'].capitalize()} integration: {t['label']}{suffix}"
 
 
+def _imports(cat):
+    """The imports of section 2. Outside vertical data ``res.summary`` has 21
+    columns (batch and classification scores too), one more than pandas shows
+    by default, so the cell asks pandas to show them all."""
+    if cat == "vertical":
+        return "import multibench as mtb\n"
+    return ("import multibench as mtb\nimport pandas as pd\n\n"
+            'pd.set_option("display.max_columns", None)   # show every column of the tables\n')
+
+
 def _run_call(var, dataset, cat, out_dir):
     """``<var> = mtb.run(...)`` on one line, or with ``out_dir=`` on a second
     line aligned under the first argument when one line passes 79 characters."""
@@ -1068,8 +1078,7 @@ def build_tutorial(key):
     md(f"""## 2. Download the data and the environments
 
 `mtb.data.fetch` downloads `{ds}` ({download_size([ds])}) once. `mtb.env.install` downloads the environment{'s' if len(methods) > 1 else ''} for {names}. {env_download_sentence(methods)}""")
-    code(f'''import multibench as mtb
-
+    code(_imports(cat) + f'''
 mtb.data.fetch("{ds}")
 METHODS = {json.dumps(methods)}
 envs = mtb.env.install(METHODS)''')
@@ -1182,8 +1191,7 @@ Methods run on Linux. The environments are {env_size_text(everyone)}.""")
             cur = "           "
         cur += piece
     lines.append(cur.rstrip(", ") + "]")
-    code(f'''import multibench as mtb
-
+    code(_imports(cat) + f'''
 mtb.data.fetch("{ds}")
 ''' + "\n".join(lines) + "\nenvs = mtb.env.install(METHODS)")
     graphs = graph_methods(key)
