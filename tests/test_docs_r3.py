@@ -91,7 +91,8 @@ def test_quickstart_batch_lines_name_run_all_as_the_guides_do():
     on evaluate, as tutorials/run and tutorials/discover do."""
     step1 = _flat("quickstart.md").split("## Step 1:", 1)[1].split("```", 1)[0]
     assert "`evaluate(batch=...)`" not in step1
-    assert "pass each cell's sample as `batch=` to `run` or `evaluate`" in step1
+    # Step 1 points at the donors recipe; the discover guide names batch= on both calls
+    assert "(tutorials/run.md#recipe-donors)" in step1
     assert "pass each cell's sample as `batch=` to `run` or `evaluate`." \
         in _flat("tutorials/discover.md")
 

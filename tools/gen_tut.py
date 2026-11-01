@@ -430,8 +430,9 @@ CROSS_ORDER = ("The batches are numbered in the sorted order of their names, rea
                "donors `A`, `B` and `C` become batches 1, 2 and 3, and `10` comes before `2`.")
 CROSS_INDEX = ("For one AnnData per batch, call `export_dataset` once per batch with "
                "`batch_index=N` instead of `batch=`.")
-#: the folder holds each matrix dense (engine/ingest.py), so a real file can be large
-CHECK_NOTE = "The folder stores each matrix dense, so drop the genes or peaks you do not need first."
+#: the folder holds each matrix dense (engine/ingest.py), so a real file can be large;
+#: {features} is "genes", or "genes or peaks" where the task reads ATAC
+CHECK_NOTE = "The folder stores each matrix dense, so drop the {features} you do not need first."
 
 
 MOSAIC_NEEDS = ("Your data needs raw counts, with one `.h5ad` file per batch and modality and "
@@ -918,7 +919,8 @@ def own_cells(key):
         notes += [CROSS_ORDER, CROSS_INDEX]
     elif cat == "mosaic":
         also = mosaic_features_sentence(key)
-    notes.append(CHECK_NOTE)
+    atac = any(r.startswith("atac") for v in t["variants"] for r in v)
+    notes.append(CHECK_NOTE.replace("{features}", "genes or peaks" if atac else "genes"))
     recipes = and_list([RECIPES[r] for r in RECIPES_OF[cat]])
     # the read cell shows one object where it ends in a name, else one per print
     shown = len(re.findall(r"^print\(", own["read"], re.M)) or 1
@@ -1037,8 +1039,8 @@ def no_classification_sentence(key, methods):
             "classification scores.")
 
 PLOT_TEXT = ("`res.plot()` draws the scores as a bubble table. Circle size ranks the rows "
-             "within each column and the colour scales each column, so a small gap can look "
-             "large: `res.summary` has the values.")
+             "within each column and colour shows the value scaled per column, so a small gap "
+             "can look large: `res.summary` has the values.")
 
 
 def plot_details(cat):
@@ -1094,11 +1096,13 @@ envs = mtb.env.install(METHODS)''')
         (SCORED_TOO_PAIR if key == "diagonal_rna_atac" else SCORED_TOO)
         + no_classification_sentence(key, methods))
     # the classification scores come from the package's own classifier, not scIB
-    scib = (f" with the [scIB metrics]({SITE}tutorials/evaluate/#what-each-metric-measures)"
-            if cat == "vertical" else "")
+    # the metric table of the evaluate guide, linked from the words that name the scores
+    table = f"{SITE}tutorials/evaluate/#what-each-metric-measures"
+    scored = (f"scores its output with the [scIB metrics]({table})" if cat == "vertical"
+              else f"[scores its output]({table})")
     md(f"""## 3. Run the method{'s' if len(methods) > 1 else ''}
 
-`run` runs each method on `{ds}` and scores its output{scib}. {CLUSTERING_WORDS}{scored_too} Higher is better for every metric.
+`run` runs each method on `{ds}` and {scored}. {CLUSTERING_WORDS}{scored_too} Higher is better for every metric.
 
 """ + details(*run_notes))
     code(_run_call("res", f'"{ds}"', cat, f'"out/{ds}"') + "\nres.summary")

@@ -100,9 +100,10 @@ def test_laptop_tab_prints_the_totalvi_command_before_the_table(tmp_path, monkey
 @needs_docs
 def test_step1_donor_advice_is_one_line_that_links_the_recipe():
     step1 = _step1_visible()
-    assert ("Several samples or donors: use `vertical` and pass each cell's sample as "
-            "`batch=` to `run` or `evaluate` ([recipe](tutorials/run.md#recipe-donors)).") in step1
-    assert "For several samples or donors:" not in step1 and "cross" not in step1
+    # a pointer only: whether vertical or cross fits depends on the donor count (round 2)
+    assert ("Several samples or donors: see "
+            "[Another number of donors](tutorials/run.md#recipe-donors).") in step1
+    assert "use `vertical`" not in step1 and "cross" not in step1
     recipe = " ".join(_read("tutorials/run.md").split("{ #recipe-donors }", 1)[1].split())
     assert ("A cross method reads a fixed number of batches: three for RNA + ADT and for "
             "RNA + ATAC, and two for ADT + ATAC and for RNA + ADT + ATAC.") in recipe
