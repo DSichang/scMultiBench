@@ -41,8 +41,8 @@ CATEGORIES = ("vertical", "diagonal", "mosaic", "cross")
 TIERS = ["fast", "medium", "slow", "very_slow"]
 
 
-# The 13 integration tasks of the benchmark article, in its order, with the
-# article's name of each: the tab labels of the site.
+# The 13 integration tasks of the benchmark paper, in its order, with the
+# paper's name of each: the tab labels of the site.
 ARTICLE_TASKS = {
     "vertical_rna_adt": ("vertical", "RNA + ADT"),
     "vertical_rna_atac": ("vertical", "RNA + ATAC"),
@@ -173,10 +173,10 @@ def test_no_notebook_names_the_modalities_or_overrides_the_atac_check():
                     (name, call)
 
 
-# ------------------------------------------------- the article's 13 tasks
+# ------------------------------------------------- the paper's 13 tasks
 def test_the_tasks_are_the_13_of_the_article_with_its_labels():
     assert {k: (t["cat"], t["label"]) for k, t in GEN.TASKS.items()} == ARTICLE_TASKS
-    assert KEYS == list(ARTICLE_TASKS)             # the article's order
+    assert KEYS == list(ARTICLE_TASKS)             # the paper's order
     assert [sum(c == cat for c, _ in ARTICLE_TASKS.values()) for cat in CATEGORIES] == \
         [3, 2, 4, 4]
     for key, t in GEN.TASKS.items():
@@ -409,8 +409,9 @@ def test_visible_text_stays_short():
             visible = re.sub(r"^\|.*$", "", visible, flags=re.M)      # table rows are data
             visible = re.sub(r"\]\(https?://[^)]+\)", "]", visible)
             words = len(re.findall(r"[A-Za-z0-9_']+", visible))
-            # the diagonal title carries the ATAC-form sentence, the longest cell
-            assert words <= 125, (name, words, visible[:80])
+            # the diagonal title carries the ATAC-form sentence, the longest cell,
+            # and since 0.5.1 every title the Colab time of sections 1-4 (owner)
+            assert words <= 130, (name, words, visible[:80])
 
 
 # ---- restored from before the 0.4 cut: kept behaviour
@@ -489,6 +490,19 @@ def test_the_generator_refuses_a_method_that_reads_only_some_batches(monkeypatch
         with pytest.raises(SystemExit, match=f"UINMF reads only some batches of {ds}"):
             GEN.check_task(key)
         monkeypatch.setattr(GEN, "labels_for", real)
+
+
+def test_every_tutorial_states_its_colab_time_and_stops_when_it_is_stale(monkeypatch):
+    """Each title gives the Colab time of sections 1-4 that COLAB_SECONDS holds;
+    a task whose dataset or methods differ from the timed ones stops the generator."""
+    for key in KEYS:
+        title = _cells(f"tutorial_{key}")[0][1]
+        minutes = round(GEN.COLAB_SECONDS[key][0] / 60)
+        assert f"sections 1 to 4 take about {minutes} minutes there." in title, key
+    monkeypatch.setattr(GEN, "check_task", lambda key: None)
+    monkeypatch.setitem(GEN.TASKS["vertical_rna_adt"], "methods", ["Matilda", "totalVI"])
+    with pytest.raises(SystemExit, match="time them and update COLAB_SECONDS"):
+        GEN.build_tutorial("vertical_rna_adt")
 
 
 @pytest.mark.parametrize("key", KEYS)

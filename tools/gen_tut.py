@@ -1,7 +1,7 @@
 """Generate one tutorial per integration task (``TASKS``), the notebook that
 runs every method of each task, and the Colab quickstart.
 
-The tasks are the 13 of the benchmark article: three vertical, two diagonal,
+The tasks are the 13 of the benchmark paper: three vertical, two diagonal,
 four mosaic and four cross. A task is named by its modality sets
 (``variants``), and a method belongs to the task when the registry gives it a
 variant with exactly one of those sets. Every variant of the four categories
@@ -61,6 +61,26 @@ OUT = "notebooks"
 os.makedirs(OUT, exist_ok=True)
 
 COLAB = "https://colab.research.google.com/github/DSichang/scMultiBench/blob/main/notebooks/"
+#: seconds that sections 1-4 (install to plot) of each task tutorial take on
+#: Colab's default CPU runtime, from "Run anyway" to the end of the plot cell,
+#: with the dataset and methods they were timed with: measured 2026-11-01 with
+#: multibench-sc 0.5.0 (owner: section 5 not counted). The generator stops when
+#: the dataset or methods change: time it again.
+COLAB_SECONDS = {
+    "vertical_rna_adt": (449, "D11", ["Matilda", "sciPENN"]),
+    "vertical_rna_atac": (661, "D27mini_vertical", ["scMM", "VIMCCA"]),
+    "vertical_rna_adt_atac": (378, "D22mini", ["Matilda", "UINMF"]),
+    "diagonal_rna_atac": (365, "D27mini", ["iNMF", "online_iNMF"]),
+    "diagonal_multi": (335, "D37mini", ["iNMF", "online_iNMF"]),
+    "mosaic_rna_adt": (650, "D38mini", ["StabMap", "scMoMaT"]),
+    "mosaic_rna_atac": (739, "D45mini", ["StabMap", "scMoMaT"]),
+    "mosaic_shared": (452, "D46mini", ["StabMap", "UINMF"]),
+    "mosaic_unshared": (636, "D49mini", ["StabMap", "scMoMaT"]),
+    "cross_rna_adt": (385, "D52mini", ["StabMap", "sciPENN"]),
+    "cross_rna_atac": (472, "D56mini", ["StabMap", "scMM"]),
+    "cross_adt_atac": (372, "D58mini", ["StabMap", "UINMF"]),
+    "cross_rna_adt_atac": (321, "D59mini", ["StabMap", "UINMF"]),
+}
 SITE = "https://dsichang.github.io/scMultiBench/"
 LAYOUT = SITE + "tutorials/run/#folder-layout"
 
@@ -160,7 +180,7 @@ INSTALL_CELL = ('import numpy, pandas\n'
 
 # One notebook per integration task, and one dataset per task: every method of
 # the task runs on it (tools/make_tutorial_data.py). The keys, their order and
-# the labels follow the benchmark article. `variants` are the modality sets of
+# the labels follow the benchmark paper. `variants` are the modality sets of
 # the task's method variants (the cross tasks with three batches also hold
 # UINMF's two-batch sets, which belong to no other task); `methods` are the
 # two the notebook runs by default (one when the task has a single method);
@@ -1074,8 +1094,13 @@ def build_tutorial(key):
         title += "\n\n" + diagonal_atac_sentence()
     elif cat == "diagonal":
         title += "\n\n" + diagonal_multi_sentence(key)
+    timed = COLAB_SECONDS.get(key)
+    if timed is None or timed[1:] != (ds, methods):
+        raise SystemExit(f"{key}: sections 1-4 were not timed on Colab with {ds} and "
+                         f"{names}: time them and update COLAB_SECONDS")
     title += (f"\n\nMethods run on Linux. On macOS or Windows, "
-              f"[open this notebook in Colab]({COLAB}tutorial_{key}.ipynb).")
+              f"[open this notebook in Colab]({COLAB}tutorial_{key}.ipynb): sections 1 "
+              f"to 4 take about {round(timed[0] / 60)} minutes there.")
     md(title)
     _install(md, code, methods)
 
