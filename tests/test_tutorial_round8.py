@@ -34,7 +34,7 @@ GEN = _load_gen_tut()
 KEYS = list(GEN.TASKS)
 GENERATED = [f"tutorial_{k}{suffix}" for k in KEYS for suffix in ("", "_all")
              if not suffix or GEN.has_all(k)]
-NOTEBOOKS = GENERATED + ["colab_quickstart", "tutorial_end_to_end"]
+NOTEBOOKS = GENERATED + ["colab_quickstart"]
 
 
 def _cells(name):

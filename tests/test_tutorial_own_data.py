@@ -277,7 +277,7 @@ def test_install_cell_asks_for_this_version():
         "import numpy, pandas",
         'pins = f"numpy=={numpy.__version__} pandas=={pandas.__version__}"',
         f'%pip install -q "multibench-sc>={mtb.__version__}" {{pins}}']
-    for name in [f"tutorial_{k}" for k in KEYS] + ["tutorial_end_to_end", "colab_quickstart"]:
+    for name in [f"tutorial_{k}" for k in KEYS] + ["colab_quickstart"]:
         nb = json.loads((ROOT / "notebooks" / f"{name}.ipynb").read_text())
         code = ["".join(c["source"]) for c in nb["cells"] if c["cell_type"] == "code"]
         assert code[0] == GEN.INSTALL_CELL, name

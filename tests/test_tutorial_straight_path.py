@@ -35,7 +35,7 @@ KEYS = list(GEN.TASKS)
 TUTORIALS = [f"tutorial_{k}" for k in KEYS]
 ALL_KEYS = [k for k in KEYS if GEN.has_all(k)]   # tasks with more methods than the defaults
 EVERY = [f"tutorial_{k}_all" for k in KEYS if GEN.has_all(k)]        # every method of a task
-RUNNING = TUTORIALS + EVERY + ["tutorial_end_to_end"]
+RUNNING = TUTORIALS + EVERY
 ALL = RUNNING + ["colab_quickstart"]
 CATEGORIES = ("vertical", "diagonal", "mosaic", "cross")
 TIERS = ["fast", "medium", "slow", "very_slow"]
@@ -303,21 +303,12 @@ def test_every_method_of_a_task_has_its_input_files_on_the_dataset(key):
         (key, sorted(set(everyone) - set(sc[sc.files_ok].method)))
 
 
-def test_end_to_end_installs_and_runs_matilda():
-    code = "\n".join(_code("tutorial_end_to_end"))
-    assert 'mtb.env.install(["Matilda"])' in code        # installs by default (X27)
-    # 0.4.0: one method is run(methods=[m]); res.embedding(m) is its embedding
-    assert 'mtb.run("D11", "vertical", methods=["Matilda"]' in code
-    assert 'emb = res.embedding("Matilda")' in code
-    assert "mtb.evaluate(emb" in code
-
-
 @pytest.mark.parametrize("name", RUNNING)
 def test_title_says_where_methods_run(name):
     assert "Methods run on Linux." in _cells(name)[0][1]
 
 
-@pytest.mark.parametrize("name", TUTORIALS + ["tutorial_end_to_end"])
+@pytest.mark.parametrize("name", TUTORIALS)
 def test_title_links_its_own_colab_notebook(name):
     assert f"{GEN.COLAB}{name}.ipynb" in _cells(name)[0][1]
 
@@ -390,26 +381,6 @@ def test_download_sentence_matches_the_plans(key):
     assert f"for {GEN.and_list(t['methods'])}. " in md
 
 
-def test_end_to_end_download_sentence_matches_the_plan():
-    assert GEN.env_download_sentence(["Matilda"]) in _markdown("tutorial_end_to_end")
-
-
-def test_installation_page_sizes_match_the_plans():
-    docs = os.environ.get("SCMULTIBENCH_DOCS")
-    if not docs:
-        pytest.skip("SCMULTIBENCH_DOCS not set")
-    import multibench as mtb
-    text = (Path(docs) / "installation.md").read_text()
-    # one row per task, named as the tutorials' links name it ("vertical RNA + ADT")
-    rows = {f"{t['cat']} {t['label']}": t["methods"] for t in GEN.TASKS.values()}
-    rows["end-to-end"] = ["Matilda"]
-    for label, methods in rows.items():
-        gb = [GEN._gb(mtb.env.install(methods, flavor=f, dry_run=True).to_dict("records")) for f in ("gpu", "cpu")]
-        sizes = gb[0] if gb[0] == gb[1] else f"{gb[0]}, {gb[1]}"
-        line = f"- {label} {sizes}: {GEN.and_list(methods)}"
-        assert line in text, line
-
-
 def test_notebooks_match_the_generator(tmp_path, monkeypatch):
     """Regenerating writes the committed notebooks byte for byte."""
     import nbformat as nbf
@@ -421,9 +392,8 @@ def test_notebooks_match_the_generator(tmp_path, monkeypatch):
     for name, build in built.items():
         fresh = nbf.writes(GEN._notebook(build(), name))
         assert fresh.strip() == (ROOT / "notebooks" / f"{name}.ipynb").read_text().strip(), name
-    # nothing else is in the folder but the hand-maintained end-to-end tutorial
-    assert sorted(p.stem for p in (ROOT / "notebooks").glob("*.ipynb")) == \
-        sorted([*built, "tutorial_end_to_end"])
+    # nothing else is in the folder: every notebook is generated
+    assert sorted(p.stem for p in (ROOT / "notebooks").glob("*.ipynb")) == sorted(built)
 
 
 def test_visible_text_stays_short():

@@ -7,7 +7,7 @@ correct result are visible, the Details blocks carry plain paragraphs, and
 the vocabulary is plain ('replacement' / 'stored outputs', not 'stand-in').
 These tests pin both, on the committed notebooks: the generated ones (one
 tutorial per integration task, the run of every method of each task, and the
-quickstart) and the hand-maintained end-to-end tutorial.
+quickstart).
 """
 import ast
 import importlib.util
@@ -36,7 +36,7 @@ KEYS = list(GEN.TASKS)
 TUTORIALS = [f"tutorial_{k}" for k in KEYS]
 EVERY = [f"tutorial_{k}_all" for k in KEYS if GEN.has_all(k)]        # every method of a task
 GENERATED = TUTORIALS + EVERY + ["colab_quickstart"]
-ALL = GENERATED + ["tutorial_end_to_end"]
+ALL = GENERATED
 
 
 def _cells(name):

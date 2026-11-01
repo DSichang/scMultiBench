@@ -36,7 +36,7 @@ KEYS = list(GEN.TASKS)
 STORED = [k for k in KEYS if GEN.TASKS[k].get("stored_ds")]
 GENERATED = [f"tutorial_{k}{suffix}" for k in KEYS for suffix in ("", "_all")
              if not suffix or GEN.has_all(k)]
-NOTEBOOKS = GENERATED + ["tutorial_end_to_end", "colab_quickstart"]
+NOTEBOOKS = GENERATED + ["colab_quickstart"]
 # the notebooks that draw stored scores
 DRAWING = [f"tutorial_{k}" for k in STORED] + ["colab_quickstart"]
 

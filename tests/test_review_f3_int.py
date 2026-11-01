@@ -316,17 +316,9 @@ def test_pages_state_the_donor_count_cross_reads():
     # UINMF has a variant for two batches and one for three
     assert reads.pop("UINMF") == {2, 3} and set(map(frozenset, reads.values())) == {
         frozenset({3})}
-    # R4-16 moved the counts from the visible bullet to the Step 1 Details block
-    step1 = _flat("quickstart.md").split("## Step 1:", 1)[1].split("## Step 2:", 1)[0]
-    assert (f"The `cross` category has {len(reads) + 1} RNA + ADT methods, which integrate "
-            f"the donors") in step1
-    assert "These methods read batches 1-3." in step1
-    assert "UINMF reads only the first two" not in step1
-    assert ("The `cross` category integrates the donors as batches and reads a fixed number "
-            "of them, three for RNA + ADT: see the") in step1
-    assert ("With another number of donors, use `vertical`, as in the recipe "
-            "[Another number of donors](tutorials/run.md#recipe-donors).") in step1
+    # 0.5.1 docs review: the Quickstart links the donors recipe, which states the count
     run = _flat("tutorials/run.md")
+    assert "A cross method reads a fixed number of batches: three for RNA + ADT" in run
     assert ('category="cross") ``` The cross methods for RNA + ADT read batches 1-3. '
             '[Dataset folder layout](#folder-layout) lists every batch pattern.') in run
 

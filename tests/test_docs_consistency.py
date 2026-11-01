@@ -624,12 +624,11 @@ def test_deploy_gate_refuses_a_stale_executed_tutorial(tmp_path, monkeypatch):
     gate = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(gate)
     # every published copy has a package notebook to be compared with, and
-    # the site publishes one page per task and the end-to-end tutorial
+    # the site publishes one page per task
     copies = sorted((_docs_root() / "tutorials").glob("*.ipynb"))
     for copy in copies:
         assert (ROOT / "notebooks" / f"tutorial_{copy.name}").is_file(), copy.name
-    assert [c.stem for c in copies] == sorted(
-        list(_load_gen_tut().TASKS) + ["end_to_end"])
+    assert [c.stem for c in copies] == sorted(_load_gen_tut().TASKS)
     cells = [("markdown", "# Title\n\nprose"), ("code", "import multibench as mtb\nmtb.scan('D11')")]
     pkg, site = tmp_path / "pkg" / "notebooks", tmp_path / "docs" / "tutorials"
     _write_nb(pkg / "tutorial_a.ipynb", cells, executed=False)

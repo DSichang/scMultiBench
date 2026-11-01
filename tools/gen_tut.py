@@ -430,8 +430,8 @@ CROSS_ORDER = ("The batches are numbered in the sorted order of their names, rea
                "donors `A`, `B` and `C` become batches 1, 2 and 3, and `10` comes before `2`.")
 CROSS_INDEX = ("For one AnnData per batch, call `export_dataset` once per batch with "
                "`batch_index=N` instead of `batch=`.")
-CHECK_NOTE = ("Without `methods=`, `scan` lists every method that reads the modalities in "
-              "the folder.")
+#: the folder holds each matrix dense (engine/ingest.py), so a real file can be large
+CHECK_NOTE = "The folder stores each matrix dense, so drop the genes or peaks you do not need first."
 
 
 MOSAIC_NEEDS = ("Your data needs raw counts, with one `.h5ad` file per batch and modality and "
@@ -1036,9 +1036,9 @@ def no_classification_sentence(key, methods):
     return (" scMoMaT writes a graph: `run` scores its 2-D UMAP, with no "
             "classification scores.")
 
-PLOT_TEXT = ("`res.plot()` draws the scores as a bubble table. The bubbles and Overall bars "
-             "rank the rows within each column, so a small gap can look large: "
-             "`res.summary` has the values.")
+PLOT_TEXT = ("`res.plot()` draws the scores as a bubble table. Circle size ranks the rows "
+             "within each column and the colour scales each column, so a small gap can look "
+             "large: `res.summary` has the values.")
 
 
 def plot_details(cat):
@@ -1094,7 +1094,8 @@ envs = mtb.env.install(METHODS)''')
         (SCORED_TOO_PAIR if key == "diagonal_rna_atac" else SCORED_TOO)
         + no_classification_sentence(key, methods))
     # the classification scores come from the package's own classifier, not scIB
-    scib = " with the scIB metrics" if cat == "vertical" else ""
+    scib = (f" with the [scIB metrics]({SITE}tutorials/evaluate/#what-each-metric-measures)"
+            if cat == "vertical" else "")
     md(f"""## 3. Run the method{'s' if len(methods) > 1 else ''}
 
 `run` runs each method on `{ds}` and scores its output{scib}. {CLUSTERING_WORDS}{scored_too} Higher is better for every metric.

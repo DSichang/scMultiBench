@@ -60,9 +60,7 @@ ANCHORS = ["own-data-recipes", "recipe-10x-h5", "recipe-labels-csv", "recipe-no-
 #: the python fences of each recipe, by their first line. A fence that is
 #: added to the page has no test until it is listed here.
 FENCES = {
-    "recipe-10x-h5": ["import scanpy as sc", "import pandas as pd",
-                      'ann.index = ann.index + "-1"',
-                      'adata = adata[adata.obs["celltype"].notna()].copy()',
+    "recipe-10x-h5": ["import scanpy as sc",
                       'kind = adata.var["feature_types"]', 'kind = adata.var["feature_types"]',
                       'mtb.scan("mydata/" + NAME, "vertical", methods=METHODS)'],
     "recipe-labels-csv": ["import pandas as pd",
@@ -85,7 +83,9 @@ PLACEHOLDERS = '["A", "B", "C"]'
 #: donor names of a file, which are not those of the page
 DONORS = ["P01", "P02", "P03", "P04", "P05"]
 # the fences of the 10x recipe, in page order
-READ_10X, LABELS, ENDING, KEEP, MULTIOME, CITE, PAGE_CHECK = range(7)
+READ_10X, MULTIOME, CITE, PAGE_CHECK = range(4)
+#: the blocks of Labels in a CSV file, which the 10x recipe links for its cell types
+LABELS, ENDING, KEEP = range(3)
 
 GENES = [f"GENE{i}" for i in range(120)]
 GENES[1] = GENES[0]                       # 10x files repeat gene names
@@ -107,13 +107,13 @@ ENDING_SENTENCE = ("When the barcodes of the CSV lack the `-1` ending that the c
 # ------------------------------------------------------------------ the page
 def _section():
     """The recipes on the page: from their heading to the rule that ends them."""
-    return _read("tutorials/run.md").split("### Recipes for your own data", 1)[1] \
+    return _read("tutorials/run.md").split("## Recipes for your own data", 1)[1] \
         .split("\n---\n", 1)[0]
 
 
 def _recipe(anchor):
     """The text of one recipe: from its heading to the next recipe."""
-    parts = re.split(r"^#### .*? \{ #([a-z0-9-]+) \}$", _section(), flags=re.M)
+    parts = re.split(r"^### .*? \{ #([a-z0-9-]+) \}$", _section(), flags=re.M)
     return dict(zip(parts[1::2], parts[2::2]))[anchor]
 
 
@@ -299,11 +299,11 @@ def test_the_anchors_exist_once(tmp_path):
     for anchor in ANCHORS:
         assert page.count(f"{{ #{anchor} }}") == 1, anchor
     # the other anchored heading, Dataset folder layout: tests/test_docs_folder_layout.py
-    assert re.findall(r"^#{3,4} .*? \{ #([a-z0-9-]+) \}$", page, flags=re.M) == \
+    assert re.findall(r"^#{2,3} .*? \{ #([a-z0-9-]+) \}$", page, flags=re.M) == \
         ["folder-layout"] + ANCHORS
     assert set(re.findall(r"\(#(recipe-[a-z0-9-]+)\)", page)) <= set(ANCHORS)
     # the section sits in "Inputs", after the ATAC details and before the rule
-    before, after = page.split("### Recipes for your own data { #own-data-recipes }")
+    before, after = page.split("## Recipes for your own data { #own-data-recipes }")
     assert before.rstrip().endswith("export the ATAC form it reads.")
     assert after.split("\n---\n", 1)[1].lstrip().startswith("## GPU or CPU?")
     linked = set()
@@ -315,7 +315,7 @@ def test_the_anchors_exist_once(tmp_path):
     listed = re.findall(r"tutorials/run\.md#((?:own-data|recipe)[a-z0-9-]*)", _read("changes.md"))
     assert set(listed) == set(ANCHORS)
     # the title that the error for a 10x file gives
-    assert re.search(r"^#### A 10x `\.h5` file \{ #recipe-10x-h5 \}$", page, flags=re.M)
+    assert re.search(r"^### A 10x `\.h5` file \{ #recipe-10x-h5 \}$", page, flags=re.M)
     src = tmp_path / "filtered_feature_bc_matrix.h5"
     _tenx(src, GENES, PEAKS, "atac", n_cells=20)
     with pytest.raises(ValueError) as e:
@@ -330,7 +330,7 @@ def test_the_fences_are_the_ones_these_tests_run():
     for anchor, first_lines in FENCES.items():
         assert [f.splitlines()[0] for f in _fences(anchor)] == first_lines, anchor
     # the section opens by saying where a recipe runs and which names it uses
-    opening = " ".join(_section().split("####", 1)[0].split())
+    opening = " ".join(_section().split("\n### ", 1)[0].split())
     assert ("Run them in the tutorial notebook of your task: `mtb` is imported, `METHODS` is "
             "the list of methods from its section 2, and its check cell and `run` cell "
             "use `NAME`, the folder name that a recipe sets.") in opening
@@ -343,8 +343,8 @@ def test_the_dataset_folder_section_points_to_the_recipes():
     MuData. A reader who starts from another kind of file finds the recipes
     from its visible text, above the tabs."""
     page = _read("tutorials/run.md")
-    section = page.split("\n### Your own data as a dataset folder\n", 1)[1] \
-        .split("\n### Recipes for your own data", 1)[0]
+    section = page.split("\n## Your own data as a dataset folder\n", 1)[1] \
+        .split("\n## Recipes for your own data", 1)[0]
     pointer = ("For a Cell Ranger `.h5` file, labels in a CSV file, data without labels or "
                "another number of donors, see [Recipes for your own data](#own-data-recipes).")
     paragraphs = [" ".join(par.split()) for par in section.strip().split("\n\n")]
@@ -356,8 +356,8 @@ def test_the_dataset_folder_section_points_to_the_recipes():
     assert section.index(link) < section.index('\n=== "') < section.index("\n??? note ")
     assert pointer in " ".join(_visible(section).split())
     # the link leads to the heading of the recipes, which follow in that order
-    assert re.search(r"^### Recipes for your own data \{ #own-data-recipes \}$", page, flags=re.M)
-    titles = re.findall(r"^#### (.+?) \{ #recipe-[a-z0-9-]+ \}$", page, flags=re.M)
+    assert re.search(r"^## Recipes for your own data \{ #own-data-recipes \}$", page, flags=re.M)
+    titles = re.findall(r"^### (.+?) \{ #recipe-[a-z0-9-]+ \}$", page, flags=re.M)
     assert titles == ["A 10x `.h5` file", "Labels in a CSV file", "No labels",
                       "Another number of donors"]
 
@@ -381,8 +381,9 @@ def test_10x_recipe_for_cite_seq(host, tmp_path, monkeypatch, capsys):
     _run_recipe_cell(fences[READ_10X], ns)
     assert re.search(rf"^{re.escape(kinds['adt'])} +20$", capsys.readouterr().out, flags=re.M)
     assert f'kind == "{kinds["adt"]}"' in fences[CITE]
-    _run_recipe_cell(fences[LABELS], ns)
-    _run_recipe_cell(fences[KEEP], ns)
+    csv = _fences("recipe-labels-csv")
+    _run_recipe_cell(csv[LABELS], ns)
+    _run_recipe_cell(csv[KEEP], ns)
     # "on the whole object it also renames an antibody that has the name of a gene"
     whole = _quiet(ns["adata"].copy)
     _quiet(whole.var_names_make_unique)
@@ -424,12 +425,11 @@ def test_10x_recipe_for_cite_seq(host, tmp_path, monkeypatch, capsys):
 ], ids=["multiome", "cite_seq"])
 def test_10x_recipe_without_labels(other, modality, fence, files, tmp_path, monkeypatch,
                                    capsys):
-    """The recipe says to skip the two label blocks without cell types, and
-    to leave the ``labels=`` line out of the export. The folder then has no
+    """The recipe says to leave the ``labels=`` line out of the export
+    without cell types. The folder then has no
     label file."""
-    _says("recipe-10x-h5", "Without cell types, skip the next two blocks and leave the "
-                           "`labels=` line out of the export below, as in "
-                           "[No labels](#recipe-no-labels).")
+    _says("recipe-10x-h5", "Without cell types, leave the `labels=` line out of the "
+                           "export below, as in [No labels](#recipe-no-labels).")
     monkeypatch.chdir(tmp_path)
     _tenx("filtered_feature_bc_matrix.h5", GENES, other, modality)
     fences, ns = _fences("recipe-10x-h5"), {"mtb": mtb}
@@ -440,7 +440,7 @@ def test_10x_recipe_without_labels(other, modality, fence, files, tmp_path, monk
     assert _quiet(ns["sc"].read_10x_h5, "filtered_feature_bc_matrix.h5").n_vars == len(GENES)
     # the second of the two blocks needs the column that the first one adds
     with pytest.raises(KeyError, match="celltype"):
-        _run_recipe_cell(fences[KEEP], ns)
+        _run_recipe_cell(_fences("recipe-labels-csv")[KEEP], ns)
     line = '                      labels="obs:celltype",\n'
     assert fences[fence].count(line) == 1
     _run_recipe_cell(fences[fence].replace(line, ""), ns)

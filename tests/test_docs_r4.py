@@ -53,18 +53,6 @@ def _step1_visible():
     return _flat("quickstart.md").split("## Step 1:", 1)[1].split("```", 1)[0]
 
 
-def _step1_all():
-    return _flat("quickstart.md").split("## Step 1:", 1)[1].split("## Step 2:", 1)[0]
-
-
-def _counts():
-    n_v = len(mtb.find_methods("vertical", modalities=["rna", "adt"]))
-    n_c = len(mtb.find_methods("cross", modalities=["rna", "adt"]))
-    stored = mtb.catalog.datasets().query("has_results").set_index("dataset").category
-    assert stored["D11"] == "vertical" and stored["D52"] == "cross"
-    return n_v, n_c
-
-
 # ---- R4-15: the laptop tab prints the dry-run command ----------------------
 def _laptop_tab():
     tab = _read("quickstart.md").split('=== "CITE-seq on a laptop"', 1)[1].split('\n=== "', 1)[0]
@@ -108,37 +96,17 @@ def test_laptop_tab_prints_the_totalvi_command_before_the_table(tmp_path, monkey
     plt.close("all")
 
 
-# ---- R4-16: two plain bullets visible, the counts in Step 1 Details ---------
+# ---- R4-16, then the 0.5.1 docs review: one line on donors, the recipe has the rest --------
 @needs_docs
-def test_step1_donor_block_is_two_plain_bullets():
+def test_step1_donor_advice_is_one_line_that_links_the_recipe():
     step1 = _step1_visible()
-    assert ("- 10x Multiome samples: use `vertical`. Keep all cells in one folder and "
-            "pass each cell's sample as `batch=` to `run` or `evaluate`.") in step1
-    assert ("- CITE-seq donors: use `vertical` in the same way. It takes any number of donors. "
-            "For `run`, `batch=` takes the donor column itself, such as "
-            "`batch=adata.obs[\"donor\"]`, not its name. The `cross` category integrates the "
-            "donors as batches and reads a fixed number of them, three for RNA + ADT: see "
-            "the [One file per batch](tutorials/run.md#your-own-data-as-a-dataset-folder) tab. With "
-            "another number of donors, use `vertical`, as in the recipe "
-            "[Another number of donors](tutorials/run.md#recipe-donors).") in step1
-    block = step1.split("For several samples or donors:", 1)[1]
-    assert "fit both" not in block and "(" not in block.replace("](", "").replace(".md#", "")
-    assert "stored table" not in block and "UINMF" not in block
-    run = _read("tutorials/run.md")
-    assert "### Your own data as a dataset folder" in run
-    section = run.split("### Your own data as a dataset folder", 1)[1].split("\n## ", 1)[0]
-    assert '=== "One file per batch"' in section and 'category="cross"' in section
-
-
-@needs_docs
-def test_step1_details_carry_the_donor_counts():
-    n_v, n_c = _counts()
-    details = _step1_all().split("```", 1)[1]           # after the first code block
-    assert (f"For CITE-seq donors, the `vertical` category has {n_v} RNA + ADT methods "
-            "and stored results on D11.") in details
-    assert (f"The `cross` category has {n_c} RNA + ADT methods, which integrate the donors "
-            "as batches, and stored results on D52.") in details
-    assert "These methods read batches 1-3." in details
+    assert ("Several samples or donors: use `vertical` and pass each cell's sample as "
+            "`batch=` to `run` or `evaluate` ([recipe](tutorials/run.md#recipe-donors)).") in step1
+    assert "For several samples or donors:" not in step1 and "cross" not in step1
+    recipe = " ".join(_read("tutorials/run.md").split("{ #recipe-donors }", 1)[1].split())
+    assert ("A cross method reads a fixed number of batches: three for RNA + ADT and for "
+            "RNA + ATAC, and two for ADT + ATAC and for RNA + ADT + ATAC.") in recipe
+    assert "`batch=` takes the column itself, not its name." in recipe
 
 
 # ---- R4-18: the ATAC override; one Multiome folder serves every method ------

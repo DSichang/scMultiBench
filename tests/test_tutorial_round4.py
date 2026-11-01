@@ -120,14 +120,12 @@ CPU_BUILDS = "CPU builds of the environments are installed"
 
 def _methods(name):
     key = name.removeprefix("tutorial_")
-    if key == "end_to_end":
-        return ["Matilda"]
     if key.endswith("_all"):
         return GEN.task_methods(key.removesuffix("_all"))
     return GEN.TASKS[key]["methods"]
 
 
-@pytest.mark.parametrize("name", TUTORIALS + EVERY + ["tutorial_end_to_end"])
+@pytest.mark.parametrize("name", TUTORIALS + EVERY)
 def test_the_colab_note_does_not_promise_a_cpu_build_of_every_environment(name):
     """The Colab note may say a CPU runtime gets the CPU builds only when
     every environment the notebook installs has one."""
@@ -160,11 +158,6 @@ def test_some_tutorial_environment_has_a_single_build():
 def test_troubleshooting_does_not_hand_out_the_dry_run_command_to_run_alone(name):
     md = _markdown(name)
     assert "prints the command to run there" not in md
-
-
-def test_end_to_end_does_not_say_the_printed_command_runs_on_its_own():
-    md = _markdown("tutorial_end_to_end")
-    assert "prepare the command on a laptop and run it on Linux" not in md
 
 
 def test_a_dry_run_command_alone_can_fail():

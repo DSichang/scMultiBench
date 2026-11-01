@@ -31,7 +31,6 @@ def _load_gen_tut():
 
 
 GEN = _load_gen_tut()
-E2E = "tutorial_end_to_end"
 GENERATED = [f"tutorial_{k}{suffix}" for k in GEN.TASKS for suffix in ("", "_all")
              if not suffix or GEN.has_all(k)]
 
@@ -52,7 +51,7 @@ def _quiet(fn, *a, **kw):
 
 
 # ------------------------------------- R5-11e: a dict in the default order
-@pytest.mark.parametrize("name", GENERATED + [E2E])
+@pytest.mark.parametrize("name", GENERATED)
 def test_no_tutorial_says_a_label_dict_is_read_in_the_default_order(name):
     assert "is read in the default order" not in _markdown(name)
 

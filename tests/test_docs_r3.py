@@ -66,33 +66,22 @@ def test_dry_run_line_is_on_the_quickstart_only():
 
 @needs_docs
 def test_intro_sends_each_data_shape_to_its_recipe():
-    """R3-22: one line per data shape, the non-CITE-seq ones straight to tutorials/run."""
+    """R3-22: one line per data shape; CITE-seq goes to its Colab tutorial (0.5.1 review),
+    the others straight to tutorials/run."""
     intro = _read("quickstart.md").split("??? note", 1)[0]
-    assert "- CITE-seq: see [Your own data](#your-own-data) below." in intro
+    assert ("- CITE-seq: the [RNA + ADT tutorial](tutorials/vertical_rna_adt.ipynb), which runs "
+            "in Colab.") in intro
     assert "(tutorials/run.md#your-own-data-as-a-dataset-folder)" in intro
 
 
 @needs_docs
-def test_step1_names_both_routes_for_citeseq_donors():
-    """R3-23: the counts on the page are the registry's. R4-16 keeps both
-    routes visible and moves the counts to the Step 1 Details block."""
+def test_step1_sends_donors_to_the_recipe():
+    """R3-23, then the 0.5.1 docs review: Step 1 names the vertical route in one line and
+    links the donors recipe, which names the cross route and its batch count."""
     step1 = _flat("quickstart.md").split("## Step 1:", 1)[1].split("```", 1)[0]
-    whole = _flat("quickstart.md").split("## Step 1:", 1)[1].split("## Step 2:", 1)[0]
-    n_v = len(mtb.find_methods("vertical", modalities=["rna", "adt"]))
-    n_c = len(mtb.find_methods("cross", modalities=["rna", "adt"]))
-    stored = mtb.catalog.datasets().query("has_results").set_index("dataset").category
-    assert stored["D11"] == "vertical" and stored["D52"] == "cross"
-    assert "CITE-seq donors: use `vertical` in the same way." in step1
-    assert ("The `cross` category integrates the donors as batches and reads a fixed number "
-            "of them, three for RNA + ADT: see the "
-            "[One file per batch](tutorials/run.md#your-own-data-as-a-dataset-folder) tab. With another "
-            "number of donors, use `vertical`, as in the recipe "
-            "[Another number of donors](tutorials/run.md#recipe-donors).") in step1
-    assert f"the `vertical` category has {n_v} RNA + ADT methods and stored results on D11" in whole
-    # cross has tasks without RNA + ADT since the article's 13 tasks: the
-    # sentence counts the methods that read the CITE-seq donors
-    assert (f"The `cross` category has {n_c} RNA + ADT methods, which integrate the donors as "
-            "batches") in whole
+    assert "(tutorials/run.md#recipe-donors)" in step1
+    recipe = " ".join(_read("tutorials/run.md").split("{ #recipe-donors }", 1)[1].split())
+    assert "three for RNA + ADT" in recipe and "treat the data as a vertical task" in recipe
 
 
 @needs_docs
@@ -102,10 +91,7 @@ def test_quickstart_batch_lines_name_run_all_as_the_guides_do():
     on evaluate, as tutorials/run and tutorials/discover do."""
     step1 = _flat("quickstart.md").split("## Step 1:", 1)[1].split("```", 1)[0]
     assert "`evaluate(batch=...)`" not in step1
-    assert "pass each cell's sample as `batch=` to `run` or `evaluate`." in step1
-    # R4-16: "in the same way" on the CITE-seq line refers to the Multiome line above it
-    assert step1.index("pass each cell's sample as `batch=` to `run` or `evaluate`.") \
-        < step1.index("CITE-seq donors: use `vertical` in the same way.")
+    assert "pass each cell's sample as `batch=` to `run` or `evaluate`" in step1
     assert "pass each cell's sample as `batch=` to `run` or `evaluate`." \
         in _flat("tutorials/discover.md")
 
@@ -124,9 +110,8 @@ def test_method_environment_details_have_no_bold_labels():
         .split("### Google Colab", 1)[0]
     assert "**" not in envs
     assert '??? note "Details: method scripts"' in envs
-    faq = _flat("faq.md")
-    assert "The method environments run only on Linux, so the install refuses here." in faq
-    assert "score embeddings and plot" not in faq
+    # 0.5.1: the FAQ repeated these entries and is gone (redirected to Troubleshooting)
+    assert not (_docs_root() / "faq.md").exists()
 
 
 # ---- guides: run and discover (R3-03, R3-19) -------------------------------
