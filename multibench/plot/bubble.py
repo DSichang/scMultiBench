@@ -662,7 +662,7 @@ def _fit_width(fig, ax, pad_pt=3.0, rounds=4):
 
 
 def bubble(long_df, *, metrics=None, methods=None, title=None, save=None):
-    """Draw the article's bubble table: methods as rows, metrics as columns.
+    """Draw the paper's bubble table: methods as rows, metrics as columns.
 
     Metrics are grouped into families, each led by an *Overall* bar. Rows run
     best first, in the order of ``mtb.rank(category, long_df=long_df,

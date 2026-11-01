@@ -584,7 +584,7 @@ def evaluate(embedding, labels=None, *, dataset: str | None = None,
              metrics=None, obsm: str | None = None, verbose: bool = True) -> pd.DataFrame:
     """Score an embedding with the benchmark's metrics.
 
-    The protocol is the article's: Leiden clusters searched to the number of
+    The protocol is the paper's: Leiden clusters searched to the number of
     cell types for ARI, NMI, ASW, iASW and iF1, and to the number of batches
     for ARI_batch and NMI_batch.
 

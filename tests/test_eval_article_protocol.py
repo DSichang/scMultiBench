@@ -1,4 +1,4 @@
-"""The article's clustering protocol (SINFONIA's ``get_N_clusters`` + scib_metrics.py).
+"""The paper's clustering protocol (SINFONIA's ``get_N_clusters`` + scib_metrics.py).
 
 ARI, NMI, ASW, iASW and iF1 score Leiden clusters searched to the number of
 cell types; ARI_batch and NMI_batch = 1 - |ARI| / 1 - |NMI| of clusters searched to
@@ -41,7 +41,7 @@ def test_the_search_keeps_the_last_clustering_when_it_cannot_reach_n(monkeypatch
             np.where(np.arange(adata.n_obs) % 2, f"a{len(seen)}", f"b{len(seen)}"))
 
     monkeypatch.setattr(S, "_leiden", two_clusters)
-    # Y11 (r3): the article's fallback, without a warning
+    # Y11 (r3): the paper's fallback, without a warning
     with warnings.catch_warnings():
         warnings.simplefilter("error", UserWarning)
         cl = S.leiden_n_clusters(emb, 5)

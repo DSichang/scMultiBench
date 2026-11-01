@@ -128,7 +128,7 @@ def _mlp(x, y, seed: int):
         return clf.fit(np.asarray(x, dtype=float), y)
 
 
-#: the columns of the frame classification_metrics() returns, in the article's order
+#: the columns of the frame classification_metrics() returns, in the paper's order
 METRICS = list(FAMILY_METRICS["classification"])
 
 

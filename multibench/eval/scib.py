@@ -1,7 +1,7 @@
 """scIB metric computation (clustering + batch), after upstream
 ``evaluation_pipelines/scib_metrics/scib_metrics.py``.
 
-The protocol is the article's: Leiden clusters searched to the number of cell
+The protocol is the paper's: Leiden clusters searched to the number of cell
 types (and of batches, for ARI_batch and NMI_batch); ASW, iASW and iF1 on those
 clusters.
 """
@@ -42,7 +42,7 @@ _CXX_FLAGS = ("-std=c++11", "-O3")
 #: (``verbose=None``): it then takes long enough to look like a hang
 _SWEEP_NOTICE_CELLS = 2000
 
-#: ``sinfonia.get_N_clusters``, which the article clusters with: the Leiden
+#: ``sinfonia.get_N_clusters``, which the paper clusters with: the Leiden
 #: resolution is bisected on this interval for at most this many steps
 _SEARCH_RANGE = (0.0, 3.0)
 _SEARCH_STEPS = 30
@@ -270,7 +270,7 @@ def _build_adata(emb, celltype, cluster, batch):
 
 
 def _clustering_graph(emb):
-    """An AnnData with the kNN graph the article clusters on (SINFONIA.py):
+    """An AnnData with the kNN graph the paper clusters on (SINFONIA.py):
     NaN read as 0, then ``sc.pp.neighbors`` with scanpy's defaults, which use
     the first 50 principal components of an embedding wider than 50."""
     import anndata as ad
@@ -308,7 +308,7 @@ def _search_n_clusters(adata, n: int, key: str, flavor: str) -> None:
 
 def _n_clusters(graph, n: int, flavor: str) -> np.ndarray:
     """The searched clusters of ``graph`` as strings: those of the last step when no
-    resolution gave ``n``, as the article's search."""
+    resolution gave ``n``, as the paper's search."""
     key = "_mb_search"
     _search_n_clusters(graph, n, key, flavor)
     out = np.asarray(graph.obs[key].astype(str))
@@ -319,7 +319,7 @@ def _n_clusters(graph, n: int, flavor: str) -> np.ndarray:
 def leiden_n_clusters(emb, n: int) -> np.ndarray:
     """Cluster an embedding with Leiden at the resolution that gives ``n`` clusters.
 
-    The article's clustering: a kNN graph with scanpy's defaults (on the
+    The paper's clustering: a kNN graph with scanpy's defaults (on the
     first 50 principal components when the embedding has more than 50
     dimensions), and the resolution bisected on [0, 3] for at most 30 steps
     until there are ``n`` clusters, as ``sinfonia.get_N_clusters``.
@@ -427,7 +427,7 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
         return [m for m in names if only is None or m in only]
 
     n_batches = int(adata.obs["batch"].nunique())
-    # the article's clusterings: one per cell type, and one per batch for
+    # the paper's clusterings: one per cell type, and one per batch for
     # ARI_batch and NMI_batch (scored only with two or more batches)
     search_ct = want_clu and cluster is None and bool(wanted(_CLUSTER_METRICS))
     search_bat = want_bat and n_batches >= 2 and bool(wanted(_BATCH_CLUSTER_METRICS))

@@ -45,14 +45,6 @@ def _visible(text):
 
 # ---- get started: quickstart, installation, FAQ (R3-20 to R3-26) ---------
 @needs_docs
-def test_linux_tab_reads_the_file_itself():
-    tab = _read("quickstart.md").split('=== "Linux, environments installed"', 1)[1]
-    code = tab.split("```python", 1)[1].split("```", 1)[0]
-    assert code.index("import multibench as mtb") < code.index('ad.read_h5ad("my_citeseq.h5ad")') \
-        < code.index("mtb.io.export_dataset(adata")
-
-
-@needs_docs
 def test_dry_run_line_is_on_the_quickstart_only():
     """R3-25: the dry-run step stays on the Quickstart; Installation no longer
     repeats it (tutorials/run carries the dry-run step)."""

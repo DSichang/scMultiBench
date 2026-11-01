@@ -80,7 +80,7 @@ class Settings:
         conda on ``PATH``, else ``~/.cache/multibench/envs``.
     leiden_flavor : str
         Leiden backend of the clustering in ``mtb.evaluate``: ``"leidenalg"``
-        (default, the article's and the stored results') or ``"igraph"``
+        (default, the paper's and the stored results') or ``"igraph"``
         (faster).
 
     Examples

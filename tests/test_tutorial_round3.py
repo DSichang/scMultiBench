@@ -75,7 +75,7 @@ def test_section_5_states_the_atac_form_where_the_task_reads_atac(key):
 
 
 def test_the_tasks_that_read_atac_are_the_ones_labelled_so():
-    """The article names two mosaic tasks by their pattern ("Mixed, with /
+    """The paper names two mosaic tasks by their pattern ("Mixed, with /
     without shared modality"); both hold an RNA + ATAC batch. Every other
     task that reads ATAC says so in its label."""
     mixed = {k for k, t in GEN.TASKS.items() if t["label"].startswith("Mixed, ")}
@@ -85,7 +85,7 @@ def test_the_tasks_that_read_atac_are_the_ones_labelled_so():
 
 
 def test_every_category_has_methods_that_read_atac():
-    """Since the article's tasks, cross has RNA + ATAC and ADT + ATAC tasks,
+    """Since the paper's tasks, cross has RNA + ATAC and ADT + ATAC tasks,
     so all four categories read ATAC (before: all but cross)."""
     import multibench as mtb
     cats = {t["cat"] for t in GEN.TASKS.values()}

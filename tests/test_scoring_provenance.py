@@ -2,7 +2,7 @@
 (study round 1, L37 and L40).
 
 The re-run rows are stamped with the package version that scored them
-(0.4.0, the article's protocol); the last test fails when shipped re-run tables carry another version stamp, so
+(0.4.0, the paper's protocol); the last test fails when shipped re-run tables carry another version stamp, so
 the docstrings cannot drift from the files silently.
 """
 import inspect

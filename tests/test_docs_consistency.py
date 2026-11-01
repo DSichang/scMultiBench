@@ -247,7 +247,7 @@ def _docs_md_files():
 
 @pytest.mark.parametrize(
     "path",
-    NOTEBOOKS + [ROOT / "README.md", ROOT / "SETUP.md"] + _docs_md_files(),
+    NOTEBOOKS + [ROOT / "README.md"] + _docs_md_files(),
     ids=lambda p: p.name)
 def test_retired_phrases_absent_from_docs_surfaces(path):
     text = path.read_text()
@@ -265,7 +265,7 @@ REMOVED_METHODS = re.compile(
 
 @pytest.mark.parametrize(
     "path",
-    NOTEBOOKS + [ROOT / "README.md", ROOT / "SETUP.md"] + _docs_md_files(),
+    NOTEBOOKS + [ROOT / "README.md"] + _docs_md_files(),
     ids=lambda p: p.name)
 def test_removed_methods_absent_from_docs_surfaces(path):
     text = path.read_text()

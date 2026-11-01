@@ -1,6 +1,6 @@
 """Pin the package's isolated-label F1 to scib's own implementation.
 
-The article's iF1 scores one clustering (the clusters searched to the number of
+The paper's iF1 scores one clustering (the clusters searched to the number of
 cell types). scib's ``isolated_labels_f1`` scores a precomputed clustering when
 ``obs[f"{cluster_key}_{resolution}"]`` holds it for every resolution it is
 given; this compares the two directly.

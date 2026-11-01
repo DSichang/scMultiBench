@@ -175,7 +175,7 @@ def test_bar_of_a_family_only_your_rows_have():
 
 # ---- restored from before the 0.4 cut: kept behaviour
 def _article(st, metrics):
-    """The article's score of a stored-only table, from the per-dataset max-ranks:
+    """The paper's score of a stored-only table, from the per-dataset max-ranks:
     mean over the datasets of minmax(mean rank), best first, ties by name."""
     rows = st[st["metric"].isin(metrics)] if metrics else st
     parts = {}
@@ -211,7 +211,7 @@ def test_overall(category, family, name):
         assert list(s.index).index(b) == list(s.index).index(a) + 1
     if st["metric"].isin(metrics or st["metric"]).any():
         alone = style.overall(st, metrics)
-        # stored-only tables reproduce today's numbers: the article's rule
+        # stored-only tables reproduce today's numbers: the paper's rule
         pd.testing.assert_series_equal(alone, _article(st, metrics), check_names=False)
         if name != "+copy stored":
             # stored scores and order are unchanged by what is added

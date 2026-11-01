@@ -145,7 +145,7 @@ def test_mosaic_and_cross_titles_say_what_the_methods_read():
         assert ("ATAC" in title) == _holds_atac(key), key
     assert not _holds_atac("mosaic_rna_adt")
     # the cross category has a task per set of modalities: each title names
-    # what every batch holds (before the article's tasks, every cross method
+    # what every batch holds (before the paper's tasks, every cross method
     # read RNA and ADT and the one title said so)
     holds = {"cross_rna_adt": "batches that each hold RNA and ADT.",
              "cross_rna_atac": "batches that each hold RNA and ATAC peaks.",

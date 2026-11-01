@@ -207,7 +207,7 @@ PINNED = {
             "online_iNMF|diagonal|rna+atac_gas", "scBridge|diagonal|(data_dir)",
             "scJoint|diagonal|rna+atac_gas",
             "sciCAN|diagonal|rna+atac_gas", "uniPort|diagonal|rna+atac_gas"],
-    # the variants of the article's 13 tasks: every method of the task of
+    # the variants of the paper's 13 tasks: every method of the task of
     # each dataset, in mosaic and cross
     "D45": ["Cobolt|mosaic|rna1+rna2+atac2+atac3", "MultiVI|mosaic|rna1+atac3+rna2+atac2",
             "Multigrate|mosaic|rna1+rna2+atac2+atac3", "SMILE|mosaic|rna2+atac2+rna1+atac3",

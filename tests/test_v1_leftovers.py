@@ -48,8 +48,8 @@ def test_the_quickstart_lines_for_counts_in_a_layer(tmp_path, monkeypatch, capsy
     """The two lines the laptop tab names for counts in a layer give the PCA of
     counts in X: X is logged once."""
     import matplotlib.pyplot as plt
-    tab = " ".join(_read("quickstart.md").split('=== "CITE-seq on a laptop"', 1)[1]
-                   .split('\n=== "', 1)[0].split())
+    tab = " ".join(_read("quickstart.md").split("### Your own data", 1)[1]
+                   .split("## Step 4", 1)[0].split())
     export, start = 'rna="layer:counts"', 'pc = sc.AnnData(adata.layers["counts"].copy())'
     assert f"pass `{export}` to `export_dataset`" in tab and f"`{start}`" in tab
     code = _laptop_tab()

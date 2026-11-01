@@ -128,7 +128,7 @@ def overall(df: pd.DataFrame, metrics=None, *, stored=None) -> pd.Series:
     the table has none): the number of stored values it reaches, plus 0.5 when
     it equals none. The mean rank over the metrics the stored rows have is
     min-max scaled with the stored rows' range (1 when they tie), then averaged
-    over the datasets. Stored rows so keep their article scores, a row equal to
+    over the datasets. Stored rows so keep their paper scores, a row equal to
     a stored row gets its score, and one better than all scores above 1.
 
     A stored row is marked stored (``source``) and is a row of the stored
@@ -254,7 +254,7 @@ def constant_columns(mat: pd.DataFrame) -> dict:
     return out
 
 
-#: the clusters part of a 0.4.0 ``scored_with``: the article's resolution
+#: the clusters part of a 0.4.0 ``scored_with``: the paper's resolution
 #: search, the user's own clusters, or none (classification only)
 SCORING_PROTOCOLS = ("search", "user", "none")
 #: first package version that scores with :data:`SCORING_PROTOCOLS`

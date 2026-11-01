@@ -543,7 +543,7 @@ def _labels_look_measured(values) -> tuple[int, int] | None:
 
 def _own_dtype(x) -> np.ndarray:
     """``x`` as an array at its own float dtype (float32 stays float32, as the
-    article's scripts read ``embedding.h5``); any other dtype as float."""
+    paper's scripts read ``embedding.h5``); any other dtype as float."""
     x = np.asarray(x.toarray() if hasattr(x, "toarray") else x)
     return x if np.issubdtype(x.dtype, np.floating) else x.astype(float)
 

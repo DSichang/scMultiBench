@@ -4,7 +4,7 @@ The owner's rule: two benchmark tasks and four removed methods are never
 mentioned where a user can see them - API return values, CLI help, and every
 text file the package ships (docstrings, YAML, CSV, drivers). This file pins
 that on the live objects, on the shipped files and on the docs surfaces
-(notebooks, SETUP.md, the notebook generator, and the site's source when it is
+(notebooks, the notebook generator, and the site's source when it is
 reachable), with four exceptions that are spelled out below and fail loudly
 when they go stale:
 
@@ -131,11 +131,11 @@ def test_pypi_page_and_metadata_stay_in_scope():
 # ---- docs surfaces outside the package ---------------------------------------
 def _docs_surfaces():
     """Text a user reads that lives outside the package tree: the notebooks,
-    SETUP.md and tools/gen_tut.py (which writes the notebooks); with
+    and tools/gen_tut.py (which writes the notebooks); with
     SCMULTIBENCH_DOCS=<docs dir> (the site's source is a separate repository)
     also every page, script and stylesheet of the site and its theme overrides."""
     paths = sorted((ROOT / "notebooks").glob("*.ipynb"))
-    paths += [ROOT / "SETUP.md", ROOT / "tools" / "gen_tut.py"]
+    paths += [ROOT / "tools" / "gen_tut.py"]
     docs = os.environ.get("SCMULTIBENCH_DOCS")
     if docs and Path(docs).is_dir():
         docs = Path(docs).resolve()

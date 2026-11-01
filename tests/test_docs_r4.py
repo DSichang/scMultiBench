@@ -55,10 +55,8 @@ def _step1_visible():
 
 # ---- R4-15: the laptop tab prints the dry-run command ----------------------
 def _laptop_tab():
-    tab = _read("quickstart.md").split('=== "CITE-seq on a laptop"', 1)[1].split('\n=== "', 1)[0]
-    code = tab.split("```python", 1)[1].split("```", 1)[0]
-    return "\n".join(line[4:] if line.startswith("    ") else line.lstrip()
-                     for line in code.splitlines())
+    section = _read("quickstart.md").split("### Your own data", 1)[1].split("## Step 4", 1)[0]
+    return section.split("```python", 1)[1].split("```", 1)[0]
 
 
 def _cite_adata(n_cells=400, n_genes=2500, n_adt=14, seed=0):

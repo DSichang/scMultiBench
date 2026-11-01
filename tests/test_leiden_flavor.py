@@ -125,7 +125,7 @@ def test_leidenalg_path_passes_no_flavor_keyword(monkeypatch):
 
 def test_shipped_default_is_leidenalg():
     """0.4: ``config.leiden_flavor`` defaults to ``"leidenalg"``, the
-    article's backend and the stored tables'; igraph stays selectable."""
+    paper's backend and the stored tables'; igraph stays selectable."""
     assert config.leiden_flavor == "leidenalg"
     config.leiden_flavor = "igraph"
     config.leiden_flavor = None                            # unset: the default again

@@ -37,7 +37,7 @@ from multibench.engine import registry  # noqa: E402
 _PKG = Path(__file__).resolve().parents[1]
 _REPO = _PKG.parent
 OUT = _PKG / "engine" / "params.yaml"
-# the package's own script copy first, then the article's, then the benchmark host's
+# the package's own script copy first, then the paper's, then the benchmark host's
 ROOTS = [str(_REPO), str(_REPO / "scMultiBench_ref"),
          "/media/disk2/Sichang/scmbench_pkg/scMultiBench_ref",
          "/media/disk2/Sichang/scmbench_tools"]
