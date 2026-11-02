@@ -94,6 +94,18 @@ def _no_stray_envs(request, monkeypatch):
     monkeypatch.setattr(envs, "other_env_prefix", lambda env, conda=None: None)
 
 
+# The envs folders earlier installs used live in the user's cache, and the
+# fallback folder may hold real envs: keep both out of every test but the
+# tests of that record, and keep installs from writing it.
+@_pytest.fixture(autouse=True)
+def _no_recorded_env_roots(request, tmp_path_factory, monkeypatch):
+    from multibench.engine import envs
+    monkeypatch.setattr(envs, "ROOTS_FILE",
+                        tmp_path_factory.mktemp("roots") / "envs_dirs.txt")
+    if request.node.fspath.basename != "test_env_roots.py":
+        monkeypatch.setattr(envs, "_known_roots", lambda: [])
+
+
 # ---- a run that reaches its subprocess --------------------------------------
 @_pytest.fixture
 def linux_with_envs(monkeypatch):

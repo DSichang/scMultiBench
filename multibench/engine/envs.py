@@ -22,7 +22,7 @@ from pathlib import Path
 
 import yaml
 
-from .. import _text
+from .. import _settings, _text
 
 from .._settings import config
 from . import registry
@@ -351,16 +351,57 @@ def made_by_multibench(prefix: Path | str, env: str | None = None) -> bool:
     return (prefix / FLAVOR_FILE).is_file() or _lockfile_build_record(prefix, env or prefix.name)
 
 
+#: The envs folders installs have used, one per line. The default envs_dir
+#: depends on the conda on PATH and on whether ``~/.conda`` exists (``conda
+#: create`` or ``conda run`` makes it), so a later session can resolve another
+#: folder; the envs are looked for in these folders too.
+ROOTS_FILE = _settings._CACHE / "envs_dirs.txt"
+
+
+def _remember_root(root: Path | str) -> None:
+    """Add ``root`` to :data:`ROOTS_FILE`. A cache that cannot be written only
+    loses the record: ``envs_dir`` still finds the env."""
+    root = Path(root).absolute()
+    try:
+        if root in _known_roots():
+            return
+        ROOTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(ROOTS_FILE, "a", encoding="utf-8") as f:
+            f.write(f"{root}\n")
+    except OSError:
+        pass
+
+
+def _known_roots() -> list[Path]:
+    """The folders of :data:`ROOTS_FILE`, then the fallback envs folder
+    (installs before the record was kept)."""
+    try:
+        lines = ROOTS_FILE.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        lines = []
+    return [Path(s) for s in lines if s.strip()] + [_settings._ENVS_FALLBACK]
+
+
+def _search_roots() -> list[Path]:
+    """Where an installed env is looked for, in order: ``mtb.config.envs_dir``,
+    then :func:`_known_roots`."""
+    return list(dict.fromkeys([Path(config.envs_dir), *_known_roots()]))
+
+
 def _same_named(env: str, conda: str | None = None):
-    """Every prefix named ``env``, lazily: ``<envs_dir>/<env>`` when it has
-    ``bin/`` (no conda asked), then those ``conda env list`` reports."""
-    candidate = Path(config.envs_dir) / env
-    if (candidate / "bin").is_dir():
-        yield candidate
+    """Every prefix named ``env``, lazily: ``<root>/<env>`` of each
+    :func:`_search_roots` folder when it has ``bin/`` (no conda asked), then
+    those ``conda env list`` reports."""
+    seen = []
+    for root in _search_roots():
+        candidate = root / env
+        if (candidate / "bin").is_dir():
+            seen.append(candidate)
+            yield candidate
     conda_exe = conda or _find_conda()
     if conda_exe is not None:
         for p in _conda_prefixes(conda_exe):
-            if os.path.basename(p.rstrip("/")) == env and Path(p) != candidate:
+            if os.path.basename(p.rstrip("/")) == env and Path(p) not in seen:
                 yield Path(p)
 
 
@@ -392,13 +433,14 @@ def _mark_built(env: str, conda: str | None, before: set) -> None:
     for p in _same_named(env, conda):
         if p not in before and p.is_dir():
             (p / FLAVOR_FILE).write_text("build\n")
+            _remember_root(p.parent)
 
 
 def env_prefix(env: str, conda: str | None = None) -> Path | None:
     """The prefix of the method env ``env`` multibench installed, or ``None``:
-    ``<mtb.config.envs_dir>/<env>``, else the one ``conda env list`` reports
-    (``conda`` = the conda/mamba to ask). An env of that name made by hand
-    is never used."""
+    ``<mtb.config.envs_dir>/<env>``, else one in a folder an earlier install
+    used, else the one ``conda env list`` reports (``conda`` = the conda/mamba
+    to ask). An env of that name made by hand is never used."""
     for p in _same_named(env, conda):
         if made_by_multibench(p, env):
             return p
@@ -670,6 +712,7 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
         # last, so a prefix that failed to unpack claims no flavour
         (dest / FLAVOR_FILE).write_text(
             ("single" if build == "single" else installed) + "\n")
+        _remember_root(envs_root)
         _conda_prefixes.cache_clear()
         return True
     except BaseException as e:  # noqa: BLE001 - degrade to the lockfile build
@@ -699,9 +742,9 @@ def _conda_unpack(prefix: Path) -> None:
 
 
 def _all_prefixes(conda: str | None = None) -> list[tuple[str, Path]]:
-    """``(name, prefix)`` of every env under ``envs_dir``, then of those
-    ``conda`` lists."""
-    out = list(_prefixes_on_disk(Path(config.envs_dir)).items())
+    """``(name, prefix)`` of every env under the :func:`_search_roots`
+    folders, then of those ``conda`` lists."""
+    out = [item for root in _search_roots() for item in _prefixes_on_disk(root).items()]
     conda_exe = conda or _find_conda()
     if conda_exe is not None:
         for p in _conda_prefixes(conda_exe):
@@ -713,8 +756,8 @@ def _all_prefixes(conda: str | None = None) -> list[tuple[str, Path]]:
 
 def installed_envs(conda: str | None = None) -> list[str]:
     """Names of the envs :func:`env_prefix` would find: those multibench
-    installed (:func:`made_by_multibench`), under ``envs_dir`` first, then
-    those ``conda`` lists, without duplicates."""
+    installed (:func:`made_by_multibench`), under the :func:`_search_roots`
+    folders first, then those ``conda`` lists, without duplicates."""
     return list(dict.fromkeys(name for name, p in _all_prefixes(conda)
                               if made_by_multibench(p, name)))
 

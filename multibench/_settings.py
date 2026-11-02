@@ -16,6 +16,9 @@ _IN_REPO = (_ROOT / "pyproject.toml").is_file()
 _CACHE = (Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
           / "multibench")
 _BASE = _ROOT if _IN_REPO else _CACHE
+#: Where the method envs go when neither ``envs_dir``, ``MULTIBENCH_ENVS_DIR`` nor
+#: a writable conda envs folder names a place.
+_ENVS_FALLBACK = _CACHE / "envs"
 
 #: The package's own tables (the stored results, the dataset and metric lists):
 #: read by the package, not settings.
@@ -125,7 +128,7 @@ class Settings:
     @property
     def envs_dir(self) -> Path:
         return (self._envs_dir or _from_env(ENVS_DIR_VAR) or _conda_envs_dir()
-                or _CACHE / "envs")
+                or _ENVS_FALLBACK)
 
     @envs_dir.setter
     def envs_dir(self, value):
