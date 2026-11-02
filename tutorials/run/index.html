@@ -1,0 +1,3013 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A benchmark of single-cell multimodal integration methods. The multibench package runs 36 of them from Python and scores their output.">
+      
+      
+        <meta name="author" content="PYangLab">
+      
+      
+        <link rel="canonical" href="https://dsichang.github.io/scMultiBench/tutorials/run/">
+      
+      
+        <link rel="prev" href="../discover/">
+      
+      
+        <link rel="next" href="../evaluate/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/m3-logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Run a method - scMultiBench</title>
+      
+    
+    
+  
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+  <style>
+    /* Colab-button styling shipped INLINE with the page HTML (not via the
+       separately-cached extra.css), so a stale cached stylesheet can't revert
+       it. Absolute (not float) so it doesn't squeeze mkdocs-jupyter's
+       .jp-Notebook narrower, and above the .jupyter-wrapper so it stays
+       clickable. Same pattern as the M3 / Matilda sites. */
+    .md-typeset a.colab-button { position: absolute; top: 0.2rem; right: 0; z-index: 3; margin: 0; line-height: 0; }
+    .md-typeset a.colab-button img { height: 1.55rem; width: auto; display: block; }
+    /* a notebook page's title wraps before the button instead of running
+       under it (a markdown page's title is kept clear by extra.css); on a
+       narrow screen the button sits on its own line above the title */
+    .md-typeset:has(> a.colab-button) > .jupyter-wrapper h1 { padding-right: 9.5rem; }
+    /* the notebook title starts below the cell padding (px) and the h1
+       margin (rem): centre the button on the title's first line */
+    .md-typeset:has(> .jupyter-wrapper) > a.colab-button { top: calc(35px + 0.4rem); }
+    @media screen and (max-width: 59.9375em) {
+      .md-typeset a.colab-button { position: static; display: inline-block; margin-bottom: 0.6rem; }
+      .md-typeset:has(> a.colab-button) > .jupyter-wrapper h1 { padding-right: 0; }
+      /* a notebook page indents its cells: the button lines up with the title */
+      .md-typeset:has(> .jupyter-wrapper) > a.colab-button { margin-left: 15px; }
+    }
+  </style>
+
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#run-a-method" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="https://pyanglab.github.io/MultiTaskOmics/" title="scMultiBench" class="md-header__button md-logo" aria-label="scMultiBench" data-md-component="logo">
+      
+  <img src="../../assets/m3-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            scMultiBench
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Run a method
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/PYangLab/scMultiBench" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PYangLab/scMultiBench
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../installation/" class="md-tabs__link">
+          
+  
+  
+  Get started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../vertical_rna_adt/" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../overview/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  How scMultiBench works
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../api/" class="md-tabs__link">
+          
+  
+  
+  API reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../shiny/" class="md-tabs__link">
+          
+  
+  
+  Resources
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="https://pyanglab.github.io/MultiTaskOmics/" title="scMultiBench" class="md-nav__button md-logo" aria-label="scMultiBench" data-md-component="logo">
+      
+  <img src="../../assets/m3-logo.png" alt="logo">
+
+    </a>
+    scMultiBench
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/PYangLab/scMultiBench" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    PYangLab/scMultiBench
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Get started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Get started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../discover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Discover methods
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run a method
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run a method
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#install-the-methods-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install the method's environment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-run-returns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What run returns
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inputs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Inputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#folder-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dataset folder layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#your-own-data-as-a-dataset-folder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Your own data as a dataset folder
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#own-data-recipes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recipes for your own data
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Recipes for your own data">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#recipe-10x-h5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A 10x .h5 file
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recipe-labels-csv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Labels in a CSV file
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recipe-no-labels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        No labels
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recipe-donors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Another number of donors
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gpu-or-cpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GPU or CPU?
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Score an embedding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Load and plot results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_1" id="__nav_3_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Vertical integration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Vertical integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../vertical_rna_adt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RNA + ADT
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../vertical_rna_atac/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RNA + ATAC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../vertical_rna_adt_atac/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    RNA + ADT + ATAC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diagonal integration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Diagonal integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diagonal_rna_atac/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    [RNA, ATAC]
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../diagonal_multi/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    [multiple RNA, multiple ATAC]
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mosaic integration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Mosaic integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mosaic_rna_adt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    [RNA, RNA + ADT, ADT]
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mosaic_rna_atac/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    [RNA, RNA + ATAC, ATAC]
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mosaic_shared/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mixed, with shared modality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mosaic_unshared/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Mixed, without shared modality
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_4" id="__nav_3_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross integration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Cross integration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cross_rna_adt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multiple RNA + ADT
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cross_rna_atac/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multiple RNA + ATAC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cross_adt_atac/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multiple ADT + ATAC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cross_rna_adt_atac/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multiple RNA + ADT + ATAC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How scMultiBench works
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/discover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Methods
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/run/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Run
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/score/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics (evaluate)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/compare/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics (stored results)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/plot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Figures (mtb.plot)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/io/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data I/O (mtb.io)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets (mtb.data)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/catalog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Catalog (mtb.catalog)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/env/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Environments (mtb.env)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration (mtb.config)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resources
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Resources
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../shiny/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Interactive explorer (Shiny)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../citation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Citation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#install-the-methods-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Install the method's environment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-run-returns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What run returns
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#inputs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inputs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Inputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#folder-layout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dataset folder layout
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#your-own-data-as-a-dataset-folder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Your own data as a dataset folder
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#own-data-recipes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recipes for your own data
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Recipes for your own data">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#recipe-10x-h5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A 10x .h5 file
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recipe-labels-csv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Labels in a CSV file
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recipe-no-labels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        No labels
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recipe-donors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Another number of donors
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gpu-or-cpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GPU or CPU?
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+                  
+
+
+  
+  
+
+
+<h1 id="run-a-method">Run a method<a class="headerlink" href="#run-a-method" title="Anchor link to this section">&para;</a></h1>
+<p><a href="../../reference/run/#multibench.workflow.run"><code>mtb.run</code></a> runs the
+methods you name on a dataset folder, each in its own environment, scores
+each output and saves the results. <code>methods=["SCALEX"]</code> runs one method.</p>
+<p>Methods run only on Linux. On macOS and Windows,
+<code>mtb.scan(dataset, category, command=True)</code> returns the plan with each
+command. Run the call itself on the Linux machine.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">fetch</span><span class="p">(</span><span class="s2">"D28"</span><span class="p">)</span>                  <span class="c1"># 137 MB; skipped when already present</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">"D28"</span><span class="p">,</span> <span class="s2">"diagonal"</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s2">"SCALEX"</span><span class="p">],</span> <span class="n">out_dir</span><span class="o">=</span><span class="s2">"runs/"</span><span class="p">)</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">res</span><span class="o">.</span><span class="n">summary</span>                            <span class="c1"># status, run time and every score</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">emb</span> <span class="o">=</span> <span class="n">res</span><span class="o">.</span><span class="n">embedding</span><span class="p">(</span><span class="s2">"SCALEX"</span><span class="p">)</span>          <span class="c1"># AnnData: obsm["X_emb"], 11014 x 10</span>
+</span></code></pre></div>
+<details class="note">
+<summary>Details</summary>
+<p><code>run</code> finds the version of the method that fits the category and
+the files of the folder, converts the files if needed, runs the method
+script in <code>&lt;out_dir&gt;/&lt;method&gt;_&lt;dataset&gt;/</code> and scores its output.</p>
+<p><code>mtb.scan</code> creates no files: with <code>command=True</code> its <code>command</code> column
+holds each command, with <code>&lt;out_dir&gt;</code> for the output folder.</p>
+<p>Some commands read a file that <code>run</code> writes first under
+<code>&lt;out_dir&gt;/&lt;method&gt;_&lt;dataset&gt;/inputs/</code>, such as a converted AnnData or
+the renamed peak file of GLUE and Seurat_v3. The <code>caveat</code> column of
+<code>scan</code> says so. Call <code>mtb.run</code> in the job for those methods, not the
+command alone.</p>
+<p><code>params={"SCALEX": {...}}</code> sets hyperparameters: <code>mtb.params_for</code>
+lists them. For several values of one hyperparameter, loop over
+<code>run</code>, one <code>out_dir</code> per value, and name each run's rows:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">runs</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">30</span><span class="p">,</span> <span class="mi">50</span><span class="p">):</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">r</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">"D28"</span><span class="p">,</span> <span class="s2">"diagonal"</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s2">"scJoint"</span><span class="p">],</span> <span class="n">out_dir</span><span class="o">=</span><span class="sa">f</span><span class="s2">"runs/e</span><span class="si">{</span><span class="n">v</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>                <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">"scJoint"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"epochs_stage1"</span><span class="p">:</span> <span class="n">v</span><span class="p">}})</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">runs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">long</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span><span class="n">method</span><span class="o">=</span><span class="sa">f</span><span class="s2">"scJoint epochs=</span><span class="si">{</span><span class="n">v</span><span class="si">}</span><span class="s2">"</span><span class="p">))</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">runs</span><span class="p">))</span>
+</span></code></pre></div>
+</details>
+<hr />
+<h2 id="install-the-methods-environment">Install the method's environment<a class="headerlink" href="#install-the-methods-environment" title="Anchor link to this section">&para;</a></h2>
+<p>Install the method's environment before its first run.
+<code>mtb.env.install(["SCALEX"], dry_run=True)</code> lists what is installed and what
+is missing, with the download sizes.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="s2">"SCALEX"</span><span class="p">)[</span><span class="s2">"env"</span><span class="p">]</span>                <span class="c1"># 'scmb_torch'</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">install</span><span class="p">([</span><span class="s2">"SCALEX"</span><span class="p">])</span>
+</span></code></pre></div>
+<details class="note">
+<summary>Details</summary>
+<p>A missing environment marks the method not runnable in <code>mtb.scan</code>, and
+<code>run</code> skips it. Off Linux the reason says that methods run only on
+Linux.</p>
+<p><code>mtb.env.install</code> downloads a prebuilt environment. Installed ones are
+skipped.</p>
+<p>GLUE reads the GENCODE v43 human annotation, which its first run
+downloads, and MIRA a <code>logger.py</code>, which the package puts next to its
+script. GLUE runs its human script only, so mouse data does not run
+through the package. <code>mtb.method_info(m)["setup_hint"]</code> holds these
+notes, and the <code>caveat</code> column of <code>scan</code> lists them.</p>
+</details>
+<hr />
+<h2 id="what-run-returns">What <code>run</code> returns<a class="headerlink" href="#what-run-returns" title="Anchor link to this section">&para;</a></h2>
+<p><code>res</code> is a <code>RunResult</code>. <code>res.summary</code> has one row per method: its status,
+run time and scores, and its <code>reason</code> column says why a method failed or
+was skipped.
+<code>res.embedding(method)</code> returns the method's embedding as an AnnData, in the
+method's cell order: <code>obsm["X_emb"]</code>, and in <code>obs</code> each cell's <code>label</code>, and
+its <code>batch</code> when the run had more than one batch (the label file of each
+cell, or the <code>batch=</code> of <code>run</code>). The cell names are the barcodes of the
+dataset files. Where two files share a barcode, each name starts with its
+label file, such as <code>cty2:AAACCTGAG...</code>.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">res</span><span class="o">.</span><span class="n">summary</span><span class="p">[</span><span class="n">res</span><span class="o">.</span><span class="n">summary</span><span class="o">.</span><span class="n">status</span> <span class="o">!=</span> <span class="s2">"scored"</span><span class="p">]</span>   <span class="c1"># empty when every method scored</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">emb</span> <span class="o">=</span> <span class="n">res</span><span class="o">.</span><span class="n">embedding</span><span class="p">(</span><span class="s2">"SCALEX"</span><span class="p">)</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">emb</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>                     <span class="c1"># label, and batch, per cell</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">res</span><span class="o">.</span><span class="n">long</span>                           <span class="c1"># the scores, as the long table</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_run</span><span class="p">(</span><span class="s2">"runs/"</span><span class="p">)</span>        <span class="c1"># the same result, later</span>
+</span></code></pre></div>
+<p><code>run</code> also writes the cell names into each <code>embedding.h5</code>, as the dataset
+<code>barcodes</code>, so <code>mtb.evaluate</code> and <code>mtb.io.read</code> find each cell of
+the file by its name.</p>
+<details class="note">
+<summary>Details</summary>
+<p><code>res.records</code> holds one dict per method: its <code>status</code>, <code>params_used</code>,
+<code>run_sec</code>, <code>reused</code> (<code>True</code> when <code>skip_existing=True</code> reused a saved
+output), the label files its scores used (<code>labels_used</code>) and the run's
+provenance. Five methods put the cells in another order than <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> before <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> and
+<code>cty1, cty2, ...</code>. uniPort and Seurat_v5 put the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> cells first.
+StabMap puts its reference batch first, in <code>cross</code> and in the <code>mosaic</code>
+patterns that start with an <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>-only batch. SMILE and MultiVI in
+<code>mosaic</code> use their own batch order. <code>embedding(method)</code> and
+<code>mtb.evaluate(..., dataset=, method=)</code> follow that order.</p>
+<p><code>method_info(m)["supports"]</code> gives each variant's <code>output_kind</code>,
+<code>embedding</code> or <code>graph</code>. Embedding metrics such as ASW do not apply to
+a graph. <code>run</code> scores scMoMaT through the <abbr title="Uniform Manifold Approximation and Projection">UMAP</abbr> embedding that
+scMoMaT also writes. MIRA and Seurat_WNN get the status <code>ran</code>, and the
+reason says that they write a graph.</p>
+<p><code>res.rescore(batch=..., labels=..., metrics=...).save()</code> scores the saved
+outputs again and writes the new scores. <code>metrics=</code> replaces those scores
+and keeps the others. No method runs again.</p>
+</details>
+<hr />
+<h2 id="inputs">Inputs<a class="headerlink" href="#inputs" title="Anchor link to this section">&para;</a></h2>
+<p>A dataset folder holds one file per role: a role is the name of one input,
+such as <code>rna</code>, <code>atac_gas</code> or <code>cty</code>, the label file.
+<a href="#folder-layout">Dataset folder layout</a> lists the file names, and
+<code>mtb.scan(dataset, category)</code> says which methods can run on a folder, and
+why not the rest.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="s2">"SCALEX"</span><span class="p">)[</span><span class="s2">"supports"</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">"modalities"</span><span class="p">]</span>   <span class="c1"># ['rna', 'atac_gas']</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="s2">"D28"</span><span class="p">,</span> <span class="s2">"diagonal"</span><span class="p">)</span>
+</span></code></pre></div>
+<details class="note">
+<summary>Details</summary>
+<p>Each entry of <code>supports</code> is one variant: the version of a method for
+one category and one set of roles. For a method with several variants,
+<code>run</code> runs the one with the most of the folder's modalities.
+<code>modalities=["rna", "adt"]</code> picks another.</p>
+<p><code>scan</code> checks that each file is there, that no matrix is transposed,
+that each label file has as many rows as its matrix, and that files that
+must hold the same cells do. Its <code>reason</code> column names what is wrong.</p>
+</details>
+<h3 id="folder-layout">Dataset folder layout<a class="headerlink" href="#folder-layout" title="Anchor link to this section">&para;</a></h3>
+<p>Put the files of one dataset in one folder, <code>&lt;data_path&gt;/&lt;DATASET&gt;/</code>, for
+example <code>data/MYDATA/</code>. The folder name is the dataset name.
+<code>mtb.io.export_dataset</code> writes the folder from an AnnData or MuData.</p>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Files</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vertical</code></td>
+<td><code>rna.h5</code> with <code>adt.h5</code>, <code>atac.h5</code> or both, from the same cells, and <code>cty.csv</code></td>
+</tr>
+<tr>
+<td><code>diagonal</code></td>
+<td><code>rna.h5</code> and <code>rna_cty.csv</code> for the <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> cells, <code>atac_peak.h5</code>, <code>atac_gas.h5</code> or both, and <code>atac_cty.csv</code> for the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> cells</td>
+</tr>
+<tr>
+<td><code>mosaic</code></td>
+<td>one file per batch and modality, numbered by batch (<code>rna1.h5</code>, <code>rna2.h5</code>, <code>atac2.h5</code> ...), and one label file per batch (<code>cty1.csv</code>, <code>cty2.csv</code> ...)</td>
+</tr>
+<tr>
+<td><code>cross</code></td>
+<td>as mosaic, with <code>atac_peak1.h5</code>, <code>atac_peak2.h5</code> ... for <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr></td>
+</tr>
+</tbody>
+</table>
+<p>Each <code>.h5</code> file holds <code>matrix/data</code> (features x cells, the transpose of
+<code>AnnData.X</code>), <code>matrix/features</code> and <code>matrix/barcodes</code>. A label file is a
+one-column CSV: a header line, then one label per cell, in the order of the
+cells.</p>
+<p>Vertical, mosaic and cross methods read <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> as peaks. In diagonal,
+<code>atac_peak.h5</code> holds peaks and <code>atac_gas.h5</code> gene-activity scores of the
+same cells, and each method reads one of them or both:</p>
+<table>
+<thead>
+<tr>
+<th><abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> files</th>
+<th>Diagonal methods</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>both</td>
+<td>MultiMAP, Seurat_v3</td>
+</tr>
+<tr>
+<td><code>atac_peak.h5</code></td>
+<td>Seurat_v5, GLUE</td>
+</tr>
+<tr>
+<td><code>atac_gas.h5</code></td>
+<td>SCALEX, scBridge, VIPCCA, Portal, uniPort, sciCAN, scJoint, iNMF, online_iNMF, Conos</td>
+</tr>
+</tbody>
+</table>
+<p>For several <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and several <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> batches in diagonal, scJoint, GLUE, iNMF
+and online_iNMF read exactly 3 of each, numbered <code>rna1.h5</code>, <code>atac_gas1.h5</code> or
+<code>atac_peak1.h5</code>, <code>rna_cty1.csv</code> and <code>atac_cty1.csv</code>, then 2 and 3. For another
+number of batches, such as 2 donors, write one <code>rna.h5</code> and one <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file with
+every cell, and pass the batches as <code>run(batch=...)</code>, one per <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>
+cell, as in <a href="#recipe-donors">Another number of donors</a>.</p>
+<p>Number your mosaic or cross batches to match one of these patterns:</p>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Batch 1</th>
+<th>Batch 2</th>
+<th>Batch 3</th>
+<th>Methods</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>mosaic</td>
+<td>rna</td>
+<td>rna+adt</td>
+<td>adt</td>
+<td>Multigrate, scMoMaT, StabMap</td>
+</tr>
+<tr>
+<td>mosaic</td>
+<td>rna</td>
+<td>rna+atac</td>
+<td>atac</td>
+<td>Multigrate, MultiVI, Cobolt, scMoMaT, SMILE, StabMap</td>
+</tr>
+<tr>
+<td>mosaic</td>
+<td>rna+adt</td>
+<td>rna+atac</td>
+<td>rna</td>
+<td>Multigrate, scMoMaT, StabMap, UINMF</td>
+</tr>
+<tr>
+<td>mosaic</td>
+<td>rna+adt</td>
+<td>rna+atac</td>
+<td>adt</td>
+<td>Multigrate, scMoMaT, StabMap</td>
+</tr>
+<tr>
+<td>cross</td>
+<td>rna+adt</td>
+<td>rna+adt</td>
+<td>rna+adt</td>
+<td>Multigrate, totalVI, scMM, scMDC, scMoMaT, Concerto, sciPENN, StabMap, UINMF, MOFA2</td>
+</tr>
+<tr>
+<td>cross</td>
+<td>rna+atac</td>
+<td>rna+atac</td>
+<td>rna+atac</td>
+<td>Multigrate, scMM, scMDC, scMoMaT, UnitedNet, StabMap, UINMF, MOFA2</td>
+</tr>
+<tr>
+<td>cross</td>
+<td>adt+atac</td>
+<td>adt+atac</td>
+<td></td>
+<td>Multigrate, scMoMaT, StabMap, UINMF, MOFA2</td>
+</tr>
+<tr>
+<td>cross</td>
+<td>rna+adt+atac</td>
+<td>rna+adt+atac</td>
+<td></td>
+<td>Multigrate, scMoMaT, StabMap, UINMF, MOFA2</td>
+</tr>
+<tr>
+<td>cross</td>
+<td>rna+adt</td>
+<td>rna+adt</td>
+<td></td>
+<td>UINMF</td>
+</tr>
+<tr>
+<td>cross</td>
+<td>rna+atac</td>
+<td>rna+atac</td>
+<td></td>
+<td>UINMF</td>
+</tr>
+</tbody>
+</table>
+<h2 id="your-own-data-as-a-dataset-folder">Your own data as a dataset folder<a class="headerlink" href="#your-own-data-as-a-dataset-folder" title="Anchor link to this section">&para;</a></h2>
+<p><code>mtb.io.export_dataset</code> writes an AnnData or MuData as a dataset folder,
+which <code>scan</code> and <code>run</code> read.</p>
+<p>For a Cell Ranger <code>.h5</code> file, labels in a CSV file, data without labels or
+another number of donors, see
+<a href="#own-data-recipes">Recipes for your own data</a>.</p>
+<p>Give raw counts for <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>, <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> and peaks. The methods normalise the data
+themselves. The folder stores each matrix dense, so drop genes or peaks
+you do not need first.</p>
+<p>With <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>, set <code>atac_kind=</code> to <code>"peak"</code> or <code>"gene_activity"</code>. Most methods
+read one of the two, and <code>method_info(m)["atac"]</code> names it. MultiMAP and
+Seurat_v3 read both. <code>scan</code> and <code>run</code> skip a method whose file holds
+the other one, also when <code>methods=</code> names it.</p>
+<p>For <abbr title="Cellular Indexing of Transcriptomes and Epitopes by sequencing">CITE-seq</abbr>, section 5 of the <a href="../vertical_rna_adt/"><abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> tutorial</a>
+writes the folder. Other layouts:</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:3"><input checked="checked" id="10x-multiome-mudata" name="__tabbed_1" type="radio" /><input id="unpaired-rna--atac" name="__tabbed_1" type="radio" /><input id="one-file-per-batch" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="10x-multiome-mudata">10x Multiome (MuData)</label><label for="unpaired-rna--atac">Unpaired <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr></label><label for="one-file-per-batch">One file per batch</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">mudata</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">md</span>      <span class="c1"># pip install mudata</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">mdata</span> <span class="o">=</span> <span class="n">md</span><span class="o">.</span><span class="n">read_h5mu</span><span class="p">(</span><span class="s2">"my_multiome.h5mu"</span><span class="p">)</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># labels in mdata.obs; use rna:celltype for mdata["rna"].obs</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">mdata</span><span class="p">,</span> <span class="s2">"data/MYMULTIOME"</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="s2">"rna"</span><span class="p">,</span> <span class="n">atac</span><span class="o">=</span><span class="s2">"atac"</span><span class="p">,</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>                      <span class="n">atac_kind</span><span class="o">=</span><span class="s2">"peak"</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="s2">"obs:celltype"</span><span class="p">,</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>                      <span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">)</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="n">mtb</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="s2">"data/MYMULTIOME"</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"rna"</span><span class="p">,</span> <span class="s2">"atac"</span><span class="p">])</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="c1"># on Linux: the RNA + ATAC methods; batch = the sample of each cell</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">"data/MYMULTIOME"</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="n">out_dir</span><span class="o">=</span><span class="s2">"out/"</span><span class="p">,</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>              <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"rna"</span><span class="p">,</span> <span class="s2">"atac_peak"</span><span class="p">],</span> <span class="n">batch</span><span class="o">=</span><span class="n">mdata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s2">"sample"</span><span class="p">])</span>
+</span></code></pre></div>
+<p>Keep all samples in one folder and pass each cell's sample as <code>batch=</code>.
+<code>atac_peak</code> keeps the methods that read <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> peaks. Every
+vertical method that reads <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> reads peaks.</p>
+</div>
+<div class="tabbed-block">
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">anndata</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ad</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">rna</span> <span class="o">=</span> <span class="n">ad</span><span class="o">.</span><span class="n">read_h5ad</span><span class="p">(</span><span class="s2">"lung_rna.h5ad"</span><span class="p">)</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">atac</span> <span class="o">=</span> <span class="n">ad</span><span class="o">.</span><span class="n">read_h5ad</span><span class="p">(</span><span class="s2">"lung_atac.h5ad"</span><span class="p">)</span>     <span class="c1"># other cells than rna</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">rna</span><span class="p">,</span> <span class="s2">"data/LUNG"</span><span class="p">,</span> <span class="n">atac</span><span class="o">=</span><span class="n">atac</span><span class="p">,</span> <span class="n">atac_kind</span><span class="o">=</span><span class="s2">"peak"</span><span class="p">,</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>                      <span class="n">labels</span><span class="o">=</span><span class="s2">"obs:cell_type"</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">"diagonal"</span><span class="p">)</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="n">peak_methods</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="s2">"diagonal"</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"atac_peak"</span><span class="p">])</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="n">mtb</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="s2">"data/LUNG"</span><span class="p">,</span> <span class="s2">"diagonal"</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="n">peak_methods</span><span class="p">)</span>
+</span></code></pre></div>
+<p><code>scan</code> checks the four methods that read peaks. With peaks alone, only
+GLUE passes the file check. To add gene activity, see
+<a href="../discover/#my-atac-is-peaks-only">My <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> is peaks only</a>.</p>
+</div>
+<div class="tabbed-block">
+<p>A mosaic or cross dataset can arrive as one file per batch. Here
+<code>cite</code>, <code>multiome</code> and <code>rna_only</code> hold one batch each.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">kw</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">labels</span><span class="o">=</span><span class="s2">"obs:cell_type"</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">"mosaic"</span><span class="p">)</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">cite</span><span class="p">,</span> <span class="s2">"data/LAB"</span><span class="p">,</span> <span class="n">adt</span><span class="o">=</span><span class="s2">"obsm:protein"</span><span class="p">,</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>                      <span class="n">batch_index</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">multiome</span><span class="p">,</span> <span class="s2">"data/LAB"</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="s2">"rna"</span><span class="p">,</span> <span class="n">atac</span><span class="o">=</span><span class="s2">"atac"</span><span class="p">,</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>                      <span class="n">atac_kind</span><span class="o">=</span><span class="s2">"peak"</span><span class="p">,</span> <span class="n">batch_index</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">rna_only</span><span class="p">,</span> <span class="s2">"data/LAB"</span><span class="p">,</span> <span class="n">batch_index</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="n">mtb</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="s2">"data/LAB"</span><span class="p">,</span> <span class="s2">"mosaic"</span><span class="p">)</span>
+</span></code></pre></div>
+<p><code>batch_index=N</code> writes the whole object as batch N. Number the batches
+to match a pattern the methods read, as
+<a href="#folder-layout">Dataset folder layout</a> lists them. For cross, write each donor file the same way with
+<code>category="cross"</code>. One file with a donor column is split by <code>batch=</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="s2">"data/MYCITE3"</span><span class="p">,</span> <span class="n">adt</span><span class="o">=</span><span class="s2">"obsm:protein"</span><span class="p">,</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>                      <span class="n">labels</span><span class="o">=</span><span class="s2">"obs:celltype"</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="s2">"obs:donor"</span><span class="p">,</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>                      <span class="n">category</span><span class="o">=</span><span class="s2">"cross"</span><span class="p">)</span>
+</span></code></pre></div>
+<p>The cross methods for <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> read batches 1-3.
+<a href="#folder-layout">Dataset folder layout</a> lists every batch pattern.</p>
+</div>
+</div>
+</div>
+<details class="note">
+<summary>Details: files and labels</summary>
+<p><code>mtb.io.read</code> reads a file of the folder back as an AnnData.</p>
+<p>A label file is a one-column CSV: a header line <code>x</code>, then one label
+per cell, for example
+<code>pd.Series(labels, name="x").to_csv(path, index=False)</code>.</p>
+<p>A 10x Multiome AnnData read with <code>gex_only=False</code> holds genes and
+peaks in one <code>X</code>. Select each part with a feature filter:
+<code>rna="X[feature_types=Gene Expression]"</code> and
+<code>atac="X[feature_types=Peaks]"</code>. Without a filter on such data,
+<code>export_dataset</code> raises <code>ValueError</code>. The recipe
+<a href="#recipe-10x-h5">A 10x <code>.h5</code> file</a> reads the file and splits it.</p>
+<p>Running an export again raises <code>FileExistsError</code> for the files already
+in the folder. <code>overwrite=True</code> replaces them. A call that fails
+writes nothing. An export also raises <code>FileExistsError</code> when the
+folder holds files of other data that it does not write: files with
+other cells, and after <code>batch=</code> files of other batch numbers. With
+<code>batch_index=</code>, a call checks its own batch number. The message names
+the first file. <code>overwrite=True</code> does not remove them. Write data with
+fewer batches into a new folder.</p>
+<p><code>mtb.scan</code> checks the folder for each method. Its <code>caveat</code> column
+flags values that are not whole numbers. When an expected file is
+missing, <code>scan</code> names the file it found instead.</p>
+</details>
+<details class="note">
+<summary>Details: <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr></summary>
+<p>The <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file name depends on the category. Vertical reads <code>atac.h5</code>,
+which holds peaks. <code>method_info(m)["atac"]</code> names the form a method
+reads. Diagonal reads
+<code>atac_peak.h5</code> for peaks and <code>atac_gas.h5</code> for gene activity. Mosaic
+reads <code>atac&lt;i&gt;.h5</code>, which holds peaks. The older name <code>atac.h5</code> for
+gene activity still works.</p>
+<p>GLUE and Seurat_v3 read peak names such as <code>chr1:100-200</code>. <code>scan</code> and
+<code>run</code> also skip these two methods when the peak names cannot be
+rewritten in that form, such as <code>peak_0</code>. With such names, <code>scan</code>
+cannot tell peaks from gene activity. The other methods run, with a
+caveat that names the file. scBridge reads the whole folder, and <code>scan</code>
+does not check its <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file. For a method skipped for its <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file,
+export the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> form it reads.</p>
+</details>
+<h2 id="own-data-recipes">Recipes for your own data<a class="headerlink" href="#own-data-recipes" title="Anchor link to this section">&para;</a></h2>
+<p>Each task tutorial has a section "Your own data". It reads <code>.h5ad</code> files
+that hold the cell types in <code>obs</code>, writes a dataset folder and runs the
+methods on it. These recipes cover four other starting points. Run them in
+the tutorial notebook of your task: <code>mtb</code> is imported, <code>METHODS</code> is the
+list of methods from its section 2, and its check cell and <code>run</code> cell
+use <code>NAME</code>, the folder name that a recipe sets. The recipes write to
+<code>mydata/</code> and call the cell-type column <code>celltype</code>, as the tutorials do.</p>
+<h3 id="recipe-10x-h5">A 10x <code>.h5</code> file<a class="headerlink" href="#recipe-10x-h5" title="Anchor link to this section">&para;</a></h3>
+<p>Cell Ranger writes <code>filtered_feature_bc_matrix.h5</code>. One file holds one
+sample of cells measured in two modalities, which is the data of a
+vertical task. <code>scan</code> and <code>run</code> do not read this
+file. Read it with scanpy first.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">scanpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">sc</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">adata</span> <span class="o">=</span> <span class="n">sc</span><span class="o">.</span><span class="n">read_10x_h5</span><span class="p">(</span><span class="s2">"filtered_feature_bc_matrix.h5"</span><span class="p">,</span>   <span class="c1"># &lt;- your file</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>                       <span class="n">gex_only</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="nb">print</span><span class="p">(</span><span class="n">adata</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s2">"feature_types"</span><span class="p">]</span><span class="o">.</span><span class="n">value_counts</span><span class="p">())</span>
+</span></code></pre></div>
+<p><code>gex_only=False</code> keeps the peaks or the antibody counts. Without it, scanpy
+returns the genes alone. The printout lists the feature types of the file.
+A 10x Multiome file holds <code>Gene Expression</code> and <code>Peaks</code>, and a <abbr title="Cellular Indexing of Transcriptomes and Epitopes by sequencing">CITE-seq</abbr>
+file holds <code>Gene Expression</code> and <code>Antibody Capture</code>.</p>
+<p>scanpy warns that variable names are not unique, here and in the next
+steps. Do not call <code>var_names_make_unique</code> on <code>adata</code>: on the whole object
+it also renames an antibody that has the name of a gene. The split below
+calls it on the genes only.</p>
+<p>The file holds no cell types. Add them to <code>adata</code> now, before the split,
+with the blocks of <a href="#recipe-labels-csv">Labels in a CSV file</a>, on <code>adata</code>
+whatever the tutorial, then come back here for the split. Without
+cell types, leave the <code>labels=</code> line out of the export below, as in
+<a href="#recipe-no-labels">No labels</a>.</p>
+<p>Split <code>adata</code> into one AnnData per modality and write the folder. For
+10x Multiome, in the vertical <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> tutorial:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="n">kind</span> <span class="o">=</span> <span class="n">adata</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s2">"feature_types"</span><span class="p">]</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="n">rna</span> <span class="o">=</span> <span class="n">adata</span><span class="p">[:,</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"Gene Expression"</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">rna</span><span class="o">.</span><span class="n">var_names_make_unique</span><span class="p">()</span>     <span class="c1"># the gene names only</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="n">atac</span> <span class="o">=</span> <span class="n">adata</span><span class="p">[:,</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"Peaks"</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="n">NAME</span> <span class="o">=</span> <span class="s2">"MY10X"</span>   <span class="c1"># &lt;- a name for your data</span>
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">rna</span><span class="p">,</span> <span class="s2">"mydata/"</span> <span class="o">+</span> <span class="n">NAME</span><span class="p">,</span>
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>                      <span class="n">rna</span><span class="o">=</span><span class="s2">"X"</span><span class="p">,</span>
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>                      <span class="n">atac</span><span class="o">=</span><span class="n">atac</span><span class="p">,</span>
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>                      <span class="n">atac_kind</span><span class="o">=</span><span class="s2">"peak"</span><span class="p">,</span>
+</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>                      <span class="n">labels</span><span class="o">=</span><span class="s2">"obs:celltype"</span><span class="p">,</span>
+</span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>                      <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span></code></pre></div>
+<p>For <abbr title="Cellular Indexing of Transcriptomes and Epitopes by sequencing">CITE-seq</abbr>, in the vertical <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> tutorial:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="n">kind</span> <span class="o">=</span> <span class="n">adata</span><span class="o">.</span><span class="n">var</span><span class="p">[</span><span class="s2">"feature_types"</span><span class="p">]</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="n">rna</span> <span class="o">=</span> <span class="n">adata</span><span class="p">[:,</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"Gene Expression"</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">rna</span><span class="o">.</span><span class="n">var_names_make_unique</span><span class="p">()</span>     <span class="c1"># the gene names only</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">adt</span> <span class="o">=</span> <span class="n">adata</span><span class="p">[:,</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"Antibody Capture"</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="n">NAME</span> <span class="o">=</span> <span class="s2">"MY10X"</span>   <span class="c1"># &lt;- a name for your data</span>
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">rna</span><span class="p">,</span> <span class="s2">"mydata/"</span> <span class="o">+</span> <span class="n">NAME</span><span class="p">,</span>
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>                      <span class="n">rna</span><span class="o">=</span><span class="s2">"X"</span><span class="p">,</span>
+</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>                      <span class="n">adt</span><span class="o">=</span><span class="n">adt</span><span class="p">,</span>
+</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>                      <span class="n">labels</span><span class="o">=</span><span class="s2">"obs:celltype"</span><span class="p">,</span>
+</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>                      <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span></code></pre></div>
+<p>When <code>export_dataset</code> says that a matrix holds 0 features, compare the type
+name in the split with the feature types printed above. A type that is not
+printed is not in <code>adata</code>: read the file again with <code>gex_only=False</code>.</p>
+<p>Then run the check cell and the <code>run</code> cell of that tutorial. They use
+<code>NAME</code>, so they work on this folder:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="s2">"mydata/"</span> <span class="o">+</span> <span class="n">NAME</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="n">METHODS</span><span class="p">)</span>
+</span></code></pre></div>
+<p>For 10x Multiome the check lists <code>atac.h5</code> and <code>atac_peak.h5</code>: one matrix
+under two names, one copy on disk.</p>
+<p>Each matrix is stored dense and read dense: features × cells × 8 bytes of
+memory. 150,000 peaks and 10,000 cells take 12 GB. Keep the genes and
+peaks you need before the export. <code>export_dataset</code> raises <code>ValueError</code>
+when a modality would hold two feature types, for example <code>rna="X"</code> on the
+object before the split.</p>
+<h3 id="recipe-labels-csv">Labels in a CSV file<a class="headerlink" href="#recipe-labels-csv" title="Anchor link to this section">&para;</a></h3>
+<p><code>export_dataset</code> reads the cell types from <code>obs</code>, not from a file. Read the
+CSV with pandas and add the column. The barcodes in the CSV must be unique:
+a duplicated barcode stops the block with the pandas error
+<code>cannot reindex on an axis with duplicate labels</code>. For diagonal data, do
+the recipe once for <code>rna</code> and once for <code>atac</code>.</p>
+<p>In the code, <code>adata</code> is the object that holds your cells. In a tutorial
+that reads one object, it is <code>adata</code>. In the <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> tutorials it is
+<code>rna</code>, and the name <code>adata</code> does not exist there: write <code>rna</code> for <code>adata</code>
+in every line of this recipe. With another name, such as <code>adt</code> or <code>rna1</code>,
+write the object whose cells the CSV lists.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="n">ann</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s2">"annotation.csv"</span><span class="p">,</span> <span class="n">index_col</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>               <span class="c1"># &lt;- your file, barcodes first</span>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="n">lab</span> <span class="o">=</span> <span class="n">ann</span><span class="p">[</span><span class="s2">"cluster_annotation"</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">str</span><span class="p">)</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>        <span class="c1"># &lt;- your column</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s2">"celltype"</span><span class="p">]</span> <span class="o">=</span> <span class="n">lab</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="o">~</span><span class="n">lab</span><span class="o">.</span><span class="n">isin</span><span class="p">([</span><span class="s2">""</span><span class="p">,</span> <span class="s2">"NA"</span><span class="p">,</span> <span class="s2">"nan"</span><span class="p">]))</span>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="nb">print</span><span class="p">(</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s2">"celltype"</span><span class="p">]</span><span class="o">.</span><span class="n">notna</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">(),</span> <span class="s2">"of"</span><span class="p">,</span> <span class="n">adata</span><span class="o">.</span><span class="n">n_obs</span><span class="p">,</span> <span class="s2">"cells have a label"</span><span class="p">)</span>
+</span></code></pre></div>
+<p>pandas matches the rows by barcode, so the CSV may be in any order. The
+third line turns a blank label and the text <code>NA</code> into a missing value,
+because a label file reads them as missing. When <code>export_dataset</code> names
+another such text, add it to that list.</p>
+<p>The last line counts the cells that got a label. When it prints 0, or
+fewer cells than you expect, stop here. Some barcodes of the CSV are then
+spelled differently from <code>adata.obs_names</code>, often by an ending such as
+<code>-1</code>. Compare <code>ann.index[:3]</code> with <code>adata.obs_names[:3]</code>, and do not go on
+until the number is right.</p>
+<p>When the barcodes of the CSV lack the <code>-1</code> ending that the cell names have,
+put the next line into the block above, after the line that reads the CSV,
+and run the block again. The line that reads the CSV comes first, so that a
+second run does not add the ending twice.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="n">ann</span><span class="o">.</span><span class="n">index</span> <span class="o">=</span> <span class="n">ann</span><span class="o">.</span><span class="n">index</span> <span class="o">+</span> <span class="s2">"-1"</span>
+</span></code></pre></div>
+<p>A cell without a label cannot be scored, and <code>export_dataset</code> refuses it.
+When some cells have no label, keep the labelled cells.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">adata</span> <span class="o">=</span> <span class="n">adata</span><span class="p">[</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s2">"celltype"</span><span class="p">]</span><span class="o">.</span><span class="n">notna</span><span class="p">()]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+</span></code></pre></div>
+<p>A second object of the same cells, such as <code>atac</code>, needs the same cells:
+<code>atac = atac[adata.obs_names].copy()</code>. Then go on with the export cell and
+<code>labels="obs:celltype"</code>.</p>
+<h3 id="recipe-no-labels">No labels<a class="headerlink" href="#recipe-no-labels" title="Anchor link to this section">&para;</a></h3>
+<p>Cell types are used for the scores. A few methods also read them as an
+input. The check names those methods: their <code>reason</code> says
+<code>cty.csv is missing.</code> The label file that it names depends on the layout.
+For diagonal data it is <code>rna_cty.csv</code>, for some methods together with
+<code>atac_cty.csv</code>: the reason then holds <code>rna_cty.csv is missing.</code> or
+<code>rna_cty.csv, atac_cty.csv are missing.</code> Without cell types, leave <code>labels=</code>
+out of the export and pass <code>evaluate=False</code> to <code>run</code>.</p>
+<p>The two blocks below are those of the vertical <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> tutorial. In
+another tutorial, do the same by removing the <code>labels=</code> line of that
+tutorial's export cell, and pass <code>evaluate=False</code> in its <code>run</code> cell.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="n">NAME</span> <span class="o">=</span> <span class="s2">"MYDATA"</span>   <span class="c1"># &lt;- a name for your data</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="s2">"mydata/"</span> <span class="o">+</span> <span class="n">NAME</span><span class="p">,</span>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>                      <span class="n">rna</span><span class="o">=</span><span class="s2">"X"</span><span class="p">,</span>              <span class="c1"># &lt;- where the RNA counts are</span>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>                      <span class="n">adt</span><span class="o">=</span><span class="s2">"obsm:protein"</span><span class="p">,</span>   <span class="c1"># &lt;- where the proteins (ADT) are</span>
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>                      <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="n">mtb</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="s2">"mydata/"</span> <span class="o">+</span> <span class="n">NAME</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="n">METHODS</span><span class="p">)</span>
+</span></code></pre></div>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="n">mine</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">"mydata/"</span> <span class="o">+</span> <span class="n">NAME</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="n">METHODS</span><span class="p">,</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>               <span class="n">out_dir</span><span class="o">=</span><span class="s2">"out/"</span> <span class="o">+</span> <span class="n">NAME</span><span class="p">,</span> <span class="n">evaluate</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="n">mine</span><span class="o">.</span><span class="n">summary</span><span class="p">[[</span><span class="s2">"method"</span><span class="p">,</span> <span class="s2">"status"</span><span class="p">]]</span>
+</span></code></pre></div>
+<p>The status <code>ran</code> means that the method ran and nothing was scored.
+<code>skipped</code> marks a method that needs cell types as an input. Each method
+that ran has a folder in <code>out/MYDATA/</code>. For most methods the embedding is
+the file <code>embedding.h5</code> in it. Without <code>evaluate=False</code> the methods run as
+well, and the status <code>ran</code> says that nothing was scored.</p>
+<p>Diagonal data with cell types for the <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> cells only is the same case.
+<code>run</code> scores a diagonal folder only when both sides have labels. Leave
+<code>labels=</code> out and pass <code>evaluate=False</code>. No score compares methods on such
+data: scores of the <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> cells alone do not change with where a method puts
+the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> cells.</p>
+<p>When you have cell types later, add them to the folder and score the saved
+embeddings. No method runs again. Here <code>adata</code> is the object whose cells
+the folder holds. In the vertical <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> tutorial it is <code>rna</code>.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="s2">"mydata/"</span> <span class="o">+</span> <span class="n">NAME</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="s2">"obs:celltype"</span><span class="p">,</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>                      <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="n">mine</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_run</span><span class="p">(</span><span class="s2">"out/"</span> <span class="o">+</span> <span class="n">NAME</span><span class="p">)</span><span class="o">.</span><span class="n">rescore</span><span class="p">()</span>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="n">mine</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>                        <span class="c1"># the new scores into out/MYDATA</span>
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="n">mine</span><span class="o">.</span><span class="n">summary</span>
+</span></code></pre></div>
+<p><code>export_dataset</code> writes the labels in the cell order of the files already
+in the folder, whatever the row order of <code>adata</code> is by then. It refuses
+labels for other cells.</p>
+<p>This line is for a folder without batch numbers that holds one set of
+cells, as the vertical tutorials write it. For cross, mosaic and diagonal
+data it does not apply: run the export cell of your tutorial again with its
+<code>labels=</code> line, and then the <code>rescore</code> line above. The files keep their
+cell order. Diagonal data needs the column in both files.</p>
+<p>With cell types for some of the cells only, keep the labelled cells before
+the export, as in the recipe above. <code>evaluate</code> raises when a label is
+missing: score an embedding on its labelled cells, as
+<code>mtb.evaluate(emb[emb.obs["label"].notna()], labels="label")</code>.</p>
+<h3 id="recipe-donors">Another number of donors<a class="headerlink" href="#recipe-donors" title="Anchor link to this section">&para;</a></h3>
+<p>A batch is a donor, a sample or an experiment. A cross method reads a fixed
+number of batches: three for <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> and for <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>, and two for
+<abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> + <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> and for <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> + <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>.
+<a href="#folder-layout">Dataset folder layout</a> lists them. With another number of donors,
+treat the data as a vertical task: keep all cells in one folder and give
+<code>run</code> the donor of each cell.</p>
+<p>Do this in the vertical tutorial of your modalities. Its <code>METHODS</code> are
+vertical methods, and its section 2 installs their environments.
+<abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> + <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> has no vertical task: for that data, keep two donors, as
+shown further down, with two names in the list.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="n">NAME</span> <span class="o">=</span> <span class="s2">"MYDONORS"</span>   <span class="c1"># &lt;- a name for your data</span>
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="s2">"mydata/"</span> <span class="o">+</span> <span class="n">NAME</span><span class="p">,</span>
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>                      <span class="n">rna</span><span class="o">=</span><span class="s2">"X"</span><span class="p">,</span>                <span class="c1"># &lt;- where the RNA counts are</span>
+</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>                      <span class="n">adt</span><span class="o">=</span><span class="s2">"obsm:protein"</span><span class="p">,</span>     <span class="c1"># &lt;- where the proteins (ADT) are</span>
+</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>                      <span class="n">labels</span><span class="o">=</span><span class="s2">"obs:celltype"</span><span class="p">,</span>  <span class="c1"># &lt;- the cell-type column</span>
+</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>                      <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>         <span class="c1"># no batch= here</span>
+</span><span id="__span-19-7"><a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="n">mine</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">"mydata/"</span> <span class="o">+</span> <span class="n">NAME</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="n">METHODS</span><span class="p">,</span>
+</span><span id="__span-19-8"><a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>               <span class="n">out_dir</span><span class="o">=</span><span class="s2">"out/"</span> <span class="o">+</span> <span class="n">NAME</span><span class="p">,</span>
+</span><span id="__span-19-9"><a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a>               <span class="n">batch</span><span class="o">=</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s2">"donor"</span><span class="p">])</span>  <span class="c1"># &lt;- your donor column</span>
+</span><span id="__span-19-10"><a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a><span class="n">mine</span><span class="o">.</span><span class="n">summary</span>
+</span></code></pre></div>
+<p>The methods do not read <code>batch=</code>. The summary then has the batch
+metrics <code>ASW_batch</code>, <code>ARI_batch</code>, <code>NMI_batch</code>, <code>GC</code> and <code>iLISI</code>, which say
+how well the donors mix. <code>batch=</code> takes the column itself, not its name. <code>run</code> reads
+the folder, and the folder holds no <code>obs</code> columns. The values are matched to
+the cells by barcode. Every cell needs a donor: <code>run</code> stops when one is missing.</p>
+<p>For diagonal data with another number of donors than 3, do the same in the
+diagonal <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> tutorial: export <code>rna</code> and <code>atac</code> with all their cells,
+without <code>batch_index=</code>, and give <code>run</code> the donor of every <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> cell:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="n">mine</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">"mydata/"</span> <span class="o">+</span> <span class="n">NAME</span><span class="p">,</span> <span class="s2">"diagonal"</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="n">METHODS</span><span class="p">,</span>
+</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a>               <span class="n">out_dir</span><span class="o">=</span><span class="s2">"out/"</span> <span class="o">+</span> <span class="n">NAME</span><span class="p">,</span>
+</span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a>               <span class="n">batch</span><span class="o">=</span><span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">rna</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s2">"donor"</span><span class="p">],</span> <span class="n">atac</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s2">"donor"</span><span class="p">]]))</span>  <span class="c1"># &lt;- your column</span>
+</span></code></pre></div>
+<p>To use the cross tutorial instead, keep as many donors as its methods read.
+First print the donor names of your file. This block changes nothing.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="nb">print</span><span class="p">(</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s2">"donor"</span><span class="p">]</span><span class="o">.</span><span class="n">value_counts</span><span class="p">())</span>   <span class="c1"># the names in your file</span>
+</span></code></pre></div>
+<p>Write as many of the printed names as the methods read into the list of the
+next block, in place of <code>A</code>, <code>B</code> and <code>C</code>. Then run it.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="n">adata</span> <span class="o">=</span> <span class="n">adata</span><span class="p">[</span><span class="n">adata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s2">"donor"</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">([</span><span class="s2">"A"</span><span class="p">,</span> <span class="s2">"B"</span><span class="p">,</span> <span class="s2">"C"</span><span class="p">])]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>   <span class="c1"># &lt;- the donors to keep</span>
+</span></code></pre></div>
+<p>When none of the names is in the file, no cell is kept, and the export stops:
+<code>The data holds 0 cells, so there is nothing to write.</code> When one name is
+wrong, the cells of the other donors are kept, and the check names the
+files of the batch that is not there.</p>
+<p>When the list holds a name that is not in the file, <code>adata</code> ends with fewer
+cells or with none, and a corrected list does not bring them back. Run the
+read cell of the tutorial again to get the data back, and then this block.</p>
+<p>In a cross folder with more batches than a method reads, the method reads
+the first ones, and the check says so:
+<code>StabMap reads batches 1-3 of 5. Batches 4-5 are not used.</code> With fewer, it
+names the files that are not there: <code>rna3.h5, adt3.h5 are missing.</code> The
+batches are numbered in the sorted order of the donor names, read as text,
+so <code>10</code> comes before <code>2</code>.</p>
+<hr />
+<h2 id="gpu-or-cpu"><abbr title="Graphics Processing Unit">GPU</abbr> or <abbr title="Central Processing Unit">CPU</abbr>?<a class="headerlink" href="#gpu-or-cpu" title="Anchor link to this section">&para;</a></h2>
+<p>Most methods also run without a <abbr title="Graphics Processing Unit">GPU</abbr>, only slower. Six need an NVIDIA
+<abbr title="Graphics Processing Unit">GPU</abbr>. On a host without one, <code>scan</code> and <code>run</code> mark them not runnable.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="p">[</span><span class="n">m</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">()</span> <span class="k">if</span> <span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="n">m</span><span class="p">)[</span><span class="s2">"gpu"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"required"</span><span class="p">]</span>
+</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="c1"># ['scBridge', 'moETM', 'SMILE', 'sciCAN', 'UnitedNet', 'iPOLNG']</span>
+</span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="s2">"scJoint"</span><span class="p">)[</span><span class="s2">"cpu_params"</span><span class="p">]</span>
+</span><span id="__span-23-4"><a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="c1"># {'use_cuda': ''}</span>
+</span></code></pre></div>
+<details class="note">
+<summary>Details</summary>
+<p>scJoint and scMDC use CUDA unless told otherwise. On a host without a
+<abbr title="Graphics Processing Unit">GPU</abbr>, <code>run</code> adds the flags in <code>method_info(m)["cpu_params"]</code> and
+prints one line to stderr. A key you pass in <code>params</code> wins.</p>
+<p>Six torch environments, <code>env_sciPENN</code>, <code>matilda</code>, <code>scmb_scjoint</code>,
+<code>scmb_torch</code>, <code>scmb_scmm2</code> and <code>scmb_multigrate2</code>, also come as smaller
+<abbr title="Central Processing Unit">CPU</abbr>-only builds.
+<code>mtb.env.install</code> picks them on a host without a <abbr title="Graphics Processing Unit">GPU</abbr>, and
+<code>flavor="cpu"</code> or <code>"gpu"</code> overrides that. scMM never uses a <abbr title="Graphics Processing Unit">GPU</abbr>, so
+<code>scmb_scmm2</code> comes as its <abbr title="Central Processing Unit">CPU</abbr> build on every host. Both builds
+install under the environment's own name, and the <code>flavor</code> column of
+<code>mtb.env.install(..., dry_run=True)</code> reports the installed one.</p>
+</details>
+<hr />
+<p>Next: <a href="../evaluate/">score an embedding</a> of your own, then draw the
+<a href="../plot/">bubble table</a>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../discover/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Discover methods">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Discover methods
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../evaluate/" class="md-footer__link md-footer__link--next" aria-label="Next: Score an embedding">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Score an embedding
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+    <a href="https://github.com/PYangLab" target="_blank" rel="noopener" title="PYangLab on GitHub" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.top", "navigation.tracking", "navigation.instant", "navigation.instant.progress", "toc.follow", "search.highlight", "content.code.copy", "content.code.annotate", "content.code.select", "content.tabs.link", "announce.dismiss", "header.autohide", "navigation.footer"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../javascripts/vendor/gsap.min.js"></script>
+      
+        <script src="../../javascripts/vendor/ScrollTrigger.min.js"></script>
+      
+        <script src="../../javascripts/animations.js"></script>
+      
+        <script src="../../javascripts/ui-tweaks.js"></script>
+      
+        <script src="../../javascripts/mermaid-init.js"></script>
+      
+        <script src="../../javascripts/mathjax.js"></script>
+      
+        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
