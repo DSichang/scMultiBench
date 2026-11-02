@@ -653,8 +653,6 @@ def test_deploy_gate_refuses_a_stale_executed_tutorial(tmp_path, monkeypatch):
     (tmp_path / "pkg" / "multibench" / "__init__.py").write_text('__version__ = "9.9.9"\n')
     gate.pypi_releases = lambda *a, **k: {"9.9.9"}
     gate.data_problems = lambda checkout: []                   # its own test: test_review_f3_int
-    # the Changes page of that version (its own test: test_deploy_gate_changes)
-    (tmp_path / "docs" / "changes.md").write_text("# Changes\n\n## New in 9.9.9\n")
     monkeypatch.delenv("DEPLOY_GATE", raising=False)
     gate.on_startup(command="build", dirty=False)
     assert gate.on_config(config) is config
@@ -724,86 +722,12 @@ def test_deploy_gate_refuses_a_version_that_is_not_on_pypi(tmp_path, monkeypatch
     gate.package_checkout = lambda cfg: pkg
     monkeypatch.setattr(gate, "data_problems", lambda checkout: [])
     monkeypatch.setattr(gate, "pypi_releases", lambda *a, **k: {"0.3.1"})
-    # the Changes page of that version (its own test: test_deploy_gate_changes)
-    (tmp_path / "docs" / "changes.md").write_text("# Changes\n\n## New in 0.3.2\n")
     gate.on_startup(command="gh-deploy", dirty=False)
     with pytest.raises(Abort, match=r"multibench-sc 0\.3\.2 .* is not on PyPI") as e:
         gate.on_config({"docs_dir": str(tmp_path / "docs")})
     assert "nothing was built or pushed" in str(e.value)
     monkeypatch.setattr(gate, "pypi_releases", lambda *a, **k: {"0.3.1", "0.3.2"})
     config = {"docs_dir": str(tmp_path / "docs")}
-    assert gate.on_config(config) is config
-
-
-@needs_docs
-def test_deploy_gate_refuses_a_changes_page_of_another_version(tmp_path, monkeypatch):
-    """The newest section of docs/changes.md (its first ``## New in X.Y.Z``)
-    must be that of the version being deployed: a site of 0.3.5 whose Changes
-    page ends at 0.3.4 would be published without a word. The message names
-    both versions and the file, and a page whose heading cannot be read fails
-    closed."""
-    import importlib.util
-    from mkdocs.exceptions import Abort
-    repo = _docs_root().parent
-    spec = importlib.util.spec_from_file_location("deploy_gate", repo / "hooks" / "deploy_gate.py")
-    gate = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(gate)
-    pkg = tmp_path / "pkg"
-    (pkg / "multibench").mkdir(parents=True)
-    (pkg / "multibench" / "__init__.py").write_text('__version__ = "0.3.5"\n')
-    page = tmp_path / "docs" / "changes.md"
-    page.parent.mkdir()
-    page.write_text("# Changes\n\n## New in 0.3.5\n\ntext\n\n## Behaviour changes in 0.3.5\n"
-                    "\n## New in 0.3.4\n")
-    assert gate.changes_version(page) == "0.3.5"
-    assert gate.changes_problems(pkg, page) == []
-    # the page of the release before
-    page.write_text("# Changes\n\n## New in 0.3.4\n\ntext\n\n## New in 0.3.3\n")
-    assert gate.changes_version(page) == "0.3.4"
-    assert gate.changes_problems(pkg, page) == [
-        f"the newest section of {page} is '## New in 0.3.4', and the package being "
-        f"deployed is multibench-sc 0.3.5 (the version of {pkg}): add the section '## New "
-        f"in 0.3.5' to {page}, or deploy from the checkout of 0.3.4"]
-    # a page ahead of the package is refused too
-    page.write_text("## New in 0.3.6\n\n## New in 0.3.5\n")
-    (msg,) = gate.changes_problems(pkg, page)
-    assert "'## New in 0.3.6'" in msg and "multibench-sc 0.3.5" in msg and str(page) in msg
-    # fails closed: no heading, a heading without a version, no file, no version
-    unreadable = [
-        f"{page} has no readable version heading (its first '## New in X.Y.Z' line), so "
-        f"it cannot be checked against multibench-sc 0.3.5: add the section '## New in "
-        f"0.3.5'"]
-    for text in ("# Changes\n\n### New in 0.3.5\n", "## New in the next release\n\n"
-                 "## New in 0.3.5\n", "## Behaviour changes in 0.3.5\n", ""):
-        page.write_text(text)
-        assert gate.changes_version(page) is None
-        assert gate.changes_problems(pkg, page) == unreadable
-    page.unlink()
-    assert gate.changes_problems(pkg, page) == unreadable
-    page.write_text("## New in 0.3.5\n")
-    assert gate.changes_problems(tmp_path / "nowhere", page) == [
-        f"no __version__ in {tmp_path / 'nowhere' / 'multibench' / '__init__.py'}, so the "
-        f"newest section of {page} cannot be checked"]
-    # the page of the docs repo names the version of this checkout
-    import multibench
-    assert gate.changes_version(_docs_root() / "changes.md") == multibench.__version__
-    assert gate.changes_problems(ROOT, _docs_root() / "changes.md") == []
-    # gh-deploy refuses; the other checks pass here
-    _write_nb(pkg / "notebooks" / "tutorial_a.ipynb", [("code", "x = 1")], executed=False)
-    _write_nb(tmp_path / "docs" / "tutorials" / "a.ipynb", [("code", "x = 1")])
-    gate.package_checkout = lambda cfg: pkg
-    monkeypatch.setattr(gate, "data_problems", lambda checkout: [])
-    monkeypatch.setattr(gate, "pypi_releases", lambda *a, **k: {"0.3.5"})
-    monkeypatch.delenv("DEPLOY_GATE", raising=False)
-    config = {"docs_dir": str(tmp_path / "docs")}
-    gate.on_startup(command="gh-deploy", dirty=False)
-    assert gate.on_config(config) is config
-    page.write_text("## New in 0.3.4\n")
-    with pytest.raises(Abort, match=r"is '## New in 0\.3\.4', and the package being "
-                                    r"deployed is multibench-sc 0\.3\.5") as e:
-        gate.on_config(config)
-    assert "nothing was built or pushed" in str(e.value)
-    gate.on_startup(command="build", dirty=False)              # mkdocs build is not gated
     assert gate.on_config(config) is config
 
 
@@ -932,27 +856,6 @@ RECIPE_ANCHORS = ["own-data-recipes", "recipe-10x-h5", "recipe-labels-csv",
                   "recipe-no-labels", "recipe-donors"]
 
 
-def _changes_0_3_5():
-    """The two 0.3.5 sections of the Changes page, each on one line."""
-    page = (_docs_root() / "changes.md").read_text()
-    heads = re.findall(r"^## (.+)$", page, re.M)
-    i = heads.index("New in 0.3.5")
-    assert heads[i:i + 3] == ["New in 0.3.5", "Behaviour changes in 0.3.5", "New in 0.3.4"]
-    return [" ".join(page.split(f"## {h}\n", 1)[1].split("\n## ", 1)[0].split())
-            for h in heads[i:i + 2]]
-
-
-def _entry_0_3_5(start):
-    """The one entry of "Behaviour changes in 0.3.5" that starts with
-    ``start``, on one line."""
-    page = (_docs_root() / "changes.md").read_text()
-    body = page.split("## Behaviour changes in 0.3.5\n", 1)[1].split("\n## ", 1)[0]
-    entries = [" ".join(e.split()) for e in re.findall(r"^- (.*?)(?=^- |^### |\Z)", body,
-                                                       re.M | re.S)]
-    (entry,) = [e for e in entries if e.startswith(start)]
-    return entry
-
-
 def _own_cells(n=120, prefix="c", seed=0):
     """Cells of a reader: RNA counts in ``X``, proteins in
     ``obsm["protein"]``, cell types in ``obs["celltype"]``."""
@@ -977,133 +880,6 @@ def _barcodes(path):
     import h5py
     with h5py.File(path, "r") as f:
         return [b.decode() for b in f["matrix/barcodes"][()]]
-
-
-def _changes_headings():
-    return re.findall(r"^#{2,4} (.+)$", (_docs_root() / "changes.md").read_text(), re.M)
-
-
-@needs_docs
-def test_changes_page_has_every_heading_once():
-    """The site makes the anchor of a section from its heading, and gives
-    the second of two equal headings ``_1``. A new section with the heading
-    of an older one would take the anchor that the older one had, so every
-    heading of the page is there once."""
-    heads = _changes_headings()
-    assert [h for h in sorted(set(heads)) if heads.count(h) > 1] == []
-    # the section of 0.3.2 keeps the heading its anchor is made from
-    page = (_docs_root() / "changes.md").read_text()
-    older = page.split("\n## Behaviour changes in 0.3.2\n", 1)[1].split("\n## ", 1)[0]
-    assert "\n### Dataset folders\n" in older
-
-
-def test_changes_page_anchors_on_the_built_site(built_site):
-    """On the built page each heading has an anchor of its own, and the
-    section of 0.3.2 on dataset folders has the anchor it had before 0.3.5."""
-    _, _, site = built_site
-    ids = re.findall(r'<h[2-4] id="([^"]+)"', (site / "changes" / "index.html").read_text())
-    assert len(ids) == len(_changes_headings()) and len(set(ids)) == len(ids)
-    assert [i for i in ids if re.search(r"_\d+$", i)] == []
-    assert {"dataset-folders", "dataset-folders-and-exports"} <= set(ids)
-
-
-@needs_docs
-def test_changes_page_missing_values_are_those_of_the_package(tmp_path):
-    """The texts that the page gives as missing are missing for the
-    package, with or without blanks around them, as a label and as a batch,
-    and the calls that the page names raise on them and write nothing."""
-    pytest.importorskip("anndata")
-    import numpy as np
-    import multibench as mtb
-    from multibench.eval import io as eio
-    _new, changed = _changes_0_3_5()
-    entry = _entry_0_3_5("A label or a batch is missing when it is NaN, `None`, blank, or text "
-                         "that a label file reads as missing")
-    words, padded = re.search(
-        r"reads as missing, such as (.+?)\. The blanks around a text are removed first, so "
-        r"`'([^`']+)'` is missing too\.", entry).groups()
-    words = re.findall(r"`([^`]+)`", words)
-    assert len(words) == 5 and eio.missing_words(words) == sorted(words)
-    assert padded != padded.strip() and eio.missing_words([padded]) == [padded.strip()]
-    assert eio.missing_mask([np.nan, None, "", " ", padded, *words]).all()
-    assert not eio.missing_mask(["T", "na", "none", "Unknown"]).any()
-
-    # as a label: the export and evaluate. "The messages name the text they found."
-    assert "The messages name the text they found." in entry
-    assert ("`mtb.io.export_dataset` raises `ValueError` for a label that a label file reads "
-            "as missing, such as the text `NA`.") in changed
-    cells = _own_cells()
-    cells.obs["celltype"] = [padded, "T", "B"] * 40
-    with pytest.raises(ValueError, match=r"40 of the 120 labels .* \(NaN, None, '' or text such as 'NA'\)"):
-        mtb.io.export_dataset(cells, tmp_path / "LABELS", labels="obs:celltype")
-    emb = np.random.default_rng(0).normal(size=(120, 4))
-    with pytest.raises(ValueError) as unlabelled:
-        mtb.evaluate(emb, labels=cells.obs["celltype"].to_numpy(), verbose=False)
-    assert str(unlabelled.value) == (
-        # 0.4.0: the hint no longer suggests the deprecated missing_labels=
-        "labels: 40 of the 120 cells have no label, for example 'NA'. Score the other "
-        "cells only, as adata[adata.obs[col].notna()].")
-    # as a batch
-    assert ("`mtb.io.export_dataset(batch=...)` raises `ValueError` when a cell has no "
-            "batch.") in changed
-    cells = _own_cells()
-    for gap in (np.nan, "nan"):
-        cells.obs["donor"] = np.array([gap] * 5 + ["A"] * 35 + ["B"] * 40 + ["C"] * 40,
-                                      dtype=object)
-        with pytest.raises(ValueError, match=r"^batch='obs:donor': 5 of the 120 cells have no "
-                                             r"batch(, for example 'nan')?\. Give every cell "
-                                             r"a batch\.$"):
-            mtb.io.export_dataset(cells, tmp_path / "BATCHES", adt="obsm:protein",
-                                  batch="obs:donor", category="cross")
-        with pytest.raises(ValueError, match=r"^batch: 5 of the 120 cells have no batch(, for example 'nan')?\. "
-                                             r"Give every cell a batch\.$"):
-            mtb.evaluate(emb, labels=cells.obs["celltype"].to_numpy(),
-                         batch=cells.obs["donor"].to_numpy(), verbose=False)
-    assert sorted(p.name for p in tmp_path.iterdir()) == []
-
-
-@needs_docs
-def test_changes_page_two_row_orders_are_refused_in_every_form(tmp_path):
-    """A folder whose RNA and ATAC files hold the same cells in two orders,
-    as a diagonal export leaves it. The page names two forms of a call into
-    it, and says that 0.3.5 refuses both: a paired export, with or without
-    ``category=``, and a call that writes one file. Each raises and writes
-    nothing, and the way out on the page is the one the message gives."""
-    pytest.importorskip("anndata")
-    import numpy as np
-    import multibench as mtb
-    entry = _entry_0_3_5("A call raises `ValueError` when two matrix files of the folder hold "
-                         "the cells it writes in different orders, and it writes nothing.")
-    assert ("A diagonal export of RNA and ATAC of the same cells in two orders leaves such a "
-            "folder.") in entry
-    # what 0.3.4 did in each form was run against the release, not here
-    assert ("0.3.4 wrote into it. A paired export without `category=` replaced both matrix "
-            "files, which were then in one order. A label file that the diagonal export had "
-            "written for the ATAC cells kept its old order. A paired export with "
-            '`category="vertical"`, or a call that wrote one file only, such as the labels, '
-            "left matrix files of the same cells in two orders, and a method that reads two "
-            "of them row by row could pair the wrong cells. 0.3.5 refuses both forms.") in entry
-    way_out = re.search(r" 0\.3\.5 refuses both forms\. (Export [^.]+\.)$", entry).group(1)
-    rna, atac = _own_cells(), _own_cells(seed=4)
-    mixed = atac[np.random.default_rng(1).permutation(atac.n_obs)].copy()
-    folder = mtb.io.export_dataset(rna, tmp_path / "TWO", atac=mixed,
-                                   atac_kind="gene_activity", category="diagonal")
-    cells = _barcodes(folder / "rna.h5")
-    assert _barcodes(folder / "atac_gas.h5") != cells
-    assert sorted(_barcodes(folder / "atac_gas.h5")) == sorted(cells)
-    held = _folder_bytes(folder)
-    paired = {"atac": atac, "atac_kind": "gene_activity"}
-    for form in (paired, {**paired, "category": "vertical"},
-                 {"rna": None, "labels": "obs:celltype"},
-                 {"rna": None, "adt": "obsm:protein"}):
-        with pytest.raises(ValueError, match="^rna.h5 and atac_gas.h5 of .* hold the same "
-                                             "cells in different orders") as e:
-            mtb.io.export_dataset(rna, folder, overwrite=True, **form)
-        assert str(e.value).endswith(" " + way_out), form
-        assert _folder_bytes(folder) == held
-    # the way out: one call, a new folder
-    new = mtb.io.export_dataset(rna, tmp_path / "NEW", labels="obs:celltype", **paired)
-    assert _barcodes(new / "atac_gas.h5") == _barcodes(new / "rna.h5") == cells
 
 
 # ---- 0.3.5: the sentences added to the guides ----

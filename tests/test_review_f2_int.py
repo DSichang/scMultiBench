@@ -282,14 +282,11 @@ def test_plot_guide_describes_the_averaged_row_labels():
 
 
 @needs_docs
-def test_api_and_changes_pages_say_cell_order():
-    docs = _docs_root()
-    for page in ("api.md", "changes.md"):
-        text = " ".join((docs / page).read_text().split())
-        for old in ("stacks its cells", "stacks the cells", "the order it stacks",
-                    "in which Seurat_v5 stacks"):
-            assert old not in text, (page, old)
-    assert "Seurat_v5's cell order." in " ".join((docs / "changes.md").read_text().split())
+def test_api_page_says_cell_order():
+    text = " ".join((_docs_root() / "api.md").read_text().split())
+    for old in ("stacks its cells", "stacks the cells", "the order it stacks",
+                "in which Seurat_v5 stacks"):
+        assert old not in text, old
 
 
 # ---- the Python part of tests that also ran the command line

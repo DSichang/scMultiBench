@@ -311,9 +311,6 @@ def test_the_anchors_exist_once(tmp_path):
         text = "\n".join("".join(c["source"]) for c in json.loads(nb.read_text())["cells"])
         linked |= set(re.findall(r"#(recipe-[a-z0-9-]+)", text))
     assert linked == set(ANCHORS[1:])
-    # so does the Changes page
-    listed = re.findall(r"tutorials/run\.md#((?:own-data|recipe)[a-z0-9-]*)", _read("changes.md"))
-    assert set(listed) == set(ANCHORS)
     # the title that the error for a 10x file gives
     assert re.search(r"^### A 10x `\.h5` file \{ #recipe-10x-h5 \}$", page, flags=re.M)
     src = tmp_path / "filtered_feature_bc_matrix.h5"

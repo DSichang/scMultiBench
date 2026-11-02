@@ -128,23 +128,3 @@ def test_run_guide_skips_an_atac_mismatch_and_needs_one_multiome_folder():
 
 
 # ---- R4-19: Changes page (the API-page exit-code sentence: tests/test_docs_r5.py) --
-@needs_docs
-def test_changes_page_lists_round_4_and_drops_the_named_method_override():
-    text = _flat("changes.md")
-    assert "to run it anyway" not in text
-    assert "Name the method" not in text
-    for phrase in ("`multibench run-all --allow-atac-mismatch`",
-                   "`mtb.run_all(..., allow_atac_mismatch=True)`",
-                   "is not runnable in `scan`, and `run_all` skips it, also when "
-                   "`methods=` names the method.",
-                   "`run-all` exits with `3` after saving",
-                   "status `SKIPPED`",
-                   "indexed by barcode is matched by barcode",
-                   "fills an existing empty `repo_path`",
-                   "It also exits with `1` while the method scripts are not fetched.",
-                   "an order that contradicts the method's cell order exits with `1`.",
-                   "`summary` shows NaN there.",
-                   "a single build, the same archive for CPU and GPU hosts.",
-                   # integration of round 4 (tests/test_int_f4.py)
-                   "`BatchResult.rescore` keeps `FAIL` and `TIMEOUT` records as they are."):
-        assert phrase in text, phrase

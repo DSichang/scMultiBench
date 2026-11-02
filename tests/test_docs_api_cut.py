@@ -114,8 +114,7 @@ def test_every_mtb_name_mentioned_is_public(path):
     ``__all__`` (dunders such as ``mtb.env.__all__`` and the two documented
     hidden helpers excepted)."""
     import multibench as mtb
-    # the retired names are listed on the Changes page (changes.md), which this
-    # check does not scan; api.md has no deprecation section and is checked whole
+    # api.md has no deprecation section and is checked whole
     text = _text(path)
     tokens = _mtb_tokens(text)
     # the README names no mtb call since 0.4.0; it is still scanned
@@ -136,23 +135,16 @@ def test_every_mtb_name_mentioned_is_public(path):
             obj = getattr(obj, part)
 
 
-def test_retired_names_live_on_the_changes_page():
-    """The old -> new tables are on changes.md, not on the API overview: api.md
-    has no deprecation section (so the check above reads it whole) and links
-    to changes.md. The docstrings no longer list retired keywords."""
+def test_no_page_lists_retired_names():
+    """The API overview has no deprecation section (so the check above reads it
+    whole), and the docstrings list no retired keywords."""
     import multibench as mtb
     for doc in (mtb.evaluate.__doc__, mtb.load_results.__doc__):
         assert "The API overview lists" not in doc
     if not os.environ.get("SCMULTIBENCH_DOCS"):
         pytest.skip("SCMULTIBENCH_DOCS not set")
-    changes, api = _docs_pages("changes.md"), _docs_pages("api.md")
-    assert changes, "docs/changes.md is missing"
-    text = changes[0].read_text()
-    assert "## Deprecated in 0.3.0" in text and "## Removed in 0.3.1" in text
-    for p in api:
-        text = p.read_text()
-        assert not re.search(r"^#+ Deprecated in", text, re.M)
-        assert "(changes.md)" in text
+    for p in _docs_pages("api.md"):
+        assert not re.search(r"^#+ Deprecated in", p.read_text(), re.M)
 
 
 # ---- (c) every mtb.<fn>(...) call in a python fence binds to the live signature

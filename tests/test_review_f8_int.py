@@ -171,20 +171,4 @@ def test_scan_says_nothing_of_a_missing_scripts_checkout(monkeypatch, tmp_path):
 
 # ============================================================ Changes page
 
-@needs_docs
-def test_changes_page_follows_the_review_of_round_8(capsys, monkeypatch):
-    text = _flat("changes.md")
-    assert text.count("- Reworded:") == 1
-    for phrase in (
-            "- `bubble` widens a family pill to fit its header, and a figure of one to "
-            "three metrics to fit its row labels and key. The height is unchanged.",
-            "0.3.1 dropped that method. `multibench run-all` exits with `1`.",
-            "- For `batch=`, `labels=` and these CSVs, ids that are missing, repeated or "
-            "not cells of the dataset raise `ValueError`.",
-            "copy a fetched scripts folder and set `MULTIBENCH_REPO_PATH`.",
-            "- Missing batch labels get `metrics='all' needs batch labels"):
-        assert phrase in text, phrase
-    for gone in ("The commands exit with `1`.", "In these three cases",
-                 "family headers and key fit", "a scripts checkout"):
-        assert gone not in text, gone
     # the 0.3 --only deprecation line the page quotes is history: 0.4 removed --only

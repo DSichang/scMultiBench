@@ -324,23 +324,6 @@ def test_pages_state_the_donor_count_cross_reads():
 
 
 @needs_docs
-def test_changes_page_follows_the_review_fixes():
-    text = _flat("changes.md")
-    for phrase in ("wrong ATAC kind, unreadable peak names and scripts not at "
-                   "`MULTIBENCH_SCRIPTS_REF`",
-                   "With `--dry-run`, a file of the wrong length exits with `1`.",
-                   "iPOLNG, which read peaks, unless `methods=` names them.",
-                   "GLUE and Seurat_v3 are not runnable in `scan` when the peak file",
-                   "takes the ids in the cell order of `labels_for(dataset)`",
-                   "the refusal of `mtb.run` starts with `Methods run only on Linux` and "
-                   "names no install command.",
-                   "`load_results` with a `result_path` that does not exist raises"):
-        assert phrase in text, phrase
-    assert "is one sentence that starts with" not in text
-    assert 'With `"atac_gas"`, `scan(..., methods=["moETM"])` raises' not in text
-
-
-@needs_docs
 def test_discover_details_say_a_representation_token_keeps_the_readers():
     text = _flat("tutorials/discover.md")
     assert ("A representation token keeps every row whose method reads it, so "

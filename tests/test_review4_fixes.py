@@ -19,9 +19,8 @@ import pytest
 from multibench import config
 from multibench.engine import ingest
 
-from tests.test_docs_r4 import needs_docs
 from tests.test_review3_fixes import (CELLS, COUNTS, DEBUG, LOOKS, N, OWN, SAME, _adt, _atac,
-                                      _changes, _dense, _refused, _rna, _two_cohorts, _warned)
+                                      _dense, _refused, _rna, _two_cohorts, _warned)
 
 ad = pytest.importorskip("anndata")
 
@@ -158,22 +157,9 @@ def test_data_passed_as_the_second_modality_is_named_as_such(tmp_path):
         "rna= and atac='X'" + SAME + OWN)
 
 
-# ------------------------------------------------ 2: the Changes page
-@needs_docs
-def test_the_changes_page_says_what_is_refused_and_what_is_not(tmp_path):
-    messages, open_ = _changes("Messages"), _changes("Not solved in 0.3.5")
-    assert "It is now refused" not in messages
-    assert ("0.3.5 no longer gives that advice for an object, an `obsm` entry or a feature "
-            "filter. The call itself is refused only when another modality names the same "
-            "matrix, as described under *Dataset folders and exports*. Otherwise it still "
-            "passes: see *Not solved in 0.3.5*.") in messages
-    assert ("- A selector for `adt=` or `atac=` that names a layer or the `X` of the object "
-            "that holds the RNA writes RNA values as that modality. "
-            "`export_dataset(rna, out, rna=\"X\", adt=\"layer:counts\")` writes the layer "
-            "of the RNA object as `adt.h5`, and no message says so. For the ATAC, only "
-            "`atac_kind=\"peak\"` warns, because gene names do not look like peaks.") in open_
-    assert "`export_dataset` does not compare the features of two modalities." in open_
-    # the call of the page, as the page describes it
+# ------------------------------------------------ 2: what is refused and what is not
+def test_a_layer_of_the_rna_object_passes_as_another_modality(tmp_path):
+    # not solved in 0.3.5: the layer is written as that modality, without a message
     rna = _rna(log=False)
     rna.layers["counts"] = rna.layers["counts"] + 1      # told apart from X
     with warnings.catch_warnings():
@@ -184,7 +170,7 @@ def test_the_changes_page_says_what_is_refused_and_what_is_not(tmp_path):
     assert np.array_equal(_dense(out / "adt.h5"), rna.layers["counts"])
     assert np.array_equal(_dense(gas / "atac_gas.h5"), rna.layers["counts"])
     assert list(ingest.read(out / "adt.h5").var_names) == list(rna.var_names)
-    # the two selectors the page names for the hint
+    # the two selectors that get the hint
     assert _warned(ingest.export_dataset, _cite(), tmp_path / "A", rna=None,
                    atac="obsm:peaks", atac_kind="peak") == [_in_obsm("atac")]
     assert _warned(ingest.export_dataset, _tenx(), tmp_path / "B", rna=None,

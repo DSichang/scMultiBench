@@ -103,8 +103,6 @@ def test_method_environment_details_have_no_bold_labels():
         .split("### Google Colab", 1)[0]
     assert "**" not in envs
     assert '??? note "Details: method scripts"' in envs
-    # 0.5.1: the FAQ repeated these entries and is gone (redirected to Troubleshooting)
-    assert not (_docs_root() / "faq.md").exists()
 
 
 # ---- guides: run and discover (R3-03, R3-19) -------------------------------
@@ -126,16 +124,7 @@ def test_run_guide_shows_the_peak_token_and_both_batch_spellings():
     assert 'batch="obs:donor"' in run
 
 
-# ---- API overview and Changes (R3-28) --------------------------------------
-@needs_docs
-def test_strict_pages_name_both_exit_rules():
-    for page in ("changes.md",):
-        text = _flat(page)
-        assert "when nothing you asked for can run" not in text, page
-        assert ("exits with `1` when no requested row is runnable. With `--methods`, it "
-                "exits with `1` when any named method has no runnable row.") in text, page
-
-
+# ---- API overview (R3-28) --------------------------------------------------
 @needs_docs
 def test_api_page_run_all_batch_and_off_linux_refusal():
     api = _flat("api.md")
@@ -144,14 +133,3 @@ def test_api_page_run_all_batch_and_off_linux_refusal():
     assert "## 2. Run (Linux)" in _read("api.md")
 
 
-@needs_docs
-def test_changes_page_lists_round_3_behaviour():
-    text = _flat("changes.md")
-    for phrase in ("`multibench run-all --batch CSV`",
-                   "`\"atac_gas\"` no longer selects moETM, scMM and iPOLNG",
-                   "is not runnable in `scan`, and `run_all` skips it",
-                   "end with a `caveat` column",
-                   "GLUE reads a copy of `atac_peak.h5`",
-                   "a `scripts_ref` row says whether it matches",
-                   "`labels has 60 entries for 90 cells in the embedding.`"):
-        assert phrase in text, phrase
