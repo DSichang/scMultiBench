@@ -1116,8 +1116,7 @@ envs = mtb.env.install(METHODS)''')
         "`params={\"Method\": {\"key\": value}}` "
         "sets a method's parameters, and `mtb.params_for` lists them. Many methods "
         "take none.",
-        f"`mtb.load_run(\"out/{ds}\")` reloads these results later without running "
-        f"anything.",
+        f"`mtb.load_run(\"out/{ds}\")` reloads these results later.",
     ]
     scored_too = "" if cat == "vertical" else (
         (SCORED_TOO_PAIR if key == "diagonal_rna_atac" else SCORED_TOO)
