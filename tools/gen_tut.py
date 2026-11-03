@@ -623,7 +623,7 @@ celltype = "obs:celltype"   # <- the cell-type column of every file
 # batch 1: RNA only
 mtb.io.export_dataset(rna1, out, rna="X", labels=celltype,
                       batch_index=1, category="mosaic", overwrite=True)
-# batch 2: RNA + ADT (one file: adt="obsm:protein")
+# batch 2: RNA + ADT (adt="obsm:protein" if rna2 holds it)
 mtb.io.export_dataset(rna2, out, rna="X", adt=adt2, labels=celltype,
                       batch_index=2, category="mosaic", overwrite=True)
 # batch 3: ADT only
@@ -679,7 +679,7 @@ print(adt1)''',
    export='''NAME = "MYMOSAIC_SHARED"   # <- a new name for your own data
 out = "mydata/" + NAME
 celltype = "obs:celltype"   # <- the cell-type column of every file
-# batch 1: RNA + ADT (one file: adt="obsm:protein")
+# batch 1: RNA + ADT (adt="obsm:protein" if rna1 holds it)
 mtb.io.export_dataset(rna1, out, rna="X", adt=adt1, labels=celltype,
                       batch_index=1, category="mosaic", overwrite=True)
 # batch 2: RNA + ATAC peaks
@@ -709,7 +709,7 @@ print(adt1)''',
    export='''NAME = "MYMOSAIC_UNSHARED"   # <- a new name for your own data
 out = "mydata/" + NAME
 celltype = "obs:celltype"   # <- the cell-type column of every file
-# batch 1: RNA + ADT (one file: adt="obsm:protein")
+# batch 1: RNA + ADT (adt="obsm:protein" if rna1 holds it)
 mtb.io.export_dataset(rna1, out, rna="X", adt=adt1, labels=celltype,
                       batch_index=1, category="mosaic", overwrite=True)
 # batch 2: RNA + ATAC peaks
@@ -950,19 +950,18 @@ def own_cells(key):
                f"{NUMBER[shown]} of your files")
     # a matrix the export takes from obsm, not one a code comment names
     obsm = any('"obsm:' in ln.split("#")[0] for ln in export.splitlines())
-    write = ("Write the dataset folder. Change each name in quotes marked `# <-`. The "
-             f"printout above lists the names in {printed}. Write a name listed after `obs:` "
-             "with that prefix, as `\"obs:celltype\"`"
-             + (", and one after `obsm:` as `\"obsm:protein\"`" if obsm else "")
+    write = ("Write the dataset folder. Change each name in quotes marked `# <-` to one the "
+             f"printout above lists for {printed}, with its prefix, as `\"obs:celltype\"`"
+             + (" or `\"obsm:protein\"`" if obsm else "")
              + ".")
     # the export cell ends with the check, so no folder path is echoed
     return [
         ("markdown", f"## 5. Your own data\n\n{own['needs']}\n\n"
                      + (f"{also}\n\n" if also else "")
-                     + f"Starting from something else? See the recipes for {recipes}.\n\n"
+                     + f"Recipes cover {recipes}.\n\n"
                      + details(*notes, label="Details: export")),
-        ("markdown", f"So that the notebook runs as it is, the next cell writes "
-                     f"{own['example']}."),
+        ("markdown", f"The next cell writes {own['example']}. Skip it for your own "
+                     f"data."),
         ("code", f'mtb.data.write_example("{t["ds"]}")'),
         ("markdown", f"Read {'your file' if one else 'your files'}. For your own data, "
                      f"change {'the file name' if one else 'every file name'} marked `# <-`. "
@@ -1024,7 +1023,7 @@ def _install(md, code, methods, *, every=False):
     gpu = any(mtb.method_info(m)["gpu"] == "required"
               or (every and mtb.method_info(m)["gpu"] != "not used") for m in methods)
     md("## 1. Install\n\n"
-       "This cell installs `multibench-sc`."
+       "The pins keep the numpy and pandas already installed, so Colab needs no restart."
        + (" On Colab, choose a T4 GPU runtime first (Runtime -> Change runtime type), "
           "because changing it later loses the downloads." if gpu else ""))
     code(INSTALL_CELL)
@@ -1062,7 +1061,7 @@ def no_classification_sentence(key, methods):
 
 PLOT_TEXT = ("`res.plot()` draws the scores as a bubble table. Circle size ranks the rows "
              "within each column and colour shows the value scaled per column, so a small gap "
-             "can look large: `res.summary` has the values.")
+             "can look large. `res.summary` has the values.")
 
 
 def plot_details(cat):
@@ -1159,8 +1158,8 @@ envs = mtb.env.install(METHODS)''')
 
 The package ships stored results for {n_stored} methods on {'the full ' if full else ''}`{stored_ds}`. `load_results` reads them and `mtb.plot.bubble` draws them, without running anything."""
            + ("\n\n" + details(*stored_notes) if stored_notes else ""))
-        code(f'''long = mtb.load_results("{cat}", dataset="{stored_ds}")
-mtb.plot.bubble(long)''')
+        code(f'''stored = mtb.load_results("{cat}", dataset="{stored_ds}")
+mtb.plot.bubble(stored)''')
         section += 1
 
     colab_all = (f" [This notebook]({COLAB}tutorial_{key}_all.ipynb) runs them all. It downloads "
@@ -1278,8 +1277,8 @@ The package ships stored results, so these figures draw without running anything
         "per category: D11, D28, D45 and D52.",
         "`mtb.plot.bar` draws each method's overall score on the dataset as one bar, "
         "best on top."))
-    code("""long = mtb.load_results("vertical", dataset="D11")
-mtb.plot.bubble(long)""")
+    code("""stored = mtb.load_results("vertical", dataset="D11")
+mtb.plot.bubble(stored)""")
     code("""mtb.plot.bar(mtb.load_results("diagonal", dataset="D28"))""")
     md("## Next steps\n\n- The integration tutorials install the environments, run methods "
        "and repeat the run on your own data: "

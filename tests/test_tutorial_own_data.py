@@ -259,8 +259,7 @@ def test_recipe_links(key):
     visible = re.sub(r"<details>.*?</details>", "", first, flags=re.S)
     text = {**LINKS, "donors": DONORS_LINK.get(cat)}
     links = [f"[{text[a]}]({RECIPES}{a})" for a in LINKS_OF[cat]]
-    assert (f"Starting from something else? See the recipes for "
-            f"{GEN.and_list(links)}.") in visible
+    assert f"Recipes cover {GEN.and_list(links)}." in visible
     extra = DETAILS_LINKS.get(key, [])
     assert re.findall(r"#(recipe-[a-z0-9-]+)", first) == \
         [f"recipe-{a}" for a in LINKS_OF[cat] + extra]
@@ -666,10 +665,9 @@ READ_SEVERAL = ("Read your files. For your own data, change every file name mark
                 "Colab, upload the files first: click the folder icon on the left, then the "
                 "upload icon.")
 
-WRITE = ("Write the dataset folder. Change each name in quotes marked `# <-`. The printout "
-         "above lists the names in {printed}. Write a name listed after `obs:` with that "
-         "prefix, as `\"obs:celltype\"`{obsm}.")
-WRITE_OBSM = ", and one after `obsm:` as `\"obsm:protein\"`"
+WRITE = ("Write the dataset folder. Change each name in quotes marked `# <-` to one the "
+         "printout above lists for {printed}, with its prefix, as `\"obs:celltype\"`{obsm}.")
+WRITE_OBSM = " or `\"obsm:protein\"`"
 
 SMALL_DATASET_ROW = ("| a method fails on a small dataset | `mtb.scan` "
                      "names what the method needs from the data's size in its `caveat` column |")
@@ -916,7 +914,7 @@ def test_the_cross_sentence_counts_the_batches_from_the_registry(monkeypatch):
         sentence = CROSS_BATCHES[key]
         assert GEN.cross_batches_sentence(key) == sentence and sentence in first
         # a paragraph of its own before the recipes, and not in the collapsed block
-        assert f"\n\n{sentence}\n\nStarting from something else?" in _visible(first)
+        assert f"\n\n{sentence}\n\nRecipes cover " in _visible(first)
         assert "The methods of this task read" not in _collapsed(first)
         counts = {m: set() for m in GEN.task_methods(key)}
         for m, v in GEN.task_variants(key):
