@@ -275,7 +275,7 @@ def test_every_method_section_lists_the_task_and_links_the_all_page(key):
     n = len(everyone)
     assert f"{n} method{'s run' if n > 1 else ' runs'} this task." in md
     assert "| Method |" not in md and "set `METHODS`" not in md
-    assert (f"runs them all. It downloads {GEN.env_size_text(everyone)}." in md) \
+    assert (f"runs them all. Its {GEN.env_size_text(everyone)}." in md) \
         == GEN.has_all(key)
     # the site has no every-method page: the link opens the notebook in Colab
     assert f"{GEN.SITE}tutorials/{key}_all" not in md
@@ -324,7 +324,7 @@ def test_all_methods_title_names_the_methods_and_links_the_tutorial(key):
     assert f"on `{t['ds']}`: {GEN.and_list(everyone)}." in first
     assert f"[tutorial]({GEN.SITE}tutorials/{key}/)" in first
     assert f"runs {GEN.and_list(t['methods'])} only." in first
-    assert f"The environments are {GEN.env_size_text(everyone)}." in first
+    assert f"Methods run on Linux. The {GEN.env_size_text(everyone)}." in first
 
 
 def test_quickstart_links_every_task_tutorial():

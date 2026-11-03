@@ -121,10 +121,11 @@ def _sizes(methods):
 
 
 def env_size_text(methods):
-    """``"<n> envs, <sizes>"`` for a method set, in the words of
-    :func:`env_download_sentence`."""
+    """``"<n> environments download <sizes>"`` for a method set, in the words
+    of :func:`env_download_sentence`."""
     n = len(mtb.env.install(methods, flavor="cpu", dry_run=True))
-    return f"{n} env{'s' if n != 1 else ''}, {_sizes(methods)}"
+    verb = "environments download" if n != 1 else "environment downloads"
+    return f"{n} {verb} {_sizes(methods)}"
 
 
 def env_download_sentence(methods):
@@ -618,16 +619,16 @@ adt3 = ad.read_h5ad("my_adt3.h5ad")   # <- batch 3: your protein (ADT) file
 print(rna2)
 print(adt2)''',
    export='''NAME = "MYMOSAIC_RNA_ADT"   # <- a new name for your own data
-out = "mydata/" + NAME
+folder = "mydata/" + NAME
 celltype = "obs:celltype"   # <- the cell-type column of every file
 # batch 1: RNA only
-mtb.io.export_dataset(rna1, out, rna="X", labels=celltype,
+mtb.io.export_dataset(rna1, folder, rna="X", labels=celltype,
                       batch_index=1, category="mosaic", overwrite=True)
 # batch 2: RNA + ADT (adt="obsm:protein" if rna2 holds it)
-mtb.io.export_dataset(rna2, out, rna="X", adt=adt2, labels=celltype,
+mtb.io.export_dataset(rna2, folder, rna="X", adt=adt2, labels=celltype,
                       batch_index=2, category="mosaic", overwrite=True)
 # batch 3: ADT only
-mtb.io.export_dataset(adt3, out, rna=None, adt="X", labels=celltype,
+mtb.io.export_dataset(adt3, folder, rna=None, adt="X", labels=celltype,
                       batch_index=3, category="mosaic", overwrite=True)''',
    notes=[MOSAIC_LAYOUT, ADT_IN_X],
  ),
@@ -646,17 +647,17 @@ atac3 = ad.read_h5ad("my_atac3.h5ad")   # <- batch 3: your peak file
 print(rna2)
 print(atac2)''',
    export='''NAME = "MYMOSAIC_RNA_ATAC"   # <- a new name for your own data
-out = "mydata/" + NAME
+folder = "mydata/" + NAME
 celltype = "obs:celltype"   # <- the cell-type column of every file
 # batch 1: RNA only
-mtb.io.export_dataset(rna1, out, rna="X", labels=celltype,
+mtb.io.export_dataset(rna1, folder, rna="X", labels=celltype,
                       batch_index=1, category="mosaic", overwrite=True)
 # batch 2: RNA + ATAC peaks
-mtb.io.export_dataset(rna2, out, rna="X", atac=atac2, atac_kind="peak",
+mtb.io.export_dataset(rna2, folder, rna="X", atac=atac2, atac_kind="peak",
                       labels=celltype,
                       batch_index=2, category="mosaic", overwrite=True)
 # batch 3: ATAC peaks only
-mtb.io.export_dataset(atac3, out, rna=None, atac="X", atac_kind="peak",
+mtb.io.export_dataset(atac3, folder, rna=None, atac="X", atac_kind="peak",
                       labels=celltype,
                       batch_index=3, category="mosaic", overwrite=True)''',
    notes=[MOSAIC_LAYOUT],
@@ -677,17 +678,17 @@ rna3 = ad.read_h5ad("my_rna3.h5ad")     # <- batch 3: your RNA file
 print(rna1)
 print(adt1)''',
    export='''NAME = "MYMOSAIC_SHARED"   # <- a new name for your own data
-out = "mydata/" + NAME
+folder = "mydata/" + NAME
 celltype = "obs:celltype"   # <- the cell-type column of every file
 # batch 1: RNA + ADT (adt="obsm:protein" if rna1 holds it)
-mtb.io.export_dataset(rna1, out, rna="X", adt=adt1, labels=celltype,
+mtb.io.export_dataset(rna1, folder, rna="X", adt=adt1, labels=celltype,
                       batch_index=1, category="mosaic", overwrite=True)
 # batch 2: RNA + ATAC peaks
-mtb.io.export_dataset(rna2, out, rna="X", atac=atac2, atac_kind="peak",
+mtb.io.export_dataset(rna2, folder, rna="X", atac=atac2, atac_kind="peak",
                       labels=celltype,
                       batch_index=2, category="mosaic", overwrite=True)
 # batch 3: RNA only
-mtb.io.export_dataset(rna3, out, rna="X", labels=celltype,
+mtb.io.export_dataset(rna3, folder, rna="X", labels=celltype,
                       batch_index=3, category="mosaic", overwrite=True)''',
    notes=[MOSAIC_LAYOUT, ADT_IN_X],
  ),
@@ -707,17 +708,17 @@ adt3 = ad.read_h5ad("my_adt3.h5ad")     # <- batch 3: your protein (ADT) file
 print(rna1)
 print(adt1)''',
    export='''NAME = "MYMOSAIC_UNSHARED"   # <- a new name for your own data
-out = "mydata/" + NAME
+folder = "mydata/" + NAME
 celltype = "obs:celltype"   # <- the cell-type column of every file
 # batch 1: RNA + ADT (adt="obsm:protein" if rna1 holds it)
-mtb.io.export_dataset(rna1, out, rna="X", adt=adt1, labels=celltype,
+mtb.io.export_dataset(rna1, folder, rna="X", adt=adt1, labels=celltype,
                       batch_index=1, category="mosaic", overwrite=True)
 # batch 2: RNA + ATAC peaks
-mtb.io.export_dataset(rna2, out, rna="X", atac=atac2, atac_kind="peak",
+mtb.io.export_dataset(rna2, folder, rna="X", atac=atac2, atac_kind="peak",
                       labels=celltype,
                       batch_index=2, category="mosaic", overwrite=True)
 # batch 3: ADT only
-mtb.io.export_dataset(adt3, out, rna=None, adt="X", labels=celltype,
+mtb.io.export_dataset(adt3, folder, rna=None, adt="X", labels=celltype,
                       batch_index=3, category="mosaic", overwrite=True)''',
    notes=[MOSAIC_LAYOUT, ADT_IN_X],
  ),
@@ -1162,7 +1163,7 @@ The package ships stored results for {n_stored} methods on {'the full ' if full 
 mtb.plot.bubble(stored)''')
         section += 1
 
-    colab_all = (f" [This notebook]({COLAB}tutorial_{key}_all.ipynb) runs them all. It downloads "
+    colab_all = (f" [This notebook]({COLAB}tutorial_{key}_all.ipynb) runs them all. Its "
                  f"{env_size_text(everyone)}." if has_all(key) else "")
     md(f"""## {section}. Every method of this task
 
@@ -1211,7 +1212,7 @@ def build_all_methods(key):
 
 This notebook runs every method that has a variant for {cat} {t['label']} on `{ds}`: {and_list(everyone)}. The [tutorial]({SITE}tutorials/{key}/) explains each step and runs {and_list(t['methods'])} only.
 
-Methods run on Linux. The environments are {env_size_text(everyone)}.""")
+Methods run on Linux. The {env_size_text(everyone)}.""")
     _install(md, code, everyone, every=True)
     md("## 2. Download the data and the environments")
     lines, cur = [], "METHODS = ["
