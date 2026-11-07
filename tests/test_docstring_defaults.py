@@ -26,7 +26,7 @@ _CHOICE_LINE = re.compile(r"^(?P<names>\w+(?:, \w+)*) : \{(?P<choices>.+)\}")
 def _modules():
     for info in pkgutil.walk_packages(multibench.__path__, "multibench."):
         if info.name.endswith("__main__"):
-            continue                      # running it would start the CLI
+            continue                      # a __main__ module runs on import
         yield importlib.import_module(info.name)
 
 

@@ -1,7 +1,7 @@
 """Scoring and run messages after the third student study (fix round 3).
 
 R3-14: a label count that differs from the embedding's cell count names the
-argument the user passed (the CLI flag on the command line) and, for one
+argument the user passed and, for one
 label file of several batches, the fix. The export error names the object
 passed as ``data`` in plain words.
 R3-16: the sweep note is short sentences (one since 0.4.0); off Linux, run's

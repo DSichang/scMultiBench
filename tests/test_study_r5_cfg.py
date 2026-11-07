@@ -1,9 +1,7 @@
 """Round-5 student study, package work 'cfg': R5-04 and R5-05.
 
-- R5-04: while the method scripts are not fetched, the ``scan --strict``
-  table shows the rows the scripts block as not runnable, with a reason, so
-  it agrees with the error under it. ``mtb.scan`` and ``scan`` without
-  ``--strict`` keep them runnable.
+- R5-04: while the method scripts are not fetched, ``mtb.scan`` keeps the
+  rows the scripts block runnable.
 - R5-05: a failed download in ``mtb.data.fetch`` / ``fetch_outputs`` raises
   ``OSError`` naming the dataset, the URL and the manual route, and leaves
   nothing under ``data_path``. The progress line names the URL.

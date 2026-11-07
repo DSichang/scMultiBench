@@ -14,8 +14,7 @@
   the modality note, the no-variant error, the missing dataset folder, the
   label-count errors, the scBridge data_dir error, the several-columns
   error, the plot unknown-name errors, the overlay error for several
-  methods, the scan count line for one method, the run-all dry-run header,
-  and the ``scan --strict`` scripts-ref fix without ``--methods``.
+  methods, and the scan count line for one method.
 """
 import inspect
 import json

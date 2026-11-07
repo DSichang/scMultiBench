@@ -11,12 +11,8 @@
 - labels_for names a missing dataset folder as scan does; load_results
   names missing tables in plain sentences without the package path.
 - Old-style messages: an unknown modality, an unknown metrics= token, no
-  conda, an empty bar table, the empty CLI table and the deprecated
-  evaluate flags.
+  conda and an empty bar table.
 - The fetch error with a ref keeps its subject in run's FAIL line.
-- The ``env plan`` and ``env install`` descriptions are short sentences
-  (the option help of ``scan`` and ``convert``: tests/test_study_r8_other.py);
-  'preflight' is gone.
 - scan names a missing scripts checkout in the ``caveat`` column.
 """
 import json
@@ -162,8 +158,3 @@ def test_scan_says_nothing_of_a_missing_scripts_checkout(monkeypatch, tmp_path):
     monkeypatch.setattr(R, "_repo_root_no_fetch", lambda: tmp_path / "no_scripts")
     plan = full_scan("D28", "diagonal", methods=["uniPort"], verbose=False)
     assert "scripts are not in" not in plan.loc[0, "caveat"]
-
-
-# ============================================================ Changes page
-
-    # the 0.3 --only deprecation line the page quotes is history: 0.4 removed --only

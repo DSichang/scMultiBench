@@ -39,10 +39,8 @@ ASW_034_LABELLED = 0.7814125597558947
 EX_NA = ", for example 'NA'"
 #: the end of the message when no cell has a label
 NONE_FIX = " Pass the column or file that holds the cell types."
-#: the end of the message when some cells have no label (Python, command line)
+#: the end of the message when some cells have no label
 KEEP_FIX = " Score the other cells only, as adata[adata.obs[col].notna()]."
-KEEP_FIX_CLI = (" Score the other cells only: leave the unlabelled ones out of the "
-                "embedding and the label file.")
 
 
 def _cells():

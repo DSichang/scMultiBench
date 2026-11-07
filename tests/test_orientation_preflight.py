@@ -86,10 +86,8 @@ def test_file_without_dimnames_is_not_rejected(tmp_path):
 # --- a 10x file, or a matrix without features or cells, under a dataset file name
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 #: what the folder check says of a 10x file after its subject ("<method> reads
-#: rna.h5 of <dataset>, which", in the reason column "rna.h5"): the same
-#: sentence in Python and on the command line
+#: rna.h5 of <dataset>, which", in the reason column "rna.h5")
 TENX = 'is a 10x Genomics file. See the recipe "A 10x .h5 file" in the docs.'
-TENX_CLI = TENX
 PEAKS = [f"chr1:{i * 1000 + 1}-{i * 1000 + 500}" for i in range(70)]
 
 

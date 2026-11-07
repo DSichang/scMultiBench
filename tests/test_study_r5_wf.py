@@ -6,9 +6,7 @@ batch Series given with it was forced to the embedding rows.
 R5-02: a batch or labels CSV written with its index (barcodes in the first
 column) was matched by position wherever the target carries cell ids.
 
-R5-03: summary.csv had no reason for a SKIPPED row; the run-all stderr line
-called a skip a failure; the exit-code texts did not say that only a skip of
-a method named in --methods sets exit 3.
+R5-03: summary.csv had no reason for a SKIPPED row.
 
 R5-12: reference Notes without dash tails.
 

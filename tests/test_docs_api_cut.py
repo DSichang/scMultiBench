@@ -23,8 +23,7 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 NOTEBOOKS = sorted((ROOT / "notebooks").glob("*.ipynb"))
 
-# The 0.2.1 spellings the 0.3.0 cut retired (deprecated aliases included:
-# the docs teach the new name, the alias only keeps old scripts alive).
+# The 0.2.1 spellings the 0.3.0 cut retired: the docs teach the new name.
 STALE = {
     r"\bplan_commands\b": "scan()",
     r"\bcommand_preview\b": "run(..., dry_run=True)",

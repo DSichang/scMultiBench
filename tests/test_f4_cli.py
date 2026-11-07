@@ -1,16 +1,12 @@
 """Fix round 4, work package 'cli'.
 
 R4-03: the ``-> FAIL`` / ``-> TIMEOUT`` progress line ends with the error.
-R4-05: ``evaluate`` refuses ``--labels`` files typed in an order that
-contradicts the method named by ``--method``; the count error speaks of the
-row order of ``--embedding``, not batches.
-R4-07: the ``run-all`` help names the files it saves and the config default.
-R4-08: an env with one archive is "a single build" in ``env plan`` /
-``env install`` and the install warning; the total is short lines with no
-semicolon inside parentheses.
+R4-08: an env with one archive is "a single build" in the install plan and
+the install warning; the total is short lines with no semicolon inside
+parentheses.
 
-The run-all tests run the real runner in prefix mode against stand-in env
-prefixes (a ``bin/python`` stub), as ``test_f3_cli`` does.
+The run tests run the real runner in prefix mode against stand-in env
+prefixes (a ``bin/python`` stub).
 """
 import stat
 import sys

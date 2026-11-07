@@ -1,6 +1,6 @@
 """Study round 4, work package wf: R4-01, R4-02, R4-04, R4-11 and R4-14.
 
-R4-01: naming a method in methods= (--methods) switched the ATAC checks of
+R4-01: naming a method in methods= switched the ATAC checks of
 scan off, so a cluster gate that picks one method per job passed a folder of
 the other representation. An explicit allow_atac_mismatch replaces it; mtb.run
 notes and warns.

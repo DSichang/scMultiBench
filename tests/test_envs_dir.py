@@ -1,6 +1,6 @@
 """The envs directory must resolve across conda/mamba `info --json` schemas.
 
-Getting this wrong is silent and expensive: `env install --packed` degrades to
+Getting this wrong is silent and expensive: ``mtb.env.install`` degrades to
 a 10-30 minute lockfile build per environment (mamba 2 dropped `root_prefix`),
 or worse, unpacks into a directory conda never searches.
 """

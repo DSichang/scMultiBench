@@ -1,9 +1,7 @@
 """Seams between the round-4 package work packages (wp/f4_wf, _ing, _plot, _cli).
 
-- run-all's failure line counts the methods of the run: a SKIPPED record of
-  a method nobody named (R4-04) is not one of them (R4-03).
-- scan --strict with --allow-atac-mismatch still needs fetched method
-  scripts (R4-01 with R4-06).
+- scan names a ``repo_path`` that holds other files and no method scripts
+  in the reason, and prints it once with verbose=True (R4-06).
 """
 from __future__ import annotations
 

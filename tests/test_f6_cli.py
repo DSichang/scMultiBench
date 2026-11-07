@@ -1,17 +1,13 @@
 """Fix round 6, work package 'cli'.
 
-R6-07: ``multibench evaluate --name`` is the row name in every case: with
-``--labels`` it works without ``--method``. The errors for an unknown
-``--method`` lead to the call that works; unknown-method and no-category
-messages are short sentences without '?;' or 'variant'. Rows written with
-``--name`` and a package ``--method`` have the columns of every long table
-(the bubble figure has no ``L`` badge since 0.3.6).
+R6-07: unknown-method and no-category messages are short sentences without
+'?;' or 'variant'.
 R6-08: bubble's duplicate-rows error says when your rows share a name with
 the stored table, and how to rename them.
-R6-09: ``run(dry_run=True)`` notes an input file that does not exist; the
-CLI dry run prints its header first.
-R6-13: plot messages read as sentences: the CLI overlay errors, the igraph
-backend warning, the require_complete warning and error.
+R6-09: the command preview (``runner.preview``) notes an input file only when
+it does not exist.
+R6-13: plot messages read as sentences: the igraph backend warning, the
+require_complete warning and error.
 """
 from pathlib import Path
 

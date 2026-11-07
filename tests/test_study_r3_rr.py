@@ -153,7 +153,6 @@ def test_scripts_ref_problem_is_none_without_scripts_or_variable(tmp_path, monke
 # ============================================================ R3-12 Slurm example
 
 
-# ---- the Python part of tests that also ran the command line
 @needs_git
 def test_dry_runs_note_another_scripts_ref(scripts, monkeypatch, capsys, tmp_path):
     repo, head = scripts

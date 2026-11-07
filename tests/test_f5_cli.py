@@ -3,12 +3,9 @@
 R5-06: ``load_results`` for a category with no published tables (mosaic)
 starts its error with that fact and the fix; the wheel path and
 ``result_path`` advice stay for a category whose tables should be there.
-``multibench plot --input ... --category mosaic`` names ``--source rerun``.
-R5-07: ``multibench evaluate --name`` is the row name; ``--method`` then
-must be a package method, and it sets the label order and its check.
-R5-10: printed messages read as short sentences: no backticks in CLI text,
-the prepared-files and peak-name notes start with the method, the scan
-reason is sentences with their own subjects, counts without '(s)'.
+R5-10: printed messages read as short sentences: the prepared-files and
+peak-name notes start with the method, the scan reason is sentences with
+their own subjects, counts without '(s)'.
 """
 import ast
 from pathlib import Path
@@ -118,6 +115,5 @@ def test_error_tail_is_clipped_at_a_word_boundary():
     assert tail[3:].split(" ", 1)[0] in {"could", "not", "reach", "github.com"}
 
 
-# ---- the Python part of tests that also ran the command line
 def test_prepared_note_starts_with_the_method(monkeypatch):
     assert runner._prepared_at('GLUE reads peak names such as chr1:100-200.') == -1

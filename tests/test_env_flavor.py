@@ -2,7 +2,7 @@
 
 The benchmark host publishes CPU-only variants of the tutorial torch envs
 (3-4x smaller: no CUDA libraries). ``flavor=`` on ``install_packed`` /
-``mtb.env.install`` / ``multibench env install --flavor`` picks one;
+``mtb.env.install`` picks one;
 ``'auto'`` asks :func:`host_has_gpu`. Whatever the flavour the prefix is
 ``<envs_dir>/<env>`` (the runner and the registry never see a flavour) and
 ``<prefix>/.multibench_flavor`` records which one landed.
@@ -368,9 +368,6 @@ def test_install_signature_and_docs():
         doc = inspect.getdoc(fn)
         assert doc and "Returns" in doc, fn.__name__
     assert "flavor" in inspect.getdoc(envs.install)    # doctor is deprecated in 0.4.0
-
-
-    # 0.4.0: install's description leaves --flavor to the option's own help
 
 
 # ---------------------------------------------------------------- the shipped placeholders

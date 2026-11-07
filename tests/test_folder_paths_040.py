@@ -1,6 +1,5 @@
-"""Dataset arguments given as folder paths (0.4): the command line resolves them
-as Python does, and a bare name that is only a folder of the working directory
-gets the path to pass."""
+"""Dataset arguments given as folder paths (0.4): a bare name that is only a
+folder of the working directory gets the path to pass."""
 import os
 import shutil
 
@@ -24,7 +23,6 @@ def test_a_registered_data_path_folder_wins_over_one_here(here, monkeypatch):
     assert got["rna"] == str(mtb.config.data_path / "D11" / "rna.h5")
 
 
-# ---- the Python part of tests that also ran the command line
 def test_a_bare_name_names_a_folder_of_the_data_path(here):
     os.rename('data/MYCITE', 'MYCITE')
     with pytest.raises(FileNotFoundError) as e:

@@ -144,8 +144,8 @@ def full_scan(*args, **kwargs):
 
 
 # ---- no test downloads an environment archive -----------------------------------
-# env install acts by default since 0.4.0: a test that forgets dry_run=True /
-# --dry-run must fail here, not fetch gigabytes from the envs releases. A test
+# env install acts by default since 0.4.0: a test that forgets dry_run=True
+# must fail here, not fetch gigabytes from the envs releases. A test
 # that serves its own archives patches urlopen itself, over this guard.
 @_pytest.fixture(autouse=True)
 def _no_archive_download(monkeypatch):

@@ -21,8 +21,7 @@ from multibench.engine import envs
 
 import re
 
-#: what only the exporting machine can resolve (the sanitizer that removed these
-#: left with the command line in 0.4.0; the shipped lockfiles stay checked)
+#: what only the exporting machine can resolve (the shipped lockfiles stay checked)
 _LOCAL_PIP_RE = re.compile(r"@\s*file://|feedstock_root")
 _CUDA_PIN_RE = re.compile(r"==[0-9][^\s]*\+(cu\d+)")
 _CONDA_ONLY_PIP = frozenset({

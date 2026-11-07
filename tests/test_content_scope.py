@@ -1,7 +1,7 @@
 """Scope guard: the package describes only the tasks it benchmarks.
 
 The owner's rule: two benchmark tasks and four removed methods are never
-mentioned where a user can see them - API return values, CLI help, and every
+mentioned where a user can see them - API return values and every
 text file the package ships (docstrings, YAML, CSV, drivers). This file pins
 that on the live objects, on the shipped files and on the docs surfaces
 (notebooks, the notebook generator, and the site's source when it is

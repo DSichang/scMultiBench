@@ -1,10 +1,8 @@
 """Fix round 6, work package 'eval'.
 
 R6-03: a barcode-keyed sample sheet with several columns (``mdata.obs.to_csv()``)
-works as a batch file. ``--batch-column NAME`` on ``evaluate`` and ``run-all``
-picks its column, as ``--column`` does for ``--labels``. Without a chosen
-column, the error lists the columns after the cell ids and says how to choose
-one (the flag on the command line, a Series in Python), without pandas'
+works as a batch file. Without a chosen column, the error lists the columns
+after the cell ids and says how to choose one (a Series), without pandas'
 'Unnamed: 0'. A two-column file whose first column has no header is read as
 an index and its other column.
 R6-15: the catalog's cLISI and iLISI rows name the median over cells.

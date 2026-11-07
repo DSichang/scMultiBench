@@ -28,7 +28,7 @@ NESTED = ("scMoMaT", "Multigrate", "MOFA2")       # these read peak ATAC
 
 @pytest.fixture
 def all_envs(monkeypatch):
-    """Every env installed, so only the file check decides (test_run_all_dispatch)."""
+    """Every env installed, so only the file check decides."""
     every = frozenset(envs.group_for(m) for m in registry.list_methods())
     monkeypatch.setattr(W, "_installed_envs", lambda: every)
 

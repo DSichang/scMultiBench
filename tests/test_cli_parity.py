@@ -1,9 +1,4 @@
-"""CLI parity with the Python API (work package F_cli, proposal P10).
-
-scan / layout / export / cite / find filters / plot bubble|bar from stored or
-own tables / evaluate --method/--dataset + npy/csv / flag aliases /
-help strings on every parser and argument / exit codes.
-"""
+"""``envs.packed_manifest`` reads the shipped archive URLs."""
 
 
 LONG_COLUMNS = ['metric', 'value', 'method', 'dataset', 'category', 'source', 'scored_with']

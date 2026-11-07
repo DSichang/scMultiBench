@@ -8,14 +8,14 @@
   says why (R3-01).
 - Dry runs print the caveat of each row the sweep would run, without the
   notes on starting a method, and the scripts note once (R3-02).
-- A scripts-ref mismatch is its own blocker: files_ok stays True, --strict
-  counts it apart, the dry run keeps its commands (R3-10).
-- run-all --dry-run --batch checks the length; a batch in the dataset's cell
-  order is put in each method's cell order (R3-09).
+- A scripts-ref mismatch is its own blocker: files_ok stays True and the dry
+  run keeps its commands (R3-10).
+- A batch in the dataset's cell order is put in each method's cell order
+  (R3-09).
 - The runnable sets of the demo datasets are pinned, D28's vertical change
   included (R3-02).
-- Smaller: the empty summary's columns, the evaluate count messages per
-  flag, the scan error's list of methods, the unpacked-size check, the
+- Smaller: the empty summary's columns, the evaluate count messages, the
+  scan error's list of methods, the unpacked-size check, the
   export_dataset wording, load_results on a missing file.
 
 The env probe is pinned (every env installed, a GPU present) where a verdict
@@ -366,7 +366,6 @@ def test_deploy_gate_refuses_while_the_data_release_is_not_public(tmp_path, monk
                                          "deploy_gate.py").read_text()
 
 
-# ---- the Python part of tests that also ran the command line
 def test_a_named_method_keeps_the_row_its_roles_spell(pinned, capsys):
     """moETM's own spelling, as scan and method_info show it (rna+atac since
     0.4.0, X13: the role names the peaks it reads)."""

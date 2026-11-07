@@ -2,12 +2,10 @@
 
 M21: UnitedNet's old input key ``rna_cty`` keeps working (DeprecationWarning).
 M23: every vertical near-miss hint names ``atac.h5``, whatever the role.
-M02: the summary figure names a tied mean rank, not a metric value; the CLI
-prints one one-method warning for bubble.
+M02: the summary figure names a tied mean rank, not a metric value.
 New: ``mtb.run`` applies the same-cell and ATAC-order checks to the files it
 is given, in the dry run too.
-M33: a reused output keeps the provenance of the run that made it; ``multibench
-config`` shows the scripts commit as its own row.
+M33: a reused output keeps the provenance of the run that made it.
 M22, M13, M28 and the category help: message and help wording.
 M25, M06: docstring wording. M10: the missing-script fix for a folder that is
 not a git checkout. M05, M09, M10, M06, M30: facts on the docs pages.
@@ -283,7 +281,6 @@ def test_api_page_says_cell_order():
         assert old not in text, old
 
 
-# ---- the Python part of tests that also ran the command line
 def test_run_refuses_seurat_v5_on_files_from_different_cells(tmp_path, capsys):
     want = 'Seurat_v5 needs RNA and ATAC from the same cells as its bridge. In D28, rna.h5 and atac_peak.h5 share 0 of 6,408 and 4,606 cells.'
     with pytest.raises(ValueError) as e:

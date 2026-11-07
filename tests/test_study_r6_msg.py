@@ -4,10 +4,8 @@
   that start with the method name (the scripts note starts with "The method
   scripts"). A caller that prints the method name before a caveat prints the
   caveat alone. scBridge's data_dir reason is a sentence like its neighbours.
-  The --strict counts do not change.
-- R6-11: the scripts-ref reason starts with a capital, and scan --strict
-  prints it in full.
-- R6-12: the nothing-runnable head, the run-all dry-run header, the Linux-only
+- R6-11: the scripts-ref reason starts with a capital.
+- R6-12: the nothing-runnable head, the Linux-only
   summary, the inputs_for file error and its layout hints, the merge line,
   the mosaic gene-activity warning, the plural positional warning and the
   method counts.
@@ -315,7 +313,6 @@ def test_notes_passages_have_no_dash_insertions():
         assert "written in one order -" not in doc and "need not score" not in doc
 
 
-# ---- the Python part of tests that also ran the command line
 def test_callers_print_the_method_name_once(tmp_path, pinned, root, monkeypatch, capsys):
     """run's log and both dry runs print the caveat alone.
     UINMF's two-batch variant is named: on D52's three batches the folder

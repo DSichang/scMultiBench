@@ -1,6 +1,6 @@
-"""Fix round 2, work package 'cli': version, GPU wording and GPU use, run-all
-dry run without --out-dir, plain env/evaluate texts, literal blocks in
-docstrings, and the method-scripts commit in fetch/config/run records.
+"""Fix round 2, work package 'cli': version, GPU wording and GPU use, plain
+env/evaluate texts, literal blocks in docstrings, and the method-scripts
+commit in run records.
 
 Every platform- or GPU-dependent test pins ``envs.host_system`` /
 ``envs.host_has_gpu``, so it holds on Linux and macOS alike.

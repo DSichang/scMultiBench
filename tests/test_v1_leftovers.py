@@ -74,7 +74,6 @@ def test_the_quickstart_lines_for_counts_in_a_layer(tmp_path, monkeypatch, capsy
     np.testing.assert_allclose(pcs[1], pcs[0], rtol=1e-3, atol=1e-3)
 
 
-# ---- the Python part of tests that also ran the command line
 
 
 def test_one_cell_is_singular(tmp_path, capsys):

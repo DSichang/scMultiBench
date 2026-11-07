@@ -1,12 +1,12 @@
 """Round-4 student study, package work 'ing': R4-06 (method scripts not fetched).
 
-- An existing empty ``repo_path`` is filled in place by ``multibench fetch
-  --scripts`` and by the first run; the folder itself is kept.
+- An existing empty ``repo_path`` is filled in place by the first run; the
+  folder itself is kept.
 - A ``repo_path`` that holds other files and no ``tools_scripts/`` is refused
-  with one sentence, which ``scan`` (reason, not runnable), the dry run and
-  ``multibench config`` repeat.
-- ``scan --strict`` fails while the method scripts are not fetched; the Python
-  ``scan`` keeps such rows runnable, with the caveat.
+  with one sentence, which ``scan`` (reason, not runnable) and the dry run
+  repeat.
+- ``scan`` keeps the rows runnable while the method scripts are not fetched,
+  with the caveat.
 """
 import os
 import shutil
@@ -44,11 +44,3 @@ def test_a_failed_fetch_leaves_the_empty_folder_as_it_was(host, monkeypatch):
     with pytest.raises(RuntimeError, match="^Could not reach github.com"):
         scripts.ensure_repo(target)
     assert target.is_dir() and not os.listdir(target)
-
-
-# ================================================= (2) --strict: scripts not fetched
-#: 0.4.0: scan --strict is deprecated; its first stderr line says so
-STRICT_DEPRECATED = ("warning: scan --strict is deprecated and will be removed in 0.5. "
-                     "Use the exit code of multibench run-all.\n")
-
-

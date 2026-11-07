@@ -11,8 +11,6 @@
   n_batches whole next to SKIPPED rows.
 - Batch Series errors: row-number indexes, missing ids and foreign ids each
   get their own fix.
-- --strict: the per-method line reads the row whose files are on disk.
-- run-all's failure line says when the saved folder kept an earlier record.
 - An env with a single build reports flavor 'single'.
 - No user-visible text says 'registry'.
 """

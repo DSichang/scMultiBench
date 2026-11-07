@@ -1,12 +1,7 @@
 """Fix round 6, integration: behaviour that needs two work packages at once.
 
-- eval + wf: ``run-all --batch SHEET --batch-column COL`` saves the column it
-  scored with (``batch_<hash>.csv``, the same file a one-column barcode CSV
-  gives), and ``rescore()`` reuses it.
-- eval + cli: ``evaluate --name`` without ``--method`` takes the batch from a
-  sample sheet with ``--batch-column``.
-- cli + msg: the dry run of ``multibench run`` prints its header, then the
-  missing-input note, then the setup note as a sentence, then the command.
+- eval + wf: ``run(batch=)`` saves the batch it scored with
+  (``batch_<hash>.csv``), and ``rescore()`` reuses it.
 """
 import re
 import warnings

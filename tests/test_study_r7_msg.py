@@ -2,7 +2,8 @@
 
 - R7-03: the file check of a variant that reads both ATAC files says so,
   instead of pointing to method_info(m)['atac'] (which says 'peak').
-- R7-07: the scripts-ref note of a run-all dry run comes after the header.
+- R7-07: scan prints the scripts-ref note once, after the count line, and only
+  with verbose=True.
 - R7-08: the dataset-mixing warnings of the plots and to_long's warning for
   scores with no record start with a capital and do not join facts with ', so'.
 - R7-09: export_dataset's full-folder error and the raw-counts warning.

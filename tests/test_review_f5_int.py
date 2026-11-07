@@ -3,12 +3,11 @@
 R5-02: a first column of numbers is read as row numbers unless it holds
 exactly the target's cell ids, so R's write.csv files keep scoring as before
 on an AnnData or a folder whose cell ids are '0'..'n-1'. Several label files
-and ``evaluate --column`` are aligned by their barcode column too. A
-repeated sample column is not taken for cell ids, a repeated barcode is
-named, and the command line names the label files instead of a Python call.
+are aligned by their barcode column too. A repeated sample column is not
+taken for cell ids, and a repeated barcode is named.
 Also: ``_error_tail`` keeps a whole first word, ``load_run`` finds the
 method folders of a moved tree, ``rescore(metrics=[...])`` without ARI
-scores a one-order dataset, CLI help has no backticks, and the scan reasons
+scores a one-order dataset, and the scan reasons
 fit the table.
 """
 import argparse

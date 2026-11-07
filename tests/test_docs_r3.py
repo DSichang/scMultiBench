@@ -115,7 +115,7 @@ def test_discover_keeps_the_full_ranking_pointer_visible():
 @needs_docs
 def test_run_guide_shows_the_peak_token_and_both_batch_spellings():
     """R3-03 / R3-24: the Multiome tab passes atac_peak and each cell's sample
-    to run_all; the one-file cross export scores donors via obs:donor."""
+    to run; the one-file cross export scores donors via obs:donor."""
     run = _read("tutorials/run.md")
     assert 'modalities=["rna", "atac_peak"]' in run
     assert 'batch=mdata.obs["sample"]' in run

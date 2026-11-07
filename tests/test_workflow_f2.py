@@ -1,13 +1,11 @@
 """Student study round 2, package items M19, M23, M28 and M29.
 
-M19: messages printed by the command line name ``multibench ...`` commands,
-not Python calls; JSON output keeps ``/`` unescaped.
+M19: the overwrite refusal of ``export_dataset`` names ``overwrite=True``.
 M23: a vertical folder holding ``atac_peak.h5`` gets a reason that says how
 to fix it.
-M28: ``assume_gpu`` / ``--assume-gpu`` let a GPU-less login node check a job
-for a GPU node; ``--strict`` counts the GPU test on its own.
-M29: one ``--labels`` spelling for a ``.h5mu`` batch, and an error that
-names it.
+M28: ``assume_gpu`` lets a GPU-less login node check a job for a GPU node.
+M29: a label column missing from ``mdata.obs`` gets an error that names
+``mdata.obs``.
 """
 import warnings
 

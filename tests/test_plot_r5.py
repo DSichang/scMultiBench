@@ -2,9 +2,8 @@
 
 R5-08: a bubble figure of few metrics clipped its Rank legend (and, with one
 metric, its Score ramp) at the right edge of the axes.
-R5-11: the plot warnings, the CLI overlay line and the label-order error read
-as plain sentences; the na='raise' error no longer describes a figure it does
-not draw.
+R5-11: the plot warnings and the label-order error read as plain sentences;
+the na='raise' error no longer describes a figure it does not draw.
 R5-14: the evaluate Notes say how LISI turns per-cell scores into one number.
 """
 import importlib
@@ -72,8 +71,6 @@ def test_a_column_one_method_has_is_not_called_equal():
     _, msgs = _messages(_build_table, df)
     assert not any("for every method" in m for m in msgs), msgs
 
-
-# --- R5-11 (c): the CLI overlay line -----------------------------------------
 
 # --- R5-11 (d): na='raise' does not describe the figure it does not draw -------
 

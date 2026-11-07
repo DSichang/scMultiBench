@@ -1,7 +1,7 @@
 """Findings of the review of the round-1 integration (wp/f1_int).
 
 - A scan row's ``modalities`` split on ``+`` selects that row again, in
-  scan, run and the CLI, also for moETM, scMM and iPOLNG (peak input
+  scan and run, also for moETM, scMM and iPOLNG (peak input
   named atac_gas) when methods= names them; ``atac_peak`` with ``atac_gas``
   means "reads both files" (MultiMAP, Seurat_v3) instead of an error (L13
   kept 0.3.1's calls).

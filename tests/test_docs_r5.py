@@ -1,17 +1,10 @@
 """Round 5 of the student study: what the docs pages now say.
 
-Get started (R5-15): the Quickstart CLI block lets ``multibench evaluate``
-read the D28 label files in SCALEX's cell order (``--method SCALEX``) and
-names the rows with ``--name SCALEX_rerun``. The block's evaluate line is run
-as printed, on a small D28 folder.
-
 Guides (R5-17, R5-02): the comparability sentence on tutorials/evaluate is
 plain, and the page says that a CSV whose first column holds the cell ids is
 aligned by id.
 
-API overview and Changes (R5-16) and the code font (R5-18): exit code ``3``
-follows the CLI rule, the Changes page lists the round-5 changes and quotes
-the live stderr line, and code is drawn without ligatures.
+The code font (R5-18): code is drawn without ligatures.
 
 Every test needs the docs source (SCMULTIBENCH_DOCS=<docs dir>) and is
 skipped without it.

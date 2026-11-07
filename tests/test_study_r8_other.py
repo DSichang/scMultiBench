@@ -6,8 +6,6 @@ gap; figures whose headers already fit are drawn as before.
 R8-07: the last messages in the old style (grey columns, the one-method
 table, the label-order errors, a failed scripts fetch) are short capitalised
 sentences, and the fetch error fits run's FAIL line whole.
-R8-08: the help of ``multibench scan`` and ``multibench convert`` is short
-sentences without ';', nested parentheses or slash lists.
 """
 import importlib
 import warnings

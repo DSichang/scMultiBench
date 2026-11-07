@@ -243,7 +243,7 @@ def test_canonical_files_still_pass(tmp_path):
 def test_the_10x_names_leave_out_the_advice_to_delete_the_column(tmp_path, capsys):
     """Deleting var['feature_types'] of a 10x object would write genes and
     peaks, or genes and antibodies, into one file. No message for the 10x
-    type names gives that advice, in Python or on the command line."""
+    type names gives that advice."""
     arc, cite = (_arc(), _cite())
     src = tmp_path / 'arc.h5ad'
     arc.write_h5ad(src)

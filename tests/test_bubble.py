@@ -253,7 +253,7 @@ def test_circles_of_values_tied_by_rounding_have_one_size():
 
 
 def test_python_bubble_titles_its_one_category_and_dataset():
-    # X86 (r3): the command line's default title
+    # X86 (r3): the default title
     import warnings
     import multibench as mtb
     with warnings.catch_warnings():

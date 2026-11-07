@@ -1,10 +1,8 @@
-"""CLI/API parity nits from the re-test, each with its evidence.
+"""Nits from the re-test, each with its evidence.
 
-* ``multibench scan D52`` without ``--category`` scans all four, like Python;
 * ``inputs_for('D52', 'StabMap', 'cross')`` (the 0.2 order) is refused, never accepted;
 * a lower-case dataset id is canonicalised to the on-disk folder name;
-* ``run(dry_run=True)`` returns the ``command`` column the CLI csv carries;
-* ``multibench cite A,B`` works like ``multibench cite A B``.
+* without ``out_dir``, the plan's ``command`` column holds the ``<out_dir>`` placeholder.
 """
 import os
 import warnings

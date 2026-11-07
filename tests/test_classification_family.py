@@ -1,5 +1,5 @@
 """The classification family (OCA, ACA, Spec, Sens, F1) in evaluate, to_long,
-run / rescore, the plots and the command line.
+run / rescore and the plots.
 
 ``evaluate`` reports the ``mean`` row of
 ``classification_metrics(classify(...))``; by default only for two or more

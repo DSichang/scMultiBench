@@ -158,7 +158,6 @@ def test_mudata_spellings_are_unchanged(tmp_path):
         "labels='site': 1 of the 60 labels for the cells are missing")
 
 
-# ---- the Python part of tests that also ran the command line
 def test_a_modality_prefix_on_an_anndata_is_a_column_name(tmp_path, capsys):
     """``'<mod>:<col>'`` reads a column of one modality of a MuData. Two
     AnnData objects have no modalities: the name is a column name, and the

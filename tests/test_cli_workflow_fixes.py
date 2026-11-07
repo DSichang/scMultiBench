@@ -1,7 +1,7 @@
 """Work package J (workshop re-study, personas Chen and Ben): run error
-scoping, compact CLI tables, dry-run command preview, --param, one env-name
-resolver for every env command, did-you-mean before I/O, stdout/stderr
-discipline.
+scoping, the command preview of scan and ``runner.preview``, ``params=``
+checked before I/O, unknown methods refused before I/O, and one env-name
+resolver for every entry point.
 
 Every test here is host-independent: where a verdict depends on which conda
 envs are installed, ``workflow._installed_envs`` is pinned to "none".

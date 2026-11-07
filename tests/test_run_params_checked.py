@@ -1,9 +1,8 @@
-"""``run(params=)`` and ``run --param`` refuse a key the variant does not accept.
+"""``run(params=)`` refuses a key the variant does not accept.
 
 ``run(params={"epoch": 3}, dry_run=True)`` returned a command ending
-``--epoch 3`` (the script would stop on it) and ``run --param nonsense=1``
-did the same, though ``run --help`` says such a key is rejected. Both raise
-now, with the message ``run`` gives.
+``--epoch 3`` (the script would stop on it). It raises now, with the message
+``run`` gives.
 """
 from __future__ import annotations
 

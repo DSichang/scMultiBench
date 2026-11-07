@@ -1,8 +1,8 @@
-"""CLI fixes from the round-1 virtual-student study (ledger L07, L22-L24,
-L26-L29, L32, L41, L52, L61 for cli.py / envs.py / config.py).
+"""Fixes from the round-1 virtual-student study (ledger L07, L22-L24,
+L26-L29, L32, L41, L52, L61 for envs.py / config.py).
 
-Each test fails on the code before its fix: the subcommand, flag or message
-it checks did not exist or read differently.
+Each test fails on the code before its fix: what it checks did not exist or
+read differently.
 """
 from pathlib import Path
 

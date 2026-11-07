@@ -7,7 +7,6 @@
   names no selector.
 - The refusal of one matrix for two modalities.
 - ``adt_names`` given a string.
-- On the command line the diagonal label error began with ``labels='...'``.
 - The Changes page said that ``adt='layer:counts'`` is refused.
 """
 import warnings

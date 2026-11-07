@@ -1,13 +1,6 @@
-"""Fix round 3, work package 'cli': ``run-all --batch`` (R3-09), help texts that
-name `multibench config` (R3-11; ``scan --strict`` is hidden since 0.4.0), and the
-``env plan`` / ``env install`` size total in two short lines (R3-13).
-
-The run-all test runs the real runner in prefix mode against a stand-in env
-prefix (a ``bin/python`` stub that writes an embedding), so the path from the
-command line to ``run(batch=)`` and the saved summary is exercised end to
-end without conda or a method.
+"""Fix round 3, work package 'cli': the size total of an install plan
+(``envs.plan_totals``) in one short line (R3-13).
 """
-import os
 import textwrap
 
 import h5py
@@ -18,27 +11,6 @@ from multibench import _settings
 from multibench.engine import envs
 
 N = 120
-
-
-def _rendered_help(parser, flag, columns=80):
-    """The lines ``--help`` prints for ``flag`` at a terminal ``columns`` wide."""
-    old = os.environ.get("COLUMNS")
-    os.environ["COLUMNS"] = str(columns)
-    try:
-        text = parser.format_help()
-    finally:
-        if old is None:
-            os.environ.pop("COLUMNS", None)
-        else:
-            os.environ["COLUMNS"] = old
-    lines = text.splitlines()
-    start = next(i for i, l in enumerate(lines) if l.lstrip().startswith(flag))
-    out = [lines[start]]
-    for l in lines[start + 1:]:
-        if not l.startswith(" " * 10) or l.lstrip().startswith("-"):
-            break
-        out.append(l)
-    return out
 
 
 # ====================================================================== R3-09
