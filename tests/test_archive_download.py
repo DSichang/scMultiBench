@@ -155,3 +155,64 @@ def test_a_small_file_reads_in_megabytes(monkeypatch, tmp_path, capsys):
     envs.download_archive(["https://u/s"], tmp_path / "x", label="s", total=len(data))
     out = capsys.readouterr().out
     assert out.startswith("[env] downloading s 53 MB ...") and "of 53 MB" in out
+
+
+# ------------------------------------------- a body shorter than its Content-Length
+@pytest.fixture
+def http_body():
+    """``start(body, cut)``: a local HTTP server for ``body`` that honours Range
+    and whose first ``cut`` answers stop halfway, after announcing the whole
+    length; returns ``(url, ranges)``, the Range header of each request."""
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    servers = []
+
+    def start(body, cut):
+        ranges = []
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                rng = self.headers.get("Range")
+                ranges.append(rng)
+                rest = body[int(rng.split("=")[1].rstrip("-")):] if rng else body
+                self.send_response(206 if rng else 200)
+                self.send_header("Content-Length", str(len(rest)))
+                self.end_headers()
+                self.wfile.write(rest[:len(rest) // 2] if len(ranges) <= cut else rest)
+
+            def log_message(self, *args):
+                pass
+
+        srv = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        servers.append(srv)
+        return f"http://127.0.0.1:{srv.server_port}/a.tar.gz", ranges
+
+    yield start
+    for srv in servers:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_a_body_cut_short_resumes_with_a_range(http_body, monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr("time.sleep", lambda s: None)
+    data = bytes(range(256)) * 400
+    url, ranges = http_body(data, cut=1)
+    assert envs.download_archive([url], tmp_path / "x", label="p", total=len(data)) == len(data)
+    assert (tmp_path / "x").read_bytes() == data
+    assert ranges == [None, f"bytes={len(data) // 2}-"]
+    assert "connection lost (ConnectionError); resuming" in capsys.readouterr().out
+
+
+def test_a_body_cut_short_every_time_raises(http_body, monkeypatch, tmp_path):
+    monkeypatch.setattr("time.sleep", lambda s: None)
+    url, ranges = http_body(b"x" * 1000, cut=99)
+    with pytest.raises(ConnectionError):
+        envs.download_archive([url], tmp_path / "x", label="p", total=1000, attempts=2)
+    assert len(ranges) == 2
+
+
+def test_a_whole_body_is_read_once(http_body, tmp_path):
+    url, ranges = http_body(b"x" * 1000, cut=0)
+    assert envs.download_archive([url], tmp_path / "x", label="p", total=1000) == 1000
+    assert ranges == [None]

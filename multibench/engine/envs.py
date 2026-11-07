@@ -461,8 +461,10 @@ def download_archive(urls: list[str], target: Path, *, label: str,
     """Stream ``urls`` in order into ``target``; return the bytes written.
 
     Prints a line at the start, then one progress line that is rewritten per
-    tenth of ``total`` (per 500 MB when it is unknown). A dropped or stalled connection or an HTTP 5xx resumes where
-    it stopped, up to ``attempts`` times per URL; another HTTP error raises.
+    tenth of ``total`` (per 500 MB when it is unknown). A dropped or stalled
+    connection, a body shorter than its ``Content-Length`` or an HTTP 5xx
+    resumes where it stopped, up to ``attempts`` times per URL; another HTTP
+    error raises.
     """
     import time
     import urllib.error
@@ -500,6 +502,12 @@ def download_archive(urls: list[str], target: Path, *, label: str,
                             out.truncate()
                             done = start
                         copy(resp, out)
+                        # a body cut short ends without an error; http.client
+                        # keeps the bytes still owed in `length`
+                        if getattr(resp, "length", None):
+                            raise ConnectionError(
+                                f"The server closed the connection before the end of "
+                                f"{label}. Run the call again.")
                     break
                 except (OSError, TimeoutError) as e:
                     final = isinstance(e, urllib.error.HTTPError) and e.code < 500
