@@ -11,9 +11,6 @@ metrics, and draws scIB-style bubble tables.
 
 **Documentation and tutorials:** <https://dsichang.github.io/scMultiBench/>
 
-
-
-
 ## Citation
 
 Liu C, Ding S, Kim HJ, Long S, Xiao D, Ghazanfar S, Yang P.
