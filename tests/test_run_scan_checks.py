@@ -1,4 +1,4 @@
-"""Journal review, round 1: run, scan and RunResult."""
+"""``run``, ``scan`` and ``RunResult``."""
 import ast
 import json
 from pathlib import Path
@@ -32,7 +32,7 @@ def test_engine_and_eval_never_import_workflow():
 
 
 def test_embedding_names_a_missing_dataset_folder(tmp_path, monkeypatch):
-    """u7 D3: a run folder copied to a laptop that does not have the dataset
+    """A run folder copied to a laptop that does not have the dataset
     folder; the label files are not the problem."""
     out = tmp_path / "out"
     (out / "Matilda_MYD").mkdir(parents=True)
@@ -54,7 +54,7 @@ def test_embedding_names_a_missing_dataset_folder(tmp_path, monkeypatch):
 
 
 def test_scan_says_a_file_problem_once(tmp_path, capsys):
-    """u8: a transposed rna.h5 was printed once per method (14 identical lines);
+    """A transposed rna.h5 was printed once per method (14 identical lines);
     the reason column keeps it for each method."""
     d = tmp_path / "TRANSPOSED"
     d.mkdir()
@@ -74,7 +74,7 @@ def test_scan_says_a_file_problem_once(tmp_path, capsys):
 
 
 def test_run_refuses_an_unknown_params_key_before_any_method_runs(tmp_path, monkeypatch):
-    """u4 D5: a typo in the params of the second method of a sweep was found
+    """A typo in the params of the second method of a sweep was found
     only after the first method ran; run raises scan's error first."""
     monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
     started = []
@@ -113,7 +113,7 @@ def _fake_method(calls, *, stop_after=None):
 
 
 def test_a_run_killed_after_one_method_keeps_its_scores(tmp_path, monkeypatch):
-    """u7 D1: the records were written once, after the last method, so a job
+    """The records were written once, after the last method, so a job
     killed at its wall-time limit kept no record of the methods that finished."""
     if not (Path(mtb.config.data_path) / "D11").is_dir():
         pytest.skip("D11 is not on disk")
