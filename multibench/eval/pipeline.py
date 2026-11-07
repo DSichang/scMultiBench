@@ -828,6 +828,38 @@ def _cell_labels(labels, emb, adata, ids, read=(), others=None):
     return emb, ct, origin
 
 
+def _batch_for_compute(batch, adata, n_cells: int, *, ids, read, origin):
+    """The batch of each cell for compute(): ``batch=``, else ``origin`` (the
+    label file of each cell, 1, 2, ..., as run), else one batch: the clustering
+    metrics need a batch key but do not use it."""
+    if batch is not None:
+        return _obs_or_vector(batch, adata, what="batch", ids=ids, read=read)
+    if origin is not None:
+        return origin
+    return np.zeros(n_cells, dtype=int)
+
+
+def _check_cells(n_cells: int, ct, cl, ba, *, cells, labels, batch) -> None:
+    """``ValueError`` when the labels, clusters or batches do not give one value
+    for each of the ``n_cells`` cells, or a label or a given batch is missing."""
+    if cells is not None and cells.whole:
+        n_held = sum(len(io.read_labels(f)) for f in cells.files)
+        if n_held != n_cells:
+            raise ValueError(_count_error("labels", n_held, n_cells, cells))
+    from_files = cells if cells is not None and cells.from_files else None
+    for what, values in (("labels", ct), ("clusters", cl), ("batch", ba)):
+        if values is not None and len(values) != n_cells:
+            raise ValueError(_count_error(what, len(values), n_cells, from_files))
+    # checked here: compute() casts labels to str, and "nan" would become a cell type
+    miss = io.missing_mask(ct)
+    if miss.any():
+        raise ValueError(_no_label_error(ct, miss, labels))
+    if batch is not None:
+        no_batch = io.missing_mask(ba)
+        if no_batch.any():
+            raise ValueError(_no_batch_error(np.asarray(ba), no_batch, batch))
+
+
 def _scores(
     embedding,
     labels=None,
@@ -877,38 +909,16 @@ def _scores(
             graph = "output"                       # cells x cells, or a kNN index
     # the clusters of run's label-order screening, an array in the embedding's rows
     cl = None if clusters is None else np.asarray(clusters)
-    if batch is not None:
-        ba = _obs_or_vector(batch, adata, what="batch", ids=ba_ids, read=read)
-    elif batch_from_files and group in {"batch", "all"}:
-        # the label file of each cell (1, 2, ...), as run
-        ba = origin
-    else:
-        # the clustering metrics need a batch key but do not use it
-        ba = np.zeros(emb.shape[0], dtype=int)
+    ba = _batch_for_compute(
+        batch, adata, emb.shape[0], ids=ba_ids, read=read,
+        origin=origin if batch_from_files and group in {"batch", "all"} else None)
     cb = None             # the batches classification learns from and predicts
     if want_cls:
         # diagonal: the RNA and ATAC sides of the folder, whatever batch= is
         sides = category == "diagonal" and origin is not None and len(set(origin)) > 1
         cb = _origin_names(labels, origin) if batch_from_files or sides else \
             ba if batch is not None else None
-
-    n_cells = emb.shape[0]
-    if cells is not None and cells.whole:
-        n_held = sum(len(io.read_labels(f)) for f in cells.files)
-        if n_held != n_cells:
-            raise ValueError(_count_error("labels", n_held, n_cells, cells))
-    from_files = cells if cells is not None and cells.from_files else None
-    for what, values in (("labels", ct), ("clusters", cl), ("batch", ba)):
-        if values is not None and len(values) != n_cells:
-            raise ValueError(_count_error(what, len(values), n_cells, from_files))
-    # checked here: compute() casts labels to str, and "nan" would become a cell type
-    miss = io.missing_mask(ct)
-    if miss.any():
-        raise ValueError(_no_label_error(ct, miss, labels))
-    if batch is not None:
-        no_batch = io.missing_mask(ba)
-        if no_batch.any():
-            raise ValueError(_no_batch_error(np.asarray(ba), no_batch, batch))
+    _check_cells(emb.shape[0], ct, cl, ba, cells=cells, labels=labels, batch=batch)
     if group in ("batch", "all") and len(set(np.asarray(ba).astype(str).tolist())) < 2:
         # batch metrics on one batch: NaN, or a GC of 1.0
         if metrics is not None:
@@ -933,8 +943,4 @@ def _scores(
                 else pd.DataFrame({"Value": rows})
     from .. import __version__
     out.attrs = {**attrs, "multibench_version": __version__, "scib_version": _scib_version()}
-    if out.empty:
-        # unreachable while every family code is one compute() scores; loud if not
-        raise ValueError(
-            f"evaluate(metrics={metrics!r}) selected no metric - nothing to return")
     return out
