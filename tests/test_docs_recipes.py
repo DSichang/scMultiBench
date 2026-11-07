@@ -328,9 +328,9 @@ def test_the_fences_are_the_ones_these_tests_run():
         assert [f.splitlines()[0] for f in _fences(anchor)] == first_lines, anchor
     # the section opens by saying where a recipe runs and which names it uses
     opening = " ".join(_section().split("\n### ", 1)[0].split())
-    assert ("Run them in the tutorial notebook of your task: `mtb` is imported, `METHODS` is "
-            "the list of methods from its section 2, and its check cell and `run` cell "
-            "use `NAME`, the folder name that a recipe sets.") in opening
+    assert ("Run them in the tutorial notebook of your task. There `mtb` is imported, and "
+            "`METHODS` is the list of methods from its section 2. Its check cell and `run` "
+            "cell use `NAME`, the folder name that a recipe sets.") in opening
     assert ("The recipes write to `mydata/` and call the cell-type column `celltype`, as the "
             "tutorials do.") in opening
 
@@ -1145,7 +1145,7 @@ def test_two_diagonal_donors_run_from_one_rna_and_one_atac_file(host, tmp_path, 
     the diagonal RNA + ATAC tutorial does, and passes the donors as batch=.
     The run scores the batch metrics of the 2 donors."""
     _says("recipe-donors", "For diagonal data with another number of donors than 3, do the "
-                           "same in the diagonal RNA + ATAC tutorial: export `rna` and `atac` "
+                           "same in the diagonal RNA + ATAC tutorial. Export `rna` and `atac` "
                            "with all their cells, without `batch_index=`, and give `run` the "
                            "donor of every RNA and ATAC cell:")
     key = "diagonal_rna_atac"

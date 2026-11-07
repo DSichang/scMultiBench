@@ -38,7 +38,12 @@ def test_evaluate_page_comparability_sentence_is_plain():
     # e1: the run-to-run difference is named where it was measured (sciPENN, VIMCCA)
     assert ("some methods, such as sciPENN and VIMCCA, give a slightly different "
             "embedding on each run.") in visible
-    assert "Compare ranks." not in visible and "4,096" not in visible
+    assert "Compare ranks." not in visible
+    # journal u5: the machine is named too (scanpy's approximate neighbours above
+    # 4,096 cells); the classification scores do not move with it
+    assert ("Above 4,096 cells, the same embedding also scores a few hundredths "
+            "differently on another computer, because the neighbours are approximate. "
+            "Its classification scores do not change.") in visible
     # v1 (u4#6): what holds, in one sentence and without a number (D45 Cobolt's
     # ARI moved 0.118 across shuffles)
     assert ("The Leiden-based and classification scores of the same embedding also "
@@ -50,7 +55,8 @@ def test_evaluate_page_comparability_sentence_is_plain():
 @needs_docs
 def test_evaluate_page_says_a_barcode_csv_is_aligned_by_id():
     text = _flat("tutorials/evaluate.md")
-    assert "A CSV whose first column holds the cell ids is aligned the same way." in text
+    assert ("A `Series` indexed by cell id, or a CSV whose first column holds the cell "
+            "ids, is then aligned by id.") in text
     assert "Plain arrays, lists and label files are always matched by position." not in text
 
 

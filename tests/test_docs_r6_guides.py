@@ -16,10 +16,11 @@ def test_evaluate_page_names_what_a_bare_array_output_matches_by_position():
     text = _flat("tutorials/evaluate.md")
     assert "both are matched by position" not in text
     # d1 (u2): a CSV without cell ids is matched by position without a warning
-    assert ("When the output is a bare array, it has no cell ids: a Series, and a CSV "
-            "whose first column holds cell ids, are matched by position, with a warning. "
-            "Plain arrays, lists and a CSV without cell ids are always matched by "
-            "position.") in text
+    # journal: a CSV without cell ids is refused when the output has ids, so only
+    # plain arrays and lists are matched by position whatever the output
+    assert ("A bare array has no cell ids. A `Series` or a CSV is then matched by "
+            "position, with a warning when it holds cell ids. Plain arrays and lists are "
+            "always matched by position.") in text
 
 
 @needs_docs
