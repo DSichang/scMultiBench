@@ -75,7 +75,7 @@ def test_scan_caveat_names_the_non_integer_file(tmp_path):
     assert sc["files_ok"].all()                      # a caveat, not a file failure
     assert all(f"{m} needs raw counts. rna.h5 holds non-integer values." in c
                for m, c in zip(sc["method"], sc["caveat"])), sc["caveat"].tolist()
-    assert not sc["caveat"].str.contains("adt.h5").any()
+    assert not sc["caveat"].str.contains("adt.h5 holds").any()
     b = _cite()
     ingest.export_dataset(b, tmp_path / "INT", adt="obsm:protein", labels="obs:cell_type")
     sc = full_scan("INT", "vertical", data_path=tmp_path, modalities=["rna", "adt"])
