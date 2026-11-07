@@ -135,7 +135,7 @@ def _tenx(path, n=60):
 
 def test_a_10x_file_under_a_dataset_name_is_named_on_its_methods_lines(linux, tmp_path,
                                                                        capsys):
-    """A 10x file copied to rna.h5: the line of each method that reads it says so."""
+    """A 10x file copied to rna.h5: scan says so once, for every method that reads it."""
     def first(*a, **kw):
         mtb.config.data_path = tmp_path
         pm = _quiet(mtb.scan, *a, **kw)
@@ -146,8 +146,8 @@ def test_a_10x_file_under_a_dataset_name_is_named_on_its_methods_lines(linux, tm
     mtb.config.data_path = tmp_path
     pm = _quiet(mtb.scan, "MIX", "vertical", methods=["Seurat_WNN", "totalVI"])
     out = capsys.readouterr().out
-    for m in ("Seurat_WNN", "totalVI"):
-        assert f"[scan] {m}: rna.h5 is a 10x Genomics file." in out, out
+    assert out.count("rna.h5 is a 10x Genomics file.") == 1, out
+    assert "[scan] rna.h5 is a 10x Genomics file." in out, out
     assert not pm["runnable"].any()
     # a 2-D matrix/data next to a matrix/indptr is a dataset file, as for mtb.run
     _cite(tmp_path, "BOTH")

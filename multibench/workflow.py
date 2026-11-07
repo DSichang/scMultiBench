@@ -324,6 +324,13 @@ def _short_reason(text: str, method: str, dataset: str) -> str:
     return _ABS_PATH_RE.sub(lambda m: m.group(0).rstrip("/").rsplit("/", 1)[-1], part)
 
 
+def _about_one_file(text: str, method: str, dataset: str) -> bool:
+    """Whether an ``inputs_for`` error is about one file of the folder
+    (``<method> reads <file> of <dataset>, which ...``): the same for every method."""
+    return re.match(rf"{re.escape(method)} reads \S+ of {re.escape(str(dataset))}, which ",
+                    _EXC_PREFIX_RE.sub("", text)) is not None
+
+
 #: The representation-mismatch caveats of ``_resolve._preflight_caveats`` after the
 #: method name; groups: wanted, file, held.
 _WRONG_ATAC_BODY = (r"needs (gene-activity|peak) ATAC\. The features of (\S+) (?:do not )?"
@@ -450,7 +457,7 @@ def _command_line(method: str, category: str, inputs: dict, *, out_dir, dataset:
 
 
 #: what :func:`_scan` keeps of each row besides the shown columns (its second frame)
-_PRIVATE_COLUMNS = ["_other", "_label_inputs", "_folder_caveat"]
+_PRIVATE_COLUMNS = ["_other", "_label_inputs", "_folder_caveat", "_file_problem"]
 
 _FAMILY_WORDS = {"rna": "RNA", "adt": "ADT", "atac": "ATAC"}
 
@@ -666,8 +673,8 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
           data_path=None, out_dir=OUT_DIR_PLACEHOLDER, params: dict | None = None,
           assume_gpu: bool = False) -> "tuple[pd.DataFrame, pd.DataFrame]":
     """The full plan (every column of :data:`PLAN_COLUMNS`), and a second frame
-    aligned with it: ``_other`` (the
-    reason without the off-Linux sentence), ``_label_inputs`` and ``_folder_caveat``."""
+    aligned with it: ``_other`` (the reason without the off-Linux sentence),
+    ``_label_inputs``, ``_folder_caveat`` and ``_file_problem`` (its part about one file)."""
     dataset, data_path = _resolve.split_dataset(dataset, data_path)
     methods, every, modalities, params = _checked_args(category, methods, modalities,
                                                        params, "scan")
@@ -704,7 +711,7 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
             file_problems.append(why_script)
             short_problems.append(_short_reason(why_script, spec.id, dataset))
         got, wrong_atac = None, ""
-        rec["_label_inputs"], rec["_folder_caveat"] = (), ""
+        rec["_label_inputs"], rec["_folder_caveat"], rec["_file_problem"] = (), "", ""
         try:
             got = _resolve.inputs_for(dataset, cat, spec.id, modalities=mods or None,
                                       data_path=data_path, check=True)
@@ -724,6 +731,8 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
             short_problems.append(short)
             if _reads_one_of_numbered(missing.values(), cat):
                 folder_only.append(short)
+            elif not missing and _about_one_file(full, spec.id, dataset):
+                rec["_file_problem"] = _join_sentences([short])
         if file_problems:
             rec["files_ok"], rec["files_reason"] = False, " ".join(file_problems)
         env_hint = gpu_hint = ""
@@ -923,7 +932,7 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
             -len(str(group.at[i, "modalities"]).split("+")), i))
         rows.append((method, cat, group.at[i, "modalities"], False, group.at[i, "reason"],
                      *group.loc[i, ["env", "caveat", "command"]]))
-        reasons.append((method, private.at[i, "_other"]))
+        reasons.append((method, private.at[i, "_other"], private.at[i, "_file_problem"]))
     out = pd.DataFrame(rows, columns=SCAN_COLUMNS)
     order = out.sort_values(["runnable", "method", "category"],
                             ascending=[False, True, True]).index
@@ -958,10 +967,15 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
     if per_batch:
         print(f"[scan] {per_batch}", flush=True)
     if not several:                   # one category: why each method cannot run
-        for method, reason in sorted(reasons):
+        # a file's problem is the same for every method that reads it: said once
+        for problem in dict.fromkeys(p for _, _, p in reasons if p):
+            print(f"[scan] {problem}", flush=True)
+        for method, reason, problem in sorted(reasons):
             # the per-batch sentence was printed once above
             if per_batch:
                 reason = reason.replace(per_batch, "").strip()
+            if problem:
+                reason = reason.replace(problem + " ", "").replace(problem, "").strip()
             if reason:
                 print(f"[scan] {method}: {reason}", flush=True)
     would = [i for i, r in df.iterrows() if _would_run(r)]

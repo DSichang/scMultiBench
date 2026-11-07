@@ -246,7 +246,7 @@ def test_the_reason_starts_with_the_file_when_the_data_path_has_a_space(ready, t
         assert 'My Data' not in df['files_reason'][0]
         pm = mtb.scan(name, 'vertical', **kw)
         assert list(pm['reason']) == [short]
-        assert capsys.readouterr().out.splitlines()[-1] == f'[scan] totalVI: {short}'
+        assert capsys.readouterr().out.splitlines()[-1] == f'[scan] {short}'
         with pytest.raises(ValueError) as e:
             mtb.run(name, 'vertical', out_dir=tmp_path / 'out', **kw)
         assert f'  totalVI (rna+adt): {short}\n' in str(e.value)
