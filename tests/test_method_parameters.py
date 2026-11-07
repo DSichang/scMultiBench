@@ -95,6 +95,21 @@ def test_download_refuses_an_archive_with_another_sha256(tmp_path, monkeypatch, 
     assert not (tmp_path / "scripts").exists() and not (tmp_path / "scripts.partial").exists()
 
 
+def test_an_archive_not_published_is_named_with_its_url(tmp_path, monkeypatch, scripts_download):
+    """A 404 is not a network problem: the message names the URL and where to report it."""
+    import urllib.error
+
+    def missing(url):
+        raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)
+    monkeypatch.setattr(scripts, "_archive_bytes", missing)
+    with pytest.raises(RuntimeError) as e:
+        scripts.ensure_repo(tmp_path / "scripts")
+    msg = str(e.value)
+    assert scripts.scripts_archive()["url"] in msg and "(HTTP 404)" in msg
+    assert msg.endswith(f"Report it at {scripts.ISSUES_URL}.")
+    assert not (tmp_path / "scripts").exists() and not (tmp_path / "scripts.partial").exists()
+
+
 def test_download_unpacks_the_scripts_and_a_run_record_names_them(tmp_path, monkeypatch,
                                                                   scripts_download):
     monkeypatch.setattr(config, "repo_path", tmp_path / "scripts")

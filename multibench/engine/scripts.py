@@ -22,6 +22,8 @@ SCRIPTS_URL = "https://github.com/PYangLab/scMultiBench.git"
 _ARCHIVE = Path(__file__).resolve().parent / "scripts_archive.json"
 #: A file a download leaves in the scripts folder: the sha256 of the archive.
 _ARCHIVE_RECORD = ".multibench-scripts-archive"
+#: Where a missing archive of the package's scripts is reported.
+ISSUES_URL = "https://github.com/DSichang/scMultiBench/issues"
 
 
 @functools.lru_cache(maxsize=1)
@@ -248,9 +250,15 @@ def _download(part: Path) -> None:
     from .._data.fetch import safe_extract
 
     shutil.rmtree(part, ignore_errors=True)
+    import urllib.error
+
     rec = scripts_archive()
     try:
         data = _archive_bytes(rec["url"])
+    except urllib.error.HTTPError as e:
+        from .. import __version__
+        raise RuntimeError(f"The method scripts of multibench {__version__} are not at "
+                           f"{rec['url']} (HTTP {e.code}). Report it at {ISSUES_URL}.") from e
     except OSError as e:
         raise RuntimeError(f"Could not reach github.com to fetch the method scripts. "
                            f"Copy {_FOLDER}") from e
