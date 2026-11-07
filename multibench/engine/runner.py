@@ -62,6 +62,10 @@ def wrap_prefix(cmd: list[str], env: str, prefix: Path | str) -> list[str]:
     return ["bash", "-c", f"{prefix_activation(env, prefix)}; exec \"$@\"", "--", *cmd]
 
 
+#: The ``out_dir`` of scan's ``command`` column.
+OUT_DIR_PLACEHOLDER = "<out_dir>"
+
+
 def normalize_paths(inputs: dict, out_dir) -> tuple[dict, str]:
     """``(inputs, out_dir)`` with every path absolute; ``out_dir``, ``data_dir``
     and any existing directory get a trailing separator.
@@ -70,8 +74,6 @@ def normalize_paths(inputs: dict, out_dir) -> tuple[dict, str]:
     and a file name (``data_path + "rna.h5"``). ``os.path.abspath`` keeps
     symlinked data roots as written. Values that are not paths pass through.
     """
-    from ..workflow import OUT_DIR_PLACEHOLDER      # workflow imports this module
-
     def absolute(path):
         # a preview's placeholder stays as written
         path = os.fspath(path)

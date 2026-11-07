@@ -1219,3 +1219,93 @@ def labels_for(dataset: str, category: str | None = None, method: str | None = N
             if rank is not None:
                 stems = sorted(stems, key=lambda st: rank[st])
     return LabelFiles((st, files[st]) for st in stems)
+
+
+# ------------------------------------------------- benchmark datasets and run folders
+# for workflow and eval.pipeline, which import them from here
+def known_category(dataset) -> str | None:
+    """The one category the benchmark scored the dataset ``dataset`` names in
+    (``catalog.datasets()``), or ``None`` for a dataset of its own."""
+    import warnings
+    from .._data import catalog
+    name = split_dataset(dataset, None)[0]
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        rows = catalog.datasets()
+    cats = rows.loc[rows["dataset"] == str(name), "category"].dropna()
+    return cats.iloc[0] if len(cats) == 1 and ";" not in cats.iloc[0] else None
+
+
+def own_batches_only(dataset) -> None:
+    """``ValueError`` for ``batch=`` on a benchmark dataset: a dataset has one
+    batch label, and a benchmark dataset's is its label files."""
+    if known_category(dataset) is not None:
+        name = split_dataset(dataset, None)[0]
+        raise ValueError(f"{name} is a benchmark dataset: its batches are its label files. "
+                         f"Pass batch= only for a dataset of your own.")
+
+
+def _run_record_for(path, dataset: str) -> dict | None:
+    """The record of the run of ``dataset`` whose method folder holds the file
+    ``path`` (``<out_dir>/<method>_<dataset>/embedding.h5``), else ``None``."""
+    import json
+    if not isinstance(path, (str, os.PathLike)):
+        return None
+    folder = Path(path).expanduser().resolve().parent
+    blob_path = folder.parent / "batch_result.json"
+    try:
+        with open(blob_path) as fh:
+            blob = json.load(fh)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(blob, dict) or blob.get("dataset") != dataset:
+        return None
+    for r in blob.get("records") or ():
+        saved = Path(str(r.get("out_dir") or f"{r.get('method')}_{dataset}"))
+        if saved.name == folder.name and registry.method_of(str(r.get("method"))):
+            return {"method": registry.method_of(r["method"]),
+                    "category": r.get("category") or blob.get("category"),
+                    "labels_used": list(r.get("labels_used") or ())}
+    return None
+
+
+def _dataset_folder(dataset, data_path) -> Path:
+    """``<data_path>/<dataset>``, with ``None`` = config's data root."""
+    base = config.data_path if data_path is None else data_path
+    return Path(base) / dataset
+
+
+def _method_files(dataset, category, method, modalities=None, data_path=None) -> set:
+    """The names of the files ``method`` reads from ``dataset``; ``set()`` when
+    they cannot be resolved (another layout, or no such method)."""
+    import warnings
+    if not method or registry.method_of(method) is None:
+        return set()
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            paths = inputs_for(dataset, category, registry.method_of(method),
+                               modalities=modalities or None,
+                               data_path=data_path, check=False)
+    except (FileNotFoundError, KeyError, ValueError):
+        return set()
+    return {Path(p).name for p in paths.values()}
+
+
+def _label_data_files(label: Path, read=()) -> list[Path]:
+    """The data files whose barcodes are the cells of one label file:
+    ``cty2.csv`` -> ``rna2.h5, adt2.h5, ...``; ``atac_cty.csv`` -> the ATAC files,
+    the ones a method read (``read``: file names) first."""
+    stem = label.stem
+    digits = stem[len(stem.rstrip("0123456789")):]
+    base = stem[:len(stem) - len(digits)]
+    if base == "cty":
+        stems = ["rna", "adt", "atac", "atac_peak", "atac_gas"]
+    elif base in ("rna_cty", "adt_cty"):
+        stems = [base[:-4]]
+    elif base == "atac_cty":
+        stems = ["atac_peak", "atac_gas", "atac"]
+    else:
+        stems = []
+    files = [label.parent / f"{s}{digits}.h5" for s in stems]
+    return sorted(files, key=lambda f: f.name not in read)

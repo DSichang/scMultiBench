@@ -34,7 +34,9 @@ from .discover import _REPRESENTATION_TOKENS
 from .engine import envs, registry, resolve as _resolve, scripts
 from .engine import runner as _runner
 from .engine.schema import base_modality as _schema_base
-from .engine.runner import run as _run
+from .engine.resolve import (_dataset_folder, _label_data_files, _method_files,
+                             known_category, own_batches_only)
+from .engine.runner import OUT_DIR_PLACEHOLDER, run as _run
 from .eval import io as _eio, scib as _escib
 from .eval.pipeline import LONG_COLUMNS as _LONG_COLUMNS, _long_table as _to_long, _scores
 
@@ -124,29 +126,6 @@ def load_run(out_dir, *, methods=None) -> "RunResult":
     for r in records:
         res._batch_text(r.get("batch_file"))       # loads the saved batch, when present
     return res
-
-
-def _run_record_for(path, dataset: str) -> dict | None:
-    """The record of the run of ``dataset`` whose method folder holds the file
-    ``path`` (``<out_dir>/<method>_<dataset>/embedding.h5``), else ``None``."""
-    if not isinstance(path, (str, os.PathLike)):
-        return None
-    folder = Path(path).expanduser().resolve().parent
-    blob_path = folder.parent / "batch_result.json"
-    try:
-        with open(blob_path) as fh:
-            blob = json.load(fh)
-    except (OSError, ValueError):
-        return None
-    if not isinstance(blob, dict) or blob.get("dataset") != dataset:
-        return None
-    for r in blob.get("records") or ():
-        saved = Path(str(r.get("out_dir") or f"{r.get('method')}_{dataset}"))
-        if saved.name == folder.name and registry.method_of(str(r.get("method"))):
-            return {"method": registry.method_of(r["method"]),
-                    "category": r.get("category") or blob.get("category"),
-                    "labels_used": list(r.get("labels_used") or ())}
-    return None
 
 
 #: load_run's warning for a folder scored before 0.4.0
@@ -239,10 +218,6 @@ PLAN_COLUMNS = ["method", "category", "modalities", "env", "output_kind", "cavea
 #: The columns of ``scan``, one row per method; ``category`` only without one.
 SCAN_COLUMNS = ["method", "category", "modalities", "runnable", "reason", "env", "caveat",
                 "command"]
-
-#: The ``out_dir`` of scan's ``command`` column.
-OUT_DIR_PLACEHOLDER = "<out_dir>"
-
 
 def _env_hint(env: str, method: str, other=None) -> str:
     """The ``env_reason`` text: the install command first, so a clipped reason
@@ -685,27 +660,6 @@ def scan(dataset: str, category: str | None = None, *,
                       nested=not isinstance(modalities, (list, tuple)))
     # a long line, for troubleshooting: shown when asked for
     return out if command else out.drop(columns=["command"])
-
-
-def known_category(dataset) -> str | None:
-    """The one category the benchmark scored the dataset ``dataset`` names in
-    (``catalog.datasets()``), or ``None`` for a dataset of its own."""
-    from ._data import catalog
-    name = _resolve.split_dataset(dataset, None)[0]
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        rows = catalog.datasets()
-    cats = rows.loc[rows["dataset"] == str(name), "category"].dropna()
-    return cats.iloc[0] if len(cats) == 1 and ";" not in cats.iloc[0] else None
-
-
-def own_batches_only(dataset) -> None:
-    """``ValueError`` for ``batch=`` on a benchmark dataset: a dataset has one
-    batch label, and a benchmark dataset's is its label files."""
-    if known_category(dataset) is not None:
-        name = _resolve.split_dataset(dataset, None)[0]
-        raise ValueError(f"{name} is a benchmark dataset: its batches are its label files. "
-                         f"Pass batch= only for a dataset of your own.")
 
 
 def _scan(dataset: str, category: str | None = None, *, methods=None, modalities=None,
@@ -2175,47 +2129,6 @@ def _batch_segments(dataset, data_path, batch) -> dict | None:
         out[name] = batch[i:i + n]
         i += n
     return out
-
-
-def _method_files(dataset, category, method, modalities=None, data_path=None) -> set:
-    """The names of the files ``method`` reads from ``dataset``; ``set()`` when
-    they cannot be resolved (another layout, or no such method)."""
-    if not method or registry.method_of(method) is None:
-        return set()
-    try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            paths = _resolve.inputs_for(dataset, category, registry.method_of(method),
-                                        modalities=modalities or None,
-                                        data_path=data_path, check=False)
-    except (FileNotFoundError, KeyError, ValueError):
-        return set()
-    return {Path(p).name for p in paths.values()}
-
-
-def _label_data_files(label: Path, read=()) -> list[Path]:
-    """The data files whose barcodes are the cells of one label file:
-    ``cty2.csv`` -> ``rna2.h5, adt2.h5, ...``; ``atac_cty.csv`` -> the ATAC files,
-    the ones a method read (``read``: file names) first."""
-    stem = label.stem
-    digits = stem[len(stem.rstrip("0123456789")):]
-    base = stem[:len(stem) - len(digits)]
-    if base == "cty":
-        stems = ["rna", "adt", "atac", "atac_peak", "atac_gas"]
-    elif base in ("rna_cty", "adt_cty"):
-        stems = [base[:-4]]
-    elif base == "atac_cty":
-        stems = ["atac_peak", "atac_gas", "atac"]
-    else:
-        stems = []
-    files = [label.parent / f"{s}{digits}.h5" for s in stems]
-    return sorted(files, key=lambda f: f.name not in read)
-
-
-def _dataset_folder(dataset, data_path) -> Path:
-    """``<data_path>/<dataset>``, with ``None`` = config's data root."""
-    base = config.data_path if data_path is None else data_path
-    return Path(base) / dataset
 
 
 def _root_tries(rec: dict) -> list:

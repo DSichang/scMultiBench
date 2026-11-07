@@ -215,8 +215,7 @@ def _file_barcodes(files, counts=None, read=()):
 def _raw_barcodes(files, counts=None, read=()):
     """``(barcodes, label file stem of each)`` of :func:`_file_barcodes`, the
     barcodes as the matrices write them; ``None`` when a file has no matrix."""
-    from ..engine.resolve import _barcodes_of
-    from ..workflow import _label_data_files      # workflow imports this module
+    from ..engine.resolve import _barcodes_of, _label_data_files
     out, stems = [], []
     for i, f in enumerate(files):
         n = counts[i] if counts is not None else len(io.read_labels(f))
@@ -646,7 +645,8 @@ def evaluate(embedding, labels=None, *, dataset: str | None = None,
     name = cells = None
     if dataset is not None:
         from ..engine import resolve
-        from ..workflow import known_category, own_batches_only, _run_record_for, _dataset_folder
+        from ..engine.resolve import (_dataset_folder, _run_record_for, known_category,
+                                      own_batches_only)
         name, data_path = resolve.split_dataset(dataset, None)
         bench = known_category(name)             # a benchmark dataset has one
         if batch is not None:
@@ -749,7 +749,7 @@ def _expected_cells(dataset, category, method, data_path, read, *,
                                                    data_path=data_path))
         if [f.name for f in folder] != [f.name for f in files]:
             moved = tuple(f.stem for f in files)
-    from ..workflow import _method_files
+    from ..engine.resolve import _method_files
     return _Cells(dataset, files, own, from_files, whole, moved,
                   frozenset(_method_files(dataset, category, own, None, data_path)),
                   data_path)
@@ -759,7 +759,7 @@ def _method_reads(cells: _Cells, category) -> list:
     """The sets of file names the package methods of ``category`` read from
     ``cells.dataset``, whose barcodes may name an embedding's cells."""
     from ..engine.registry import list_methods
-    from ..workflow import _method_files
+    from ..engine.resolve import _method_files
     reads = (frozenset(_method_files(cells.dataset, category, m, None, cells.data_path))
              for m in (list_methods(category=category) if category else ()))
     return list(dict.fromkeys(r for r in reads if r))
