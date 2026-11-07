@@ -12,7 +12,10 @@ Pinning them to each other is what stops that happening again.
 import numpy as np
 
 from multibench.eval import scib as escib
-from multibench.plot.bar import BATCH_METRICS, CLUSTERING_METRICS
+from multibench._data.catalog import FAMILY_METRICS
+
+CLUSTERING_METRICS = FAMILY_METRICS["clustering"]
+BATCH_METRICS = FAMILY_METRICS["batch"]
 
 
 def _blobs(n_per=60, n_labels=4, dims=6, n_batches=2, seed=5):

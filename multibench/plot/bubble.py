@@ -161,11 +161,18 @@ def _need_long(long_df: pd.DataFrame, fn: str) -> None:
                          f"['method', 'metric', 'value']; missing {absent}.")
 
 
-def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None) -> BubbleTable:
-    """The :class:`BubbleTable` of ``long_df``, as :func:`bubble` draws it."""
+def _select(long_df: pd.DataFrame, *, metrics, methods, fn: str) -> tuple:
+    """The rows of ``long_df`` that :func:`bubble` and ``bar`` draw, and the
+    metric codes ``metrics`` names (``None`` when it is ``None``). Raises for a
+    table that is not a long table, is empty, has no rows left, names what it
+    does not hold or repeats rows."""
     from .._data import catalog
 
-    _need_long(long_df, "bubble")
+    _need_long(long_df, fn)
+    if len(long_df) == 0:
+        raise ValueError(
+            "long_df has no rows to plot. If it came from load_results, its "
+            "UserWarning says why.")
     df = long_df.dropna(subset=["metric"])
     if methods is not None:
         methods = _resolve(methods, df["method"].unique().tolist(), catalog._canonical_id)
@@ -178,8 +185,13 @@ def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None) -> Bubble
         raise ValueError("no rows left after applying methods=/metrics= filters"
                          if methods is not None or metrics is not None
                          else "The table has no rows.")
-
     _refuse_repeats(df)
+    return df, metrics
+
+
+def _build_table(long_df: pd.DataFrame, *, metrics=None, methods=None) -> BubbleTable:
+    """The :class:`BubbleTable` of ``long_df``, as :func:`bubble` draws it."""
+    df, metrics = _select(long_df, metrics=metrics, methods=methods, fn="bubble")
     score = style.overall(df)       # refuses your rows on another dataset
 
     has_ds = "dataset" in df.columns

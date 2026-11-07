@@ -15,7 +15,7 @@ from .._text import _and_list
 from .._data import catalog
 from .._data.results import COLUMNS as _RESULT_COLUMNS
 
-#: the long table's columns; the stored tables' constant ``clustering`` is not written
+#: the long table's columns (mtb.load_results's)
 LONG_COLUMNS = list(_RESULT_COLUMNS)
 
 #: the ``attrs`` keys evaluate() sets and the long table joins into ``scored_with``
@@ -69,13 +69,6 @@ def _long_table(value_df, *, method: str, dataset: str | None = None,
         if "scib_version" in value_df.attrs:
             out.attrs["scib_version"] = value_df.attrs["scib_version"]
     return out
-
-
-def _metric_families() -> tuple[list, list, list]:
-    """The clustering, batch and classification codes evaluate() can produce."""
-    # the plotting layer owns the metric families
-    from ..plot.bar import BATCH_METRICS, CLASSIFICATION_METRICS, CLUSTERING_METRICS
-    return list(CLUSTERING_METRICS), list(BATCH_METRICS), list(CLASSIFICATION_METRICS)
 
 
 def _cell_ids(output):
@@ -451,7 +444,8 @@ def _plan_metrics(metrics, *, has_batch: bool):
     ``"default"`` (scored when the data allow), ``"all"`` (NaN with a warning
     when not) or ``"explicit"`` (an error when not).
     """
-    clu, bat, cls = _metric_families()
+    fam = catalog.FAMILY_METRICS
+    clu, bat, cls = list(fam["clustering"]), list(fam["batch"]), list(fam["classification"])
     # a family token computes kBET only when it is named
     family_bat = [c for c in bat if c != "kBET"]
 

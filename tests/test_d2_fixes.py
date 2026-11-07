@@ -94,7 +94,8 @@ def test_load_run_of_a_missing_folder_says_it_holds_no_result(tmp_path):
 
 def test_an_empty_table_is_not_blamed_on_filters():
     empty = pd.DataFrame(columns=["method", "metric", "value"])
-    with pytest.raises(ValueError, match=r"^The table has no rows\.$"):
+    with pytest.raises(ValueError, match=r"^long_df has no rows to plot\. If it came from "
+                                         r"load_results, its UserWarning says why\.$"):
         mtb.plot.bubble(empty)
 
 

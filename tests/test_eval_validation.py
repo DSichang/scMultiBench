@@ -72,7 +72,9 @@ def test_batch_metric_without_batch_labels_raises_not_empty():
 
 
 def test_metrics_none_computes_every_applicable_family():
-    from multibench.plot.bar import BATCH_METRICS, CLASSIFICATION_METRICS, CLUSTERING_METRICS
+    from multibench._data.catalog import FAMILY_METRICS
+    CLUSTERING_METRICS, BATCH_METRICS, CLASSIFICATION_METRICS = (
+        FAMILY_METRICS[f] for f in ("clustering", "batch", "classification"))
     emb, ct, bat, _ = _toy()
     clu = evaluate(emb, labels=ct)                       # no batch: clustering family
     assert set(_metrics(clu)) == set(CLUSTERING_METRICS)

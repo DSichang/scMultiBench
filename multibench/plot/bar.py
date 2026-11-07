@@ -8,9 +8,6 @@ from .. import _text
 from .._data.catalog import FAMILY_METRICS
 from .style import minmax
 
-CLUSTERING_METRICS = FAMILY_METRICS["clustering"]
-BATCH_METRICS = FAMILY_METRICS["batch"]
-CLASSIFICATION_METRICS = FAMILY_METRICS["classification"]
 #: the colour ramp of each family, as in the paper's figures
 FAMILY_CMAPS = {"clustering": "Blues", "batch": "Greens", "classification": "Pinks"}
 
@@ -66,26 +63,12 @@ def bar(long_df: pd.DataFrame, *, metrics=None, methods=None, title: str | None 
     >>> fig = mtb.plot.bar(df, metrics="clustering", save="clustering.png")
     """
     import matplotlib.pyplot as plt
-    from .bubble import _expand_families, _need_long, _refuse_repeats, _resolve
-    from .._data import catalog
+    from .bubble import _select
 
-    _need_long(long_df, "bar")
-    if len(long_df) == 0:
-        raise ValueError(
-            "long_df has no rows to plot. If it came from load_results, its "
-            "UserWarning says why.")
-    if methods is not None:
-        methods = _resolve(methods, long_df["method"].unique().tolist(), catalog._canonical_id)
-        long_df = long_df[long_df["method"].isin(methods)]
     family = (metrics.lower() if isinstance(metrics, str)
               and metrics.lower() in FAMILY_METRICS else None)
-    if metrics is not None:
-        names = long_df["metric"].dropna().unique().tolist()
-        metrics = _resolve(_expand_families(metrics, names), names, catalog._canonical_metric)
-
-    picked = long_df if not metrics else long_df[long_df["metric"].isin(metrics)]
-    _refuse_repeats(picked)
-    mean = style.overall(long_df, metrics)       # refuses your rows on another dataset
+    picked, _ = _select(long_df, metrics=metrics, methods=methods, fn="bar")
+    mean = style.overall(picked)       # refuses your rows on another dataset
     # the methods and metrics of each dataset, for the warnings
     parts = style.dataset_tables(picked)
     lone = style.lone_message({ds: style.lone_columns(mat) for ds, mat in parts.items()})

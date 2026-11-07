@@ -17,7 +17,7 @@ import pandas as pd
 
 from .. import _text
 
-#: metrics that run scib's prebuilt LISI helper binary
+
 def import_scib():
     """``scib``, with ``scib.metrics``, imported under the caller's warning
     filters: scib 1.1.7 calls ``warnings.simplefilter("default")`` on import
@@ -30,6 +30,7 @@ def import_scib():
     return sys.modules["scib"]
 
 
+#: metrics that run scib's prebuilt LISI helper binary
 _LISI_METRICS = ("cLISI", "iLISI")
 
 #: C++ compilers tried, in order, when the shipped LISI helper cannot execute
