@@ -592,6 +592,12 @@ def plan_totals(rows, sizes: dict | None = None, *, layers: dict | None = None
              "shared_layers": shared}, line)
 
 
+def _own_name(path: Path) -> Path:
+    """``path`` with this process's id appended: a temporary name that another
+    install into the same envs folder does not use."""
+    return path.with_name(f"{path.name}.{os.getpid()}")
+
+
 def _ensure_layer(name: str, info: dict, envs_root: Path) -> Path:
     """``<envs_root>/.layers/<name>``, downloaded and unpacked on first use;
     ``RuntimeError`` when its digest is not the one ``info`` names."""
@@ -603,18 +609,22 @@ def _ensure_layer(name: str, info: dict, envs_root: Path) -> Path:
         if not entry or not entry.get("urls"):
             raise RuntimeError(f"this multibench version does not list the layer {name}")
         dest.parent.mkdir(parents=True, exist_ok=True)
-        tgz = dest.parent / f".{name}.tar.gz.download"
-        part = dest.with_name(name + ".partial")
+        tgz = _own_name(dest.parent / f".{name}.tar.gz.download")
+        part = _own_name(dest.with_name(name + ".partial"))
         try:
             download_archive(list(entry["urls"]), tgz, label=f"{name} (shared layer)",
                              total=entry.get("archive_bytes"))
             print(f"[env] unpacking {name} ...", flush=True)
             shutil.rmtree(part, ignore_errors=True)
-            shutil.rmtree(dest, ignore_errors=True)
             part.mkdir(parents=True)
             with tarfile.open(tgz) as t:
                 safe_extract(t, part)
-            part.rename(dest)
+            try:
+                part.rename(dest)
+            except OSError:
+                if not (dest / LAYER_INFO).is_file():
+                    raise
+                # another install unpacked the layer meanwhile: it is used
         finally:
             tgz.unlink(missing_ok=True)
             shutil.rmtree(part, ignore_errors=True)
@@ -680,7 +690,7 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
         raise RuntimeError(other_env_text(env, dest, "install again."))
     key, urls, build, total = _pick_archive(env, flavor)
     envs_root.mkdir(parents=True, exist_ok=True)
-    tgz = envs_root / f".{key}.tar.gz.download"
+    tgz = _own_name(envs_root / f".{key}.tar.gz.download")
     try:
         download_archive(urls, tgz, label=env if build == "single" else f"{env} ({build} build)",
                          total=total)
@@ -691,11 +701,13 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
         tgz.unlink(missing_ok=True)
         raise
     print(f"[env] unpacking {env} ...", flush=True)
-    part = dest.with_name(dest.name + ".partial")
+    part = _own_name(dest.with_name(dest.name + ".partial"))
+    moved = False
     try:
         _unpack_archive(tgz, part, envs_root)
         # conda-unpack writes the final path into the env: move first
         part.rename(dest)
+        moved = True
         _conda_unpack(dest)
         # last, so a prefix that failed to unpack claims no flavour
         (dest / FLAVOR_FILE).write_text(build + "\n")
@@ -703,8 +715,8 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
         _conda_prefixes.cache_clear()
         return True
     except BaseException as e:  # noqa: BLE001 - degrade to the lockfile build
-        shutil.rmtree(part, ignore_errors=True)
-        shutil.rmtree(dest, ignore_errors=True)
+        # a `dest` this call did not move there is another install's
+        shutil.rmtree(dest if moved else part, ignore_errors=True)
         if not isinstance(e, Exception):    # an interrupt leaves no half env
             raise
         print(f"[env] prebuilt {env} failed ({type(e).__name__}: "

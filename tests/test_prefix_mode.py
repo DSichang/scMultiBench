@@ -238,7 +238,7 @@ def test_install_packed_without_conda_creates_the_prefix(envs_dir, tmp_path, mon
     prefix = envs_dir / "matilda"
     assert fetched and "matilda" in fetched[0]
     assert (prefix / "bin" / "python").exists() and (prefix / "lib" / "keep").exists()
-    assert not (envs_dir / "matilda.partial").exists()
+    assert not list(envs_dir.glob("matilda.partial*"))
     # conda-unpack ran, with <prefix>/bin FIRST on PATH
     recorded = (prefix / "unpacked.txt").read_text()
     assert recorded.startswith(f"PATH={prefix / 'bin'}{os.pathsep}")
@@ -268,7 +268,7 @@ def test_install_packed_unpack_failure_cleans_up(envs_dir, tmp_path, monkeypatch
     import urllib.request
     serve_archives(monkeypatch, lambda url: (str(tgz), None))
     assert envs.install_packed("matilda") is False
-    assert not (envs_dir / "matilda").exists() and not (envs_dir / "matilda.partial").exists()
+    assert not (envs_dir / "matilda").exists() and not list(envs_dir.glob("matilda.partial*"))
     assert "falling back to the lockfile build" in capsys.readouterr().out
     assert envs.installed_envs() == []
 
@@ -285,7 +285,7 @@ def test_install_packed_interrupted_unpack_leaves_no_env(envs_dir, tmp_path, mon
     monkeypatch.setattr(envs, "_conda_unpack", interrupted)
     with pytest.raises(KeyboardInterrupt):
         envs.install_packed("matilda")
-    assert not (envs_dir / "matilda").exists() and not (envs_dir / "matilda.partial").exists()
+    assert not (envs_dir / "matilda").exists() and not list(envs_dir.glob("matilda.partial*"))
 
 
 def test_install_packed_no_archive_returns_false(envs_dir, monkeypatch):

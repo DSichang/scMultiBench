@@ -90,6 +90,63 @@ def test_an_unlisted_layer_installs_nothing(tmp_path, published, monkeypatch):
     assert not (tmp_path / "envs" / "env_a").exists()
 
 
+def test_two_processes_use_their_own_temporary_names():
+    """Two installs into one shared envs folder download and unpack into
+    their own files."""
+    import subprocess
+    import sys
+    code = ("from pathlib import Path; from multibench.engine import envs; "
+            "print(envs._own_name(Path('/e/.L.tar.gz.download')))")
+    procs = [subprocess.Popen([sys.executable, "-c", code], stdout=subprocess.PIPE, text=True,
+                              env={**os.environ, "PYTHONPATH": str(ROOT)}) for _ in range(2)]
+    names = [p.communicate()[0].strip() for p in procs]
+    assert all(n.startswith("/e/.L.tar.gz.download.") for n in names)
+    assert names[0] != names[1]
+
+
+def _finished_meanwhile(monkeypatch, label, finish):
+    """Run ``finish()`` (another install completing) right after the download
+    of ``label``."""
+    real = envs.download_archive
+
+    def download(urls, target, **kw):
+        n = real(urls, target, **kw)
+        if kw["label"] == label:
+            finish()
+        return n
+    monkeypatch.setattr(envs, "download_archive", download)
+
+
+def test_a_layer_another_install_unpacked_meanwhile_is_kept(tmp_path, published, monkeypatch):
+    out, _ = published
+    root = tmp_path / "envs"
+    layer = root / ".layers" / "L"
+    theirs = {}
+
+    def finish():
+        with tarfile.open(out / "L.tar.gz") as t:
+            t.extractall(layer, filter="data")
+        theirs["ino"] = (layer / envs.LAYER_INFO).stat().st_ino
+    _finished_meanwhile(monkeypatch, "L (shared layer)", finish)
+    assert envs.install_packed("env_a", envs_dir=root)
+    assert (layer / envs.LAYER_INFO).stat().st_ino == theirs["ino"]
+    assert (root / "env_a" / LIB).stat().st_ino == (layer / LIB).stat().st_ino
+    assert sorted(p.name for p in (root / ".layers").iterdir()) == ["L"]
+
+
+def test_an_env_another_install_finished_meanwhile_is_kept(tmp_path, published, monkeypatch):
+    root = tmp_path / "envs"
+    theirs = root / "env_a"
+
+    def finish():
+        (theirs / "bin").mkdir(parents=True)
+        (theirs / envs.FLAVOR_FILE).write_text("single\n")
+    _finished_meanwhile(monkeypatch, "env_a", finish)
+    envs.install_packed("env_a", envs_dir=root)
+    assert (theirs / envs.FLAVOR_FILE).read_text() == "single\n"
+    assert sorted(p.name for p in root.iterdir()) == [".layers", "env_a"]
+
+
 def test_layers_for_counts_a_layer_once_and_skips_one_on_disk(tmp_path, published):
     _, layers = published
     assert list(envs.layers_for(["env_a", "env_b"], envs_dir=tmp_path)) == ["L"]
