@@ -131,7 +131,7 @@ def test_x67_labels_for_names_the_dataset_category_once():
 def test_x72_batch_leiden_warning_says_what_it_affects(monkeypatch):
     import numpy as np
     from multibench.eval import scib as S
-    monkeypatch.setattr(S, "_search_n_clusters", lambda adata, n, key, flavor: (
+    monkeypatch.setattr(S, "_search_n_clusters", lambda adata, n, key, flavor, seen=None: (
         adata.obs.__setitem__(key, pd.Categorical(["a"] * 4 + ["b"] * (adata.n_obs - 4)))
         or False))
     # Y11 (r3): the warning went (nothing to do); the last step's clusters are used
@@ -224,7 +224,8 @@ def test_rescore_leiden_warning_names_the_method(monkeypatch):
     class G:
         obs = {}
     monkeypatch.setattr(scib, "_search_n_clusters",
-                        lambda g, n, key, flavor: g.obs.update({key: _Ser()}) or False)
+                        lambda g, n, key, flavor, seen=None: g.obs.update({key: _Ser()})
+                        or False)
     # Y11 (r3): no warning at all, so nothing names a method
     with warnings.catch_warnings():
         warnings.simplefilter("error", UserWarning)

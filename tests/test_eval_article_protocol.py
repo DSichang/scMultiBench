@@ -50,6 +50,24 @@ def test_the_search_keeps_the_last_clustering_when_it_cannot_reach_n(monkeypatch
     assert set(cl) == {f"a{len(seen)}", f"b{len(seen)}"}
 
 
+@pytest.mark.parametrize("flavor", ["leidenalg", "igraph"])
+def test_a_resolution_both_searches_visit_is_clustered_once(flavor, monkeypatch):
+    if flavor == "igraph" and not S.igraph_flavor_available():
+        pytest.skip("this scanpy cannot run flavor='igraph'")
+    emb, _ = _blobs(k=6)
+    graph = S._clustering_graph(emb)
+    alone = S._n_clusters(graph, 2, flavor)
+    runs, real = [], S._leiden
+    monkeypatch.setattr(S, "_leiden", lambda a, res, key, fl: runs.append(res) or
+                        real(a, res, key, fl))
+    seen = {}
+    S._n_clusters(graph, 6, flavor, seen)
+    first = list(runs)
+    shared = S._n_clusters(graph, 2, flavor, seen)
+    assert first[0] == 1.5 and 1.5 not in runs[len(first):]
+    assert list(shared) == list(alone)        # Leiden on one graph: one clustering
+
+
 def test_the_graph_is_scanpys_default_one_on_50_pcs_with_nan_as_zero():
     import anndata as ad
     import scanpy as sc

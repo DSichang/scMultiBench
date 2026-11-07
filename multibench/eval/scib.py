@@ -287,16 +287,23 @@ def _clustering_graph(emb):
     return adata
 
 
-def _search_n_clusters(adata, n: int, key: str, flavor: str) -> None:
+def _search_n_clusters(adata, n: int, key: str, flavor: str, seen: dict | None = None) -> None:
     """Leiden into ``adata.obs[key]`` at the resolution that gives ``n`` clusters,
     bisected as ``sinfonia.get_N_clusters`` does; the last step's clustering
-    when no step gave ``n``."""
+    when no step gave ``n``. ``seen`` holds ``{resolution: clusters}`` of
+    ``adata``: Leiden on one graph at one resolution gives one clustering, so a
+    resolution two searches visit is clustered once."""
     lo, hi = _SEARCH_RANGE
     with contextlib.redirect_stdout(io.StringIO()), warnings.catch_warnings():
         warnings.simplefilter("ignore")
         for _ in range(_SEARCH_STEPS):
             res = lo + (hi - lo) / 2
-            _leiden(adata, res, key, flavor)
+            if seen is not None and res in seen:
+                adata.obs[key] = seen[res]
+            else:
+                _leiden(adata, res, key, flavor)
+                if seen is not None:
+                    seen[res] = adata.obs[key].copy()
             found = adata.obs[key].nunique()
             if found > n:
                 hi = res
@@ -306,11 +313,12 @@ def _search_n_clusters(adata, n: int, key: str, flavor: str) -> None:
                 return
 
 
-def _n_clusters(graph, n: int, flavor: str) -> np.ndarray:
+def _n_clusters(graph, n: int, flavor: str, seen: dict | None = None) -> np.ndarray:
     """The searched clusters of ``graph`` as strings: those of the last step when no
-    resolution gave ``n``, as the paper's search."""
+    resolution gave ``n``, as the paper's search (``seen``: see
+    :func:`_search_n_clusters`)."""
     key = "_mb_search"
-    _search_n_clusters(graph, n, key, flavor)
+    _search_n_clusters(graph, n, key, flavor, seen)
     out = np.asarray(graph.obs[key].astype(str))
     del graph.obs[key]
     return out
@@ -441,12 +449,13 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
             print(f"Clustering {n:,} cells for {_text._and_list(needs)} with the {flavor} "
                   f"Leiden backend.", file=sys.stderr, flush=True)
         graph = _clustering_graph(emb)
+        seen: dict = {}             # both searches cluster this graph
         if search_ct:
             adata.obs["cluster"] = pd.Categorical(_n_clusters(
-                graph, adata.obs["celltype"].nunique(), flavor))
+                graph, adata.obs["celltype"].nunique(), flavor, seen))
         if search_bat:
             adata.obs["batch_cluster"] = pd.Categorical(_n_clusters(
-                graph, n_batches, flavor))
+                graph, n_batches, flavor, seen))
     out: dict[str, float] = {}
 
     def _safe(name, fn):
