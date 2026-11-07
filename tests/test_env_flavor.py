@@ -29,7 +29,7 @@ from tests.test_prefix_mode import (_tiny_archive, envs_dir, make_prefix,  # noq
 from _serve import serve_archives
 
 ROOT = Path(__file__).resolve().parents[1]
-CPU_ENVS = ["env_sciPENN", "matilda", "scmb_scjoint", "scmb_torch", "scmb_scmm2", "scmb_multigrate2"]
+CPU_ENVS = ["env_sciPENN", "matilda", "scmb_scjoint", "scmb_torch", "scmb_multigrate2"]
 RELEASE = "https://github.com/DSichang/scMultiBench/releases/download/envs-v1"
 #: the release of each CPU build that is not on envs-v1
 CPU_RELEASE = {"scmb_multigrate2": RELEASE.replace("envs-v1", "envs-v2")}
@@ -382,13 +382,10 @@ def test_manifests_carry_the_cpu_builds():
         assert env in urls, env
         assert urls[f"{env}-cpu"] == f"{CPU_RELEASE.get(env, RELEASE)}/{env}-cpu.tar.gz"
         assert f"{env}-cpu" in sizes and set(sizes[f"{env}-cpu"]) == {"archive_bytes", "unpacked_bytes"}
-    # until the orchestrator fills a size the placeholder is inert: every
-    # flavour resolves to the GPU archive, so nothing changes on any host
-    # before the archives exist (the runtime reads null as unknown)
     for env in CPU_ENVS:
-        if sizes[f"{env}-cpu"]["archive_bytes"] is None:
-            assert envs.archive_for(env, "cpu") == (env, "gpu")
-        else:
-            assert envs.archive_for(env, "cpu") == (f"{env}-cpu", "cpu")
+        assert envs.archive_for(env, "cpu") == (f"{env}-cpu", "cpu")
+    # scMM runs with --no_cuda and its two builds held the same files: one archive
+    assert urls["scmb_scmm2"] == f"{RELEASE}/scmb_scmm2-cpu.tar.gz"
+    assert "scmb_scmm2-cpu" not in urls and envs._single_build("scmb_scmm2")
     assert set(envs.packed_manifest()) == set(urls)
     assert set(envs.packed_sizes()) == set(sizes) - {"_meta"}
