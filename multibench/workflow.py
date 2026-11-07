@@ -1819,9 +1819,16 @@ class RunResult:
         mtb.load_run : reads the folder back.
         """
         folder = Path(out_dir or self.out_dir or ".").expanduser()
+        self._write(folder)
+        return folder
+
+    def _write(self, folder: Path, before=None, *, say: bool = True) -> None:
+        """Write the files of :meth:`save` into ``folder``, merged with the records
+        saved there (``before``: those records, already read); ``say``: print the
+        line that names the earlier records kept."""
         _check_save_target(folder, self.dataset, self.category)
-        before = (load_run(folder).records if (folder / "batch_result.json").exists()
-                  else [])
+        if before is None:
+            before = _records_in(folder)
         # a skipped record never replaces an earlier record of a run
         ran = {r.get("method") for r in before if _status(r.get("status")) != "skipped"}
         new = [r for r in self.records
@@ -1857,12 +1864,11 @@ class RunResult:
         with open(folder / "batch_result.json", "w") as fh:
             json.dump({"dataset": self.dataset, "category": self.category,
                        "records": slim}, fh, indent=1, default=str)
-        if kept:
+        if kept and say:
             names = ", ".join(dict.fromkeys(str(r.get("method")) for r in kept))
             records = "record" if len(kept) == 1 else "records"
             print(f"[save] Merged with {len(kept)} earlier {records} in {folder} ({names}).",
                   flush=True)
-        return folder
 
     def __len__(self):
         return len(self.records)
@@ -2604,7 +2610,8 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
     """Run the runnable methods of a category on a dataset folder, and score them.
 
     Only the methods ``mtb.scan`` marks runnable run. A method's failure is
-    recorded, never raised, and the results are saved under ``out_dir``.
+    recorded, never raised, and the results are saved under ``out_dir`` after
+    each method.
     ``methods=["Matilda"]`` runs one method. ``mtb.scan`` shows the plan
     first, with each command.
 
@@ -2773,6 +2780,7 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
                 print(f"[run] {method} ({category}/{dataset}): reusing the saved run "
                       f"-> {_status(rec['status'])} {_ari_tail(rec)}".rstrip(), flush=True)
             records.append(rec)
+            _save_run(records, dataset, category, out_dir, batch_file, resuming=bool(earlier))
             continue
         if verbose:
             print(f"[run] {method} ({category}/{dataset}) ...", flush=True)
@@ -2834,19 +2842,46 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
         rec.update(_UNKNOWN_PROVENANCE if rec.get("reused")
                    else scripts.run_provenance(row["env"]))
         records.append(rec)
+        # saved after each method: a job killed later keeps this record
+        _save_run(records, dataset, category, out_dir, batch_file, resuming=bool(earlier))
     records += _skipped_records(shown, attempted, methods, category=category,
                                 dataset=dataset, data_path=data_path,
                                 version=_pkg_version, data_root=data_root)
+    return _save_run(records, dataset, category, out_dir, batch_file, resuming=bool(earlier),
+                     last=True)
 
+
+def _save_run(records, dataset, category, out_dir, batch_file, *, resuming: bool,
+              last: bool = False) -> RunResult:
+    """The result of ``run``'s records so far, saved in ``out_dir``. The first save
+    warns what reading the folder's earlier result warns; the save after the last
+    method prints and warns the rest. Resuming, a method that cannot run here
+    leaves the saved folder as it was."""
     result = RunResult(records, dataset, category, out_dir)
     if batch_file and any(r.get("batch_file") for r in records):
         result._batches[batch_file[0]] = batch_file[1]
-    if earlier:
-        # resuming: a method that cannot run here leaves the saved folder as it was
-        kept = RunResult([r for r in records if r["status"] != "skipped"], dataset,
-                         category, out_dir)
-        kept._batches = result._batches
-        kept.save()
+    saved = result
+    if resuming:
+        saved = RunResult([r for r in records if r["status"] != "skipped"], dataset,
+                          category, out_dir)
+        saved._batches = result._batches
+    folder = Path(out_dir).expanduser()
+    if len(records) == 1 and not last:
+        before = _records_in(folder)       # the folder as it was before the run
     else:
-        result.save()
+        # it holds this run's records: read back, they would warn again
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            before = _records_in(folder)
+    if last:
+        saved._write(folder, before)
+        return result
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        saved._write(folder, before, say=False)
     return result
+
+
+def _records_in(folder: Path) -> list:
+    """The records saved in ``folder`` (:func:`load_run`); ``[]`` when none."""
+    return load_run(folder).records if (folder / "batch_result.json").exists() else []

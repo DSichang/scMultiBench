@@ -87,3 +87,51 @@ def test_run_refuses_an_unknown_params_key_before_any_method_runs(tmp_path, monk
                 params=params, verbose=False)
     assert ran.value.args == scanned.value.args
     assert started == [] and not (tmp_path / "out").exists()
+
+
+def _fake_method(calls, *, stop_after=None):
+    """A method that writes an embedding.h5 whose rows separate the cell types
+    of its label files; with ``stop_after``, the job is killed when it starts
+    the method after that many (KeyboardInterrupt: not a method failure)."""
+    from multibench.engine import resolve
+    from multibench.eval import io as eio
+
+    def method(method, category, inputs, out_dir, params=None):
+        if stop_after is not None and len(calls) >= stop_after:
+            raise KeyboardInterrupt
+        calls.append(method)
+        folder = Path(str(next(p for p in inputs.values() if str(p).endswith(".h5")))).parent
+        files = resolve.labels_for(folder.name, category, method, data_path=folder.parent)
+        lab = np.concatenate([eio.read_labels(p) for p in files.values()]).astype(str)
+        emb = np.random.default_rng(0).normal(scale=0.3, size=(len(lab), 6))
+        emb[np.arange(len(lab)), pd.factorize(lab)[0] % 6] += 4.0
+        Path(out_dir).mkdir(parents=True, exist_ok=True)
+        with h5py.File(Path(out_dir) / "embedding.h5", "w") as f:
+            f.create_dataset("data", data=emb.T)
+        return emb
+    return method
+
+
+def test_a_run_killed_after_one_method_keeps_its_scores(tmp_path, monkeypatch):
+    """u7 D1: the records were written once, after the last method, so a job
+    killed at its wall-time limit kept no record of the methods that finished."""
+    if not (Path(mtb.config.data_path) / "D11").is_dir():
+        pytest.skip("D11 is not on disk")
+    monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
+    out, calls = tmp_path / "out", []
+    monkeypatch.setattr(W, "_run", _fake_method(calls, stop_after=1))
+    with pytest.raises(KeyboardInterrupt):
+        mtb.run("D11", "vertical", out, methods=["Matilda", "scMM"], verbose=False)
+    assert calls == ["Matilda"]
+    saved = mtb.load_run(out)
+    assert [(r["method"], r["status"]) for r in saved.records] == [("Matilda", "scored")]
+    assert (out / "summary.csv").is_file() and set(saved.long["method"]) == {"Matilda"}
+    # the job again: Matilda's record is reused, only scMM runs
+    calls.clear()
+    monkeypatch.setattr(W, "_run", _fake_method(calls))
+    res = mtb.run("D11", "vertical", out, methods=["Matilda", "scMM"], skip_existing=True,
+                  verbose=False)
+    assert calls == ["scMM"]
+    first = {r["method"]: r for r in res.records}["Matilda"]
+    assert first["reused"] is True and first["run_sec"] == saved.records[0]["run_sec"]
+    assert list(mtb.load_run(out).summary["status"]) == ["scored", "scored"]
