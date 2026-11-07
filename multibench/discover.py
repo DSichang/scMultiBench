@@ -123,9 +123,17 @@ def _effective(v) -> dict:
 
 
 def _tunable(v) -> dict:
-    """``{name: {"type", "default"}}``: ``default`` is what a run uses."""
+    """``{name: {"type", "default"}}``: ``default`` is what a run uses. Every
+    true/false parameter shows as ``bool``, whichever way the script reads it
+    (``boolean`` and ``flag`` in params.yaml decide only the command line)."""
     eff = _effective(v)
-    return {k: {**(t or {}), "default": eff[k]} for k, t in v.tunable.items()}
+    out = {}
+    for k, t in v.tunable.items():
+        t = dict(t or {})
+        if t.get("type") in ("boolean", "flag"):
+            t["type"] = "bool"
+        out[k] = {**t, "default": eff[k]}
+    return out
 
 
 def method_info(method: str) -> dict:
