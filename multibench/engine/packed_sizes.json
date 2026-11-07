@@ -1,127 +1,123 @@
 {
   "MOFA2_env": {
     "archive_bytes": 9605113054,
-    "unpacked_bytes": 18000000000
+    "unpacked_bytes": 18446184488
   },
   "_meta": {
-    "measured": "2026-09-03 (archive: HEAD on scmb_r, env_sciPENN, scmb_scvi; unpacked: SETUP.md du -sh figures for MOFA2_env, unitednet, scmb_torch_v2)",
+    "measured": "2026-11-08 (archive: HEAD on every URL; unpacked: every env installed on kserver, the gpu builds and the six cpu builds)",
     "note": "archive_bytes = Content-Length of the packed archive in packed_urls.json (a HEAD request); unpacked_bytes = size on disk after conda-unpack. null = not measured yet; rerun the tool after republishing an archive. An env built on a layer of packed_layers.json counts its own files only.",
     "written_by": "tools/packed_sizes.py"
   },
   "env_moETM": {
     "archive_bytes": 4100293453,
-    "unpacked_bytes": null
+    "unpacked_bytes": 7651003802
   },
   "env_sciPENN": {
     "archive_bytes": 2077412003,
-    "unpacked_bytes": null
+    "unpacked_bytes": 4120782885
   },
   "env_sciPENN-cpu": {
     "archive_bytes": 472787805,
-    "unpacked_bytes": 1504347712
+    "unpacked_bytes": 1495426392
   },
   "glue": {
     "archive_bytes": 3212148440,
-    "unpacked_bytes": null
+    "unpacked_bytes": 6124743239
   },
   "matilda": {
     "archive_bytes": 3043807507,
-    "unpacked_bytes": null
+    "unpacked_bytes": 5733621274
   },
   "matilda-cpu": {
     "archive_bytes": 584704264,
-    "unpacked_bytes": 1880385956
+    "unpacked_bytes": 1865879381
   },
   "scmb_cobolt3": {
     "archive_bytes": 520155458,
-    "unpacked_bytes": 1290374632
+    "unpacked_bytes": 1279531476
   },
   "scmb_concerto": {
     "archive_bytes": 887587172,
-    "unpacked_bytes": null
+    "unpacked_bytes": 2335794584
   },
   "scmb_ipolng2": {
     "archive_bytes": 2111740612,
-    "unpacked_bytes": null
+    "unpacked_bytes": 4213989926
   },
   "scmb_mira": {
     "archive_bytes": 2643963495,
-    "unpacked_bytes": null
+    "unpacked_bytes": 5293917193
   },
   "scmb_multigrate2": {
     "archive_bytes": 458911917,
-    "unpacked_bytes": 1504795715
+    "unpacked_bytes": 1485575694
   },
   "scmb_multigrate2-cpu": {
     "archive_bytes": 641534636,
-    "unpacked_bytes": 2086137506
+    "unpacked_bytes": 2086151405
   },
   "scmb_multivi": {
     "archive_bytes": 431872416,
-    "unpacked_bytes": 1424315472
+    "unpacked_bytes": 1407340210
   },
   "scmb_r": {
     "archive_bytes": 916953088,
-    "unpacked_bytes": null
+    "unpacked_bytes": 2325608764
   },
   "scmb_scjoint": {
     "archive_bytes": 280481966,
-    "unpacked_bytes": 887599395
+    "unpacked_bytes": 874679567
   },
   "scmb_scjoint-cpu": {
     "archive_bytes": 641368911,
-    "unpacked_bytes": 2122277614
+    "unpacked_bytes": 2109790066
   },
   "scmb_scmm2": {
-    "archive_bytes": 1118430485,
-    "unpacked_bytes": null
-  },
-  "scmb_scmm2-cpu": {
     "archive_bytes": 480594425,
-    "unpacked_bytes": 216867187
+    "unpacked_bytes": 1419373418
   },
   "scmb_scmsi": {
     "archive_bytes": 1115264987,
-    "unpacked_bytes": null
+    "unpacked_bytes": 2568893080
   },
   "scmb_scmvp4": {
     "archive_bytes": 1145555088,
-    "unpacked_bytes": null
+    "unpacked_bytes": 2602509459
   },
   "scmb_scvi": {
     "archive_bytes": 3215645570,
-    "unpacked_bytes": null
+    "unpacked_bytes": 6193202957
   },
   "scmb_seurat4b": {
     "archive_bytes": 772890631,
-    "unpacked_bytes": null
+    "unpacked_bytes": 2149128114
   },
   "scmb_seurat5": {
     "archive_bytes": 833693762,
-    "unpacked_bytes": 2292259616
+    "unpacked_bytes": 2272609176
   },
   "scmb_torch": {
     "archive_bytes": 587672367,
-    "unpacked_bytes": 1496194411
+    "unpacked_bytes": 1481639856
   },
   "scmb_torch-cpu": {
     "archive_bytes": 922099761,
-    "unpacked_bytes": 2642831784
+    "unpacked_bytes": 2629148722
   },
   "scmb_torch_v2": {
     "archive_bytes": 1992173084,
-    "unpacked_bytes": 4535806331
+    "unpacked_bytes": 4510755533
   },
   "scmb_vimcca": {
     "archive_bytes": 725133485,
-    "unpacked_bytes": null
+    "unpacked_bytes": 1882328827
   },
   "scmb_vipcca27": {
     "archive_bytes": 718808190,
-    "unpacked_bytes": null
+    "unpacked_bytes": 1859215564
   },
   "unitednet": {
     "archive_bytes": 7056427724,
-    "unpacked_bytes": 12000000000
+    "unpacked_bytes": 14525270896
   }
 }

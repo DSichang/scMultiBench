@@ -148,7 +148,7 @@ def main(argv=None) -> int:
     urls = json.loads(URLS.read_text())
     previous = json.loads(args.out.read_text()) if args.out.is_file() else {}
     table = build(urls, previous=previous, envs_dir=args.envs_dir, flavor=args.flavor)
-    text = json.dumps(table, indent=1) + "\n"
+    text = json.dumps(table, indent=2, sort_keys=True) + "\n"
     if args.check:
         # the measurement date is not a difference worth failing on
         old = {k: v for k, v in previous.items() if k != "_meta"}

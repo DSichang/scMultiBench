@@ -271,13 +271,12 @@ def test_an_unpacked_size_below_the_archive_reads_unknown(tmp_path, monkeypatch)
     finally:
         envs.packed_sizes.cache_clear()
     assert sizes["a"]["unpacked_bytes"] is None and sizes["b"]["unpacked_bytes"] == 9
-    # the shipped table: no new entry of that kind (scmb_scmm2-cpu awaits a
-    # measurement on the Linux host)
+    # the shipped table has no entry of that kind
     raw = json.loads(shipped.read_text())
     bad = {k for k, v in raw.items() if isinstance(v, dict)
            and isinstance(v.get("unpacked_bytes"), int)
            and v["unpacked_bytes"] < (v.get("archive_bytes") or 0)}
-    assert bad <= {"scmb_scmm2-cpu"}
+    assert not bad
 
 
 def test_export_notes_say_scan_skips_the_other_representation():
