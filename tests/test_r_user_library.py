@@ -37,8 +37,8 @@ def _launch_env(monkeypatch, tmp_path, method, category):
 
     monkeypatch.setattr(runner.subprocess, "Popen", fake_popen)
     monkeypatch.setattr("multibench.engine.envs.host_system", lambda: None)
-    monkeypatch.setattr(runner.envs, "installed_envs",
-                        lambda conda=None: [envs.group_for(method)])
+    monkeypatch.setattr(runner.envs, "env_prefix",
+                        lambda env, conda=None: tmp_path / "envs" / env)
     monkeypatch.setattr(runner.envs, "other_env_prefix", lambda name: None)
     import multibench as mtb
     inp = mtb.engine.resolve.inputs_for("D11", category, method, modalities=["rna", "adt"])

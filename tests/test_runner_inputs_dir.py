@@ -41,7 +41,7 @@ def test_data_dir_method_gets_no_empty_inputs_dir(tmp_path, monkeypatch):
             super().__init__(cmd, cwd, None, None, True)
             self.returncode = 1                  # stop before any output is loaded
     monkeypatch.setattr(runner.subprocess, "Popen", FakePopen)
-    monkeypatch.setattr(runner.envs, "installed_envs", lambda conda=None: ["scmb_torch"])
+    monkeypatch.setattr(runner.envs, "env_prefix", lambda env, conda=None: tmp_path / "envs" / env)
     # scBridge's script calls CUDA unconditionally (registry requires_gpu), so
     # on a GPU-less host run() refuses it before Popen; this test is about the
     # inputs/ layout, so pretend the host has a GPU (tests/test_gpu_requirements.py

@@ -368,27 +368,25 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
 
 
 def _check_env(method: str, env_name: str) -> None:
-    """The env check of scan, before anything is written: off Linux always; on
-    Linux when the probe finds some env (else the subprocess reports the
-    failure) or an env of that name multibench did not install."""
+    """The env check of scan, before anything is written: off Linux, or when
+    :func:`envs.env_prefix` does not find ``env_name``."""
     linux_only = envs.linux_only_text()
     if linux_only:
         raise OSError(
             f"{linux_only} Run this call on a Linux machine, such as Colab.")
-    have = envs.installed_envs()
-    if env_name not in have:
-        # conda's env list is cached per process: probe once more
-        envs._conda_prefixes.cache_clear()
-        have = envs.installed_envs()
-    other = envs.other_env_prefix(env_name) if env_name not in have else None
+    if envs.env_prefix(env_name) is not None:
+        return
+    # conda's env list is cached per process: probe once more
+    envs._conda_prefixes.cache_clear()
+    if envs.env_prefix(env_name) is not None:
+        return
+    other = envs.other_env_prefix(env_name)
     if other is not None:
         raise EnvironmentError(envs.other_env_text(
             env_name, other,
             f"call mtb.env.install([{method!r}])."))
-    if have and env_name not in have:
-        raise EnvironmentError(
-            f"Environment {env_name} of {method} is not installed. Run "
-            f"mtb.env.install([{method!r}]).")
+    raise EnvironmentError(f"Environment {env_name} of {method} is not installed. Run "
+                           f"mtb.env.install([{method!r}]).")
 
 
 def _execute(method: str, cmd: list[str], cwd: str, run_env: dict | None) -> None:

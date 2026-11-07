@@ -273,8 +273,10 @@ def _envs_dir(conda_bin: str) -> Path | None:
 
 
 def _find_conda() -> str | None:
-    """Path of the conda (else mamba) binary on PATH, or ``None``."""
-    return shutil.which("conda") or shutil.which("mamba")
+    """Path of the conda (else mamba) binary on PATH, else ``$CONDA_EXE`` (the
+    one a conda-mode run calls), or ``None``."""
+    return (shutil.which("conda") or shutil.which("mamba")
+            or os.environ.get("CONDA_EXE") or None)
 
 
 @functools.lru_cache(maxsize=4)

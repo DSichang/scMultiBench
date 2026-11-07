@@ -106,6 +106,19 @@ def _no_recorded_env_roots(request, tmp_path_factory, monkeypatch):
         monkeypatch.setattr(envs, "_known_roots", lambda: [])
 
 
+# ---- no test asks the developer's own conda ---------------------------------
+# The envs are looked up through the conda on PATH, else $CONDA_EXE (what a
+# conda-mode run calls); the tests run with a PATH without conda, and a
+# developer's shell may still export CONDA_EXE. Tests of the conda lookup set
+# their own. A MonkeyPatch of its own, so that a test's monkeypatch.undo()
+# keeps it.
+@_pytest.fixture(autouse=True)
+def _no_conda_exe():
+    with _pytest.MonkeyPatch.context() as mp:
+        mp.delenv("CONDA_EXE", raising=False)
+        yield
+
+
 # ---- a run that reaches its subprocess --------------------------------------
 @_pytest.fixture
 def linux_with_envs(monkeypatch):
@@ -115,6 +128,8 @@ def linux_with_envs(monkeypatch):
     every = {envs.group_for(m) for m in registry.list_methods()}
     monkeypatch.setattr("multibench.engine.envs.host_system", lambda: None)
     monkeypatch.setattr(envs, "installed_envs", lambda conda=None: every)
+    monkeypatch.setattr(envs, "env_prefix",
+                        lambda env, conda=None: Path("/envs") / env if env in every else None)
     monkeypatch.setattr(runner, "run_mode", lambda env: ("conda", None))
     return every
 

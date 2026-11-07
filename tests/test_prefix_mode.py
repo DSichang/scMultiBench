@@ -335,6 +335,31 @@ def test_scan_env_gate_flips_on_the_fake_prefix(envs_dir):
     assert "run_matilda.py" in row["command"]
 
 
+# ---------------------------------------------------------------- run: env check
+def test_a_run_with_no_env_installed_stops_before_the_subprocess(envs_dir, tmp_path,
+                                                                monkeypatch):
+    """Nothing installed and no conda: run names the install call; the method's
+    subprocess, which would fail on a missing ``conda``, is never started."""
+    monkeypatch.setattr(runner.subprocess, "Popen", lambda *a, **k: pytest.fail("spawned"))
+    inp = mtb.engine.resolve.inputs_for("D11", "vertical", "Matilda", modalities=["rna", "adt"])
+    with pytest.raises(EnvironmentError, match=r"mtb\.env\.install\(\['Matilda'\]\)"):
+        runner.run("Matilda", "vertical", inputs=inp, out_dir=str(tmp_path / "out"))
+    assert not (tmp_path / "out").exists()
+
+
+def test_the_env_check_asks_the_conda_of_conda_exe(envs_dir, tmp_path, monkeypatch):
+    """No conda on PATH: the env a conda-mode run would reach through
+    ``$CONDA_EXE`` passes the check."""
+    prefix = make_prefix(tmp_path / "opt" / "conda" / "envs", "matilda")
+    (prefix / envs.FLAVOR_FILE).write_text("gpu\n")
+    conda = _executable(tmp_path / "opt" / "conda" / "bin" / "conda",
+                        f"#!/bin/sh\necho '{{\"envs\": [\"{prefix}\"]}}'\n")
+    with pytest.raises(EnvironmentError):
+        runner._check_env("Matilda", "matilda")
+    monkeypatch.setenv("CONDA_EXE", str(conda))
+    runner._check_env("Matilda", "matilda")
+
+
 def test_envs_dir_env_var_wins(monkeypatch, tmp_path):
     monkeypatch.setenv(_settings.ENVS_DIR_VAR, str(tmp_path / "mine"))
     config.envs_dir = None                                  # unset: the default

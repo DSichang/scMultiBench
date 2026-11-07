@@ -104,7 +104,7 @@ def _child_env(monkeypatch, tmp_path, method: str, run_env: dict) -> dict:
     variant = dataclasses.replace(spec.variants[0], run_env=run_env)
     fake = dataclasses.replace(spec, variants=[variant])
     monkeypatch.setattr(runner.registry, "get", lambda m: fake if m == method else spec)
-    monkeypatch.setattr(runner.envs, "installed_envs", lambda conda=None: [])
+    monkeypatch.setattr(runner.envs, "env_prefix", lambda env, conda=None: tmp_path / "envs" / env)
     monkeypatch.setattr(runner, "check_gpu_requirement", lambda spec: None)
     monkeypatch.setattr(runner, "run_mode", lambda env: ("conda", None))  # no env probe
     seen = {}

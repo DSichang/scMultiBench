@@ -22,7 +22,7 @@ def test_method_subprocess_gets_headless_backend(monkeypatch):
     monkeypatch.setattr(runner.subprocess, "Popen", fake_popen)
     # run() preflights the method's conda env before spawning; this machine
     # need not have `matilda`, so pretend it does to reach the Popen call
-    monkeypatch.setattr(runner.envs, "installed_envs", lambda conda=None: ["matilda"])
+    monkeypatch.setattr(runner.envs, "env_prefix", lambda env, conda=None: f"/envs/{env}")
     try:
         import multibench as mtb
         inp = mtb.engine.resolve.inputs_for("D11", "vertical", "Matilda", modalities=["rna", "adt"])
