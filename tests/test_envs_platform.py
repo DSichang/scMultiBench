@@ -6,6 +6,7 @@ Every test pins the platform through ``envs.host_system`` so it
 holds on Linux and macOS alike.
 """
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -98,6 +99,32 @@ def test_packed_sizes_json_is_package_data():
 def test_gb_formatting():
     assert envs._gb(3215645570) == "3.2 GB"
     assert envs._gb(None) == "?" and envs._gb("x") == "?"
+
+
+def test_packed_sizes_tool_counts_an_env_on_a_layer_without_the_layer(tmp_path):
+    """An env built on a layer counts its own files, not the layer's files
+    hard-linked into it; the CPU build's key is measured from a flavor='cpu'
+    install, which uses the env's own name."""
+    sys.path.insert(0, str(ROOT / "tools"))
+    import packed_sizes as tool
+    root = tmp_path / "envs"
+    (root / ".layers" / "torch").mkdir(parents=True)
+    (root / ".layers" / "torch" / "lib.so").write_bytes(b"x" * 100)
+    (root / "a" / "lib").mkdir(parents=True)
+    os.link(root / ".layers" / "torch" / "lib.so", root / "a" / "lib" / "lib.so")
+    (root / "a" / "own.py").write_bytes(b"y" * 7)
+    os.link(root / "a" / "own.py", root / "a" / "again.py")
+
+    class _Down:
+        def open(self, req):
+            raise OSError("offline")
+    urls = {"a": "https://x/a.tar.gz", "a-cpu": "https://x/a-cpu.tar.gz",
+            "b": "https://x/b.tar.gz"}
+    gpu = tool.build(urls, envs_dir=root, opener=_Down())
+    assert gpu["a"]["unpacked_bytes"] == 7 and gpu["a-cpu"]["unpacked_bytes"] is None
+    cpu = tool.build(urls, previous=gpu, envs_dir=root, opener=_Down(), flavor="cpu")
+    assert cpu["a"]["unpacked_bytes"] == 7 and cpu["a-cpu"]["unpacked_bytes"] == 7
+    assert cpu["b"]["unpacked_bytes"] is None
 
 
 def test_packed_sizes_tool_builds_from_head_requests(tmp_path):

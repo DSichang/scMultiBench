@@ -8,13 +8,16 @@ publishing::
 
     python tools/packed_sizes.py                    # HEAD every URL in packed_urls.json
     python tools/packed_sizes.py --envs-dir /opt/conda/envs   # also measure unpacked sizes
+    python tools/packed_sizes.py --envs-dir cpu_envs --flavor cpu  # the CPU builds
     python tools/packed_sizes.py --check            # exit 1 when the shipped file is stale,
                                                     # or a layer of packed_layers.json is
                                                     # not published at its recorded size
 
 Only ``archive_bytes`` needs the network; ``unpacked_bytes`` needs the envs on
-disk (``--envs-dir``). An env that cannot be measured keeps ``null`` rather
-than a guess.
+disk (``--envs-dir``; ``--flavor cpu`` when they were installed with
+``flavor="cpu"``). An env built on a layer counts its own files only: the
+layer's files, hard-linked into it, are not counted again. An env that cannot
+be measured keeps ``null`` rather than a guess.
 """
 from __future__ import annotations
 
@@ -53,29 +56,51 @@ def head_content_length(url: str, opener=None) -> int | None:
     return n if n > 0 else None
 
 
-def du_bytes(path: Path) -> int | None:
-    """Total size of the files under ``path`` (symlinks not followed), or None."""
-    if not path.is_dir():
-        return None
-    total = 0
+def _files(path: Path):
+    """``os.lstat`` of every file under ``path`` (symlinks not followed)."""
     for dirpath, _dirs, files in os.walk(path):
         for f in files:
             try:
-                total += os.lstat(os.path.join(dirpath, f)).st_size
+                yield os.lstat(os.path.join(dirpath, f))
             except OSError:
                 pass
+
+
+def du_bytes(path: Path, skip: frozenset = frozenset()) -> int | None:
+    """Total size of the files under ``path``, each inode once and none of
+    ``skip`` (a layer's files hard-linked into it), or None."""
+    if not path.is_dir():
+        return None
+    seen, total = set(skip), 0
+    for st in _files(path):
+        if st.st_ino not in seen:
+            seen.add(st.st_ino)
+            total += st.st_size
     return total
 
 
+def env_folder(key: str, urls: dict, flavor: str) -> str | None:
+    """The folder under ``--envs-dir`` that holds the build ``key`` names, or
+    None when an install of ``flavor`` does not make that build. Both builds
+    of an env install under the env's name; ``<env>-cpu`` is the CPU build."""
+    if key.endswith("-cpu"):
+        return key[:-4] if flavor == "cpu" else None
+    if flavor == "cpu" and f"{key}-cpu" in urls:
+        return None
+    return key
+
+
 def build(urls: dict, *, previous: dict | None = None, envs_dir: Path | None = None,
-          opener=None, today: str | None = None) -> dict:
+          opener=None, today: str | None = None, flavor: str = "gpu") -> dict:
     """The sizes table for ``urls`` (``{env: url or [part url, ...]}``).
 
     Measures ``archive_bytes`` by HEAD request and ``unpacked_bytes`` under
-    ``envs_dir`` when given; a value that cannot be measured falls back to
-    ``previous`` (the shipped file) and finally ``None``.
+    ``envs_dir`` when given (the builds of ``flavor``); a value that cannot be
+    measured falls back to ``previous`` (the shipped file) and finally ``None``.
     """
     previous = previous or {}
+    layer = (frozenset(st.st_ino for st in _files(envs_dir / ".layers")) if envs_dir
+             else frozenset())
     out = {"_meta": {
         "written_by": "tools/packed_sizes.py",
         "note": "archive_bytes = Content-Length of the packed archive in packed_urls.json "
@@ -91,7 +116,8 @@ def build(urls: dict, *, previous: dict | None = None, envs_dir: Path | None = N
         parts = [urls[env]] if isinstance(urls[env], str) else list(urls[env])
         lengths = [head_content_length(u, opener=opener) for u in parts]
         arch = None if None in lengths else sum(lengths)
-        unp = du_bytes(envs_dir / env) if envs_dir else None
+        folder = env_folder(env, urls, flavor) if envs_dir else None
+        unp = du_bytes(envs_dir / folder, layer) if folder else None
         out[env] = {"archive_bytes": arch if arch is not None else prev.get("archive_bytes"),
                     "unpacked_bytes": unp if unp is not None else prev.get("unpacked_bytes")}
     return out
@@ -112,6 +138,8 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--envs-dir", type=Path, help="conda envs directory on a host that has "
                     "the envs unpacked, to measure unpacked_bytes")
+    ap.add_argument("--flavor", choices=["gpu", "cpu"], default="gpu",
+                    help="the build of the envs under --envs-dir")
     ap.add_argument("--check", action="store_true",
                     help="do not write; exit 1 if the shipped table differs")
     ap.add_argument("--out", type=Path, default=SIZES, help="where to write (default: the "
@@ -119,7 +147,7 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
     urls = json.loads(URLS.read_text())
     previous = json.loads(args.out.read_text()) if args.out.is_file() else {}
-    table = build(urls, previous=previous, envs_dir=args.envs_dir)
+    table = build(urls, previous=previous, envs_dir=args.envs_dir, flavor=args.flavor)
     text = json.dumps(table, indent=1) + "\n"
     if args.check:
         # the measurement date is not a difference worth failing on
