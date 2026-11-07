@@ -22,6 +22,10 @@ parser.add_argument('--path4', metavar='DIR', default="", help='path to ATAC')
 parser.add_argument('--save_path', metavar='DIR', default='NULL', help='path to save the output data')
 parser.add_argument('--batch_size',  type=int,  default=128, help='path to save the output data')
 parser.add_argument('--lr',  type=float,  default=0.005, help='path to save the output data')
+# Hyperparameters. A default is the value this script has always used; None leaves the argument to cobolt.
+parser.add_argument('--n_latent', type=int, default=10, help='dimensions of the joint embedding')
+parser.add_argument('--num_epochs', type=int, default=100, help='training epochs')
+parser.add_argument('--annealing_epochs', type=int, default=None, help='epochs of KL annealing (cobolt: 30)')
 args = parser.parse_args()
 
 # The script of Cobolt for mosaic integration, [RNA, RNA+ATAC, ATAC] data type, the output is joint embedding (dimension reduction)
@@ -60,8 +64,10 @@ single_data_atac_3.filter_features(upper_quantile=0.99, lower_quantile=0.7)
 single_data_rna_1.filter_features(upper_quantile=0.99, lower_quantile=0.7)
 
 multi_dt = MultiomicDataset.from_singledata(single_data_rna_2, single_data_atac_2, single_data_atac_3, single_data_rna_1)
-model = Cobolt(dataset=multi_dt, lr=args.lr, n_latent=10, batch_size=args.batch_size)
-model.train(num_epochs=100)
+# only the arguments that were given are passed on; the others stay at the cobolt defaults
+model_kwargs = {k: getattr(args, k) for k in ("annealing_epochs",) if getattr(args, k) is not None}
+model = Cobolt(dataset=multi_dt, lr=args.lr, n_latent=args.n_latent, batch_size=args.batch_size, **model_kwargs)
+model.train(num_epochs=args.num_epochs)
 model.calc_all_latent()
 latent = model.get_all_latent()
 

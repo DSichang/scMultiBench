@@ -24,7 +24,9 @@ set.seed(2021)
 #print("finish")
 
 
-run_StabMap <- function(file_paths,save_path, reference){
+# maxFeatures defaults to the value this script has always used; an argument left at NULL is
+# not passed, so StabMap's own default applies.
+run_StabMap <- function(file_paths,save_path, reference, maxFeatures = Inf, ncomponentsReference = NULL, ncomponentsSubset = NULL){
     begin_time <- Sys.time()
 
     processed_data <- read_h5_data(file_paths$rna_path,file_paths$adt_path,file_paths$atac_path)
@@ -37,10 +39,11 @@ run_StabMap <- function(file_paths,save_path, reference){
     if (!is.null(file_paths$atac_path)){file_paths$atac_path <- file_paths$atac_path[1:(length(file_paths$atac_path))]}
 
     stabmap_input <- stabmap_input_function(file_paths, processed_data)
-    result = stabMap(stabmap_input,
+    result = do.call("stabMap", c(list(quote(stabmap_input),
                    reference_list = c(reference),
-                   maxFeatures = Inf,
-                   plot = FALSE)
+                   maxFeatures = maxFeatures,
+                   plot = FALSE),
+                   Filter(Negate(is.null), list(ncomponentsReference = ncomponentsReference, ncomponentsSubset = ncomponentsSubset))))
                    
     end_time <- Sys.time()
     all_time <- difftime(end_time, begin_time, units="secs")

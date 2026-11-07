@@ -17,6 +17,14 @@ parser.add_argument('--path1', metavar='DIR', default='NULL', help='path to RNA'
 parser.add_argument('--path2', metavar='DIR', default='NULL', help='path to ATAC')
 parser.add_argument('--save_path', metavar='DIR', default='NULL', help='path to save the output data')
 parser.add_argument('--seed',  type=int,  default=1, help='path to save the output data')
+# Hyperparameters. A default is the value this script has always used; None leaves the argument to uniport.
+parser.add_argument('--lambda_s', type=float, default=1.0, help='weight of the reconstruction loss of the specific genes')
+parser.add_argument('--lambda_ot', type=float, default=None, help='weight of the optimal transport loss (uniport: 1.0)')
+parser.add_argument('--iteration', type=int, default=None, help='maximum training iterations (uniport: 30000)')
+parser.add_argument('--batch_size', type=int, default=None, help='minibatch size (uniport: 256)')
+parser.add_argument('--lr', type=float, default=None, help='learning rate (uniport: 0.0002)')
+parser.add_argument('--n_top_genes', type=int, default=2000, help='number of highly variable genes')
+parser.add_argument('--patience', type=int, default=None, help='early-stopping patience (uniport: 30)')
 args = parser.parse_args()
 
 # The uniPort script for diagonal integration requires RNA and ATAC data as input, where ATAC needs to be transformed into gene activity score. The output is a joint embedding (dimensionality reduction).
@@ -49,21 +57,23 @@ adata_cm = adata_atac.concatenate(adata_rna, join='inner', batch_key='domain_id'
 
 sc.pp.normalize_total(adata_cm)
 sc.pp.log1p(adata_cm)
-sc.pp.highly_variable_genes(adata_cm, n_top_genes=2000, inplace=False, subset=True)
+sc.pp.highly_variable_genes(adata_cm, n_top_genes=args.n_top_genes, inplace=False, subset=True)
 up.batch_scale(adata_cm)
 print(adata_cm.obs)
 
 sc.pp.normalize_total(adata_rna)
 sc.pp.log1p(adata_rna)
-sc.pp.highly_variable_genes(adata_rna, n_top_genes=2000, inplace=False, subset=True)
+sc.pp.highly_variable_genes(adata_rna, n_top_genes=args.n_top_genes, inplace=False, subset=True)
 up.batch_scale(adata_rna)
 
 sc.pp.normalize_total(adata_atac)
 sc.pp.log1p(adata_atac)
-sc.pp.highly_variable_genes(adata_atac, n_top_genes=2000, inplace=False, subset=True)
+sc.pp.highly_variable_genes(adata_atac, n_top_genes=args.n_top_genes, inplace=False, subset=True)
 up.batch_scale(adata_atac)
 
-adata = up.Run(adatas=[adata_atac,adata_rna], adata_cm=adata_cm, lambda_s=1.0, seed=args.seed)
+# only the arguments that were given are passed on; the others stay at the uniport defaults
+run_kwargs = {k: getattr(args, k) for k in ("lambda_ot", "iteration", "batch_size", "lr", "patience") if getattr(args, k) is not None}
+adata = up.Run(adatas=[adata_atac,adata_rna], adata_cm=adata_cm, lambda_s=args.lambda_s, seed=args.seed, **run_kwargs)
 
 embedding = adata.obsm['latent']
 if not os.path.exists(args.save_path):

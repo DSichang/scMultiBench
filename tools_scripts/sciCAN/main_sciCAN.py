@@ -14,6 +14,9 @@ parser = argparse.ArgumentParser("sciCAN")
 parser.add_argument('--path1', metavar='DIR', default='NULL', help='path to train rna')
 parser.add_argument('--path2', metavar='DIR', default='NULL', help='path to train atac')
 parser.add_argument('--save_path', metavar='DIR', default='NULL', help='path to save the output data')
+# Hyperparameters. The defaults are the values this script has always used.
+parser.add_argument('--epoch', type=int, default=200, help='training epochs')
+parser.add_argument('--batch_size', type=int, default=1024, help='minibatch size')
 args = parser.parse_args()
 
 # The sciCAN script for diagonal integration requires RNA and ATAC data as input, where ATAC needs to be transformed into gene activity score. The output is a joint embedding (dimensionality reduction).
@@ -43,7 +46,7 @@ dna_X = adata.X
 scaler = StandardScaler()
 dna_X = scaler.fit_transform(dna_X)
 
-FeatureExtractor = Cycle_train_wolabel(epoch=200, batch_size=1024, source_trainset=rna_X, target_trainset=dna_X)
+FeatureExtractor = Cycle_train_wolabel(epoch=args.epoch, batch_size=args.batch_size, source_trainset=rna_X, target_trainset=dna_X)
 
 X_tensor_a = torch.tensor(rna_X).float()
 X_tensor_b = torch.tensor(dna_X).float()

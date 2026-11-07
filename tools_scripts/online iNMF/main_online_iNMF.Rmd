@@ -43,9 +43,12 @@ runiNMF<- function(path_list){
   }
   pbmcs <- createLiger(data)
   pbmcs <- rliger::normalize(pbmcs)
-  pbmcs <- selectGenes(pbmcs, var.thresh = 0.2) 
+  # do.call puts the value itself (not a variable name) into the call, as the literal did;
+  # quote(pbmcs) keeps the object out of the call that rliger records
+  pbmcs <- do.call("selectGenes", list(quote(pbmcs), var.thresh = thresh))
   pbmcs <- scaleNotCenter(pbmcs)
-  pbmcs <- runIntegration(pbmcs, k = 20, method = "online")
+  # an option left at NULL is not passed, so rliger's own default applies
+  pbmcs <- do.call("runIntegration", c(list(quote(pbmcs), k = k, method = "online"), given(lambda = lambda, maxEpochs = maxEpochs, minibatchSize = minibatchSize, seed = seed)))
   #pbmcs <- online_iNMF(pbmcs, k = 20, miniBatch_size = 5000, max.epochs = 5)
   pbmcs <- quantileNorm(pbmcs)
   result <- pbmcs@H.norm
@@ -54,6 +57,26 @@ runiNMF<- function(path_list){
 
 # input
 args <- commandArgs(trailingOnly = TRUE)
+# Hyperparameters follow the paths as --name=value. A default is the value this script has
+# always used; NULL leaves the argument to rliger.
+is_opt <- grepl("^--[A-Za-z][A-Za-z0-9_.]*=", args)
+opts <- setNames(sub("^--[^=]+=", "", args[is_opt]), sub("^--([^=]+)=.*", "\\1", args[is_opt]))
+args <- args[!is_opt]
+option <- function(name, default, convert = as.numeric) {
+  if (!name %in% names(opts)) return(default)
+  value <- suppressWarnings(convert(opts[[name]]))
+  if (is.na(value)) stop("option --", name, ": cannot read the value ", opts[[name]])
+  opts <<- opts[names(opts) != name]
+  value
+}
+given <- function(...) Filter(Negate(is.null), list(...))
+k <- option("k", 20)
+lambda <- option("lambda", NULL)
+maxEpochs <- option("maxEpochs", NULL)
+minibatchSize <- option("minibatchSize", NULL)
+seed <- option("seed", NULL)
+thresh <- option("thresh", 0.2)
+if (length(opts) > 0) stop("unknown option: ", paste0("--", names(opts), collapse = " "))
 num <- length(args)
 path_list <- vector("list", num-1)
 for (i in c(1:(num-1))){

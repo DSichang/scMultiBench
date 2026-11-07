@@ -45,8 +45,9 @@ run_Seurat_atac_peak <- function(path_rna1,path_rna2,path_atac2,path_atac3,save_
 
   rna_count <- h5_to_matrix(path_rna1)
   obj.rna  <- CreateSeuratObject(counts = rna_count,assay = 'RNA')
-  obj.rna = SCTransform(object = obj.rna) %>%  RunPCA() %>%
-    RunUMAP(dims = 1:50, return.model = TRUE)
+  # quote(): do.call would otherwise put the whole object into the call
+  obj.rna = do.call("SCTransform", c(list(object = quote(obj.rna)), given(variable.features.n = variable.features.n))) %>%  RunPCA() %>%
+    RunUMAP(dims = 1:dims.rna, return.model = TRUE)   # dims.rna is still the option here (50 by default)
 
   atac_count <- h5_to_matrix(path_atac3)
   ATAC_assay <- CreateChromatinAssay(counts = atac_count, sep = c(":", "-"))
@@ -54,7 +55,7 @@ run_Seurat_atac_peak <- function(path_rna1,path_rna2,path_atac2,path_atac3,save_
 
 # normalize multiome RNA
   DefaultAssay(obj.multi) <- "RNA"
-  obj.multi <- SCTransform(obj.multi, verbose = FALSE)
+  obj.multi <- do.call("SCTransform", c(list(quote(obj.multi), verbose = FALSE), given(variable.features.n = variable.features.n)))
 # normalize multiome ATAC
   DefaultAssay(obj.multi) <- "ATAC"
   obj.multi <- RunTFIDF(object = obj.multi) 
@@ -62,8 +63,9 @@ run_Seurat_atac_peak <- function(path_rna1,path_rna2,path_atac2,path_atac3,save_
 # normalize query
   obj.atac <- RunTFIDF(object = obj.atac)  
 
-  dims.atac <- 2:50
-  dims.rna <- 1:50
+  # the right-hand sides read the options (upper bounds) set at the bottom of this script
+  dims.atac <- 2:dims.atac
+  dims.rna <- 1:dims.rna
   DefaultAssay(obj.multi) <-  "RNA"
   DefaultAssay(obj.rna) <- "SCT"
 
@@ -88,6 +90,24 @@ run_Seurat_atac_peak <- function(path_rna1,path_rna2,path_atac2,path_atac3,save_
 }
 
 args <- commandArgs(trailingOnly = TRUE)
+# Hyperparameters follow the paths as --name=value. A default is the value this script has
+# always used; NULL leaves the argument to Seurat.
+# dims.rna / dims.atac are the upper bound N of 1:N / 2:N.
+is_opt <- grepl("^--[A-Za-z][A-Za-z0-9_.]*=", args)
+opts <- setNames(sub("^--[^=]+=", "", args[is_opt]), sub("^--([^=]+)=.*", "\\1", args[is_opt]))
+args <- args[!is_opt]
+option <- function(name, default, convert = as.numeric) {
+  if (!name %in% names(opts)) return(default)
+  value <- suppressWarnings(convert(opts[[name]]))
+  if (is.na(value)) stop("option --", name, ": cannot read the value ", opts[[name]])
+  opts <<- opts[names(opts) != name]
+  value
+}
+given <- function(...) Filter(Negate(is.null), list(...))
+dims.rna <- option("dims.rna", 50)
+dims.atac <- option("dims.atac", 50)
+variable.features.n <- option("variable.features.n", NULL)
+if (length(opts) > 0) stop("unknown option: ", paste0("--", names(opts), collapse = " "))
 rna_path1 <- args[1] 
 rna_path2 <- args[2]
 adt_path2 <- args[3]

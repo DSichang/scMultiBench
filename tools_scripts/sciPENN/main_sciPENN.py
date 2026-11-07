@@ -15,6 +15,14 @@ parser.add_argument('--path1', metavar='DIR', nargs='+', default="", help='path 
 parser.add_argument('--path2', metavar='DIR', nargs='+', default="", help='path to ADT')
 parser.add_argument('--save_path', metavar='DIR', default='NULL', help='path to save the output data')
 parser.add_argument('--seed',  type=int,  default=1, help='path to save the output data')
+# Hyperparameters. A default is the value this script has always used; None leaves the argument to sciPENN.
+parser.add_argument('--n_epochs', type=int, default=10000, help='maximum training epochs')
+parser.add_argument('--lr', type=float, default=10**(-3), help='learning rate')
+parser.add_argument('--batch_size', type=int, default=None, help='minibatch size (sciPENN: 128)')
+parser.add_argument('--ES_max', type=int, default=12, help='early-stopping patience in epochs')
+parser.add_argument('--decay_max', type=int, default=6, help='epochs without improvement before the learning rate decays')
+parser.add_argument('--min_cells', type=int, default=0, help='keep genes found in at least this many cells (sciPENN: 30)')
+parser.add_argument('--min_genes', type=int, default=0, help='keep cells with at least this many genes (sciPENN: 200)')
 args = parser.parse_args()
 
 # The sciPENN script for vertical/cross integration requires one/multiple matched RNA+ADT data as input. The output is a joint embedding (dimensionality reduction).
@@ -70,9 +78,11 @@ def embedding_output(adata_gene_train, adata_protein_train):
         adata_protein_combined[i].obs['batch'] = str(adata_protein_combined[i].obs['batch'])
         batch.append('batch')
         
-    sciPENN = sciPENN_API(gene_trainsets = adata_gene_combined, protein_trainsets = adata_protein_combined, train_batchkeys = batch, min_cells=0, min_genes=0) #min_cells=0, min_genes=0 is added by myself.
-    sciPENN.train(quantiles = [0.1, 0.25, 0.75, 0.9], n_epochs = 10000, ES_max = 12, decay_max = 6,
-             decay_step = 0.1, lr = 10**(-3), weights_dir = "pbmc_to_pbmc", load = False)
+    # only the arguments that were given are passed on; the others stay at the sciPENN defaults
+    api_kwargs = {k: getattr(args, k) for k in ("batch_size",) if getattr(args, k) is not None}
+    sciPENN = sciPENN_API(gene_trainsets = adata_gene_combined, protein_trainsets = adata_protein_combined, train_batchkeys = batch, min_cells=args.min_cells, min_genes=args.min_genes, **api_kwargs) #min_cells=0, min_genes=0 is added by myself.
+    sciPENN.train(quantiles = [0.1, 0.25, 0.75, 0.9], n_epochs = args.n_epochs, ES_max = args.ES_max, decay_max = args.decay_max,
+             decay_step = 0.1, lr = args.lr, weights_dir = "pbmc_to_pbmc", load = False)
     embedding_output = sciPENN.embed()
     return embedding_output
     

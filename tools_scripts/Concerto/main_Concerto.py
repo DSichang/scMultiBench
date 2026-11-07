@@ -14,6 +14,10 @@ parser = argparse.ArgumentParser("Concerto")
 parser.add_argument('--path1', metavar='DIR', nargs='+', default=[], help='path to modality1')
 parser.add_argument('--path2', metavar='DIR', nargs='+', default=[], help='path to modality2')
 parser.add_argument('--save_path', metavar='DIR', default='NULL', help='path to save the output data')
+# Hyperparameters of the training step. The defaults are the values this script has always used.
+parser.add_argument('--epoch_pretrain', type=int, default=5, help='training epochs')
+parser.add_argument('--lr', type=float, default=1e-4, help='learning rate')
+parser.add_argument('--batch_size', type=int, default=64, help='training minibatch size')
 args = parser.parse_args()
 
 # The script of Concerto for vertical&cross integration, RNA+ADT or multiple RNA+ADT data types, the output is joint embedding (dimension reduction)
@@ -199,12 +203,14 @@ def run_Concerto(adt_files, rna_files, batch_name):
   RNA_tf_path = save_path + 'tfrecord/RNA_tf/'
   Protein_tf_path = save_path + 'tfrecord/Protein_tf/'
 
-  concerto_train_multimodal(RNA_tf_path,Protein_tf_path,weight_path,super_parameters = {'batch_size': 64, 'epoch_pretrain': 5, 'lr': 1e-4,'drop_rate': 0.1})  #5
+  concerto_train_multimodal(RNA_tf_path,Protein_tf_path,weight_path,super_parameters = {'batch_size': args.batch_size, 'epoch_pretrain': args.epoch_pretrain, 'lr': args.lr,'drop_rate': 0.1})  #5
   save_path = './'
   weight_path = save_path + 'weight/'
   RNA_tf_path = save_path + 'tfrecord/RNA_tf/'
   Protein_tf_path = save_path + 'tfrecord/Protein_tf/'
-  saved_weight_path = None #'./weight/weight_encoder_epoch3.h5'# You can choose a trained weight or use None to default to the weight of the last epoch.
+  # the weight of this run's last epoch. None would take the highest epoch found in weight/,
+  # which is another run's when --epoch_pretrain is lower than in an earlier run here.
+  saved_weight_path = weight_path + 'weight_encoder_epoch{}.h5'.format(args.epoch_pretrain)
   embedding,batch,RNA_id,attention_weight =  concerto_test_multimodal(weight_path,RNA_tf_path,Protein_tf_path,n_cells_for_sample = None, super_parameters={'batch_size': 128, 'epoch_pretrain': 1, 'lr': 1e-4,'drop_rate': 0.1},saved_weight_path = saved_weight_path)
   return embedding
 

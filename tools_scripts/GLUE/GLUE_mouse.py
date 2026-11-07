@@ -24,7 +24,30 @@ parser.add_argument('--path1', metavar='DIR', nargs ="*", default=[], help='path
 parser.add_argument('--path2', metavar='DIR', nargs ="*", default=[], help='path to train peak')
 parser.add_argument('--species', metavar='str', default='Mouse', help='Human or Mouse')
 parser.add_argument('--save_path', metavar='DIR', default='NULL', help='path to save the output data')
+# Hyperparameters. A default is the value this script has always used; None leaves the argument to scglue.
+parser.add_argument('--n_top_genes', type=int, default=2000, help='number of highly variable genes')
+parser.add_argument('--n_pcs', type=int, default=100, help='principal components of the RNA input')
+parser.add_argument('--n_lsi', type=int, default=100, help='LSI dimensions of the ATAC input')
+parser.add_argument('--latent_dim', type=int, default=None, help='dimensions of the joint embedding (scglue: 50)')
+parser.add_argument('--random_seed', type=int, default=None, help='random seed (scglue: 0)')
+parser.add_argument('--lr', type=float, default=None, help='learning rate (scglue: 0.002)')
+parser.add_argument('--lam_graph', type=float, default=None, help='weight of the guidance graph loss (scglue: 0.02)')
+parser.add_argument('--lam_align', type=float, default=None, help='weight of the modality alignment loss (scglue: 0.05)')
+parser.add_argument('--max_epochs', type=int, default=None, help='training epochs (scglue: set automatically)')
+parser.add_argument('--data_batch_size', type=int, default=None, help='minibatch size (scglue: 128)')
+parser.add_argument('--patience', type=int, default=None, help='early-stopping patience in epochs (scglue: set automatically)')
+parser.add_argument('--align_burnin', type=int, default=None, help='epochs before the alignment starts (scglue: set automatically)')
 args = parser.parse_args()
+# only the arguments that were given are passed on; the others stay at the scglue defaults
+init_kws = {k: getattr(args, k) for k in ("latent_dim", "random_seed") if getattr(args, k) is not None}
+compile_kws = {k: getattr(args, k) for k in ("lr", "lam_graph", "lam_align") if getattr(args, k) is not None}
+fit_kws = {"directory": "glue"}
+fit_kws.update({k: getattr(args, k) for k in ("max_epochs", "data_batch_size", "patience", "align_burnin") if getattr(args, k) is not None})
+glue_kws = {"fit_kws": fit_kws}
+if init_kws:
+    glue_kws["init_kws"] = init_kws
+if compile_kws:
+    glue_kws["compile_kws"] = compile_kws
 
 # This script is designed for GLUE (Mouse species), integrating RNA and ATAC (peaks). The output is a joint embedding (dimensionality reduction).
 # run command for GLUE ([RNA, ATAC])
@@ -76,15 +99,15 @@ def load_atac(atac_peaks_path):
 
 def preprocess_rna(rna):
     rna.layers["counts"] = rna.X.copy()
-    sc.pp.highly_variable_genes(rna, n_top_genes=2000, flavor="seurat_v3")
+    sc.pp.highly_variable_genes(rna, n_top_genes=args.n_top_genes, flavor="seurat_v3")
     sc.pp.normalize_total(rna)
     sc.pp.log1p(rna)
     sc.pp.scale(rna)
-    sc.tl.pca(rna, n_comps=100, svd_solver="auto")
+    sc.tl.pca(rna, n_comps=args.n_pcs, svd_solver="auto")
     return (rna)
 
 def preprocess_atac(atac):
-    scglue.data.lsi(atac, n_components=100, n_iter=15)
+    scglue.data.lsi(atac, n_components=args.n_lsi, n_iter=15)
     return (atac)
 
 def runGLUE(rna_path_list, atac_peaks_path_list, species="Mouse"): # claim to have dna as well, missing in its tutorial
@@ -190,7 +213,7 @@ def runGLUE(rna_path_list, atac_peaks_path_list, species="Mouse"): # claim to ha
         )).copy()
         glue = scglue.models.fit_SCGLUE(
             {"rna": rna, "atac": atac}, guidance_hvf,
-            fit_kws={"directory": "glue"}
+            **glue_kws
         )
 
         
@@ -255,7 +278,7 @@ def runGLUE(rna_path_list, atac_peaks_path_list, species="Mouse"): # claim to ha
         )).copy()
         glue = scglue.models.fit_SCGLUE(
             {"rna": rna, "atac": atac}, guidance_hvf,
-            fit_kws={"directory": "glue"}
+            **glue_kws
         )
     
     else:

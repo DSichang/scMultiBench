@@ -34,8 +34,12 @@ run_MOFA2 <- function(processed_data,  plot=FALSE){
     data_opts <- get_default_data_options(MOFAobject)
     model_opts <- get_default_model_options(MOFAobject)
     train_opts <- get_default_training_options(MOFAobject)
-    train_opts$seed <- 42
+    train_opts$seed <- seed
     train_opts$gpu_mode <- TRUE
+    if (!is.null(num_factors)) model_opts$num_factors <- num_factors
+    if (!is.null(maxiter)) train_opts$maxiter <- maxiter
+    if (!is.null(convergence_mode)) train_opts$convergence_mode <- convergence_mode
+    if (!is.null(scale_views)) data_opts$scale_views <- scale_views
     MOFAobject <- prepare_mofa(
       object = MOFAobject,
       data_options = data_opts,
@@ -48,6 +52,26 @@ run_MOFA2 <- function(processed_data,  plot=FALSE){
 
 # input data
 args <- commandArgs(trailingOnly = TRUE)
+# Hyperparameters follow the paths as --name=value. A default is the value this script has
+# always used; NULL leaves the argument to MOFA2.
+# (the value in MOFA2's default option lists is kept)
+is_opt <- grepl("^--[A-Za-z][A-Za-z0-9_.]*=", args)
+opts <- setNames(sub("^--[^=]+=", "", args[is_opt]), sub("^--([^=]+)=.*", "\\1", args[is_opt]))
+args <- args[!is_opt]
+option <- function(name, default, convert = as.numeric) {
+  if (!name %in% names(opts)) return(default)
+  value <- suppressWarnings(convert(opts[[name]]))
+  if (is.na(value)) stop("option --", name, ": cannot read the value ", opts[[name]])
+  opts <<- opts[names(opts) != name]
+  value
+}
+given <- function(...) Filter(Negate(is.null), list(...))
+num_factors <- option("num_factors", NULL)
+maxiter <- option("maxiter", NULL)
+convergence_mode <- option("convergence_mode", NULL, as.character)
+seed <- option("seed", 42)
+scale_views <- option("scale_views", NULL, as.logical)
+if (length(opts) > 0) stop("unknown option: ", paste0("--", names(opts), collapse = " "))
 batch_num <-  args[length(args)-2]
 num <-  args[length(args)-1]
 save_path <- args[length(args)]

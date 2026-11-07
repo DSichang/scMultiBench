@@ -48,14 +48,14 @@ run_UINMF <- function(rna_path1, rna_path2, adt_path1, adt_path2, save_path){
   rna2 <- h5_to_matrix(rna_path2)
   lig <- createLiger(list(rna1 = rna1, rna2 = rna2))
   lig <- normalize(lig) %>%
-    selectGenes(useDatasets = "rna1", thresh = 0.1) %>%
+    selectGenes(useDatasets = "rna1", thresh = thresh) %>%
     scaleNotCenter()
   
   adt1 <- h5_to_matrix(adt_path1)
   adt1 <- as(adt1, "CsparseMatrix")
   unshareNormed1 <- normalize(adt1)
   se1 <- CreateSeuratObject(unshareNormed1)
-  se1 <- FindVariableFeatures(se1, selection.method = "vst", nfeatures = 2000)
+  se1 <- FindVariableFeatures(se1, selection.method = "vst", nfeatures = nfeatures)
   adt1_top2000 <- VariableFeatures(se1)
   unshareScaled1 <- scaleNotCenter(unshareNormed1[adt1_top2000,])
   varUnsharedFeatures(lig, "rna1") <- adt1_top2000
@@ -69,7 +69,9 @@ run_UINMF <- function(rna_path1, rna_path2, adt_path1, adt_path2, save_path){
   varUnsharedFeatures(lig, "rna2") <- adt2_top2000
   scaleUnsharedData(lig, "rna2") <- unshareScaled2
   
-  lig <- runUINMF(lig, k = 30, nIteration = 30)
+  # an option left at NULL is not passed, so rliger's own default applies.
+  # quote(lig): do.call would otherwise put the whole object into the call that rliger records
+  lig <- do.call("runUINMF", c(list(quote(lig), k = k, nIteration = nIteration), given(lambda = lambda, seed = seed)))
   lig <- quantileNorm(lig)
   
   result <- lig@H.norm
@@ -87,6 +89,26 @@ run_UINMF <- function(rna_path1, rna_path2, adt_path1, adt_path2, save_path){
 # read parameters, the input is RNA counts and ATAC gene activity score counts
 begin_time <- Sys.time()
 args <- commandArgs(trailingOnly = TRUE)
+# Hyperparameters follow the paths as --name=value. A default is the value this script has
+# always used; NULL leaves the argument to rliger.
+is_opt <- grepl("^--[A-Za-z][A-Za-z0-9_.]*=", args)
+opts <- setNames(sub("^--[^=]+=", "", args[is_opt]), sub("^--([^=]+)=.*", "\\1", args[is_opt]))
+args <- args[!is_opt]
+option <- function(name, default, convert = as.numeric) {
+  if (!name %in% names(opts)) return(default)
+  value <- suppressWarnings(convert(opts[[name]]))
+  if (is.na(value)) stop("option --", name, ": cannot read the value ", opts[[name]])
+  opts <<- opts[names(opts) != name]
+  value
+}
+given <- function(...) Filter(Negate(is.null), list(...))
+k <- option("k", 30)
+lambda <- option("lambda", NULL)
+nIteration <- option("nIteration", 30)
+seed <- option("seed", NULL)
+thresh <- option("thresh", 0.1)
+nfeatures <- option("nfeatures", 2000)
+if (length(opts) > 0) stop("unknown option: ", paste0("--", names(opts), collapse = " "))
 rna_path1 <- args[1] 
 rna_path2 <- args[2] 
 adt_path1 <- args[3] 

@@ -14,6 +14,13 @@ parser = argparse.ArgumentParser("VIPCCA")
 parser.add_argument('--path1', metavar='DIR', default='NULL', help='path to rna')
 parser.add_argument('--path2', metavar='DIR', default='NULL', help='path to atac')
 parser.add_argument('--save_path', metavar='DIR', default='NULL', help='path to save the output data')
+# Hyperparameters. A default is the value this script has always used; None leaves the argument to vipcca.
+parser.add_argument('--epochs', type=int, default=20, help='training epochs')
+parser.add_argument('--lambda_regulizer', type=float, default=2, help='weight of the regularisation term')
+parser.add_argument('--batch_input_size', type=int, default=64, help='minibatch size')
+parser.add_argument('--batch_input_size2', type=int, default=14, help='second minibatch size setting of vipcca')
+parser.add_argument('--n_top_genes', type=int, default=None, help='number of highly variable genes (vipcca: 2000)')
+parser.add_argument('--patience_es', type=int, default=None, help='early stopping patience in epochs (vipcca: 50)')
 args = parser.parse_args()
 
 # The VIPCCA script for diagonal integration requires RNA and ATAC data as input, where ATAC needs to be transformed into gene activity score. The output is a joint embedding (dimensionality reduction).
@@ -35,15 +42,19 @@ adata_atac.obs['tech'] = ['atac' for _ in range(adata_atac.n_obs)]
 adata_atac.obs['_batch'] = ['ATAC' for _ in range(adata_atac.n_obs)]
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
-adata_all= tl.preprocessing([adata_rna, adata_atac])
+# only the arguments that were given are passed on; the others stay at the vipcca defaults
+preprocess_kwargs = {k: getattr(args, k) for k in ("n_top_genes",) if getattr(args, k) is not None}
+model_kwargs = {k: getattr(args, k) for k in ("patience_es",) if getattr(args, k) is not None}
+adata_all= tl.preprocessing([adata_rna, adata_atac], **preprocess_kwargs)
 handle = vip.VIPCCA(adata_all=adata_all,
                            res_path='./atac_result/',
                            mode='CVAE',
                            split_by="_batch",
-                           epochs=20,
-                           lambda_regulizer=2,
-                           batch_input_size=64,
-                           batch_input_size2=14,
+                           epochs=args.epochs,
+                           lambda_regulizer=args.lambda_regulizer,
+                           batch_input_size=args.batch_input_size,
+                           batch_input_size2=args.batch_input_size2,
+                           **model_kwargs
                            )
 adata_integrate=handle.fit_integrate()
 result = adata_integrate.obsm['X_vipcca']

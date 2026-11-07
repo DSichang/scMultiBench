@@ -49,7 +49,9 @@ runSeurat<- function(rna_path, atac_path, gene.activities_path, rna_cty_path, at
   atac_seurat  <- CreateSeuratObject(counts = atac_seurat, assay = 'ATAC') 
 
   rna_seurat <- NormalizeData(rna_seurat)
-  rna_seurat <- FindVariableFeatures(rna_seurat)
+  # an option left at NULL is not passed, so Seurat's own default applies.
+  # quote(): do.call would otherwise put the whole object into the call
+  rna_seurat <- do.call("FindVariableFeatures", c(list(quote(rna_seurat)), given(nfeatures = nfeatures)))
   rna_seurat <- ScaleData(rna_seurat)
   rna_seurat <- RunPCA(rna_seurat)
   rna_seurat <- RunUMAP(rna_seurat, dims = 1:30)
@@ -67,25 +69,26 @@ runSeurat<- function(rna_path, atac_path, gene.activities_path, rna_cty_path, at
   atac_seurat$seurat_annotations <- read.csv(atac_cty_path)$x
   
   # Identify anchors
-  transfer.anchors <- FindTransferAnchors(reference = rna_seurat, query = atac_seurat, features =
-                                            VariableFeatures(object = rna_seurat),
-                                          reference.assay = "RNA", query.assay = "ACTIVITY", reduction = "cca") 
+  transfer.anchors <- do.call("FindTransferAnchors", c(list(reference = quote(rna_seurat), query = quote(atac_seurat), features =
+                                            quote(VariableFeatures(object = rna_seurat)),
+                                          reference.assay = "RNA", query.assay = "ACTIVITY", reduction = "cca"),
+                                          given(k.anchor = k.anchor)))
 
   # prediction
-  celltype.predictions <- TransferData(anchorset = transfer.anchors, refdata = rna_seurat$annotation,
-    weight.reduction = atac_seurat[["lsi"]], dims = 2:30)
+  celltype.predictions <- do.call("TransferData", c(list(anchorset = quote(transfer.anchors), refdata = quote(rna_seurat$annotation),
+    weight.reduction = quote(atac_seurat[["lsi"]]), dims = 2:lsi_dims), given(k.weight = k.weight)))
   atac_seurat <- AddMetaData(atac_seurat, metadata = celltype.predictions)
 
   # coembedding
   genes.use <- VariableFeatures(rna_seurat)
   refdata <- GetAssayData(rna_seurat, assay = "RNA", slot = "data")[genes.use, ]
-  imputation <- TransferData(anchorset = transfer.anchors, refdata = refdata, weight.reduction = atac_seurat[["lsi"]],
-      dims = 2:30) 
+  imputation <- do.call("TransferData", c(list(anchorset = quote(transfer.anchors), refdata = quote(refdata), weight.reduction = quote(atac_seurat[["lsi"]]),
+      dims = 2:lsi_dims), given(k.weight = k.weight)))
   atac_seurat[["RNA"]] <- imputation
   
   coembed <- merge(x = rna_seurat, y = atac_seurat)
   coembed <- ScaleData(coembed, features = genes.use, do.scale = FALSE)
-  coembed <- RunPCA(coembed, features = genes.use, verbose = FALSE)
+  coembed <- do.call("RunPCA", c(list(quote(coembed), features = quote(genes.use), verbose = FALSE), given(npcs = npcs)))
   result <- coembed@reductions[["pca"]]@cell.embeddings
   result_rna <- result[1:dim(rna)[2],]
   result_rna <- t(result_rna)
@@ -97,6 +100,25 @@ runSeurat<- function(rna_path, atac_path, gene.activities_path, rna_cty_path, at
 # load data, the input is RNA counts and ATAC gene activity score counts
 begin_time <- Sys.time()
 args <- commandArgs(trailingOnly = TRUE)
+# Hyperparameters follow the paths as --name=value. A default is the value this script has
+# always used; NULL leaves the argument to Seurat.
+is_opt <- grepl("^--[A-Za-z][A-Za-z0-9_.]*=", args)
+opts <- setNames(sub("^--[^=]+=", "", args[is_opt]), sub("^--([^=]+)=.*", "\\1", args[is_opt]))
+args <- args[!is_opt]
+option <- function(name, default, convert = as.numeric) {
+  if (!name %in% names(opts)) return(default)
+  value <- suppressWarnings(convert(opts[[name]]))
+  if (is.na(value)) stop("option --", name, ": cannot read the value ", opts[[name]])
+  opts <<- opts[names(opts) != name]
+  value
+}
+given <- function(...) Filter(Negate(is.null), list(...))
+nfeatures <- option("nfeatures", NULL)
+npcs <- option("npcs", NULL)
+lsi_dims <- option("lsi_dims", 30)
+k.anchor <- option("k.anchor", NULL)
+k.weight <- option("k.weight", NULL)
+if (length(opts) > 0) stop("unknown option: ", paste0("--", names(opts), collapse = " "))
 rna_path <- args[1] 
 atac_path <- args[2] 
 gene_activity_path <- args[3] 

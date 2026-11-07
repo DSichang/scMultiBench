@@ -26,6 +26,10 @@ parser = argparse.ArgumentParser("moETM_atac")
 parser.add_argument('--path1', metavar='DIR', nargs='+', default=[], help='path to RNA')
 parser.add_argument('--path2', metavar='DIR', nargs='+', default=[], help='path to ATAC')
 parser.add_argument('--save_path', metavar='DIR', default='NULL', help='path to save the output data')
+# Hyperparameters. The defaults are the values this script has always used.
+parser.add_argument('--Total_epoch', type=int, default=500, help='training epochs')
+parser.add_argument('--batch_size', type=int, default=2000, help='minibatch size; with fewer cells than this no gradient step is taken')
+parser.add_argument('--num_topic', type=int, default=100, help='number of topics, the dimensions of the joint embedding')
 args = parser.parse_args()
 
 # This script is designed for moETM for vertical integration, where the input should be RNA+ATAC.
@@ -189,7 +193,7 @@ def integration_moETM(atac_files, rna_files, batch_names,Total_epoch=500, batch_
     input_dim_mod1 = X_mod1_train_T.shape[1]
     input_dim_mod2 = X_mod2_train_T.shape[1]
     train_num = X_mod1_train_T.shape[0]
-    num_topic = 100
+    num_topic = args.num_topic
     emd_dim = 400
     encoder_mod1, encoder_mod2, decoder, optimizer = build_moETM(input_dim_mod1, input_dim_mod2, num_batch, num_topic=num_topic, emd_dim=emd_dim)
     trainer = Trainer_moETM(encoder_mod1, encoder_mod2, decoder, optimizer)
@@ -204,7 +208,7 @@ def integration_moETM(atac_files, rna_files, batch_names,Total_epoch=500, batch_
 atac_files = args.path2
 rna_files = args.path1
 batch_names = ["batch{}".format(i) for i in range(1)]
-result = integration_moETM(atac_files, rna_files,batch_names)
+result = integration_moETM(atac_files, rna_files,batch_names, Total_epoch=args.Total_epoch, batch_size=args.batch_size)
 end_time = time.time()
 all_time = end_time - begin_time
 print(all_time)

@@ -15,6 +15,27 @@ source("util.R")
 
 # load parameters from
 args <- commandArgs(trailingOnly = TRUE)
+# Hyperparameters follow the paths as --name=value. A default is the value this script has
+# always used; NULL leaves the argument to Seurat.
+# dims_rna / dims_adt / dims_atac are the upper bound N of 1:N (ATAC: 2:N); left at NULL they keep
+# the value util.R has always used for the data type (RNA+ADT: 30 and 18; RNA+ATAC: 50 and 50).
+is_opt <- grepl("^--[A-Za-z][A-Za-z0-9_.]*=", args)
+opts <- setNames(sub("^--[^=]+=", "", args[is_opt]), sub("^--([^=]+)=.*", "\\1", args[is_opt]))
+args <- args[!is_opt]
+option <- function(name, default, convert = as.numeric) {
+  if (!name %in% names(opts)) return(default)
+  value <- suppressWarnings(convert(opts[[name]]))
+  if (is.na(value)) stop("option --", name, ": cannot read the value ", opts[[name]])
+  opts <<- opts[names(opts) != name]
+  value
+}
+given <- function(...) Filter(Negate(is.null), list(...))
+dims_rna <- option("dims_rna", NULL)
+dims_adt <- option("dims_adt", NULL)
+dims_atac <- option("dims_atac", NULL)
+k.nn <- option("k.nn", NULL)
+variable.features.n <- option("variable.features.n", NULL)
+if (length(opts) > 0) stop("unknown option: ", paste0("--", names(opts), collapse = " "))
 rna_path <- args[1] 
 adt_path <- args[2] 
 atac_path <- args[3] 

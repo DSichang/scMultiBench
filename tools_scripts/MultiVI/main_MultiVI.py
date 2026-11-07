@@ -14,13 +14,31 @@ from scipy.sparse import csr_matrix
 from util import data_loader_multi_single, data_loader_multi_multi, split_dataset_by_modality, organize_multiome_datasets, sort_features_by_modality, filter_features, setup_anndata_for_multivi, get_normalized_expression, create_multivi_model, train_multivi_model, get_accessibility_estimates, save_multivi_model, load_multivi_model
 
 random.seed(1)
+def boolean(text):
+    return {'true': True, 'false': False}[text.lower()]
+
 parser = argparse.ArgumentParser("MultiVI")
 parser.add_argument('--path1', metavar='DIR', default='NULL', help='path to  RNA')
 parser.add_argument('--path2', metavar='DIR', default='NULL', help='path to  ATAC')
 parser.add_argument('--pair_path1', metavar='DIR', default='NULL', help='path to RNA of multiome')
 parser.add_argument('--pair_path2', metavar='DIR', default='NULL', help='path to ATAC of multiome')
 parser.add_argument('--save_path', metavar='DIR', default='NULL', help='path to save the output data')
+# Hyperparameters. A default is the value this script has always used; None leaves the argument to scvi-tools.
+parser.add_argument('--max_epochs', type=int, default=500, help='training epochs')
+parser.add_argument('--lr', type=float, default=1e-3, help='learning rate')
+parser.add_argument('--batch_size', type=int, default=None, help='minibatch size (scvi-tools: 128)')
+parser.add_argument('--early_stopping', type=boolean, default=None, help='true or false: stop when the validation loss stalls (scvi-tools: true)')
+parser.add_argument('--n_epochs_kl_warmup', type=int, default=None, help='epochs of KL warm-up (scvi-tools: 50)')
+parser.add_argument('--n_latent', type=int, default=None, help='dimensions of the joint embedding (scvi-tools: set automatically)')
+parser.add_argument('--modality_weights', type=str, default=None, help='how the modalities are weighted: equal, cell or universal (scvi-tools: equal)')
+parser.add_argument('--modality_penalty', type=str, default=None, help='modality alignment penalty: Jeffreys, MMD or None (scvi-tools: Jeffreys)')
+parser.add_argument('--seed', type=int, default=None, help='scvi-tools random seed (scvi-tools: 0)')
 args = parser.parse_args()
+if args.seed is not None:
+    scvi.settings.seed = args.seed
+# only the arguments that were given are passed on; the others stay at the scvi-tools defaults
+model_kwargs = {k: getattr(args, k) for k in ("n_latent", "modality_weights", "modality_penalty") if getattr(args, k) is not None}
+train_kwargs = {k: getattr(args, k) for k in ("batch_size", "early_stopping", "n_epochs_kl_warmup") if getattr(args, k) is not None}
 
 # The MultiVI script for mosaic integration requires [RNA, RNA+ATAC, ADT]. The output is a joint embedding (dimensionality reduction).
 # run commond for MultiVI
@@ -29,7 +47,7 @@ args = parser.parse_args()
 """# Module2 Creating, saving and loading the model"""
 
 
-def run_MultiVI(file_paths, n_epochs=500, lr=1e-3):
+def run_MultiVI(file_paths, n_epochs=500, lr=1e-3, model_kwargs={}, train_kwargs={}):
 
     # Load and preprocess the data
     rna_path = file_paths["rna_path_single"]
@@ -48,8 +66,8 @@ def run_MultiVI(file_paths, n_epochs=500, lr=1e-3):
     # Setup anndata for multivi
     setup_anndata_for_multivi(adata, batch_key="modality")
     # Create the model
-    model = create_multivi_model(adata)
-    train_multivi_model(model, adata, n_epochs=n_epochs, lr=lr)
+    model = create_multivi_model(adata, **model_kwargs)
+    train_multivi_model(model, adata, n_epochs=n_epochs, lr=lr, **train_kwargs)
     normalized_expression = get_normalized_expression(model)
     accessibility_estimates = get_accessibility_estimates(model)
     return model, adata, adata_single_rna, adata_single_atac, adata_multi, normalized_expression, accessibility_estimates
@@ -68,10 +86,10 @@ file_paths = {
         args.pair_path2
     ]
 }
-n_epochs = 500
-lr = 1e-3
+n_epochs = args.max_epochs
+lr = args.lr
 model, adata, adata_single_rna, adata_single_atac, adata_multi, normalized_expression, accessibility_estimates = run_MultiVI(
-    file_paths,n_epochs
+    file_paths,n_epochs,lr,model_kwargs,train_kwargs
 )
 
 latent_key = "X_multivi"

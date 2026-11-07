@@ -19,6 +19,12 @@ parser.add_argument('--test_path2', metavar='DIR', nargs='+', default=[], help='
 parser.add_argument('--train_cty_path', metavar='DIR', nargs='+', default=[], help='path to cty')
 parser.add_argument('--save_path', metavar='DIR', default='NULL', help='path to save the output data')
 parser.add_argument('--index', type=int, default=1, help='batch size')
+# Hyperparameters. The defaults are the values this script has always used.
+parser.add_argument('--train_epochs', type=int, default=10, help='epochs of the training stage')
+parser.add_argument('--finetune_epochs', type=int, default=10, help='epochs of the fine-tuning stage')
+parser.add_argument('--lr', type=float, default=0.01, help='learning rate')
+parser.add_argument('--train_batch_size', type=int, default=512, help='minibatch size of the training stage')
+parser.add_argument('--finetune_batch_size', type=int, default=5000, help='minibatch size of the fine-tuning stage')
 args = parser.parse_args()
 
 # The UnitedNet script is designed for vertical integration of RNA and ATAC data, as well as cross-integration of multiple RNA and ATAC datasets. This is a supervised method and requires labels.
@@ -105,11 +111,11 @@ adatas_train = [adata_atac, adata_gex]
 adatas_test = [test_adata_atac, test_adata_gex]
 
 atacseq_config = {
-    "train_batch_size": 512,
-    "finetune_batch_size": 5000,
+    "train_batch_size": args.train_batch_size,
+    "finetune_batch_size": args.finetune_batch_size,
     "transfer_batch_size": 512,
-    "train_epochs": 10,
-    "finetune_epochs": 10,
+    "train_epochs": args.train_epochs,
+    "finetune_epochs": args.finetune_epochs,
     "transfer_epochs": 20,
     "train_task": "supervised_group_identification",
     "finetune_task": "cross_model_prediction_clas",
@@ -117,7 +123,7 @@ atacseq_config = {
     "train_loss_weight": None,
     "finetune_loss_weight": None,
     "transfer_loss_weight": None,
-    "lr": 0.01,
+    "lr": args.lr,
     "checkpoint": 1,
     "n_head": 1,
     "noise_level":[0,0],

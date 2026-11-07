@@ -27,6 +27,13 @@ parser.add_argument('--ref_path2', metavar='DIR', default='NULL', help='path to 
 parser.add_argument('--query_path1', metavar='DIR', default='NULL', help='path to train data2')
 parser.add_argument('--query_path2', metavar='DIR', default='NULL', help='path to train data2')
 parser.add_argument('--save_path', metavar='DIR', default='NULL', help='path to save the output data')
+# Hyperparameters. A default is the value this script has always used; None leaves the argument to SMILE.
+parser.add_argument('--train_epoch', type=int, default=1000, help='training epochs')
+parser.add_argument('--pretrain_epoch', type=int, default=None, help='pre-training epochs (SMILE: 10)')
+parser.add_argument('--batch_size', type=int, default=None, help='minibatch size; with fewer unpaired cells than this the pre-training has no iteration (SMILE: 1024)')
+parser.add_argument('--f_temp', type=float, default=None, help='temperature of the contrastive loss (SMILE: 0.2)')
+parser.add_argument('--clf_out', type=int, default=20, help='dimensions of the joint embedding')
+parser.add_argument('--n_top_genes', type=int, default=5000, help='number of highly variable genes')
 args = parser.parse_args()
 begin_time = time.time()
 
@@ -92,7 +99,7 @@ sc.pp.log1p(query_rna)
 ##identify highly variable features across modalities
 adata = ref_rna.concatenate(query_rna,query_dna)
 
-sc.pp.highly_variable_genes(ref_rna, n_top_genes=5000,subset=True)
+sc.pp.highly_variable_genes(ref_rna, n_top_genes=args.n_top_genes,subset=True)
 adata_rna = ref_rna.concatenate(query_rna)
 
 #sc.pp.highly_variable_genes(ref_dna, n_top_genes=5000,subset=True)
@@ -116,8 +123,10 @@ X_rna_unpaired = scaler.fit_transform(X_rna_unpaired)
 
 start_time = time.time()
 
-integrater = littleSMILE(input_dim_a=X_rna_paired.shape[1],input_dim_b=X_dna_paired.shape[1],clf_out=20)
-ReferenceSMILE_trainer(X_rna_paired,X_dna_paired,X_rna_unpaired,X_dna_unpaired,integrater,train_epoch=1000)
+integrater = littleSMILE(input_dim_a=X_rna_paired.shape[1],input_dim_b=X_dna_paired.shape[1],clf_out=args.clf_out)
+# only the arguments that were given are passed on; the others stay at the SMILE defaults
+trainer_kwargs = {k: getattr(args, k) for k in ("pretrain_epoch", "batch_size", "f_temp") if getattr(args, k) is not None}
+ReferenceSMILE_trainer(X_rna_paired,X_dna_paired,X_rna_unpaired,X_dna_unpaired,integrater,train_epoch=args.train_epoch,**trainer_kwargs)
 
 print("--- %s seconds ---" % int((time.time() - start_time)))
 

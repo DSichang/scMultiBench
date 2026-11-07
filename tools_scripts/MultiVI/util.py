@@ -163,7 +163,7 @@ def setup_anndata_for_multivi(adata, batch_key):
     """
     scvi.model.MULTIVI.setup_anndata(adata, batch_key=batch_key)
 
-def create_multivi_model(adata):
+def create_multivi_model(adata, **model_kwargs):
     """
     Creates a MultiVI model object.
     Parameters:
@@ -179,16 +179,17 @@ def create_multivi_model(adata):
     n_atac = (adata.var["modality"] == "Peak").sum()
     print(f"Number of RNA features: {n_rna}")
     print(f"Number of ATAC features: {n_atac}")
-    return scvi.model.MULTIVI(adata, n_genes=n_rna, n_regions=n_atac)
+    return scvi.model.MULTIVI(adata, n_genes=n_rna, n_regions=n_atac, **model_kwargs)
 
 """# Module2 Creating, saving and loading the model"""
 
-def train_multivi_model(model, adata, n_epochs=400, lr=1e-3, use_cuda=True):
+def train_multivi_model(model, adata, n_epochs=400, lr=1e-3, use_cuda=True, **train_kwargs):
     accelerator = "gpu" if use_cuda else "cpu"
     model.train(
         max_epochs=n_epochs,
         lr=lr,
         #accelerator=accelerator
+        **train_kwargs
     )
 
 def save_multivi_model(model, model_dir, overwrite=True):

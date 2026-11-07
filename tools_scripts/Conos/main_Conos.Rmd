@@ -59,11 +59,12 @@ runConos<- function(path_list, save_path){
   }
   
 
-  p2l <- lapply(data,basicP2proc,n.cores=1,n.odgenes=3e3,min.cells.per.gene=0,make.geneknn=FALSE,nPcs=30,min.transcripts.per.cell = 0)
+  p2l <- lapply(data,basicP2proc,n.cores=1,n.odgenes=n.odgenes.p2,min.cells.per.gene=0,make.geneknn=FALSE,nPcs=nPcs,min.transcripts.per.cell = 0)
   con <- Conos$new(p2l, n.cores=1)
-  con$buildGraph(k=15, k.self=5, k.self.weigh=0.01, ncomps=30, n.odgenes=5e3, space='PCA') 
+  con$buildGraph(k=k, k.self=k.self, k.self.weigh=k.self.weight, ncomps=ncomps, n.odgenes=n.odgenes, space='PCA') 
   con$findCommunities(resolution=1.5)
-  con$embedGraph(alpha=1/2) 
+  # an option left at NULL is not passed, so conos' own default applies
+  do.call(con$embedGraph, c(list(alpha=alpha), given(target.dims = target.dims, seed = seed)))
   #write.csv(c(con$graph)[[9]][[3]]$name, c(paste0(save_path,"barcode.csv")))
   
   metadata <- data.frame(Cluster=con$clusters$leiden$groups)
@@ -80,6 +81,30 @@ runConos<- function(path_list, save_path){
 
 # load data, the input is RNA counts and ATAC gene activity score counts
 args <- commandArgs(trailingOnly = TRUE)
+# Hyperparameters follow the paths as --name=value. A default is the value this script has
+# always used; NULL leaves the argument to conos.
+is_opt <- grepl("^--[A-Za-z][A-Za-z0-9_.]*=", args)
+opts <- setNames(sub("^--[^=]+=", "", args[is_opt]), sub("^--([^=]+)=.*", "\\1", args[is_opt]))
+args <- args[!is_opt]
+option <- function(name, default, convert = as.numeric) {
+  if (!name %in% names(opts)) return(default)
+  value <- suppressWarnings(convert(opts[[name]]))
+  if (is.na(value)) stop("option --", name, ": cannot read the value ", opts[[name]])
+  opts <<- opts[names(opts) != name]
+  value
+}
+given <- function(...) Filter(Negate(is.null), list(...))
+k <- option("k", 15)
+k.self <- option("k.self", 5)
+k.self.weight <- option("k.self.weight", 0.01)
+ncomps <- option("ncomps", 30)
+n.odgenes <- option("n.odgenes", 5e3)
+alpha <- option("alpha", 1/2)
+target.dims <- option("target.dims", NULL)
+seed <- option("seed", NULL)
+nPcs <- option("nPcs", 30)
+n.odgenes.p2 <- option("n.odgenes.p2", 3e3)
+if (length(opts) > 0) stop("unknown option: ", paste0("--", names(opts), collapse = " "))
 num <- length(args)
 path_list <- vector("list", num-1)
 for (i in c(1:(num-1))){

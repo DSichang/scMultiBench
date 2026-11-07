@@ -16,10 +16,20 @@ from scMSI.utils import read_txt, init_library_size
 from scMSI.utils import get_top_coeff, get_knn_Aff
 from scMSI.scMSI_main import SCMSIRNA, SCMSIProtein, SCMSIRNAProtein, SCMSICiteRna
 
+def boolean(text):
+    return {'true': True, 'false': False}[text.lower()]
+
 parser = argparse.ArgumentParser("scMSI")
 parser.add_argument('--path1', metavar='DIR', default='NULL', help='path to train rna')
 parser.add_argument('--path2', metavar='DIR', default='NULL', help='path to train adt')
 parser.add_argument('--save_path', metavar='DIR', default='NULL', help='path to save the output data')
+# Hyperparameters. A default is the value this script has always used; None leaves the argument to scMSI.
+parser.add_argument('--n_latent', type=int, default=10, help='latent dimensions per modality; the embedding has twice as many')
+parser.add_argument('--max_epochs', type=int, default=400, help='training epochs')
+parser.add_argument('--batch_size', type=int, default=128, help='training minibatch size')
+parser.add_argument('--lr', type=float, default=None, help='learning rate (scMSI: 0.0004)')
+parser.add_argument('--early_stopping', type=boolean, default=None, help='true or false: stop when the validation loss stalls (scMSI: false)')
+parser.add_argument('--n_epochs_kl_warmup', type=int, default=None, help='epochs of KL warm-up (scMSI: set automatically)')
 args = parser.parse_args()
 
 # The scMSI script for vertical integration requires RNA and ADT data as input. The output is a joint embedding (dimensionality reduction).
@@ -59,11 +69,13 @@ def run_scMSI(adt_path,rna_path):
     scMSI_output_times10 = pd.DataFrame()
     model = SCMSIRNAProtein(
       adata,
-      n_latent=10,
+      n_latent=args.n_latent,
       latent_distribution="normal",
     )
-    max_epochs = 400
-    model.train(max_epochs=max_epochs, record_loss=True, batch_size=128) # may change the batch_size if there is nan error
+    max_epochs = args.max_epochs
+    # only the arguments that were given are passed on; the others stay at the scMSI defaults
+    train_kwargs = {k: getattr(args, k) for k in ("lr", "early_stopping", "n_epochs_kl_warmup") if getattr(args, k) is not None}
+    model.train(max_epochs=max_epochs, record_loss=True, batch_size=args.batch_size, **train_kwargs) # may change the batch_size if there is nan error
     rna_latent, pro_latent = model.get_latent_representation(batch_size=128)
     adata.obsm["rna_latent"] = rna_latent
     adata.obsm["pro_latent"] = pro_latent

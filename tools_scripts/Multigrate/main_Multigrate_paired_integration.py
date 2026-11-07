@@ -11,6 +11,9 @@ import anndata as ad
 import multigrate as mtg
 import scipy.sparse as sp
 
+def boolean(text):
+    return {'true': True, 'false': False}[text.lower()]
+
 parser = argparse.ArgumentParser("Multigrate")
 parser.add_argument('--path1', metavar='DIR', nargs='+', default=[], help='path to rna')
 parser.add_argument('--path2', metavar='DIR', nargs='+', default=[], help='path to adt')
@@ -19,7 +22,14 @@ parser.add_argument('--save_path', metavar='DIR', default='NULL', help='path to 
 parser.add_argument('--epochs', type = int, default=200, help='')
 parser.add_argument('--bs', type = int, default=256, help='')
 parser.add_argument('--lr', type = float, default=1e-3, help='')
+# Hyperparameters. A default is the value this script has always used; None leaves the argument to multigrate.
+parser.add_argument('--z_dim', type=int, default=None, help='dimensions of the joint embedding (multigrate: 15)')
+parser.add_argument('--early_stopping', type=boolean, default=None, help='true or false: stop when the validation loss stalls (multigrate: true)')
+parser.add_argument('--n_epochs_kl_warmup', type=int, default=None, help='epochs of KL warm-up (multigrate: a third of the training epochs)')
 args = parser.parse_args()
+# only the arguments that were given are passed on; the others stay at the multigrate defaults
+model_kwargs = {k: getattr(args, k) for k in ("z_dim",) if getattr(args, k) is not None}
+train_kwargs = {k: getattr(args, k) for k in ("early_stopping", "n_epochs_kl_warmup") if getattr(args, k) is not None}
 
 # The Multigrate script is designed for both vertical and cross integration.
 # example for vertical integration (rna+adt)
@@ -141,8 +151,9 @@ def run_Multigrate(file_paths):
             losses=['nb', 'mse'],
             n_layers_encoders=[2, 2],
             n_layers_decoders=[2, 2],
+            **model_kwargs
         )
-        model.train(max_epochs=args.epochs, lr=args.lr, batch_size=args.bs)
+        model.train(max_epochs=args.epochs, lr=args.lr, batch_size=args.bs, **train_kwargs)
         model.get_latent_representation()
         latent_space = adata.obsm['latent']
         latent_space1 = latent_space[0:sum(batch==1)[0],:]
@@ -173,8 +184,9 @@ def run_Multigrate(file_paths):
                        },
             n_layers_encoders=[2, 2],
             n_layers_decoders=[2, 2],
+            **model_kwargs
         )
-        model.train(max_epochs=args.epochs, lr=args.lr, batch_size=args.bs)
+        model.train(max_epochs=args.epochs, lr=args.lr, batch_size=args.bs, **train_kwargs)
         model.get_latent_representation()
         latent_space = adata.obsm['latent']
         latent_space1 = latent_space[0:sum(batch==1)[0],:]
@@ -205,8 +217,9 @@ def run_Multigrate(file_paths):
                        },
             n_layers_encoders=[2, 2],
             n_layers_decoders=[2, 2],
+            **model_kwargs
         )
-        model.train(max_epochs=args.epochs, lr=args.lr, batch_size=args.bs)
+        model.train(max_epochs=args.epochs, lr=args.lr, batch_size=args.bs, **train_kwargs)
         model.get_latent_representation()
         latent_space = adata.obsm['latent']
         latent_space1 = latent_space[0:sum(batch==1)[0],:]
@@ -238,8 +251,9 @@ def run_Multigrate(file_paths):
             #z_dim = 100,
             n_layers_encoders=[2, 2, 2],
             n_layers_decoders=[2, 2, 2],
+            **model_kwargs
         )
-        model.train(max_epochs=args.epochs, lr=args.lr, batch_size=args.bs)
+        model.train(max_epochs=args.epochs, lr=args.lr, batch_size=args.bs, **train_kwargs)
         model.get_latent_representation()
         latent_space = adata.obsm['latent']
         latent_space1 = latent_space[0:sum(batch==1)[0],:]

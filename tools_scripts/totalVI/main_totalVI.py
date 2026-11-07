@@ -11,10 +11,23 @@ import anndata as ad
 from anndata import AnnData
 from scipy.sparse import csr_matrix
 
+def boolean(text):
+    return {'true': True, 'false': False}[text.lower()]
+
 parser = argparse.ArgumentParser("totalVI")
 parser.add_argument('--path1', metavar='DIR', nargs='+', default=[], help='path to rna')
 parser.add_argument('--path2', metavar='DIR', nargs='+', default=[], help='path to adt')
 parser.add_argument('--save_path', metavar='DIR', default='NULL', help='path to save the output data')
+# Hyperparameters. A default is the value this script has always used; None leaves the argument to scvi-tools.
+parser.add_argument('--seed', type=int, default=0, help='random seed')
+parser.add_argument('--n_latent', type=int, default=None, help='dimensions of the joint embedding (scvi-tools: 20)')
+parser.add_argument('--max_epochs', type=int, default=None, help='training epochs (scvi-tools: from the number of cells, at most 400)')
+parser.add_argument('--lr', type=float, default=None, help='learning rate (scvi-tools: 0.004)')
+parser.add_argument('--batch_size', type=int, default=None, help='minibatch size (scvi-tools: 256)')
+parser.add_argument('--early_stopping', type=boolean, default=None, help='true or false: stop when the validation loss stalls (scvi-tools: true)')
+parser.add_argument('--n_epochs_kl_warmup', type=int, default=None, help='epochs of KL warm-up (scvi-tools: set automatically)')
+parser.add_argument('--empirical_protein_background_prior', choices=['true', 'false', 'auto'], default='false', help='protein background prior from the data; auto lets scvi-tools decide from the panel size')
+parser.add_argument('--gene_likelihood', choices=['nb', 'zinb'], default=None, help='RNA count distribution (scvi-tools: nb)')
 args = parser.parse_args()
 
 # The totalVI script for vertical&cross integration requires RNA and ADT data as input. The output is a joint embedding (dimensionality reduction).
@@ -25,7 +38,7 @@ args = parser.parse_args()
 # python main_totalVI.py --path1 "../../data/dataset_final/D51/rna1.h5" "../../data/dataset_final/D51/rna2.h5" --path2 "../../data/dataset_final/D51/adt1.h5"  "../../data/dataset_final/D51/adt2.h5" --save_path "../../result/embedding/cross integration/D51/totalVI"
 
 begin_time = time.time()
-scvi.settings.seed = 0
+scvi.settings.seed = args.seed
 print("Last run with scvi-tools version:", scvi.__version__)
 
 def data_loader(path):
@@ -74,8 +87,12 @@ def run_totalVI(file_paths):
         layer="counts",
         batch_key="batch"
     )
-    vae = scvi.model.TOTALVI(adata, empirical_protein_background_prior=False,latent_distribution="normal")
-    vae.train()
+    # only the arguments that were given are passed on; the others stay at the scvi-tools defaults
+    model_kwargs = {k: getattr(args, k) for k in ("n_latent", "gene_likelihood") if getattr(args, k) is not None}
+    train_kwargs = {k: getattr(args, k) for k in ("max_epochs", "lr", "batch_size", "early_stopping", "n_epochs_kl_warmup") if getattr(args, k) is not None}
+    prior = {"true": True, "false": False, "auto": None}[args.empirical_protein_background_prior]
+    vae = scvi.model.TOTALVI(adata, empirical_protein_background_prior=prior, latent_distribution="normal", **model_kwargs)
+    vae.train(**train_kwargs)
     
     result_embedding = vae.get_latent_representation()
  

@@ -12,6 +12,10 @@ parser = argparse.ArgumentParser("VIMCCA")
 parser.add_argument('--path1', metavar='DIR', default='NULL', help='path to RNA')
 parser.add_argument('--path2', metavar='DIR', default='NULL', help='path to ADT')
 parser.add_argument('--save_path', metavar='DIR', default='NULL', help='path to save the output data')
+# Hyperparameters. A default is the value this script has always used; None leaves the argument to scbean.
+parser.add_argument('--epochs', type=int, default=50, help='training epochs')
+parser.add_argument('--weight', type=float, default=None, help='weight of the second modality in the loss (scbean: 5)')
+parser.add_argument('--batch_size', type=int, default=None, help='minibatch size (scbean: 128)')
 args = parser.parse_args()
 
 # The VIMCCA script for vertical integration requires RNA and ADT data as input. The output is a joint embedding (dimensionality reduction).
@@ -32,13 +36,16 @@ sc.pp.log1p(adata_rna)
 sc.pp.log1p(adata_adt)
 sc.pp.scale(adata_rna)
 sc.pp.scale(adata_adt)
+# only the arguments that were given are passed on; the others stay at the scbean defaults
+fit_kwargs = {k: getattr(args, k) for k in ("weight", "batch_size") if getattr(args, k) is not None}
 result = vimcca.fit_integration(
     adata_rna,
     adata_adt,
     sparse_x=False,
     sparse_y=False,
     hidden_layers=[128, 64, 32, 8],
-    epochs=50
+    epochs=args.epochs,
+    **fit_kwargs
 )
 print(result.shape)
 

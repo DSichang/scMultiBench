@@ -44,10 +44,12 @@ runLIGER<- function(path_list){
     
   pbmcs = createLiger(data)
   pbmcs = rliger::normalize(pbmcs)
-  pbmcs = selectGenes(pbmcs, datasets.use = 1)
+  # an option left at NULL is not passed, so rliger's own default applies.
+  # quote(pbmcs): do.call would otherwise put the whole object into the call that rliger records
+  pbmcs = do.call(selectGenes, c(list(quote(pbmcs), datasets.use = 1), given(thresh = thresh)))
   pbmcs = scaleNotCenter(pbmcs)
   
-  pbmcs <- runIntegration(pbmcs, k = 20)
+  pbmcs <- do.call(runIntegration, c(list(quote(pbmcs), k = k), given(lambda = lambda, nIteration = nIteration, seed = seed)))
   pbmcs = quantile_norm(pbmcs)
   result <- pbmcs@H.norm
   return (result)
@@ -55,6 +57,25 @@ runLIGER<- function(path_list){
 
 # read parameters, the input is RNA counts and ATAC gene activity score counts
 args <- commandArgs(trailingOnly = TRUE)
+# Hyperparameters follow the paths as --name=value. A default is the value this script has
+# always used; NULL leaves the argument to rliger.
+is_opt <- grepl("^--[A-Za-z][A-Za-z0-9_.]*=", args)
+opts <- setNames(sub("^--[^=]+=", "", args[is_opt]), sub("^--([^=]+)=.*", "\\1", args[is_opt]))
+args <- args[!is_opt]
+option <- function(name, default, convert = as.numeric) {
+  if (!name %in% names(opts)) return(default)
+  value <- suppressWarnings(convert(opts[[name]]))
+  if (is.na(value)) stop("option --", name, ": cannot read the value ", opts[[name]])
+  opts <<- opts[names(opts) != name]
+  value
+}
+given <- function(...) Filter(Negate(is.null), list(...))
+k <- option("k", 20)
+lambda <- option("lambda", NULL)
+nIteration <- option("nIteration", NULL)
+seed <- option("seed", NULL)
+thresh <- option("thresh", NULL)
+if (length(opts) > 0) stop("unknown option: ", paste0("--", names(opts), collapse = " "))
 num <- length(args)
 path_list <- vector("list", num-1)
 for (i in c(1:(num-1))){

@@ -14,6 +14,15 @@ parser = argparse.ArgumentParser("iPOLNG")
 parser.add_argument('--path1', metavar='DIR',  default="", help='path to RNA')
 parser.add_argument('--path2', metavar='DIR',  default="", help='path to ATAC')
 parser.add_argument('--save_path', metavar='DIR', default='NULL', help='path to save the output data')
+# Hyperparameters. A default is the value this script has always used; None leaves the argument to iPoLNG.
+parser.add_argument('--num_topics', type=int, default=20, help='number of topics, the dimensions of the joint embedding')
+parser.add_argument('--integrated_epochs', type=int, default=3000, help='training epochs of the integrated model')
+parser.add_argument('--warmup_epochs', type=int, default=3000, help='training epochs of the warm-up stage')
+parser.add_argument('--lr', type=float, default=None, help='learning rate (iPoLNG: 0.1)')
+parser.add_argument('--seed', type=int, default=42, help='random seed')
+parser.add_argument('--alpha_k', type=float, default=None, help='prior parameter alpha_k (iPoLNG: 1)')
+parser.add_argument('--n_top_rna', type=int, default=5000, help='number of highly variable RNA features')
+parser.add_argument('--n_top_atac', type=int, default=20000, help='number of highly variable ATAC features')
 args = parser.parse_args()
 
 # The iPOLNG script for vertical integration requires RNA and ATAC data as input. The output is a joint embedding (dimensionality reduction).
@@ -34,12 +43,14 @@ def data_loader(path, top_number):
     return X
     
 def run_iPOLNG(data1_path, data2_path):
-    data1 = data_loader(data1_path, 5000)
-    data2 = data_loader(data2_path, 20000)
+    data1 = data_loader(data1_path, args.n_top_rna)
+    data2 = data_loader(data2_path, args.n_top_atac)
     print(data1.shape)
     print(data2.shape)
     W = {"W1":data1.type("torch.cuda.FloatTensor"), "W2":data2.type("torch.cuda.FloatTensor")}
-    model = iPoLNG.iPoLNG(W, num_topics=20, integrated_epochs=3000, warmup_epochs=3000, seed=42, verbose=True)
+    # only the arguments that were given are passed on; the others stay at the iPoLNG defaults
+    model_kwargs = {k: getattr(args, k) for k in ("lr", "alpha_k") if getattr(args, k) is not None}
+    model = iPoLNG.iPoLNG(W, num_topics=args.num_topics, integrated_epochs=args.integrated_epochs, warmup_epochs=args.warmup_epochs, seed=args.seed, verbose=True, **model_kwargs)
     result = model.Run()
     embedding = result['L_est']
     embedding_rna = result['Ls_est']['W1']

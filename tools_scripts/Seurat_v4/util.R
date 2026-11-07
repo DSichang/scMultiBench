@@ -49,10 +49,13 @@ run_Seurat_RNA_ADT <- function(rna, adt){
   # The WNN graph can be accessed at bm[["wknn"]], 
   # and the SNN graph used for clustering at bm[["wsnn"]]
   # Cell-specific modality weights can be accessed at bm$RNA.weight
-  bm <- FindMultiModalNeighbors(
-    bm, reduction.list = list("pca", "apca"), 
-    dims.list = list(1:30, 1:18), modality.weight.name = "RNA.weight"
-  )
+  # dims_rna, dims_adt, k.nn are the options read in main_Seurat_v4.Rmd; one left at NULL keeps
+  # the value used here before (dims) or is not passed, so Seurat's own default applies (k.nn).
+  # quote(bm): do.call would otherwise put the whole object into the call
+  bm <- do.call("FindMultiModalNeighbors", c(list(
+    quote(bm), reduction.list = list("pca", "apca"), 
+    dims.list = list(1:(if (is.null(dims_rna)) 30 else dims_rna), 1:(if (is.null(dims_adt)) 18 else dims_adt)), modality.weight.name = "RNA.weight"
+  ), given(k.nn = k.nn)))
 
   #bm <- RunUMAP(bm, nn.name = "weighted.nn", reduction.name = "wnn.umap", reduction.key = "wnnUMAP_", return.model = TRUE)
   bm <- FindClusters(bm, graph.name = "wsnn", algorithm = 3, resolution = 2, verbose = FALSE)
@@ -66,7 +69,7 @@ run_Seurat_RNA_ATAC <- function(rna, atac){
     pbmc[["ATAC"]] <- atac_assay
     
     DefaultAssay(pbmc) <- "RNA"
-    pbmc <- SCTransform(pbmc, verbose = FALSE) %>% RunPCA() %>% RunUMAP(dims = 1:50, reduction.name = 'umap.rna', reduction.key = 'rnaUMAP_')
+    pbmc <- do.call("SCTransform", c(list(quote(pbmc), verbose = FALSE), given(variable.features.n = variable.features.n))) %>% RunPCA() %>% RunUMAP(dims = 1:50, reduction.name = 'umap.rna', reduction.key = 'rnaUMAP_')
     
     # ATAC analysis
     # We exclude the first dimension as this is typically correlated with sequencing depth
@@ -76,7 +79,7 @@ run_Seurat_RNA_ATAC <- function(rna, atac){
     pbmc <- RunSVD(pbmc)
     pbmc <- RunUMAP(pbmc, reduction = 'lsi', dims = 2:50, reduction.name = "umap.atac", reduction.key = "atacUMAP_")
     
-    pbmc <- FindMultiModalNeighbors(pbmc, reduction.list = list("pca", "lsi"), dims.list = list(1:50, 2:50))
+    pbmc <- do.call("FindMultiModalNeighbors", c(list(quote(pbmc), reduction.list = list("pca", "lsi"), dims.list = list(1:(if (is.null(dims_rna)) 50 else dims_rna), 2:(if (is.null(dims_atac)) 50 else dims_atac))), given(k.nn = k.nn)))
     #pbmc <- RunUMAP(pbmc, nn.name = "weighted.nn", reduction.name = "wnn.umap", reduction.key = "wnnUMAP_", return.model = TRUE)
     pbmc <- FindClusters(pbmc, graph.name = "wsnn", algorithm = 3, verbose = FALSE)
     

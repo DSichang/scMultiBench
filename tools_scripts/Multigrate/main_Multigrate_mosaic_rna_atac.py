@@ -10,15 +10,35 @@ import anndata as ad
 import multigrate as mtg
 from scipy.sparse import csr_matrix
 
+def boolean(text):
+    return {'true': True, 'false': False}[text.lower()]
+
 parser = argparse.ArgumentParser("Multigrate")
 parser.add_argument('--path1', metavar='DIR', default="", help='path to train RNA')
 parser.add_argument('--path2', metavar='DIR', default="", help='path to train RNA of multiome')
 parser.add_argument('--path3', metavar='DIR', default="", help='path to train ATAC of multiome')
 parser.add_argument('--path4', metavar='DIR', default="", help='path to train ATAC')
 parser.add_argument('--save_path', metavar='DIR', default='NULL', help='path to save the output data')
-parser.add_argument('--epochs', type = int, default=200, help='')
-parser.add_argument('--lr', type = float, default=1e-3, help='')
+parser.add_argument('--epochs', type = int, default=None, help='training epochs (multigrate: 200)')
+parser.add_argument('--lr', type = float, default=None, help='learning rate (multigrate: 0.0005)')
+# Hyperparameters. A default is the value this script has always used; None leaves the argument to multigrate.
+parser.add_argument('--bs', type=int, default=None, help='minibatch size (multigrate: 256)')
+parser.add_argument('--z_dim', type=int, default=None, help='dimensions of the joint embedding (multigrate: 15)')
+parser.add_argument('--n_top_rna', type=int, default=4000, help='number of highly variable RNA features')
+parser.add_argument('--n_top_atac', type=int, default=20000, help='number of highly variable ATAC features')
+parser.add_argument('--integ_coef', type=float, default=4000, help='weight of the integration loss')
+parser.add_argument('--early_stopping', type=boolean, default=None, help='true or false: stop when the validation loss stalls (multigrate: true)')
+parser.add_argument('--n_epochs_kl_warmup', type=int, default=None, help='epochs of KL warm-up (multigrate: a third of the training epochs)')
 args = parser.parse_args()
+# only the arguments that were given are passed on; the others stay at the multigrate defaults
+model_kwargs = {k: getattr(args, k) for k in ("z_dim",) if getattr(args, k) is not None}
+train_kwargs = {k: getattr(args, k) for k in ("early_stopping", "n_epochs_kl_warmup") if getattr(args, k) is not None}
+if args.epochs is not None:
+    train_kwargs["max_epochs"] = args.epochs
+if args.lr is not None:
+    train_kwargs["lr"] = args.lr
+if args.bs is not None:
+    train_kwargs["batch_size"] = args.bs
 
 # This Multigrate script is designed for mosaic integration for [RNA, RNA+ATAC, ATAC] data type.
 # example for mosaic integration ([RNA, RNA+ATAC, ATAC])
@@ -77,12 +97,12 @@ adata_adt2.obs['Modality'] = "cite"
 adata_adt3.obs['Modality'] = "adt"
 
 adata_rna = ad.concat([adata_rna1, adata_rna2], merge='same')
-sc.pp.highly_variable_genes(adata_rna, n_top_genes=4000,  batch_key='Modality')
+sc.pp.highly_variable_genes(adata_rna, n_top_genes=args.n_top_rna,  batch_key='Modality')
 adata_rna1 = adata_rna1[:, adata_rna.var.highly_variable]
 adata_rna2 = adata_rna2[:, adata_rna.var.highly_variable]
 
 adata_adt = ad.concat([adata_adt2, adata_adt3], merge='same')
-sc.pp.highly_variable_genes(adata_adt, n_top_genes=20000,  batch_key='Modality')
+sc.pp.highly_variable_genes(adata_adt, n_top_genes=args.n_top_atac,  batch_key='Modality')
 adata_adt2 = adata_adt2[:, adata_adt.var.highly_variable]
 adata_adt3 = adata_adt3[:, adata_adt.var.highly_variable]
 
@@ -105,20 +125,21 @@ adata
 mtg.model.MultiVAE.setup_anndata(
     adata,
     categorical_covariate_keys=['Modality'],
-    rna_indices_end=4000
+    rna_indices_end=args.n_top_rna
 )
 
 model = mtg.model.MultiVAE(
     adata,
     losses=['nb', 'mse'],
     loss_coefs={'kl': 1e-3,
-               'integ': 4000,
+               'integ': args.integ_coef,
                },
     integrate_on='Modality',
     mmd='marginal',
+    **model_kwargs
 )
 
-model.train()
+model.train(**train_kwargs)
 model.get_latent_representation()
 result = adata.obsm['latent']
 end_time = time.time()

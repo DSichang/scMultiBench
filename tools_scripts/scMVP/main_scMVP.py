@@ -21,6 +21,13 @@ parser = argparse.ArgumentParser("scMVP")
 parser.add_argument('--path1', metavar='DIR', default='NULL', help='path to RNA')
 parser.add_argument('--path2', metavar='DIR', default='NULL', help='path to ATAC')
 parser.add_argument('--save_path', metavar='DIR', default='NULL', help='path to save the output data')
+# Hyperparameters. A default is the value this script has always used; None leaves the argument to scMVP.
+parser.add_argument('--n_epochs', type=int, default=10, help='training epochs')
+parser.add_argument('--lr', type=float, default=1e-3, help='learning rate')
+parser.add_argument('--n_latent', type=int, default=20, help='dimensions of the joint embedding')
+parser.add_argument('--n_centroids', type=int, default=5, help='number of cluster centroids')
+parser.add_argument('--n_top_genes', type=int, default=3000, help='number of highly variable genes')
+parser.add_argument('--n_epochs_kl_warmup', type=int, default=None, help='epochs of KL warm-up (scMVP: 200)')
 args = parser.parse_args()
 
 # The scMVP script for vertical integration requires RNA and ATAC data as input. The output is a joint embedding (dimensionality reduction).
@@ -34,7 +41,7 @@ def run_MVP(rna_path, atac_path):
         adata= anndata.AnnData(X=rna_X)
         sc.pp.normalize_total(adata, target_sum=1e4)
         sc.pp.log1p(adata)
-        sc.pp.highly_variable_genes(adata, n_top_genes=3000)
+        sc.pp.highly_variable_genes(adata, n_top_genes=args.n_top_genes)
         selected_features = adata.var['highly_variable'].values
         adata = adata[:,selected_features]
         rna_X = adata.X
@@ -97,19 +104,22 @@ def run_MVP(rna_path, atac_path):
                            dense=False,gzipped=False, atac_threshold=0.001,
                            cell_threshold=1)
 
-    n_epochs = 10
-    lr = 1e-3
+    n_epochs = args.n_epochs
+    lr = args.lr
     use_batches = False
     use_cuda = True # False if using CPU
-    n_centroids = 5 
+    n_centroids = args.n_centroids 
     n_alfa = 1.0
-    multi_vae = Multi_VAE_Attention(dataset.nb_genes, len(dataset.atac_names), n_batch=0, n_latent=20, n_centroids=n_centroids, n_alfa = n_alfa, mode="mm-vae") # should provide ATAC num, alfa, mode and loss type
+    multi_vae = Multi_VAE_Attention(dataset.nb_genes, len(dataset.atac_names), n_batch=0, n_latent=args.n_latent, n_centroids=n_centroids, n_alfa = n_alfa, mode="mm-vae") # should provide ATAC num, alfa, mode and loss type
+    # only the arguments that were given are passed on; the others stay at the scMVP defaults
+    trainer_kwargs = {k: getattr(args, k) for k in ("n_epochs_kl_warmup",) if getattr(args, k) is not None}
     trainer = MultiTrainer(
         multi_vae,
         dataset,
         train_size=0.9,
         use_cuda=use_cuda,
         frequency=5,
+        **trainer_kwargs
     )
     trainer.train(n_epochs=n_epochs, lr=lr)
     # create posterior from trained model

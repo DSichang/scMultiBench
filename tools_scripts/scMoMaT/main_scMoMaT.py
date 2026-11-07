@@ -16,6 +16,14 @@ parser.add_argument('--path2', metavar='DIR', nargs='+', default=[], help='path 
 parser.add_argument('--path3', metavar='DIR', nargs='+', default=[], help='path to ATAC')
 parser.add_argument('--cty_path', metavar='DIR', nargs='+', default=[], help='path to train cty1')
 parser.add_argument('--save_path', metavar='DIR', default='NULL', help='path to save the output data')
+# Hyperparameters. The defaults are the values this script has always used.
+parser.add_argument('--K', type=int, default=30, help='number of latent factors')
+parser.add_argument('--lamb', type=float, default=0.001, help='weight of the regularisation term')
+parser.add_argument('--T', type=int, default=4000, help='training iterations')
+parser.add_argument('--batch_size', type=float, default=0.1, help='fraction of the data sampled in each iteration')
+parser.add_argument('--lr', type=float, default=1e-2, help='learning rate')
+parser.add_argument('--seed', type=int, default=0, help='random seed')
+parser.add_argument('--n_neighbors', type=int, default=100, help='neighbours per cell in the output graph')
 args = parser.parse_args()
 
 # The scMoMaT script for vertical/mosaic/cross integration requires multi-batch multi-modal data with bridge modality as input. The output is a joint graph (dimensionality reduction).
@@ -68,13 +76,13 @@ def run_scMoMaT(file_paths):
         counts = {"feats_name": feats_name, "nbatches": len(file_paths[list(file_paths.keys())[2]]), "atac":counts_atacs}
 
     ######### training ############
-    K = 30
-    lamb = 0.001 
-    T = 4000
+    K = args.K
+    lamb = args.lamb 
+    T = args.T
     interval = 1000
-    batch_size = 0.1
-    lr = 1e-2
-    seed = 0
+    batch_size = args.batch_size
+    lr = args.lr
+    seed = args.seed
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # run and get embedding
@@ -84,7 +92,7 @@ def run_scMoMaT(file_paths):
     
     
     # post-processing
-    n_neighbors = 100
+    n_neighbors = args.n_neighbors
     r = None
     knn_indices, knn_dists = scmomat.calc_post_graph(zs, n_neighbors, njobs = 8, r = r)
     umap_embedding = scmomat.calc_umap_embedding(knn_indices = knn_indices, knn_dists = knn_dists, n_components = 2, n_neighbors = n_neighbors, min_dist = 0.20, random_state = 0)
