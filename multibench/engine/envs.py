@@ -721,12 +721,33 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
         shutil.rmtree(dest if moved else part, ignore_errors=True)
         if not isinstance(e, Exception):    # an interrupt leaves no half env
             raise
+        if not moved and dest.exists() and _finished_by_another(dest, env):
+            _remember_root(envs_root)
+            return True
         print(f"[env] prebuilt {env} failed ({type(e).__name__}: "
               f"{str(e)[:120]}); falling back to the lockfile build",
               flush=True)
         return False
     finally:
         tgz.unlink(missing_ok=True)
+
+
+def _finished_by_another(dest: Path, env: str, *, limit: float = 3600) -> bool:
+    """Wait while another install, which moved its copy of ``env`` to ``dest``
+    first, unpacks it: ``True`` once it is complete, ``False`` when it fails or
+    ``limit`` seconds pass."""
+    import time
+
+    print(f"[env] another install is unpacking {env}; waiting for it ...", flush=True)
+    end = time.monotonic() + limit
+    while time.monotonic() < end:
+        if made_by_multibench(dest, env):
+            _conda_prefixes.cache_clear()
+            return True
+        if not dest.exists():
+            return False
+        time.sleep(2)
+    return False
 
 
 def _pick_archive(env: str, flavor: str) -> tuple[str, list[str], str, int | None]:

@@ -134,7 +134,9 @@ def test_a_layer_another_install_unpacked_meanwhile_is_kept(tmp_path, published,
     assert sorted(p.name for p in (root / ".layers").iterdir()) == ["L"]
 
 
-def test_an_env_another_install_finished_meanwhile_is_kept(tmp_path, published, monkeypatch):
+def test_an_env_another_install_finished_meanwhile_is_kept(tmp_path, published, monkeypatch,
+                                                         capsys):
+    """The install that loses the race reports the env installed, not a failure."""
     root = tmp_path / "envs"
     theirs = root / "env_a"
 
@@ -142,7 +144,8 @@ def test_an_env_another_install_finished_meanwhile_is_kept(tmp_path, published, 
         (theirs / "bin").mkdir(parents=True)
         (theirs / envs.FLAVOR_FILE).write_text("single\n")
     _finished_meanwhile(monkeypatch, "env_a", finish)
-    envs.install_packed("env_a", envs_dir=root)
+    assert envs.install_packed("env_a", envs_dir=root) is True
+    assert "falling back" not in capsys.readouterr().out
     assert (theirs / envs.FLAVOR_FILE).read_text() == "single\n"
     assert sorted(p.name for p in root.iterdir()) == [".layers", "env_a"]
 
