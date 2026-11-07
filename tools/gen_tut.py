@@ -42,6 +42,8 @@ without the pins pip upgrades numpy and pandas there, and the session has to
 restart. With the pins pip picks the scanpy and anndata releases that fit.
 The cell asks for the package version the notebooks were generated with or a
 later one: section 5 calls what an earlier release does not have.
+
+Run from the checkout: PYTHONPATH=. python tools/gen_tut.py  (rewrites notebooks/)
 """
 import hashlib
 import json
