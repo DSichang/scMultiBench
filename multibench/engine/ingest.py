@@ -19,33 +19,17 @@ from .. import _text
 
 from .._settings import config
 from .registry import ATAC_VALUES as _ATAC_KINDS, check_category, check_id_list
-
-# peak ids come as chr_start_end, chr-start-end or chr:start-end; Signac needs the last
-_PEAK_RE = re.compile(r"^(.+?)[-_:](\d+)[-_](\d+)$")
+from . import resolve
+from .h5 import (_PEAK_RE, _cell_order, _comparable, _has_fraction, _is_canonical_h5,
+                 _is_tenx_h5, _peak_fraction, _strings)
 
 #: :func:`export_dataset` warns when ``matrix/data`` (stored dense, features x
 #: cells) would exceed this many bytes uncompressed on disk.
 DENSE_WARN_BYTES = 10 ** 9
 #: Roles whose matrix must hold raw counts; gene-activity scores are not checked.
 _COUNT_ROLES = ("rna", "adt", "atac_peak")
-#: Stored non-zero values sampled by the raw-count check.
-_COUNT_SAMPLE = 5000
 # '<selector>[<var column>=<value>]'
 _VAR_FILTER_RE = re.compile(r"^(?P<base>.*?)\[(?P<col>[^\[\]=]+)=(?P<val>[^\[\]]*)\]$")
-
-
-def _has_fraction(vals) -> bool:
-    """True when a sample of up to ``_COUNT_SAMPLE`` non-zero values of
-    ``vals`` holds a value whose fractional part exceeds 1e-6."""
-    v = np.asarray(vals).ravel()
-    if v.size == 0 or v.dtype.kind != "f":
-        return False                    # integer / bool storage: whole numbers
-    if v.size > 20 * _COUNT_SAMPLE:     # thin out before the non-zero filter
-        v = v[np.linspace(0, v.size - 1, 20 * _COUNT_SAMPLE).astype(int)]
-    v = v[(v != 0) & np.isfinite(v)]
-    if v.size > _COUNT_SAMPLE:
-        v = v[np.linspace(0, v.size - 1, _COUNT_SAMPLE).astype(int)]
-    return bool(np.any(np.abs(v - np.round(v)) > 1e-6))
 
 
 def _warn_not_counts(X, name: str) -> None:
@@ -97,37 +81,6 @@ def _check_one_matrix_each(data, specs, given) -> None:
                              f"matrix, or pass {first}=None.")
 
 
-#: a trailing ``-<n>`` (10x GEM-well) suffix of a cell barcode
-_BARCODE_SUFFIX_RE = re.compile(r"-\d+$")
-
-
-def _comparable(names, ref):
-    """``(names, ref)`` as written, then without a trailing ``-<n>``; a pair
-    with a repeated barcode is left out."""
-    names, ref = [str(x) for x in names], [str(x) for x in ref]
-    for key in (None, _BARCODE_SUFFIX_RE):
-        a = names if key is None else [key.sub("", x) for x in names]
-        b = ref if key is None else [key.sub("", x) for x in ref]
-        if len(set(a)) == len(a) and len(set(b)) == len(b):
-            yield a, b
-
-
-def _cell_order(names, ref):
-    """``("same", None)``, ``("order", idx)`` (``names[idx]`` is in ``ref``
-    order), ``("other", None)`` or ``("unknown", None)`` (non-unique
-    barcodes). A trailing ``-<n>`` does not count when the names stay unique
-    without it."""
-    judged = False
-    for a, b in _comparable(names, ref):
-        judged = True
-        if a == b:
-            return "same", None
-        if set(a) == set(b):
-            pos = {k: i for i, k in enumerate(a)}
-            return "order", [pos[k] for k in b]
-    return ("other" if judged else "unknown"), None
-
-
 def _split_var_filter(spec: str):
     """``'X[feature_types=Peaks]'`` -> ``('X', ('feature_types', 'Peaks'))``;
     a selector without a filter -> ``(spec, None)``."""
@@ -163,32 +116,8 @@ def _filter_var(adata, var_filter, *, what, spec):
     return adata[:, mask]
 
 
-def _is_canonical_h5(path: Path) -> bool:
-    """``matrix/data`` is a 2-D dataset; a 10x Genomics ``.h5`` has a 1-D one."""
-    try:
-        with h5py.File(path, "r") as f:
-            d = f.get("matrix/data")
-            return isinstance(d, h5py.Dataset) and d.ndim == 2
-    except (OSError, KeyError):
-        return False
-
-
-def _is_tenx_h5(path: Path) -> bool:
-    """A 10x Genomics ``.h5``: a sparse matrix with ``matrix/indptr``."""
-    try:
-        with h5py.File(path, "r") as f:
-            return "matrix/indptr" in f
-    except OSError:
-        return False
-
-
 def _tenx_message(path) -> str:
     return f'{path} is a 10x Genomics file. See the recipe "A 10x .h5 file" in the docs.'
-
-
-def _strings(raw) -> list[str]:
-    """The names an h5 string dataset holds, as ``str``."""
-    return [x.decode() if isinstance(x, bytes) else str(x) for x in raw]
 
 
 def _is_mudata(obj) -> bool:
@@ -309,12 +238,6 @@ def _warn_dense_size(out: Path, n_feat: int, n_cell: int, dtype) -> None:
         _text.warn(f"{out.name} is {size / 1e9:.1f} GB uncompressed, stored dense. Keep "
                    f"fewer features, such as the highly variable genes, before the export.",
                    UserWarning)
-
-
-def _peak_fraction(feats) -> float:
-    if not len(feats):
-        return 0.0
-    return sum(1 for x in feats if _PEAK_RE.match(x)) / len(feats)
 
 
 #: the ATAC role of each ``atac_kind=``
@@ -1113,8 +1036,7 @@ def _layout_unit(name: str, diagonal: bool):
     """``(side, batch number or '', is a matrix)`` of a layout file, else
     ``None``; the files of one unit hold the same cells. Paired data has the
     one side ``'rna'``; in a diagonal folder a plain ``cty*.csv`` has none."""
-    from .resolve import _LAYOUT_FILE_RE
-    m = _LAYOUT_FILE_RE.match(name)
+    m = resolve._LAYOUT_FILE_RE.match(name)
     if not m:
         return None
     matrix = m.group(1) is not None
@@ -1156,7 +1078,6 @@ def _holds_other_cells(names, mine) -> bool:
 def _folder_readers():
     """The resolver's barcode and label-row readers with their caches cleared:
     a file rewritten within one tick of the file system clock keeps its mtime."""
-    from . import resolve
     resolve._sniff_barcode_list.cache_clear()
     resolve._count_label_rows.cache_clear()
     return (resolve._barcodes_of,
@@ -1277,9 +1198,8 @@ def _check_batch_args(batch, batch_index, category) -> None:
             raise ValueError("batch_index= writes numbered files, which only mosaic, cross "
                              "and diagonal methods read: pass category=.")
     if batch is not None and category in ("vertical", "diagonal"):
-        from .resolve import _one_file_advice
         raise ValueError("batch= writes per-batch files (rna1.h5, rna2.h5, ...). "
-                         + _one_file_advice(category))
+                         + resolve._one_file_advice(category))
 
 
 def _names_of(spec):

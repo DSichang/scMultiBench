@@ -11,6 +11,8 @@ from .. import _text
 from .._settings import config
 from .._text import _and_list
 from . import registry
+from .h5 import (_COUNT_SAMPLE, _PEAK_RE, _cell_order, _has_fraction,
+                 _is_canonical_h5, _is_tenx_h5, _peak_fraction, _strings)
 from .schema import (_NON_MODALITY_ROLES, AmbiguousVariantError, _batch_of,
                      base_modality, is_label_role)
 
@@ -438,7 +440,6 @@ def _check_matrix_files(method, dataset, resolved):
     """Reject a 10x Genomics file, or a matrix with 0 features or 0 cells,
     under the name of a dataset file. Other non-canonical files pass here;
     ``mtb.run`` refuses them."""
-    from .ingest import _is_canonical_h5, _is_tenx_h5
     for path in dict.fromkeys(resolved.values()):
         p = Path(path)
         if p.suffix != ".h5" or not p.is_file():
@@ -488,7 +489,6 @@ def _read_features(path: str, n: int | None = None) -> tuple:
             raw = feats[:n]
     except OSError:
         return ()
-    from .ingest import _strings
     return tuple(_strings(raw))
 
 
@@ -662,8 +662,6 @@ def _h5_has_fraction(path: str, mtime_ns: int) -> bool | None:
     import h5py
     import numpy as np
 
-    from .ingest import _COUNT_SAMPLE, _has_fraction
-
     try:
         with h5py.File(path, "r") as f:
             if "matrix/data" not in f:
@@ -694,8 +692,6 @@ def _h5_has_fraction(path: str, mtime_ns: int) -> bool | None:
 def _peak_fraction_of(path: Path) -> float | None:
     """Share of the first 50 feature names that look like ``chr:start-end``;
     ``None`` when the file is not a readable canonical ``.h5``."""
-    from .ingest import _peak_fraction
-
     if path.suffix != ".h5" or not path.is_file():
         return None
     feats = _sniff_features(str(path), path.stat().st_mtime_ns)
@@ -744,8 +740,6 @@ def _names_are_genes(path: Path) -> bool | None:
 def _unrewritable_peak_name(path: Path) -> str | None:
     """The first of the first 50 feature names ``ingest._normalize_peak_names`` cannot
     rewrite, when more than 10% are such names; else ``None``."""
-    from .ingest import _PEAK_RE
-
     if path.suffix != ".h5" or not path.is_file():
         return None
     feats = _sniff_features(str(path), path.stat().st_mtime_ns)
@@ -791,7 +785,6 @@ def _sniff_barcode_list(path: str, mtime_ns: int) -> tuple | None:
             raw = f["matrix/barcodes"][:]
     except OSError:
         return None
-    from .ingest import _strings
     return tuple(_strings(raw))
 
 
@@ -824,9 +817,7 @@ def _check_atac_gas_cells(method, dataset, resolved) -> None:
     """Diagonal: each gene-activity file must list the cells of its peak file
     (the ``atac_peak[<i>]`` role, else the file next to it) in that order,
     as ``atac_cty[<i>].csv`` labels the peak file's cells. Compared as
-    ``ingest._cell_order`` compares (D28's ATAC barcodes end in -1 and -2)."""
-    from .ingest import _cell_order
-
+    ``h5._cell_order`` compares (D28's ATAC barcodes end in -1 and -2)."""
     for role, gas in resolved.items():
         digits = role[len("atac_gas"):]
         if not role.startswith("atac_gas") or (digits and not digits.isdigit()) or not gas:
