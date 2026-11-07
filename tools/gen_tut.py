@@ -160,7 +160,7 @@ def atac_forms(cat):
 def diagonal_atac_sentence():
     """The visible ATAC-form sentence of the diagonal tutorial's first cell.
 
-    It points to the run guide's folder layout, which lists each diagonal
+    It points to the run page's folder layout, which lists each diagonal
     method under the ATAC files it needs (a package test pins that table to
     the registry). ``method_info(m)["atac"]`` names one form, and lists the
     methods that read both files under peak."""
@@ -457,7 +457,7 @@ MOSAIC_NEEDS = ("Your data needs raw counts, with one `.h5ad` file per batch and
                 "a cell type for each cell. Number the batches as below:")
 NUMBER = {2: "two", 3: "three", 4: "four", 5: "five", 6: "six"}
 
-# The recipes of the run guide, for data that does not come as the files of
+# The recipes of the run page, for data that does not come as the files of
 # this section, and the ones the tutorials of each category link. A vertical
 # tutorial links the donors recipe as the one for a donor or sample column,
 # a cross tutorial as the one for another number of batches than its methods
@@ -1114,7 +1114,7 @@ envs = mtb.env.install(METHODS)''')
         (SCORED_TOO_PAIR if key == "diagonal_rna_atac" else SCORED_TOO)
         + no_classification_sentence(key, methods))
     # the classification scores come from the package's own classifier, not scIB
-    # the metric table of the evaluate guide, linked from the words that name the scores
+    # the metric table of the evaluate page, linked from the words that name the scores
     table = f"{SITE}tutorials/evaluate/#what-each-metric-measures"
     scored = (f"scores its output with the [scIB metrics]({table})" if cat == "vertical"
               else f"[scores its output]({table})")
@@ -1173,7 +1173,7 @@ mtb.plot.bubble(stored)''')
 
     md(f"""## Next steps
 
-- The guides: [run]({SITE}tutorials/run/), [evaluate]({SITE}tutorials/evaluate/), [plot]({SITE}tutorials/plot/) and [discover methods]({SITE}tutorials/discover/).
+- [Run a method]({SITE}tutorials/run/), [Score an embedding]({SITE}tutorials/evaluate/), [Load and plot results]({SITE}tutorials/plot/) and [Discover methods]({SITE}tutorials/discover/).
 - The [interactive explorer](https://shiny.maths.usyd.edu.au/scMultiBench/) has the full benchmark's rankings, with no install needed.""")
     return cells
 
