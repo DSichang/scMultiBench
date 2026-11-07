@@ -25,7 +25,7 @@ import yaml
 from .. import _settings, _text
 
 from .._settings import config
-from . import registry
+from . import registry, scripts
 
 
 # --- host platform --------------------------------------------------------
@@ -960,7 +960,9 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
     """Install the environments a set of methods needs; Linux only.
 
     Each env is unpacked from its published archive, or built from its
-    lockfile where none is published. Installed envs are skipped.
+    lockfile where none is published. Installed envs are skipped. Then the
+    method scripts are downloaded to ``mtb.config.repo_path`` if they are
+    missing.
 
     Parameters
     ----------
@@ -997,7 +999,8 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
     OSError
         A real install on a host that is not Linux.
     RuntimeError
-        ``build=True`` without conda, or a failed build.
+        ``build=True`` without conda, a failed build, or a failed download of
+        the method scripts.
 
     Examples
     --------
@@ -1007,6 +1010,9 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
     """
     rows = _install_rows(methods, category=category, packed=not build, dry_run=dry_run,
                          flavor=flavor)
+    if not dry_run:
+        # here as well as in a run: a cluster's compute nodes may have no network
+        scripts.ensure_repo()
     import pandas as pd
     plan = pd.DataFrame(rows, columns=list(INSTALL_COLUMNS))
     if dry_run and not build:
