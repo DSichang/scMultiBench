@@ -35,6 +35,9 @@ def _fake_scib(tmp_path, monkeypatch, script: str | None):
     mod = types.ModuleType("scib")
     mod.__file__ = str(pkg / "__init__.py")
     monkeypatch.setitem(sys.modules, "scib", mod)
+    # import_scib imports scib.metrics: without this the file passes only after
+    # another test has imported the real one
+    monkeypatch.setitem(sys.modules, "scib.metrics", types.ModuleType("scib.metrics"))
     mscib._lisi_helper_problem.cache_clear()
     return pkg
 

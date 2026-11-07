@@ -1,11 +1,15 @@
-"""scib's LISI helper is rebuilt in place when it cannot execute (Sam's macOS case).
+"""scib's LISI helper is rebuilt when it cannot execute (Sam's macOS case) or is missing.
 
 scib ships a Linux x86-64 knn_graph.o; on macOS exec fails with
 `Exec format error`, so cLISI/iLISI recorded NaN and the warning told the user
 to run g++ by hand. With a compiler on PATH and knn_graph.cpp shipped, the
-probe now runs scib's own build line once and proceeds. These tests use a
-fake scib package and a fake compiler script, never the real one.
+probe now runs scib's own build line once and proceeds. The build writes a
+file of its own and replaces the helper only when it succeeds, so a failed
+build, or two processes building at once (a shared environment), never leave
+the helper missing. These tests use a fake scib package and a fake compiler
+script, never the real one.
 """
+import os
 import stat
 import sys
 import types
@@ -40,8 +44,21 @@ def _fake_scib(tmp_path, monkeypatch, *, exe_bytes, cpp=True):
     mod = types.ModuleType("scib")
     mod.__file__ = str(pkg / "__init__.py")
     monkeypatch.setitem(sys.modules, "scib", mod)
+    # import_scib imports scib.metrics: without this the file passes only after
+    # another test has imported the real one
+    monkeypatch.setitem(sys.modules, "scib.metrics", types.ModuleType("scib.metrics"))
     mscib._lisi_helper_problem.cache_clear()
     return exe
+
+
+def _build_line(exe):
+    """What the fake compiler logs: scib's build line, written to this process's
+    own file next to the helper."""
+    return f"-std=c++11 -O3 -o {exe.parent / f'.knn_graph.o.{os.getpid()}'} {exe.parent / 'knn_graph.cpp'}"
+
+
+def _leftovers(exe):
+    return [f.name for f in exe.parent.iterdir() if f.name.startswith(".")]
 
 
 def _fake_compiler(tmp_path, monkeypatch, name="g++", *, succeed=True):
@@ -72,11 +89,10 @@ def test_foreign_binary_is_rebuilt_once_and_then_healthy(tmp_path, monkeypatch, 
     exe = _fake_scib(tmp_path, monkeypatch, exe_bytes=FOREIGN_BINARY)
     log = _fake_compiler(tmp_path, monkeypatch)
     assert mscib._lisi_helper_problem() is None
-    # scib's own build line, in place, once
-    lines = log.read_text().strip().splitlines()
-    assert lines == [f"-std=c++11 -O3 -o {exe} {exe.parent / 'knn_graph.cpp'}"]
-    assert exe.read_text() == HEALTHY
-    assert "rebuilt scib's LISI helper knn_graph.o from source" in capsys.readouterr().err
+    # scib's own build line, once, then the helper replaced
+    assert log.read_text().strip().splitlines() == [_build_line(exe)]
+    assert exe.read_text() == HEALTHY and _leftovers(exe) == []
+    assert capsys.readouterr().err == ""                   # a repair that worked says nothing
     mscib._lisi_helper_problem.cache_clear()
     assert mscib._lisi_helper_problem() is None            # now just runs
     assert len(log.read_text().strip().splitlines()) == 1  # no second compile
@@ -96,6 +112,7 @@ def test_failed_rebuild_keeps_the_original_problem_and_the_gxx_hint(tmp_path, mo
     assert problem and "cannot be executed here" in problem
     assert "rebuilding from source failed" in problem and "no such instruction" in problem
     assert exe.read_bytes() == FOREIGN_BINARY               # untouched
+    assert _leftovers(exe) == []
     # the metric-level fallback still prints the manual build line;
     # exercise the warning text through the same helper compute() uses
     msg = mscib._lisi_fallback_message("cLISI", problem)
@@ -119,8 +136,26 @@ def test_loader_failure_is_rebuilt(tmp_path, monkeypatch):
                      exe_bytes=b"#!/bin/sh\n>&2 echo 'GLIBC_2.38 not found'\nexit 127\n")
     log = _fake_compiler(tmp_path, monkeypatch)
     assert mscib._lisi_helper_problem() is None
-    assert log.read_text().strip().splitlines() == [
-        f"-std=c++11 -O3 -o {exe} {exe.parent / 'knn_graph.cpp'}"]
+    assert log.read_text().strip().splitlines() == [_build_line(exe)]
+
+
+def test_a_missing_helper_is_built(tmp_path, monkeypatch):
+    # e.g. removed by a failed build of an older multibench in a shared environment
+    exe = _fake_scib(tmp_path, monkeypatch, exe_bytes=FOREIGN_BINARY)
+    exe.unlink()
+    log = _fake_compiler(tmp_path, monkeypatch)
+    assert mscib._lisi_helper_problem() is None
+    assert log.read_text().strip().splitlines() == [_build_line(exe)]
+    assert exe.read_text() == HEALTHY
+
+
+def test_a_missing_helper_without_a_compiler_is_named(tmp_path, monkeypatch):
+    exe = _fake_scib(tmp_path, monkeypatch, exe_bytes=FOREIGN_BINARY)
+    exe.unlink()
+    monkeypatch.setenv("PATH", str(tmp_path / "empty"))
+    problem = mscib._lisi_helper_problem()
+    assert "is missing from the scib installation" in problem
+    assert "no C++ compiler" in problem
 
 
 def test_a_rebuild_that_does_not_help_reports_the_new_problem(tmp_path, monkeypatch):

@@ -91,21 +91,26 @@ def _probe_lisi_binary(exe) -> str | None:
 
 
 def _rebuild_lisi_binary(exe, cpp, cxx: str) -> str | None:
-    """Compile ``cpp`` to ``exe`` in place with scib's own build line; None on
-    success, else why. scib looks for the binary in its own ``knn_graph/``."""
+    """Compile ``cpp`` to ``exe`` with scib's own build line; None on success,
+    else why. scib looks for the binary in its own ``knn_graph/``. The build
+    writes a file of its own and replaces ``exe`` only when it succeeds, so two
+    processes rebuilding at once, or a failed build, never remove ``exe``."""
+    import os
     import subprocess
-    import sys
 
-    cmd = [cxx, *_CXX_FLAGS, "-o", str(exe), str(cpp)]
+    shown = " ".join([cxx, *_CXX_FLAGS, "-o", str(exe), str(cpp)])
+    tmp = exe.with_name(f".{exe.name}.{os.getpid()}")
     try:
-        p = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        p = subprocess.run([cxx, *_CXX_FLAGS, "-o", str(tmp), str(cpp)],
+                           capture_output=True, text=True, timeout=600)
     except (OSError, subprocess.TimeoutExpired) as exc:
-        return f"{' '.join(cmd)} failed ({type(exc).__name__}: {exc})"
+        tmp.unlink(missing_ok=True)
+        return f"{shown} failed ({type(exc).__name__}: {exc})"
     if p.returncode != 0:
+        tmp.unlink(missing_ok=True)
         err = (p.stderr or p.stdout or "").strip().splitlines()
-        return f"{' '.join(cmd)} exited {p.returncode}" + (f": {err[-1]}" if err else "")
-    print(f"multibench: rebuilt scib's LISI helper {exe.name} from source with "
-          f"{cxx} (the shipped binary could not run here)", file=sys.stderr)
+        return f"{shown} exited {p.returncode}" + (f": {err[-1]}" if err else "")
+    os.replace(tmp, exe)
     return None
 
 
@@ -129,8 +134,8 @@ def _lisi_helper_problem() -> str | None:
     scib runs the prebuilt binary without checking it, so a binary that does
     not start (scib ships a Linux x86-64 executable linked against glibc 2.38)
     surfaces only as a missing output file, once per metric. One probe names
-    the cause; with a C++ compiler and the shipped ``knn_graph.cpp`` the
-    helper is rebuilt once in place and probed again.
+    the cause; with a C++ compiler and the shipped ``knn_graph.cpp`` a helper
+    that cannot run, or is missing, is rebuilt once and probed again.
     """
     from pathlib import Path
 
@@ -140,9 +145,8 @@ def _lisi_helper_problem() -> str | None:
         return f"scib is not importable ({type(exc).__name__})"
     kg = Path(scib.__file__).parent / "knn_graph"
     exe = kg / "knn_graph.o"
-    if not exe.is_file():
-        return f"{exe} is missing from the scib installation"
-    problem = _probe_lisi_binary(exe)
+    problem = (_probe_lisi_binary(exe) if exe.is_file()
+               else f"{exe} is missing from the scib installation")
     if problem is None:
         return None
     cpp = kg / "knn_graph.cpp"
