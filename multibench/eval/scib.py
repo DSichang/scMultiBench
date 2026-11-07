@@ -495,14 +495,15 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
         _safe("iF1", lambda: _isolated_labels_f1(adata, label_key="celltype",
                                                  batch_key="batch", cluster_key="cluster",
                                                  iso_threshold=iso_threshold))
-        _safe("cLISI", lambda: me.clisi_graph(adata, label_key="celltype", type_="embed", use_rep="X_emb"))
+        # type_="knn": scib walks the 15-NN graph computed above; "embed" would recompute it
+        _safe("cLISI", lambda: me.clisi_graph(adata, label_key="celltype", type_="knn"))
     if want_bat:
         _safe("ASW_batch", lambda: me.silhouette_batch(adata, batch_key="batch", label_key="celltype", embed="X_emb"))
         if n_batches >= 2:
             _safe("ARI_batch", lambda: 1 - abs(me.ari(adata, cluster_key="batch_cluster", label_key="batch")))
             _safe("NMI_batch", lambda: 1 - abs(me.nmi(adata, cluster_key="batch_cluster", label_key="batch")))
         _safe("GC", lambda: me.graph_connectivity(adata, label_key="celltype"))
-        _safe("iLISI", lambda: me.ilisi_graph(adata, batch_key="batch", type_="embed", use_rep="X_emb"))
+        _safe("iLISI", lambda: me.ilisi_graph(adata, batch_key="batch", type_="knn"))
         # opt-in: kBET runs in R and takes hours at 10-30k cells
         if slow_metrics:
             _safe("kBET", lambda: me.kBET(adata, batch_key="batch", label_key="celltype", type_="embed", embed="X_emb"))

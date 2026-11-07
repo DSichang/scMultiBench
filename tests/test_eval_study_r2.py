@@ -54,6 +54,24 @@ def test_stated_scib_facts_match_the_requirement_and_scib_defaults():
     assert "mmwrite(mtx_file_path, connectivities" in graph_py
 
 
+def test_lisi_walks_the_graph_scibs_embed_type_would_recompute():
+    """cLISI and iLISI run scib with type_="knn" on compute()'s 15-NN graph:
+    the graph scib's type_="embed" (the paper's call) recomputes."""
+    from scib.metrics import lisi
+    from multibench.eval import scib as S
+    rng = np.random.default_rng(0)
+    adata = S._build_adata(rng.normal(size=(300, 8)), ["a", "b", "c"] * 100, None,
+                           [0, 1] * 150)
+    S._neighbors(adata, "X_emb")
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        again = lisi.recompute_knn(adata, "embed", "X_emb")
+    for key in ("connectivities", "distances"):
+        assert (adata.obsp[key] != again.obsp[key]).nnz == 0, key
+    kept = lisi.recompute_knn(adata, "knn")
+    assert (kept.obsp["connectivities"] != adata.obsp["connectivities"]).nnz == 0
+
+
 def test_catalog_describes_clisi_in_plain_direction():
     d = mtb.catalog.metrics()
     text = d.loc[d["metric"] == "cLISI", "description"].iloc[0]
