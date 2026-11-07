@@ -285,7 +285,7 @@ def _missing_paths(spec, category: str, mods: list, dataset: str, data_path) -> 
     try:
         paths = _resolve.inputs_for(dataset, category, spec.id, modalities=mods or None,
                                     data_path=data_path, check=False)
-    except Exception:           # noqa: BLE001 - fall back to the exception text
+    except Exception:           # fall back to the exception text
         return {}
     return {r: Path(p) for r, p in paths.items() if not Path(p).exists()}
 
@@ -470,7 +470,7 @@ def _command_line(method: str, category: str, inputs: dict, *, out_dir, dataset:
                                          out_dir=Path(out_dir) / f"{method}_{dataset}",
                                          params=params, gpu=gpu)
         return shlex.join(argv), [prepared] if prepared else []
-    except Exception as e:  # noqa: BLE001 - a preview must never abort the scan
+    except Exception as e:  # a preview must never abort the scan
         return f"(no preview: {type(e).__name__}: {e})", []
 
 
@@ -906,7 +906,7 @@ def _missing_inputs(row, dataset, data_path) -> int:
         return 0
     try:
         paths = _row_paths(row, dataset, data_path)
-    except Exception:  # noqa: BLE001 - unresolvable: the last row to speak for its method
+    except Exception:  # unresolvable: the last row to speak for its method
         return 10 ** 6
     return sum(not Path(p).exists() for p in paths.values())
 
@@ -1080,7 +1080,7 @@ def _label_candidates(dataset, n, data_path=None):
     for p in _label_files(dataset, data_path):
         try:
             by_file[p.name] = _eio.read_labels(p)
-        except Exception as e:  # noqa: BLE001 - say which file
+        except Exception as e:  # say which file
             raise ValueError(f"{p} cannot be read: {e}") from e
     cands = [([k], v) for k, v in by_file.items()]
     rna = [k for k in by_file if k.startswith("rna_cty")]
@@ -1177,7 +1177,7 @@ def _evaluate_best_order(emb, category, cands, *, metrics=None, user_batch=False
         names, lab, batch = cands[0]
         try:
             val = _full(lab, batch)
-        except Exception as e:  # noqa: BLE001 - surfaced on the record
+        except Exception as e:  # surfaced on the record
             # an empty result would make a bad metrics=/batch= look like 'no label file matched'
             return names, None, [{"order": names,
                                   "error": f"{type(e).__name__}: {str(e)[:300]}"}]
@@ -1207,7 +1207,7 @@ def _evaluate_best_order(emb, category, cands, *, metrics=None, user_batch=False
             ari = float(scib.metrics.ari(ad.AnnData(obs=obs), cluster_key="cluster",
                                          label_key="celltype"))
             scored.append((ari, names, lab, batch, searched[n]))
-        except Exception as e:  # noqa: BLE001 - keep screening other orders
+        except Exception as e:  # keep screening other orders
             last_error = f"{type(e).__name__}: {e}"
     if not scored:
         raise RuntimeError("no label ordering could be screened"
@@ -1315,7 +1315,7 @@ def _plan_caveats(dataset, category, data_path, methods) -> dict | None:
     try:
         plan, _ = _scan(dataset, category, methods=methods, modalities="all",
                         data_path=data_path)
-    except Exception:  # noqa: BLE001 - no plan: the record keeps its caveat
+    except Exception:  # no plan: the record keeps its caveat
         return None
     return {(r["method"], tuple(_row_modalities(r["modalities"]))): _run_caveat(r["caveat"])
             for _, r in plan.iterrows()}
@@ -1718,7 +1718,7 @@ class RunResult:
                                       batch_given=batch is not None,
                                       on_rank=_rank_line(method) if verbose else None,
                                       tried=tried[root])
-                except Exception as e:  # noqa: BLE001 - one bad record must not abort the rest
+                except Exception as e:  # one bad record must not abort the rest
                     _drop_scores(rec)
                     rec["status"] = "ran"
                     rec["error"] = _clip_error(f"{type(e).__name__}: {e}")
@@ -2160,7 +2160,7 @@ def _label_file_sizes(dataset, category=None, method=None, *, modalities=None,
             files = _resolve.labels_for(dataset, category, method, modalities=modalities,
                                         data_path=data_path)
         return [(Path(p).name, len(_eio.read_labels(p))) for p in files.values()]
-    except Exception:  # noqa: BLE001 - no label files: nothing to compare against
+    except Exception:  # no label files: nothing to compare against
         return []
 
 
@@ -2284,7 +2284,7 @@ def _default_label_files(dataset, data_path) -> list:
         with warnings.catch_warnings():       # the default order is meant here
             warnings.simplefilter("ignore", UserWarning)
             return list(map(Path, _resolve.labels_for(dataset, data_path=data_path).values()))
-    except Exception:  # noqa: BLE001 - no readable files: no ids
+    except Exception:  # no readable files: no ids
         return []
 
 
@@ -2295,7 +2295,7 @@ def _dataset_cell_ids(dataset, data_path) -> list | None:
     files = _default_label_files(dataset, data_path)
     try:
         ids = files and (_raw_barcodes(files) or [None])[0]
-    except Exception:  # noqa: BLE001 - an unreadable label file: no ids
+    except Exception:  # an unreadable label file: no ids
         return None
     return ids if ids and len(set(ids)) == len(ids) else None
 
@@ -2309,7 +2309,7 @@ def _embedding_cell_ids(dataset, data_path) -> list:
     files = _default_label_files(dataset, data_path)
     try:
         sizes = [len(_eio.read_labels(p)) for p in files]
-    except Exception:  # noqa: BLE001 - an unreadable label file: no ids
+    except Exception:  # an unreadable label file: no ids
         return []
     out: list = []
     if not files:
@@ -2409,7 +2409,7 @@ def _label_gaps(dataset, data_path) -> dict:
     for p in _label_files(dataset, data_path):
         try:
             labels = _eio.read_labels(p)
-        except Exception:  # noqa: BLE001 - not a readable label file
+        except Exception:  # not a readable label file
             continue
         if not _has_gap(labels):
             continue
@@ -2456,7 +2456,7 @@ def _inputs_on_disk(row, dataset, data_path) -> bool:
                 row["category"], set(_row_modalities(row["modalities"])))
             if not _resolve._check_data_dir(variant, paths["data_dir"])[0]:
                 return False
-    except Exception:  # noqa: BLE001 - unresolvable: not on disk
+    except Exception:  # unresolvable: not on disk
         return False
     return all(Path(p).exists() for p in paths.values())
 
@@ -2697,7 +2697,8 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
         One batch per cell; a Series or a barcode-indexed CSV is aligned by
         barcode. ``None`` = each cell's label file.
     evaluate : bool
-        Score each embedding; ``False`` only runs (status ``ran``).
+        Score each embedding; ``False`` only runs (status ``ran``), and a
+        reused saved record keeps its scores.
     timeout : float | None
         Wall-clock limit per method, in seconds; ``None`` = none.
     skip_existing : bool
