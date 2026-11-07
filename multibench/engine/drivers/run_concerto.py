@@ -2,11 +2,11 @@
 
 Concerto writes one shard per batch (``tf_<k>.tfrecord``, the k-th
 ``--path1``/``--path2`` file) and trains on and embeds the shards in the
-order ``os.listdir`` returns them (main_Concerto.py:60,
+order ``os.listdir`` returns them (main_Concerto.py:64,
 concerto_function5_3.py:1961). That order depends on the filesystem, so it
 would fix the embedding's rows differently per host.
 
-This driver runs the unmodified main_Concerto.py with ``os.listdir`` giving
+This driver runs main_Concerto.py with ``os.listdir`` giving
 the shards in batch order, so the rows follow the argument order, the order
 of the dataset's numbered label files. Any other listing is left as the filesystem gives it.
 

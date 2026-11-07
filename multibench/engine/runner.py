@@ -212,7 +212,7 @@ def _argv(variant, method: str, values: dict, out_str: str, repo: Path,
     wrap of the mode :func:`run_mode` picks.
     """
     cmd = builder.build_command(variant, values=values, out_dir=out_str, params=params)
-    # a driver runs the unmodified script from its folder (--script_dir)
+    # a driver runs the script from its folder (--script_dir)
     if variant.driver:
         pkg_root = Path(__file__).resolve().parents[1]      # .../multibench
         driver_abs = pkg_root / variant.driver

@@ -1,7 +1,7 @@
 methods:
   - id: SCALEX
     language: python
-    gpu_use: used when present   # torch env with CPU and GPU archives; main_SCALEX.py:50 passes gpu=0
+    gpu_use: used when present   # torch env with CPU and GPU archives; main_SCALEX.py:60 passes gpu=0
     tasks: [clustering, batch]
     atac: gene_activity
     status: verified
@@ -59,7 +59,7 @@ methods:
         output: {kind: embedding, file: embedding.h5, dataset: data}
       # The paired script takes --path1 rna, --path2 adt, --path3 atac, each with
       # one file per batch; an absent modality is an absent flag. Its own examples
-      # cover vertical and cross runs (main_Multigrate_paired_integration.py:25-30).
+      # cover vertical and cross runs (main_Multigrate_paired_integration.py:35-40).
       - when: {category: vertical, modalities: [rna, atac]}
         entrypoint: tools_scripts/Multigrate/main_Multigrate_paired_integration.py
         language: python
@@ -180,7 +180,7 @@ methods:
           - {role: atac_peak}
           - {role: atac_peak}
           - {role: out_dir}
-        # ATAC cells first: main_Seurat_v5.Rmd:84-86 returns list(ATAC query
+        # ATAC cells first: main_Seurat_v5.Rmd:86-88 returns list(ATAC query
         # ref.umap, RNA reference umap) and :109 writes rbind(result[[1]],
         # result[[2]]). Source-level; a host run on D27 has not confirmed it yet.
         output: {kind: embedding, file: embedding.h5, dataset: data, cell_order: [atac_peak, rna]}
@@ -221,7 +221,7 @@ methods:
 
   - id: totalVI
     language: python
-    gpu_use: used when present   # main_totalVI.py:78 vae.train(); scvi-tools 1.3 accelerator='auto'
+    gpu_use: used when present   # main_totalVI.py:95 vae.train(); scvi-tools 1.3 accelerator='auto'
     tasks: [batch, clustering]
     status: verified
     variants:
@@ -400,7 +400,7 @@ methods:
 
   - id: scMoMaT
     language: python
-    gpu_use: used when present   # main_scMoMaT.py:78 falls back on torch.cuda.is_available()
+    gpu_use: used when present   # main_scMoMaT.py:86 falls back on torch.cuda.is_available()
     tasks: [batch, clustering]
     atac: peak
     status: verified
@@ -441,7 +441,7 @@ methods:
           - {kind: embedding, file: umap_embedding.h5, dataset: data}
       # Mosaic integration. main_scMoMaT.py takes --path1/--path2/--path3 with
       # nargs='+', so a per-batch modality pattern maps directly. --cty_path is
-      # not passed: its only use is commented out (main_scMoMaT.py:93).
+      # not passed: its only use is commented out (main_scMoMaT.py:101).
       - when: {category: mosaic, modalities: [rna1, rna2, rna3, adt1, atac2]}
         entrypoint: tools_scripts/scMoMaT/main_scMoMaT.py
         args:
@@ -468,7 +468,7 @@ methods:
         extra_outputs:
           - {kind: graph, file: knn_dists.h5, dataset: data}
           - {kind: embedding, file: umap_embedding.h5, dataset: data}
-      # rna1 | rna2 + adt2 | adt3: upstream's own mosaic example (main_scMoMaT.py:29)
+      # rna1 | rna2 + adt2 | adt3: upstream's own mosaic example (main_scMoMaT.py:37)
       - when: {category: mosaic, modalities: [rna1, rna2, adt2, adt3]}
         entrypoint: tools_scripts/scMoMaT/main_scMoMaT.py
         language: python
@@ -545,14 +545,14 @@ methods:
   - id: moETM
     language: python
     tasks: [clustering]
-    # atac: role `atac_gas` is only the resolver alias for atac.h5; upstream main_moETM_rna_atac.py:33 feeds the multiome peak matrix (D15/atac.h5)
+    # atac: role `atac_gas` is only the resolver alias for atac.h5; upstream main_moETM_rna_atac.py:37 feeds the multiome peak matrix (D15/atac.h5)
     atac: peak
     status: verified
-    # GPU: every minibatch goes `.to('cuda')` unconditionally - main_moETM_rna_adt.py:109-111
-    # and main_moETM_rna_atac.py:124-126 - and the encoders are moved back with
-    # `.cuda()` (:130-131 / :145-146); neither script has a device flag.
+    # GPU: every minibatch goes `.to('cuda')` unconditionally - main_moETM_rna_adt.py:113-115
+    # and main_moETM_rna_atac.py:128-130 - and the encoders are moved back with
+    # `.cuda()` (:134-135 / :149-150); neither script has a device flag.
     requires_gpu: true
-    gpu_evidence: tools_scripts/moETM/main_moETM_rna_adt.py:109, tools_scripts/moETM/main_moETM_rna_atac.py:124
+    gpu_evidence: tools_scripts/moETM/main_moETM_rna_adt.py:113, tools_scripts/moETM/main_moETM_rna_atac.py:128
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
         entrypoint: tools_scripts/moETM/main_moETM_rna_adt.py
@@ -716,7 +716,7 @@ methods:
           - {role: out_dir, flag: "--save_path"}
         output: {kind: embedding, file: embedding.h5, dataset: data}
   - id: SMILE
-    # GPU: main_SMILE.py:120 calls ReferenceSMILE_trainer, which builds
+    # GPU: main_SMILE.py:129 calls ReferenceSMILE_trainer, which builds
     # ContrastiveLoss (SMILE/SMILE.py:208) whose __init__ does
     # `torch.tensor(temperature).cuda()` unconditionally (SMILE/SMILE.py:20,22);
     # the trainer's own is_available() fallback (:207) never reaches that line.
@@ -772,11 +772,11 @@ methods:
           - {role: atac_gas, flag: "--path2"}
           - {role: out_dir, flag: "--save_path"}
         params: {seed: 1}
-        # ATAC cells first: main_uniPort.py:48 concatenates adata_atac before
+        # ATAC cells first: main_uniPort.py:56 concatenates adata_atac before
         # adata_rna (D28: ARI .599 atac-first vs .001 rna-first)
         output: {kind: embedding, file: embedding.h5, dataset: data, cell_order: [atac_gas, rna]}
   - id: sciCAN
-    # GPU: main_sciCAN.py:46 calls Cycle_train_wolabel, which puts every network
+    # GPU: main_sciCAN.py:49 calls Cycle_train_wolabel, which puts every network
     # and minibatch on CUDA unconditionally (training.py:162-166, :193-198); the
     # script only moves the trained extractor to CPU afterwards (:50). No flag.
     requires_gpu: true
@@ -786,7 +786,7 @@ methods:
     atac: gene_activity
     status: verified
     variants:
-      # main_sciCAN.py:51 concatenates the rna and atac_gas matrices row-wise, so
+      # main_sciCAN.py:54 concatenates the rna and atac_gas matrices row-wise, so
       # atac_gas must be gene-aligned to rna (same feature dimension), as for scJoint.
       - when: {category: diagonal, modalities: [rna, atac_gas]}
         entrypoint: tools_scripts/sciCAN/main_sciCAN.py
@@ -869,7 +869,7 @@ methods:
           - {role: out_dir, flag: "--save_path"}
         output: {kind: embedding, file: embedding.h5, dataset: data}
       # Three RNA and three ATAC batches, fixed by the script
-      # (GLUE_human_multibatch.py:86-108). Output: the RNA batches, then the ATAC batches.
+      # (GLUE_human_multibatch.py:109-131). Output: the RNA batches, then the ATAC batches.
       - when: {category: diagonal, modalities: [rna1, rna2, rna3, atac_peak1, atac_peak2, atac_peak3]}
         entrypoint: tools_scripts/GLUE/GLUE_human_multibatch.py
         language: python
@@ -949,12 +949,12 @@ methods:
   - id: UnitedNet
     language: python
     tasks: [clustering]
-    # GPU: main_UnitedNet.py:32 hardcodes `device = "cuda:0"` (passed to
-    # UnitedNet(..., device=device) at :217, which .to()s the model onto it,
-    # src/interface.py:25); the argparse (:15-21) has no device flag.
+    # GPU: main_UnitedNet.py:38 hardcodes `device = "cuda:0"` (passed to
+    # UnitedNet(..., device=device) at :223, which .to()s the model onto it,
+    # src/interface.py:25); the argparse (:15-27) has no device flag.
     requires_gpu: true
-    gpu_evidence: tools_scripts/UnitedNet/main_UnitedNet.py:32
-    # atac: inferred from the upstream script's reference atacseq config (main_UnitedNet.py:174, ATAC input dim 13634 = gene-level features, is_binary_input False). Generic MLP encoders - runs on either representation
+    gpu_evidence: tools_scripts/UnitedNet/main_UnitedNet.py:38
+    # atac: inferred from the upstream script's reference atacseq config (main_UnitedNet.py:180, ATAC input dim 13634 = gene-level features, is_binary_input False). Generic MLP encoders - runs on either representation
     # the benchmark runs this method on peak matrices: its RNA + ATAC datasets (D12-D22,
     # D56) hold peaks only, and the script takes any feature matrix
     atac: peak
@@ -1002,10 +1002,10 @@ methods:
     # `.type("torch.cuda.FloatTensor")` unconditionally, which a CPU-only torch
     # cannot do ("Torch not compiled with CUDA enabled"). No flag.
     requires_gpu: true
-    gpu_evidence: tools_scripts/iPOLNG/main_iPOLNG.py:41
+    gpu_evidence: tools_scripts/iPOLNG/main_iPOLNG.py:50
     language: python
     tasks: [clustering]
-    # atac: role `atac_gas` is only the resolver alias for atac.h5; upstream main_iPOLNG.py:21 feeds the multiome peak matrix (D15/atac.h5)
+    # atac: role `atac_gas` is only the resolver alias for atac.h5; upstream main_iPOLNG.py:30 feeds the multiome peak matrix (D15/atac.h5)
     atac: peak
     status: verified
     variants:
@@ -1026,7 +1026,7 @@ methods:
     variants:
       # Cross integration. main_StabMap.Rmd only defines run_StabMap() and helpers
       # (no top-level call), so the package driver engine/drivers/run_stabmap.R
-      # source()s the unmodified .Rmd and calls run_StabMap(file_paths, save_path,
+      # source()s the .Rmd and calls run_StabMap(file_paths, save_path,
       # reference).
       - when: {category: cross, modalities: [rna1, rna2, rna3, adt1, adt2, adt3]}
         entrypoint: tools_scripts/StabMap/main_StabMap.Rmd

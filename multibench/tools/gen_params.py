@@ -68,7 +68,7 @@ NOT_TUNABLE = {
     # call is commented out (main_scJoint.py:130-137)
     "scJoint": {"use_cuda", "threads", "epochs_stage3", "lr_stage3", "with_crossentorpy",
                 "center_weight"},
-    # main_UnitedNet.py:234 names its output embedding{index}.h5; the package reads
+    # main_UnitedNet.py:240 names its output embedding{index}.h5; the package reads
     # embedding1.h5
     "UnitedNet": {"index"},
 }
