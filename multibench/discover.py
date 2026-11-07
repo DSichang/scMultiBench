@@ -245,7 +245,8 @@ def params_for(method: str, category: str | None = None,
         ``method``, ``variant`` (``'category:mods'``, or several that take
         the same parameters), ``tunable`` (what
         ``params=`` can set, ``{name: {"type", "default"}}``; ``default`` is
-        what a run uses when you pass nothing), ``fixed_in_script`` (what the
+        what a run uses when you pass nothing, and ``None`` leaves it to the
+        method's library), ``fixed_in_script`` (what the
         script pins, with ``file:line``), ``upstream_knobs`` (what its library
         documents but the script does not expose) and ``upstream_url``.
 
