@@ -114,15 +114,15 @@ def _rebuild_lisi_binary(exe, cpp, cxx: str) -> str | None:
     return None
 
 
-def _lisi_fallback_message(name: str, problem: str) -> str:
-    """The warning for a LISI metric recorded as NaN: the cause and scib's own
-    ``g++`` build line."""
+def _lisi_fallback_message(problem: str) -> str:
+    """The warning for the LISI metrics recorded as NaN: the cause and scib's
+    own ``g++`` build line. One text for both, so a call warns once."""
     from pathlib import Path
 
     scib = import_scib()
     kg = Path(scib.__file__).parent / "knn_graph"
-    return (f"scib metric {name!r} needs scib's LISI helper binary, which "
-            f"cannot run here: {problem}. Recording NaN. To fix it, rebuild the "
+    return (f"cLISI and iLISI need scib's LISI helper binary, which cannot run "
+            f"here: {problem}. Recording NaN. To fix it, rebuild the "
             f"binary from the source scib ships (needs a C++ compiler):\n"
             f"    g++ {' '.join(_CXX_FLAGS)} -o {kg / 'knn_graph.o'} {kg / 'knn_graph.cpp'}")
 
@@ -413,7 +413,8 @@ def _score(out: dict, only, name: str, fn) -> None:
     if name in _LISI_METRICS:
         problem = _lisi_helper_problem()
         if problem:
-            _text.warn(_lisi_fallback_message(name, problem))
+            if not any(m in out for m in _LISI_METRICS):     # once per embedding
+                _text.warn(_lisi_fallback_message(problem))
             out[name] = float("nan")
             return
     try:

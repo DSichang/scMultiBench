@@ -9,6 +9,7 @@ build, or two processes building at once (a shared environment), never leave
 the helper missing. These tests use a fake scib package and a fake compiler
 script, never the real one.
 """
+import functools
 import os
 import stat
 import sys
@@ -115,7 +116,7 @@ def test_failed_rebuild_keeps_the_original_problem_and_the_gxx_hint(tmp_path, mo
     assert _leftovers(exe) == []
     # the metric-level fallback still prints the manual build line;
     # exercise the warning text through the same helper compute() uses
-    msg = mscib._lisi_fallback_message("cLISI", problem)
+    msg = mscib._lisi_fallback_message(problem)
     assert "g++ -std=c++11 -O3 -o" in msg and str(exe) in msg and "Recording NaN" in msg
 
 
@@ -165,3 +166,15 @@ def test_a_rebuild_that_does_not_help_reports_the_new_problem(tmp_path, monkeypa
     problem = mscib._lisi_helper_problem()
     assert "GLIBCXX_3.4.29 not found" in problem and "rebuilding from source failed" in problem
     assert log.exists()
+
+
+def test_one_warning_for_both_lisi_metrics(monkeypatch):
+    monkeypatch.setattr(mscib, "_lisi_helper_problem",
+                        functools.lru_cache(maxsize=1)(lambda: "it cannot start"))
+    monkeypatch.setattr(mscib, "_lisi_fallback_message", lambda problem: f"LISI: {problem}")
+    out = {}
+    with pytest.warns(UserWarning) as rec:
+        for name in ("cLISI", "ASW_batch", "iLISI"):
+            mscib._score(out, None, name, lambda: 0.5)
+    assert [str(w.message) for w in rec] == ["LISI: it cannot start"]
+    assert out["ASW_batch"] == 0.5 and all(out[m] != out[m] for m in ("cLISI", "iLISI"))
