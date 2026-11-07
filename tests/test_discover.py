@@ -68,8 +68,6 @@ def test_find_methods_modalities_none_unchanged():
     assert discover.find_methods() == discover.find_methods(modalities=None)
 
 
-# --- P06: derived needs_labels / explicit atac reach discovery ---------------
-
 # --- P09: typos raise, aliases resolve ---------------------------------------
 
 def test_params_for_validates_and_aliases():

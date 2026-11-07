@@ -72,8 +72,6 @@ def test_a_column_one_method_has_is_not_called_equal():
     assert not any("for every method" in m for m in msgs), msgs
 
 
-# --- R5-11 (d): na='raise' does not describe the figure it does not draw -------
-
 # --- R5-11 (e): the label-order error names a method only when one was used ---
 
 def _cty(tmp_path):

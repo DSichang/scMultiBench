@@ -1,9 +1,6 @@
 """``envs.packed_manifest`` reads the shipped archive URLs."""
 
 
-LONG_COLUMNS = ['metric', 'value', 'method', 'dataset', 'category', 'source', 'scored_with']
-
-
 def test_packed_manifest_reads_shipped_file():
     from multibench.engine import envs
     mf = envs.packed_manifest()

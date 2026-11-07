@@ -158,10 +158,7 @@ def test_run_on_linux_keeps_the_install_line(tmp_path, monkeypatch):
 
 
 def test_label_files_of_one_diagonal_side_are_named(tmp_path, capsys):
-    """rna_cty.csv without atac_cty.csv: the 70 ATAC cells of the embedding
-    have no entry. The message names the side that is labelled and a recipe.
-    It does not blame the embedding or name the call that was made, and
-    missing_labels="drop" does not change it."""
+    """rna_cty.csv without atac_cty.csv: labels_for finds the RNA side only."""
     emb = np.random.default_rng(0).normal(size=(150, 5))
     np.save(tmp_path / 'emb.npy', emb)
     data = tmp_path / 'data'

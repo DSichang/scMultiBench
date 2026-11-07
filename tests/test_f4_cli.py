@@ -13,7 +13,6 @@ import sys
 import textwrap
 import warnings
 
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -103,20 +102,6 @@ def test_error_tail_is_the_last_line_that_says_something():
     assert len(tail) == 200 and tail.startswith("...") and tail.endswith("x" * 50)
     assert W._error_tail("TimeoutError: over 1 s") == "TimeoutError: over 1 s"
     assert W._error_tail(None) == "" and W._error_tail("\n \n") == ""
-
-
-# ====================================================================== R4-05
-def _diag_folder(root, name="D28", n=40):
-    """A diagonal folder: RNA cells (types r0/r1), then ATAC cells (a0/a1)."""
-    d = root / name
-    d.mkdir(parents=True)
-    rna = np.array(["t0"] * (n // 2) + ["t1"] * (n // 2))
-    atac = np.array(["t2"] * (n // 2) + ["t3"] * (n // 2))
-    pd.DataFrame({"x": rna}).to_csv(d / "rna_cty.csv", index=False)
-    pd.DataFrame({"x": atac}).to_csv(d / "atac_cty.csv", index=False)
-    rng = np.random.default_rng(0)
-    emb = np.vstack([rng.normal(8 * i, 1, size=(n // 2, 4)) for i in range(4)])
-    return d, emb
 
 
 def test_single_build_is_an_env_without_a_cpu_key(tmp_path, monkeypatch):
