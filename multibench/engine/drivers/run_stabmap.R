@@ -4,7 +4,7 @@
 # Upstream tools_scripts/StabMap/main_StabMap.Rmd defines run_StabMap() and
 # helpers but has no top-level call (it is meant to be `source()`d, per the
 # commented example in that file), so `Rscript <entrypoint> <args>` would only
-# define functions and exit. This driver sources the unmodified .Rmd and calls
+# define functions and exit. This driver sources the .Rmd and calls
 # run_StabMap() with file_paths assembled from the command-line arguments.
 #
 # Args (all flagged; --rna/--adt/--atac repeatable, one file each):
@@ -16,6 +16,23 @@
 #   --atac <file> [...]
 
 args <- commandArgs(trailingOnly = TRUE)
+# Hyperparameters come as --name=value. A default is the value the method script has
+# always used; NULL leaves the argument to StabMap.
+is_opt <- grepl("^--[A-Za-z][A-Za-z0-9_.]*=", args)
+opts <- setNames(sub("^--[^=]+=", "", args[is_opt]), sub("^--([^=]+)=.*", "\\1", args[is_opt]))
+args <- args[!is_opt]
+asked <- names(opts)
+option <- function(name, default, convert = as.numeric) {
+  if (!name %in% names(opts)) return(default)
+  value <- suppressWarnings(convert(opts[[name]]))
+  if (is.na(value)) stop("option --", name, ": cannot read the value ", opts[[name]])
+  opts <<- opts[names(opts) != name]
+  value
+}
+maxFeatures <- option("maxFeatures", Inf)
+ncomponentsReference <- option("ncomponentsReference", NULL)
+ncomponentsSubset <- option("ncomponentsSubset", NULL)
+if (length(opts) > 0) stop("unknown option: ", paste0("--", names(opts), collapse = " "))
 script_dir <- NULL; save_path <- NULL; reference <- NULL
 rna <- character(0); adt <- character(0); atac <- character(0)
 i <- 1
@@ -27,7 +44,7 @@ while (i <= length(args)) {
   else if (a == "--rna")        { rna  <- c(rna,  args[i + 1]); i <- i + 2 }
   else if (a == "--adt")        { adt  <- c(adt,  args[i + 1]); i <- i + 2 }
   else if (a == "--atac")       { atac <- c(atac, args[i + 1]); i <- i + 2 }
-  else { i <- i + 1 }
+  else stop("unknown argument: ", a)
 }
 stopifnot(!is.null(script_dir), !is.null(save_path), !is.null(reference))
 
@@ -43,7 +60,7 @@ save_path <- ifelse(grepl("/$", save_path), save_path, paste0(save_path, "/"))
 
 old <- getwd()
 setwd(script_dir)                 # so main_StabMap.Rmd`s source("util.R") resolves
-source("main_StabMap.Rmd")        # defines run_StabMap + helpers (upstream, unmodified)
+source("main_StabMap.Rmd")        # defines run_StabMap + helpers
 
 
 # Build a per-batch list that preserves gaps: "None" (or "NULL"/"NA") becomes a
@@ -63,6 +80,13 @@ if (length(rna))  file_paths$rna_path  <- slot_list(rna)
 if (length(adt))  file_paths$adt_path  <- slot_list(adt)
 if (length(atac)) file_paths$atac_path <- slot_list(atac)
 
-run_StabMap(file_paths, save_path, reference)
+if ("maxFeatures" %in% names(formals(run_StabMap))) {
+  run_StabMap(file_paths, save_path, reference, maxFeatures = maxFeatures,
+              ncomponentsReference = ncomponentsReference, ncomponentsSubset = ncomponentsSubset)
+} else {
+  # the script of PYangLab/scMultiBench (MULTIBENCH_SCRIPTS_REF) has no parameters
+  if (length(asked) > 0) stop("these method scripts take no ", paste0("--", asked, collapse = " "))
+  run_StabMap(file_paths, save_path, reference)
+}
 setwd(old)
 cat("finish\n")
