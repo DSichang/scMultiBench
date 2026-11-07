@@ -10,8 +10,8 @@ from ._text import _and_list
 
 #: The package checkout or install root (``multibench/..``).
 _ROOT = Path(__file__).resolve().parent.parent
-# datasets and the scripts clone sit next to the package in a checkout; a wheel
-# install keeps them out of site-packages, in a per-user cache
+# datasets and the downloaded scripts sit next to the package in a checkout; a
+# wheel install keeps them out of site-packages, in a per-user cache
 _IN_REPO = (_ROOT / "pyproject.toml").is_file()
 _CACHE = (Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
           / "multibench")
@@ -52,6 +52,12 @@ def _conda_envs_dir() -> Path | None:
     return _envs_dir(exe)
 
 
+def _scripts_id() -> str:
+    """The id of the package's method scripts (``engine.scripts.archive_id``)."""
+    from .engine.scripts import archive_id
+    return archive_id()
+
+
 def _path(value) -> Path | None:
     return None if value is None else Path(value).expanduser()
 
@@ -74,9 +80,10 @@ class Settings:
         ``mtb.scan`` and ``mtb.run`` use it. Default
         ``$MULTIBENCH_DATA_PATH``, else ``<base>/data``.
     repo_path : pathlib.Path
-        Folder of the method scripts (``tools_scripts/``), fetched there on
-        the first run when absent or empty. Default
-        ``$MULTIBENCH_REPO_PATH``, else ``<base>/scMultiBench_ref``.
+        Folder of the method scripts (``tools_scripts/``), downloaded there
+        on the first run when absent or empty. Default
+        ``$MULTIBENCH_REPO_PATH``, else ``<base>/scMultiBench_scripts/<id>``,
+        where ``<id>`` changes with the scripts.
     envs_dir : pathlib.Path
         Where the method environments live (``<envs_dir>/<env>``). Default
         ``$MULTIBENCH_ENVS_DIR``, else the first writable envs folder of the
@@ -119,7 +126,8 @@ class Settings:
 
     @property
     def repo_path(self) -> Path:
-        return self._repo_path or _from_env(REPO_PATH_VAR) or _BASE / "scMultiBench_ref"
+        return (self._repo_path or _from_env(REPO_PATH_VAR)
+                or _BASE / "scMultiBench_scripts" / _scripts_id())
 
     @repo_path.setter
     def repo_path(self, value):

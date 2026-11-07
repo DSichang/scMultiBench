@@ -60,7 +60,9 @@ def test_data_and_repo_path_variables(monkeypatch, tmp_path):
         monkeypatch.delenv(var, raising=False)
         setattr(config, field, None)
         default = getattr(config, field)
-        assert default.parent == _settings._BASE
+        # the scripts folder carries the id of the package's scripts
+        assert default.parent == (_settings._BASE / "scMultiBench_scripts"
+                                  if field == "repo_path" else _settings._BASE)
         monkeypatch.setenv(var, str(tmp_path / field))
         cfg = config
         assert getattr(cfg, field) == tmp_path / field           # the variable wins

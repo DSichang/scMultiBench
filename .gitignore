@@ -13,6 +13,7 @@ __pycache__/
 # run outputs
 /runs/
 /scMultiBench_ref
+/scMultiBench_scripts
 dist/
 build/
 # git bundles are transfer artefacts (host sync), never package content

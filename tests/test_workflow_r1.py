@@ -13,7 +13,6 @@ import inspect
 import json
 import re
 import shlex
-import subprocess
 import warnings
 from pathlib import Path
 
@@ -201,15 +200,17 @@ def test_scan_without_scripts_keeps_files_ok_and_no_note(no_scripts):
 
 def test_real_run_without_network_names_the_fetch_command(tmp_path, monkeypatch,
                                                           linux_with_envs):
-    def offline(cmd, **kw):
-        raise subprocess.CalledProcessError(128, cmd)
-    monkeypatch.setattr(subprocess, "run", offline)
+    import urllib.error
+
+    def offline(url):
+        raise urllib.error.URLError("no network")
+    monkeypatch.setattr(mtb.engine.scripts, "_archive_bytes", offline)
     monkeypatch.setattr(mtb.config, "repo_path", tmp_path / "scripts")
     with pytest.raises(RuntimeError, match="^Could not reach github.com") as e:
         mtb.engine.runner.run("totalVI", "vertical", inputs=mtb.engine.resolve.inputs_for("D11", "vertical", "totalVI"),
                 out_dir=str(tmp_path / "out"))
-    assert isinstance(e.value.__cause__, subprocess.CalledProcessError)
-    assert not (tmp_path / "out").exists()
+    assert isinstance(e.value.__cause__, urllib.error.URLError)
+    assert not (tmp_path / "out").exists() and not (tmp_path / "scripts").exists()
 
 
 # ----------------------------------------------------------------- L25: one out_dir

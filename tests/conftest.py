@@ -163,3 +163,44 @@ def _restore_config():
     yield
     for slot, value in saved.items():
         object.__setattr__(config, slot, value)
+
+
+# ---- the method scripts, as a wheel install finds them ------------------------
+# A wheel carries no tools_scripts/: the first run downloads them into
+# repo_path. Here the package root holds none, repo_path is this checkout (the
+# scripts "already downloaded"), and no test reaches the network for them. A
+# test of a machine without the scripts points repo_path at its own folder; a
+# test of the download serves this checkout's archive with ``scripts_download``.
+@_pytest.fixture(autouse=True)
+def _scripts_as_installed(monkeypatch):
+    from multibench import _settings, config
+    from multibench.engine import scripts
+
+    def unreachable(url):
+        raise OSError("tests do not reach the network")
+    monkeypatch.setattr(scripts, "_archive_bytes", unreachable)
+    monkeypatch.setattr(_settings, "_ROOT", ROOT / "no-scripts-here")
+    monkeypatch.setattr(config, "_repo_path", ROOT)
+
+
+@_pytest.fixture(scope="session")
+def _packed_scripts():
+    """``(archive bytes, record)`` of this checkout's ``tools_scripts/``."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("pack_scripts",
+                                                  ROOT / "tools" / "pack_scripts.py")
+    tool = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tool)
+    data = tool.pack()
+    return data, tool.record(data)
+
+
+@_pytest.fixture
+def scripts_download(monkeypatch, _packed_scripts):
+    """Serve the archive of this checkout's ``tools_scripts/`` as the download;
+    returns the ``tools_scripts-<id>`` name a run record gives it."""
+    from multibench.engine import scripts
+    data, rec = _packed_scripts
+    monkeypatch.setattr(scripts, "scripts_archive", lambda: rec)
+    monkeypatch.setattr(scripts, "_archive_bytes", lambda url: data)
+    return f"tools_scripts-{rec['sha256'][:12]}"

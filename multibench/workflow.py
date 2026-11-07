@@ -28,7 +28,6 @@ import pandas as pd
 
 from . import _text
 
-from . import _settings
 from ._settings import config
 from ._text import _and_list
 from .discover import _REPRESENTATION_TOKENS
@@ -192,7 +191,7 @@ def _missing_script(variant, method: str) -> str:
     """Why this variant's script or a helper module it imports is missing from
     the scripts checkout, or "" (also when there is no checkout yet: run fetches it)."""
     entry = Path(variant.entrypoint)
-    for root in (Path(config.repo_path), _settings._ROOT):
+    for root in scripts.folders():
         if (root / "tools_scripts").is_dir():
             # a script the package ships is copied in before the run
             shipped = (entry.name in variant.helpers

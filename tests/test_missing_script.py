@@ -7,7 +7,7 @@ import urllib.parse
 from types import SimpleNamespace
 
 import multibench as mtb
-from multibench import workflow
+from multibench import _settings, workflow
 
 
 def _variant(entrypoint):
@@ -32,7 +32,7 @@ def test_relative_entrypoint_present_in_the_checkout(tmp_path, monkeypatch):
 def test_no_checkout_yet_reports_nothing(tmp_path, monkeypatch):
     """run()/run() fetch the scripts; flagging them first would be wrong."""
     monkeypatch.setattr(workflow.config, "repo_path", tmp_path / "absent")
-    monkeypatch.setattr(workflow._settings, "_ROOT", tmp_path / "pkg")
+    monkeypatch.setattr(_settings, "_ROOT", tmp_path / "pkg")
     assert workflow._missing_script(_variant("tools_scripts/Any/main_Any.py"), "Any") == ""
 
 
