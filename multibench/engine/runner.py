@@ -169,13 +169,15 @@ def _check_input(val) -> None:
 
 
 def _plan_inputs(variant, inputs: dict, inputs_dir: Path) -> dict:
-    """``{role: {"value", "normpeaks_from"}}``: the file each role hands the
-    script, for the run and scan. A ``normalize_peaks`` role reads
-    ``inputs/<role>_normpeaks.h5``. Nothing is written; the format checks run.
+    """``{role: {"value", "normpeaks_from", "link_from"}}``: the file each role
+    hands the script, for the run and scan. A ``normalize_peaks`` role reads
+    ``inputs/<role>_normpeaks.h5``; every other input file of a variant that
+    ``writes_beside_inputs`` reads a link ``inputs/<role><suffix>`` to it.
+    Nothing is written; the format checks run.
     """
     plan: dict = {}
     for role, val in inputs.items():
-        step = {"value": val, "normpeaks_from": None}
+        step = {"value": val, "normpeaks_from": None, "link_from": None}
         if _is_modality_role(role):
             _check_input(val)
             step["value"] = str(val)
@@ -184,7 +186,21 @@ def _plan_inputs(variant, inputs: dict, inputs_dir: Path) -> dict:
         if role in plan:
             plan[role]["normpeaks_from"] = plan[role]["value"]
             plan[role]["value"] = str(inputs_dir / f"{role}_normpeaks.h5")
+    if variant.writes_beside_inputs:
+        for role, step in plan.items():
+            if (role not in _NON_MODALITY_ROLES and step["normpeaks_from"] is None
+                    and isinstance(step["value"], str)):
+                step["link_from"] = step["value"]
+                step["value"] = str(inputs_dir / f"{role}{Path(step['value']).suffix}")
     return plan
+
+
+def _link_input(src, dest) -> None:
+    """Make ``dest`` a link to ``src`` (absolute), replacing a link an earlier
+    run left there."""
+    if os.path.islink(dest):
+        os.unlink(dest)
+    os.symlink(os.path.abspath(src), dest)
 
 
 def _host_run_env(run_env: dict | None) -> dict:
@@ -359,6 +375,8 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     for role, step in plan.items():
         if step["normpeaks_from"] is not None:
             ingest._normalize_peak_names(step["normpeaks_from"], step["value"])
+        elif step["link_from"] is not None:
+            _link_input(step["link_from"], step["value"])
         values[role] = step["value"]
     cmd = _argv(variant, method, values, out_str, repo, params)
     cwd = (repo / variant.entrypoint).parent if variant.cwd_at_script else out
@@ -456,9 +474,9 @@ def _prepared_at(text) -> int:
 
 def _prepared_note(plan: dict, out_str: str, method: str) -> str | None:
     """The note for a command that reads files :func:`run` writes first
-    (renamed peak files), or ``None``."""
+    (renamed peak files, links to the input files), or ``None``."""
     files = [os.path.relpath(step["value"], out_str) for step in plan.values()
-             if step["normpeaks_from"]]
+             if step["normpeaks_from"] or step["link_from"]]
     if not files:
         return None
     that = "that file" if len(files) == 1 else "those files"

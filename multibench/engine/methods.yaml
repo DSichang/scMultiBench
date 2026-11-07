@@ -292,9 +292,12 @@ methods:
       # The env's torch 1.9.1+cu102 has no sm_89 kernels: on such a GPU (e.g. RTX 4090)
       # multi_vae_attention fails with "CUDA error: no kernel image is available".
       # Forced to CPU, as for scMSI (scMM does the same with its own --no_cuda flag).
+      # main_scMVP.py:68-105 writes .mtx and .txt files next to its input files, then
+      # reads them from the RNA file's folder.
       - when: {category: vertical, modalities: [rna, atac]}
         entrypoint: tools_scripts/scMVP/main_scMVP.py
         language: python
+        writes_beside_inputs: true
         run_env:
           CUDA_VISIBLE_DEVICES: ""
         args:
@@ -309,10 +312,12 @@ methods:
     # atac: role `atac_gas` is only the resolver alias for atac.h5; upstream main_scMM.py feeds the multiome peak matrix (D15/atac.h5)
     atac: peak
     status: verified
+    # main_scMM.py:115-159 writes scMM_data/ (.mtx, .txt) next to its input files.
     variants:
       - when: {category: vertical, modalities: [rna, adt]}
         entrypoint: tools_scripts/scMM/main_scMM.py
         language: python
+        writes_beside_inputs: true
         args:
           - {role: rna, flag: "--path1"}
           - {role: adt, flag: "--path2"}
@@ -322,6 +327,7 @@ methods:
       - when: {category: vertical, modalities: [rna, atac]}
         entrypoint: tools_scripts/scMM/main_scMM.py
         language: python
+        writes_beside_inputs: true
         args:
           - {role: rna, flag: "--path1"}
           - {role: atac, flag: "--path2"}
@@ -331,6 +337,7 @@ methods:
       - when: {category: cross, modalities: [rna1, rna2, rna3, adt1, adt2, adt3]}
         entrypoint: tools_scripts/scMM/main_scMM.py
         language: python
+        writes_beside_inputs: true
         args:
           - {roles: [rna1, rna2, rna3], flag: "--path1"}
           - {roles: [adt1, adt2, adt3], flag: "--path2"}
@@ -341,6 +348,7 @@ methods:
       - when: {category: cross, modalities: [rna1, rna2, rna3, atac1, atac2, atac3]}
         entrypoint: tools_scripts/scMM/main_scMM.py
         language: python
+        writes_beside_inputs: true
         args:
           - {roles: [rna1, rna2, rna3], flag: "--path1"}
           - {roles: [atac1, atac2, atac3], flag: "--path2"}

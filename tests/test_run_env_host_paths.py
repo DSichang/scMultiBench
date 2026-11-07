@@ -119,7 +119,7 @@ def _child_env(monkeypatch, tmp_path, method: str, run_env: dict) -> dict:
     inputs = {role: str(tmp_path / f"{role}.h5") for role in variant.when["modalities"]}
     # the inputs pass through as they are: the env handed to the child is the subject
     monkeypatch.setattr(runner, "_plan_inputs", lambda variant, inputs, inputs_dir, **kw: {
-        r: {"value": v, "normpeaks_from": None}
+        r: {"value": v, "normpeaks_from": None, "link_from": None}
         for r, v in inputs.items()})
     with pytest.raises(_Spawned):
         runner.run(method, variant.when["category"], inputs=inputs,

@@ -159,6 +159,9 @@ class Variant:
         The package-side wrapper in ``engine/drivers/`` that runs the script.
     normalize_peaks : list
         Roles whose peak names are rewritten as ``chr:start-end``.
+    writes_beside_inputs : bool
+        The script writes files next to the files it reads (scMM, scMVP), so
+        it reads links to them in the run's ``inputs/`` folder.
     extra_outputs : list of OutputSpec
         Other files the script must write.
     helpers : list
@@ -189,6 +192,7 @@ class Variant:
     pty: bool = False
     driver: str | None = None
     normalize_peaks: list = field(default_factory=list)
+    writes_beside_inputs: bool = False
     extra_outputs: list[OutputSpec] = field(default_factory=list)
     helpers: list = field(default_factory=list)
     size_hint: str = ""
