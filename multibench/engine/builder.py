@@ -38,23 +38,31 @@ def build_command(variant: Variant, values: dict, out_dir: str,
             cmd.extend(items)
 
     for k, v in {**variant.params, **(params or {})}.items():
-        cmd.extend(_param_tokens(k, v, variant.tunable.get(k) or {}))
+        cmd.extend(_param_tokens(k, v, variant.tunable.get(k) or {}, variant.language))
     return cmd
 
 
-def _param_tokens(key: str, value, decl: dict) -> list[str]:
+def _param_tokens(key: str, value, decl: dict, language: str = "python") -> list[str]:
     """The tokens of one param, by the type the script declares: a
     ``type=bool`` argument gets ``True`` or ``''`` (argparse's ``bool('')``
-    is ``False``); a switch (``flag``) is present when the value differs
-    from the one the script gets without it. Otherwise ``True`` is a bare
-    flag, ``False``/``None`` nothing, anything else its text."""
+    is ``False``), a ``boolean`` option ``true`` or ``false``; a switch
+    (``flag``) is present when the value differs from the one the script
+    gets without it. Otherwise ``True`` is a bare flag, ``False``/``None``
+    nothing, a list one token per item, anything else its text. An R script
+    reads ``--name=value``."""
     kind = decl.get("type")
     if kind == "bool" and isinstance(value, bool):
         return [f"--{key}", "True" if value else ""]
+    if kind == "boolean" and isinstance(value, bool):
+        value = "true" if value else "false"
     if kind == "flag" and isinstance(value, bool):
         return [f"--{key}"] if value != bool(decl.get("default")) else []
     if value is True:
         return [f"--{key}"]
     if value is False or value is None:
         return []
+    if language == "R":
+        return [f"--{key}={value}"]
+    if isinstance(value, (list, tuple)):
+        return [f"--{key}", *map(str, value)]
     return [f"--{key}", str(value)]

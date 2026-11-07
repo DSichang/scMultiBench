@@ -254,14 +254,14 @@ def check_params(method: str, variant, params: dict | None) -> None:
 
 #: the script's declared type -> what a value must be
 _TYPE_WORDS = {"int": "a whole number", "float": "a number", "str": "a text value",
-               "bool": "True or False", "flag": "True or False"}
+               "bool": "True or False", "boolean": "True or False", "flag": "True or False"}
 
 
 def _fits(value, kind: str) -> bool:
     """Whether ``value`` can stand on the command line for an argument of
     argparse ``type=kind``: a bool never stands for a number or text."""
     import numbers
-    if kind in ("bool", "flag"):
+    if kind in ("bool", "boolean", "flag"):
         return isinstance(value, bool)
     if isinstance(value, bool):
         return False
@@ -282,7 +282,7 @@ def _fits(value, kind: str) -> bool:
 
 def check_param_types(method: str, variant, params: dict | None) -> None:
     """``TypeError`` for a ``params`` value that does not fit the type the
-    script declares for it (``int``, ``float``, ``str``, ``bool``, ``flag``):
+    script declares for it (``int``, ``float``, ``str``, ``bool``, ``boolean``, ``flag``):
     ``2.5`` or ``True`` for ``epochs`` would reach the script as ``--epochs
     2.5`` or a bare ``--epochs``, and ``"False"`` for a ``bool`` is true."""
     for key, value in (params or {}).items():
