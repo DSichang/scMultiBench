@@ -147,13 +147,14 @@ def no_envs(monkeypatch):
 
 def test_nothing_runnable_tail_is_plain(no_envs, root):
     # D11 holds no ATAC file: the rows that read one are not listed, and, since
-    # c3 (C55), no line says so
+    # c3 (C55), no line says so; the scan call echoes the dataset as given
+    ds = os.path.join(root / 'data', 'D11')
     for kw, where in (
-            ({}, "mtb.scan('D11', 'vertical') says why."),
+            ({}, f"mtb.scan({ds!r}, 'vertical') says why."),
             ({"methods": ["Matilda"]},
-             "mtb.scan('D11', 'vertical', methods=['Matilda']) says why.")):
+             f"mtb.scan({ds!r}, 'vertical', methods=['Matilda']) says why.")):
         with pytest.raises(ValueError) as e:
-            mtb.run(os.path.join(root / 'data', 'D11'), 'vertical', out_dir='/tmp/unused', verbose=False, **kw)
+            mtb.run(ds, 'vertical', out_dir='/tmp/unused', verbose=False, **kw)
         lines = str(e.value).splitlines()
         assert lines[-1] == f"{where} mtb.env.install(dry_run=True) checks the environments."
         assert "not listed" not in str(e.value)

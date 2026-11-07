@@ -133,10 +133,11 @@ def test_scan_is_the_plan_with_its_command():
     """d1: one check, one run - scan returns the plan, run has no dry_run."""
     with pytest.raises(TypeError):
         mtb.scan("D11", "vertical", "data")
-    df = mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False)
+    df = mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False, command=True)
     assert list(df.columns) == ["method", "modalities", "runnable", "reason", "env",
                                 "caveat", "command"]
     assert df["command"].iloc[0].startswith("conda run -n matilda ")
+    assert "command" not in mtb.scan("D11", "vertical", methods=["Matilda"], verbose=False).columns
     assert "dry_run" not in inspect.signature(mtb.run).parameters
 
 

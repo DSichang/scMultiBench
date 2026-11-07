@@ -218,8 +218,9 @@ def test_a_call_with_default_arguments_keeps_the_hint(no_envs, tmp_path, root):
     for ds in ("D11", str(root / "data" / "D11")):     # the default data root, spelled out
         with pytest.raises(ValueError) as e:
             mtb.run(ds, "vertical", out_dir=tmp_path, verbose=False)
-        assert e.value.args[0].splitlines()[-1].startswith(
-            "mtb.scan('D11', 'vertical') says why. ")
+        assert e.value.args[0].splitlines()[-1] == (
+            f"mtb.scan({ds!r}, 'vertical') says why. "
+            "mtb.env.install(dry_run=True) checks the environments.")
 
 
 # ============================================================ R7-06
