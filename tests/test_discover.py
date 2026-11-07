@@ -15,6 +15,14 @@ def test_top_level_find_methods():
     assert "SCALEX" in mtb.find_methods(category="diagonal")
 
 
+def test_method_info_default_keys():
+    import multibench as mtb
+    info = mtb.method_info("Matilda")
+    assert set(info) == {"id", "language", "notes", "categories", "env", "atac",
+                         "needs_labels", "supports", "runtime", "gpu",
+                         "cpu_params", "setup_hint", "repo_url", "reference"}
+
+
 # --- modalities= filter ---
 
 def test_modality_types_mapping():
