@@ -1,23 +1,158 @@
-# AUTO-GENERATED - do not hand-edit; regenerate with multibench/tools/gen_params.py
+# AUTO-GENERATED - do not hand-edit; regenerate with
+#   python -m multibench.tools.gen_params
 #
-# Doc-only tunable hyperparameters, extracted from each upstream method
-# script's own argparse. These are never added to a command line by the
-# package; they document what `run(..., params={...})` may override, and
-# are surfaced by `multibench.params_for(method, category, modalities)`.
-# Arguments the package or the script sets (input files, values taken
-# from the data) are left out.
-#
-# A method absent from this file exposes no command-line hyperparameters
-# (they are hardcoded in its source). Since method scripts are never
-# modified, such a method is not tunable through the wrapper.
+# The hyperparameters each method variant takes, read from the method scripts
+# (tools_scripts/) and StabMap's R driver. The package never puts these
+# defaults on a command line; they document what `run(..., params={...})` may
+# set, and `multibench.params_for(method, category, modalities)` shows them. A
+# default of null leaves the argument to the method's library. Arguments the
+# package or the script sets (input files, values taken from the data) are
+# left out.
 Cobolt:
   mosaic:rna1+rna2+atac2+atac3:
+    annealing_epochs:
+      default: null
+      type: int
     batch_size:
       default: 128
       type: int
     lr:
       default: 0.005
       type: float
+    n_latent:
+      default: 10
+      type: int
+    num_epochs:
+      default: 100
+      type: int
+Concerto:
+  cross:rna1+rna2+rna3+adt1+adt2+adt3:
+    batch_size:
+      default: 64
+      type: int
+    epoch_pretrain:
+      default: 5
+      type: int
+    lr:
+      default: 0.0001
+      type: float
+  vertical:rna+adt:
+    batch_size:
+      default: 64
+      type: int
+    epoch_pretrain:
+      default: 5
+      type: int
+    lr:
+      default: 0.0001
+      type: float
+Conos:
+  diagonal:rna+atac_gas:
+    alpha:
+      default: 0.5
+      type: float
+    k:
+      default: 15
+      type: float
+    k.self:
+      default: 5
+      type: float
+    k.self.weight:
+      default: 0.01
+      type: float
+    n.odgenes:
+      default: 5000.0
+      type: float
+    n.odgenes.p2:
+      default: 3000.0
+      type: float
+    nPcs:
+      default: 30
+      type: float
+    ncomps:
+      default: 30
+      type: float
+    seed:
+      default: null
+      type: float
+    target.dims:
+      default: null
+      type: float
+GLUE:
+  diagonal:rna+atac_peak:
+    align_burnin:
+      default: null
+      type: int
+    data_batch_size:
+      default: null
+      type: int
+    lam_align:
+      default: null
+      type: float
+    lam_graph:
+      default: null
+      type: float
+    latent_dim:
+      default: null
+      type: int
+    lr:
+      default: null
+      type: float
+    max_epochs:
+      default: null
+      type: int
+    n_lsi:
+      default: 100
+      type: int
+    n_pcs:
+      default: 100
+      type: int
+    n_top_genes:
+      default: 2000
+      type: int
+    patience:
+      default: null
+      type: int
+    random_seed:
+      default: null
+      type: int
+  diagonal:rna1+rna2+rna3+atac_peak1+atac_peak2+atac_peak3:
+    align_burnin:
+      default: null
+      type: int
+    data_batch_size:
+      default: null
+      type: int
+    lam_align:
+      default: null
+      type: float
+    lam_graph:
+      default: null
+      type: float
+    latent_dim:
+      default: null
+      type: int
+    lr:
+      default: null
+      type: float
+    max_epochs:
+      default: null
+      type: int
+    n_lsi:
+      default: 100
+      type: int
+    n_pcs:
+      default: 100
+      type: int
+    n_top_genes:
+      default: 2000
+      type: int
+    patience:
+      default: null
+      type: int
+    random_seed:
+      default: null
+      type: int
 MIRA:
   vertical:rna+atac:
     acc:
@@ -34,6 +169,119 @@ MIRA:
     filter_atac_cells:
       default: false
       type: flag
+MOFA2:
+  cross:adt1+adt2+atac1+atac2:
+    convergence_mode:
+      default: null
+      type: str
+    maxiter:
+      default: null
+      type: float
+    num_factors:
+      default: null
+      type: float
+    scale_views:
+      default: null
+      type: boolean
+    seed:
+      default: 42
+      type: float
+  cross:rna1+rna2+adt1+adt2+atac1+atac2:
+    convergence_mode:
+      default: null
+      type: str
+    maxiter:
+      default: null
+      type: float
+    num_factors:
+      default: null
+      type: float
+    scale_views:
+      default: null
+      type: boolean
+    seed:
+      default: 42
+      type: float
+  cross:rna1+rna2+rna3+adt1+adt2+adt3:
+    convergence_mode:
+      default: null
+      type: str
+    maxiter:
+      default: null
+      type: float
+    num_factors:
+      default: null
+      type: float
+    scale_views:
+      default: null
+      type: boolean
+    seed:
+      default: 42
+      type: float
+  cross:rna1+rna2+rna3+atac1+atac2+atac3:
+    convergence_mode:
+      default: null
+      type: str
+    maxiter:
+      default: null
+      type: float
+    num_factors:
+      default: null
+      type: float
+    scale_views:
+      default: null
+      type: boolean
+    seed:
+      default: 42
+      type: float
+  vertical:rna+adt:
+    convergence_mode:
+      default: null
+      type: str
+    maxiter:
+      default: null
+      type: float
+    num_factors:
+      default: null
+      type: float
+    scale_views:
+      default: null
+      type: boolean
+    seed:
+      default: 42
+      type: float
+  vertical:rna+adt+atac:
+    convergence_mode:
+      default: null
+      type: str
+    maxiter:
+      default: null
+      type: float
+    num_factors:
+      default: null
+      type: float
+    scale_views:
+      default: null
+      type: boolean
+    seed:
+      default: 42
+      type: float
+  vertical:rna+atac:
+    convergence_mode:
+      default: null
+      type: str
+    maxiter:
+      default: null
+      type: float
+    num_factors:
+      default: null
+      type: float
+    scale_views:
+      default: null
+      type: boolean
+    seed:
+      default: 42
+      type: float
 Matilda:
   vertical:rna+adt:
     augmentation:
@@ -119,90 +367,897 @@ Matilda:
     z_dim:
       default: 100
       type: int
+MultiMAP:
+  diagonal:rna+atac_peak+atac_gas:
+    n_components:
+      default: null
+      type: int
+    n_comps:
+      default: null
+      type: int
+    n_epochs:
+      default: null
+      type: int
+    n_neighbors:
+      default: null
+      type: int
+    n_pcs:
+      default: null
+      type: int
+    seed:
+      default: null
+      type: int
+    strengths:
+      default:
+      - 0
+      - 1
+      type: list
+MultiVI:
+  mosaic:rna1+atac3+rna2+atac2:
+    batch_size:
+      default: null
+      type: int
+    early_stopping:
+      default: null
+      type: boolean
+    lr:
+      default: 0.001
+      type: float
+    max_epochs:
+      default: 500
+      type: int
+    modality_penalty:
+      default: null
+      type: str
+    modality_weights:
+      default: null
+      type: str
+    n_epochs_kl_warmup:
+      default: null
+      type: int
+    n_latent:
+      default: null
+      type: int
+    seed:
+      default: null
+      type: int
 Multigrate:
   cross:adt1+adt2+atac1+atac2:
     bs:
       default: 256
       type: int
+    early_stopping:
+      default: null
+      type: boolean
     epochs:
       default: 200
       type: int
     lr:
       default: 0.001
       type: float
+    n_epochs_kl_warmup:
+      default: null
+      type: int
+    z_dim:
+      default: null
+      type: int
   cross:rna1+rna2+adt1+adt2+atac1+atac2:
     bs:
       default: 256
       type: int
+    early_stopping:
+      default: null
+      type: boolean
     epochs:
       default: 200
       type: int
     lr:
       default: 0.001
       type: float
+    n_epochs_kl_warmup:
+      default: null
+      type: int
+    z_dim:
+      default: null
+      type: int
   cross:rna1+rna2+rna3+adt1+adt2+adt3:
     bs:
       default: 256
       type: int
+    early_stopping:
+      default: null
+      type: boolean
     epochs:
       default: 200
       type: int
     lr:
       default: 0.001
       type: float
+    n_epochs_kl_warmup:
+      default: null
+      type: int
+    z_dim:
+      default: null
+      type: int
   cross:rna1+rna2+rna3+atac1+atac2+atac3:
     bs:
       default: 256
       type: int
+    early_stopping:
+      default: null
+      type: boolean
     epochs:
       default: 200
       type: int
     lr:
       default: 0.001
       type: float
+    n_epochs_kl_warmup:
+      default: null
+      type: int
+    z_dim:
+      default: null
+      type: int
+  mosaic:rna1+rna2+adt1+adt3+atac2:
+    bs:
+      default: null
+      type: int
+    early_stopping:
+      default: null
+      type: boolean
+    epochs:
+      default: null
+      type: int
+    integ_coef:
+      default: 4000
+      type: float
+    lr:
+      default: null
+      type: float
+    n_epochs_kl_warmup:
+      default: null
+      type: int
+    n_top_atac:
+      default: 20000
+      type: int
+    n_top_rna:
+      default: 4000
+      type: int
+    seed:
+      default: 1
+      type: int
+    z_dim:
+      default: null
+      type: int
   mosaic:rna1+rna2+adt2+adt3:
+    bs:
+      default: null
+      type: int
+    early_stopping:
+      default: null
+      type: boolean
     epochs:
       default: 200
       type: int
+    integ_coef:
+      default: 4000
+      type: float
     lr:
       default: 0.0001
       type: float
-  mosaic:rna1+rna2+atac2+atac3:
-    epochs:
-      default: 200
+    n_epochs_kl_warmup:
+      default: null
       type: int
-    lr:
-      default: 0.001
+    n_top_rna:
+      default: 4000
+      type: int
+    z_dim:
+      default: null
+      type: int
+  mosaic:rna1+rna2+atac2+atac3:
+    bs:
+      default: null
+      type: int
+    early_stopping:
+      default: null
+      type: boolean
+    epochs:
+      default: null
+      type: int
+    integ_coef:
+      default: 4000
       type: float
+    lr:
+      default: null
+      type: float
+    n_epochs_kl_warmup:
+      default: null
+      type: int
+    n_top_atac:
+      default: 20000
+      type: int
+    n_top_rna:
+      default: 4000
+      type: int
+    z_dim:
+      default: null
+      type: int
+  mosaic:rna1+rna2+rna3+adt1+atac2:
+    bs:
+      default: null
+      type: int
+    early_stopping:
+      default: null
+      type: boolean
+    epochs:
+      default: null
+      type: int
+    integ_coef:
+      default: 4000
+      type: float
+    lr:
+      default: null
+      type: float
+    n_epochs_kl_warmup:
+      default: null
+      type: int
+    n_top_atac:
+      default: 20000
+      type: int
+    n_top_rna:
+      default: 4000
+      type: int
+    z_dim:
+      default: null
+      type: int
   vertical:rna+adt:
     bs:
       default: 256
       type: int
+    early_stopping:
+      default: null
+      type: boolean
     epochs:
       default: 200
       type: int
     lr:
       default: 0.001
       type: float
+    n_epochs_kl_warmup:
+      default: null
+      type: int
+    z_dim:
+      default: null
+      type: int
   vertical:rna+adt+atac:
     bs:
       default: 256
       type: int
+    early_stopping:
+      default: null
+      type: boolean
     epochs:
       default: 200
       type: int
     lr:
       default: 0.001
       type: float
+    n_epochs_kl_warmup:
+      default: null
+      type: int
+    z_dim:
+      default: null
+      type: int
   vertical:rna+atac:
     bs:
       default: 256
       type: int
+    early_stopping:
+      default: null
+      type: boolean
     epochs:
       default: 200
       type: int
     lr:
       default: 0.001
+      type: float
+    n_epochs_kl_warmup:
+      default: null
+      type: int
+    z_dim:
+      default: null
+      type: int
+Portal:
+  diagonal:rna+atac_gas:
+    batch_size:
+      default: null
+      type: int
+    hvg_num:
+      default: null
+      type: int
+    lambdacos:
+      default: 10.0
+      type: float
+    n_latent:
+      default: null
+      type: int
+    npcs:
+      default: null
+      type: int
+    seed:
+      default: null
+      type: int
+    training_steps:
+      default: 3000
+      type: int
+SCALEX:
+  diagonal:rna+atac_gas:
+    batch_size:
+      default: null
+      type: int
+    lr:
+      default: null
+      type: float
+    max_iteration:
+      default: null
+      type: int
+    min_cells:
+      default: 0
+      type: int
+    min_features:
+      default: 0
+      type: int
+    n_top_features:
+      default: null
+      type: int
+    seed:
+      default: null
+      type: int
+SMILE:
+  mosaic:rna2+atac2+rna1+atac3:
+    batch_size:
+      default: null
+      type: int
+    clf_out:
+      default: 20
+      type: int
+    f_temp:
+      default: null
+      type: float
+    n_top_genes:
+      default: 5000
+      type: int
+    pretrain_epoch:
+      default: null
+      type: int
+    train_epoch:
+      default: 1000
+      type: int
+Seurat_WNN:
+  vertical:rna+adt:
+    dims_adt:
+      default: null
+      type: float
+    dims_atac:
+      default: null
+      type: float
+    dims_rna:
+      default: null
+      type: float
+    k.nn:
+      default: null
+      type: float
+    variable.features.n:
+      default: null
+      type: float
+  vertical:rna+atac:
+    dims_adt:
+      default: null
+      type: float
+    dims_atac:
+      default: null
+      type: float
+    dims_rna:
+      default: null
+      type: float
+    k.nn:
+      default: null
+      type: float
+    variable.features.n:
+      default: null
+      type: float
+Seurat_v3:
+  diagonal:rna+atac_peak+atac_gas:
+    k.anchor:
+      default: null
+      type: float
+    k.weight:
+      default: null
+      type: float
+    lsi_dims:
+      default: 30
+      type: float
+    nfeatures:
+      default: null
+      type: float
+    npcs:
+      default: null
+      type: float
+Seurat_v5:
+  diagonal:rna+atac_peak:
+    dims.atac:
+      default: 50
+      type: float
+    dims.rna:
+      default: 50
+      type: float
+    variable.features.n:
+      default: null
+      type: float
+StabMap:
+  cross:adt1+adt2+atac1+atac2:
+    maxFeatures:
+      default: .inf
+      type: float
+    ncomponentsReference:
+      default: null
+      type: float
+    ncomponentsSubset:
+      default: null
+      type: float
+  cross:rna1+rna2+adt1+adt2+atac1+atac2:
+    maxFeatures:
+      default: .inf
+      type: float
+    ncomponentsReference:
+      default: null
+      type: float
+    ncomponentsSubset:
+      default: null
+      type: float
+  cross:rna1+rna2+rna3+adt1+adt2+adt3:
+    maxFeatures:
+      default: .inf
+      type: float
+    ncomponentsReference:
+      default: null
+      type: float
+    ncomponentsSubset:
+      default: null
+      type: float
+  cross:rna1+rna2+rna3+atac1+atac2+atac3:
+    maxFeatures:
+      default: .inf
+      type: float
+    ncomponentsReference:
+      default: null
+      type: float
+    ncomponentsSubset:
+      default: null
+      type: float
+  mosaic:rna1+rna2+adt1+adt3+atac2:
+    maxFeatures:
+      default: .inf
+      type: float
+    ncomponentsReference:
+      default: null
+      type: float
+    ncomponentsSubset:
+      default: null
+      type: float
+  mosaic:rna1+rna2+adt2+adt3:
+    maxFeatures:
+      default: .inf
+      type: float
+    ncomponentsReference:
+      default: null
+      type: float
+    ncomponentsSubset:
+      default: null
+      type: float
+  mosaic:rna1+rna2+atac2+atac3:
+    maxFeatures:
+      default: .inf
+      type: float
+    ncomponentsReference:
+      default: null
+      type: float
+    ncomponentsSubset:
+      default: null
+      type: float
+  mosaic:rna1+rna2+rna3+adt1+atac2:
+    maxFeatures:
+      default: .inf
+      type: float
+    ncomponentsReference:
+      default: null
+      type: float
+    ncomponentsSubset:
+      default: null
+      type: float
+UINMF:
+  cross:adt1+adt2+atac1+atac2:
+    k:
+      default: 30
+      type: float
+    lambda:
+      default: null
+      type: float
+    nIteration:
+      default: 30
+      type: float
+    nfeatures:
+      default: 2000
+      type: float
+    seed:
+      default: null
+      type: float
+    thresh:
+      default: 0.1
+      type: float
+  cross:rna1+rna2+adt1+adt2:
+    k:
+      default: 30
+      type: float
+    lambda:
+      default: null
+      type: float
+    nIteration:
+      default: 30
+      type: float
+    nfeatures:
+      default: 2000
+      type: float
+    seed:
+      default: null
+      type: float
+    thresh:
+      default: 0.1
+      type: float
+  cross:rna1+rna2+adt1+adt2+atac1+atac2:
+    k:
+      default: 30
+      type: float
+    lambda:
+      default: null
+      type: float
+    nIteration:
+      default: 30
+      type: float
+    nfeatures:
+      default: 2000
+      type: float
+    seed:
+      default: null
+      type: float
+    thresh:
+      default: 0.1
+      type: float
+  cross:rna1+rna2+atac1+atac2:
+    k:
+      default: 30
+      type: float
+    lambda:
+      default: null
+      type: float
+    nIteration:
+      default: 30
+      type: float
+    nfeatures:
+      default: 2000
+      type: float
+    seed:
+      default: null
+      type: float
+    thresh:
+      default: 0.1
+      type: float
+  cross:rna1+rna2+rna3+adt1+adt2+adt3:
+    k:
+      default: 30
+      type: float
+    lambda:
+      default: null
+      type: float
+    nIteration:
+      default: 30
+      type: float
+    nfeatures:
+      default: 2000
+      type: float
+    seed:
+      default: null
+      type: float
+    thresh:
+      default: 0.1
+      type: float
+  cross:rna1+rna2+rna3+atac1+atac2+atac3:
+    k:
+      default: 30
+      type: float
+    lambda:
+      default: null
+      type: float
+    nIteration:
+      default: 30
+      type: float
+    nfeatures:
+      default: 2000
+      type: float
+    seed:
+      default: null
+      type: float
+    thresh:
+      default: 0.1
+      type: float
+  mosaic:rna1+rna2+rna3+adt1+atac2:
+    k:
+      default: 30
+      type: float
+    lambda:
+      default: null
+      type: float
+    nIteration:
+      default: 30
+      type: float
+    nfeatures:
+      default: 2000
+      type: float
+    seed:
+      default: null
+      type: float
+    thresh:
+      default: 0.1
+      type: float
+  vertical:rna+adt:
+    k:
+      default: 30
+      type: float
+    lambda:
+      default: null
+      type: float
+    nIteration:
+      default: 30
+      type: float
+    nfeatures:
+      default: 2000
+      type: float
+    seed:
+      default: null
+      type: float
+    thresh:
+      default: 0.1
+      type: float
+  vertical:rna+adt+atac:
+    k:
+      default: 30
+      type: float
+    lambda:
+      default: null
+      type: float
+    nIteration:
+      default: 30
+      type: float
+    nfeatures:
+      default: 2000
+      type: float
+    seed:
+      default: null
+      type: float
+    thresh:
+      default: 0.1
+      type: float
+  vertical:rna+atac:
+    k:
+      default: 30
+      type: float
+    lambda:
+      default: null
+      type: float
+    nIteration:
+      default: 30
+      type: float
+    nfeatures:
+      default: 2000
+      type: float
+    seed:
+      default: null
+      type: float
+    thresh:
+      default: 0.1
+      type: float
+UnitedNet:
+  cross:rna1+rna2+rna3+atac1+atac2+atac3:
+    finetune_batch_size:
+      default: 5000
+      type: int
+    finetune_epochs:
+      default: 10
+      type: int
+    lr:
+      default: 0.01
+      type: float
+    train_batch_size:
+      default: 512
+      type: int
+    train_epochs:
+      default: 10
+      type: int
+  vertical:rna+atac:
+    finetune_batch_size:
+      default: 5000
+      type: int
+    finetune_epochs:
+      default: 10
+      type: int
+    lr:
+      default: 0.01
+      type: float
+    train_batch_size:
+      default: 512
+      type: int
+    train_epochs:
+      default: 10
+      type: int
+VIMCCA:
+  vertical:rna+adt:
+    batch_size:
+      default: null
+      type: int
+    epochs:
+      default: 50
+      type: int
+    weight:
+      default: null
+      type: float
+  vertical:rna+atac:
+    batch_size:
+      default: null
+      type: int
+    epochs:
+      default: 50
+      type: int
+    weight:
+      default: 5
+      type: float
+VIPCCA:
+  diagonal:rna+atac_gas:
+    batch_input_size:
+      default: 64
+      type: int
+    batch_input_size2:
+      default: 14
+      type: int
+    epochs:
+      default: 20
+      type: int
+    lambda_regulizer:
+      default: 2
+      type: float
+    n_top_genes:
+      default: null
+      type: int
+    patience_es:
+      default: null
+      type: int
+iNMF:
+  diagonal:rna+atac_gas:
+    k:
+      default: 20
+      type: float
+    lambda:
+      default: null
+      type: float
+    nIteration:
+      default: null
+      type: float
+    seed:
+      default: null
+      type: float
+    thresh:
+      default: null
+      type: float
+  diagonal:rna1+rna2+rna3+atac_gas1+atac_gas2+atac_gas3:
+    k:
+      default: 20
+      type: float
+    lambda:
+      default: null
+      type: float
+    nIteration:
+      default: null
+      type: float
+    seed:
+      default: null
+      type: float
+    thresh:
+      default: null
+      type: float
+iPOLNG:
+  vertical:rna+atac:
+    alpha_k:
+      default: null
+      type: float
+    integrated_epochs:
+      default: 3000
+      type: int
+    lr:
+      default: null
+      type: float
+    n_top_atac:
+      default: 20000
+      type: int
+    n_top_rna:
+      default: 5000
+      type: int
+    num_topics:
+      default: 20
+      type: int
+    seed:
+      default: 42
+      type: int
+    warmup_epochs:
+      default: 3000
+      type: int
+moETM:
+  vertical:rna+adt:
+    Total_epoch:
+      default: 500
+      type: int
+    batch_size:
+      default: 2000
+      type: int
+    num_topic:
+      default: 100
+      type: int
+  vertical:rna+atac:
+    Total_epoch:
+      default: 500
+      type: int
+    batch_size:
+      default: 2000
+      type: int
+    num_topic:
+      default: 100
+      type: int
+online_iNMF:
+  diagonal:rna+atac_gas:
+    k:
+      default: 20
+      type: float
+    lambda:
+      default: null
+      type: float
+    maxEpochs:
+      default: null
+      type: float
+    minibatchSize:
+      default: null
+      type: float
+    seed:
+      default: null
+      type: float
+    thresh:
+      default: 0.2
+      type: float
+  diagonal:rna1+rna2+rna3+atac_gas1+atac_gas2+atac_gas3:
+    k:
+      default: 20
+      type: float
+    lambda:
+      default: null
+      type: float
+    maxEpochs:
+      default: null
+      type: float
+    minibatchSize:
+      default: null
+      type: float
+    seed:
+      default: null
+      type: float
+    thresh:
+      default: 0.2
       type: float
 scBridge:
   diagonal:-:
@@ -639,17 +1694,438 @@ scMM:
     seed:
       default: 1
       type: int
+scMSI:
+  vertical:rna+adt:
+    batch_size:
+      default: 128
+      type: int
+    early_stopping:
+      default: null
+      type: boolean
+    lr:
+      default: null
+      type: float
+    max_epochs:
+      default: 400
+      type: int
+    n_epochs_kl_warmup:
+      default: null
+      type: int
+    n_latent:
+      default: 10
+      type: int
+scMVP:
+  vertical:rna+atac:
+    lr:
+      default: 0.001
+      type: float
+    n_centroids:
+      default: 5
+      type: int
+    n_epochs:
+      default: 10
+      type: int
+    n_epochs_kl_warmup:
+      default: null
+      type: int
+    n_latent:
+      default: 20
+      type: int
+    n_top_genes:
+      default: 3000
+      type: int
+scMoMaT:
+  cross:adt1+adt2+atac1+atac2:
+    K:
+      default: 30
+      type: int
+    T:
+      default: 4000
+      type: int
+    batch_size:
+      default: 0.1
+      type: float
+    lamb:
+      default: 0.001
+      type: float
+    lr:
+      default: 0.01
+      type: float
+    n_neighbors:
+      default: 100
+      type: int
+    seed:
+      default: 0
+      type: int
+  cross:rna1+rna2+adt1+adt2+atac1+atac2:
+    K:
+      default: 30
+      type: int
+    T:
+      default: 4000
+      type: int
+    batch_size:
+      default: 0.1
+      type: float
+    lamb:
+      default: 0.001
+      type: float
+    lr:
+      default: 0.01
+      type: float
+    n_neighbors:
+      default: 100
+      type: int
+    seed:
+      default: 0
+      type: int
+  cross:rna1+rna2+rna3+adt1+adt2+adt3:
+    K:
+      default: 30
+      type: int
+    T:
+      default: 4000
+      type: int
+    batch_size:
+      default: 0.1
+      type: float
+    lamb:
+      default: 0.001
+      type: float
+    lr:
+      default: 0.01
+      type: float
+    n_neighbors:
+      default: 100
+      type: int
+    seed:
+      default: 0
+      type: int
+  cross:rna1+rna2+rna3+atac1+atac2+atac3:
+    K:
+      default: 30
+      type: int
+    T:
+      default: 4000
+      type: int
+    batch_size:
+      default: 0.1
+      type: float
+    lamb:
+      default: 0.001
+      type: float
+    lr:
+      default: 0.01
+      type: float
+    n_neighbors:
+      default: 100
+      type: int
+    seed:
+      default: 0
+      type: int
+  mosaic:rna1+rna2+adt1+adt3+atac2:
+    K:
+      default: 30
+      type: int
+    T:
+      default: 4000
+      type: int
+    batch_size:
+      default: 0.1
+      type: float
+    lamb:
+      default: 0.001
+      type: float
+    lr:
+      default: 0.01
+      type: float
+    n_neighbors:
+      default: 100
+      type: int
+    seed:
+      default: 0
+      type: int
+  mosaic:rna1+rna2+adt2+adt3:
+    K:
+      default: 30
+      type: int
+    T:
+      default: 4000
+      type: int
+    batch_size:
+      default: 0.1
+      type: float
+    lamb:
+      default: 0.001
+      type: float
+    lr:
+      default: 0.01
+      type: float
+    n_neighbors:
+      default: 100
+      type: int
+    seed:
+      default: 0
+      type: int
+  mosaic:rna1+rna2+atac2+atac3:
+    K:
+      default: 30
+      type: int
+    T:
+      default: 4000
+      type: int
+    batch_size:
+      default: 0.1
+      type: float
+    lamb:
+      default: 0.001
+      type: float
+    lr:
+      default: 0.01
+      type: float
+    n_neighbors:
+      default: 100
+      type: int
+    seed:
+      default: 0
+      type: int
+  mosaic:rna1+rna2+rna3+adt1+atac2:
+    K:
+      default: 30
+      type: int
+    T:
+      default: 4000
+      type: int
+    batch_size:
+      default: 0.1
+      type: float
+    lamb:
+      default: 0.001
+      type: float
+    lr:
+      default: 0.01
+      type: float
+    n_neighbors:
+      default: 100
+      type: int
+    seed:
+      default: 0
+      type: int
+  vertical:rna+adt:
+    K:
+      default: 30
+      type: int
+    T:
+      default: 4000
+      type: int
+    batch_size:
+      default: 0.1
+      type: float
+    lamb:
+      default: 0.001
+      type: float
+    lr:
+      default: 0.01
+      type: float
+    n_neighbors:
+      default: 100
+      type: int
+    seed:
+      default: 0
+      type: int
+  vertical:rna+adt+atac:
+    K:
+      default: 30
+      type: int
+    T:
+      default: 4000
+      type: int
+    batch_size:
+      default: 0.1
+      type: float
+    lamb:
+      default: 0.001
+      type: float
+    lr:
+      default: 0.01
+      type: float
+    n_neighbors:
+      default: 100
+      type: int
+    seed:
+      default: 0
+      type: int
+  vertical:rna+atac:
+    K:
+      default: 30
+      type: int
+    T:
+      default: 4000
+      type: int
+    batch_size:
+      default: 0.1
+      type: float
+    lamb:
+      default: 0.001
+      type: float
+    lr:
+      default: 0.01
+      type: float
+    n_neighbors:
+      default: 100
+      type: int
+    seed:
+      default: 0
+      type: int
+sciCAN:
+  diagonal:rna+atac_gas:
+    batch_size:
+      default: 1024
+      type: int
+    epoch:
+      default: 200
+      type: int
 sciPENN:
   cross:rna1+rna2+rna3+adt1+adt2+adt3:
+    ES_max:
+      default: 12
+      type: int
+    batch_size:
+      default: null
+      type: int
+    decay_max:
+      default: 6
+      type: int
+    lr:
+      default: 10 ** (-3)
+      type: float
+    min_cells:
+      default: 0
+      type: int
+    min_genes:
+      default: 0
+      type: int
+    n_epochs:
+      default: 10000
+      type: int
     seed:
       default: 1
       type: int
   vertical:rna+adt:
+    ES_max:
+      default: 12
+      type: int
+    batch_size:
+      default: null
+      type: int
+    decay_max:
+      default: 6
+      type: int
+    lr:
+      default: 10 ** (-3)
+      type: float
+    min_cells:
+      default: 0
+      type: int
+    min_genes:
+      default: 0
+      type: int
+    n_epochs:
+      default: 10000
+      type: int
     seed:
       default: 1
       type: int
+totalVI:
+  cross:rna1+rna2+rna3+adt1+adt2+adt3:
+    batch_size:
+      default: null
+      type: int
+    early_stopping:
+      default: null
+      type: boolean
+    empirical_protein_background_prior:
+      choices:
+      - 'true'
+      - 'false'
+      - auto
+      default: 'false'
+    gene_likelihood:
+      choices:
+      - nb
+      - zinb
+      default: null
+    lr:
+      default: null
+      type: float
+    max_epochs:
+      default: null
+      type: int
+    n_epochs_kl_warmup:
+      default: null
+      type: int
+    n_latent:
+      default: null
+      type: int
+    seed:
+      default: 0
+      type: int
+  vertical:rna+adt:
+    batch_size:
+      default: null
+      type: int
+    early_stopping:
+      default: null
+      type: boolean
+    empirical_protein_background_prior:
+      choices:
+      - 'true'
+      - 'false'
+      - auto
+      default: 'false'
+    gene_likelihood:
+      choices:
+      - nb
+      - zinb
+      default: null
+    lr:
+      default: null
+      type: float
+    max_epochs:
+      default: null
+      type: int
+    n_epochs_kl_warmup:
+      default: null
+      type: int
+    n_latent:
+      default: null
+      type: int
+    seed:
+      default: 0
+      type: int
 uniPort:
   diagonal:rna+atac_gas:
+    batch_size:
+      default: null
+      type: int
+    iteration:
+      default: null
+      type: int
+    lambda_ot:
+      default: null
+      type: float
+    lambda_s:
+      default: 1.0
+      type: float
+    lr:
+      default: null
+      type: float
+    n_top_genes:
+      default: 2000
+      type: int
+    patience:
+      default: null
+      type: int
     seed:
       default: 1
       type: int
