@@ -1,7 +1,9 @@
-"""A script that writes next to the files it reads (scMM, scMVP) reads links
-in its run's ``inputs/`` folder: a data folder others share, or one without
-write access, is only read, and two runs on one dataset write apart."""
+"""A script that writes next to the files it reads (scMM, scMVP, scJoint)
+reads links in its run's ``inputs/`` folder: a data folder others share, or
+one without write access, is only read, and two runs on one dataset write
+apart."""
 import os
+import shlex
 from pathlib import Path
 
 import h5py
@@ -10,12 +12,16 @@ import pytest
 
 from multibench import workflow
 from multibench.engine import registry, runner
+from multibench.engine.schema import is_label_role
 
 CROSS_RNA_ADT = ["rna1", "rna2", "rna3", "adt1", "adt2", "adt3"]
 CROSS_RNA_ATAC = ["rna1", "rna2", "rna3", "atac1", "atac2", "atac3"]
 WRITERS = [("scMM", "vertical", ["rna", "adt"]), ("scMM", "vertical", ["rna", "atac"]),
            ("scMM", "cross", CROSS_RNA_ADT), ("scMM", "cross", CROSS_RNA_ATAC),
-           ("scMVP", "vertical", ["rna", "atac"])]
+           ("scMVP", "vertical", ["rna", "atac"]),
+           ("scJoint", "diagonal", ["rna", "atac_gas", "rna_cty"]),
+           ("scJoint", "diagonal", ["rna1", "rna2", "rna3", "atac_gas1", "atac_gas2",
+                                    "atac_gas3", "rna_cty1", "rna_cty2", "rna_cty3"])]
 
 
 def _h5(path):
@@ -24,15 +30,28 @@ def _h5(path):
 
 
 def _data(tmp_path, roles) -> dict:
+    """``{role: path}``: an ``.h5`` per modality, a ``.csv`` per label file."""
     data = tmp_path / "data"
     data.mkdir()
+    inputs = {}
     for role in roles:
-        _h5(data / f"{role}.h5")
-    return {role: str(data / f"{role}.h5") for role in roles}
+        if is_label_role(role):
+            path = data / f"{role}.csv"
+            path.write_text("x\n")
+        else:
+            path = data / f"{role}.h5"
+            _h5(path)
+        inputs[role] = str(path)
+    return inputs
 
 
-def test_every_scmm_and_scmvp_variant_writes_beside_its_inputs():
-    for method in ("scMM", "scMVP"):
+def _script_argv(cmd: list) -> list:
+    """The method's own argv, out of the pseudo-terminal wrap (scJoint)."""
+    return shlex.split(cmd[cmd.index("-c") + 1]) if "script" in cmd else cmd
+
+
+def test_every_variant_of_these_methods_writes_beside_its_inputs():
+    for method in ("scMM", "scMVP", "scJoint"):
         assert all(v.writes_beside_inputs for v in registry.get(method).variants), method
 
 
@@ -55,14 +74,14 @@ def test_the_script_gets_links_to_the_original_files(tmp_path, monkeypatch, meth
     out = tmp_path / "out" / f"{method}_D1"
     with pytest.raises(RuntimeError, match=f"{method} failed"):
         runner.run(method, category, inputs=inputs, out_dir=str(out))
-    given = [a for a in seen["cmd"] if a.endswith(".h5")]
+    given = [a for a in _script_argv(seen["cmd"]) if a.endswith((".h5", ".csv"))]
     assert len(given) == len(roles)
     for path in given:
         assert Path(path).parent == out / "inputs"
         assert os.readlink(path) == inputs[Path(path).stem]
         assert os.path.samefile(path, inputs[Path(path).stem])
     assert sorted(p.name for p in (tmp_path / "data").iterdir()) == sorted(
-        f"{r}.h5" for r in roles)
+        Path(p).name for p in inputs.values())
 
 
 def test_the_link_step_creates_and_replaces_links(tmp_path, monkeypatch):

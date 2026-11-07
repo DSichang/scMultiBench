@@ -828,10 +828,12 @@ methods:
       # not. embedding.h5 holds the rna cells, then the atac cells. Intermediates go
       # to ./output/<name>_embeddings.txt in the script directory
       # (main_scJoint.py:155), so that directory must be writable and runs must not
-      # overlap.
+      # overlap. process_db.py:18,49,60,72 writes .npz and .txt files next to the
+      # input and label files.
       - when: {category: diagonal, modalities: [rna, atac_gas]}
         entrypoint: tools_scripts/scJoint/main_scJoint.py
         language: python
+        writes_beside_inputs: true
         cwd_at_script: true
         pty: true
         args:
@@ -845,6 +847,7 @@ methods:
       - when: {category: diagonal, modalities: [rna1, rna2, rna3, atac_gas1, atac_gas2, atac_gas3]}
         entrypoint: tools_scripts/scJoint/main_scJoint.py
         language: python
+        writes_beside_inputs: true
         cwd_at_script: true
         pty: true
         args:
