@@ -3,7 +3,7 @@ the package does not import matplotlib."""
 from matplotlib.figure import Figure
 
 
-class BubbleFigure(Figure):
+class _BubbleFigure(Figure):
     """A ``Figure`` with ``_repr_png_``. Built without pyplot, the figure is
     never shown twice, and a notebook without ``%matplotlib inline`` still
     shows the image rather than ``<Figure size ...>``."""

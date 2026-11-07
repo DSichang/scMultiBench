@@ -396,7 +396,7 @@ def _draw(tbl, title, gaps):
     (one data-unit amount per pair of neighbouring families)."""
     from matplotlib import cm, colors
     from matplotlib.patches import Rectangle
-    from ._figure import BubbleFigure
+    from ._figure import _BubbleFigure
 
     methods = tbl.methods
     n_rows = len(methods)
@@ -414,7 +414,7 @@ def _draw(tbl, title, gaps):
     x_right = max(total_w + 0.45, legend_right)
 
     # the width follows the x-range: 0.6 inch per unit past the table's own
-    fig = BubbleFigure(figsize=(0.6 * (x_right - 0.45) + 2.8, 0.42 * n_rows + 2.9))
+    fig = _BubbleFigure(figsize=(0.6 * (x_right - 0.45) + 2.8, 0.42 * n_rows + 2.9))
     ax = fig.subplots()
     norm01 = colors.Normalize(vmin=0.0, vmax=1.0)
     mappers = [cm.ScalarMappable(norm=norm01, cmap=style.colormap(b.cmap))
