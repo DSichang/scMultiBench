@@ -6,7 +6,6 @@ import pytest
 import multibench as mtb
 from multibench.engine import builder, envs, registry
 
-MATILDA = {"rna": "/d/rna.h5", "adt": "/d/adt.h5", "cty": "/d/cty.csv"}
 SCJOINT = {"rna": "r.h5", "atac_gas": "a.h5", "rna_cty": "c.csv"}
 
 
@@ -20,20 +19,19 @@ def _dry(method, category, inputs, params, tmp_path):
 
 
 # X63: a param is rendered by the type the script declares
-def test_a_bool_argument_gets_an_explicit_value(tmp_path, gpu):
-    # a type=bool argument: bool('') is False (scJoint's use_cuda left tunable in r3)
-    argv = _dry("Matilda", "vertical", MATILDA, {"augmentation": False}, tmp_path)
-    assert argv[argv.index("--augmentation") + 1] == ""
-    argv = _dry("Matilda", "vertical", MATILDA, {"augmentation": True}, tmp_path)
-    assert argv[argv.index("--augmentation") + 1] == "True"
+def test_a_bool_argument_gets_an_explicit_value():
+    # a type=bool argument: bool('') is False, bool('False') is True
+    decl = {"type": "bool", "default": True}
+    assert builder._param_tokens("x", False, decl) == ["--x", ""]
+    assert builder._param_tokens("x", True, decl) == ["--x", "True"]
 
 
-def test_matilda_augmentation_false_reaches_the_driver(tmp_path):
-    argv = _dry("Matilda", "vertical", MATILDA, {"augmentation": False}, tmp_path)
-    i = argv.index("--augmentation")
-    assert argv[i + 1] == ""
-    src = (registry._YAML.parent / "drivers" / "run_matilda.py").read_text()
-    assert 'a.augmentation not in ("", "False")' in src
+def test_matilda_augmentation_is_not_offered():
+    # matilda's main_train fails whenever augmentation is False (new_data unset)
+    assert "augmentation" not in mtb.params_for("Matilda", "vertical", ["rna", "adt"])["tunable"]
+    with pytest.raises(KeyError, match=r"Matilda does not accept \['augmentation'\]"):
+        mtb.scan("D11", "vertical", methods=["Matilda"],
+                 params={"Matilda": {"augmentation": False}}, verbose=False)
 
 
 def test_a_switch_is_present_only_for_true(tmp_path):
@@ -48,8 +46,9 @@ def test_a_switch_or_bool_refuses_another_value(tmp_path):
     with pytest.raises(TypeError, match=r"scMDC: filter1 takes True or False, got 1\."):
         _dry("scMDC", "vertical", {"rna": "/d/rna.h5", "adt": "/d/adt.h5"},
              {"filter1": 1}, tmp_path)
-    with pytest.raises(TypeError, match=r"augmentation takes True or False, got 'False'"):
-        _dry("Matilda", "vertical", MATILDA, {"augmentation": "False"}, tmp_path)
+    with pytest.raises(TypeError, match=r"early_stopping takes True or False, got 'False'"):
+        _dry("totalVI", "vertical", {"rna": "/d/rna.h5", "adt": "/d/adt.h5"},
+             {"early_stopping": "False"}, tmp_path)
 
 
 def test_a_store_false_switch_is_present_for_false():

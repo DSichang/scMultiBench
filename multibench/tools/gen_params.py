@@ -61,7 +61,11 @@ SET_FROM_DATA = {
 #: sets per host, logging and thread settings, and what is read only by code
 #: that never runs. tests/test_params_api.py checks each is a script argument.
 NOT_TUNABLE = {
-    "Matilda": {"device"},              # the driver passes device='auto'
+    # device: the driver passes device='auto'. augmentation: matilda's
+    # main_train leaves new_data unset without it (main_matilda_train.py:138-228,
+    # matilda 1.0), so False always fails; the paper's script could not pass
+    # False either (argparse type=bool reads "False" as True)
+    "Matilda": {"device", "augmentation"},
     "scMDC": {"device"},                # cpu_params on a host without a GPU
     "scMM": {"no_cuda", "print_freq"},  # every variant passes no_cuda; print_freq logs
     # use_cuda: cpu_params; main_scJoint.py:108 set_num_threads(1) ignores --threads;

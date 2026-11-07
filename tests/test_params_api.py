@@ -35,10 +35,9 @@ def test_params_for_tunable_carries_default_and_type():
 
 
 def test_a_true_false_parameter_shows_one_type_name():
-    # the script reads it as a switch (scMM learn_prior), as true/false text
-    # (totalVI early_stopping) or as a Python bool (Matilda augmentation)
-    for method, key in (("scMM", "learn_prior"), ("totalVI", "early_stopping"),
-                        ("Matilda", "augmentation")):
+    # the script reads it as a switch (scMM learn_prior) or as true/false text
+    # (totalVI early_stopping)
+    for method, key in (("scMM", "learn_prior"), ("totalVI", "early_stopping")):
         assert mtb.params_for(method, "vertical")["tunable"][key]["type"] == "bool", method
 
 

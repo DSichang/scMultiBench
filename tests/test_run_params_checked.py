@@ -12,7 +12,7 @@ import multibench as mtb
 
 INPUTS = {"rna": "/d/rna.h5", "adt": "/d/adt.h5", "cty": "/d/cty.csv"}
 # r3: device is the package's (X64); the list alone, without the empty-set note (Z16)
-ACCEPTS = ("it accepts ['augmentation', 'batch_size', 'epochs', 'hidden_adt', "
+ACCEPTS = ("it accepts ['batch_size', 'epochs', 'hidden_adt', "
            "'hidden_atac', 'hidden_rna', 'lr', 'seed', 'z_dim'].")
 
 
