@@ -46,7 +46,10 @@ methods:
           - {role: atac2, flag: "--path3"}
           - {role: atac3, flag: "--path4"}
           - {role: out_dir, flag: "--save_path"}
-        params: {epochs: 200, lr: 0.001}
+        # no lr here: the paper's script declared --lr and never passed it to
+        # model.train, so its runs used multigrate's own 0.0005. Emitting 0.001
+        # now that the script reads --lr would change the default run.
+        params: {epochs: 200}
         output: {kind: embedding, file: embedding.h5, dataset: data}
       - when: {category: vertical, modalities: [rna, adt]}
         entrypoint: tools_scripts/Multigrate/main_Multigrate_paired_integration.py
