@@ -20,7 +20,7 @@ import shlex
 import time
 import traceback
 import warnings
-from collections import Counter
+from collections import Counter, namedtuple
 from pathlib import Path
 
 import numpy as np
@@ -689,98 +689,11 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
     label_files = {q.resolve(): q.name for q in _label_files(dataset, data_path)}
     # the real run refuses these scripts, so every row is blocked
     wrong_ref = scripts.scripts_ref_problem(repo) or scripts.scripts_folder_problem(repo) or ""
-    rows = []
     off_linux = bool(envs.linux_only_text())
-    others: dict = {}          # env -> a same-named env multibench did not install
-    for spec, v, cat, mods in _variant_rows(category):
-        if methods is not None and spec.id not in methods:
-            continue
-        if wanted is not None and not wanted(spec, mods):
-            continue
-        rec = {"method": spec.id, "category": cat, "modalities": "+".join(mods) or "(data_dir)",
-               "env": envs.group_for(spec.id), "output_kind": v.output.kind,
-               "caveat": "", "runnable": False, "reason": "",
-               "files_ok": True, "files_reason": "", "env_ok": True, "env_reason": "",
-               "command": ""}
-        # check 1, files: both the script and the dataset files, so neither hides
-        # the other. files_reason keeps the full text; reason the short form.
-        # folder_only: said by scan's folder line, not on the method's own line
-        file_problems, short_problems, folder_only = [], [], []
-        why_script = _missing_script(v, method=spec.id)
-        if why_script:
-            file_problems.append(why_script)
-            short_problems.append(_short_reason(why_script, spec.id, dataset))
-        got, wrong_atac = None, ""
-        rec["_label_inputs"], rec["_folder_caveat"], rec["_file_problem"] = (), "", ""
-        try:
-            got = _resolve.inputs_for(dataset, cat, spec.id, modalities=mods or None,
-                                      data_path=data_path, check=True)
-            rec["_label_inputs"] = _label_inputs(got, v, label_files)
-            extra = _resolve._preflight_caveats(got, atac=spec.atac, category=cat,
-                                                method=spec.id)
-            if extra:
-                rec["caveat"] = _join_sentences([rec["caveat"], *extra])
-                rec["_folder_caveat"] = _join_sentences(extra)
-            wrong_atac = next(iter(_blocking_caveats(extra)), "")
-        except Exception as e:  # missing files, no variant, bad layout
-            full = f"{type(e).__name__}: {e}"
-            file_problems.append(full)
-            missing = _missing_paths(spec, cat, mods, dataset, data_path)
-            short = (_missing_files_reason(spec, cat, missing)
-                     or _short_reason(full, spec.id, dataset))
-            short_problems.append(short)
-            if _reads_one_of_numbered(missing.values(), cat):
-                folder_only.append(short)
-            elif not missing and _about_one_file(full, spec.id, dataset):
-                rec["_file_problem"] = _join_sentences([short])
-        if file_problems:
-            rec["files_ok"], rec["files_reason"] = False, " ".join(file_problems)
-        env_hint = gpu_hint = ""
-        if rec["env"] and (off_linux or rec["env"] not in installed):
-            rec["env_ok"] = False
-            if not off_linux and rec["env"] not in others:
-                others[rec["env"]] = _other_env(rec["env"])
-            env_hint = _env_hint(rec["env"], spec.id, others.get(rec["env"]))
-        # a script that calls CUDA unconditionally: run() raises this sentence
-        if spec.requires_gpu and not envs.host_has_gpu():
-            if assume_gpu:
-                rec["caveat"] = _join_sentences([rec["caveat"],
-                                               GPU_NODE_CAVEAT.format(method=spec.id)])
-            else:
-                rec["env_ok"] = False
-                # off Linux the platform already blocks the method
-                gpu_hint = "" if off_linux else spec.requires_gpu_reason or ""
-        rec["env_reason"] = " ".join(r for r in (env_hint, gpu_hint) if r)
-        rec["runnable"] = bool(rec["files_ok"] and rec["env_ok"] and not wrong_atac
-                               and not wrong_ref)
-        # the ATAC reason comes last
-        rec["reason"] = _join_sentences([wrong_ref, *short_problems, rec["env_reason"],
-                                         wrong_atac])
-        rec["_other"] = _join_sentences([wrong_ref, *(p for p in short_problems
-                                                      if p not in folder_only),
-                                         gpu_hint if off_linux else rec["env_reason"],
-                                         wrong_atac])
-        # the method's command, also for an env-blocked row; setup steps go to caveat
-        if rec["files_ok"] and got is not None:
-            rec["command"], prepared = _command_line(spec.id, cat, got, out_dir=out_dir,
-                                                     dataset=dataset,
-                                                     params=params.get(spec.id),
-                                                     gpu=True if assume_gpu else None)
-            # the setup hint's first sentence; a same-cells hint (Seurat_v5) is
-            # checked on the files above instead
-            notes = [n if n != spec.setup_hint else
-                     "" if spec.id in _resolve._SAME_CELL_ROLES else _first_sentence(n)
-                     for n in _runner.script_notes(spec, v, repo)]
-            if v.size_hint in notes:
-                # the folder's size against the method's, or nothing when it is large enough
-                small = _too_small(v, got, ds_dir)
-                notes[notes.index(v.size_hint)] = (
-                    "" if small is None else v.size_hint if small is True
-                    else f"{spec.id} needs about {small}: leave {spec.id} out.")
-            notes = [n for n in notes if n] + prepared
-            if notes:
-                rec["caveat"] = _join_sentences([rec["caveat"], *notes])
-        rows.append(rec)
+    ctx = _ScanContext(dataset, data_path, ds_dir, installed, repo, label_files, wrong_ref,
+                       off_linux, {}, out_dir, params, assume_gpu)
+    rows = [_plan_row(spec, v, cat, mods, ctx) for spec, v, cat, mods in _variant_rows(category)
+            if (methods is None or spec.id in methods) and (wanted is None or wanted(spec, mods))]
     df = pd.DataFrame(rows, columns=[*PLAN_COLUMNS, *_PRIVATE_COLUMNS])
     df = df.sort_values(["runnable", "category", "method"],
                         ascending=[False, True, True]).reset_index(drop=True)
@@ -793,16 +706,138 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
     if params:
         _check_param_keys(df, params)
     # last, so every check above saw every variant
+    df, private = _listed_rows(df, private, ds_dir, category, methods,
+                               every=every or modalities is not None)
+    private.attrs.update(dataset=dataset, folder=ds_dir, category=category)
+    return df, private
+
+
+#: what :func:`_plan_row` reads besides the variant, the same for every row of a
+#: scan; ``others``: env -> a same-named env multibench did not install
+_ScanContext = namedtuple("_ScanContext", "dataset data_path ds_dir installed repo label_files "
+                                          "wrong_ref off_linux others out_dir params assume_gpu")
+
+
+def _plan_row(spec, v, cat, mods, ctx) -> dict:
+    """The plan row of one variant: the columns of :data:`PLAN_COLUMNS` and
+    :data:`_PRIVATE_COLUMNS`."""
+    rec = {"method": spec.id, "category": cat, "modalities": "+".join(mods) or "(data_dir)",
+           "env": envs.group_for(spec.id), "output_kind": v.output.kind,
+           "caveat": "", "runnable": False, "reason": "",
+           "files_ok": True, "files_reason": "", "env_ok": True, "env_reason": "",
+           "command": ""}
+    short_problems, folder_only, got, wrong_atac = _check_files(rec, spec, v, cat, mods, ctx)
+    env_hint, gpu_hint = _check_env(rec, spec, ctx)
+    rec["env_reason"] = " ".join(r for r in (env_hint, gpu_hint) if r)
+    rec["runnable"] = bool(rec["files_ok"] and rec["env_ok"] and not wrong_atac
+                           and not ctx.wrong_ref)
+    # the ATAC reason comes last
+    rec["reason"] = _join_sentences([ctx.wrong_ref, *short_problems, rec["env_reason"],
+                                     wrong_atac])
+    rec["_other"] = _join_sentences([ctx.wrong_ref, *(p for p in short_problems
+                                                      if p not in folder_only),
+                                     gpu_hint if ctx.off_linux else rec["env_reason"],
+                                     wrong_atac])
+    # the method's command, also for an env-blocked row; setup steps go to caveat
+    if rec["files_ok"] and got is not None:
+        _add_command(rec, spec, v, cat, got, ctx)
+    return rec
+
+
+def _check_files(rec, spec, v, cat, mods, ctx) -> tuple:
+    """Check 1, files: both the script and the dataset files, so neither hides
+    the other; fills the file columns of ``rec``. ``(short problems, those said
+    by scan's folder line, the checked inputs or None, the blocking ATAC caveat)``."""
+    # files_reason keeps the full text; reason the short form. folder_only: said
+    # by scan's folder line, not on the method's own line
+    file_problems, short_problems, folder_only = [], [], []
+    why_script = _missing_script(v, method=spec.id)
+    if why_script:
+        file_problems.append(why_script)
+        short_problems.append(_short_reason(why_script, spec.id, ctx.dataset))
+    got, wrong_atac = None, ""
+    rec["_label_inputs"], rec["_folder_caveat"], rec["_file_problem"] = (), "", ""
+    try:
+        got = _resolve.inputs_for(ctx.dataset, cat, spec.id, modalities=mods or None,
+                                  data_path=ctx.data_path, check=True)
+        rec["_label_inputs"] = _label_inputs(got, v, ctx.label_files)
+        extra = _resolve._preflight_caveats(got, atac=spec.atac, category=cat,
+                                            method=spec.id)
+        if extra:
+            rec["caveat"] = _join_sentences([rec["caveat"], *extra])
+            rec["_folder_caveat"] = _join_sentences(extra)
+        wrong_atac = next(iter(_blocking_caveats(extra)), "")
+    except Exception as e:  # missing files, no variant, bad layout
+        full = f"{type(e).__name__}: {e}"
+        file_problems.append(full)
+        missing = _missing_paths(spec, cat, mods, ctx.dataset, ctx.data_path)
+        short = (_missing_files_reason(spec, cat, missing)
+                 or _short_reason(full, spec.id, ctx.dataset))
+        short_problems.append(short)
+        if _reads_one_of_numbered(missing.values(), cat):
+            folder_only.append(short)
+        elif not missing and _about_one_file(full, spec.id, ctx.dataset):
+            rec["_file_problem"] = _join_sentences([short])
+    if file_problems:
+        rec["files_ok"], rec["files_reason"] = False, " ".join(file_problems)
+    return short_problems, folder_only, got, wrong_atac
+
+
+def _check_env(rec, spec, ctx) -> tuple[str, str]:
+    """Check 2, the environment and the GPU: fills ``env_ok`` of ``rec`` (and the
+    GPU-node caveat); ``(env hint, GPU hint)``."""
+    env_hint = gpu_hint = ""
+    if rec["env"] and (ctx.off_linux or rec["env"] not in ctx.installed):
+        rec["env_ok"] = False
+        if not ctx.off_linux and rec["env"] not in ctx.others:
+            ctx.others[rec["env"]] = _other_env(rec["env"])
+        env_hint = _env_hint(rec["env"], spec.id, ctx.others.get(rec["env"]))
+    # a script that calls CUDA unconditionally: run() raises this sentence
+    if spec.requires_gpu and not envs.host_has_gpu():
+        if ctx.assume_gpu:
+            rec["caveat"] = _join_sentences([rec["caveat"],
+                                             GPU_NODE_CAVEAT.format(method=spec.id)])
+        else:
+            rec["env_ok"] = False
+            # off Linux the platform already blocks the method
+            gpu_hint = "" if ctx.off_linux else spec.requires_gpu_reason or ""
+    return env_hint, gpu_hint
+
+
+def _add_command(rec, spec, v, cat, got, ctx) -> None:
+    """The ``command`` of ``rec``, and the notes on its setup steps in ``caveat``."""
+    rec["command"], prepared = _command_line(spec.id, cat, got, out_dir=ctx.out_dir,
+                                             dataset=ctx.dataset,
+                                             params=ctx.params.get(spec.id),
+                                             gpu=True if ctx.assume_gpu else None)
+    # the setup hint's first sentence; a same-cells hint (Seurat_v5) is
+    # checked on the files above instead
+    notes = [n if n != spec.setup_hint else
+             "" if spec.id in _resolve._SAME_CELL_ROLES else _first_sentence(n)
+             for n in _runner.script_notes(spec, v, ctx.repo)]
+    if v.size_hint in notes:
+        # the folder's size against the method's, or nothing when it is large enough
+        small = _too_small(v, got, ctx.ds_dir)
+        notes[notes.index(v.size_hint)] = (
+            "" if small is None else v.size_hint if small is True
+            else f"{spec.id} needs about {small}: leave {spec.id} out.")
+    notes = [n for n in notes if n] + prepared
+    if notes:
+        rec["caveat"] = _join_sentences([rec["caveat"], *notes])
+
+
+def _listed_rows(df, private, ds_dir: Path, category, methods, *, every: bool) -> tuple:
+    """``(df, private)`` without the rows a scan without ``modalities`` does not list
+    (``every``: keep each row); ``df.attrs`` says what the folder holds and what
+    was left out."""
     held = _held_families(ds_dir, category)
     need = [_row_families(m) for m in _shown_modalities(df)["modalities"]]
-    keep = ([True] * len(df) if every or modalities is not None
-            else _listed(df, need, held, methods))
+    keep = [True] * len(df) if every else _listed(df, need, held, methods)
     left_out = [(m, [f for f in registry._BASE_MODALITIES if f in n and f not in held])
                 for m, n, k in zip(df["method"], need, keep) if not k]
     # a variant for numbered batches the folder does not have (a batched
     # variant next to a one-batch folder) is not listed either
-    batch_keep = ([True] * len(df) if every or modalities is not None
-                  else _batch_listed(df, ds_dir, keep, methods))
+    batch_keep = [True] * len(df) if every else _batch_listed(df, ds_dir, keep, methods)
     n_batch_out = sum(k and not b for k, b in zip(keep, batch_keep))
     keep = [k and b for k, b in zip(keep, batch_keep)]
     if not all(keep):
@@ -811,7 +846,6 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
     df.attrs.update(held=held, not_listed=len(left_out), not_listed_batch=n_batch_out,
                     not_held=[f for f in registry._BASE_MODALITIES
                               if any(f in lack for _, lack in left_out)])
-    private.attrs.update(dataset=dataset, folder=ds_dir, category=category)
     return df, private
 
 
@@ -914,25 +948,13 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
     for (method, cat), group in df.groupby(["method", "category"], sort=False):
         if group["files_ok"].any():
             with_files.add(method)
-        if group["runnable"].any():
-            # the variant run runs: the one with the most modalities
-            i = max(group.index[group["runnable"].to_numpy().astype(bool)],
-                    key=lambda i: len(str(group.at[i, "modalities"]).split("+")))
-            rows.append((method, cat, group.at[i, "modalities"], True, "",
-                         *group.loc[i, ["env", "caveat", "command"]]))
-            continue
-        # the row that speaks for the method: files on disk, the folder's number of
-        # batches, families held, fewest missing, then the most modalities, as
-        # run runs
-        i = min(group.index, key=lambda i: (
-            not _inputs_on_disk(group.loc[i], dataset, data_path),
-            len(set(re.findall(r"\d+", str(group.at[i, "modalities"])))) != batches,
-            len(_row_families(group.at[i, "modalities"]) - held),
-            _missing_inputs(group.loc[i], dataset, data_path),
-            -len(str(group.at[i, "modalities"]).split("+")), i))
-        rows.append((method, cat, group.at[i, "modalities"], False, group.at[i, "reason"],
+        i = _spokesman_row(group, dataset, data_path, held, batches)
+        runnable = bool(group.at[i, "runnable"])
+        rows.append((method, cat, group.at[i, "modalities"], runnable,
+                     "" if runnable else group.at[i, "reason"],
                      *group.loc[i, ["env", "caveat", "command"]]))
-        reasons.append((method, private.at[i, "_other"], private.at[i, "_file_problem"]))
+        if not runnable:
+            reasons.append((method, private.at[i, "_other"], private.at[i, "_file_problem"]))
     out = pd.DataFrame(rows, columns=SCAN_COLUMNS)
     order = out.sort_values(["runnable", "method", "category"],
                             ascending=[False, True, True]).index
@@ -947,11 +969,36 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
     if per_batch:
         out["reason"] = [" ".join(r.replace(per_batch, "").split()) for r in out["reason"]]
     out.attrs = {**df.attrs, "cells": cells}
-    if not verbose:
-        return out
+    if verbose:
+        _print_scan(out, df, private, data_path=data_path, n_files=len(with_files),
+                    reasons=None if several else reasons, per_batch=per_batch,
+                    nested=nested)
+    return out
+
+
+def _spokesman_row(group, dataset, data_path, held: set, batches: int):
+    """The index of the row that speaks for a method in ``scan``: the variant run
+    runs (the runnable one with the most modalities); else files on disk, the
+    folder's number of batches, families held, fewest missing, then the most
+    modalities, as run runs."""
+    if group["runnable"].any():
+        return max(group.index[group["runnable"].to_numpy().astype(bool)],
+                   key=lambda i: len(str(group.at[i, "modalities"]).split("+")))
+    return min(group.index, key=lambda i: (
+        not _inputs_on_disk(group.loc[i], dataset, data_path),
+        len(set(re.findall(r"\d+", str(group.at[i, "modalities"])))) != batches,
+        len(_row_families(group.at[i, "modalities"]) - held),
+        _missing_inputs(group.loc[i], dataset, data_path),
+        -len(str(group.at[i, "modalities"]).split("+")), i))
+
+
+def _print_scan(out, df, private, *, data_path, n_files: int, reasons, per_batch: str,
+                nested: bool) -> None:
+    """The lines of ``scan(verbose=True)``: what the folder holds, then why each
+    method cannot run (``reasons``, ``None`` with several categories)."""
+    dataset, ds_dir = private.attrs["dataset"], private.attrs["folder"]
     # methods, not rows: without a category a method has a row per category
     n, k = out["method"].nunique(), out.loc[out["runnable"], "method"].nunique()
-    n_files = len(with_files)
     holds = _holds_sentence(dataset, ds_dir, df.attrs["held"], private.attrs["category"])
     line = (f"[scan] {n_files} of {n} {'method' if n == 1 else 'methods'} "
             f"{_have_their(n_files, n)} input files in {dataset}. {k} of {n} can run on "
@@ -962,22 +1009,12 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
     if envs.linux_only_text():
         line += f" {LINUX_ONLY_CHECK}"
     print(line, flush=True)
-    if cells:
-        print(f"[scan] {_cells_line(cells)}", flush=True)
+    if out.attrs["cells"]:
+        print(f"[scan] {_cells_line(out.attrs['cells'])}", flush=True)
     if per_batch:
         print(f"[scan] {per_batch}", flush=True)
-    if not several:                   # one category: why each method cannot run
-        # a file's problem is the same for every method that reads it: said once
-        for problem in dict.fromkeys(p for _, _, p in reasons if p):
-            print(f"[scan] {problem}", flush=True)
-        for method, reason, problem in sorted(reasons):
-            # the per-batch sentence was printed once above
-            if per_batch:
-                reason = reason.replace(per_batch, "").strip()
-            if problem:
-                reason = reason.replace(problem + " ", "").replace(problem, "").strip()
-            if reason:
-                print(f"[scan] {method}: {reason}", flush=True)
+    if reasons is not None:                   # one category: why each method cannot run
+        _print_reasons(reasons, per_batch)
     would = [i for i, r in df.iterrows() if _would_run(r)]
     if nested:
         inside = set(_nested_rows(df.loc[would])[0])
@@ -989,7 +1026,21 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
                                          evaluate=True)
     if unlabelled:
         print(f"[scan] {unlabelled}", flush=True)
-    return out
+
+
+def _print_reasons(reasons, per_batch: str) -> None:
+    """``scan``'s line per method that cannot run, from ``(method, reason, its
+    problem of one file)``; the per-batch sentence was printed once before."""
+    # a file's problem is the same for every method that reads it: said once
+    for problem in dict.fromkeys(p for _, _, p in reasons if p):
+        print(f"[scan] {problem}", flush=True)
+    for method, reason, problem in sorted(reasons):
+        if per_batch:
+            reason = reason.replace(per_batch, "").strip()
+        if problem:
+            reason = reason.replace(problem + " ", "").replace(problem, "").strip()
+        if reason:
+            print(f"[scan] {method}: {reason}", flush=True)
 
 
 @contextlib.contextmanager
@@ -1313,6 +1364,50 @@ def _warn_unsaved_batch(records, result) -> None:
                    "Pass batch= again to keep the batch metrics.", UserWarning)
 
 
+def _rescore_vectors(records, dataset, category, used, tried, *, labels,
+                     batch) -> tuple[dict, dict]:
+    """``(labels_at, batch_at)``: rescore's labels and batch per data folder of
+    ``used``, before any record is scored: ids that are not cells of the dataset
+    raise here."""
+    labels_at: dict = {}
+    batch_at: dict = {}
+    for root in used:
+        if labels is not None:
+            labels_at[root] = _cell_vector(labels, dataset, root, what="labels",
+                                           order=_ROWS, tried=tried[root])
+            _check_gaps(labels_at[root][0], dataset, "labels")
+        else:
+            # a missing label would be scored as one more cell type
+            unlabelled = _missing_labels_problem(dataset, root)
+            if unlabelled:
+                raise ValueError(unlabelled)
+        # a batch vector follows labels given in embedding row order
+        rows = labels is not None and not labels_at[root][1]
+        if batch is not None:
+            vec, by_cell = _cell_vector(batch, dataset, root, what="batch",
+                                        order=_ROWS if rows else None, tried=tried[root])
+            _check_gaps(vec, dataset)
+            bad = not rows and not by_cell and _batch_length_problem(
+                [(r.get("method"), r.get("modalities")) for r in records if _scorable(r)],
+                vec, dataset, category, root)
+            if bad:
+                raise ValueError(bad)
+            # saved with the result, unless it follows the embedding rows
+            file = None if rows and not by_cell else _batch_csv(vec, dataset, root)
+            batch_at[root] = (vec, by_cell, file)
+    return labels_at, batch_at
+
+
+def _merge_scores(old: dict, new: dict, dataset, category) -> tuple[dict, pd.DataFrame]:
+    """``(metrics, long)`` of a record scored again for some metrics: their new
+    scores replace the old ones, the other scores stay."""
+    both = pd.concat([RunResult([old], dataset, category).long, new["_long"]],
+                     ignore_index=True)
+    return ({**old["metrics"], **new["metrics"]},
+            both.drop_duplicates("metric", keep="last").set_index("metric")
+            .loc[list(dict.fromkeys(both["metric"]))].reset_index())
+
+
 class RunResult:
     """The result of ``mtb.run``: its summary table, long table and figure.
 
@@ -1599,37 +1694,10 @@ class RunResult:
             tried: dict = {}           # the roots searched, named when the folder is not found
             for root, r in zip(roots, self.records):
                 tried.setdefault(root, _root_tries(r))
-            # labels and batch per data folder, before any record is scored: ids
-            # that are not cells of the dataset raise here
-            labels_at: dict = {}
-            batch_at: dict = {}
             used = dict.fromkeys(root for root, r in zip(roots, self.records)
                                  if _status(r.get("status")) != "skipped")
-            for root in used:
-                if labels is not None:
-                    labels_at[root] = _cell_vector(labels, self.dataset, root, what="labels",
-                                                   order=_ROWS, tried=tried[root])
-                    _check_gaps(labels_at[root][0], self.dataset, "labels")
-                else:
-                    # a missing label would be scored as one more cell type
-                    unlabelled = _missing_labels_problem(self.dataset, root)
-                    if unlabelled:
-                        raise ValueError(unlabelled)
-                # a batch vector follows labels given in embedding row order
-                rows = labels is not None and not labels_at[root][1]
-                if batch is not None:
-                    vec, by_cell = _cell_vector(batch, self.dataset, root, what="batch",
-                                                order=_ROWS if rows else None,
-                                                tried=tried[root])
-                    _check_gaps(vec, self.dataset)
-                    bad = not rows and not by_cell and _batch_length_problem(
-                        [(r.get("method"), r.get("modalities")) for r in self.records
-                         if _scorable(r)], vec, self.dataset, self.category, root)
-                    if bad:
-                        raise ValueError(bad)
-                    # saved with the result, unless it follows the embedding rows
-                    file = None if rows and not by_cell else _batch_csv(vec, self.dataset, root)
-                    batch_at[root] = (vec, by_cell, file)
+            labels_at, batch_at = _rescore_vectors(self.records, self.dataset, self.category,
+                                                   used, tried, labels=labels, batch=batch)
             if batch is None and _names_batch_metric(metrics):
                 _warn_unsaved_batch([r for r in self.records if _scorable(r)], self)
             # run passes its plan's caveats (_caveats), so the plan is not made again
@@ -1643,66 +1711,17 @@ class RunResult:
                 rec = copy.deepcopy({k: v for k, v in r.items()
                                      if k not in ("_long", "n_tunable")})
                 rec["_long"] = None
-                method = rec.get("method")
-                if not _scorable(rec):
-                    new.records.append(rec)
-                    continue
-                rec["data_path"] = root
-                if ok and root is not None:
-                    rec["data_root"] = root
-                # the plan's caveat as this version words it
-                plan = caveats.get(root)
-                if plan is not None:
-                    rec["caveat"] = plan.get((method, tuple(rec.get("modalities") or ())), "")
-                try:
-                    mods = rec.get("modalities") or []
-                    variant = registry.get(method).select(self.category, set(mods))
-                    try:
-                        # a record without out_dir: the folder run names
-                        emb = _load_embedding(Path(rec.get("out_dir") or Path(self.out_dir or ".")
-                                                   / f"{method}_{self.dataset}"), variant)
-                    except FileNotFoundError:
-                        no_output.append(method)
-                        raise
-                    if emb is None:
-                        rec["status"], rec["note"] = "ran", _RAN_REASON["RUN_OK_NO_EMBEDDING"]
-                    else:
-                        label_ids, labels_by_cell = labels_at.get(root, (None, False))
-                        if batch is not None:
-                            batch_ids, batch_by_cell, file = batch_at[root]
-                            rec["batch_file"] = file and file[0]
-                        else:
-                            # the batch run was given, when it is saved
-                            text = self._batch_text(rec.get("batch_file"))
-                            file = text and (rec["batch_file"], text)
-                            batch_ids, batch_by_cell = (
-                                (_read_batch_csv(text)["batch"].to_numpy(), True) if text
-                                else (None, False))
-                        if file:
-                            new._batches[file[0]] = file[1]
-                        _score_record(rec, emb, self.dataset, self.category, root, variant,
-                                      batch=batch_ids, labels=label_ids, metrics=metrics,
-                                      labels_by_cell=labels_by_cell,
-                                      batch_by_cell=batch_by_cell,
-                                      batch_given=batch is not None,
-                                      on_rank=_rank_line(method) if verbose else None,
-                                      tried=tried[root])
-                except Exception as e:  # one bad record must not abort the rest
-                    _drop_scores(rec)
-                    rec["status"] = "ran"
-                    rec["error"] = _clip_error(f"{type(e).__name__}: {e}")
-                if verbose:
-                    print(f"[rescore] {method} -> {_status(rec['status'])} "
-                          f"{_ari_tail(rec)}".rstrip(), flush=True)
-                if metrics is not None and batch is None and labels is None \
-                        and rec.get("metrics") and r.get("metrics"):
-                    # the named metrics replace theirs; the other scores stay (not
-                    # after new batches or labels: they were scored with the old ones)
-                    rec["metrics"] = {**r["metrics"], **rec["metrics"]}
-                    both = pd.concat([RunResult([r], self.dataset, self.category).long,
-                                      rec["_long"]], ignore_index=True)
-                    rec["_long"] = both.drop_duplicates("metric", keep="last").set_index(
-                        "metric").loc[list(dict.fromkeys(both["metric"]))].reset_index()
+                if _scorable(rec):
+                    self._rescore_one(rec, new, root, ok, caveats.get(root),
+                                      labels_at.get(root, (None, False)), batch_at.get(root),
+                                      metrics=metrics, verbose=verbose, tried=tried[root],
+                                      no_output=no_output)
+                    if metrics is not None and batch is None and labels is None \
+                            and rec.get("metrics") and r.get("metrics"):
+                        # the named metrics replace theirs; the other scores stay (not
+                        # after new batches or labels: they were scored with the old ones)
+                        rec["metrics"], rec["_long"] = _merge_scores(r, rec, self.dataset,
+                                                                     self.category)
                 new.records.append(rec)
             # a saved batch that fits no label order: the batch metrics are gone
             unused = next((r["note"] for r in new.records
@@ -1718,6 +1737,60 @@ class RunResult:
                     f"No method output in {self.out_dir or '.'}. Load the folder that holds "
                     f"the method folders, or run the methods again.")
             return new
+
+    def _rescore_one(self, rec, new, root, ok, plan, labels, batch, *, metrics, verbose,
+                     tried, no_output) -> None:
+        """Score the saved output of the copied record ``rec`` again, in place; one
+        that cannot be scored gets status ``ran`` and its error. ``plan``: the
+        plan's caveats, ``labels``: ``(ids, by cell)``, ``batch``: the given
+        ``(ids, by cell, file)`` or ``None``; a batch file used goes to ``new``."""
+        method = rec.get("method")
+        rec["data_path"] = root
+        if ok and root is not None:
+            rec["data_root"] = root
+        # the plan's caveat as this version words it
+        if plan is not None:
+            rec["caveat"] = plan.get((method, tuple(rec.get("modalities") or ())), "")
+        try:
+            mods = rec.get("modalities") or []
+            variant = registry.get(method).select(self.category, set(mods))
+            try:
+                # a record without out_dir: the folder run names
+                emb = _load_embedding(Path(rec.get("out_dir") or Path(self.out_dir or ".")
+                                           / f"{method}_{self.dataset}"), variant)
+            except FileNotFoundError:
+                no_output.append(method)
+                raise
+            if emb is None:
+                rec["status"], rec["note"] = "ran", _RAN_REASON["RUN_OK_NO_EMBEDDING"]
+            else:
+                label_ids, labels_by_cell = labels
+                if batch is not None:
+                    batch_ids, batch_by_cell, file = batch
+                    rec["batch_file"] = file and file[0]
+                else:
+                    # the batch run was given, when it is saved
+                    text = self._batch_text(rec.get("batch_file"))
+                    file = text and (rec["batch_file"], text)
+                    batch_ids, batch_by_cell = (
+                        (_read_batch_csv(text)["batch"].to_numpy(), True) if text
+                        else (None, False))
+                if file:
+                    new._batches[file[0]] = file[1]
+                _score_record(rec, emb, self.dataset, self.category, root, variant,
+                              batch=batch_ids, labels=label_ids, metrics=metrics,
+                              labels_by_cell=labels_by_cell,
+                              batch_by_cell=batch_by_cell,
+                              batch_given=batch is not None,
+                              on_rank=_rank_line(method) if verbose else None,
+                              tried=tried)
+        except Exception as e:  # one bad record must not abort the rest
+            _drop_scores(rec)
+            rec["status"] = "ran"
+            rec["error"] = _clip_error(f"{type(e).__name__}: {e}")
+        if verbose:
+            print(f"[rescore] {method} -> {_status(rec['status'])} "
+                  f"{_ari_tail(rec)}".rstrip(), flush=True)
 
     def embedding(self, method: str):
         """The embedding of one method, as an AnnData.
@@ -2489,6 +2562,57 @@ def _drop_scores(rec: dict) -> dict:
     return rec
 
 
+def _candidates_with_labels(dataset, data_path, n: int, labels, rows: bool) -> list:
+    """The label orders to score ``n`` cells with, ``[(file names, labels, batch
+    per cell)]``: the label files', with the caller's ``labels`` (in ``labels_for``
+    order, or ``rows``: in embedding row order) in place of the files' labels."""
+    cands = [] if rows else _label_candidates(dataset, n, data_path)
+    if labels is None:
+        return cands
+    labels = np.asarray(labels)
+    if not rows:
+        # the user's labels, in the dataset's cell order, replace each
+        # candidate's file labels; the cells form one batch
+        by_file = _batch_segments(dataset, data_path, labels)
+        cands = [(names, np.concatenate([by_file[k] for k in names]),
+                  np.ones(n, dtype=int))
+                 for names, _, _ in cands
+                 if by_file is not None and all(k in by_file for k in names)]
+    if not cands:
+        if len(labels) != n:
+            raise ValueError(f"labels has {len(labels)} entries, embedding has {n} cells")
+        cands = [(["(user labels)"], labels, np.ones(n, dtype=int))]
+    return cands
+
+
+def _place_batch(cands, batch, segments, n: int, *, rows: bool, stored_used, rec, dataset,
+                 category, data_path) -> list:
+    """``cands`` with the user's batch ids in place of each candidate's
+    file-of-origin batch, in that candidate's order. With labels in embedding
+    rows: the stored label order when its files hold the embedding's cells, else
+    the variant's own order; a vector as long as the embedding is kept as given."""
+    def covers(keys):
+        return (segments is not None and bool(keys) and all(k in segments for k in keys)
+                and sum(len(segments[k]) for k in keys) == n)
+    own = None
+    if rows and segments is not None:
+        stored_order = list(stored_used or ())
+        own = (stored_order if covers(stored_order) else
+               [k for k, _ in _label_file_sizes(dataset, category, rec.get("method"),
+                                                modalities=rec.get("modalities") or None,
+                                                data_path=data_path)])
+    placed = []
+    for names, lab, _ in cands:
+        keys = own if rows else names
+        if covers(keys):
+            placed.append((names, lab, np.concatenate([segments[k] for k in keys])))
+        elif len(batch) == n:
+            placed.append((names, lab, batch))
+    if cands and not placed:
+        raise ValueError(f"batch has {len(batch)} entries, embedding has {n} cells")
+    return placed
+
+
 def _score_record(rec, emb, dataset, category, data_path, variant, *,
                   batch=None, labels=None, metrics=None, labels_by_cell=False,
                   batch_by_cell=False, on_rank=None, batch_given=True, tried=None):
@@ -2516,46 +2640,11 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
             batch = None
         elif len(batch) != n and segments is None:
             raise ValueError(f"batch has {len(batch)} entries, embedding has {n} cells")
-    cands = [] if rows else _label_candidates(dataset, n, data_path)
-    if labels is not None:
-        labels = np.asarray(labels)
-        if not rows:
-            # the user's labels, in the dataset's cell order, replace each
-            # candidate's file labels; the cells form one batch
-            by_file = _batch_segments(dataset, data_path, labels)
-            cands = [(names, np.concatenate([by_file[k] for k in names]),
-                      np.ones(n, dtype=int))
-                     for names, _, _ in cands
-                     if by_file is not None and all(k in by_file for k in names)]
-        if not cands:
-            if len(labels) != n:
-                raise ValueError(f"labels has {len(labels)} entries, embedding has {n} cells")
-            cands = [(["(user labels)"], labels, np.ones(n, dtype=int))]
+    cands = _candidates_with_labels(dataset, data_path, n, labels, rows)
     if batch is not None:
-        # the user's ids replace each candidate's file-of-origin batch, in that
-        # candidate's order. With labels in embedding rows: the stored label order
-        # when its files hold the embedding's cells, else the variant's own order;
-        # a vector as long as the embedding is kept as given
-        def covers(keys):
-            return (segments is not None and bool(keys) and all(k in segments for k in keys)
-                    and sum(len(segments[k]) for k in keys) == n)
-        own = None
-        if rows and segments is not None:
-            stored_order = list(stored_used or ())
-            own = (stored_order if covers(stored_order) else
-                   [k for k, _ in _label_file_sizes(dataset, category, rec.get("method"),
-                                                    modalities=rec.get("modalities") or None,
-                                                    data_path=data_path)])
-        placed = []
-        for names, lab, _ in cands:
-            keys = own if rows else names
-            if covers(keys):
-                placed.append((names, lab, np.concatenate([segments[k] for k in keys])))
-            elif len(batch) == n:
-                placed.append((names, lab, batch))
-        if cands and not placed:
-            raise ValueError(f"batch has {len(batch)} entries, embedding has {n} cells")
-        cands = placed
+        cands = _place_batch(cands, batch, segments, n, rows=rows, stored_used=stored_used,
+                             rec=rec, dataset=dataset, category=category,
+                             data_path=data_path)
     # orders whose labels and batches agree cell for cell are one ordering
     distinct = {}
     for c in cands:
@@ -2575,6 +2664,14 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
                                               user_batch=batch is not None,
                                               batch_given=batch_given,
                                               on_rank=on_rank, embedding=embedding)
+    return _fill_scores(rec, names, val, spread, cands, same=same, stored_cands=stored_cands,
+                        user_batch=batch is not None, dataset=dataset, category=category)
+
+
+def _fill_scores(rec, names, val, spread, cands, *, same, stored_cands, user_batch: bool,
+                 dataset, category) -> dict:
+    """``rec`` with the scores of the best label order ``names`` (``val``; ``spread``:
+    each order's), or status ``ran`` when no order was scored."""
     if val is None:
         rec["status"] = "ran"
         errs = [s["error"] for s in spread if s.get("error")]
@@ -2590,7 +2687,7 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
     # the batch vector the batch metrics saw
     winning_batch = next(b for order, _, b in cands if order == names)
     n_batches = len(set(np.asarray(winning_batch).tolist()))
-    rec["batch_source"] = ("user" if batch is not None
+    rec["batch_source"] = ("user" if user_batch
                            else "file_of_origin" if n_batches > 1 else None)
     rec["n_batches"] = n_batches
     rec["_long"] = _to_long(val, method=rec["method"], dataset=dataset, category=category)
@@ -2683,6 +2780,58 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
     root = Path(data_path) if data_path is not None else config.data_path
     # the on-disk spelling, once, so out_dir names and records agree (one warning)
     dataset = _resolve.canonical_dataset(root, dataset)
+    plan_df, blocked, batch_vec = _run_plan(
+        dataset, category, out_dir, data_path=data_path, methods=methods,
+        modalities=modalities, every=every, params=params, batch=batch, evaluate=evaluate,
+        skip_existing=skip_existing, verbose=verbose, given=given)
+    # saved in out_dir so that rescore can reuse it
+    batch_file = (_batch_csv(batch_vec, dataset, data_path)
+                  if batch_vec is not None and evaluate else None)
+    # absolute: a saved result read from another directory still finds the data
+    data_root = os.path.abspath(root)
+    # the save after the run would refuse this folder: refuse it now
+    _check_save_target(out_dir, dataset, category)
+    attempted = set(plan_df["method"])
+    shown, others = _skipped_rows(blocked, attempted, methods, dataset, data_path)
+    if verbose:
+        _skipped_lines(shown, others, methods)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    records = []
+    earlier = _saved_records(out_dir) if skip_existing else {}
+    from . import __version__ as _pkg_version
+
+    for _, row in plan_df.iterrows():
+        method = row["method"]
+        method_dir = out_dir / f"{method}_{dataset}"
+        rec = _record(row, {"status": "?", "_long": None, "caveat": _run_caveat(row["caveat"]),
+                            "params_used": dict(params.get(method) or {}),
+                            "out_dir": str(method_dir)},
+                      category=category, dataset=dataset, data_path=data_path,
+                      data_root=data_root, version=_pkg_version)
+        # a plan row's own (category, modalities): select cannot fail
+        variant = registry.get(method).select(category, set(rec["modalities"]))
+        saved = earlier.get(method)
+        if saved is not None and _scorable(saved) and (method_dir / variant.output.file).exists():
+            rec = _reuse_saved(saved, rec, variant, out_dir, batch=batch, evaluate=evaluate,
+                               data_path=data_path, verbose=verbose)
+        else:
+            _run_one(rec, row["env"], variant, data_path=data_path, params=params,
+                     batch_vec=batch_vec, batch_file=batch_file, evaluate=evaluate,
+                     timeout=timeout, skip_existing=skip_existing, verbose=verbose)
+        records.append(rec)
+        # saved after each method: a job killed later keeps this record
+        _save_run(records, dataset, category, out_dir, batch_file, resuming=bool(earlier))
+    records += _skipped_records(shown, attempted, methods, category=category,
+                                dataset=dataset, data_path=data_path,
+                                version=_pkg_version, data_root=data_root)
+    return _save_run(records, dataset, category, out_dir, batch_file, resuming=bool(earlier),
+                     last=True)
+
+
+def _run_plan(dataset, category, out_dir, *, data_path, methods, modalities, every, params,
+              batch, evaluate, skip_existing, verbose, given) -> tuple:
+    """``(rows to run, blocked rows, batch per cell)`` of a ``run`` call; a
+    request that cannot start raises here, before anything runs."""
     # a params key no variant of the method accepts raises here, as in scan
     plan_df, private = _scan(dataset, category, data_path=data_path, methods=methods,
                              modalities="all" if every else modalities, out_dir=out_dir,
@@ -2699,11 +2848,7 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
     if bad:
         raise ValueError(bad)
     if skip_existing:
-        # a saved output is only scored: it needs no environment
-        saved = [(out_dir / f"{r['method']}_{dataset}" / registry.get(r["method"]).select(
-            r["category"], set(_row_modalities(r["modalities"]))).output.file).exists()
-            for _, r in plan_df.iterrows()]
-        plan_df = plan_df.assign(runnable=plan_df["runnable"].to_numpy(bool) | saved)
+        plan_df = _with_saved_outputs(plan_df, out_dir, dataset)
     blocked = plan_df[~plan_df["runnable"]]
     plan_df = plan_df[plan_df["runnable"]]
     if plan_df.empty and skip_existing:
@@ -2727,128 +2872,128 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
                                          evaluate=evaluate)
     if unlabelled:
         raise ValueError(unlabelled)
+    return plan_df, blocked, batch_vec
 
-    # saved in out_dir so that rescore can reuse it
-    batch_file = (_batch_csv(batch_vec, dataset, data_path)
-                  if batch_vec is not None and evaluate else None)
-    # absolute: a saved result read from another directory still finds the data
-    data_root = os.path.abspath(root)
-    # the save after the run would refuse this folder: refuse it now
-    _check_save_target(out_dir, dataset, category)
-    attempted = set(plan_df["method"])
-    shown, others = _skipped_rows(blocked, attempted, methods, dataset, data_path)
+
+def _with_saved_outputs(plan_df, out_dir: Path, dataset: str) -> pd.DataFrame:
+    """``plan_df`` with each row whose output is in ``out_dir`` runnable: a saved
+    output is only scored, so it needs no environment."""
+    saved = [(out_dir / f"{r['method']}_{dataset}" / registry.get(r["method"]).select(
+        r["category"], set(_row_modalities(r["modalities"]))).output.file).exists()
+        for _, r in plan_df.iterrows()]
+    return plan_df.assign(runnable=plan_df["runnable"].to_numpy(bool) | saved)
+
+
+def _skipped_lines(shown, others: int, methods) -> None:
+    """``run``'s lines on the rows it skips (:func:`_skipped_rows`)."""
+    several = Counter(r["method"] for r, _ in shown)
+    for r, _ in shown:
+        mods = f" ({r['modalities']})" if several[r["method"]] > 1 else ""
+        print(f"[run] skipping {r['method']}{mods}: {r['reason']}", flush=True)
+    if others and not methods:      # with methods=, only other variants of those
+        rows = "row needs" if others == 1 else "rows need"
+        print(f"[run] {others} more {rows} files this folder does not have. "
+              f"mtb.scan shows {'it' if others == 1 else 'them'}.", flush=True)
+
+
+def _reuse_saved(saved, rec, variant, out_dir, *, batch, evaluate, data_path,
+                 verbose) -> dict:
+    """The record of the saved run ``run(skip_existing=True)`` reuses for ``rec``.
+    It is scored again, as rescore does: its record is kept, with its folder as
+    found from here, and the caveat of this plan's row."""
+    method, category, dataset, mods = (rec["method"], rec["category"], rec["dataset"],
+                                       rec["modalities"])
+    output = Path(rec["out_dir"]) / variant.output.file
+    caveats = ({(method, tuple(mods)): rec["caveat"]}
+               if list(saved.get("modalities") or ()) == mods else None)
+    rec = (RunResult([dict(saved, out_dir=rec["out_dir"])], dataset, category,
+                     out_dir).rescore(batch=batch, verbose=False, _caveats=caveats)
+           .records[0] if evaluate else dict(saved))
+    rec["reused"] = True
+    if variant.output.kind == "embedding" and rec.get("emb_shape"):
+        _write_cell_names(rec, output, dataset, category, data_path)
     if verbose:
-        several = Counter(r["method"] for r, _ in shown)
-        for r, _ in shown:
-            mods = f" ({r['modalities']})" if several[r["method"]] > 1 else ""
-            print(f"[run] skipping {r['method']}{mods}: {r['reason']}", flush=True)
-        if others and not methods:      # with methods=, only other variants of those
-            rows = "row needs" if others == 1 else "rows need"
-            print(f"[run] {others} more {rows} files this folder does not have. "
-                  f"mtb.scan shows {'it' if others == 1 else 'them'}.", flush=True)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    records = []
-    earlier = _saved_records(out_dir) if skip_existing else {}
-    from . import __version__ as _pkg_version
+        print(f"[run] {method} ({category}/{dataset}): reusing the saved run "
+              f"-> {_status(rec['status'])} {_ari_tail(rec)}".rstrip(), flush=True)
+    return rec
 
-    for _, row in plan_df.iterrows():
-        method = row["method"]
-        method_dir = out_dir / f"{method}_{dataset}"
-        rec = _record(row, {"status": "?", "_long": None, "caveat": _run_caveat(row["caveat"]),
-                            "params_used": dict(params.get(method) or {}),
-                            "out_dir": str(method_dir)},
-                      category=category, dataset=dataset, data_path=data_path,
-                      data_root=data_root, version=_pkg_version)
-        mods = rec["modalities"]
-        # a plan row's own (category, modalities): select cannot fail
-        variant = registry.get(method).select(category, set(mods))
-        output = method_dir / variant.output.file
-        start = time.time()
-        saved = earlier.get(method)
-        if saved is not None and _scorable(saved) and output.exists():
-            # a saved run is scored again, as rescore does: its record is kept,
-            # with its folder as found from here, and the caveat of this plan's row
-            caveats = ({(method, tuple(mods)): rec["caveat"]}
-                       if list(saved.get("modalities") or ()) == mods else None)
-            rec = (RunResult([dict(saved, out_dir=str(method_dir))], dataset, category,
-                             out_dir).rescore(batch=batch, verbose=False, _caveats=caveats)
-                   .records[0] if evaluate else dict(saved))
-            rec["reused"] = True
-            if variant.output.kind == "embedding" and rec.get("emb_shape"):
-                _write_cell_names(rec, output, dataset, category, data_path)
-            if verbose:
-                print(f"[run] {method} ({category}/{dataset}): reusing the saved run "
-                      f"-> {_status(rec['status'])} {_ari_tail(rec)}".rstrip(), flush=True)
-            records.append(rec)
-            _save_run(records, dataset, category, out_dir, batch_file, resuming=bool(earlier))
-            continue
-        if verbose:
-            print(f"[run] {method} ({category}/{dataset}) ...", flush=True)
-            if rec["caveat"]:              # it starts with the method name
-                print(f"[run]   {rec['caveat']}", flush=True)
+
+def _run_one(rec, env, variant, *, data_path, params, batch_vec, batch_file, evaluate,
+             timeout, skip_existing, verbose) -> None:
+    """Run the method of ``rec`` and score its output, into ``rec``: status,
+    error, scores and provenance. A failure is recorded, never raised."""
+    method, category, dataset, mods = (rec["method"], rec["category"], rec["dataset"],
+                                       rec["modalities"])
+    method_dir = Path(rec["out_dir"])
+    output = method_dir / variant.output.file
+    start = time.time()
+    if verbose:
+        print(f"[run] {method} ({category}/{dataset}) ...", flush=True)
+        if rec["caveat"]:              # it starts with the method name
+            print(f"[run]   {rec['caveat']}", flush=True)
+    try:
+        with _deadline(timeout):
+            inputs = _resolve.inputs_for(dataset, category, method, modalities=mods or None,
+                                         data_path=data_path, check=True)
+            reused = skip_existing and output.exists()
+            overrides = params.get(method)
+            _runner.check_params(method, variant, overrides)   # before the method starts
+            if reused:
+                if verbose:
+                    print(f"[run]   reusing existing output in {method_dir}", flush=True)
+                res = None
+            else:
+                res = _run(method=method, category=category, inputs=inputs,
+                           out_dir=str(method_dir), params=overrides)
+            rec["reused"] = bool(reused)
+            rec["run_sec"] = round(time.time() - start, 1)
+            emb = (_cells_first(np.asarray(res))
+                   if variant.output.kind == "embedding" and res is not None
+                   else _load_embedding(method_dir, variant))
+            _score_output(rec, emb, variant, output, data_path=data_path,
+                          batch_vec=batch_vec, batch_file=batch_file, evaluate=evaluate)
+    except TimeoutError as e:
+        rec["status"] = "timeout"
+        rec["error"] = str(e)
+        rec["run_sec"] = round(time.time() - start, 1)
+    except Exception as e:
+        rec["status"] = "failed"
+        rec["error"] = _clip_error(f"{type(e).__name__}: {e}")
+        rec["traceback"] = traceback.format_exc()[-1200:]
+        rec["run_sec"] = round(time.time() - start, 1)
+    if verbose:
+        tail = _error_tail(rec["error"]) if rec.get("error") else _ari_tail(rec)
+        print(f"[run]   -> {_status(rec['status'])} ({rec.get('run_sec')}s) {tail}".rstrip(),
+              flush=True)
+    # scripts_commit, env_flavor, hostname
+    rec.update(_UNKNOWN_PROVENANCE if rec.get("reused") else scripts.run_provenance(env))
+
+
+def _score_output(rec, emb, variant, output: Path, *, data_path, batch_vec, batch_file,
+                  evaluate) -> None:
+    """Fill ``rec`` from the output its method just wrote in ``output``: ``emb``
+    (``None`` for a graph) is scored when ``evaluate``; a scoring error leaves
+    status ``ran``."""
+    dataset, category = rec["dataset"], rec["category"]
+    if emb is None:
+        rec["status"], rec["note"] = "ran", _RAN_REASON["RUN_OK_NO_EMBEDDING"]
+        return
+    rec["emb_shape"] = list(emb.shape)
+    if not evaluate:
+        rec["status"] = "ran"
+    else:
+        if batch_file:
+            rec["batch_file"] = batch_file[0]
         try:
-            with _deadline(timeout):
-                inputs = _resolve.inputs_for(dataset, category, method, modalities=mods or None,
-                                             data_path=data_path, check=True)
-                reused = skip_existing and output.exists()
-                overrides = params.get(method)
-                _runner.check_params(method, variant, overrides)   # before the method starts
-                if reused:
-                    if verbose:
-                        print(f"[run]   reusing existing output in {method_dir}", flush=True)
-                    res = None
-                else:
-                    res = _run(method=method, category=category, inputs=inputs,
-                               out_dir=str(method_dir), params=overrides)
-                rec["reused"] = bool(reused)
-                rec["run_sec"] = round(time.time() - start, 1)
-                emb = (_cells_first(np.asarray(res))
-                       if variant.output.kind == "embedding" and res is not None
-                       else _load_embedding(method_dir, variant))
-                if emb is None:
-                    rec["status"], rec["note"] = "ran", _RAN_REASON["RUN_OK_NO_EMBEDDING"]
-                else:
-                    rec["emb_shape"] = list(emb.shape)
-                    if not evaluate:
-                        rec["status"] = "ran"
-                    else:
-                        if batch_file:
-                            rec["batch_file"] = batch_file[0]
-                        try:
-                            _score_record(rec, emb, dataset, category, data_path, variant,
-                                          batch=batch_vec)
-                        except TimeoutError:
-                            raise
-                        except Exception as e:      # the run itself succeeded
-                            rec["status"] = "ran"
-                            rec["error"] = f"{type(e).__name__}: {e}"
-                    if variant.output.kind == "embedding":
-                        # evaluate on the file then finds each cell by its name
-                        _write_cell_names(rec, output, dataset, category, data_path)
-        except TimeoutError as e:
-            rec["status"] = "timeout"
-            rec["error"] = str(e)
-            rec["run_sec"] = round(time.time() - start, 1)
-        except Exception as e:
-            rec["status"] = "failed"
-            rec["error"] = _clip_error(f"{type(e).__name__}: {e}")
-            rec["traceback"] = traceback.format_exc()[-1200:]
-            rec["run_sec"] = round(time.time() - start, 1)
-        if verbose:
-            tail = _error_tail(rec["error"]) if rec.get("error") else _ari_tail(rec)
-            print(f"[run]   -> {_status(rec['status'])} ({rec.get('run_sec')}s) {tail}".rstrip(),
-                  flush=True)
-        # scripts_commit, env_flavor, hostname
-        rec.update(_UNKNOWN_PROVENANCE if rec.get("reused")
-                   else scripts.run_provenance(row["env"]))
-        records.append(rec)
-        # saved after each method: a job killed later keeps this record
-        _save_run(records, dataset, category, out_dir, batch_file, resuming=bool(earlier))
-    records += _skipped_records(shown, attempted, methods, category=category,
-                                dataset=dataset, data_path=data_path,
-                                version=_pkg_version, data_root=data_root)
-    return _save_run(records, dataset, category, out_dir, batch_file, resuming=bool(earlier),
-                     last=True)
+            _score_record(rec, emb, dataset, category, data_path, variant, batch=batch_vec)
+        except TimeoutError:
+            raise
+        except Exception as e:      # the run itself succeeded
+            rec["status"] = "ran"
+            rec["error"] = f"{type(e).__name__}: {e}"
+    if variant.output.kind == "embedding":
+        # evaluate on the file then finds each cell by its name
+        _write_cell_names(rec, output, dataset, category, data_path)
 
 
 def _save_run(records, dataset, category, out_dir, batch_file, *, resuming: bool,
