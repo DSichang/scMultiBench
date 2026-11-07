@@ -39,11 +39,9 @@ def test_evaluate_page_comparability_sentence_is_plain():
     assert ("some methods, such as sciPENN and VIMCCA, give a slightly different "
             "embedding on each run.") in visible
     assert "Compare ranks." not in visible
-    # journal u5: the machine is named too (scanpy's approximate neighbours above
-    # 4,096 cells); the classification scores do not move with it
+    # the machine is named too: scanpy's neighbours are approximate above 4,096 cells
     assert ("Above 4,096 cells, the same embedding also scores a few hundredths "
-            "differently on another computer, because the neighbours are approximate. "
-            "Its classification scores do not change.") in visible
+            "differently on another computer, because the neighbours are approximate.") in visible
     # v1 (u4#6): what holds, in one sentence and without a number (D45 Cobolt's
     # ARI moved 0.118 across shuffles)
     assert ("The Leiden-based and classification scores of the same embedding also "
