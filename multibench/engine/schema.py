@@ -73,52 +73,129 @@ def modality_family(role: str) -> str:
 
 @dataclass
 class ArgSpec:
-    role: str = ""          # input role (e.g. 'rna') or 'out_dir'
-    flag: str | None = None # None -> positional
-    # several input roles under one flag, in order (nargs='+'); an entry
-    # "=VALUE" emits VALUE, e.g. [adt1, "=None"] -> --path2 adt1.h5 None
+    """One command-line argument of a method script.
+
+    Attributes
+    ----------
+    role : str
+        The input role whose value is passed (``'rna'``), or ``'out_dir'``.
+    flag : str or None
+        The option (``'--path1'``); ``None`` for a positional argument.
+    roles : list
+        Several input roles under one flag, in order (``nargs='+'``); an entry
+        ``"=VALUE"`` passes ``VALUE``: ``[adt1, "=None"]`` gives
+        ``--path2 adt1.h5 None``.
+    repeat : bool
+        The value may be a list (``nargs='+'``).
+    eq : bool
+        Passed as ``--flag=value``.
+    const : str or None
+        A literal value passed instead of the role's (``'NULL'``).
+    """
+    role: str = ""
+    flag: str | None = None
     roles: list = field(default_factory=list)
-    repeat: bool = False    # value may be a list (nargs='+')
-    eq: bool = False        # emit as --flag=value
-    const: str | None = None  # literal value to emit (e.g. 'NULL')
+    repeat: bool = False
+    eq: bool = False
+    const: str | None = None
 
     @property
     def is_positional(self) -> bool:
+        """True for an argument without a flag."""
         return self.flag is None
 
 
 @dataclass
 class OutputSpec:
-    kind: str               # embedding | graph | labels
-    file: str               # filename written into out_dir
-    dataset: str | None = None  # in-file dataset name for h5 outputs
-    # the order of the output's rows when it is not argument order:
-    # Variant.stacked_roles
+    """A file a method script writes.
+
+    Attributes
+    ----------
+    kind : str
+        ``'embedding'``, ``'graph'`` or ``'labels'``.
+    file : str
+        Its name in ``out_dir``.
+    dataset : str or None
+        The dataset that holds it in an ``.h5`` output.
+    cell_order : list, str or None
+        The order of its rows when it is not argument order
+        (:meth:`Variant.stacked_roles`).
+    """
+    kind: str
+    file: str
+    dataset: str | None = None
     cell_order: list | str | None = None
 
 
 @dataclass
 class Variant:
-    when: dict              # {'category': str, 'modalities': [str, ...]}
+    """One way to run a method: a category, the modalities it reads and the
+    script call.
+
+    Attributes
+    ----------
+    when : dict
+        ``{'category': str, 'modalities': [str, ...]}``.
+    entrypoint : str
+        The script, relative to the scripts folder.
+    language : str
+        ``'python'`` or ``'R'``.
+    args : list of ArgSpec
+        The script's arguments, in order.
+    output : OutputSpec
+        The result file.
+    params : dict
+        Default hyperparameters passed on the command line.
+    tunable : dict
+        ``{name: {default, type}}``: the parameters the script accepts; never
+        passed unless given.
+    run_env : dict
+        Environment variables the method needs.
+    cwd_at_script : bool
+        Run in the script's folder (it imports local files).
+    pty : bool
+        Run under a pseudo-terminal (scJoint reads the terminal size).
+    driver : str or None
+        The package-side wrapper in ``engine/drivers/`` that runs the script.
+    normalize_peaks : list
+        Roles whose peak names are rewritten as ``chr:start-end``.
+    extra_outputs : list of OutputSpec
+        Other files the script must write.
+    helpers : list
+        Modules the scMultiBench repository does not ship, copied from
+        ``engine/helpers/<method>/``.
+    size_hint : str
+        What the method needs from the data's size; starts with the method
+        name. ``scan`` shows it only for data smaller than one of the next
+        three sizes.
+    min_cells : int or None
+        Cells of the files the row reads, in total.
+    min_cells_per_batch : int or None
+        Cells of each numbered batch.
+    min_genes : int or None
+        Features of each RNA file.
+    downloads : list
+        ``[{file, url}]``: files the first run downloads next to the script.
+    """
+    when: dict
     entrypoint: str
     language: str
     args: list[ArgSpec]
     output: OutputSpec
-    params: dict = field(default_factory=dict)        # default hyperparams emitted on the command line
-    tunable: dict = field(default_factory=dict)       # {name: {default, type}} the script accepts; never emitted
-    run_env: dict = field(default_factory=dict)       # environment variables the method needs
-    cwd_at_script: bool = False        # run in the script's folder (it imports local files)
-    pty: bool = False                  # run under a pseudo-tty (scJoint reads the terminal size)
-    driver: str | None = None          # package-side wrapper in engine/drivers/ that runs the script
-    normalize_peaks: list = field(default_factory=list)  # roles whose peak names become chr:start-end
+    params: dict = field(default_factory=dict)
+    tunable: dict = field(default_factory=dict)
+    run_env: dict = field(default_factory=dict)
+    cwd_at_script: bool = False
+    pty: bool = False
+    driver: str | None = None
+    normalize_peaks: list = field(default_factory=list)
     extra_outputs: list[OutputSpec] = field(default_factory=list)
-    helpers: list = field(default_factory=list)     # modules upstream does not ship, from engine/helpers/<method>/
-    size_hint: str = ""                # what the method needs from the data's size; starts with the method name
-    # the sizes below which size_hint applies; scan shows it only for such data
-    min_cells: int | None = None       # cells of the files the row reads, in total
-    min_cells_per_batch: int | None = None   # cells of each numbered batch
-    min_genes: int | None = None       # features of each RNA file
-    downloads: list = field(default_factory=list)   # [{file, url}] the first run downloads next to the script
+    helpers: list = field(default_factory=list)
+    size_hint: str = ""
+    min_cells: int | None = None
+    min_cells_per_batch: int | None = None
+    min_genes: int | None = None
+    downloads: list = field(default_factory=list)
 
     @property
     def shown_modalities(self) -> list[str]:
@@ -129,6 +206,8 @@ class Variant:
             if a.const and str(a.const).endswith(".h5")]
 
     def matches(self, category: str, modalities: set[str]) -> bool:
+        """True when this variant is declared for ``category`` and exactly
+        ``modalities``."""
         return (self.when.get("category") == category
                 and set(self.when.get("modalities", [])) == set(modalities))
 
@@ -221,19 +300,47 @@ _ATAC_GAS_RENAMED = frozenset({"scMM", "scMDC", "moETM", "UnitedNet", "iPOLNG"})
 
 @dataclass
 class MethodSpec:
+    """One method of ``methods.yaml``.
+
+    Attributes
+    ----------
+    id : str
+        The registry id (``'totalVI'``).
+    language : str
+        ``'python'`` or ``'R'``.
+    categories : list of str
+        The categories it runs on; the variants' categories unless given.
+    tasks : list of str
+        The tasks it serves (``clustering``, ``batch``,
+        ``dimension_reduction``).
+    atac : str or None
+        ``'peak'``, ``'gene_activity'`` or ``None``: the ATAC form it reads,
+        declared because the role ``atac`` stands for either.
+    setup_hint : str
+        A setup fact ``scan`` shows before the run.
+    variants : list of Variant
+        The ways to run it.
+    reference : dict
+        Its provenance, from ``references.yaml``.
+    cpu_params : dict
+        The parameters that turn CUDA off, merged by
+        ``runner.cpu_params_for`` on a host without a GPU.
+    requires_gpu : bool
+        The script calls CUDA unconditionally.
+    gpu_evidence : str
+        The ``file:line`` of that call.
+    gpu_use : str
+        How it uses a GPU when not required (``'used when present'``,
+        ``'not used'``); see :attr:`gpu`.
+    """
     id: str
     language: str
-    # derived from the variants in __post_init__ unless given
     categories: list[str] = field(default_factory=list)
     tasks: list[str] = field(default_factory=list)
-    # "peak" | "gene_activity" | None; declared, not derived from role names:
-    # moETM/scMM/iPOLNG declare role `atac_gas` yet read peak matrices
     atac: str | None = None
     setup_hint: str = ""
     variants: list[Variant] = field(default_factory=list)
-    reference: dict = field(default_factory=dict)     # provenance (references.yaml)
-    # the flags that turn CUDA off (merged by runner.cpu_params_for on a host
-    # without a GPU), or a script that calls CUDA unconditionally (file:line)
+    reference: dict = field(default_factory=dict)
     cpu_params: dict = field(default_factory=dict)
     requires_gpu: bool = False
     gpu_evidence: str = ""

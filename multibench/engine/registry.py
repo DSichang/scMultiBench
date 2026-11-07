@@ -96,6 +96,8 @@ def _references() -> dict:
 
 @functools.lru_cache(maxsize=1)
 def load() -> list[MethodSpec]:
+    """Every method of ``methods.yaml``, in file order, with its references;
+    parsed once."""
     data = yaml.safe_load(_YAML.read_text())
     specs = [_parse_method(m) for m in data["methods"]]
     refs = _references()
@@ -135,6 +137,7 @@ def method_of(name) -> str | None:
 
 
 def unknown_method_message(method_id) -> str:
+    """The error text for a name that is no method."""
     return f"Unknown method {method_id}. mtb.find_methods() shows all methods."
 
 
@@ -196,6 +199,7 @@ def normalize_modalities(modalities) -> list[str]:
 
 # ---------------------------------------------------------------- lookups
 def get(method_id: str) -> MethodSpec:
+    """The :class:`MethodSpec` of a method name, read as :func:`check_method` reads it."""
     method_id = check_method(method_id)
     return next(s for s in load() if s.id == method_id)
 
