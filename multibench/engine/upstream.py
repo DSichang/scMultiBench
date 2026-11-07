@@ -1,15 +1,11 @@
-"""What a method's script fixes, and what its library exposes anyway.
+"""What a method's script still fixes, and what its library offers beyond it.
 
-`params_for` reports the hyperparameters a method accepts on its command line.
-For most methods that set is empty: the benchmark scripts pin their settings in
-source, and this package never edits `tools_scripts/`. An empty `tunable` does
-not mean the method has no hyperparameters.
-
-This module serves the two missing facts from ``upstream_knobs.yaml``: what
-each script pins (with the `file:line` that pins it), and the knobs the wrapped
-library documents but the script never surfaces. `tools/gen_upstream_knobs.py`
-generates the table and drops any entry whose cited line no longer matches the
-upstream script.
+`params_for` reports the hyperparameters a method script takes on its command
+line. This module serves two further facts from ``upstream_knobs.yaml``: the
+values a script still fixes (with the `file:line` that fixes it), and the
+settings the wrapped library documents that the script has no parameter for.
+`tools/gen_upstream_knobs.py` generates the table from the package's scripts
+and drops an entry whose code is gone or whose setting became a parameter.
 """
 from __future__ import annotations
 
@@ -27,17 +23,14 @@ def _table() -> dict:
 
 
 def knobs_for(method: str) -> dict:
-    """Return ``{fixed_in_script, upstream_knobs, upstream_url, notes}``.
+    """Return ``{fixed_in_script, upstream_knobs, upstream_url}``.
 
-    Empty lists mean the audit has nothing recorded for this method - either it
-    already exposes its hyperparameters on the command line (see `params_for`),
-    or it was not part of the audited set. Absence is not a claim that the
-    method fixes nothing.
+    Empty lists mean the audit has nothing recorded for this method: it was
+    not part of the audited set, or everything it recorded became a parameter.
     """
     entry = _table().get(method) or {}
     return {
         "fixed_in_script": list(entry.get("fixed_in_script") or []),
         "upstream_knobs": list(entry.get("upstream_knobs") or []),
         "upstream_url": entry.get("upstream_url") or None,
-        "notes": entry.get("notes") or None,
     }
