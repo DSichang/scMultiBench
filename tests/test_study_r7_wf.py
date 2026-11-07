@@ -14,18 +14,13 @@ R7-06  ``rescore(verbose=True)`` also prints a line before each label-order
 R7-12  template-like passages in workflow.py docstrings, reworded.
 """
 import inspect
-import io
 import os
 import re
-import shlex
-import warnings
 from pathlib import Path
 
-import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import config
 from multibench import workflow as W
 from tests.test_docs_consistency import REFERENCE, _resolve
 

@@ -22,8 +22,7 @@ import pandas as pd
 import pytest
 
 from multibench.eval import io
-from multibench.eval import pipeline
-from multibench.eval.pipeline import LONG_COLUMNS, evaluate
+from multibench.eval.pipeline import evaluate
 from tests.test_study_r4_wf import N as N_CITE, _quiet, cite  # noqa: F401
 
 pytest.importorskip("scib")

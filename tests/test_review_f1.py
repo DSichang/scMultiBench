@@ -193,7 +193,6 @@ def test_method_info_notes_and_setup_hint_hold_no_internal_names(method):
 def test_the_na_hint_uses_the_spelling_of_the_caller(tmp_path, capsys):
     import matplotlib
     matplotlib.use('Agg')
-    args = ['plot', 'bubble', '--category', 'diagonal', '--dataset', 'D28', '--metrics', 'ARI,NMI,ASW', '--out', str(tmp_path / 'f.png')]
     with warnings.catch_warnings(record=True) as rec:
         warnings.simplefilter('always')
         mtb.plot.bubble(mtb.load_results('diagonal', dataset='D28'), metrics=['ARI', 'NMI', 'ASW'])

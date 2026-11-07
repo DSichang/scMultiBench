@@ -44,7 +44,6 @@ def test_a_graph_only_run_counts_as_ran_not_failed():
     r = RunResult(recs, "D11", "vertical")
     assert repr(r) == "<RunResult vertical/D11: 1 scored, 2 ran, 1 failed, 1 timeout>"
 import multibench as mtb
-from multibench.workflow import RunResult
 
 
 def test_run_all_raises_when_nothing_can_run(tmp_path, monkeypatch):

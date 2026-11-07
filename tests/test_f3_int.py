@@ -20,7 +20,6 @@ import pytest
 
 import multibench as mtb
 from multibench.engine import scripts
-from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, registry
 from tests.conftest import full_scan

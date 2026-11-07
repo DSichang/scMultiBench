@@ -35,7 +35,6 @@ import multibench as mtb
 from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs
-from multibench.eval import pipeline
 from tests.test_study_r4_wf import (ALL_ENVS, N, _batch_metrics, _h5, _quiet,  # noqa: F401
                                     cite)
 

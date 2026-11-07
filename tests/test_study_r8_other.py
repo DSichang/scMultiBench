@@ -10,8 +10,6 @@ R8-08: the help of ``multibench scan`` and ``multibench convert`` is short
 sentences without ';', nested parentheses or slash lists.
 """
 import importlib
-import re
-import subprocess
 import warnings
 
 import matplotlib
@@ -19,8 +17,6 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import config
-from multibench.eval import pipeline as P
 
 matplotlib.use("Agg")
 

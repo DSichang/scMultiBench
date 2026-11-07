@@ -17,15 +17,8 @@ Every test needs the docs source (SCMULTIBENCH_DOCS=<docs dir>) and is
 skipped without it.
 """
 import re
-import shlex
 
-import h5py
-import numpy as np
-import pandas as pd
-
-from multibench import config
 from tests.test_docs_r4 import _docs_root, _flat, _read, _visible, needs_docs
-from tests.test_f4_cli import _diag_folder
 
 
 # ---- get started (R5-15) -------------------------------------------------

@@ -16,11 +16,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from multibench import config
 from multibench.engine import ingest
 
-from tests.test_review3_fixes import (CELLS, COUNTS, DEBUG, LOOKS, N, OWN, SAME, _adt, _atac,
-                                      _dense, _refused, _rna, _two_cohorts, _warned)
+from tests.test_review3_fixes import (CELLS, COUNTS, OWN, SAME, _adt, _atac,
+                                      _dense, _refused, _rna, _warned)
 
 ad = pytest.importorskip("anndata")
 

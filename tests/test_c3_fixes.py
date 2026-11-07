@@ -1,6 +1,5 @@
 """Core round c3 (0.4.0): the fixes of the cross-check (c3/crosscheck/items.json)."""
 import contextlib
-import importlib
 import io
 import json
 import warnings

@@ -6,11 +6,9 @@ find_methods(vertical, rna+adt, needs_labels=False); category/modalities were
 not required to hold on the same variant so Multigrate showed up for vertical
 rna+atac.
 """
-import pytest
 
-import multibench as mtb
 from multibench import discover
-from multibench.engine import envs, registry, schema
+from multibench.engine import registry
 
 
 def test_per_variant_semantics_on_a_synthetic_spec(monkeypatch):

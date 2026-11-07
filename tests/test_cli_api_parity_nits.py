@@ -7,7 +7,6 @@
 * ``multibench cite A,B`` works like ``multibench cite A B``.
 """
 import os
-import io
 import warnings
 
 import numpy as np

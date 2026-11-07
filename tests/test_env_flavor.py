@@ -16,7 +16,6 @@ from __future__ import annotations
 import inspect
 import json
 import re
-import urllib.request
 import warnings
 from pathlib import Path
 

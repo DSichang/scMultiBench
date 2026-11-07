@@ -7,10 +7,8 @@ dataset, and nothing said so. 0.3.x warned; since 0.4 it raises.
 import warnings
 
 import pandas as pd
-import pytest
 
 import multibench as mtb
-from multibench._data import results
 
 
 def _quiet(fn, *a, **kw):

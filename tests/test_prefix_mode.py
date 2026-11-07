@@ -30,7 +30,6 @@ import pytest
 import multibench as mtb
 from multibench import _settings
 from multibench import config
-from multibench import workflow as W
 from multibench.engine import envs, runner
 from _serve import serve_archives
 from tests.conftest import full_scan
@@ -231,7 +230,6 @@ def test_install_packed_without_conda_creates_the_prefix(envs_dir, tmp_path, mon
     tgz = _tiny_archive(tmp_path / "matilda.tar.gz")
     fetched = []
     monkeypatch.setattr(envs, "host_system", lambda: None)
-    import urllib.request
     serve_archives(monkeypatch,
                         lambda url: (fetched.append(url), (str(tgz), None))[1])
     assert envs.install_packed("matilda") is True
@@ -254,7 +252,6 @@ def test_install_packed_without_conda_creates_the_prefix(envs_dir, tmp_path, mon
 def test_install_packed_explicit_envs_dir(envs_dir, tmp_path, monkeypatch):
     tgz = _tiny_archive(tmp_path / "x.tar.gz")
     monkeypatch.setattr(envs, "host_system", lambda: None)
-    import urllib.request
     serve_archives(monkeypatch, lambda url: (str(tgz), None))
     other = tmp_path / "elsewhere"
     assert envs.install_packed("scmb_r", envs_dir=other) is True
@@ -265,7 +262,6 @@ def test_install_packed_explicit_envs_dir(envs_dir, tmp_path, monkeypatch):
 def test_install_packed_unpack_failure_cleans_up(envs_dir, tmp_path, monkeypatch, capsys):
     tgz = _tiny_archive(tmp_path / "bad.tar.gz", unpack_ok=False)
     monkeypatch.setattr(envs, "host_system", lambda: None)
-    import urllib.request
     serve_archives(monkeypatch, lambda url: (str(tgz), None))
     assert envs.install_packed("matilda") is False
     assert not (envs_dir / "matilda").exists() and not list(envs_dir.glob("matilda.partial*"))
@@ -301,7 +297,6 @@ def test_install_packed_no_archive_returns_false(envs_dir, monkeypatch):
 
 
 def test_install_platform_guard_precedes_download(envs_dir, monkeypatch):
-    import urllib.request
     monkeypatch.setattr(envs, "host_system", lambda: "macOS")
     serve_archives(monkeypatch,
                         lambda url: pytest.fail("downloaded on a non-linux host"))

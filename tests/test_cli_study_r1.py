@@ -4,22 +4,14 @@ L26-L29, L32, L41, L52, L61 for cli.py / envs.py / config.py).
 Each test fails on the code before its fix: the subcommand, flag or message
 it checks did not exist or read differently.
 """
-import importlib
-import json
-import re
-import shlex
 from pathlib import Path
 
-import numpy as np
-import pandas as pd
 import pytest
 
-import multibench
 from multibench import _settings
 import multibench as mtb
 from multibench import config, workflow
-from multibench.engine import envs, ingest, registry, resolve, runner
-from multibench.eval import pipeline
+from multibench.engine import envs
 
 
 @pytest.fixture

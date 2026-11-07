@@ -13,7 +13,6 @@ of the task runs them all.
 import ast
 import importlib.util
 import json
-import os
 import re
 from pathlib import Path
 
@@ -266,7 +265,6 @@ def test_every_method_reads_every_batch(key):
 def test_every_method_section_lists_the_task_and_links_the_all_page(key):
     """Markdown only: the section counts the methods of the task and links the
     notebook that runs them all, with its download size."""
-    t = GEN.TASKS[key]
     cells = _cells(f"tutorial_{key}")
     i = next(i for i, (kind, src) in enumerate(cells)
              if kind == "markdown" and re.match(r"## \d\. Every method of this task\n", src))
@@ -421,7 +419,6 @@ def _would_run(key, methods, **where):
     input files that nothing but the environment blocks, less the rows inside
     a larger one of the same method (no notebook names the modalities)."""
     import warnings
-    import multibench as mtb
     from multibench import workflow as W
     t = GEN.TASKS[key]
     with warnings.catch_warnings():

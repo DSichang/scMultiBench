@@ -2,7 +2,6 @@
 summary's five statuses and own clusters."""
 import importlib
 import json
-import shutil
 import warnings
 from pathlib import Path
 
@@ -12,10 +11,6 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import workflow
-from multibench.engine import registry, resolve
-from multibench.eval import io as eio, pipeline, scib as escib
-from multibench.plot import style
 from multibench.plot.bubble import _build_table
 
 bar_module = importlib.import_module("multibench.plot.bar")

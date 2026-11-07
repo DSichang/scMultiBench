@@ -8,7 +8,6 @@ probe's verdicts so that failure mode cannot come back silently.
 import stat
 import sys
 import types
-from pathlib import Path
 
 import pytest
 

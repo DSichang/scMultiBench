@@ -19,7 +19,6 @@
 """
 import inspect
 import json
-import re
 import shutil
 import warnings
 from pathlib import Path
@@ -29,15 +28,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import multibench
 import multibench as mtb
 from multibench.plot.bubble import _build_table
-from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs
 from tests.test_docs_r4 import _flat, needs_docs
 from tests.test_study_r4_wf import ALL_ENVS, _h5, _quiet, cite  # noqa: F401
-from tests.test_study_r6_msg import _lung_ids, needs_git, pinned, wrong_ref
+from tests.test_study_r6_msg import _lung_ids, needs_git, pinned, wrong_ref  # noqa: F401 - fixtures
 from tests.test_study_r6_wf import KW, _shuffled_labels, rel  # noqa: F401
 
 #: 0.4: data_path= of load_run is deprecated, so the fix names the config
@@ -295,7 +292,6 @@ def test_plot_unknown_names_are_one_sentence_form(tmp_path, capsys):
 @needs_git
 def test_strict_without_methods_prints_the_scripts_ref_fix(wrong_ref, capsys):
     repo, head = wrong_ref
-    ref = f'The method scripts are at {head}, not deadbeef (MULTIBENCH_SCRIPTS_REF). Unset MULTIBENCH_SCRIPTS_REF, or set MULTIBENCH_REPO_PATH to a new folder and run multibench fetch --scripts.'
     n = len(list(W._variant_rows('cross')))
     assert n == 30
 

@@ -25,7 +25,6 @@ import pytest
 import os
 
 import multibench as mtb
-from multibench.engine import registry
 from tests.conftest import full_scan
 
 

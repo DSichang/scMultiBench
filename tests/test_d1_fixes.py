@@ -2,7 +2,6 @@
 names in embedding.h5, the record of a run folder, one status vocabulary, and
 the messages the users could not act on."""
 import json
-import os
 import shutil
 import warnings
 from pathlib import Path

@@ -6,11 +6,9 @@ the path, the working directory and - for a canonical INPUT matrix handed in
 as an output - what the file actually is.
 """
 import os
-import re
 
 import h5py
 import numpy as np
-import pandas as pd
 import pytest
 
 from multibench.eval import evaluate, io as eio, pipeline

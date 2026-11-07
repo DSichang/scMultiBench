@@ -18,7 +18,6 @@ rule of scan names what atac_peak alone keeps.
 The env probe is pinned where a verdict depends on it; ``_run`` is faked in
 the real-run tests.
 """
-import argparse
 import inspect
 import json
 import re
@@ -32,7 +31,7 @@ import pytest
 import multibench as mtb
 from multibench.engine import scripts
 from multibench import _settings
-from multibench import config, discover
+from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, registry
 from tests.conftest import full_scan

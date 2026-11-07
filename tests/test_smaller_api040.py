@@ -1,5 +1,4 @@
 """Smaller items of the API review (D25)."""
-import importlib
 import inspect
 import subprocess
 import sys

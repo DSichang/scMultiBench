@@ -7,7 +7,6 @@ wrong number (measured: the methods fail), but without this check it fails late,
 after conda-env startup and potentially hours of compute, with a third-party
 error that never mentions orientation.
 """
-import os
 
 import shutil
 

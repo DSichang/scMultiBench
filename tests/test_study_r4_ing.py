@@ -9,22 +9,15 @@
   ``scan`` keeps such rows runnable, with the caveat.
 """
 import os
-import argparse
-import re
 import shutil
-import stat
 import subprocess
-import warnings
 
 import pytest
 
-import multibench as mtb
 from multibench.engine import scripts
 from multibench import _settings
-from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, registry
-from tests.conftest import full_scan
 
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 needs_git = pytest.mark.skipif(shutil.which("git") is None, reason="git not installed")

@@ -7,12 +7,9 @@ every cell type, ARI named 'Louvain/Leiden' clusters, and only some rows said
 which direction is better. catalog.datasets() carried five columns that were
 empty in all rows.
 """
-import warnings
 
-import pandas as pd
 
 import multibench as mtb
-from multibench._data import catalog
 
 
 def _desc():

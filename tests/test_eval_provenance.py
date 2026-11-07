@@ -4,17 +4,14 @@ A CSV of a user's rows must say which Leiden backend ran, whether the
 clusters behind ARI/NMI came from the sweep or from the user, and the package
 version: those decide whether two rows are comparable (S4-11).
 """
-import warnings
 from importlib.metadata import version
 
 import numpy as np
-import pandas as pd
 import pytest
 
 import multibench as mtb
 from multibench import config
 from multibench import workflow as W
-from multibench.eval import pipeline
 
 pytest.importorskip("scib")
 

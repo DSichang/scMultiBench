@@ -1,15 +1,11 @@
 """Names kept through the 0.4 cut: the metric families, the ATAC kind read
 from the names, and a dataset given as a folder path."""
-import io
-import contextlib
-import warnings
 
 import numpy as np
 import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import workflow as W
 
 
 # ------------------------------------------------------------------ catalog / io / plot / env

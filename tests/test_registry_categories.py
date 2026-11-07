@@ -3,8 +3,6 @@ const filenames (P03); method ids are case-sensitive."""
 import pytest
 import yaml
 
-import multibench as mtb
-from multibench import discover, workflow
 from multibench.engine import registry
 from multibench.engine.schema import MethodSpec
 

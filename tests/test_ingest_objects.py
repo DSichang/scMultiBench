@@ -1,6 +1,5 @@
 """export_dataset with objects + one master cell order (P20/P11); to_canonical's
 size warning (P23) and file errors (Noor)."""
-import os
 import warnings
 
 import h5py

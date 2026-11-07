@@ -12,21 +12,17 @@
   normalize_peak_names' example.
 """
 import inspect
-import re
-import shutil
 import warnings
 
 import anndata as ad
 import numpy as np
-import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import config
 from multibench import workflow as W
-from multibench.engine import envs, ingest, registry
+from multibench.engine import envs, ingest
 from tests.test_docs_r4 import _flat, needs_docs
-from tests.test_study_r7_msg import ALL_ENVS, GENES, _h5, _lung, _quiet
+from tests.test_study_r7_msg import GENES, _h5, _lung, _quiet
 from tests.conftest import full_scan
 
 ROOT = __import__("pathlib").Path(__file__).resolve().parent.parent

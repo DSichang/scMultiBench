@@ -9,7 +9,6 @@ deprecated ``source=``, and the agreement of the two copies.
 import ast
 import importlib.util
 import json
-import re
 import warnings
 from pathlib import Path
 

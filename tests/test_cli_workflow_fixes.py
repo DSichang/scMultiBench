@@ -6,17 +6,15 @@ discipline.
 Every test here is host-independent: where a verdict depends on which conda
 envs are installed, ``workflow._installed_envs`` is pinned to "none".
 """
-import json
 import os
 import re
 
 import pandas as pd
-import multibench
 import pytest
 
 import multibench as mtb
 from multibench import workflow
-from multibench.engine import envs, registry
+from multibench.engine import envs
 from tests.conftest import full_scan
 
 

@@ -10,10 +10,9 @@ import os
 import sys
 from pathlib import Path
 
-import pandas as pd
 import pytest
 
-from multibench.engine import envs, registry
+from multibench.engine import envs
 from _serve import serve_archives
 
 ROOT = Path(__file__).resolve().parents[1]

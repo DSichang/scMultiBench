@@ -11,7 +11,6 @@
 import re
 import warnings
 
-import pandas as pd
 import pytest
 
 import multibench as mtb

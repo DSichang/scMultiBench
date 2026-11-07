@@ -9,17 +9,14 @@ These tests pin both, on the committed notebooks: the generated ones (one
 tutorial per integration task, the run of every method of each task, and the
 quickstart).
 """
-import ast
 import importlib.util
 import io
 import json
 import re
 import tokenize
-import warnings
 from pathlib import Path
 
 import pytest
-from tests.conftest import full_scan
 
 ROOT = Path(__file__).resolve().parent.parent
 

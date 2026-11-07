@@ -1,5 +1,4 @@
 """Round-3 student study, package work 'rr': R3-04, R3-10, R3-12."""
-import inspect
 import re
 import shutil
 import subprocess
@@ -15,7 +14,7 @@ from multibench.engine import scripts as _scripts
 from multibench import _settings
 from multibench import config
 from multibench import workflow as W
-from multibench.engine import envs, ingest, registry
+from multibench.engine import envs, registry
 from tests.conftest import full_scan
 
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
@@ -158,13 +157,11 @@ def test_scripts_ref_problem_is_none_without_scripts_or_variable(tmp_path, monke
 @needs_git
 def test_dry_runs_note_another_scripts_ref(scripts, monkeypatch, capsys, tmp_path):
     repo, head = scripts
-    inp = mtb.engine.resolve.inputs_for('D11', 'vertical', 'Matilda')
     assert _scripts.scripts_ref_problem() is None
     monkeypatch.setenv(_scripts.SCRIPTS_REF_VAR, 'deadbeef')
     assert _scripts.scripts_ref_problem() == _mismatch(head)
     mtb.scan('D11', 'vertical', methods=['Matilda'], verbose=False)
     mtb.scan('D11', 'vertical', methods=['Matilda'], verbose=True)
     assert capsys.readouterr().out.count(_mismatch(head)[:-1]) == 1
-    pairs = [a for role, path in inp.items() for a in ('--input', f'{role}={path}')]
     with pytest.raises(RuntimeError, match=re.escape(f'The method scripts in {repo} are at ' + _mismatch(head).split('The method scripts are at ', 1)[1])):
         _scripts.ensure_repo()

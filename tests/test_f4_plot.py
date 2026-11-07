@@ -20,7 +20,6 @@ import pytest
 import multibench as mtb
 # the table behind a bubble figure
 from multibench.plot.bubble import _build_table  # noqa: E402
-from multibench import config
 from tests.conftest import full_scan
 
 B = importlib.import_module("multibench.plot.bubble")

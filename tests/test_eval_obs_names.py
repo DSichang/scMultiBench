@@ -14,7 +14,6 @@ import numpy as np
 import pytest
 
 import multibench as mtb
-from multibench import config
 from multibench.eval import io as eio
 from multibench.eval import pipeline
 from tests.test_missing_labels import _adata, _cells, _donors, _same, _silent
@@ -130,7 +129,6 @@ def test_docstring_states_the_rule():
 
 def test_a_10x_suffix_on_one_side_names_its_fix():
     # Z25 (r3): the '-1' difference and the one call that fixes it
-    import numpy as np
     import pandas as pd
     from multibench.eval import io
     ids = [f"AAAC{i}-1" for i in range(4)]

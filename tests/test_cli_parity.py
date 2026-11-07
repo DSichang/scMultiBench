@@ -4,15 +4,6 @@ scan / layout / export / cite / find filters / plot bubble|bar from stored or
 own tables / evaluate --method/--dataset + npy/csv / flag aliases /
 help strings on every parser and argument / exit codes.
 """
-import argparse
-import importlib
-
-import numpy as np
-import pandas as pd
-import pytest
-
-import multibench
-from tests.conftest import full_scan
 
 
 LONG_COLUMNS = ['metric', 'value', 'method', 'dataset', 'category', 'source', 'scored_with']

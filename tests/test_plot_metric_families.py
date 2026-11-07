@@ -1,7 +1,6 @@
 """``plot.bubble`` / ``bar`` / ``build_table`` and ``plot --metrics`` take the
 family words ``evaluate`` takes: clustering, batch, classification, all."""
 import pandas as pd
-import pytest
 
 import multibench as mtb
 

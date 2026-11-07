@@ -1,10 +1,7 @@
 """Core round c1 (0.4.0) blockers: the label order of evaluate(dataset=, method=),
 obsm=None means X_emb, and one dtype in every route."""
 import importlib
-import json
-import shutil
 import warnings
-from pathlib import Path
 
 import h5py
 import numpy as np
@@ -12,11 +9,8 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import workflow
 from multibench.engine import registry, resolve
 from multibench.eval import io as eio, pipeline, scib as escib
-from multibench.plot import style
-from multibench.plot.bubble import _build_table
 
 bar_module = importlib.import_module("multibench.plot.bar")
 

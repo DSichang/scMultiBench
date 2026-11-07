@@ -5,18 +5,10 @@ Quickstart tab.
 The sentences quoted from messages are compared with what the package says.
 """
 import os
-import re
-import warnings
 from pathlib import Path
 
-import numpy as np
-import pandas as pd
 import pytest
 
-import multibench as mtb
-from multibench.engine import ingest
-from multibench.eval import io
-from multibench.eval import scib as escib
 
 _ROOT = os.environ.get("SCMULTIBENCH_DOCS")
 DOCS = Path(_ROOT) if _ROOT and Path(_ROOT).is_dir() else None

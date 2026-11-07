@@ -15,7 +15,6 @@ which is why it passed on all of them. This checks the property that actually
 matters, statically - a real build is far too slow for the suite.
 """
 
-import pytest
 
 from multibench.engine import envs
 

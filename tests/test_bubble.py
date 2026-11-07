@@ -80,7 +80,7 @@ def test_plot_bubble_save(tmp_path):
     import matplotlib
     matplotlib.use("Agg")
     out = tmp_path / "b.png"
-    fig = bubble.bubble(_toy_long(), metrics=["ARI", "NMI"], save=out)
+    bubble.bubble(_toy_long(), metrics=["ARI", "NMI"], save=out)
     assert out.exists()
 
 
@@ -98,7 +98,6 @@ def test_top_level_plot_namespace(tmp_path):
 # ---------------------------------------------------------------------------
 import inspect
 import pydoc
-import warnings
 
 import pytest
 

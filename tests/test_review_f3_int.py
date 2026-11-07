@@ -23,9 +23,7 @@ depends on it.
 """
 import inspect
 import json
-import re
 import shutil
-import subprocess
 import warnings
 
 import h5py
@@ -402,7 +400,6 @@ def test_scan_says_nothing_of_missing_scripts_and_no_start_notes(pinned, capsys)
 def test_run_all_dry_run_checks_the_batch_length(tmp_path, pinned, capsys):
     short = tmp_path / 'short.csv'
     pd.DataFrame({'b': ['s1', 's2', 's1']}).to_csv(short, index=False)
-    argv = ['run-all', 'D11', '--category', 'vertical', '--methods', 'totalVI', '--dry-run', '--batch']
     full = tmp_path / 'full.csv'
     pd.DataFrame({'b': np.tile(['s1', 's2'], 1432)}).to_csv(full, index=False)
     with pytest.raises(ValueError, match='^D11 is a benchmark dataset'):

@@ -23,7 +23,6 @@ import os
 import ast
 import json
 import re
-import shlex
 import warnings
 from pathlib import Path
 
@@ -37,12 +36,11 @@ from multibench.engine import scripts
 from multibench import _settings
 from multibench import config
 from multibench import workflow as W
-from multibench.engine import envs, ingest, registry, resolve, schema
+from multibench.engine import envs, ingest, registry, resolve
 from multibench.eval import io as eio
 
 from tests.test_docs_r4 import _read, _visible, needs_docs
-from tests.test_tutorial_own_data import (CHECK, EXAMPLE, EXPORT, GEN, NAMES, READ, RUN,
-                                          VERTICAL, _bytes, _content, _namespace, _on_disk,
+from tests.test_tutorial_own_data import (CHECK, EXAMPLE, EXPORT, GEN, NAMES, READ, VERTICAL, _bytes, _namespace, _on_disk,
                                           _run_cell, _sources)
 
 ad = pytest.importorskip("anndata")

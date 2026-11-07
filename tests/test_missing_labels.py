@@ -15,17 +15,14 @@ evaluate returns the long table (``metric, value, ...``).
 """
 import inspect
 import warnings
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import config
 from multibench.engine import ingest
 from multibench.eval import io as eio
-from multibench.eval import pipeline
 
 pytest.importorskip("scib")
 

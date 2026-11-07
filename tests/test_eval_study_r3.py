@@ -165,13 +165,9 @@ def test_label_files_of_one_diagonal_side_are_named(tmp_path, capsys):
     emb = np.random.default_rng(0).normal(size=(150, 5))
     np.save(tmp_path / 'emb.npy', emb)
     data = tmp_path / 'data'
-    d = _folder(data, 'BRAIN', {'rna.h5': 80, 'atac_gas.h5': 70}, {'rna_cty.csv': 80})
+    _folder(data, 'BRAIN', {'rna.h5': 80, 'atac_gas.h5': 70}, {'rna_cty.csv': 80})
     found = mtb.engine.resolve.labels_for('BRAIN', 'diagonal', 'SCALEX', data_path=data)
     assert list(found) == ['rna_cty']
-    out = ['--embedding', str(tmp_path / 'emb.npy'), '--metrics', 'ASW']
-    dataset = ['--dataset', 'BRAIN', '--method', 'SCALEX', '--category', 'diagonal', '--data-path', str(data)]
-    d = _folder(data, 'ATAC', {}, {'atac_cty.csv': 70})
-    d = _folder(data, 'RNA2', {}, {'rna_cty1.csv': 40, 'rna_cty2.csv': 40})
 
 
 def test_other_short_label_files_keep_their_advice(tmp_path, capsys):
@@ -181,7 +177,6 @@ def test_other_short_label_files_keep_their_advice(tmp_path, capsys):
     np.save(tmp_path / 'emb.npy', emb)
     np.save(tmp_path / 'emb80.npy', emb[:80])
     data = tmp_path / 'data'
-    out = ['--embedding', str(tmp_path / 'emb.npy'), '--metrics', 'ASW']
     _folder(data, 'OLDPAIR', {'rna.h5': 120, 'adt.h5': 120}, {'rna_cty.csv': 120})
     d = _folder(data, 'BOTH', {'rna.h5': 80, 'atac_gas.h5': 70}, {'rna_cty.csv': 80, 'atac_cty.csv': 70})
     with pytest.raises(ValueError) as e:

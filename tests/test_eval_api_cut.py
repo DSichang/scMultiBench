@@ -6,7 +6,6 @@ the replacement; ``to_long`` lost ``needs_labels``. One test per removed keyword
 import inspect
 
 import numpy as np
-import pandas as pd
 import pytest
 
 from multibench.eval import evaluate

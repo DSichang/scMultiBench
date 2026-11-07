@@ -11,7 +11,6 @@ import inspect
 import json
 import os
 import re
-import warnings
 from pathlib import Path
 
 import pytest
@@ -140,7 +139,6 @@ def test_notebook_code_cells_parse(nb):
 def test_gen_tut_output_matches_committed_notebooks(tmp_path, monkeypatch):
     """Regenerating must reproduce the committed notebooks' code cells (no hand edits)."""
     gen = _load_gen_tut()
-    import nbformat
     for name, build in _generated(gen).items():
         cells = [c.source for c in build() if c.cell_type == "code"]
         committed = _code_cells(ROOT / "notebooks" / f"{name}.ipynb")

@@ -3,7 +3,6 @@ overall score (tests/test_c2_overall.py)."""
 import importlib
 import json
 import re
-import shutil
 import warnings
 from pathlib import Path
 
@@ -200,7 +199,6 @@ def test_label_files_without_ids_are_matched_by_position_without_a_warning():
 
 
 def test_diagonal_classification_follows_the_folders_sides_whatever_batch_is():
-    from multibench.eval import pipeline
     n = sum(len(pd.read_csv(Path(mtb.config.data_path) / "D28" / f))
             for f in ("rna_cty.csv", "atac_cty.csv"))
     e, donor = _emb(n), np.random.default_rng(1).choice(["d1", "d2"], n)

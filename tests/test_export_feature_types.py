@@ -14,9 +14,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import multibench as mtb
 from multibench import config
-from multibench.engine import ingest, runner
+from multibench.engine import ingest
 
 ad = pytest.importorskip("anndata")
 

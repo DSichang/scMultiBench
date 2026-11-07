@@ -9,7 +9,6 @@
   you mean Matilda and totalVI?" for Matilda and totalVI.
 """
 import os
-from pathlib import Path
 
 import numpy as np
 import pandas as pd

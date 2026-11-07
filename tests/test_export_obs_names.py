@@ -4,7 +4,6 @@
 0.3.4 took the first only and answered the second with a line about
 selector syntax. A name that is no column now names the columns there are.
 """
-import warnings
 
 import numpy as np
 import pandas as pd

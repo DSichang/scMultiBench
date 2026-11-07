@@ -10,8 +10,6 @@ from pathlib import Path
 
 import pytest
 
-import multibench as mtb
-
 
 def _docs_root():
     root = os.environ.get("SCMULTIBENCH_DOCS")

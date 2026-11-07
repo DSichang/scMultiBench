@@ -6,11 +6,9 @@ to run g++ by hand. With a compiler on PATH and knn_graph.cpp shipped, the
 probe now runs scib's own build line once and proceeds. These tests use a
 fake scib package and a fake compiler script, never the real one.
 """
-import os
 import stat
 import sys
 import types
-from pathlib import Path
 
 import pytest
 
@@ -98,14 +96,9 @@ def test_failed_rebuild_keeps_the_original_problem_and_the_gxx_hint(tmp_path, mo
     assert problem and "cannot be executed here" in problem
     assert "rebuilding from source failed" in problem and "no such instruction" in problem
     assert exe.read_bytes() == FOREIGN_BINARY               # untouched
-    # the metric-level fallback still prints the manual build line
-    import warnings
-    import numpy as np
-    out = {}
-    with warnings.catch_warnings(record=True) as rec:
-        warnings.simplefilter("always")
-        # exercise the warning text through the same helper compute() uses
-        msg = mscib._lisi_fallback_message("cLISI", problem)
+    # the metric-level fallback still prints the manual build line;
+    # exercise the warning text through the same helper compute() uses
+    msg = mscib._lisi_fallback_message("cLISI", problem)
     assert "g++ -std=c++11 -O3 -o" in msg and str(exe) in msg and "Recording NaN" in msg
 
 
@@ -131,7 +124,7 @@ def test_loader_failure_is_rebuilt(tmp_path, monkeypatch):
 
 
 def test_a_rebuild_that_does_not_help_reports_the_new_problem(tmp_path, monkeypatch):
-    exe = _fake_scib(tmp_path, monkeypatch,
+    _fake_scib(tmp_path, monkeypatch,
                      exe_bytes=b"#!/bin/sh\n>&2 echo 'GLIBCXX_3.4.29 not found'\nexit 127\n")
     log = _fake_compiler(tmp_path, monkeypatch, succeed=False)
     problem = mscib._lisi_helper_problem()

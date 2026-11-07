@@ -1,8 +1,6 @@
 """Dataset arguments given as folder paths (0.4): the command line resolves them
 as Python does, and a bare name that is only a folder of the working directory
 gets the path to pass."""
-import io
-import contextlib
 import os
 import shutil
 

@@ -13,7 +13,6 @@
   is made. 0.3.4 refused it afterwards and left the folder empty.
 """
 import random
-import warnings
 
 import numpy as np
 import pandas as pd

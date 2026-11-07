@@ -3,9 +3,6 @@ from __future__ import annotations
 
 import os
 
-import anndata as ad
-import numpy as np
-import pandas as pd
 import pytest
 
 import multibench as mtb

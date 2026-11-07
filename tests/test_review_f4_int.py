@@ -17,7 +17,6 @@
 - No user-visible text says 'registry'.
 """
 import inspect
-import re
 import warnings
 
 import h5py
@@ -28,11 +27,10 @@ import pytest
 import multibench as mtb
 from multibench.engine import scripts
 from multibench import _settings
-from multibench import config, discover
+from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, registry
 from multibench.engine import resolve as RS
-from multibench.engine import runner as R
 from tests.conftest import full_scan
 
 #: the caveat of a gene-activity method given peaks in atac.h5 (after the method)

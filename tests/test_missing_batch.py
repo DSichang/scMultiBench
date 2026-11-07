@@ -9,17 +9,14 @@ are scored need a batch. The batch that evaluate makes itself (the label file
 of each cell, or the placeholder when no batch metric is scored) is not
 checked.
 """
-import warnings
 
 import numpy as np
 import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import config
 from multibench.eval import io as eio
-from multibench.eval import pipeline
-from tests.test_missing_labels import GAPS, KEEP, N, _adata, _cells, _donors, _gaps, _same, _silent, _value
+from tests.test_missing_labels import GAPS, N, _adata, _cells, _donors, _gaps, _same, _silent, _value
 
 pytest.importorskip("scib")
 

@@ -21,14 +21,11 @@ import argparse
 import json
 import os
 import re
-import warnings
 from pathlib import Path
 
 import pytest
 import yaml
 
-import multibench as mtb
-from multibench.engine import registry
 
 ROOT = Path(__file__).resolve().parent.parent
 PKG = ROOT / "multibench"

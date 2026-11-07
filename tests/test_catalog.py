@@ -1,9 +1,6 @@
-import warnings
-
 import pytest
 
 from multibench._data import catalog
-from multibench.engine import registry
 
 # canonical_id / canonical_metric / known_metrics / PAPER_COLUMNS are deprecated
 # (0.4) but still work until 0.5; these tests exercise them on purpose.

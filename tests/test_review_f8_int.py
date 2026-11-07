@@ -19,8 +19,6 @@
   'preflight' is gone.
 - scan names a missing scripts checkout in the ``caveat`` column.
 """
-import importlib.util
-import inspect
 import json
 import math
 import warnings
@@ -32,12 +30,9 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import config
 from multibench import workflow as W
-from multibench._data import results as RS
 from multibench.engine import envs
 from multibench.engine import runner as R
-from tests.test_docs_r4 import _flat, needs_docs
 from tests.test_study_r8_other import _plain
 from tests.conftest import full_scan
 

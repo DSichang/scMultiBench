@@ -6,11 +6,9 @@ chip); the legends and row labels of a narrow figure fit inside the figure at it
 own size.
 """
 import importlib
-import inspect
 import warnings
 
 import matplotlib
-import pandas as pd
 import pytest
 
 import multibench as mtb

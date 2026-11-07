@@ -13,15 +13,12 @@ import subprocess
 import sys
 from pathlib import Path
 
-import h5py
 import numpy as np
-import pandas as pd
 import pytest
 
 import multibench as mtb
 from multibench.engine import scripts
 from multibench import _settings
-from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, registry
 

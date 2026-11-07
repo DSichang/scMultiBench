@@ -30,7 +30,6 @@ def test_methods_are_canonicalized(result_dir):
 # ---------------------------------------------------------------------------
 # provenance (`source`), clustering-variant dirs, filters, error texts
 # ---------------------------------------------------------------------------
-import warnings
 
 import pandas as pd
 import pytest

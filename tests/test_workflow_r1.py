@@ -10,10 +10,7 @@ Host-independent: the platform is pinned to Linux by conftest; the tests of
 the other hosts patch ``envs.host_system`` themselves.
 """
 import inspect
-import json
 import re
-import shlex
-import warnings
 from pathlib import Path
 
 import h5py

@@ -241,8 +241,6 @@ def test_a_diagonal_labels_series_is_put_in_each_methods_cell_order(tmp_path):
 import textwrap  # noqa: E402
 
 from multibench.eval import io as eio  # noqa: E402
-from tests.test_f3_cli import _clear_env_caches  # noqa: E402
-from tests.test_f4_cli import _standin  # noqa: E402
 
 SAMPLES = np.tile(["s1", "s2"], N // 2)
 # a stand-in method whose embedding separates the cell types and shifts sample s2
@@ -375,7 +373,6 @@ def test_files_without_an_id_column_are_read_as_before(tmp_path, cite):
 
 
 # ======================================================================= R5-03
-from tests.test_f3_cli import _WRITER  # noqa: E402
 
 
 def _rec(method, status, **kw):

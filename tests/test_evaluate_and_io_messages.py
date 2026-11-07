@@ -180,8 +180,7 @@ def test_default_order_warning_once():
 
 # X10: barcodes that match after removing a suffix say so; vertical drops the diagonal hint
 def test_export_barcodes_that_differ_by_a_suffix():
-    import numpy as np
-    ad = pytest.importorskip("anndata")
+    pytest.importorskip("anndata")
     from test_study_r2_rr import _peak_adata, _rna_adata
     rna = _rna_adata([f"AAAC{i:04d}-1" for i in range(30)])
     atac = _peak_adata([f"AAAC{i:04d}" for i in range(30)])
@@ -217,7 +216,6 @@ def test_label_column_in_another_case(tmp_path):
 
 # Y11: in rescore, the Leiden search warning names its method
 def test_rescore_leiden_warning_names_the_method(monkeypatch):
-    import numpy as np
     from multibench import workflow
     from multibench.eval import scib
 

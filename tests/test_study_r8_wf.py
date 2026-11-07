@@ -15,7 +15,6 @@ R8-06  template-like docstring passages; ``label_order_confidence`` was an
 import os
 import inspect
 import math
-import re
 from pathlib import Path
 
 import pandas as pd
@@ -24,7 +23,7 @@ import pytest
 import multibench as mtb
 from multibench.engine import scripts
 from multibench import workflow as W
-from multibench.engine import envs, runner as R
+from multibench.engine import envs
 from tests.test_f4_cli import working  # noqa: F401 - the stand-in Matilda env fixture
 from tests.conftest import full_scan
 

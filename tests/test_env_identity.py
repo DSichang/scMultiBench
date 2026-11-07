@@ -21,7 +21,7 @@ import pytest
 
 import multibench as mtb
 from multibench import config
-from multibench.engine import envs, runner
+from multibench.engine import envs
 from tests.conftest import full_scan
 
 FAKE_CONDA = r"""#!/bin/sh

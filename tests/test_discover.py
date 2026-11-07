@@ -1,5 +1,3 @@
-import pytest
-
 from multibench import discover
 
 

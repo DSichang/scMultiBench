@@ -14,7 +14,6 @@ same sentence in the env gate. On a GPU host nothing changes. Every test
 patches ``host_has_gpu`` both ways, so it holds on ANY machine.
 """
 import os
-from pathlib import Path
 
 import h5py
 import numpy as np

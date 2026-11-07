@@ -7,24 +7,15 @@ prefix (a ``bin/python`` stub that writes an embedding), so the path from the
 command line to ``run(batch=)`` and the saved summary is exercised end to
 end without conda or a method.
 """
-import argparse
 import os
-import re
-import stat
-import sys
 import textwrap
 
 import h5py
 import numpy as np
-import pandas as pd
 import pytest
 
-import multibench as mtb
 from multibench import _settings
-from multibench import config
-from multibench import workflow as W
-from multibench._data import results
-from multibench.engine import envs, runner
+from multibench.engine import envs
 
 N = 120
 

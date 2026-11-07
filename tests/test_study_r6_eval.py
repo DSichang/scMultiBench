@@ -11,7 +11,6 @@ R6-15: the catalog's cLISI and iLISI rows name the median over cells.
 """
 import os
 
-import numpy as np
 import pandas as pd
 import pytest
 

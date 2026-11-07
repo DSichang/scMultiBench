@@ -11,9 +11,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import multibench as mtb
 from multibench import workflow
-from multibench.engine import runner, envs, registry
+from multibench.engine import envs
 from tests.conftest import full_scan
 
 

@@ -13,7 +13,6 @@ import pytest
 pytest.importorskip("scanpy")
 pytest.importorskip("scib")
 
-import multibench as mtb
 from multibench.eval import scib as S
 
 

@@ -1,7 +1,6 @@
 """rank(long_df=) gives the numbers behind a figure, in its row order (core040 M7)."""
 import warnings
 
-import pandas as pd
 import pytest
 
 import multibench as mtb

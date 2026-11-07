@@ -6,13 +6,10 @@ leave the listing, and ``bubble`` / ``bar`` take the same keyword-only
 selectors after ``long_df``.
 """
 import inspect
-import warnings
 
 import matplotlib
 matplotlib.use("Agg")
 
-import pandas as pd
-import pytest
 
 import multibench as mtb
 

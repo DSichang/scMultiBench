@@ -8,11 +8,9 @@ means base ``atac`` plus the ATAC representation the method reads, the same as
 which reads gene activity, ``rank(atac=...)`` was a TypeError and
 ``rank(modalities=['rna', 'peak'])`` ranked all 14 diagonal methods.
 """
-import warnings
 
 import pytest
 
-import multibench as mtb
 from multibench import discover
 
 

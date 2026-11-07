@@ -1,6 +1,5 @@
 """export_dataset: AnnData or MuData -> canonical dataset folder
 (work package D_ingest, proposal P04)."""
-import os
 import warnings
 
 import h5py
@@ -58,7 +57,6 @@ def test_export_dataset_vertical(tmp_path):
                               data_path=root, check=True)
     assert got["rna"].endswith("rna.h5") and got["adt"].endswith("adt.h5")
     # ... and scan() lists the vertical rna+adt methods for it (env-independent)
-    import multibench as mtb
     sc = full_scan("MYCITE", "vertical", data_path=root)
     assert ((sc["method"] == "Matilda") & (sc["modalities"] == "rna+adt")).any()
     # the file gate now runs on every host: the rna+adt rows must pass it (the

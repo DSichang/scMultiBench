@@ -9,8 +9,6 @@ for a GPU node; ``--strict`` counts the GPU test on its own.
 M29: one ``--labels`` spelling for a ``.h5mu`` batch, and an error that
 names it.
 """
-import json
-import re
 import warnings
 
 import numpy as np
@@ -18,7 +16,7 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import config, workflow as W
+from multibench import workflow as W
 from multibench.engine import envs, ingest
 from tests.conftest import full_scan
 

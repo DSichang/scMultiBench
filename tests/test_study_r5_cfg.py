@@ -9,15 +9,8 @@
   nothing under ``data_path``. The progress line names the URL.
 """
 import importlib
-import io
-import re
-import urllib.error
-
-import pytest
 
 import multibench as mtb
-from multibench import config
-from multibench import workflow as W
 from multibench.engine import envs, registry
 
 F = importlib.import_module("multibench._data.fetch")

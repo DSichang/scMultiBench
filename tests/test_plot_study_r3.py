@@ -16,7 +16,6 @@ import pytest
 import multibench as mtb
 # the table behind a bubble figure: mtb.plot.build_table is deprecated in 0.4.0
 from multibench.plot.bubble import _build_table  # noqa: E402
-from multibench import config
 
 B = importlib.import_module("multibench.plot.bubble")
 

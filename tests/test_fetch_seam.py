@@ -1,16 +1,7 @@
 """``mtb.data.fetch`` through its single network seam (``fetch._download``),
 and the ``load_run(methods=)`` filter, without the network."""
-import fnmatch
 import importlib
-import json
-import re
-import tarfile
 from pathlib import Path
-
-import h5py
-import numpy as np
-import pandas as pd
-import pytest
 
 import multibench as mtb
 

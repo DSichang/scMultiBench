@@ -10,7 +10,6 @@ import pytest
 
 import multibench as mtb
 from multibench import _settings
-from multibench import config
 from multibench.eval import pipeline
 
 

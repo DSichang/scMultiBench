@@ -18,8 +18,6 @@ both directions, so every test of this file runs with the three set back to
 gene activity (``three_methods_read_gene_activity``). The messages pinned
 here are what the package says about such a method, not about the real three.
 """
-import inspect
-import json
 import os
 import warnings
 
@@ -29,7 +27,6 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import discover
 from multibench import workflow as W
 from multibench.engine import envs, registry
 from tests.conftest import full_scan

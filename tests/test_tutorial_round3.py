@@ -113,7 +113,6 @@ def _batch(rng, n, feats):
 
 def _scan(name, cat, root, modalities):
     """The rows of one modality set (a method has one row per variant)."""
-    import multibench as mtb
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         df = full_scan(name, cat, data_path=root, verbose=False)

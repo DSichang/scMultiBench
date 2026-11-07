@@ -9,10 +9,8 @@ warning and writes scored_with = 'unknown' instead of dropping the column.
 """
 import inspect
 import warnings
-from importlib.metadata import version
 
 import numpy as np
-import pandas as pd
 import pytest
 
 import multibench as mtb

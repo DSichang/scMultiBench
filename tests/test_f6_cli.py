@@ -13,17 +13,13 @@ CLI dry run prints its header first.
 R6-13: plot messages read as sentences: the CLI overlay errors, the igraph
 backend warning, the require_complete warning and error.
 """
-import warnings
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import config
 from multibench.engine import registry
-from tests.test_f4_cli import _diag_folder
 
 pytest.importorskip("scib")
 

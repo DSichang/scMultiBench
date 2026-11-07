@@ -240,7 +240,6 @@ def test_scan_of_complete_labels_prints_no_such_line(cite, capsys):
 def test_scan_off_linux_names_the_gap(
         cite, monkeypatch, capsys):
     # no environment can be installed here; the rows would run on Linux
-    from multibench.engine import runner as R
     monkeypatch.setattr("multibench.engine.envs.host_system", lambda: "macOS")
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     _write(cite / "MYCITE" / "cty.csv", _with_gaps())

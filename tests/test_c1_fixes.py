@@ -1,21 +1,14 @@
 """Core round c1 (0.4.0): the smaller fixes and simplifications."""
 import importlib
-import json
-import shutil
 import warnings
 from pathlib import Path
 
-import h5py
 import numpy as np
 import pandas as pd
 import pytest
 
 import multibench as mtb
-from multibench import workflow
-from multibench.engine import registry, resolve
-from multibench.eval import io as eio, pipeline, scib as escib
-from multibench.plot import style
-from multibench.plot.bubble import _build_table
+from multibench.engine import resolve
 from tests.test_c1_decisions import _tree  # noqa: F401
 
 bar_module = importlib.import_module("multibench.plot.bar")

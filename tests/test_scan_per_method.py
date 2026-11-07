@@ -21,8 +21,6 @@ from multibench import _settings
 from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, registry
-from multibench.engine import runner as R
-from tests.conftest import full_scan
 
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 GENES = [f"GENE{i}" for i in range(40)]

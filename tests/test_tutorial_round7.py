@@ -106,7 +106,6 @@ def test_env_reason_on_linux_holds_the_install_command_the_tutorials_name(name, 
     environments; ``env_reason`` gives the same command for a missing one."""
     import multibench as mtb
     from multibench import workflow as W
-    from multibench.engine import runner as R
     t = GEN.TASKS[name.removeprefix("tutorial_")]
     cat, methods = t["cat"], t["methods"]
     md = _markdown(name, "## 2. Download the data and the environments")

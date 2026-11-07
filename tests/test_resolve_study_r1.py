@@ -5,7 +5,6 @@ A per-batch folder (rna1..3.h5) scanned as vertical resolved batch 1 only
 did not read ``atac_peak<i>.h5`` (L06); StabMap's reference batch was not
 documented or exposed (L55).
 """
-import inspect
 import warnings
 
 import h5py

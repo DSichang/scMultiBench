@@ -3,10 +3,8 @@
 Without this check, scan() calls such a method runnable and the failure only
 arrives minutes later, from a shell, as a file-not-found.
 """
-import urllib.parse
 from types import SimpleNamespace
 
-import multibench as mtb
 from multibench import _settings, workflow
 
 

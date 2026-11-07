@@ -12,12 +12,8 @@ M22, M13, M28 and the category help: message and help wording.
 M25, M06: docstring wording. M10: the missing-script fix for a folder that is
 not a git checkout. M05, M09, M10, M06, M30: facts on the docs pages.
 """
-import contextlib
-import importlib.util
-import io
 import json
 import os
-import re
 import shutil
 import warnings
 from pathlib import Path
@@ -32,8 +28,6 @@ import multibench as mtb
 from multibench.engine import scripts
 from multibench import config, workflow as W
 from multibench.engine import envs, registry, resolve
-from multibench.plot import bubble as B
-from tests.conftest import full_scan
 
 ROOT = Path(__file__).resolve().parents[1]
 ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
@@ -298,6 +292,5 @@ def test_run_refuses_seurat_v5_on_files_from_different_cells(tmp_path, capsys):
 
 
 def test_help_texts_put_the_object_first_and_end_in_plain_sentences():
-    import argparse
     doc = ' '.join(mtb.scan.__doc__.split())
     assert "``True`` = skip this host's GPU test, to check a job for a GPU node from a login node." in doc

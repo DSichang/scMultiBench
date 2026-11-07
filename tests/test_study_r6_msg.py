@@ -29,7 +29,7 @@ from multibench.engine import scripts
 from multibench import _settings
 from multibench import config
 from multibench import workflow as W
-from multibench.engine import envs, ingest, registry
+from multibench.engine import envs, registry
 from tests.conftest import full_scan
 
 #: the caveat of a gene-activity method given peaks in atac.h5 (after the method)
@@ -336,8 +336,6 @@ def test_callers_print_the_method_name_once(tmp_path, pinned, root, monkeypatch,
 
 
 def test_strict_counts_are_unchanged(tmp_path, pinned, root, capsys):
-    data = _lung_ids(tmp_path)
-    base = ['scan', 'LUNG_ids', '--category', 'diagonal', '--data-path', str(data), '--strict']
     n = len(list(W._variant_rows('diagonal')))
     assert n == 18
     n -= 4

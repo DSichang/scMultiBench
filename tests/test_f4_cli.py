@@ -12,14 +12,11 @@ semicolon inside parentheses.
 The run-all tests run the real runner in prefix mode against stand-in env
 prefixes (a ``bin/python`` stub), as ``test_f3_cli`` does.
 """
-import os
-import re
 import stat
 import sys
 import textwrap
 import warnings
 
-import h5py
 import numpy as np
 import pandas as pd
 import pytest
@@ -29,7 +26,7 @@ from multibench import _settings
 from multibench import config
 from multibench import workflow as W
 from multibench.engine import envs, runner
-from tests.test_f3_cli import _clear_env_caches, _h5, _rendered_help, _WRITER, N
+from tests.test_f3_cli import _clear_env_caches, _h5, _WRITER, N
 from _serve import serve_archives
 
 pytest.importorskip("scib")
@@ -136,7 +133,6 @@ def test_single_build_is_an_env_without_a_cpu_key(tmp_path, monkeypatch):
 
 def test_single_build_install_does_not_warn_and_unpacks_as_single(
         tmp_path, monkeypatch, capsys):
-    import urllib.request
 
     from tests.test_prefix_mode import _tiny_archive
     manifest = {"scmb_r": "https://x/scmb_r.tar.gz"}

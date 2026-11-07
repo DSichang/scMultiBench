@@ -4,10 +4,7 @@ A file-role method gets ``inputs/`` for its canonical copies; a ``data_dir``
 method (scBridge) takes the dataset folder plus bare filenames, so it gets no
 empty ``inputs/``.
 """
-from pathlib import Path
 
-import numpy as np
-import h5py
 import pytest
 
 import multibench as mtb

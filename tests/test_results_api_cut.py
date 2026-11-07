@@ -5,7 +5,6 @@ naming the replacement; ``available_datasets`` lost ``metric_set`` and
 ``clustering``. The 0.4 deprecated keywords (``source``, ``result_path``,
 ``clustering``) leave the signatures and keep working.
 """
-import inspect
 import warnings
 
 import pandas as pd

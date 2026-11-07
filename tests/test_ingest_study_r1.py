@@ -15,9 +15,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import multibench as mtb
 from multibench.engine import ingest
-from multibench.engine import resolve
 from tests.conftest import full_scan
 
 ad = pytest.importorskip("anndata")

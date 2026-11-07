@@ -1,6 +1,5 @@
 """Hyperparameters: how a value is rendered, what is tunable, argument mistakes."""
 from __future__ import annotations
-import warnings
 
 import pytest
 

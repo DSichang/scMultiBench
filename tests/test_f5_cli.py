@@ -11,20 +11,13 @@ the prepared-files and peak-name notes start with the method, the scan
 reason is sentences with their own subjects, counts without '(s)'.
 """
 import ast
-import re
-import warnings
 from pathlib import Path
 
-import numpy as np
-import pandas as pd
 import pytest
 
 import multibench as mtb
 from multibench.engine import scripts
-from multibench import config
 from multibench.engine import envs
-from multibench._data import results as R
-from tests.test_f4_cli import _diag_folder
 from tests.conftest import full_scan
 
 pytest.importorskip("scib")
@@ -34,7 +27,7 @@ _PKG = Path(mtb.__file__).resolve().parent
 
 # ====================================================================== R5-10
 from multibench import workflow as W                                  # noqa: E402
-from multibench.engine import envs, registry, runner                  # noqa: E402
+from multibench.engine import envs, runner                  # noqa: E402
 from tests.test_review_f3_int import _diagonal, _quiet, pinned        # noqa: E402,F401
 
 
@@ -107,7 +100,6 @@ def test_fetch_prints_no_progress_line(tmp_path, monkeypatch, capsys):
     import subprocess
 
     def fake_run(argv, check=True, **kw):
-        target = argv[-1] if argv[:2] == ["git", "clone"] else argv[3]
         (tmp_path / "fresh.partial" / "tools_scripts").mkdir(parents=True, exist_ok=True)
         return subprocess.CompletedProcess(argv, 0)
     monkeypatch.setattr(subprocess, "run", fake_run)
@@ -128,5 +120,4 @@ def test_error_tail_is_clipped_at_a_word_boundary():
 
 # ---- the Python part of tests that also ran the command line
 def test_prepared_note_starts_with_the_method(monkeypatch):
-    counts = 'GLUE needs raw counts. rna.h5 holds non-integer values.'
     assert runner._prepared_at('GLUE reads peak names such as chr1:100-200.') == -1
