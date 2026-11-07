@@ -49,10 +49,16 @@ def test_params_for_separates_parameters_from_what_stays_fixed():
 
 
 def test_no_library_setting_is_also_a_parameter():
+    # a knob is named with its function ("k.nn (FindMultiModalNeighbors)") or
+    # with two spellings ("seed / random_state"): the setting names are compared
     from multibench.engine import registry
+    names = _load_generator().knob_names
+    assert names("n_neighbors (calc_post_graph)") == {"n_neighbors"}
+    assert names("seed / random_state") == {"seed", "random_state"}
     for m in AUDITED:
         tunable = {k for v in registry.get(m).variants for k in v.tunable}
-        assert not tunable & {k["name"] for k in upstream.knobs_for(m)["upstream_knobs"]}, m
+        knobs = set().union(*(names(k["name"]) for k in upstream.knobs_for(m)["upstream_knobs"]))
+        assert not tunable & knobs, m
 
 
 def test_unaudited_method_returns_empty_lists_not_an_error():

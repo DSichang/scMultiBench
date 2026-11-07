@@ -83,6 +83,12 @@ def relocate(h: dict, clone: pathlib.Path) -> dict | None:
     return None
 
 
+def knob_names(name: str) -> set:
+    """The setting names a knob entry gives: ``"n_neighbors (calc_post_graph)"``
+    names ``n_neighbors``, ``"seed / random_state"`` names both."""
+    return {n.strip() for n in name.split(" (")[0].split(" / ")}
+
+
 def tunable_names() -> dict:
     """``{method: {parameter names of any of its variants}}`` from the registry."""
     sys.path.insert(0, str(HERE.parent))
@@ -111,7 +117,7 @@ def main(clone: pathlib.Path) -> int:
                   "default": str(k.get("library_default") or "(undocumented)"),
                   "effect": k["effect"]}
                  for k in (m.get("library_knobs") or [])
-                 if k["name"] not in params.get(m["method"], ())]
+                 if not knob_names(k["name"]) & params.get(m["method"], set())]
         entry = {"upstream_url": m.get("upstream_url", ""),
                  "fixed_in_script": fixed,
                  "upstream_knobs": knobs}

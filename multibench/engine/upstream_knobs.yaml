@@ -156,16 +156,9 @@ MultiMAP:
   - default: None (derived from spread=1.0)
     effect: minimum separation of points in the low-dimensional layout, i.e. cluster tightness
     name: min_dist
-  - default: '0'
-    effect: RNG seed for the spectral initialization and stochastic layout optimization
-    name: seed / random_state
   - default: 'True'
     effect: whether each dataset is scaled to N(0,1) before the cross-dataset PCAs are computed
     name: scale (Integration)
-  - default: '50'
-    effect: number of LSI components computed from the binarized, TF-IDF-transformed ATAC
-      peak matrix
-    name: n_comps (TFIDF_LSI)
   upstream_url: https://github.com/Teichlab/MultiMAP/blob/master/MultiMAP/__init__.py
 MultiVI:
   fixed_in_script:
@@ -269,9 +262,6 @@ Seurat_WNN:
     source: tools_scripts/Seurat_v4/util.R:84
     value: algorithm = 3 (SLM); resolution not passed, so 0.8
   upstream_knobs:
-  - default: '20'
-    effect: number of multimodal neighbors retained in the weighted-NN graph
-    name: k.nn (FindMultiModalNeighbors)
   - default: no default — required argument
     effect: per-modality dimensions fed into the weighted nearest-neighbor computation
     name: dims.list
@@ -325,15 +315,6 @@ Seurat_v3:
   - default: '30'
     effect: neighborhood size used to score each anchor's consistency
     name: k.score
-  - default: '50'
-    effect: number of anchors weighted per query cell when transferring labels or expression
-    name: k.weight (TransferData)
-  - default: '2000'
-    effect: size of the HVG set that becomes the anchor feature space
-    name: nfeatures (FindVariableFeatures)
-  - default: '50'
-    effect: dimensionality of the co-embedding PCA that is written out as this method's result
-    name: npcs (RunPCA)
   upstream_url: https://satijalab.org/seurat/reference/findtransferanchors
 Seurat_v5:
   fixed_in_script:
@@ -375,9 +356,6 @@ Seurat_v5:
   - default: c("direct", "cca") — first value "direct" is used
     effect: whether bridge and query are compared directly on assay data or through CCA
     name: bridge.reduction
-  - default: '3000'
-    effect: how many top-residual-variance genes SCT keeps, feeding the reference PCA
-    name: variable.features.n (SCTransform)
   upstream_url: https://satijalab.org/seurat/reference/preparebridgereference
 StabMap:
   fixed_in_script:
@@ -636,12 +614,6 @@ scMVP:
   - default: '"zinb"'
     effect: likelihood for the RNA channel, zero-inflated vs plain negative binomial
     name: reconstruction_loss
-  - default: '20'
-    effect: number of training epochs
-    name: n_epochs (Trainer.train)
-  - default: '200'
-    effect: epochs over which the KL term is annealed to full weight
-    name: n_epochs_kl_warmup (MultiTrainer)
   upstream_url: https://raw.githubusercontent.com/bm2-lab/scMVP/master/scMVP/models/multi_vae_attention.py
 scMoMaT:
   fixed_in_script:
@@ -658,9 +630,6 @@ scMoMaT:
     source: tools_scripts/scMoMaT/main_scMoMaT.py:98
     value: n_components=2, min_dist=0.20, random_state=0
   upstream_knobs:
-  - default: no default — required positional argument; README recommends 30~50
-    effect: neighborhood size of the post-processed kNN graph that is the method's output
-    name: n_neighbors (calc_post_graph)
   - default: None
     effect: radius parameter (0-1) bounding neighborhood size as an alternative to a fixed
       k
