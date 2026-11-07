@@ -424,11 +424,9 @@ def rank(
             raise ValueError(f"No scored method in {category} reads {list(modalities)}.")
 
     # methods run for the category without scores; of long_df's methods only
-    in_frame = {catalog._canonical_id(m) for m in df["method"].unique()}
-    wired = [m for m in find_methods(category=category, modalities=modalities)
-             if (stored or m in in_frame) and (want_ids is None or m in want_ids)]
-    scored_ids = {catalog._canonical_id(m) for m in keep_methods}
-    missing = sorted((m for m in wired if m not in scored_ids), key=str.lower)
+    in_frame = None if stored else {catalog._canonical_id(m) for m in df["method"].unique()}
+    missing = _unscored_methods(category, modalities, keep_methods, in_frame=in_frame,
+                                want_ids=want_ids)
 
     out = pd.DataFrame([{"method": m,
                          "grand_score": float(grand.loc[m]) if m in grand.index else float("nan"),
@@ -442,6 +440,31 @@ def rank(
         unmeasured = _unmeasured_note(category, list(kept), want_mods, stored)
         if unmeasured:
             raise ValueError(unmeasured)
+    partial = {m: int(n_ds.loc[m]) for m in out["method"]
+               if m in n_ds.index and n_ds.loc[m] < len(kept)}
+    warning = _rank_warning(category, degenerate, foreign, partial, len(kept), backend)
+    if warning:
+        _text.warn(warning, UserWarning)
+    return out
+
+
+def _unscored_methods(category, modalities, scored, *, in_frame=None, want_ids=None) -> list:
+    """The methods the package runs for ``category`` (and ``modalities``) that
+    are not among ``scored``, by name; only those of ``in_frame`` and of
+    ``want_ids`` when given (``long_df=`` and ``methods=``)."""
+    from ..discover import find_methods
+    scored_ids = {catalog._canonical_id(m) for m in scored}
+    wired = [m for m in find_methods(category=category, modalities=modalities)
+             if (in_frame is None or m in in_frame) and (want_ids is None or m in want_ids)]
+    return sorted((m for m in wired if m not in scored_ids), key=str.lower)
+
+
+def _rank_warning(category, degenerate, foreign, partial: dict, n_datasets: int,
+                  backend) -> str | None:
+    """rank()'s one warning, or ``None``: the ``degenerate`` datasets left out,
+    the ``foreign`` methods not run for ``category``, the methods scored on part
+    of the ``n_datasets`` datasets (``partial``: ``{method: datasets}``) and the
+    ``backend`` note."""
     notes = []
     if degenerate:
         one = len(degenerate) == 1
@@ -454,16 +477,13 @@ def rank(
         one = len(foreign) == 1
         notes.append(f"{_and_list(foreign)} {'is' if one else 'are'} not run for {category} "
                      f"by this package and left out.")
-    partial = [m for m in out["method"] if m in n_ds.index and n_ds.loc[m] < len(kept)]
     if partial:
         notes.append(
             "Some methods have scores on only part of the datasets: "
-            + ", ".join(f"{m} {int(n_ds.loc[m])} of {len(kept)}" for m in partial) + ".")
+            + ", ".join(f"{m} {k} of {n_datasets}" for m, k in partial.items()) + ".")
     if backend:
         notes.append(backend)
-    if notes:
-        _text.warn(f"rank({category!r}):\n  - " + "\n  - ".join(notes), UserWarning)
-    return out
+    return f"rank({category!r}):\n  - " + "\n  - ".join(notes) if notes else None
 
 
 def _refuse_other_categories(long_df, category) -> None:
