@@ -665,7 +665,6 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
         archive is published or the unpack failed (the caller then builds
         from the lockfile).
     """
-    import tarfile
     import urllib.error
 
     if envs_dir is not None:
@@ -679,20 +678,12 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
         if made_by_multibench(dest, env):
             return True
         raise RuntimeError(other_env_text(env, dest, "install again."))
-    manifest, sizes = packed_manifest(), packed_sizes()
-    key, installed = archive_for(env, flavor, manifest=manifest, sizes=sizes)
-    if (resolve_flavor(flavor) == "cpu" and installed == "gpu"
-            and not _single_build(env, manifest=manifest)):
-        size = _gb((sizes.get(env) or {}).get("archive_bytes"))
-        _text.warn(f"No CPU build of {env} yet; installing the GPU build ({size}).",
-                   UserWarning)
-    urls = archive_urls(key, manifest)
-    build = "single" if _single_build(env, manifest=manifest) else installed
+    key, urls, build, total = _pick_archive(env, flavor)
     envs_root.mkdir(parents=True, exist_ok=True)
     tgz = envs_root / f".{key}.tar.gz.download"
     try:
         download_archive(urls, tgz, label=env if build == "single" else f"{env} ({build} build)",
-                         total=(sizes.get(key) or {}).get("archive_bytes"))
+                         total=total)
     except urllib.error.HTTPError:
         tgz.unlink(missing_ok=True)
         return False
@@ -700,26 +691,14 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
         tgz.unlink(missing_ok=True)
         raise
     print(f"[env] unpacking {env} ...", flush=True)
-    from .._data.fetch import safe_extract
     part = dest.with_name(dest.name + ".partial")
     try:
-        shutil.rmtree(part, ignore_errors=True)
-        part.mkdir(parents=True)
-        with tarfile.open(tgz) as t:
-            safe_extract(t, part)
-        if not (part / "bin").is_dir():
-            raise RuntimeError("archive did not contain bin/")
-        # the files this env shares with others: one download, hard links
-        marker = part / LAYER_MARKER
-        if marker.is_file():
-            for name, info in _json.loads(marker.read_text())["layers"].items():
-                _link_layer(_ensure_layer(name, info, envs_root), part, info)
+        _unpack_archive(tgz, part, envs_root)
         # conda-unpack writes the final path into the env: move first
         part.rename(dest)
         _conda_unpack(dest)
         # last, so a prefix that failed to unpack claims no flavour
-        (dest / FLAVOR_FILE).write_text(
-            ("single" if build == "single" else installed) + "\n")
+        (dest / FLAVOR_FILE).write_text(build + "\n")
         _remember_root(envs_root)
         _conda_prefixes.cache_clear()
         return True
@@ -734,6 +713,40 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
         return False
     finally:
         tgz.unlink(missing_ok=True)
+
+
+def _pick_archive(env: str, flavor: str) -> tuple[str, list[str], str, int | None]:
+    """``(key, urls, build, total)`` of the archive that installs ``env`` for
+    ``flavor``: ``build`` is ``'single'`` (one archive for CPU and GPU hosts),
+    ``'cpu'`` or ``'gpu'``; ``total`` is its size in bytes, ``None`` when not
+    recorded. Warns when a CPU host gets the GPU build."""
+    manifest, sizes = packed_manifest(), packed_sizes()
+    key, installed = archive_for(env, flavor, manifest=manifest, sizes=sizes)
+    single = _single_build(env, manifest=manifest)
+    if resolve_flavor(flavor) == "cpu" and installed == "gpu" and not single:
+        size = _gb((sizes.get(env) or {}).get("archive_bytes"))
+        _text.warn(f"No CPU build of {env} yet; installing the GPU build ({size}).",
+                   UserWarning)
+    return (key, archive_urls(key, manifest), "single" if single else installed,
+            (sizes.get(key) or {}).get("archive_bytes"))
+
+
+def _unpack_archive(tgz: Path, part: Path, envs_root: Path) -> None:
+    """Extract the env archive ``tgz`` into the new folder ``part`` and link in
+    the shared layers it names (downloaded into ``envs_root`` on first use)."""
+    import tarfile
+    from .._data.fetch import safe_extract
+    shutil.rmtree(part, ignore_errors=True)
+    part.mkdir(parents=True)
+    with tarfile.open(tgz) as t:
+        safe_extract(t, part)
+    if not (part / "bin").is_dir():
+        raise RuntimeError("archive did not contain bin/")
+    # the files this env shares with others: one download, hard links
+    marker = part / LAYER_MARKER
+    if marker.is_file():
+        for name, info in _json.loads(marker.read_text())["layers"].items():
+            _link_layer(_ensure_layer(name, info, envs_root), part, info)
 
 
 def _conda_unpack(prefix: Path) -> None:

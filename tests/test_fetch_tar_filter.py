@@ -64,5 +64,6 @@ def test_traversal_guard_still_fires_before_extraction(tmp_path):
 def test_install_packed_goes_through_safe_extract():
     import inspect
     from multibench.engine import envs
-    src = inspect.getsource(envs.install_packed)
+    assert "_unpack_archive(tgz, part, envs_root)" in inspect.getsource(envs.install_packed)
+    src = inspect.getsource(envs._unpack_archive)
     assert "safe_extract(t, part)" in src and "extractall" not in src
