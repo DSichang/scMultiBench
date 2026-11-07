@@ -374,6 +374,57 @@ def _isolated_labels_f1(adata, label_key, batch_key, cluster_key, iso_threshold)
     return float(np.mean(scores))
 
 
+def _searched_clusters(adata, emb, ct_metrics: list, batch_metrics: list, *,
+                       verbose: bool | None) -> str | None:
+    """The paper's Leiden clusters into ``adata.obs``: ``"cluster"``, searched to
+    the number of cell types, when ``ct_metrics`` names a metric scored on it,
+    and ``"batch_cluster"``, searched to the number of batches, when
+    ``batch_metrics`` does. Returns the Leiden backend, or ``None`` when no
+    search runs; ``verbose`` as in :func:`compute`."""
+    if not (ct_metrics or batch_metrics):
+        return None
+    flavor = _resolve_flavor()
+    n = adata.n_obs
+    if verbose or (verbose is None and n > _SWEEP_NOTICE_CELLS):
+        import sys
+        print(f"Clustering {n:,} cells for {_text._and_list(ct_metrics + batch_metrics)} "
+              f"with the {flavor} Leiden backend.", file=sys.stderr, flush=True)
+    graph = _clustering_graph(emb)
+    seen: dict = {}             # both searches cluster this graph
+    if ct_metrics:
+        adata.obs["cluster"] = pd.Categorical(_n_clusters(
+            graph, adata.obs["celltype"].nunique(), flavor, seen))
+    if batch_metrics:
+        adata.obs["batch_cluster"] = pd.Categorical(_n_clusters(
+            graph, adata.obs["batch"].nunique(), flavor, seen))
+    return flavor
+
+
+def _score(out: dict, only, name: str, fn) -> None:
+    """``out[name] = fn()`` (see :func:`_tidy_value`) unless ``only`` leaves
+    ``name`` out; NaN with a warning when it fails (the LISI binary does not
+    load on every platform)."""
+    if only is not None and name not in only:
+        return
+    if name in _LISI_METRICS:
+        problem = _lisi_helper_problem()
+        if problem:
+            _text.warn(_lisi_fallback_message(name, problem))
+            out[name] = float("nan")
+            return
+    try:
+        # scib's progress prints and third-party deprecation warnings
+        with contextlib.redirect_stdout(io.StringIO()), warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            out[name] = _tidy_value(name, fn())
+    except Exception as exc:  # noqa: BLE001 - report and continue
+        _text.warn(
+            f"scib metric {name!r} could not be computed "
+            f"({type(exc).__name__}: {str(exc)[:160]}); recording NaN."
+        )
+        out[name] = float("nan")
+
+
 def compute(emb, celltype, cluster, batch, group: str = "clustering",
             slow_metrics: bool = False, only=None, *,
             verbose: bool | None = None) -> pd.DataFrame:
@@ -418,14 +469,14 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
     Values within ``1e-12`` of 0 are recorded as ``0.0``. The metrics
     bounded by [0, 1] (``ASW``, ``iASW``, ``cLISI``, ``ASW_batch``,
     ``ARI_batch``, ``NMI_batch``, ``GC``, ``iLISI``) are clipped to that
-    range, with values within ``1e-12`` of 1 recorded as ``1.0``. An iLISI of ``2.2e-16`` is therefore ``0.0``.
+    range, with values within ``1e-12`` of 1 recorded as ``1.0``. An iLISI of
+    ``2.2e-16`` is therefore ``0.0``.
     """
     me = import_scib().metrics
 
     if only is not None:
         only = set(only)
 
-    n = np.asarray(emb).shape[0]
     adata = _build_adata(emb, celltype, cluster, batch)
     _neighbors(adata, "X_emb")
 
@@ -438,79 +489,46 @@ def compute(emb, celltype, cluster, batch, group: str = "clustering",
     n_batches = int(adata.obs["batch"].nunique())
     # the paper's clusterings: one per cell type, and one per batch for
     # ARI_batch and NMI_batch (scored only with two or more batches)
-    search_ct = want_clu and cluster is None and bool(wanted(_CLUSTER_METRICS))
-    search_bat = want_bat and n_batches >= 2 and bool(wanted(_BATCH_CLUSTER_METRICS))
-    leiden_ran = search_ct or search_bat
-    if leiden_ran:
-        flavor = _resolve_flavor()
-        if verbose or (verbose is None and n > _SWEEP_NOTICE_CELLS):
-            import sys
-            needs = ((wanted(_CLUSTER_METRICS) if search_ct else [])
-                     + (wanted(_BATCH_CLUSTER_METRICS) if search_bat else []))
-            print(f"Clustering {n:,} cells for {_text._and_list(needs)} with the {flavor} "
-                  f"Leiden backend.", file=sys.stderr, flush=True)
-        graph = _clustering_graph(emb)
-        seen: dict = {}             # both searches cluster this graph
-        if search_ct:
-            adata.obs["cluster"] = pd.Categorical(_n_clusters(
-                graph, adata.obs["celltype"].nunique(), flavor, seen))
-        if search_bat:
-            adata.obs["batch_cluster"] = pd.Categorical(_n_clusters(
-                graph, n_batches, flavor, seen))
+    flavor = _searched_clusters(
+        adata, emb, wanted(_CLUSTER_METRICS) if want_clu and cluster is None else [],
+        wanted(_BATCH_CLUSTER_METRICS) if want_bat and n_batches >= 2 else [],
+        verbose=verbose)
+
     out: dict[str, float] = {}
-
-    def _safe(name, fn):
-        """Compute one metric; NaN with a warning when it fails (the LISI binary
-        does not load on every platform)."""
-        if only is not None and name not in only:
-            return
-        if name in _LISI_METRICS:
-            problem = _lisi_helper_problem()
-            if problem:
-                _text.warn(_lisi_fallback_message(name, problem))
-                out[name] = float("nan")
-                return
-        try:
-            # scib's progress prints and third-party deprecation warnings
-            with contextlib.redirect_stdout(io.StringIO()), \
-                    warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                out[name] = _tidy_value(name, fn())
-        except Exception as exc:  # noqa: BLE001 - report and continue
-            _text.warn(
-                f"scib metric {name!r} could not be computed "
-                f"({type(exc).__name__}: {str(exc)[:160]}); recording NaN."
-            )
-            out[name] = float("nan")
-
+    score = functools.partial(_score, out, only)
     if want_clu:
-        _safe("ARI", lambda: me.ari(adata, cluster_key="cluster", label_key="celltype"))
-        _safe("NMI", lambda: me.nmi(adata, cluster_key="cluster", label_key="celltype"))
-        _safe("ASW", lambda: me.silhouette(adata, label_key="cluster", embed="X_emb"))
+        score("ARI", lambda: me.ari(adata, cluster_key="cluster", label_key="celltype"))
+        score("NMI", lambda: me.nmi(adata, cluster_key="cluster", label_key="celltype"))
+        score("ASW", lambda: me.silhouette(adata, label_key="cluster", embed="X_emb"))
         # every label counts as isolated: scib's default scores none when every
         # one is in every batch, and n_batches + 1 clears its check
         iso_threshold = n_batches + 1
-        _safe("iASW", lambda: me.isolated_labels_asw(adata, batch_key="batch", label_key="cluster",
-                                                     embed="X_emb", iso_threshold=iso_threshold))
-        _safe("iF1", lambda: _isolated_labels_f1(adata, label_key="celltype",
-                                                 batch_key="batch", cluster_key="cluster",
-                                                 iso_threshold=iso_threshold))
+        score("iASW", lambda: me.isolated_labels_asw(
+            adata, batch_key="batch", label_key="cluster", embed="X_emb",
+            iso_threshold=iso_threshold))
+        score("iF1", lambda: _isolated_labels_f1(
+            adata, label_key="celltype", batch_key="batch", cluster_key="cluster",
+            iso_threshold=iso_threshold))
         # type_="knn": scib walks the 15-NN graph computed above; "embed" would recompute it
-        _safe("cLISI", lambda: me.clisi_graph(adata, label_key="celltype", type_="knn"))
+        score("cLISI", lambda: me.clisi_graph(adata, label_key="celltype", type_="knn"))
     if want_bat:
-        _safe("ASW_batch", lambda: me.silhouette_batch(adata, batch_key="batch", label_key="celltype", embed="X_emb"))
+        score("ASW_batch", lambda: me.silhouette_batch(
+            adata, batch_key="batch", label_key="celltype", embed="X_emb"))
         if n_batches >= 2:
-            _safe("ARI_batch", lambda: 1 - abs(me.ari(adata, cluster_key="batch_cluster", label_key="batch")))
-            _safe("NMI_batch", lambda: 1 - abs(me.nmi(adata, cluster_key="batch_cluster", label_key="batch")))
-        _safe("GC", lambda: me.graph_connectivity(adata, label_key="celltype"))
-        _safe("iLISI", lambda: me.ilisi_graph(adata, batch_key="batch", type_="knn"))
+            score("ARI_batch", lambda: 1 - abs(me.ari(
+                adata, cluster_key="batch_cluster", label_key="batch")))
+            score("NMI_batch", lambda: 1 - abs(me.nmi(
+                adata, cluster_key="batch_cluster", label_key="batch")))
+        score("GC", lambda: me.graph_connectivity(adata, label_key="celltype"))
+        score("iLISI", lambda: me.ilisi_graph(adata, batch_key="batch", type_="knn"))
         # opt-in: kBET runs in R and takes hours at 10-30k cells
         if slow_metrics:
-            _safe("kBET", lambda: me.kBET(adata, batch_key="batch", label_key="celltype", type_="embed", embed="X_emb"))
+            score("kBET", lambda: me.kBET(adata, batch_key="batch", label_key="celltype",
+                                          type_="embed", embed="X_emb"))
 
     frame = pd.DataFrame.from_dict(out, orient="index", columns=["Value"])
     scored_clusters = want_clu and any(m in out for m in _CLUSTER_METRICS)
-    frame.attrs["leiden_flavor"] = flavor if leiden_ran else None
+    frame.attrs["leiden_flavor"] = flavor
     frame.attrs["clustering"] = (None if not scored_clusters
                                  else "user" if cluster is not None else "search")
     return frame
