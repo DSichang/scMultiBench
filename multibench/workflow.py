@@ -1130,24 +1130,23 @@ def _metric_codes(metrics):
 def _names_batch_metric(metrics) -> bool:
     """Whether ``metrics=`` is ``None`` or names a metric that needs the
     batches: one of the batch or the classification family."""
-    from .plot.bar import BATCH_METRICS, CLASSIFICATION_METRICS
+    from ._data.catalog import FAMILY_METRICS as fam
     codes = _metric_codes(metrics)
-    return codes is None or any(c in BATCH_METRICS + CLASSIFICATION_METRICS
-                                for c in codes)
+    return codes is None or any(c in fam["batch"] + fam["classification"] for c in codes)
 
 
 def _without_classification(metrics, multi_batch: bool):
     """``metrics=`` without the classification family, for the UMAP a graph method
     writes; ``None`` when nothing else is left."""
-    from .plot.bar import BATCH_METRICS, CLASSIFICATION_METRICS, CLUSTERING_METRICS
+    from ._data.catalog import FAMILY_METRICS as fam
     if metrics is None or metrics == "all":
         if multi_batch:
-            return CLUSTERING_METRICS + [c for c in BATCH_METRICS if c != "kBET"]
+            return fam["clustering"] + [c for c in fam["batch"] if c != "kBET"]
         return "clustering" if metrics is None else metrics
     codes = _metric_codes(metrics)
     if codes is None:
         return metrics                     # evaluate rejects it with its message
-    left = [c for c in codes if c not in CLASSIFICATION_METRICS]
+    left = [c for c in codes if c not in fam["classification"]]
     if len(left) == len(codes):
         return metrics
     return left or None
