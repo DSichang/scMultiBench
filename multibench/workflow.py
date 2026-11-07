@@ -1883,9 +1883,14 @@ def _embedding_obs(rec, dataset, category, root, n, batch_text=None) -> pd.DataF
         barcodes.append(bars)
         batch.append(np.full(len(lab), Path(f).stem, dtype=object))
     if sum(map(len, labels)) != n:
-        _text.warn(f"The label files of {dataset} do not hold the {n:,} cells of "
-                     f"{rec['method']}, so obs has no barcodes, labels or batches.",
-                     UserWarning)
+        if folder.is_dir():
+            why = (f"The label files of {dataset} do not hold the {n:,} cells of "
+                   f"{rec['method']}, so obs has no barcodes, labels or batches.")
+        else:
+            why = _folder_missing(dataset, _root_tries(rec))
+            why = (f"{why[:1].upper()}{why[1:]}, so obs has no barcodes, labels or batches. "
+                   f"Set mtb.config.data_path to the folder that holds it.")
+        _text.warn(why, UserWarning)
         return pd.DataFrame(index=pd.Index([str(i) for i in range(n)]))
     index = (np.concatenate([np.asarray(b, dtype=object) for b in barcodes])
              if all(b is not None for b in barcodes) else np.arange(n).astype(str))
