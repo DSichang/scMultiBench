@@ -1,7 +1,6 @@
 """Figures of a long table: ``mtb.plot.bubble`` draws the paper's bubble table
 and ``mtb.plot.bar`` one bar per method. ``mtb.rank(category, long_df=...)``
 gives the numbers behind both, in their row order."""
-from . import style  # noqa: F401
 from .._text import public_dir
 from .bubble import bubble
 from .bar import bar

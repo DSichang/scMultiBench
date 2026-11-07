@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import functools
 import numpy as np
 import pandas as pd
 
@@ -369,23 +368,6 @@ def render(tbl: BubbleTable, title: str | None = None):
     return fig
 
 
-@functools.cache
-def _figure_class():
-    """A ``Figure`` with ``_repr_png_``. Built without pyplot, the figure is
-    never shown twice, and a notebook without ``%matplotlib inline`` still
-    shows the image rather than ``<Figure size ...>``."""
-    from matplotlib.figure import Figure
-
-    class BubbleFigure(Figure):
-        def _repr_png_(self):
-            import io
-            buf = io.BytesIO()
-            self.savefig(buf, format="png", bbox_inches="tight", dpi=110)
-            return buf.getvalue()
-
-    return BubbleFigure
-
-
 #: row height; circle max radius = row/2
 ROW_H, R_MAX = 1.0, 0.5
 #: the Score ramp of each family under the table: first x, step, width
@@ -402,6 +384,7 @@ def _draw(tbl, title, gaps):
     (one data-unit amount per pair of neighbouring families)."""
     from matplotlib import cm, colors
     from matplotlib.patches import Rectangle
+    from ._figure import BubbleFigure
 
     methods = tbl.methods
     n_rows = len(methods)
@@ -419,7 +402,7 @@ def _draw(tbl, title, gaps):
     x_right = max(total_w + 0.45, legend_right)
 
     # the width follows the x-range: 0.6 inch per unit past the table's own
-    fig = _figure_class()(figsize=(0.6 * (x_right - 0.45) + 2.8, 0.42 * n_rows + 2.9))
+    fig = BubbleFigure(figsize=(0.6 * (x_right - 0.45) + 2.8, 0.42 * n_rows + 2.9))
     ax = fig.subplots()
     norm01 = colors.Normalize(vmin=0.0, vmax=1.0)
     mappers = [cm.ScalarMappable(norm=norm01, cmap=style.colormap(b.cmap))
