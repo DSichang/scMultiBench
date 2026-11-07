@@ -62,6 +62,18 @@ def test_a_default_is_the_script_value_or_none():
     assert tunable("StabMap")["maxFeatures"] == {"default": float("inf"), "type": "float"}
 
 
+def test_a_numeric_default_is_a_number():
+    """sciPENN's script writes its lr default as ``10 ** (-3)``: the table holds 0.001."""
+    import yaml
+    table = yaml.safe_load(gen_params.OUT.read_text())
+    numeric = [(m, k, p["default"]) for m, variants in table.items()
+               for params in variants.values() for k, p in params.items()
+               if p.get("type") in ("int", "float")]
+    assert numeric and all(d is None or type(d) in (int, float) for _, _, d in numeric), \
+        [x for x in numeric if not (x[2] is None or type(x[2]) in (int, float))]
+    assert {d for m, k, d in numeric if (m, k) == ("sciPENN", "lr")} == {0.001}
+
+
 def _variant(method, language):
     return next(v for v in registry.get(method).variants if v.language == language)
 

@@ -1997,7 +1997,7 @@ sciPENN:
       default: 6
       type: int
     lr:
-      default: 10 ** (-3)
+      default: 0.001
       type: float
     min_cells:
       default: 0
@@ -2022,7 +2022,7 @@ sciPENN:
       default: 6
       type: int
     lr:
-      default: 10 ** (-3)
+      default: 0.001
       type: float
     min_cells:
       default: 0

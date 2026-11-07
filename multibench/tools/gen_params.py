@@ -32,6 +32,7 @@ argument that takes several values (``nargs``) as ``list``; an argument with
 ``choices=`` records them.
 """
 import ast
+import operator
 import re
 import sys
 import warnings
@@ -84,11 +85,32 @@ def vkey(v):
     return "%s:%s" % (v.when.get("category"), "+".join(v.when.get("modalities", [])) or "-")
 
 
+_ARITH = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul,
+          ast.Div: operator.truediv, ast.Pow: operator.pow}
+
+
+def _arith(node):
+    """The number of constant arithmetic (numbers, ``+ - * / **``, unary minus);
+    ``ValueError`` for anything else."""
+    if isinstance(node, ast.Constant) and type(node.value) in (int, float):
+        return node.value
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
+        return -_arith(node.operand)
+    if isinstance(node, ast.BinOp) and type(node.op) in _ARITH:
+        return _ARITH[type(node.op)](_arith(node.left), _arith(node.right))
+    raise ValueError(ast.unparse(node))
+
+
 def _value(node):
-    """The literal ``node`` holds, else its source text (``10**-3``)."""
+    """The literal ``node`` holds, the number of its constant arithmetic
+    (``10 ** (-3)`` is 0.001), else its source text."""
     try:
         return ast.literal_eval(node)
     except (ValueError, TypeError, SyntaxError):
+        pass
+    try:
+        return _arith(node)
+    except ValueError:
         return ast.unparse(node)
 
 
