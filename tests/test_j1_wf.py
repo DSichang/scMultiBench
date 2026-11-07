@@ -9,6 +9,10 @@ import pandas as pd
 import pytest
 
 import multibench as mtb
+from multibench import workflow as W
+from multibench.engine import envs, registry
+
+ALL_ENVS = frozenset(envs.group_for(m) for m in registry.list_methods())
 
 
 def test_engine_and_eval_never_import_workflow():
@@ -67,3 +71,19 @@ def test_scan_says_a_file_problem_once(tmp_path, capsys):
     lines = [line for line in capsys.readouterr().out.splitlines() if "cells x features" in line]
     assert len(lines) == 1 and lines[0].startswith("[scan] rna.h5 stores"), lines
     assert len(plan) > 1 and plan["reason"].str.contains("rna.h5 stores").all()
+
+
+def test_run_refuses_an_unknown_params_key_before_any_method_runs(tmp_path, monkeypatch):
+    """u4 D5: a typo in the params of the second method of a sweep was found
+    only after the first method ran; run raises scan's error first."""
+    monkeypatch.setattr(W, "_installed_envs", lambda: ALL_ENVS)
+    started = []
+    monkeypatch.setattr(W, "_run", lambda **k: started.append(k["method"]))
+    params = {"scMM": {"epoch": 3}}
+    with pytest.raises(KeyError) as scanned:
+        mtb.scan("D11", "vertical", methods=["Matilda", "scMM"], params=params, verbose=False)
+    with pytest.raises(KeyError) as ran:
+        mtb.run("D11", "vertical", tmp_path / "out", methods=["Matilda", "scMM"],
+                params=params, verbose=False)
+    assert ran.value.args == scanned.value.args
+    assert started == [] and not (tmp_path / "out").exists()

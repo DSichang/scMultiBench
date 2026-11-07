@@ -73,15 +73,14 @@ def test_no_timeout_path_dispatches_exactly_once(monkeypatch, tmp_path):
 
 def test_unknown_override_rejected_on_the_timeout_path(monkeypatch, tmp_path):
     """Validation used to be skipped whenever `timeout` was set. The params are
-    checked before the method starts."""
+    checked before anything runs."""
     calls = []
     monkeypatch.setattr(W, "_run", lambda **k: calls.append(k))
-    res = mtb.run("D11", "vertical", methods=["Matilda"],
-                      params={"Matilda": {"not_a_real_parameter": 1}},
-                      out_dir=str(tmp_path), timeout=600,
-                      evaluate=False, verbose=False)
-    assert res.summary.status.tolist() == ["failed"]
-    assert "does not accept" in str(res.summary.iloc[0]["reason"])
+    with pytest.raises(KeyError, match="does not accept"):
+        mtb.run("D11", "vertical", methods=["Matilda"],
+                params={"Matilda": {"not_a_real_parameter": 1}},
+                out_dir=str(tmp_path), timeout=600,
+                evaluate=False, verbose=False)
     assert calls == [], "method was dispatched despite an invalid override"
 
 

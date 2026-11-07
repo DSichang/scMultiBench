@@ -27,10 +27,11 @@ def test_a_real_run_refuses_before_the_method_starts(tmp_path, monkeypatch, linu
     from multibench import workflow as W
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset(linux_with_envs))
     monkeypatch.setattr(W, "_run", lambda **k: pytest.fail("the method started"))
-    res = mtb.run("D11", "vertical", tmp_path / "o", methods=["Matilda"],
-                  params={"Matilda": {"epoch": 3}}, verbose=False)
-    row = res.summary.iloc[0]
-    assert row["status"] == "failed" and "does not accept ['epoch']" in row["reason"]
+    with pytest.raises(KeyError) as e:
+        mtb.run("D11", "vertical", tmp_path / "o", methods=["Matilda"],
+                params={"Matilda": {"epoch": 3}}, verbose=False)
+    assert e.value.args[0] == f"Matilda does not accept ['epoch']; {ACCEPTS}"
+    assert not (tmp_path / "o").exists()
 
 
 def test_a_known_key_still_reaches_the_command():

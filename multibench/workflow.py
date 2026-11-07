@@ -2653,8 +2653,8 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
         of another dataset or category, or a ``batch`` that does not fit the
         cells; checked before anything runs.
     KeyError
-        Unknown method id. A ``params`` key the method does not accept fails
-        that method (status ``failed``).
+        Unknown method id, or a ``params`` key the method does not accept;
+        checked before anything runs.
 
     Examples
     --------
@@ -2675,9 +2675,10 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
     root = Path(data_path) if data_path is not None else config.data_path
     # the on-disk spelling, once, so out_dir names and records agree (one warning)
     dataset = _resolve.canonical_dataset(root, dataset)
-    # a real run checks params per method and records a bad key as FAIL
+    # a params key no variant of the method accepts raises here, as in scan
     plan_df, private = _scan(dataset, category, data_path=data_path, methods=methods,
-                             modalities="all" if every else modalities, out_dir=out_dir)
+                             modalities="all" if every else modalities, out_dir=out_dir,
+                             params=params)
     not_listed = _not_listed_note(plan_df, dataset, private.attrs["folder"], category)
 
     if plan_df.empty:
