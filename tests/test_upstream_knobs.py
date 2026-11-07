@@ -1,9 +1,9 @@
 """The upstream-knob table must stay honest and reachable.
 
-`params_for` reporting an empty `tunable` is accurate but misleading on its own:
-it says the SCRIPT exposes nothing, not that the method is parameterless. These
-tests pin the two keys that carry the rest of the truth, and the shape of the
-evidence that makes them checkable.
+`params_for` lists what a script takes on its command line. These tests pin
+the two keys that carry the rest (what the script still fixes, and what its
+library offers that the script does not take), and the shape of the evidence
+that makes them checkable.
 """
 import re
 
@@ -39,17 +39,26 @@ def test_every_upstream_knob_says_what_it_controls(method):
         assert k["name"] and k["effect"]
 
 
-def test_params_for_explains_an_empty_tunable():
+def test_params_for_separates_parameters_from_what_stays_fixed():
     p = mtb.params_for("totalVI", "vertical")
-    assert p["tunable"] == {}, "totalVI's script takes only paths"
-    assert p["fixed_in_script"], "so the answer must say what it pins instead"
-    assert any(k["name"] == "n_latent" for k in p["upstream_knobs"])
+    assert "n_latent" in p["tunable"]
+    assert p["fixed_in_script"], "what the script still fixes"
+    # a library setting that became a parameter is no longer listed as unreachable
+    names = {k["name"] for k in p["upstream_knobs"]}
+    assert "protein_dispersion" in names and not names & set(p["tunable"])
+
+
+def test_no_library_setting_is_also_a_parameter():
+    from multibench.engine import registry
+    for m in AUDITED:
+        tunable = {k for v in registry.get(m).variants for k in v.tunable}
+        assert not tunable & {k["name"] for k in upstream.knobs_for(m)["upstream_knobs"]}, m
 
 
 def test_unaudited_method_returns_empty_lists_not_an_error():
     out = upstream.knobs_for("NoSuchMethod")
     assert out == {"fixed_in_script": [], "upstream_knobs": [],
-                   "upstream_url": None, "notes": None}
+                   "upstream_url": None}
 
 
 # --- the generator's verification step --------------------------------------

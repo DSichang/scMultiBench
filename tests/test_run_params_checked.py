@@ -45,7 +45,10 @@ def test_run_all_says_the_same():
 
 
 def test_a_method_without_hyperparameters_says_so():
-    # Z16 (r3): the hardcoded-upstream sentence only where the set is empty
+    # Z16 (r3): the sentence only where the set is empty; every wrapped script
+    # takes parameters now
+    err = mtb.engine.runner.unknown_params_error("X", ["epochs"], set())
+    assert err.args[0] == "X does not accept ['epochs']; it accepts no parameters."
     with pytest.raises(KeyError) as e:
         mtb.scan("D11", "vertical", methods=["totalVI"], modalities=["rna", "adt"], params={"totalVI": {"epochs": 3}}, verbose=False)
-    assert e.value.args[0] == "totalVI does not accept ['epochs']; it accepts no parameters."
+    assert e.value.args[0].startswith("totalVI does not accept ['epochs']; it accepts ['batch_size', ")

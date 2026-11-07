@@ -21,10 +21,11 @@ def test_params_for_returns_defaults_and_tunable():
     assert set(r["tunable"]) >= {"epochs", "lr"}
 
 
-def test_params_for_reports_untunable_methods_honestly():
-    # totalVI's upstream script exposes only paths -> nothing to tune
+def test_params_for_gives_the_script_value_or_none_as_the_default():
+    # a value the script fixed is the default; None leaves it to the library
     r = mtb.params_for("totalVI", "vertical", ["rna", "adt"])
-    assert r["tunable"] == {}
+    assert r["tunable"]["seed"] == {"default": 0, "type": "int"}
+    assert r["tunable"]["max_epochs"] == {"default": None, "type": "int"}
 
 
 def test_params_for_tunable_carries_default_and_type():
@@ -121,16 +122,15 @@ def _gen_params():
 
 
 def _scripts():
-    """``[(method, variant, path, folder text)]`` of every variant whose script is here."""
+    """``[(method, variant, path, folder text)]`` of every Python variant, read
+    from the package's scripts (``tools_scripts/``)."""
     gen = _gen_params()
     out = []
     for s in registry.load():
         for v in s.variants:
-            path = gen.resolve(v.entrypoint)
-            if path and path.endswith(".py"):
+            path = str(gen._REPO / v.entrypoint)
+            if path.endswith(".py"):
                 out.append((s, v, path, gen.folder_text(path)))
-    if not out:
-        pytest.skip("the method scripts are not in this checkout")
     return out
 
 
@@ -162,7 +162,7 @@ def test_the_keys_left_out_are_script_arguments():
 
 def test_host_switches_and_dead_knobs_are_not_tunable():
     assert "index" not in mtb.params_for("UnitedNet", "vertical", ["rna", "atac"])["tunable"]
-    assert not any(v.tunable for v in registry.get("UnitedNet").variants)
+    assert not any("index" in v.tunable for v in registry.get("UnitedNet").variants)
     gone = {("scMDC", "vertical", ("rna", "adt")): {"device", "run"},
             ("scMM", "vertical", ("rna", "atac")): {"no_cuda", "print_freq"},
             ("Matilda", "vertical", ("rna", "adt")): {"device"},

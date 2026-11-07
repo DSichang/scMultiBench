@@ -42,7 +42,8 @@ def test_kept_docstrings_name_no_cut_name():
 def test_params_for_returns_the_parameters_the_variants_share():
     p = mtb.params_for("Matilda")
     assert "epochs" in p["tunable"] and p["variant"].count("vertical:") == 3
-    assert mtb.params_for("iNMF")["tunable"] == {}
+    p = mtb.params_for("iNMF")                  # its two variants take the same ones
+    assert p["variant"].count("diagonal:") == 2 and p["tunable"]["k"]["default"] == 20
 
 
 def test_batch_metrics_on_one_batch_are_refused():
