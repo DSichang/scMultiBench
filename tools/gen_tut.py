@@ -1114,8 +1114,7 @@ envs = mtb.env.install(METHODS)''')
 
     run_notes = [
         "`params={\"Method\": {\"key\": value}}` "
-        "sets a method's parameters, and `mtb.params_for` lists them. Many methods "
-        "take none.",
+        "sets a method's parameters, and `mtb.params_for` lists them.",
         f"`mtb.load_run(\"out/{ds}\")` reloads these results later.",
     ]
     scored_too = "" if cat == "vertical" else (
