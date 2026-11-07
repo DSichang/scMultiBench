@@ -1532,7 +1532,7 @@ class RunResult:
         return _plot.bubble(lng, **kw)
 
     def rescore(self, *, batch=None, labels=None, metrics=None,
-                verbose: bool = True) -> "RunResult":
+                verbose: bool = True, _caveats=None) -> "RunResult":
         """Score the saved outputs again with new labels, batch or metrics.
 
         No method is re-run. Each record's embedding is read back from its
@@ -1632,9 +1632,10 @@ class RunResult:
                     batch_at[root] = (vec, by_cell, file)
             if batch is None and _names_batch_metric(metrics):
                 _warn_unsaved_batch([r for r in self.records if _scorable(r)], self)
-            caveats = {root: _plan_caveats(self.dataset, self.category, root,
-                                           [r.get("method") for r in self.records
-                                            if _scorable(r)])
+            # run passes its plan's caveats (_caveats), so the plan is not made again
+            caveats = {root: _caveats if _caveats is not None else
+                       _plan_caveats(self.dataset, self.category, root,
+                                     [r.get("method") for r in self.records if _scorable(r)])
                        for root in used}
             no_output = []             # records whose saved output is not found
             for r, (root, ok) in zip(self.records, found):
@@ -2759,10 +2760,12 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
         saved = earlier.get(method)
         if saved is not None and _scorable(saved) and output.exists():
             # a saved run is scored again, as rescore does: its record is kept,
-            # with its folder as found from here
+            # with its folder as found from here, and the caveat of this plan's row
+            caveats = ({(method, tuple(mods)): rec["caveat"]}
+                       if list(saved.get("modalities") or ()) == mods else None)
             rec = (RunResult([dict(saved, out_dir=str(method_dir))], dataset, category,
-                             out_dir).rescore(batch=batch, verbose=False).records[0]
-                   if evaluate else dict(saved))
+                             out_dir).rescore(batch=batch, verbose=False, _caveats=caveats)
+                   .records[0] if evaluate else dict(saved))
             rec["reused"] = True
             if variant.output.kind == "embedding" and rec.get("emb_shape"):
                 _write_cell_names(rec, output, dataset, category, data_path)
