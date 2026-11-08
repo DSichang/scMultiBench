@@ -588,10 +588,27 @@ def test_reference_table_generator_repairs_a_drifted_table(tmp_path, capsys):
     (tmp_path / "reference").mkdir()
     page = tmp_path / "reference" / "run.md"
     page.write_text(text.replace(rows[0] + "\n", "").replace(rows[1], stale))
+    (tmp_path / "tutorials").mkdir()
+    metrics_page = tmp_path / "tutorials" / "evaluate.md"
+    metrics_page.write_text((_docs_root() / "tutorials" / "evaluate.md").read_text())
     assert gen.main([str(tmp_path), "--check"]) == 1
     assert "run.md" in capsys.readouterr().out
     assert gen.main([str(tmp_path)]) == 0
     assert page.read_text() == text
+
+
+@needs_docs
+def test_the_metric_table_of_the_evaluate_page_is_the_catalog():
+    """The table under "What each metric measures" is ``mtb.catalog.metrics()``,
+    row for row, so the page and the catalog cannot describe a metric twice."""
+    import multibench as mtb
+    text = (_docs_root() / "tutorials" / "evaluate.md").read_text()
+    block = re.search(r"<!-- metric-table:[^\n]*-->\n(.*?)<!-- /metric-table -->", text, re.S)
+    assert block, REGENERATE
+    rows = [[c.strip().replace(r"\|", "|") for c in line.strip("|").split(" | ")]
+            for line in block.group(1).splitlines()[2:]]
+    assert rows == mtb.catalog.metrics()[["metric", "family", "description"]].values.tolist(), \
+        REGENERATE
 
 
 # ---- the executed tutorial copies on the site (docs/tutorials/*.ipynb) ------
@@ -767,15 +784,14 @@ def test_landing_card_has_content_without_the_animation():
 
 @needs_docs
 def test_get_started_pages_keep_the_round2_facts():
-    """Quickstart: the laptop tab compares an RNA PCA on 2,000 genes with an
-    ADT PCA, says a new run's scores differ a little from the stored ones, links the
-    peaks-only section and defines cell order; the unpaired tab lives on
-    tutorials/run only."""
+    """Quickstart (O36, owner 2026-11-09: the five steps' code, then one link
+    per step): it links each guide and "Are my numbers comparable?", and
+    defines cell order. The unpaired tab lives on tutorials/run only."""
     docs = _docs_root()
     quick = (docs / "quickstart.md").read_text()
-    for fact in ("highly_variable_genes(pc, n_top_genes=2000)", '"ADT PCA"',
-                 "differ a little from the stored ones", "#my-atac-is-peaks-only"):
-        assert fact in quick, fact
+    for link in ("(tutorials/discover.md)", "(tutorials/plot.md)", "(tutorials/run.md)",
+                 "(tutorials/evaluate.md)", "(tutorials/evaluate.md#are-my-numbers-comparable)"):
+        assert link in quick, link
     assert re.search(r"^    cell order\n    :   ", quick, re.M)
     assert '=== "Unpaired RNA + ATAC"' not in quick
 

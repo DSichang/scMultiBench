@@ -16,7 +16,6 @@ import shutil
 import warnings
 from pathlib import Path
 
-import anndata as ad
 import h5py
 import numpy as np
 import pandas as pd
@@ -207,53 +206,6 @@ def _docs_root():
 
 
 needs_docs = pytest.mark.skipif(_docs_root() is None, reason="SCMULTIBENCH_DOCS not set")
-
-
-def _laptop_tab():
-    text = (_docs_root() / "quickstart.md").read_text()
-    section = text.split("### Your own data", 1)[1].split("## Step 4", 1)[0]
-    return section.split("```python", 1)[1].split("```", 1)[0]
-
-
-def _cite_adata(n_cells=400, n_genes=2500, n_adt=14, seed=0):
-    rng = np.random.default_rng(seed)
-    types = rng.choice(["T", "B", "NK"], n_cells)
-    shift = pd.Series(types).map({"T": 0.5, "B": 1.5, "NK": 3.0}).to_numpy()[:, None]
-    a = ad.AnnData(rng.poisson(0.3 + shift * rng.random(n_genes), (n_cells, n_genes))
-                   .astype("float32"))
-    a.obs_names = [f"c{i}" for i in range(n_cells)]
-    a.var_names = [f"g{i}" for i in range(n_genes)]
-    a.obs["celltype"] = types
-    a.obsm["protein"] = rng.poisson(5 + 10 * shift * rng.random(n_adt),
-                                    (n_cells, n_adt)).astype("float32")
-    return a
-
-
-@needs_docs
-def test_quickstart_laptop_tab_runs_on_a_panel_of_14_adts(tmp_path, monkeypatch, capsys):
-    """Pasted alone into a fresh file, the laptop tab imports multibench, reads
-    my_citeseq.h5ad itself (R3-20/R3-21), prints the 2 x 6 score table and
-    draws the figure."""
-    import matplotlib.pyplot as plt
-    code = _laptop_tab()
-    assert "sc.pp.pca(adt, n_comps=min(20, adt.n_vars - 1))" in code
-    assert max(len(line) for line in code.splitlines()) <= 80
-    monkeypatch.chdir(tmp_path)
-    _cite_adata().write_h5ad(tmp_path / "my_citeseq.h5ad")
-    scope = {}                        # nothing pre-defined: no mtb, no adata
-    with warnings.catch_warnings(record=True) as rec:
-        warnings.simplefilter("always")
-        exec(compile(code, "quickstart-laptop-tab", "exec"), scope)
-    assert set(scope["mine"]["method"]) == {"RNA PCA", "ADT PCA"}
-    assert scope["adata"].obsm["X_adt"].shape == (400, 13)
-    out = capsys.readouterr().out
-    table = out[out.index("metric"):].splitlines()
-    assert table[0].split() == ["metric", "ARI", "ASW", "NMI", "cLISI", "iASW", "iF1"]
-    assert [row.split()[:2] for row in table[2:4]] == [["ADT", "PCA"], ["RNA", "PCA"]]
-    msgs = [str(w.message) for w in rec if issubclass(w.category, UserWarning)
-            and "multibench" in str(w.filename)]
-    assert not any("only one method" in m.lower() for m in msgs), msgs
-    plt.close("all")
 
 
 @needs_docs

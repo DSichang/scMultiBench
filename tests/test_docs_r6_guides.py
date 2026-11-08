@@ -28,7 +28,7 @@ def test_evaluate_page_points_to_evaluate_notes_for_the_exact_computation():
     visible = " ".join(_visible(_read("tutorials/evaluate.md")).split())
     section = visible.split("### What each metric measures", 1)[1].split("## ", 1)[0]
     assert "gives each definition in full" not in section
-    assert "describes each metric in one line." in section
+    assert "returns this table." in section
     assert "The details below give the exact computation." in section
     # the catalog rows are indeed one line each, and the page's details hold the median
     rows = mtb.catalog.metrics().set_index("metric")["description"]

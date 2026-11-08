@@ -366,14 +366,19 @@ def test_deploy_gate_refuses_while_the_data_release_is_not_public(tmp_path, monk
                                          "deploy_gate.py").read_text()
 
 
-def test_a_named_method_keeps_the_row_its_roles_spell(pinned, capsys):
+def test_a_named_method_keeps_the_row_its_roles_spell(pinned, tmp_path, capsys):
     """moETM's own spelling, as scan and method_info show it (rna+atac since
-    0.4.0, X13: the role names the peaks it reads)."""
+    0.4.0, X13: the role names the peaks it reads). D28's files under a name
+    the catalog does not know: D28 itself is diagonal, and scan refuses it as
+    vertical (O53)."""
     assert ['rna', 'atac'] in [s['modalities'] for s in mtb.method_info('moETM')['supports']]
+    folder = tmp_path / "MYD28"
+    folder.symlink_to(mtb.config.data_path / "D28")
     for call in (full_scan, lambda *a, **k: mtb.scan(*a, **k)):
-        df = _quiet(call, 'D28', 'vertical', methods=['moETM'], modalities=['rna', 'atac'], verbose=False)
+        df = _quiet(call, str(folder), 'vertical', methods=['moETM'], modalities=['rna', 'atac'],
+                    verbose=False)
         assert list(df['modalities']) == ['rna+atac']
-    df = _quiet(full_scan, 'D28', 'vertical', modalities=['rna', 'atac_gas'], verbose=False)
+    df = _quiet(full_scan, str(folder), 'vertical', modalities=['rna', 'atac_gas'], verbose=False)
     assert 'moETM' not in set(df['method'])
 
 

@@ -43,14 +43,15 @@ def _visible(text):
 
 # ---- get started: quickstart, installation, FAQ (R3-20 to R3-26) ---------
 @needs_docs
-def test_dry_run_line_is_on_the_quickstart_only():
-    """R3-25: the dry-run step stays on the Quickstart; Installation no longer
-    repeats it (tutorials/run carries the dry-run step)."""
+def test_dry_run_line_is_on_the_run_guide():
+    """R3-25, then O36 (owner, 2026-11-09): the Quickstart runs SCALEX and links
+    the guides, tutorials/run carries the dry-run step, and Installation does
+    not repeat it."""
     quick, install = _read("quickstart.md"), _read("installation.md")
-    for text in (quick, install):
-        assert "(tutorials/run.md#folder-layout)" in text
+    assert "(tutorials/run.md#folder-layout)" in install
     assert 'mtb.run("D28", "diagonal", methods=["SCALEX"]' in quick
-    assert "dry_run=True" in quick
+    assert "(tutorials/run.md)" in quick
+    assert "dry_run=True" in _read("tutorials/run.md")
     assert "**Preview a run.**" not in install and "**Custom launch.**" not in install
 
 
@@ -65,24 +66,18 @@ def test_intro_sends_each_data_shape_to_its_recipe():
 
 
 @needs_docs
-def test_step1_sends_donors_to_the_recipe():
-    """R3-23, then the 0.5.1 docs review: Step 1 names the vertical route in one line and
-    links the donors recipe, which names the cross route and its batch count."""
-    step1 = _flat("quickstart.md").split("## Step 1:", 1)[1].split("```", 1)[0]
-    assert "(tutorials/run.md#recipe-donors)" in step1
+def test_the_donors_recipe_names_both_routes():
+    """R3-23, then the 0.5.1 docs review: the donors recipe names the vertical
+    route and the cross route with its batch count."""
     recipe = " ".join(_read("tutorials/run.md").split("{ #recipe-donors }", 1)[1].split())
     assert "three for RNA + ADT" in recipe and "treat the data as a vertical task" in recipe
 
 
 @needs_docs
-def test_quickstart_batch_lines_name_run_all_as_the_guides_do():
+def test_the_discover_guide_names_batch_on_run_and_evaluate():
     """Integration of round 3: run without batch= scores a two-sample
-    folder as one batch, so the Quickstart names batch= on run as well as
-    on evaluate, as tutorials/run and tutorials/discover do."""
-    step1 = _flat("quickstart.md").split("## Step 1:", 1)[1].split("```", 1)[0]
-    assert "`evaluate(batch=...)`" not in step1
-    # Step 1 points at the donors recipe; the discover guide names batch= on both calls
-    assert "(tutorials/run.md#recipe-donors)" in step1
+    folder as one batch, so the discover guide names batch= on run as well as
+    on evaluate."""
     assert "pass each cell's sample as `batch=` to `run` or `evaluate`." \
         in _flat("tutorials/discover.md")
 
