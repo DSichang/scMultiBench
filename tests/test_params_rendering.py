@@ -34,18 +34,30 @@ def test_matilda_augmentation_is_not_offered():
                  params={"Matilda": {"augmentation": False}}, verbose=False)
 
 
+def test_scmdc_settings_without_effect_are_not_offered():
+    # the script only pretrains and encodes; filter1/filter2 fail on its np.matrix data
+    tunable = mtb.params_for("scMDC", "vertical")["tunable"]
+    dead = {"tau", "gamma", "phi2", "n_clusters", "resolution", "n_neighbors",
+            "filter1", "filter2", "f1", "f2"}
+    assert not dead & set(tunable)
+    assert {"pretrain_epochs", "batch_size", "sigma1", "sigma2", "cutoff", "phi1"} <= set(tunable)
+    with pytest.raises(KeyError, match=r"scMDC does not accept \['filter1'\]"):
+        mtb.scan("D11", "vertical", methods=["scMDC"],
+                 params={"scMDC": {"filter1": True}}, verbose=False)
+
+
 def test_a_switch_is_present_only_for_true(tmp_path):
-    inputs = {"rna": "/d/rna.h5", "adt": "/d/adt.h5"}
-    argv = _dry("scMDC", "vertical", inputs, {"filter1": True}, tmp_path)
-    assert argv[-1] == "--filter1"
-    argv = _dry("scMDC", "vertical", inputs, {"filter1": False}, tmp_path)
-    assert "--filter1" not in argv
+    inputs = {"rna": "/d/rna.h5", "atac": "/d/atac.h5"}
+    argv = _dry("MIRA", "vertical", inputs, {"filter_atac_cells": True}, tmp_path)
+    assert argv[-1] == "--filter_atac_cells"
+    argv = _dry("MIRA", "vertical", inputs, {"filter_atac_cells": False}, tmp_path)
+    assert "--filter_atac_cells" not in argv
 
 
 def test_a_switch_or_bool_refuses_another_value(tmp_path):
-    with pytest.raises(TypeError, match=r"scMDC: filter1 takes True or False, got 1\."):
-        _dry("scMDC", "vertical", {"rna": "/d/rna.h5", "adt": "/d/adt.h5"},
-             {"filter1": 1}, tmp_path)
+    with pytest.raises(TypeError, match=r"MIRA: filter_atac_cells takes True or False, got 1\."):
+        _dry("MIRA", "vertical", {"rna": "/d/rna.h5", "atac": "/d/atac.h5"},
+             {"filter_atac_cells": 1}, tmp_path)
     with pytest.raises(TypeError, match=r"early_stopping takes True or False, got 'False'"):
         _dry("totalVI", "vertical", {"rna": "/d/rna.h5", "adt": "/d/adt.h5"},
              {"early_stopping": "False"}, tmp_path)

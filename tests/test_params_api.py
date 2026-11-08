@@ -29,9 +29,9 @@ def test_params_for_gives_the_script_value_or_none_as_the_default():
 
 
 def test_params_for_tunable_carries_default_and_type():
-    # scMDC's lr is declared but never read (X64, r3): gamma stands in
+    # scMDC's lr is declared but never read (X64, r3): sigma1 stands in
     spec = mtb.params_for("scMDC", "vertical", ["rna", "adt"])["tunable"]
-    assert spec["gamma"]["type"] == "float" and "lr" not in spec
+    assert spec["sigma1"] == {"default": 2.5, "type": "float"} and "lr" not in spec
 
 
 def test_a_true_false_parameter_shows_one_type_name():

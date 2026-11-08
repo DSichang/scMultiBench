@@ -66,7 +66,14 @@ NOT_TUNABLE = {
     # matilda 1.0), so False always fails; the paper's script could not pass
     # False either (argparse type=bool reads "False" as True)
     "Matilda": {"device", "augmentation"},
-    "scMDC": {"device"},                # cpu_params on a host without a GPU
+    # device: cpu_params on a host without a GPU. The script only pretrains and
+    # encodes (main_scMDC.py:175-199): tau, gamma and phi2 are read by fit(),
+    # which it never calls, and the cluster count from n_clusters, resolution
+    # and n_neighbors is never used. filter1/filter2 always fail: geneSelection
+    # (utils.py:107) cannot index the np.matrix data_loader returns
+    # (main_scMDC.py:79); f1 and f2 are read only under them.
+    "scMDC": {"device", "tau", "gamma", "phi2", "n_clusters", "resolution",
+              "n_neighbors", "filter1", "filter2", "f1", "f2"},
     "scMM": {"no_cuda", "print_freq"},  # every variant passes no_cuda; print_freq logs
     # use_cuda: cpu_params; main_scJoint.py:108 set_num_threads(1) ignores --threads;
     # the stage-3 arguments are read only by util/trainingprocess_stage3.py, whose

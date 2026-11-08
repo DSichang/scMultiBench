@@ -1347,47 +1347,17 @@ scMDC:
     cutoff:
       default: 0.5
       type: float
-    f1:
-      default: 1000
-      type: float
-    f2:
-      default: 2000
-      type: float
-    filter1:
-      default: false
-      type: flag
-    filter2:
-      default: false
-      type: flag
-    gamma:
-      default: 0.1
-      type: float
-    n_clusters:
-      default: 27
-      type: int
-    n_neighbors:
-      default: 30
-      type: int
     phi1:
-      default: 0.001
-      type: float
-    phi2:
       default: 0.001
       type: float
     pretrain_epochs:
       default: 400
       type: int
-    resolution:
-      default: 0.2
-      type: float
     sigma1:
       default: 2.5
       type: float
     sigma2:
       default: 1.5
-      type: float
-    tau:
-      default: 1.0
       type: float
   cross:rna1+rna2+rna3+atac1+atac2+atac3:
     batch_size:
@@ -1396,47 +1366,17 @@ scMDC:
     cutoff:
       default: 0.5
       type: float
-    f1:
-      default: 1000
-      type: float
-    f2:
-      default: 2000
-      type: float
-    filter1:
-      default: false
-      type: flag
-    filter2:
-      default: false
-      type: flag
-    gamma:
-      default: 0.1
-      type: float
-    n_clusters:
-      default: 27
-      type: int
-    n_neighbors:
-      default: 30
-      type: int
     phi1:
-      default: 0.001
-      type: float
-    phi2:
       default: 0.001
       type: float
     pretrain_epochs:
       default: 400
       type: int
-    resolution:
-      default: 0.2
-      type: float
     sigma1:
       default: 2.5
       type: float
     sigma2:
       default: 1.5
-      type: float
-    tau:
-      default: 1.0
       type: float
   vertical:rna+adt:
     batch_size:
@@ -1445,47 +1385,17 @@ scMDC:
     cutoff:
       default: 0.5
       type: float
-    f1:
-      default: 1000
-      type: float
-    f2:
-      default: 2000
-      type: float
-    filter1:
-      default: false
-      type: flag
-    filter2:
-      default: false
-      type: flag
-    gamma:
-      default: 0.1
-      type: float
-    n_clusters:
-      default: 27
-      type: int
-    n_neighbors:
-      default: 30
-      type: int
     phi1:
-      default: 0.001
-      type: float
-    phi2:
       default: 0.001
       type: float
     pretrain_epochs:
       default: 400
       type: int
-    resolution:
-      default: 0.2
-      type: float
     sigma1:
       default: 2.5
       type: float
     sigma2:
       default: 1.5
-      type: float
-    tau:
-      default: 1.0
       type: float
   vertical:rna+atac:
     batch_size:
@@ -1494,47 +1404,17 @@ scMDC:
     cutoff:
       default: 0.5
       type: float
-    f1:
-      default: 1000
-      type: float
-    f2:
-      default: 2000
-      type: float
-    filter1:
-      default: false
-      type: flag
-    filter2:
-      default: false
-      type: flag
-    gamma:
-      default: 0.1
-      type: float
-    n_clusters:
-      default: 27
-      type: int
-    n_neighbors:
-      default: 30
-      type: int
     phi1:
-      default: 0.001
-      type: float
-    phi2:
       default: 0.001
       type: float
     pretrain_epochs:
       default: 400
       type: int
-    resolution:
-      default: 0.2
-      type: float
     sigma1:
       default: 2.5
       type: float
     sigma2:
       default: 1.5
-      type: float
-    tau:
-      default: 1.0
       type: float
 scMM:
   cross:rna1+rna2+rna3+adt1+adt2+adt3:

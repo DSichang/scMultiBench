@@ -90,7 +90,7 @@ def test_cpu_params_keys_are_accepted_params_of_every_variant():
     # scMDC has two cross variants (RNA + ADT, RNA + ATAC), both on that script
     for second in ("adt", "atac"):
         mods = [f"{r}{i}" for r in ("rna", second) for i in (1, 2, 3)]
-        assert "gamma" in mtb.params_for("scMDC", "cross", mods)["tunable"]
+        assert "sigma1" in mtb.params_for("scMDC", "cross", mods)["tunable"]
 
 
 # ------------------------------------------------------------ schema validation
