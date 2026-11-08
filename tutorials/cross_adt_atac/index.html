@@ -2921,7 +2921,7 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="1-install">1. Install<a class="anchor-link" href="#1-install">¶</a></h2><p>This cell installs <code>multibench-sc</code>.</p>
+<h2 id="1-install">1. Install<a class="anchor-link" href="#1-install">¶</a></h2><p>The pins keep the numpy and pandas already installed, so Colab needs no restart.</p>
 </div>
 </div>
 </div>
@@ -2946,11 +2946,11 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="o">,</span><span class="w"> </span><span class="nn">pandas</span>
 <span class="n">pins</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"numpy==</span><span class="si">{</span><span class="n">numpy</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2"> pandas==</span><span class="si">{</span><span class="n">pandas</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2">"</span>
-<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.5.2"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
+<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.6.0"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-1">import numpy, pandas
 pins = f"numpy=={numpy.__version__} pandas=={pandas.__version__}"
-%pip install -q "multibench-sc&gt;=0.5.2" {pins}</div>
+%pip install -q "multibench-sc&gt;=0.6.0" {pins}</div>
 </div>
 </div>
 </div>
@@ -3029,7 +3029,7 @@ envs = mtb.env.install(METHODS)</div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>downloading D58mini (7 MB) ...
 [env] downloading scmb_r 917 MB ...
-[env]   92 MB of 917 MB (24 MB/s)[env]   184 MB of 917 MB (27 MB/s)[env]   276 MB of 917 MB (27 MB/s)[env]   367 MB of 917 MB (28 MB/s)[env]   459 MB of 917 MB (28 MB/s)[env]   551 MB of 917 MB (28 MB/s)[env]   643 MB of 917 MB (28 MB/s)[env]   734 MB of 917 MB (28 MB/s)[env]   826 MB of 917 MB (29 MB/s)[env]   917 MB of 917 MB (28 MB/s)
+[env]   917 MB of 917 MB (29 MB/s)
 [env] unpacking scmb_r ...
 </pre>
 </div>
@@ -3047,8 +3047,8 @@ envs = mtb.env.install(METHODS)</div>
 <h2 id="3-run-the-methods">3. Run the methods<a class="anchor-link" href="#3-run-the-methods">¶</a></h2><p><code>run</code> runs each method on <code>D58mini</code> and <a href="https://dsichang.github.io/scMultiBench/tutorials/evaluate/#what-each-metric-measures">scores its output</a>. The clustering metrics score how well the embedding's clusters and neighbourhoods match the cell types, and how separate the clusters are. The batch metrics measure how well the batches mix. The classification scores measure how well the cell types learned on one batch are predicted in the other batches. Higher is better for every metric.</p>
 <details>
 <summary>Details</summary>
-<p><code>params={"Method": {"key": value}}</code> sets a method's parameters, and <code>mtb.params_for</code> lists them. Many methods take none.</p>
-<p><code>mtb.load_run("out/D58mini")</code> reloads these results later without running anything.</p>
+<p><code>params={"Method": {"key": value}}</code> sets a method's parameters, and <code>mtb.params_for</code> lists them.</p>
+<p><code>mtb.load_run("out/D58mini")</code> reloads these results later.</p>
 </details>
 </div>
 </div>
@@ -3089,9 +3089,9 @@ res.summary</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[run] StabMap (cross/D58mini) ...
-[run]   -&gt; scored (19.3s) ARI 0.916
+[run]   -&gt; scored (12.1s) ARI 0.916
 [run] UINMF (cross/D58mini) ...
-[run]   -&gt; scored (17.4s) ARI 0.682
+[run]   -&gt; scored (16.5s) ARI 0.682
 </pre>
 </div>
 </div>
@@ -3160,7 +3160,7 @@ res.summary</div>
 <td>0.9823</td>
 <td>0.9550</td>
 <td>0.9556</td>
-<td>19.3</td>
+<td>12.1</td>
 <td></td>
 <td></td>
 </tr>
@@ -3184,7 +3184,7 @@ res.summary</div>
 <td>0.9679</td>
 <td>0.8857</td>
 <td>0.9043</td>
-<td>17.4</td>
+<td>16.5</td>
 <td></td>
 <td></td>
 </tr>
@@ -3203,7 +3203,7 @@ res.summary</div>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="4-plot">4. Plot<a class="anchor-link" href="#4-plot">¶</a></h2><p><code>res.plot()</code> draws the scores as a bubble table. Circle size ranks the rows within each column and colour shows the value scaled per column, so a small gap can look large: <code>res.summary</code> has the values.</p>
+<h2 id="4-plot">4. Plot<a class="anchor-link" href="#4-plot">¶</a></h2><p><code>res.plot()</code> draws the scores as a bubble table. Circle size ranks the rows within each column and colour shows the value scaled per column, so a small gap can look large. <code>res.summary</code> has the values.</p>
 <details>
 <summary>Details</summary>
 <p>Metrics are grouped by family: blue for clustering, green for batch correction, pink for classification. Each family starts with an <code>Overall</code> bar: each row's mean rank over the family's metrics, scaled so that the lowest gets the shortest bar.</p>
@@ -3260,14 +3260,13 @@ res.summary</div>
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <h2 id="5-your-own-data">5. Your own data<a class="anchor-link" href="#5-your-own-data">¶</a></h2><p>Your data needs raw ADT counts in one <code>.h5ad</code> file and an ATAC peak matrix of the same cells in another, with a cell type and a batch for each cell.</p>
 <p>The methods of this task read two batches.</p>
-<p>Starting from something else? See the recipes for <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-10x-h5">a 10x <code>.h5</code> file</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-labels-csv">labels in a CSV file</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-no-labels">no labels</a> and <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-donors">another number of donors</a>.</p>
+<p>Recipes cover <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-10x-h5">a 10x <code>.h5</code> file</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-labels-csv">labels in a CSV file</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-no-labels">no labels</a> and <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-donors">another number of donors</a>.</p>
 <details>
 <summary>Details: export</summary>
 <p>The names in quotes say where your file holds each part. <code>"X"</code> is the main matrix, <code>"obsm:protein"</code> the matrix <code>obsm["protein"]</code>, <code>"layer:counts"</code> the layer <code>layers["counts"]</code>, and <code>"obs:celltype"</code> the column <code>obs["celltype"]</code>. A wrong name after <code>obsm:</code>, <code>layer:</code> or <code>obs:</code> raises an error that lists the names the file has.</p>
 <p>When the ADT file also holds a matrix in <code>obsm</code> under a name that does not start with <code>X_</code>, <code>export_dataset</code> asks which one is the protein matrix. <code>X_umap</code> and <code>X_pca</code> are left alone.</p>
 <p>The batches are numbered in the sorted order of their names, read as text: donors <code>A</code>, <code>B</code> and <code>C</code> become batches 1, 2 and 3, and <code>10</code> comes before <code>2</code>.</p>
 <p>For one AnnData per batch, call <code>export_dataset</code> once per batch with <code>batch_index=N</code> instead of <code>batch=</code>.</p>
-<p>The folder stores each matrix dense, so drop the peaks you do not need first.</p>
 </details>
 </div>
 </div>
@@ -3279,7 +3278,7 @@ res.summary</div>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>So that the notebook runs as it is, the next cell writes two small example files, <code>my_adt.h5ad</code> and <code>my_atac.h5ad</code>, from 60% of the cells of <code>D58mini</code>, with a batch column.</p>
+<p>The next cell writes two small example files, <code>my_adt.h5ad</code> and <code>my_atac.h5ad</code>, from 60% of the cells of <code>D58mini</code>, with a batch column. Skip it for your own data.</p>
 </div>
 </div>
 </div>
@@ -3380,8 +3379,10 @@ print(atac)</div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>AnnData object with n_obs × n_vars = 1800 × 227
     obs: 'celltype', 'batch'
+    layers: None (.X)
 AnnData object with n_obs × n_vars = 1800 × 5000
     obs: 'celltype', 'batch'
+    layers: None (.X)
 </pre>
 </div>
 </div>
@@ -3395,7 +3396,7 @@ AnnData object with n_obs × n_vars = 1800 × 5000
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>Write the dataset folder. Change each name in quotes marked <code># &lt;-</code>. The printout above lists the names in your files. Write a name listed after <code>obs:</code> with that prefix, as <code>"obs:celltype"</code>.</p>
+<p>Write the dataset folder. Change each name in quotes marked <code># &lt;-</code> to one the printout above lists for your files, with its prefix, as <code>"obs:celltype"</code>.</p>
 </div>
 </div>
 </div>
@@ -3549,9 +3550,9 @@ mine.summary</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[run] StabMap (cross/MYCROSS_ADT_ATAC) ...
-[run]   -&gt; scored (10.7s) ARI 0.451
+[run]   -&gt; scored (10.5s) ARI 0.451
 [run] UINMF (cross/MYCROSS_ADT_ATAC) ...
-[run]   -&gt; scored (15.4s) ARI 0.531
+[run]   -&gt; scored (14.2s) ARI 0.531
 </pre>
 </div>
 </div>
@@ -3620,7 +3621,7 @@ mine.summary</div>
 <td>0.9884</td>
 <td>0.9732</td>
 <td>0.9739</td>
-<td>10.7</td>
+<td>10.5</td>
 <td></td>
 <td></td>
 </tr>
@@ -3644,7 +3645,7 @@ mine.summary</div>
 <td>0.9508</td>
 <td>0.8318</td>
 <td>0.8583</td>
-<td>15.4</td>
+<td>14.2</td>
 <td></td>
 <td></td>
 </tr>
@@ -3702,7 +3703,7 @@ mine.summary</div>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="6-every-method-of-this-task">6. Every method of this task<a class="anchor-link" href="#6-every-method-of-this-task">¶</a></h2><p>5 methods run this task. <a href="https://colab.research.google.com/github/DSichang/scMultiBench/blob/main/notebooks/tutorial_cross_adt_atac_all.ipynb">This notebook</a> runs them all. It downloads 4 envs, 12.1 GB on a computer without a GPU and 15.5 GB on one with a GPU.</p>
+<h2 id="6-every-method-of-this-task">6. Every method of this task<a class="anchor-link" href="#6-every-method-of-this-task">¶</a></h2><p>5 methods run this task. <a href="https://colab.research.google.com/github/DSichang/scMultiBench/blob/main/notebooks/tutorial_cross_adt_atac_all.ipynb">This notebook</a> runs them all. Its 4 environments download 12.1 GB on a computer without a GPU and 15.5 GB on one with a GPU.</p>
 </div>
 </div>
 </div>
@@ -3750,7 +3751,7 @@ mine.summary</div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <h2 id="next-steps">Next steps<a class="anchor-link" href="#next-steps">¶</a></h2><ul>
-<li>The guides: <a href="https://dsichang.github.io/scMultiBench/tutorials/run/">run</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/evaluate/">evaluate</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/plot/">plot</a> and <a href="https://dsichang.github.io/scMultiBench/tutorials/discover/">discover methods</a>.</li>
+<li><a href="https://dsichang.github.io/scMultiBench/tutorials/run/">Run a method</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/evaluate/">Score an embedding</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/plot/">Load and plot results</a> and <a href="https://dsichang.github.io/scMultiBench/tutorials/discover/">Discover methods</a>.</li>
 <li>The <a href="https://shiny.maths.usyd.edu.au/scMultiBench/">interactive explorer</a> has the full benchmark's rankings, with no install needed.</li>
 </ul>
 </div>

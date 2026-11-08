@@ -2227,17 +2227,16 @@ need. <code>mtb.env.install</code> downloads prebuilt archives, with no conda ne
 <summary>Details</summary>
 <ul>
 <li><code>mtb.config.envs_dir</code> is where they go: <code>$MULTIBENCH_ENVS_DIR</code>
-  when set, else the envs directory of the conda or mamba on <code>PATH</code>,
-  else <code>~/.cache/multibench/envs</code>. <code>print(mtb.config)</code> shows the
+  when set, else the writable envs directory of the conda or mamba on
+  <code>PATH</code>, else <code>~/.cache/multibench/envs</code>. <code>print(mtb.config)</code> shows the
   folder in use.</li>
 <li>A failed archive download falls back to a build from the lockfile,
   which needs conda or mamba and takes longer.</li>
-<li><code>flavor="cpu"</code> or <code>"gpu"</code> picks the build. By default, a host without an
-  NVIDIA <abbr title="Graphics Processing Unit">GPU</abbr> gets the smaller <abbr title="Central Processing Unit">CPU</abbr> build of the PyTorch environments that
-  have one.</li>
+<li><code>flavor="cpu"</code> or <code>"gpu"</code> picks the build. <code>flavor="gpu"</code> installs the
+  <abbr title="Graphics Processing Unit">GPU</abbr> build from a host without a <abbr title="Graphics Processing Unit">GPU</abbr>, such as a cluster login node; by
+  default such a host gets the <abbr title="Central Processing Unit">CPU</abbr> build.</li>
 <li>The totals of the dry run: categories share environments, so two
-  categories cost less than the sum of their totals. <code>? disk</code> means the
-  size on disk is not recorded.</li>
+  categories cost less than the sum of their totals.</li>
 <li><code>mtb.env.install</code> skips environments that already exist, so a rerun
   resumes an interrupted install. With no methods and no <code>category</code>, it
   installs all 24. Check the total with the dry run first
@@ -2246,13 +2245,15 @@ need. <code>mtb.env.install</code> downloads prebuilt archives, with no conda ne
 </details>
 <details class="note">
 <summary>Details: method scripts</summary>
-<p>The first run clones the method scripts from PYangLab/scMultiBench
-with <code>git</code>. They go to <code>mtb.config.repo_path</code>, which is
-<code>~/.cache/multibench/scMultiBench_ref</code> after <code>pip install</code>.
-The variable <code>MULTIBENCH_SCRIPTS_REF</code> fetches a given commit or tag.</p>
-<p>On a host without network, clone them on a connected machine with
-<code>git clone --depth 1 https://github.com/PYangLab/scMultiBench.git &lt;folder&gt;</code>
-and copy the folder. Then set <code>MULTIBENCH_REPO_PATH</code> to the copy.</p>
+<p><code>mtb.env.install</code> downloads the method scripts with the environments,
+and a run downloads them if they are missing. They go to
+<code>mtb.config.repo_path</code>, which is
+<code>~/.cache/multibench/scMultiBench_scripts/&lt;id&gt;</code> after <code>pip install</code>.
+The variable <code>MULTIBENCH_SCRIPTS_REF</code> instead fetches a given commit or
+tag of PYangLab/scMultiBench with <code>git</code>.</p>
+<p>On a host without network, run <code>mtb.env.install</code> on a connected machine
+that sees the same home folder, or copy <code>mtb.config.repo_path</code> from one
+and set <code>MULTIBENCH_REPO_PATH</code> to the copy.</p>
 </details>
 <h3 id="google-colab">Google Colab<a class="headerlink" href="#google-colab" title="Anchor link to this section">&para;</a></h3>
 <p>The tutorials open in Colab from their badge and run on its default <abbr title="Central Processing Unit">CPU</abbr>
@@ -2398,12 +2399,6 @@ computer's paths into them.
 <code>mtb.env.install</code> raises the same error.</p>
 </details>
 <details class="note">
-<summary><code>FileNotFoundError: ... 'conda'</code> from a run</summary>
-<p>No method environment is installed yet and this host has no conda.
-Install the method's environment with
-<code>mtb.env.install(["&lt;method&gt;"])</code>.</p>
-</details>
-<details class="note">
 <summary><code>OSError</code> naming <code>envs_dir</code>, with <code>MULTIBENCH_RUN_MODE=prefix</code></summary>
 <p>Prefix mode is forced, but the environment is not under <code>envs_dir</code>.
 Install it (<code>mtb.env.install(["&lt;method&gt;"])</code>),
@@ -2438,8 +2433,8 @@ other formats into an AnnData first.</p>
 output of <code>python -c "import multibench as mtb; print(mtb.__version__)"</code> and
 <code>pip freeze</code>.</p>
 <hr />
-<p>Next: the <a href="../quickstart/">Quickstart</a>, or run a method with the
-<a href="../tutorials/run/">Run a method</a> tutorial.</p>
+<p>Next: the <a href="../quickstart/">Quickstart</a>, or run a method with
+<a href="../tutorials/run/">Run a method</a>.</p>
 
 
 

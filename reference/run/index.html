@@ -2579,7 +2579,8 @@ without a variant there.</p>
 
         <p>Run the runnable methods of a category on a dataset folder, and score them.</p>
 <p>Only the methods <code>mtb.scan</code> marks runnable run. A method's failure is
-recorded, never raised, and the results are saved under <code>out_dir</code>.
+recorded, never raised, and the results are saved under <code>out_dir</code> after
+each method.
 <code>methods=["Matilda"]</code> runs one method. <code>mtb.scan</code> shows the plan
 first, with each command.</p>
 
@@ -2731,7 +2732,8 @@ barcode. <code>None</code> = each cell's label file.</p>
             </td>
             <td class="doc-param-details">
               <div class="doc-md-description">
-                <p>Score each embedding; <code>False</code> only runs (status <code>ran</code>).</p>
+                <p>Score each embedding; <code>False</code> only runs (status <code>ran</code>), and a
+reused saved record keeps its scores.</p>
               </div>
               <p>
                   <span class="doc-param-annotation">
@@ -2876,8 +2878,8 @@ cells; checked before anything runs.</p>
             </td>
             <td class="doc-raises-details">
               <div class="doc-md-description">
-                <p>Unknown method id. A <code>params</code> key the method does not accept fails
-that method (status <code>failed</code>).</p>
+                <p>Unknown method id, or a <code>params</code> key the method does not accept;
+checked before anything runs.</p>
               </div>
             </td>
           </tr>
@@ -3554,8 +3556,13 @@ scale. Check the values in <code>summary</code>.</p>
 
 <a href="#multibench.workflow.RunResult.rescore" class="headerlink" title="Anchor link to this section">&para;</a></h3>
 <div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">rescore</span><span class="p">(</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="o">*</span><span class="p">,</span> <span class="n">batch</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">=</span> <span class="kc">True</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"RunResult"</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">batch</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">labels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">metrics</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">verbose</span><span class="p">:</span> <span class="n"><span title="bool">bool</span></span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">_caveats</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"RunResult"</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents ">

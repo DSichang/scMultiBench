@@ -2075,7 +2075,7 @@ folder, environment folder or Leiden backend.</p>
 </tr>
 <tr>
 <td><code>MULTIBENCH_SCRIPTS_REF</code></td>
-<td>A commit or tag of the method scripts to download instead of the default branch.</td>
+<td>A commit or tag of PYangLab/scMultiBench whose method scripts are fetched with <code>git</code> instead of the package's.</td>
 </tr>
 <tr>
 <td><code>MULTIBENCH_RUN_MODE</code></td>
@@ -2142,9 +2142,10 @@ over the variable; <code>None</code> goes back to the default.
             <td><code><span title="multibench._settings.Settings.repo_path">repo_path</span></code></td>
             <td class="doc-attribute-details">
               <div class="doc-md-description">
-                <p>Folder of the method scripts (<code>tools_scripts/</code>), fetched there on
-the first run when absent or empty. Default
-<code>$MULTIBENCH_REPO_PATH</code>, else <code>&lt;base&gt;/scMultiBench_ref</code>.</p>
+                <p>Folder of the method scripts (<code>tools_scripts/</code>), downloaded there
+on the first run when absent or empty. Default
+<code>$MULTIBENCH_REPO_PATH</code>, else <code>&lt;base&gt;/scMultiBench_scripts/&lt;id&gt;</code>,
+where <code>&lt;id&gt;</code> changes with the scripts.</p>
               </div>
               <p>
                   <span class="doc-attribute-annotation">

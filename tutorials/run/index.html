@@ -679,6 +679,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#set-a-methods-hyperparameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Set a method's hyperparameters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#inputs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2110,6 +2121,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#set-a-methods-hyperparameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Set a method's hyperparameters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#inputs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2257,6 +2279,8 @@ each output and saves the results. <code>methods=["SCALEX"]</code> runs one meth
 <p>Methods run only on Linux. On macOS and Windows,
 <code>mtb.scan(dataset, category, command=True)</code> returns the plan with each
 command. Run the call itself on the Linux machine.</p>
+<div class="admonition tip">
+<p class="admonition-title">Summary</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">fetch</span><span class="p">(</span><span class="s2">"D28"</span><span class="p">)</span>                  <span class="c1"># 137 MB; skipped when already present</span>
@@ -2264,38 +2288,28 @@ command. Run the call itself on the Linux machine.</p>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">res</span><span class="o">.</span><span class="n">summary</span>                            <span class="c1"># status, run time and every score</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">emb</span> <span class="o">=</span> <span class="n">res</span><span class="o">.</span><span class="n">embedding</span><span class="p">(</span><span class="s2">"SCALEX"</span><span class="p">)</span>          <span class="c1"># AnnData: obsm["X_emb"], 11014 x 10</span>
 </span></code></pre></div>
+</div>
 <details class="note">
 <summary>Details</summary>
 <p><code>run</code> finds the version of the method that fits the category and
-the files of the folder, converts the files if needed, runs the method
-script in <code>&lt;out_dir&gt;/&lt;method&gt;_&lt;dataset&gt;/</code> and scores its output.</p>
+the files of the folder. It converts the files if needed, runs the
+method script in <code>&lt;out_dir&gt;/&lt;method&gt;_&lt;dataset&gt;/</code> and scores its output.</p>
 <p><code>mtb.scan</code> creates no files: with <code>command=True</code> its <code>command</code> column
 holds each command, with <code>&lt;out_dir&gt;</code> for the output folder.</p>
 <p>Some commands read a file that <code>run</code> writes first under
-<code>&lt;out_dir&gt;/&lt;method&gt;_&lt;dataset&gt;/inputs/</code>, such as a converted AnnData or
-the renamed peak file of GLUE and Seurat_v3. The <code>caveat</code> column of
+<code>&lt;out_dir&gt;/&lt;method&gt;_&lt;dataset&gt;/inputs/</code>, such as a converted AnnData,
+the renamed peak file of GLUE and Seurat_v3, or the links to the data
+files of scMM, scMVP and scJoint. The <code>caveat</code> column of
 <code>scan</code> says so. Call <code>mtb.run</code> in the job for those methods, not the
 command alone.</p>
-<p><code>params={"SCALEX": {...}}</code> sets hyperparameters: <code>mtb.params_for</code>
-lists them. For several values of one hyperparameter, loop over
-<code>run</code>, one <code>out_dir</code> per value, and name each run's rows:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">runs</span> <span class="o">=</span> <span class="p">[]</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">30</span><span class="p">,</span> <span class="mi">50</span><span class="p">):</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">r</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">"D28"</span><span class="p">,</span> <span class="s2">"diagonal"</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s2">"scJoint"</span><span class="p">],</span> <span class="n">out_dir</span><span class="o">=</span><span class="sa">f</span><span class="s2">"runs/e</span><span class="si">{</span><span class="n">v</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>                <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">"scJoint"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"epochs_stage1"</span><span class="p">:</span> <span class="n">v</span><span class="p">}})</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">runs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">long</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span><span class="n">method</span><span class="o">=</span><span class="sa">f</span><span class="s2">"scJoint epochs=</span><span class="si">{</span><span class="n">v</span><span class="si">}</span><span class="s2">"</span><span class="p">))</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">runs</span><span class="p">))</span>
-</span></code></pre></div>
 </details>
 <hr />
 <h2 id="install-the-methods-environment">Install the method's environment<a class="headerlink" href="#install-the-methods-environment" title="Anchor link to this section">&para;</a></h2>
 <p>Install the method's environment before its first run.
 <code>mtb.env.install(["SCALEX"], dry_run=True)</code> lists what is installed and what
 is missing, with the download sizes.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="s2">"SCALEX"</span><span class="p">)[</span><span class="s2">"env"</span><span class="p">]</span>                <span class="c1"># 'scmb_torch'</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">install</span><span class="p">([</span><span class="s2">"SCALEX"</span><span class="p">])</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="s2">"SCALEX"</span><span class="p">)[</span><span class="s2">"env"</span><span class="p">]</span>                <span class="c1"># 'scmb_torch'</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">install</span><span class="p">([</span><span class="s2">"SCALEX"</span><span class="p">])</span>
 </span></code></pre></div>
 <details class="note">
 <summary>Details</summary>
@@ -2316,16 +2330,16 @@ notes, and the <code>caveat</code> column of <code>scan</code> lists them.</p>
 run time and scores, and its <code>reason</code> column says why a method failed or
 was skipped.
 <code>res.embedding(method)</code> returns the method's embedding as an AnnData, in the
-method's cell order: <code>obsm["X_emb"]</code>, and in <code>obs</code> each cell's <code>label</code>, and
-its <code>batch</code> when the run had more than one batch (the label file of each
-cell, or the <code>batch=</code> of <code>run</code>). The cell names are the barcodes of the
+method's cell order: <code>obsm["X_emb"]</code>. Its <code>obs</code> holds each cell's <code>label</code>,
+and its <code>batch</code> when the run had more than one batch: the label file of each
+cell, or the <code>batch=</code> of <code>run</code>. The cell names are the barcodes of the
 dataset files. Where two files share a barcode, each name starts with its
 label file, such as <code>cty2:AAACCTGAG...</code>.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">res</span><span class="o">.</span><span class="n">summary</span><span class="p">[</span><span class="n">res</span><span class="o">.</span><span class="n">summary</span><span class="o">.</span><span class="n">status</span> <span class="o">!=</span> <span class="s2">"scored"</span><span class="p">]</span>   <span class="c1"># empty when every method scored</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">emb</span> <span class="o">=</span> <span class="n">res</span><span class="o">.</span><span class="n">embedding</span><span class="p">(</span><span class="s2">"SCALEX"</span><span class="p">)</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">emb</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>                     <span class="c1"># label, and batch, per cell</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">res</span><span class="o">.</span><span class="n">long</span>                           <span class="c1"># the scores, as the long table</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_run</span><span class="p">(</span><span class="s2">"runs/"</span><span class="p">)</span>        <span class="c1"># the same result, later</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">res</span><span class="o">.</span><span class="n">summary</span><span class="p">[</span><span class="n">res</span><span class="o">.</span><span class="n">summary</span><span class="o">.</span><span class="n">status</span> <span class="o">!=</span> <span class="s2">"scored"</span><span class="p">]</span>   <span class="c1"># empty when every method scored</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">emb</span> <span class="o">=</span> <span class="n">res</span><span class="o">.</span><span class="n">embedding</span><span class="p">(</span><span class="s2">"SCALEX"</span><span class="p">)</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">emb</span><span class="o">.</span><span class="n">obs</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>                     <span class="c1"># label, and batch, per cell</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">res</span><span class="o">.</span><span class="n">long</span>                           <span class="c1"># the scores, as the long table</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_run</span><span class="p">(</span><span class="s2">"runs/"</span><span class="p">)</span>        <span class="c1"># the same result, later</span>
 </span></code></pre></div>
 <p><code>run</code> also writes the cell names into each <code>embedding.h5</code>, as the dataset
 <code>barcodes</code>, so <code>mtb.evaluate</code> and <code>mtb.io.read</code> find each cell of
@@ -2351,6 +2365,26 @@ outputs again and writes the new scores. <code>metrics=</code> replaces those sc
 and keeps the others. No method runs again.</p>
 </details>
 <hr />
+<h2 id="set-a-methods-hyperparameters">Set a method's hyperparameters<a class="headerlink" href="#set-a-methods-hyperparameters" title="Anchor link to this section">&para;</a></h2>
+<p>Every method takes hyperparameters.
+<code>mtb.params_for(method, category, modalities)</code> lists them with their
+defaults, which are the paper's values. A default of <code>None</code> leaves the
+setting to the method's library. <code>run(params={method: {name: value}})</code> sets
+them. For several values of one hyperparameter, loop over <code>run</code>, one
+<code>out_dir</code> per value, and name each run's rows:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">p</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">params_for</span><span class="p">(</span><span class="s2">"scJoint"</span><span class="p">,</span> <span class="s2">"diagonal"</span><span class="p">)</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">p</span><span class="p">[</span><span class="s2">"tunable"</span><span class="p">][</span><span class="s2">"epochs_stage1"</span><span class="p">]</span>          <span class="c1"># {'default': 20, 'type': 'int'}</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="n">runs</span> <span class="o">=</span> <span class="p">[]</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">30</span><span class="p">,</span> <span class="mi">50</span><span class="p">):</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="n">r</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">"D28"</span><span class="p">,</span> <span class="s2">"diagonal"</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s2">"scJoint"</span><span class="p">],</span> <span class="n">out_dir</span><span class="o">=</span><span class="sa">f</span><span class="s2">"runs/e</span><span class="si">{</span><span class="n">v</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>                <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">"scJoint"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"epochs_stage1"</span><span class="p">:</span> <span class="n">v</span><span class="p">}})</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="n">runs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">long</span><span class="o">.</span><span class="n">assign</span><span class="p">(</span><span class="n">method</span><span class="o">=</span><span class="sa">f</span><span class="s2">"scJoint epochs=</span><span class="si">{</span><span class="n">v</span><span class="si">}</span><span class="s2">"</span><span class="p">))</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">runs</span><span class="p">))</span>
+</span></code></pre></div>
+<hr />
 <h2 id="inputs">Inputs<a class="headerlink" href="#inputs" title="Anchor link to this section">&para;</a></h2>
 <p>A dataset folder holds one file per role: a role is the name of one input,
 such as <code>rna</code>, <code>atac_gas</code> or <code>cty</code>, the label file.
@@ -2366,9 +2400,10 @@ why not the rest.</p>
 one category and one set of roles. For a method with several variants,
 <code>run</code> runs the one with the most of the folder's modalities.
 <code>modalities=["rna", "adt"]</code> picks another.</p>
-<p><code>scan</code> checks that each file is there, that no matrix is transposed,
-that each label file has as many rows as its matrix, and that files that
-must hold the same cells do. Its <code>reason</code> column names what is wrong.</p>
+<p><code>scan</code> checks that each file is there and that no matrix is transposed.
+It also checks that each label file has as many rows as its matrix, and
+that files that must hold the same cells do. Its <code>reason</code> column names
+what is wrong.</p>
 </details>
 <h3 id="folder-layout">Dataset folder layout<a class="headerlink" href="#folder-layout" title="Anchor link to this section">&para;</a></h3>
 <p>Put the files of one dataset in one folder, <code>&lt;data_path&gt;/&lt;DATASET&gt;/</code>, for
@@ -2401,9 +2436,10 @@ example <code>data/MYDATA/</code>. The folder name is the dataset name.
 </tbody>
 </table>
 <p>Each <code>.h5</code> file holds <code>matrix/data</code> (features x cells, the transpose of
-<code>AnnData.X</code>), <code>matrix/features</code> and <code>matrix/barcodes</code>. A label file is a
-one-column CSV: a header line, then one label per cell, in the order of the
-cells.</p>
+<code>AnnData.X</code>), <code>matrix/features</code> and <code>matrix/barcodes</code>. R's <code>rhdf5</code> shows the
+dimensions reversed, so write a cells x features matrix from R. A label file
+is a one-column CSV: a header line, then one label per cell, in the order of
+the cells.</p>
 <p>Vertical, mosaic and cross methods read <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> as peaks. In diagonal,
 <code>atac_peak.h5</code> holds peaks and <code>atac_gas.h5</code> gene-activity scores of the
 same cells, and each method reads one of them or both:</p>
@@ -2430,11 +2466,11 @@ same cells, and each method reads one of them or both:</p>
 </tbody>
 </table>
 <p>For several <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and several <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> batches in diagonal, scJoint, GLUE, iNMF
-and online_iNMF read exactly 3 of each, numbered <code>rna1.h5</code>, <code>atac_gas1.h5</code> or
-<code>atac_peak1.h5</code>, <code>rna_cty1.csv</code> and <code>atac_cty1.csv</code>, then 2 and 3. For another
-number of batches, such as 2 donors, write one <code>rna.h5</code> and one <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file with
-every cell, and pass the batches as <code>run(batch=...)</code>, one per <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>
-cell, as in <a href="#recipe-donors">Another number of donors</a>.</p>
+and online_iNMF read exactly 3 of each. They are numbered <code>rna1.h5</code>,
+<code>atac_gas1.h5</code> or <code>atac_peak1.h5</code>, <code>rna_cty1.csv</code> and <code>atac_cty1.csv</code>, then 2
+and 3. For another number of batches, such as 2 donors, write one <code>rna.h5</code>
+and one <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file with every cell. Then pass the batches as <code>run(batch=...)</code>,
+one per <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> cell, as in <a href="#recipe-donors">Another number of donors</a>.</p>
 <p>Number your mosaic or cross batches to match one of these patterns:</p>
 <table>
 <thead>
@@ -2635,8 +2671,8 @@ export the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)"
 <p>Each task tutorial has a section "Your own data". It reads <code>.h5ad</code> files
 that hold the cell types in <code>obs</code>, writes a dataset folder and runs the
 methods on it. These recipes cover four other starting points. Run them in
-the tutorial notebook of your task: <code>mtb</code> is imported, <code>METHODS</code> is the
-list of methods from its section 2, and its check cell and <code>run</code> cell
+the tutorial notebook of your task. There <code>mtb</code> is imported, and <code>METHODS</code>
+is the list of methods from its section 2. Its check cell and <code>run</code> cell
 use <code>NAME</code>, the folder name that a recipe sets. The recipes write to
 <code>mydata/</code> and call the cell-type column <code>celltype</code>, as the tutorials do.</p>
 <h3 id="recipe-10x-h5">A 10x <code>.h5</code> file<a class="headerlink" href="#recipe-10x-h5" title="Anchor link to this section">&para;</a></h3>
@@ -2826,7 +2862,7 @@ how well the donors mix. <code>batch=</code> takes the column itself, not its na
 the folder, and the folder holds no <code>obs</code> columns. The values are matched to
 the cells by barcode. Every cell needs a donor: <code>run</code> stops when one is missing.</p>
 <p>For diagonal data with another number of donors than 3, do the same in the
-diagonal <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> tutorial: export <code>rna</code> and <code>atac</code> with all their cells,
+diagonal <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> tutorial. Export <code>rna</code> and <code>atac</code> with all their cells,
 without <code>batch_index=</code>, and give <code>run</code> the donor of every <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> cell:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 </span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>

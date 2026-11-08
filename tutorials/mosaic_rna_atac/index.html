@@ -2943,7 +2943,7 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="1-install">1. Install<a class="anchor-link" href="#1-install">¶</a></h2><p>This cell installs <code>multibench-sc</code>.</p>
+<h2 id="1-install">1. Install<a class="anchor-link" href="#1-install">¶</a></h2><p>The pins keep the numpy and pandas already installed, so Colab needs no restart.</p>
 </div>
 </div>
 </div>
@@ -2968,11 +2968,11 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="o">,</span><span class="w"> </span><span class="nn">pandas</span>
 <span class="n">pins</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"numpy==</span><span class="si">{</span><span class="n">numpy</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2"> pandas==</span><span class="si">{</span><span class="n">pandas</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2">"</span>
-<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.5.2"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
+<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.6.0"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-1">import numpy, pandas
 pins = f"numpy=={numpy.__version__} pandas=={pandas.__version__}"
-%pip install -q "multibench-sc&gt;=0.5.2" {pins}</div>
+%pip install -q "multibench-sc&gt;=0.6.0" {pins}</div>
 </div>
 </div>
 </div>
@@ -3050,15 +3050,6 @@ envs = mtb.env.install(METHODS)</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>downloading D45mini (11 MB) ...
-[env] downloading scmb_r 917 MB ...
-[env]   92 MB of 917 MB (79 MB/s)[env]   184 MB of 917 MB (89 MB/s)[env]   276 MB of 917 MB (87 MB/s)[env]   367 MB of 917 MB (91 MB/s)[env]   459 MB of 917 MB (93 MB/s)[env]   551 MB of 917 MB (95 MB/s)[env]   643 MB of 917 MB (96 MB/s)[env]   734 MB of 917 MB (96 MB/s)[env]   826 MB of 917 MB (97 MB/s)[env]   917 MB of 917 MB (97 MB/s)
-[env] unpacking scmb_r ...
-[env] downloading scmb_torch (gpu build) 588 MB ...
-[env]   60 MB of 588 MB (50 MB/s)[env]   118 MB of 588 MB (57 MB/s)[env]   177 MB of 588 MB (62 MB/s)[env]   236 MB of 588 MB (65 MB/s)[env]   295 MB of 588 MB (68 MB/s)[env]   353 MB of 588 MB (69 MB/s)[env]   412 MB of 588 MB (69 MB/s)[env]   471 MB of 588 MB (69 MB/s)[env]   530 MB of 588 MB (71 MB/s)[env]   588 MB of 588 MB (71 MB/s)
-[env] unpacking scmb_torch ...
-[env] downloading torch-2.8.0-cu12-py39 (shared layer) 3.9 GB ...
-[env]   0.4 GB of 3.9 GB (98 MB/s)[env]   0.8 GB of 3.9 GB (102 MB/s)[env]   1.2 GB of 3.9 GB (102 MB/s)[env]   1.6 GB of 3.9 GB (102 MB/s)[env]   1.9 GB of 3.9 GB (103 MB/s)[env]   2.3 GB of 3.9 GB (96 MB/s)[env]   2.7 GB of 3.9 GB (95 MB/s)[env]   3.1 GB of 3.9 GB (96 MB/s)[env]   3.5 GB of 3.9 GB (96 MB/s)[env]   3.9 GB of 3.9 GB (96 MB/s)
-[env] unpacking torch-2.8.0-cu12-py39 ...
 </pre>
 </div>
 </div>
@@ -3075,8 +3066,8 @@ envs = mtb.env.install(METHODS)</div>
 <h2 id="3-run-the-methods">3. Run the methods<a class="anchor-link" href="#3-run-the-methods">¶</a></h2><p><code>run</code> runs each method on <code>D45mini</code> and <a href="https://dsichang.github.io/scMultiBench/tutorials/evaluate/#what-each-metric-measures">scores its output</a>. The clustering metrics score how well the embedding's clusters and neighbourhoods match the cell types, and how separate the clusters are. The batch metrics measure how well the batches mix. The classification scores measure how well the cell types learned on one batch are predicted in the other batches. scMoMaT writes a graph: <code>run</code> scores its 2-D UMAP, with no classification scores. Higher is better for every metric.</p>
 <details>
 <summary>Details</summary>
-<p><code>params={"Method": {"key": value}}</code> sets a method's parameters, and <code>mtb.params_for</code> lists them. Many methods take none.</p>
-<p><code>mtb.load_run("out/D45mini")</code> reloads these results later without running anything.</p>
+<p><code>params={"Method": {"key": value}}</code> sets a method's parameters, and <code>mtb.params_for</code> lists them.</p>
+<p><code>mtb.load_run("out/D45mini")</code> reloads these results later.</p>
 </details>
 </div>
 </div>
@@ -3117,9 +3108,9 @@ res.summary</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[run] StabMap (mosaic/D45mini) ...
-[run]   -&gt; scored (32.1s) ARI 0.526
+[run]   -&gt; scored (13.8s) ARI 0.526
 [run] scMoMaT (mosaic/D45mini) ...
-[run]   -&gt; scored (79.7s) ARI 0.314
+[run]   -&gt; scored (73.9s) ARI 0.314
 </pre>
 </div>
 </div>
@@ -3188,7 +3179,7 @@ res.summary</div>
 <td>0.9875</td>
 <td>0.7882</td>
 <td>0.8103</td>
-<td>32.1</td>
+<td>13.8</td>
 <td></td>
 <td></td>
 </tr>
@@ -3212,7 +3203,7 @@ res.summary</div>
 <td>NaN</td>
 <td>NaN</td>
 <td>NaN</td>
-<td>79.7</td>
+<td>73.9</td>
 <td></td>
 <td></td>
 </tr>
@@ -3231,7 +3222,7 @@ res.summary</div>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="4-plot">4. Plot<a class="anchor-link" href="#4-plot">¶</a></h2><p><code>res.plot()</code> draws the scores as a bubble table. Circle size ranks the rows within each column and colour shows the value scaled per column, so a small gap can look large: <code>res.summary</code> has the values.</p>
+<h2 id="4-plot">4. Plot<a class="anchor-link" href="#4-plot">¶</a></h2><p><code>res.plot()</code> draws the scores as a bubble table. Circle size ranks the rows within each column and colour shows the value scaled per column, so a small gap can look large. <code>res.summary</code> has the values.</p>
 <details>
 <summary>Details</summary>
 <p>Metrics are grouped by family: blue for clustering, green for batch correction, pink for classification. Each family starts with an <code>Overall</code> bar: each row's mean rank over the family's metrics, scaled so that the lowest gets the shortest bar.</p>
@@ -3288,12 +3279,11 @@ res.summary</div>
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <h2 id="5-your-own-data">5. Your own data<a class="anchor-link" href="#5-your-own-data">¶</a></h2><p>Your data needs raw counts, with one <code>.h5ad</code> file per batch and modality and a cell type for each cell. Number the batches as below: RNA, then RNA + ATAC, then ATAC. Give ATAC as peaks.</p>
 <p>Every RNA file needs the same gene names and every ATAC file the same peaks, in the same order. scMoMaT matches the features of two batches by position, and the check does not compare their names across batches.</p>
-<p>Starting from something else? See the recipes for <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-10x-h5">a 10x <code>.h5</code> file</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-labels-csv">labels in a CSV file</a> and <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-no-labels">no labels</a>.</p>
+<p>Recipes cover <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-10x-h5">a 10x <code>.h5</code> file</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-labels-csv">labels in a CSV file</a> and <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-no-labels">no labels</a>.</p>
 <details>
 <summary>Details: export</summary>
 <p>The names in quotes say where your file holds each part. <code>"X"</code> is the main matrix, <code>"obsm:atac"</code> the matrix <code>obsm["atac"]</code>, <code>"layer:counts"</code> the layer <code>layers["counts"]</code>, and <code>"obs:celltype"</code> the column <code>obs["celltype"]</code>. A wrong name after <code>obsm:</code>, <code>layer:</code> or <code>obs:</code> raises an error that lists the names the file has.</p>
 <p><a href="https://dsichang.github.io/scMultiBench/tutorials/run/#folder-layout">The folder layout</a> lists the batch patterns and the methods that accept each one.</p>
-<p>The folder stores each matrix dense, so drop the genes or peaks you do not need first.</p>
 </details>
 </div>
 </div>
@@ -3305,7 +3295,7 @@ res.summary</div>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>So that the notebook runs as it is, the next cell writes four small example files, one per batch and modality, from the first 1,500 cells of each batch of <code>D45mini</code>.</p>
+<p>The next cell writes four small example files, one per batch and modality, from the first 1,500 cells of each batch of <code>D45mini</code>. Skip it for your own data.</p>
 </div>
 </div>
 </div>
@@ -3412,8 +3402,10 @@ print(atac2)</div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>AnnData object with n_obs × n_vars = 1500 × 1000
     obs: 'celltype'
+    layers: None (.X)
 AnnData object with n_obs × n_vars = 1500 × 5000
     obs: 'celltype'
+    layers: None (.X)
 </pre>
 </div>
 </div>
@@ -3427,7 +3419,7 @@ AnnData object with n_obs × n_vars = 1500 × 5000
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>Write the dataset folder. Change each name in quotes marked <code># &lt;-</code>. The printout above lists the names in two of your files. Write a name listed after <code>obs:</code> with that prefix, as <code>"obs:celltype"</code>.</p>
+<p>Write the dataset folder. Change each name in quotes marked <code># &lt;-</code> to one the printout above lists for two of your files, with its prefix, as <code>"obs:celltype"</code>.</p>
 </div>
 </div>
 </div>
@@ -3451,33 +3443,33 @@ AnnData object with n_obs × n_vars = 1500 × 5000
 </clipboard-copy>
 </div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="n">NAME</span> <span class="o">=</span> <span class="s2">"MYMOSAIC_RNA_ATAC"</span>   <span class="c1"># &lt;- a new name for your own data</span>
-<span class="n">out</span> <span class="o">=</span> <span class="s2">"mydata/"</span> <span class="o">+</span> <span class="n">NAME</span>
+<span class="n">folder</span> <span class="o">=</span> <span class="s2">"mydata/"</span> <span class="o">+</span> <span class="n">NAME</span>
 <span class="n">celltype</span> <span class="o">=</span> <span class="s2">"obs:celltype"</span>   <span class="c1"># &lt;- the cell-type column of every file</span>
 <span class="c1"># batch 1: RNA only</span>
-<span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">rna1</span><span class="p">,</span> <span class="n">out</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="s2">"X"</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">celltype</span><span class="p">,</span>
+<span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">rna1</span><span class="p">,</span> <span class="n">folder</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="s2">"X"</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">celltype</span><span class="p">,</span>
                       <span class="n">batch_index</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">"mosaic"</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="c1"># batch 2: RNA + ATAC peaks</span>
-<span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">rna2</span><span class="p">,</span> <span class="n">out</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="s2">"X"</span><span class="p">,</span> <span class="n">atac</span><span class="o">=</span><span class="n">atac2</span><span class="p">,</span> <span class="n">atac_kind</span><span class="o">=</span><span class="s2">"peak"</span><span class="p">,</span>
+<span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">rna2</span><span class="p">,</span> <span class="n">folder</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="s2">"X"</span><span class="p">,</span> <span class="n">atac</span><span class="o">=</span><span class="n">atac2</span><span class="p">,</span> <span class="n">atac_kind</span><span class="o">=</span><span class="s2">"peak"</span><span class="p">,</span>
                       <span class="n">labels</span><span class="o">=</span><span class="n">celltype</span><span class="p">,</span>
                       <span class="n">batch_index</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">"mosaic"</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="c1"># batch 3: ATAC peaks only</span>
-<span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">atac3</span><span class="p">,</span> <span class="n">out</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">atac</span><span class="o">=</span><span class="s2">"X"</span><span class="p">,</span> <span class="n">atac_kind</span><span class="o">=</span><span class="s2">"peak"</span><span class="p">,</span>
+<span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">atac3</span><span class="p">,</span> <span class="n">folder</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">atac</span><span class="o">=</span><span class="s2">"X"</span><span class="p">,</span> <span class="n">atac_kind</span><span class="o">=</span><span class="s2">"peak"</span><span class="p">,</span>
                       <span class="n">labels</span><span class="o">=</span><span class="n">celltype</span><span class="p">,</span>
                       <span class="n">batch_index</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="s2">"mosaic"</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">mtb</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="s2">"mydata/"</span> <span class="o">+</span> <span class="n">NAME</span><span class="p">,</span> <span class="s2">"mosaic"</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="n">METHODS</span><span class="p">)</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-7">NAME = "MYMOSAIC_RNA_ATAC"   # &lt;- a new name for your own data
-out = "mydata/" + NAME
+folder = "mydata/" + NAME
 celltype = "obs:celltype"   # &lt;- the cell-type column of every file
 # batch 1: RNA only
-mtb.io.export_dataset(rna1, out, rna="X", labels=celltype,
+mtb.io.export_dataset(rna1, folder, rna="X", labels=celltype,
                       batch_index=1, category="mosaic", overwrite=True)
 # batch 2: RNA + ATAC peaks
-mtb.io.export_dataset(rna2, out, rna="X", atac=atac2, atac_kind="peak",
+mtb.io.export_dataset(rna2, folder, rna="X", atac=atac2, atac_kind="peak",
                       labels=celltype,
                       batch_index=2, category="mosaic", overwrite=True)
 # batch 3: ATAC peaks only
-mtb.io.export_dataset(atac3, out, rna=None, atac="X", atac_kind="peak",
+mtb.io.export_dataset(atac3, folder, rna=None, atac="X", atac_kind="peak",
                       labels=celltype,
                       batch_index=3, category="mosaic", overwrite=True)
 mtb.scan("mydata/" + NAME, "mosaic", methods=METHODS)</div>
@@ -3591,9 +3583,9 @@ mine.summary</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[run] StabMap (mosaic/MYMOSAIC_RNA_ATAC) ...
-[run]   -&gt; scored (16.5s) ARI 0.463
+[run]   -&gt; scored (12.9s) ARI 0.463
 [run] scMoMaT (mosaic/MYMOSAIC_RNA_ATAC) ...
-[run]   -&gt; scored (216.5s) ARI 0.370
+[run]   -&gt; scored (71.3s) ARI 0.370
 </pre>
 </div>
 </div>
@@ -3662,7 +3654,7 @@ mine.summary</div>
 <td>0.9867</td>
 <td>0.7645</td>
 <td>0.7851</td>
-<td>16.5</td>
+<td>12.9</td>
 <td></td>
 <td></td>
 </tr>
@@ -3686,7 +3678,7 @@ mine.summary</div>
 <td>NaN</td>
 <td>NaN</td>
 <td>NaN</td>
-<td>216.5</td>
+<td>71.3</td>
 <td></td>
 <td></td>
 </tr>
@@ -3767,11 +3759,11 @@ mine.summary</div>
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">long</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="s2">"mosaic"</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">"D45"</span><span class="p">)</span>
-<span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">long</span><span class="p">)</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">stored</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="s2">"mosaic"</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">"D45"</span><span class="p">)</span>
+<span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">stored</span><span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-10">long = mtb.load_results("mosaic", dataset="D45")
-mtb.plot.bubble(long)</div>
+<div class="clipboard-copy-txt" id="cell-10">stored = mtb.load_results("mosaic", dataset="D45")
+mtb.plot.bubble(stored)</div>
 </div>
 </div>
 </div>
@@ -3796,7 +3788,7 @@ mtb.plot.bubble(long)</div>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="7-every-method-of-this-task">7. Every method of this task<a class="anchor-link" href="#7-every-method-of-this-task">¶</a></h2><p>6 methods run this task. <a href="https://colab.research.google.com/github/DSichang/scMultiBench/blob/main/notebooks/tutorial_mosaic_rna_atac_all.ipynb">This notebook</a> runs them all. It downloads 6 envs, 7.8 GB on a computer without a GPU and 8.9 GB on one with a GPU.</p>
+<h2 id="7-every-method-of-this-task">7. Every method of this task<a class="anchor-link" href="#7-every-method-of-this-task">¶</a></h2><p>6 methods run this task. <a href="https://colab.research.google.com/github/DSichang/scMultiBench/blob/main/notebooks/tutorial_mosaic_rna_atac_all.ipynb">This notebook</a> runs them all. Its 6 environments download 7.8 GB on a computer without a GPU and 8.9 GB on one with a GPU.</p>
 </div>
 </div>
 </div>
@@ -3844,7 +3836,7 @@ mtb.plot.bubble(long)</div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <h2 id="next-steps">Next steps<a class="anchor-link" href="#next-steps">¶</a></h2><ul>
-<li>The guides: <a href="https://dsichang.github.io/scMultiBench/tutorials/run/">run</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/evaluate/">evaluate</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/plot/">plot</a> and <a href="https://dsichang.github.io/scMultiBench/tutorials/discover/">discover methods</a>.</li>
+<li><a href="https://dsichang.github.io/scMultiBench/tutorials/run/">Run a method</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/evaluate/">Score an embedding</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/plot/">Load and plot results</a> and <a href="https://dsichang.github.io/scMultiBench/tutorials/discover/">Discover methods</a>.</li>
 <li>The <a href="https://shiny.maths.usyd.edu.au/scMultiBench/">interactive explorer</a> has the full benchmark's rankings, with no install needed.</li>
 </ul>
 </div>

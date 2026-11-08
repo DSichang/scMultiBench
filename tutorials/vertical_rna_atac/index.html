@@ -2921,7 +2921,7 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="1-install">1. Install<a class="anchor-link" href="#1-install">¶</a></h2><p>This cell installs <code>multibench-sc</code>.</p>
+<h2 id="1-install">1. Install<a class="anchor-link" href="#1-install">¶</a></h2><p>The pins keep the numpy and pandas already installed, so Colab needs no restart.</p>
 </div>
 </div>
 </div>
@@ -2946,11 +2946,11 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="o">,</span><span class="w"> </span><span class="nn">pandas</span>
 <span class="n">pins</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"numpy==</span><span class="si">{</span><span class="n">numpy</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2"> pandas==</span><span class="si">{</span><span class="n">pandas</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2">"</span>
-<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.5.2"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
+<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.6.0"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-1">import numpy, pandas
 pins = f"numpy=={numpy.__version__} pandas=={pandas.__version__}"
-%pip install -q "multibench-sc&gt;=0.5.2" {pins}</div>
+%pip install -q "multibench-sc&gt;=0.6.0" {pins}</div>
 </div>
 </div>
 </div>
@@ -3022,11 +3022,8 @@ envs = mtb.env.install(METHODS)</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>downloading D27mini_vertical (24 MB) ...
-[env] downloading scmb_scmm2 (cpu build) 481 MB ...
-[env]   48 MB of 481 MB (58 MB/s)[env]   96 MB of 481 MB (74 MB/s)[env]   145 MB of 481 MB (83 MB/s)[env]   193 MB of 481 MB (88 MB/s)[env]   241 MB of 481 MB (91 MB/s)[env]   288 MB of 481 MB (94 MB/s)[env]   337 MB of 481 MB (94 MB/s)[env]   385 MB of 481 MB (95 MB/s)[env]   433 MB of 481 MB (95 MB/s)[env]   481 MB of 481 MB (96 MB/s)
-[env] unpacking scmb_scmm2 ...
 [env] downloading scmb_vimcca 725 MB ...
-[env]   73 MB of 725 MB (26 MB/s)[env]   146 MB of 725 MB (28 MB/s)[env]   218 MB of 725 MB (28 MB/s)[env]   290 MB of 725 MB (29 MB/s)[env]   363 MB of 725 MB (29 MB/s)[env]   435 MB of 725 MB (29 MB/s)[env]   509 MB of 725 MB (29 MB/s)[env]   581 MB of 725 MB (29 MB/s)[env]   653 MB of 725 MB (28 MB/s)[env]   725 MB of 725 MB (28 MB/s)
+[env]   725 MB of 725 MB (30 MB/s)
 [env] unpacking scmb_vimcca ...
 </pre>
 </div>
@@ -3044,8 +3041,8 @@ envs = mtb.env.install(METHODS)</div>
 <h2 id="3-run-the-methods">3. Run the methods<a class="anchor-link" href="#3-run-the-methods">¶</a></h2><p><code>run</code> runs each method on <code>D27mini_vertical</code> and scores its output with the <a href="https://dsichang.github.io/scMultiBench/tutorials/evaluate/#what-each-metric-measures">scIB metrics</a>. The clustering metrics score how well the embedding's clusters and neighbourhoods match the cell types, and how separate the clusters are. Higher is better for every metric.</p>
 <details>
 <summary>Details</summary>
-<p><code>params={"Method": {"key": value}}</code> sets a method's parameters, and <code>mtb.params_for</code> lists them. Many methods take none.</p>
-<p><code>mtb.load_run("out/D27mini_vertical")</code> reloads these results later without running anything.</p>
+<p><code>params={"Method": {"key": value}}</code> sets a method's parameters, and <code>mtb.params_for</code> lists them.</p>
+<p><code>mtb.load_run("out/D27mini_vertical")</code> reloads these results later.</p>
 </details>
 </div>
 </div>
@@ -3088,9 +3085,9 @@ res.summary</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[run] VIMCCA (vertical/D27mini_vertical) ...
-[run]   -&gt; scored (39.7s) ARI 0.380
+[run]   -&gt; scored (18.5s) ARI 0.456
 [run] scMM (vertical/D27mini_vertical) ...
-[run]   -&gt; scored (90.8s) ARI 0.263
+[run]   -&gt; scored (55.5s) ARI 0.276
 </pre>
 </div>
 </div>
@@ -3133,13 +3130,13 @@ res.summary</div>
 <th>0</th>
 <td>VIMCCA</td>
 <td>scored</td>
-<td>0.3803</td>
-<td>0.5598</td>
-<td>0.6105</td>
-<td>0.6092</td>
-<td>0.4671</td>
-<td>0.9482</td>
-<td>39.7</td>
+<td>0.4556</td>
+<td>0.5941</td>
+<td>0.6198</td>
+<td>0.6249</td>
+<td>0.5202</td>
+<td>0.9655</td>
+<td>18.5</td>
 <td></td>
 <td></td>
 </tr>
@@ -3147,13 +3144,13 @@ res.summary</div>
 <th>1</th>
 <td>scMM</td>
 <td>scored</td>
-<td>0.2633</td>
-<td>0.4762</td>
-<td>0.6042</td>
-<td>0.6071</td>
-<td>0.3859</td>
-<td>0.8962</td>
-<td>90.8</td>
+<td>0.2762</td>
+<td>0.4837</td>
+<td>0.6001</td>
+<td>0.6045</td>
+<td>0.3890</td>
+<td>0.8963</td>
+<td>55.5</td>
 <td></td>
 <td></td>
 </tr>
@@ -3172,7 +3169,7 @@ res.summary</div>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="4-plot">4. Plot<a class="anchor-link" href="#4-plot">¶</a></h2><p><code>res.plot()</code> draws the scores as a bubble table. Circle size ranks the rows within each column and colour shows the value scaled per column, so a small gap can look large: <code>res.summary</code> has the values.</p>
+<h2 id="4-plot">4. Plot<a class="anchor-link" href="#4-plot">¶</a></h2><p><code>res.plot()</code> draws the scores as a bubble table. Circle size ranks the rows within each column and colour shows the value scaled per column, so a small gap can look large. <code>res.summary</code> has the values.</p>
 <details>
 <summary>Details</summary>
 <p>Metrics are grouped by family: blue for clustering. Each family starts with an <code>Overall</code> bar: each row's mean rank over the family's metrics, scaled so that the lowest gets the shortest bar.</p>
@@ -3228,7 +3225,7 @@ res.summary</div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <h2 id="5-your-own-data">5. Your own data<a class="anchor-link" href="#5-your-own-data">¶</a></h2><p>Your data needs raw RNA counts, an ATAC matrix of the same cells and a cell type for each cell, as two <code>.h5ad</code> files.</p>
-<p>Starting from something else? See the recipes for <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-10x-h5">a 10x <code>.h5</code> file</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-labels-csv">labels in a CSV file</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-no-labels">no labels</a> and <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-donors">several donors or samples</a>.</p>
+<p>Recipes cover <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-10x-h5">a 10x <code>.h5</code> file</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-labels-csv">labels in a CSV file</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-no-labels">no labels</a> and <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-donors">several donors or samples</a>.</p>
 <details>
 <summary>Details: export</summary>
 <p>The names in quotes say where your file holds each part. <code>"X"</code> is the main matrix, <code>"obsm:atac"</code> the matrix <code>obsm["atac"]</code>, <code>"layer:counts"</code> the layer <code>layers["counts"]</code>, and <code>"obs:celltype"</code> the column <code>obs["celltype"]</code>. A wrong name after <code>obsm:</code>, <code>layer:</code> or <code>obs:</code> raises an error that lists the names the file has.</p>
@@ -3238,7 +3235,6 @@ res.summary</div>
                       <span class="n">atac_kind</span><span class="o">=</span><span class="s2">"peak"</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="s2">"obs:celltype"</span><span class="p">,</span>
                       <span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">)</span>
 </pre></div>
-<p>The folder stores each matrix dense, so drop the genes or peaks you do not need first.</p>
 </details>
 </div>
 </div>
@@ -3250,7 +3246,7 @@ res.summary</div>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>So that the notebook runs as it is, the next cell writes two small example files, <code>my_rna.h5ad</code> and <code>my_atac.h5ad</code>, from 60% of the cells of <code>D27mini_vertical</code>.</p>
+<p>The next cell writes two small example files, <code>my_rna.h5ad</code> and <code>my_atac.h5ad</code>, from 60% of the cells of <code>D27mini_vertical</code>. Skip it for your own data.</p>
 </div>
 </div>
 </div>
@@ -3351,8 +3347,10 @@ print(atac)</div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>AnnData object with n_obs × n_vars = 3000 × 2500
     obs: 'celltype'
+    layers: None (.X)
 AnnData object with n_obs × n_vars = 3000 × 5000
     obs: 'celltype'
+    layers: None (.X)
 </pre>
 </div>
 </div>
@@ -3366,7 +3364,7 @@ AnnData object with n_obs × n_vars = 3000 × 5000
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p>Write the dataset folder. Change each name in quotes marked <code># &lt;-</code>. The printout above lists the names in your files. Write a name listed after <code>obs:</code> with that prefix, as <code>"obs:celltype"</code>.</p>
+<p>Write the dataset folder. Change each name in quotes marked <code># &lt;-</code> to one the printout above lists for your files, with its prefix, as <code>"obs:celltype"</code>.</p>
 </div>
 </div>
 </div>
@@ -3470,7 +3468,7 @@ mtb.scan("mydata/" + NAME, "vertical", methods=METHODS)</div>
 <td>True</td>
 <td></td>
 <td>scmb_scmm2</td>
-<td></td>
+<td>scMM reads inputs/rna.h5, inputs/atac.h5. mtb....</td>
 </tr>
 </tbody>
 </table>
@@ -3518,9 +3516,9 @@ mine.summary</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[run] VIMCCA (vertical/MYMULTIOME) ...
-[run]   -&gt; scored (20.7s) ARI 0.367
+[run]   -&gt; scored (12.8s) ARI 0.381
 [run] scMM (vertical/MYMULTIOME) ...
-[run]   -&gt; scored (58.6s) ARI 0.309
+[run]   -&gt; scored (34.9s) ARI 0.317
 </pre>
 </div>
 </div>
@@ -3563,13 +3561,13 @@ mine.summary</div>
 <th>0</th>
 <td>VIMCCA</td>
 <td>scored</td>
-<td>0.3673</td>
-<td>0.5625</td>
-<td>0.6100</td>
-<td>0.6165</td>
-<td>0.4745</td>
-<td>0.9582</td>
-<td>20.7</td>
+<td>0.3812</td>
+<td>0.5328</td>
+<td>0.6172</td>
+<td>0.6146</td>
+<td>0.4632</td>
+<td>0.9601</td>
+<td>12.8</td>
 <td></td>
 <td></td>
 </tr>
@@ -3577,13 +3575,13 @@ mine.summary</div>
 <th>1</th>
 <td>scMM</td>
 <td>scored</td>
-<td>0.3094</td>
-<td>0.4736</td>
-<td>0.5682</td>
-<td>0.5759</td>
-<td>0.3844</td>
-<td>0.8887</td>
-<td>58.6</td>
+<td>0.3171</td>
+<td>0.4731</td>
+<td>0.5729</td>
+<td>0.5806</td>
+<td>0.3867</td>
+<td>0.8883</td>
+<td>34.9</td>
 <td></td>
 <td></td>
 </tr>
@@ -3641,7 +3639,7 @@ mine.summary</div>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="6-every-method-of-this-task">6. Every method of this task<a class="anchor-link" href="#6-every-method-of-this-task">¶</a></h2><p>14 methods run this task. <a href="https://colab.research.google.com/github/DSichang/scMultiBench/blob/main/notebooks/tutorial_vertical_rna_atac_all.ipynb">This notebook</a> runs them all. It downloads 13 envs, 31.8 GB on a computer without a GPU and 37.6 GB on one with a GPU.</p>
+<h2 id="6-every-method-of-this-task">6. Every method of this task<a class="anchor-link" href="#6-every-method-of-this-task">¶</a></h2><p>14 methods run this task. <a href="https://colab.research.google.com/github/DSichang/scMultiBench/blob/main/notebooks/tutorial_vertical_rna_atac_all.ipynb">This notebook</a> runs them all. Its 13 environments download 31.8 GB on a computer without a GPU and 37.6 GB on one with a GPU.</p>
 </div>
 </div>
 </div>
@@ -3689,7 +3687,7 @@ mine.summary</div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <h2 id="next-steps">Next steps<a class="anchor-link" href="#next-steps">¶</a></h2><ul>
-<li>The guides: <a href="https://dsichang.github.io/scMultiBench/tutorials/run/">run</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/evaluate/">evaluate</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/plot/">plot</a> and <a href="https://dsichang.github.io/scMultiBench/tutorials/discover/">discover methods</a>.</li>
+<li><a href="https://dsichang.github.io/scMultiBench/tutorials/run/">Run a method</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/evaluate/">Score an embedding</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/plot/">Load and plot results</a> and <a href="https://dsichang.github.io/scMultiBench/tutorials/discover/">Discover methods</a>.</li>
 <li>The <a href="https://shiny.maths.usyd.edu.au/scMultiBench/">interactive explorer</a> has the full benchmark's rankings, with no install needed.</li>
 </ul>
 </div>

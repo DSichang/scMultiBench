@@ -2070,7 +2070,9 @@ builds.</p>
 
         <p>Install the environments a set of methods needs; Linux only.</p>
 <p>Each env is unpacked from its published archive, or built from its
-lockfile where none is published. Installed envs are skipped.</p>
+lockfile where none is published. Installed envs are skipped. Then the
+method scripts are downloaded to <code>mtb.config.repo_path</code> if they are
+missing.</p>
 
 
 <table>
@@ -2259,7 +2261,8 @@ archive for both), <code>archive_bytes</code> (the download) and
             </td>
             <td class="doc-raises-details">
               <div class="doc-md-description">
-                <p><code>build=True</code> without conda, or a failed build.</p>
+                <p><code>build=True</code> without conda, a failed build, or a failed download of
+the method scripts.</p>
               </div>
             </td>
           </tr>

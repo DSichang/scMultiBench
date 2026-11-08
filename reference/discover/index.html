@@ -2494,7 +2494,8 @@ infer it from the other arguments.</p>
                 <p><code>method</code>, <code>variant</code> (<code>'category:mods'</code>, or several that take
 the same parameters), <code>tunable</code> (what
 <code>params=</code> can set, <code>{name: {"type", "default"}}</code>; <code>default</code> is
-what a run uses when you pass nothing), <code>fixed_in_script</code> (what the
+what a run uses when you pass nothing, and <code>None</code> leaves it to the
+method's library), <code>fixed_in_script</code> (what the
 script pins, with <code>file:line</code>), <code>upstream_knobs</code> (what its library
 documents but the script does not expose) and <code>upstream_url</code>.</p>
               </div>

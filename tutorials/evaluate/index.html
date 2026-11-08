@@ -2266,19 +2266,19 @@ joint embedding in its <code>.obsm</code>, and <code>"rna:celltype"</code> names
 one modality.</p>
 <p>A label is missing when it is NaN, <code>None</code>, blank text, or text that a
 label file reads as missing, such as <code>NA</code>, <code>nan</code> or <code>null</code>.</p>
-<p>When the output has cell ids (an AnnData, an <code>.h5ad</code> file, a DataFrame
-indexed by cell id, or a CSV embedding whose first column holds the
-barcodes), the ids decide. Where barcodes repeat across a dataset's
-label files (D45, D52), a cell id is the label file and the barcode, as
-<code>cty2:AAAC...</code>, the way <code>res.embedding(m)</code> names cells. A <code>Series</code>
-indexed by cell id is aligned by id. A CSV whose first column holds the cell ids is aligned the same way.
-Ids of other cells are left out. A label file without cell ids in a
-dataset folder takes the cell ids of the matrix next to it. Any other
-file or <code>Series</code> without cell ids is refused: add the barcodes, or pass
-<code>.to_numpy()</code> to match by position. When the output is a bare array, it
-has no cell ids: a Series, and a CSV whose first column holds cell ids,
-are matched by position, with a warning. Plain arrays, lists and a CSV
-without cell ids are always matched by position.</p>
+<p>When the output has cell ids, the ids decide. An AnnData, an <code>.h5ad</code>
+file, a DataFrame indexed by cell id and a CSV embedding whose first
+column holds the barcodes have them. A <code>Series</code> indexed by cell id, or a
+CSV whose first column holds the cell ids, is then aligned by id. Ids of
+other cells are left out. Where barcodes repeat across a dataset's label
+files, a cell id is the label file and the barcode, as <code>cty2:AAAC...</code>,
+the way <code>res.embedding(m)</code> names cells.</p>
+<p>A label file without cell ids in a dataset folder takes the cell ids of
+the matrix next to it. Any other file or <code>Series</code> without cell ids is
+refused: add the barcodes, or pass <code>.to_numpy()</code> to match by position.</p>
+<p>A bare array has no cell ids. A <code>Series</code> or a CSV is then matched by
+position, with a warning when it holds cell ids. Plain arrays and lists
+are always matched by position.</p>
 <p>A run's <code>embedding.h5</code> holds the name of each cell (the dataset
 <code>barcodes</code>), so <code>dataset=</code> matches the label files to its cells whatever
 <code>method=</code> says. In a <code>run</code> folder written before 0.4.0, the run's record
@@ -2496,7 +2496,9 @@ its <code>obs_names</code>, and one line puts the embedding into it:
 order: <code>mtb.evaluate(embedding, dataset=..., category=..., method=...)</code>.</p>
 <p>Scores of your runs can differ a little from the stored ones: some methods,
 such as sciPENN and VIMCCA, give a slightly different embedding on each run. The Leiden-based and
-classification scores of the same embedding also depend on the cells' order.</p>
+classification scores of the same embedding also depend on the cells' order.
+Above 4,096 cells, the same embedding also scores a few hundredths
+differently on another computer, because the neighbours are approximate.</p>
 <details class="note">
 <summary>Details</summary>
 <p>The <code>scored_with</code> column records how the scores were computed: the
