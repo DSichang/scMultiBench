@@ -33,8 +33,9 @@ def test_kept_docstrings_name_no_cut_name():
 
 
 def test_params_for_returns_the_parameters_the_variants_share():
-    p = mtb.params_for("Matilda")
-    assert "epochs" in p["tunable"] and p["variant"].count("vertical:") == 3
+    p = mtb.params_for("sciPENN")
+    assert "lr" in p["tunable"]
+    assert p["variant"] == "vertical:rna+adt and cross:rna1+rna2+rna3+adt1+adt2+adt3"
     p = mtb.params_for("iNMF")                  # its two variants take the same ones
     assert p["variant"].count("diagonal:") == 2 and p["tunable"]["k"]["default"] == 20
 

@@ -46,8 +46,8 @@ def test_method_info_supports_exposes_labels():
 
 def test_params_for_ambiguity_is_valueerror_with_the_exact_call():
     # c1 (C09): variants with the same parameters answer together; Multigrate's differ
-    assert mtb.params_for("Matilda")["variant"] == (
-        "vertical:rna+adt, vertical:rna+atac and vertical:rna+adt+atac")
+    assert mtb.params_for("sciPENN")["variant"] == (
+        "vertical:rna+adt and cross:rna1+rna2+rna3+adt1+adt2+adt3")
     with pytest.raises(ValueError) as e:
         mtb.params_for("Multigrate")
     assert isinstance(e.value, AmbiguousVariantError)

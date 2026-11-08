@@ -703,11 +703,11 @@ def _scan(dataset: str, category: str | None = None, *, methods=None, modalities
         missing = [m for m in dict.fromkeys(methods) if m not in set(df["method"])]
         if missing or df.empty:
             raise _no_variant_error(category, missing or methods, modalities)
-    if params:
-        _check_param_keys(df, params)
-    # last, so every check above saw every variant
+    # after the checks above, so they saw every variant
     df, private = _listed_rows(df, private, ds_dir, category, methods,
                                every=every or modalities is not None)
+    if params:      # against the listed rows: the variants this folder would run
+        _check_param_keys(df, params)
     private.attrs.update(dataset=dataset, folder=ds_dir, category=category)
     return df, private
 
@@ -2186,7 +2186,7 @@ def _checked_args(category, methods, modalities, params, fn: str) -> tuple:
 
 
 def _check_param_keys(plan_df: pd.DataFrame, params: dict) -> None:
-    """Raise ``KeyError`` when ``params`` names a key no scanned variant of that
+    """Raise ``KeyError`` when ``params`` names a key no listed variant of that
     method accepts, so scan catches the typo; a method without rows is skipped."""
     for method, overrides in params.items():
         rows = plan_df[plan_df["method"] == method]

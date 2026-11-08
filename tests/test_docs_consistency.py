@@ -933,19 +933,17 @@ def test_evaluate_guide_names_both_column_spellings_and_the_missing_values():
                                 mtb.__version__]
 
 
-@needs_docs
-def test_discover_guide_says_which_rows_scan_lists(tmp_path, monkeypatch):
-    """The guide names the default rows of ``scan`` and the argument that lists
-    every method. On a folder with RNA and ADT, the calls as the guide spells
-    them list those rows; the command of each only with ``command=True``."""
+def test_scan_docstring_says_which_rows_scan_lists(tmp_path, monkeypatch):
+    """scan's docstring names its default rows and the argument that lists
+    every method. On a folder with RNA and ADT, those calls list those rows;
+    the command of each only with ``command=True``."""
     pytest.importorskip("anndata")
     import multibench as mtb
     from multibench import workflow as W
-    guide = _flat("tutorials/discover.md")
-    assert 'Check your folder with `mtb.scan("MYDATA", category)`.' in guide
-    every, = re.search(
-        r"By default `scan` lists the methods that read the modalities the folder holds, "
-        r"and `(modalities=\"\w+\")` lists every method\.", guide).groups()
+    doc = " ".join(inspect.getdoc(mtb.scan).split())
+    assert ('``None`` = the combinations whose modalities the folder holds; '
+            '``"all"`` = every combination.') in doc
+    every = 'modalities="all"'
     monkeypatch.setattr(W, "_installed_envs", lambda: frozenset())
     mtb.io.export_dataset(_own_cells(), tmp_path / "MYDATA", adt="obsm:protein",
                           labels="obs:celltype")

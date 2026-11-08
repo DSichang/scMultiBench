@@ -301,7 +301,7 @@ def test_a_named_method_keeps_its_rows(no_envs):
     assert len(every) == 4
 
 
-def test_params_keys_are_checked_before_the_filter(monkeypatch):
+def test_params_keys_are_checked_against_the_listed_rows(monkeypatch):
     seen = []
     real = W._check_param_keys
 
@@ -310,9 +310,12 @@ def test_params_keys_are_checked_before_the_filter(monkeypatch):
         return real(plan_df, params)
     monkeypatch.setattr(W, "_check_param_keys", check)
     df = full_scan("D11", "vertical", params={"Matilda": {"epochs": 1}}, verbose=False)
-    assert seen == [33] and len(df) == 14          # every variant was checked
+    assert seen == [14] and len(df) == 14          # the variants D11 would run
     with pytest.raises(KeyError, match="Matilda does not accept"):
         full_scan("D11", "vertical", params={"Matilda": {"no_such_key": 1}}, verbose=False)
+    # D11 holds RNA and ADT: the ATAC part of Matilda's model is not among them
+    with pytest.raises(KeyError, match=r"Matilda does not accept \['hidden_atac'\]"):
+        full_scan("D11", "vertical", params={"Matilda": {"hidden_atac": 1}}, verbose=False)
 
 
 def test_two_families_can_be_lacking(tmp_path, no_envs, capsys):
