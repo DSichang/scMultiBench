@@ -643,8 +643,9 @@ def scan(dataset: str, category: str | None = None, *,
     FileNotFoundError
         The dataset folder does not exist; the message lists the folders present.
     ValueError
-        Unknown ``category`` or modality token, or a method in ``methods``
-        without a variant there.
+        Unknown ``category`` or modality token, a method in ``methods``
+        without a variant there, or a benchmark dataset given another
+        ``category`` than its own.
     KeyError
         Unknown method id, or a ``params`` key the method does not accept.
 
@@ -941,13 +942,15 @@ def _per_method(df: "pd.DataFrame", private: "pd.DataFrame", *, data_path=None,
     ``verbose`` it prints the per-method lines (``nested``: leave out nested rows)."""
     dataset, ds_dir = private.attrs["dataset"], private.attrs["folder"]
     data_path = ds_dir.parent if data_path is None else data_path
-    rows, reasons, with_files = [], [], set()
+    with_files = set(df.loc[df["files_ok"].astype(bool), "method"])
+    wrong = _wrong_category(dataset, private.attrs["category"], len(with_files))
+    if wrong:            # each method's missing files would say it 18 times
+        raise ValueError(wrong)
+    rows, reasons = [], []
     held = set(df.attrs["held"])
     several = df["category"].nunique() > 1
     batches = len(_resolve._folder_batches(ds_dir))
     for (method, cat), group in df.groupby(["method", "category"], sort=False):
-        if group["files_ok"].any():
-            with_files.add(method)
         i = _spokesman_row(group, dataset, data_path, held, batches)
         runnable = bool(group.at[i, "runnable"])
         rows.append((method, cat, group.at[i, "modalities"], runnable,
@@ -1006,10 +1009,6 @@ def _print_scan(out, df, private, *, data_path, n_files: int, reasons, per_batch
     """The lines of ``scan(verbose=True)``: what the folder holds, then why each
     method cannot run (``reasons``, ``None`` with several categories)."""
     dataset, ds_dir = private.attrs["dataset"], private.attrs["folder"]
-    wrong = _wrong_category(dataset, private.attrs["category"], n_files)
-    if wrong:            # each method's missing files would say it 18 times
-        print(f"[scan] {wrong}", flush=True)
-        return
     # methods, not rows: without a category a method has a row per category
     n, k = out["method"].nunique(), out.loc[out["runnable"], "method"].nunique()
     holds = _holds_sentence(dataset, ds_dir, df.attrs["held"], private.attrs["category"])
@@ -2131,7 +2130,7 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
               if methods else "No method can run on ") + f"{dataset} ({category})."]
     wrong = _wrong_category(dataset, category, int(blocked["files_ok"].astype(bool).sum()))
     if wrong:
-        return f"{lines[0]} {wrong}"
+        return wrong
     if platform:
         lines.append(f"{linux_only} On this computer you can check files, score embeddings "
                      f"and plot. Run the methods on a Linux machine, such as Colab.")

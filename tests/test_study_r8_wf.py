@@ -198,7 +198,8 @@ def test_a_method_the_modalities_drop_raises_with_where_to_look(lung):
 
 
 def test_the_docstrings_say_a_method_without_a_variant_raises():
-    assert "or a method in ``methods`` without a variant there." in _doc(W.scan)
+    assert "a method in ``methods`` without a variant there," in _doc(W.scan)
+    assert "a benchmark dataset given another ``category`` than its own." in _doc(W.scan)
     assert "checked before anything runs." in _doc(W.run)
 
 

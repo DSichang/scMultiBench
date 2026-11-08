@@ -423,3 +423,18 @@ def test_scan_says_nothing_of_the_rows_it_does_not_list(no_envs, capsys):
     out = capsys.readouterr().out
     assert out.startswith("[scan] 14 of 18 methods have their input files in D11. ")
     assert "not listed" not in out
+
+
+def test_a_catalog_dataset_given_the_wrong_category_raises_one_sentence(tmp_path):
+    # scan and run say the same; the per-method missing files would repeat it
+    ds = mtb.config.data_path / "D52mini"
+    if not ds.is_dir():
+        pytest.skip("D52mini is not downloaded")
+    said = []
+    for call in (lambda: mtb.scan("D52mini", "vertical"),
+                 lambda: mtb.run("D52mini", "vertical", tmp_path / "out")):
+        with pytest.raises(ValueError) as e:
+            call()
+        said.append(str(e.value))
+    assert said == ['D52mini is a cross dataset: pass category="cross".'] * 2
+    assert not (tmp_path / "out").exists()
