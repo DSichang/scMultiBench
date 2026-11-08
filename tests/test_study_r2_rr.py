@@ -154,7 +154,7 @@ def test_partial_overlap_says_which_cells_in_short_sentences(tmp_path):
 def test_the_raw_count_warning_names_no_selector(tmp_path):
     clr = np.random.default_rng(0).normal(size=(30, 5))
     rna = _rna_adata([f"c{i}" for i in range(30)], obsm=clr)
-    told = "The adt values are not whole numbers, so they look log-normalised. Export raw counts."
+    told = "The adt values are not whole numbers, so they are not raw counts. Export raw counts."
     with pytest.warns(UserWarning) as rec:
         mtb.io.export_dataset(rna, tmp_path / "O", adt="obsm:protein",
                               adt_names=[f"p{i}" for i in range(5)])

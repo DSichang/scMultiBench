@@ -40,7 +40,7 @@ N = 60
 CELLS = [f"c{i:03d}" for i in range(N)]
 PEAKS = [f"chr1:{j * 1000}-{j * 1000 + 500}" for j in range(30)]
 DEBUG = ""          # c3 (E19): a refusal that names its fix prints no traceback line
-LOOKS = "The {what} values are not whole numbers, so they look log-normalised. "
+LOOKS = "The {what} values are not whole numbers, so they are not raw counts. "
 COUNTS = LOOKS + "Export raw counts."
 
 

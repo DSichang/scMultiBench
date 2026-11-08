@@ -419,10 +419,6 @@ PROTEIN_NAMES = ("The example keeps the protein names in `adata.uns[\"protein_na
 ADT_IN_X = ("When the ADT file also holds a matrix in `obsm` under a name that does not "
             "start with `X_`, `export_dataset` asks which one is the protein matrix. "
             "`X_umap` and `X_pca` are left alone.")
-TENX_NOTE = ("A 10x Multiome file read with scanpy and `gex_only=False` holds genes and "
-             "peaks in one `X`. The recipe for a 10x `.h5` file splits it into the two "
-             "objects of this section. Without a split or a filter, `export_dataset` raises "
-             "rather than write genes and peaks into one file.")
 MUDATA_NOTE = ("A 10x Multiome MuData goes in with one call. Here the labels are in "
                "`mdata.obs`. For labels in `mdata[\"rna\"].obs`, write "
                "`labels=\"rna:celltype\"`.\n\n"
@@ -442,9 +438,7 @@ def multi_numbering():
     return (f"The RNA batches and the ATAC batches are numbered separately. RNA batch 1 "
             f"and ATAC batch 1 need not come from the same sample. "
             f"{and_list(_several_batch_diagonal_methods())} read exactly {n} RNA and {n} "
-            f"ATAC batches. For another number, such as two donors, export `rna` and "
-            f"`atac` with every cell, without `batch_index=`, and pass the batches to "
-            f"`run` as `batch=`, one per RNA and ATAC cell, as in {RECIPES['donors']}.")
+            f"ATAC batches. For another number of batches, see {RECIPES['donors']}.")
 MULTI_PEAK = ("For ATAC as a peak matrix, pass `atac_kind=\"peak\"`. {multi_peak} "
               "the peak matrix.")
 MOSAIC_LAYOUT = ("[The folder layout](" + LAYOUT + ") lists the batch patterns and the methods "
@@ -522,7 +516,7 @@ mtb.io.export_dataset(rna, "mydata/" + NAME,
                       atac_kind="peak",       # the methods here read peaks
                       labels="obs:celltype",  # <- the cell-type column
                       overwrite=True)''',
-   notes=[TENX_NOTE, MUDATA_NOTE],
+   notes=[MUDATA_NOTE],
  ),
  "vertical_rna_adt_atac": dict(
    name="MYTRI",
@@ -1019,7 +1013,8 @@ def _install(md, code, methods, *, every=False):
     gpu = any(mtb.method_info(m)["gpu"] == "required"
               or (every and mtb.method_info(m)["gpu"] != "not used") for m in methods)
     md("## 1. Install\n\n"
-       "The pins keep the numpy and pandas already installed, so Colab needs no restart."
+       "pip may then print a note about restarting the kernel: no restart is needed, because "
+       "the pins keep the numpy and pandas already installed."
        + (" On Colab, choose a T4 GPU runtime first (Runtime -> Change runtime type), "
           "because changing it later loses the downloads." if gpu else ""))
     code(INSTALL_CELL)
@@ -1169,9 +1164,9 @@ mtb.plot.bubble(stored)''')
 """ + details(
         """| symptom | fix |
 |---|---|
-| a method fails on a small dataset | `mtb.scan` names what the method needs from the data's size in its `caveat` column |
-| a method times out | raise `timeout=` in `run` |
-| batch metrics use the wrong batches | `res.rescore(batch=my_vector)` scores again without running the methods |"""))
+| a method fails on a small dataset | `mtb.scan` names what the method needs from the data's size in its `caveat` column |"""
+        + ("" if cat == "vertical" else """
+| batch metrics use the wrong batches | `res.rescore(batch=...)`, with one batch per cell, scores again without running the methods |""")))
 
     md(f"""## Next steps
 

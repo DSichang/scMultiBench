@@ -293,9 +293,6 @@ Matilda:
     hidden_adt:
       default: 30
       type: int
-    hidden_atac:
-      default: 185
-      type: int
     hidden_rna:
       default: 185
       type: int
@@ -338,9 +335,6 @@ Matilda:
       default: 64
       type: int
     epochs:
-      default: 30
-      type: int
-    hidden_adt:
       default: 30
       type: int
     hidden_atac:
@@ -729,9 +723,6 @@ Seurat_WNN:
     dims_adt:
       default: null
       type: float
-    dims_atac:
-      default: null
-      type: float
     dims_rna:
       default: null
       type: float
@@ -742,9 +733,6 @@ Seurat_WNN:
       default: null
       type: float
   vertical:rna+atac:
-    dims_adt:
-      default: null
-      type: float
     dims_atac:
       default: null
       type: float

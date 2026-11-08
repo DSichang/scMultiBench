@@ -34,7 +34,7 @@ _VAR_FILTER_RE = re.compile(r"^(?P<base>.*?)\[(?P<col>[^\[\]=]+)=(?P<val>[^\[\]]
 
 def _warn_not_counts(X, name: str) -> None:
     """``UserWarning`` when sampled stored values of ``X`` (cells x features)
-    are not whole numbers, which look log-normalised; no verdict for storage
+    are not whole numbers, so not raw counts; no verdict for storage
     that cannot be read."""
     import scipy.sparse as sp
     try:
@@ -50,7 +50,7 @@ def _warn_not_counts(X, name: str) -> None:
     except Exception:                   # backed or exotic storage: no verdict
         return
     if fraction:
-        _text.warn(f"The {name} values are not whole numbers, so they look log-normalised. "
+        _text.warn(f"The {name} values are not whole numbers, so they are not raw counts. "
                    f"Export raw counts.", UserWarning)
 
 

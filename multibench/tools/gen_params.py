@@ -22,6 +22,9 @@ out (setting it would duplicate the flag or have no effect):
 - a ``store_true`` switch whose default is already ``True`` (it cannot be
   turned off);
 - arguments no Python file of the script's folder reads (``args.<name>``);
+- an argument named for a modality the variant does not read (``hidden_atac``
+  of Matilda and ``dims_atac`` of Seurat_WNN on RNA + ADT: the scripts read
+  them only with ATAC);
 - the arguments in :data:`SET_FROM_DATA`, which the package sets per run, and
   in :data:`NOT_TUNABLE`.
 
@@ -219,6 +222,17 @@ def r_params(txt: str, skip: set) -> dict:
     return tun
 
 
+#: ``hidden_atac``, ``dims_adt``: an argument for one modality's part of the model
+_FOR_MODALITY = re.compile(r"_(rna|adt|atac)$")
+
+
+def for_absent_modality(name: str, v) -> bool:
+    """Whether ``name`` is an argument for a modality variant ``v`` does not read."""
+    m = _FOR_MODALITY.search(name)
+    read = {re.sub(r"\d+$", "", x) for x in v.when.get("modalities", [])}
+    return bool(m) and m.group(1) not in read
+
+
 def variant_params(s, v) -> dict:
     """The parameters variant ``v`` of method ``s`` takes."""
     skip = set_by_package(s, v) | SET_FROM_DATA.get(s.id, set()) | NOT_TUNABLE.get(s.id, set())
@@ -226,12 +240,13 @@ def variant_params(s, v) -> dict:
     txt = path.read_text(errors="ignore")
     if path.suffix == ".py":
         every = folder_text(path)
-        return {k: t for k, t in python_params(txt, skip | set_by_script(txt)).items()
-                if is_read(k, every)}
-    tun = r_params(txt, skip)
-    if v.driver and v.driver.endswith(".R"):       # StabMap's driver reads the options
-        tun.update(r_params((_PKG / v.driver).read_text(), skip))
-    return tun
+        tun = {k: t for k, t in python_params(txt, skip | set_by_script(txt)).items()
+               if is_read(k, every)}
+    else:
+        tun = r_params(txt, skip)
+        if v.driver and v.driver.endswith(".R"):       # StabMap's driver reads the options
+            tun.update(r_params((_PKG / v.driver).read_text(), skip))
+    return {k: t for k, t in tun.items() if not for_absent_modality(k, v)}
 
 
 HEADER = """\

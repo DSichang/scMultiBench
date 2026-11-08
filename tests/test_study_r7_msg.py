@@ -154,7 +154,7 @@ def test_raw_counts_warning_of_an_anndata_export(tmp_path):
     a = _cite(log=True)
     (msg,) = _count_warnings(ingest.export_dataset, a, tmp_path / "LOG",
                              adt="obsm:protein", labels="obs:cell_type")
-    assert msg == ("The rna values are not whole numbers, so they look log-normalised. "
+    assert msg == ("The rna values are not whole numbers, so they are not raw counts. "
                    "Export raw counts.")
     assert "(log-normalised?)" not in msg and "e.g." not in msg and "MuData" not in msg
 
@@ -168,7 +168,7 @@ def test_raw_counts_warning_of_a_mudata_selector(tmp_path):
     m = mu.MuData({"gex": rna, "adt": adt})
     msgs = _count_warnings(ingest.export_dataset, m, tmp_path / "MU", rna="gex",
                            adt="adt")
-    assert msgs == ["The rna values are not whole numbers, so they look log-normalised. "
+    assert msgs == ["The rna values are not whole numbers, so they are not raw counts. "
                     "Export raw counts."]
 
 

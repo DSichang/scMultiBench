@@ -618,7 +618,7 @@ def scan(dataset: str, category: str | None = None, *,
         the combinations whose modalities the folder holds; ``"all"`` = every
         combination.
     params : dict | None
-        Hyperparameters per method, as ``run`` takes them; they are checked
+        Parameters per method, as ``run`` takes them; they are checked
         and appear in ``command`` when it is asked for.
     assume_gpu : bool
         ``True`` = skip this host's GPU test, to check a job for a GPU node
@@ -992,11 +992,24 @@ def _spokesman_row(group, dataset, data_path, held: set, batches: int):
         -len(str(group.at[i, "modalities"]).split("+")), i))
 
 
+def _wrong_category(dataset: str, category: str | None, n_files: int) -> str:
+    """``'D52mini is a cross dataset: pass category="cross".'`` when a benchmark
+    dataset is given another category and no method finds its files; ``""``
+    otherwise. The catalog knows the category, so nothing is guessed."""
+    known = known_category(dataset) if category is not None and not n_files else None
+    return (f'{dataset} is a {known} dataset: pass category="{known}".'
+            if known and known != category else "")
+
+
 def _print_scan(out, df, private, *, data_path, n_files: int, reasons, per_batch: str,
                 nested: bool) -> None:
     """The lines of ``scan(verbose=True)``: what the folder holds, then why each
     method cannot run (``reasons``, ``None`` with several categories)."""
     dataset, ds_dir = private.attrs["dataset"], private.attrs["folder"]
+    wrong = _wrong_category(dataset, private.attrs["category"], n_files)
+    if wrong:            # each method's missing files would say it 18 times
+        print(f"[scan] {wrong}", flush=True)
+        return
     # methods, not rows: without a category a method has a row per category
     n, k = out["method"].nunique(), out.loc[out["runnable"], "method"].nunique()
     holds = _holds_sentence(dataset, ds_dir, df.attrs["held"], private.attrs["category"])
@@ -1627,7 +1640,7 @@ class RunResult:
         return _plot.bubble(lng, **kw)
 
     def rescore(self, *, batch=None, labels=None, metrics=None,
-                verbose: bool = True, _caveats=None) -> "RunResult":
+                verbose: bool = True) -> "RunResult":
         """Score the saved outputs again with new labels, batch or metrics.
 
         No method is re-run. Each record's embedding is read back from its
@@ -1684,6 +1697,12 @@ class RunResult:
         mtb.evaluate : the scoring function applied per record.
         RunResult.save : persist the re-scored result.
         """
+        return self._rescore(batch=batch, labels=labels, metrics=metrics,
+                             verbose=verbose)
+
+    def _rescore(self, *, batch=None, labels=None, metrics=None,
+                 verbose: bool = True, _caveats=None) -> "RunResult":
+        """``rescore``; ``run`` passes its plan's caveats (``_caveats``)."""
         import copy
         with warnings.catch_warnings():
             # load_run chose the data folder: no note on a same-named one here
@@ -2110,6 +2129,9 @@ def _nothing_runnable_message(dataset: str, category: str, blocked: pd.DataFrame
             if r["_why"] and (methods or not r["_files"])]
     lines = [(f"None of the requested methods ({', '.join(methods)}) can run on "
               if methods else "No method can run on ") + f"{dataset} ({category})."]
+    wrong = _wrong_category(dataset, category, int(blocked["files_ok"].astype(bool).sum()))
+    if wrong:
+        return f"{lines[0]} {wrong}"
     if platform:
         lines.append(f"{linux_only} On this computer you can check files, score embeddings "
                      f"and plot. Run the methods on a Linux machine, such as Colab.")
@@ -2728,7 +2750,7 @@ def run(dataset: str, category: str, out_dir, *, methods=None, modalities=None,
         Modality tokens of one combination, e.g. ``["rna", "adt"]``; ``None`` =
         every combination the folder holds; ``"all"`` = every combination.
     params : dict | None
-        Hyperparameters per method, ``{"Matilda": {"epochs": 3}}``;
+        Parameters per method, ``{"Matilda": {"epochs": 3}}``;
         ``mtb.params_for`` lists the keys.
     batch : array-like | Series | path | None
         One batch per cell; a Series or a barcode-indexed CSV is aligned by
@@ -2907,7 +2929,7 @@ def _reuse_saved(saved, rec, variant, out_dir, *, batch, evaluate, data_path,
     caveats = ({(method, tuple(mods)): rec["caveat"]}
                if list(saved.get("modalities") or ()) == mods else None)
     rec = (RunResult([dict(saved, out_dir=rec["out_dir"])], dataset, category,
-                     out_dir).rescore(batch=batch, verbose=False, _caveats=caveats)
+                     out_dir)._rescore(batch=batch, verbose=False, _caveats=caveats)
            .records[0] if evaluate else dict(saved))
     rec["reused"] = True
     if variant.output.kind == "embedding" and rec.get("emb_shape"):

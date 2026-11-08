@@ -180,7 +180,7 @@ def method_info(method: str) -> dict:
 
     See Also
     --------
-    mtb.params_for : the hyperparameters of one variant, with upstream defaults.
+    mtb.params_for : the parameters of one variant, with upstream defaults.
     mtb.find_methods : filter methods by category, modalities, labels, ATAC representation.
     """
     s = registry.get(method)
@@ -231,7 +231,7 @@ def _variant_key(v) -> str:
 
 def params_for(method: str, category: str | None = None,
                modalities: list[str] | set[str] | None = None) -> dict:
-    """Return the hyperparameters of one method variant.
+    """Return the parameters of one method variant.
 
     Call it before ``run(params=...)`` to see what a method accepts and
     what it runs with when you pass nothing.

@@ -110,7 +110,7 @@ def test_method_info_returns_and_raises_read_as_a_card():
     flat = " ".join(doc.split())
     # 0.4: method_info(verbose=) is deprecated; the card points at params_for
     assert "``params`` (per variant" not in flat
-    assert "mtb.params_for : the hyperparameters of one variant" in flat
+    assert "mtb.params_for : the parameters of one variant" in flat
 
 
 # ==================================================== docs pages

@@ -11,9 +11,10 @@ import pytest
 import multibench as mtb
 
 INPUTS = {"rna": "/d/rna.h5", "adt": "/d/adt.h5", "cty": "/d/cty.csv"}
-# r3: device is the package's (X64); the list alone, without the empty-set note (Z16)
+# r3: device is the package's (X64); the list alone, without the empty-set note (Z16);
+# no hidden_atac: the RNA + ADT model does not read it (main_matilda_train.py:198)
 ACCEPTS = ("it accepts ['batch_size', 'epochs', 'hidden_adt', "
-           "'hidden_atac', 'hidden_rna', 'lr', 'seed', 'z_dim'].")
+           "'hidden_rna', 'lr', 'seed', 'z_dim'].")
 
 
 def test_run_dry_run_refuses_an_unknown_key():
