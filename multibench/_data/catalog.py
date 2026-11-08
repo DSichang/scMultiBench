@@ -9,6 +9,7 @@ from typing import NamedTuple
 import pandas as pd
 
 from .. import _settings
+from .._text import _and_list
 from ..engine import registry
 
 #: display spellings -> method id, for those the folding of :func:`_canonical_id`
@@ -164,6 +165,47 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
     codes = list(dict.fromkeys(codes))
     holding = [f for f, members in FAMILY_METRICS.items() if all(c in members for c in codes)]
     return MetricSelection(holding[0] if holding else "all", codes, True)
+
+
+def metrics_in(metrics, names, *, table: str = "The table has") -> list | None:
+    """The metric names of a table that ``metrics=`` selects, for
+    ``load_results``, ``rank``, ``plot.bubble`` and ``plot.bar``.
+
+    :func:`metric_selection` reads the value (``names`` count as codes too);
+    a family selects the table's codes of it, a code the table's spelling of
+    it. ``None`` = every metric.
+
+    Raises
+    ------
+    ValueError
+        What :func:`metric_selection` raises, a family the table has no code
+        of, or a code it has no row of; ``table`` begins the message.
+    """
+    names = list(dict.fromkeys(n for n in names if n is not None))
+    sel = metric_selection(metrics, extra=names)
+    if sel.codes is None or not names:
+        return sel.codes
+    spelling: dict = {}
+    for n in names:
+        spelling.setdefault(_canonical_metric(n), n)
+    out, absent = [], []
+    for r in [metrics] if isinstance(metrics, str) else list(metrics):
+        word = str(r).strip().lower()
+        if word == "all":
+            out += [spelling[c] for c in _known_metrics() if c in spelling]
+            out += sorted(set(names) - set(out), key=str)
+        elif word in FAMILY_METRICS:
+            got = [spelling[c] for c in FAMILY_METRICS[word] if c in spelling]
+            out += got
+            absent += [] if got else [f"{word} metrics"]
+        elif r in names or _canonical_metric(r) in spelling:
+            out.append(r if r in names else spelling[_canonical_metric(r)])
+        else:
+            absent.append(str(r))
+    if absent:
+        raise ValueError(f"{table} no {_and_list(dict.fromkeys(absent))}. "
+                         f"Pick metrics= from {_and_list(sorted(map(str, names)))}.")
+    return list(dict.fromkeys(out))
 
 
 def _dataset_sort_key(ds: str):

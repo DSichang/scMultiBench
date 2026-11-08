@@ -92,8 +92,9 @@ def test_rank_task_error_names_real_metrics(result_dir):
     # not "metrics present: []" (the loader used to pre-filter by task)
     with pytest.raises(ValueError) as e:
         rank("vertical", metrics="batch")
-    assert str(e.value) == "The stored results of vertical have no metrics='batch' scores; they have ARI, ASW, NMI, cLISI, iASW and iF1."
-    with pytest.raises(ValueError, match=r"; they have ARI, ASW"):
+    assert str(e.value) == ("The stored results of vertical have no batch metrics. "
+                            "Pick metrics= from ARI, ASW, NMI, cLISI, iASW and iF1.")
+    with pytest.raises(ValueError, match=r"have no GC and iLISI\. Pick metrics= from ARI, ASW"):
         rank("vertical", metrics=["GC", "iLISI"])
 
 
@@ -127,17 +128,18 @@ def test_rank_rerun_missing_only_seurat_wnn(result_dir):
 def test_rank_long_df_records_source_and_family(result_dir):
     long = mtb.load_results("vertical", dataset="D11")
     r, _ = _rec("vertical", long_df=long, metrics="clustering")
-    assert r.attrs["source"] == "long_df" and r.attrs["metrics"] == "clustering"
+    assert r.attrs["source"] == "long_df"
+    assert r.attrs["metrics"] == ["ARI", "NMI", "ASW", "iASW", "iF1", "cLISI"]
     r2, _ = _rec("vertical", long_df=long, metrics=["ARI", "NMI"])
     assert r2.attrs["metrics"] == ["ARI", "NMI"]
 
 
 def test_rank_metrics_batch_on_diagonal_rerun(result_dir):
     r, _ = _rec("diagonal", metrics="batch")
-    assert r.attrs["metrics"] == "batch" and r.grand_score.notna().any()
+    # the stored results hold every batch code but kBET
+    batch = ["ASW_batch", "ARI_batch", "NMI_batch", "GC", "iLISI"]
+    assert r.attrs["metrics"] == batch and r.grand_score.notna().any()
     # the explicit list of the same family scores the same
-    m = mtb.catalog.metrics()
-    batch = m.loc[m.family == "batch", "metric"].tolist()
     r2, _ = _rec("diagonal", metrics=batch)
     assert r2.attrs["metrics"] == batch
     pd.testing.assert_frame_equal(r, r2)

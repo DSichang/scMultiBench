@@ -298,7 +298,7 @@ def test_rank_without_classification_scores():
     with pytest.raises(ValueError) as e:
         _quiet(mtb.rank, "vertical", metrics="classification")
     assert str(e.value).startswith("The stored results of vertical have no "
-                                   "metrics='classification' scores; they have ")
+                                   "classification metrics. Pick metrics= from ")
 
 
 @pytest.mark.parametrize("category", ["diagonal", "mosaic", "cross"])
@@ -317,12 +317,11 @@ def test_the_stored_results_rank_on_classification(category, tmp_path):
 
 
 def test_stored_tables_have_no_classification():
-    df, said = _caught(mtb.load_results, "vertical", dataset="D11",
-                       metrics="classification")
-    # one line says so since 0.4, as for metrics="batch" on a single-batch dataset
-    assert df.empty and said == [
-        "The stored results of vertical, D11 have no classification scores, so no rows "
-        "are left. Leave out metrics= to get the scores they have (ARI, ASW, NMI, cLISI, "
-        "iASW, iF1)."]
+    # as for metrics="batch" on a single-batch dataset
+    with pytest.raises(ValueError) as e:
+        mtb.load_results("vertical", dataset="D11", metrics="classification")
+    assert str(e.value) == (
+        "The stored results of vertical, D11 have no classification metrics. "
+        "Pick metrics= from ARI, ASW, NMI, cLISI, iASW and iF1.")
 
 

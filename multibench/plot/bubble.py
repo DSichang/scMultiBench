@@ -120,39 +120,6 @@ def _resolve(requested, available, canon) -> list:
     return list(dict.fromkeys(out))
 
 
-def _expand_families(metrics, available) -> list:
-    """``metrics`` with each family word (``"clustering"``, ``"batch"``,
-    ``"classification"``, ``"all"``, as ``mtb.evaluate`` takes them) replaced by
-    the frame's codes of that family, in the figure's column order; other
-    names are kept for ``_resolve``. A family the frame has no code of
-    raises ``ValueError``."""
-    from .._data import catalog
-    paper = [c for _, codes, _ in FAMILIES for c in codes]
-
-    def in_figure_order(names):
-        return sorted(names, key=lambda a: (
-            paper.index(catalog._canonical_metric(a))
-            if catalog._canonical_metric(a) in paper else len(paper), str(a)))
-
-    requested = [metrics] if isinstance(metrics, str) else list(metrics)
-    available = [a for a in available if a is not None]
-    out = []
-    for r in requested:
-        word = str(r).strip().lower()
-        if word == "all":
-            out += in_figure_order(available)
-        elif word in _FAMILY_METRICS:
-            codes = _FAMILY_METRICS[word]
-            got = [a for a in available if catalog._canonical_metric(a) in codes]
-            if not got:
-                raise ValueError(f"The table has no {word} metrics. It has "
-                                 f"{_and_distinct(sorted(map(str, available)))}.")
-            out += in_figure_order(got)
-        else:
-            out.append(r)
-    return list(dict.fromkeys(out))
-
-
 def _need_long(long_df: pd.DataFrame, fn: str) -> None:
     """``ValueError`` when ``long_df`` is not a long table (method, metric, value)."""
     absent = sorted({"method", "metric", "value"} - set(long_df.columns))
@@ -177,9 +144,8 @@ def _select(long_df: pd.DataFrame, *, metrics, methods, fn: str) -> tuple:
     if methods is not None:
         methods = _resolve(methods, df["method"].unique().tolist(), catalog._canonical_id)
         df = df[df["method"].isin(methods)]
+    metrics = catalog.metrics_in(metrics, df["metric"].unique())
     if metrics is not None:
-        names = df["metric"].unique().tolist()
-        metrics = _resolve(_expand_families(metrics, names), names, catalog._canonical_metric)
         df = df[df["metric"].isin(metrics)]
     if df.empty:
         raise ValueError("no rows left after applying methods=/metrics= filters"

@@ -37,7 +37,7 @@ def test_bar_group_batch_errors_clearly_without_batch_metrics():
     """A single-batch design has no batch metrics; say so instead of drawing nothing."""
     with pytest.raises(ValueError) as e:
         mtb.plot.bar(_long(metrics=("ARI", "NMI")), metrics="batch")
-    assert str(e.value) == "The table has no batch metrics. It has ARI and NMI."
+    assert str(e.value) == "The table has no batch metrics. Pick metrics= from ARI and NMI."
 
 
 def test_bar_methods_selects_the_bars():

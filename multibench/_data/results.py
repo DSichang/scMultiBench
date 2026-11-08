@@ -168,13 +168,14 @@ def load_results(
     KeyError
         Unknown method name in ``methods``.
     ValueError
-        Unknown ``category`` or ``metrics``.
+        Unknown ``category`` or ``metrics``, or ``metrics`` names a family or
+        code the stored results have no rows of, for example
+        ``metrics="classification"`` on vertical.
 
     Warns
     -----
     UserWarning
-        The selection leaves no rows, for example ``metrics="classification"``
-        on vertical, whose stored results have none.
+        ``methods`` leaves no rows.
 
     Examples
     --------
@@ -201,10 +202,6 @@ def _load_results(
     metrics=None,
 ) -> pd.DataFrame:
     """The stored rows of a selection, with every column of :data:`COLUMNS`."""
-    # a token is validated before anything is read; a list after the load,
-    # against the codes the frame holds too
-    sel = catalog.metric_selection(metrics) if metrics is None or isinstance(metrics, str) \
-        else None
     registry.check_category(category)
     datasets = _as_list(dataset)
     wanted_methods = _as_list(methods)
@@ -243,21 +240,10 @@ def _load_results(
         if out.empty:
             _text.warn(f"The stored results{of} have no rows for {_and_list(wanted_methods)}.",
                        UserWarning)
-    have_metrics = sorted(out["metric"].unique())
-    if sel is None:
-        sel = catalog.metric_selection(metrics, extra=have_metrics)
-    if sel.codes is not None:
-        before = len(out)
-        out = out[out["metric"].isin(sel.codes)]
-        absent = [c for c in sel.codes if c not in have_metrics]
-        if sel.explicit and absent:
-            _text.warn(f"The stored results have no {_and_list(absent)}.",
-                         UserWarning)
-        elif out.empty and before:
-            _text.warn(
-                f"The stored results{of} have no {sel.family} scores, so no rows are left. "
-                f"Leave out metrics= to get the scores they have "
-                f"({', '.join(have_metrics)}).", UserWarning)
+    picked = catalog.metrics_in(metrics, out["metric"].unique(),
+                                table=f"The stored results{of} have")
+    if picked is not None:
+        out = out[out["metric"].isin(picked)]
     out = out[COLUMNS].reset_index(drop=True)
     out.attrs["rerun_version"] = _one_version(frames)
     return out
@@ -343,10 +329,11 @@ def rank(
     Raises
     ------
     ValueError
-        Nothing left to rank, ``long_df`` repeating stored method/dataset
-        rows, your rows on another dataset than the stored rows, or
-        ``modalities`` naming data that none of the ranked datasets measured
-        (pass such scores as ``long_df=``).
+        Nothing left to rank, ``metrics`` naming a family or code the table
+        has no rows of, ``long_df`` repeating stored method/dataset rows, your
+        rows on another dataset than the stored rows, or ``modalities`` naming
+        data that none of the ranked datasets measured (pass such scores as
+        ``long_df=``).
     KeyError
         Unknown method name in ``methods``.
 
@@ -373,7 +360,6 @@ def rank(
     filtered = want_mods is not None or atac is not None
     if want_mods is None and atac is not None:
         want_mods = {"atac"}
-    sel = catalog.metric_selection(metrics)
     stored = long_df is None
     if stored:
         # every metric: the "metrics present" error names what the frame holds
@@ -394,13 +380,10 @@ def rank(
                 f"none of methods={list(wanted)} has rows in {label} for "
                 f"{category}; methods with rows: "
                 f"{sorted(long_df['method'].astype(str).unique())}")
-    if sel.explicit:
-        # a user's own metric name in long_df is selectable too
-        sel = catalog.metric_selection(metrics, extra=df["metric"].astype(str).unique())
-    if sel.codes is not None:
-        df = df[df["metric"].isin(sel.codes)]
-        if df.empty:
-            raise ValueError(_no_metric_rows(category, metrics, long_df, stored))
+    picked = catalog.metrics_in(metrics, df["metric"].unique(), table=(
+        f"The stored results of {category} have" if stored else "long_df has"))
+    if picked is not None:
+        df = df[df["metric"].isin(picked)]
     if "dataset" not in df.columns:
         df["dataset"] = "all"
     _refuse_repeats(df)
@@ -409,11 +392,10 @@ def rank(
     # igraph-scored rows ranked against leidenalg-scored stored rows
     backend = style.backend_warning(df[df["dataset"].isin(list(kept))])
     n_ds = pd.Series([m for ms in kept.values() for m in ms]).value_counts()
-    codes = sel.codes if sel.explicit else None
     pairs = style.stored_pairs()
-    grand = style.overall(df, codes, stored=pairs)   # refuses your rows on another dataset
+    grand = style.overall(df, stored=pairs)   # refuses your rows on another dataset
     if degenerate:
-        grand = style.overall(df[df["dataset"].isin(list(kept))], codes, stored=pairs)
+        grand = style.overall(df[df["dataset"].isin(list(kept))], stored=pairs)
     keep_methods = list(grand.index) + sorted(
         {m for ms in kept.values() for m in ms} - set(grand.index), key=str)
     if filtered:
@@ -431,7 +413,7 @@ def rank(
     out = pd.DataFrame([{"method": m,
                          "grand_score": float(grand.loc[m]) if m in grand.index else float("nan"),
                          **_chips(m, category)} for m in keep_methods + missing])
-    out.attrs["metrics"] = list(sel.codes) if sel.explicit else sel.family
+    out.attrs["metrics"] = "all" if picked is None else picked
     out.attrs["source"] = "rerun" if stored else "long_df"
     out.attrs["missing"] = list(missing)
     out.attrs["dropped_methods"] = list(foreign)
@@ -516,13 +498,6 @@ def _drop_unrun(df, category, label) -> tuple[pd.DataFrame, list]:
                 f"mtb.find_methods(category={category!r}) lists the rankable "
                 f"ones")
     return df, foreign
-
-
-def _no_metric_rows(category, metrics, long_df, stored: bool) -> str:
-    """rank()'s error when ``metrics=`` leaves no row."""
-    label = f"stored results of {category}" if stored else "long_df rows"
-    have = _and_list(sorted(map(str, long_df["metric"].unique())))
-    return f"The {label} have no metrics={metrics!r} scores; they have {have}."
 
 
 #: the fewest methods a dataset needs to count in the ranking

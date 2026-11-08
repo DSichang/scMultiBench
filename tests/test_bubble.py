@@ -138,9 +138,9 @@ def test_metrics_order_is_honoured():
 
 
 def test_unknown_metric_raises_with_available():
-    with pytest.raises(ValueError, match=r"^F1 is not in the table\. ") as e:
+    with pytest.raises(ValueError) as e:
         bubble._build_table(_three(), metrics=["ARI", "NMI", "F1"])
-    assert "The table has ARI, NMI and iF1." in str(e.value)
+    assert str(e.value) == "The table has no F1. Pick metrics= from ARI, NMI and iF1."
 
 
 def test_unknown_method_lists_the_table():

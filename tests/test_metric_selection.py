@@ -5,6 +5,8 @@ import pytest
 import multibench as mtb
 from multibench._data.catalog import metric_selection
 
+V = "ARI, ASW, NMI, cLISI, iASW and iF1"
+
 
 def test_one_code_is_a_list_of_one():
     sel = metric_selection("ari")
@@ -31,7 +33,8 @@ def test_load_results_and_rank_take_one_code():
     assert len(mtb.rank("vertical", metrics="NMI"))
 
 
-def test_load_results_names_a_code_it_has_no_row_for():
-    with pytest.warns(UserWarning, match=r"^The stored results have no kBET\.$"):
-        out = mtb.load_results("vertical", metrics=["ARI", "kBET"])
-    assert set(out["metric"]) == {"ARI"}
+def test_load_results_refuses_a_code_it_has_no_row_for():
+    with pytest.raises(ValueError) as e:
+        mtb.load_results("vertical", metrics=["ARI", "kBET"])
+    assert str(e.value) == (f"The stored results of vertical have no kBET. "
+                            f"Pick metrics= from {V}.")

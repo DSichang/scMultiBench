@@ -228,9 +228,9 @@ def test_every_long_table_has_scored_with():
 
 @pytest.mark.parametrize("metrics", ["kBET", ["clustering", "kBET"]])
 def test_an_absent_metric_has_one_text(metrics):
-    with pytest.warns(UserWarning) as rec:
+    with pytest.raises(ValueError, match=r"^The stored results of cross have no kBET\. "
+                                         r"Pick metrics= from "):
         mtb.load_results("cross", metrics=metrics)
-    assert [str(w.message) for w in rec] == ["The stored results have no kBET."]
 
 
 # --------------------------------------------------------------- C13, C22, C25, C55

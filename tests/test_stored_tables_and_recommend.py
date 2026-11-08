@@ -76,4 +76,5 @@ def test_x14_rows_repeating_stored_rows_are_refused(fn):
 def test_x89_batch_family_on_vertical_names_the_scores_there_are():
     with pytest.raises(ValueError) as e:
         mtb.rank("vertical", metrics="batch")
-    assert str(e.value) == "The stored results of vertical have no metrics='batch' scores; they have ARI, ASW, NMI, cLISI, iASW and iF1."
+    assert str(e.value) == ("The stored results of vertical have no batch metrics. "
+                            "Pick metrics= from ARI, ASW, NMI, cLISI, iASW and iF1.")
