@@ -2,6 +2,7 @@
 import contextlib
 import io
 import json
+import textwrap
 import warnings
 
 import numpy as np
@@ -266,7 +267,9 @@ def test_c43_the_labels_recipe_follows_the_package_order():
     from multibench.engine import resolve
     ad = pytest.importorskip("anndata")
     page = _read("tutorials/evaluate.md")
-    block = next(b for b in re.findall(r"```python\n(.*?)```", page, re.S) if "order = {" in b)
+    # the recipe sits in a Details fold, indented
+    block = textwrap.dedent(next(b for b in re.findall(r"```python\n(.*?)```", page, re.S)
+                                 if "order = {" in b))
     code = "\n".join(line for line in block.splitlines() if "fetch(" not in line)
     root = mtb.config.data_path
     cats = mtb.catalog.datasets().set_index("dataset")["category"]

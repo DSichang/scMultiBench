@@ -1,6 +1,7 @@
 """Round c4 fixes of the 0.4.0 core API."""
 from __future__ import annotations
 
+import textwrap
 import warnings
 from pathlib import Path
 
@@ -319,7 +320,9 @@ def test_the_labels_recipe_orders_twelve_batches_by_number(tmp_path):
     import re
     from multibench.engine.resolve import _label_sort_key
     page = _read("tutorials/evaluate.md")
-    block = next(b for b in re.findall(r"```python\n(.*?)```", page, re.S) if "order = {" in b)
+    # the recipe sits in a Details fold, indented
+    block = textwrap.dedent(next(b for b in re.findall(r"```python\n(.*?)```", page, re.S)
+                                 if "order = {" in b))
     code = "\n".join(line for line in block.splitlines() if "fetch(" not in line)
     folder = tmp_path / "SYN12"
     folder.mkdir()

@@ -122,7 +122,7 @@ def test_run_guide_skips_an_atac_mismatch_and_needs_one_multiome_folder():
     assert "also when `methods=` names it" in " ".join(_visible(run).split())
     assert "allow_atac_mismatch" not in run and "--allow-atac-mismatch" not in run
     assert mtb.find_methods("vertical", modalities=["atac_gas"]) == []
-    assert "Every vertical method that reads ATAC reads peaks." in _flat("tutorials/run.md")
+    assert "Vertical, mosaic and cross methods read ATAC as peaks." in _flat("tutorials/run.md")
     assert "gene-activity folder" not in run and "second folder" not in _flat("tutorials/run.md")
     assert '.assign(dataset="MYMULTIOME")' not in run
 
