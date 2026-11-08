@@ -409,11 +409,6 @@ def diagonal_multi_sentence(key):
 # twice.
 #
 # The paragraphs of the collapsed block, in the order they appear.
-WHERE = ("The names in quotes say where your file holds each part. `\"X\"` is the main "
-         "matrix, `\"obsm:{obsm}\"` the matrix `obsm[\"{obsm}\"]`, `\"layer:counts\"` the "
-         "layer `layers[\"counts\"]`, and `\"obs:celltype\"` the column `obs[\"celltype\"]`. "
-         "A wrong name after `obsm:`, `layer:` or "
-         "`obs:` raises an error that lists the names the file has.")
 PROTEIN_NAMES = ("The example keeps the protein names in `adata.uns[\"protein_names\"]`. A "
                  "DataFrame in `adata.obsm[\"protein\"]` brings its own names in its columns.")
 ADT_IN_X = ("When the ADT file also holds a matrix in `obsm` under a name that does not "
@@ -838,7 +833,8 @@ def cross_batches_sentence(key):
     """How many batches the methods of a cross task read, for the visible
     text of section 5's first cell, from the modalities of the task's
     variants: every method the same number, or every method one number and
-    some of them a smaller one as well (UINMF's two-batch variants)."""
+    some of them a smaller one as well (UINMF's two-batch variants), said only
+    of a method the tutorial runs."""
     reads = {}
     for m, v in task_variants(key):
         numbers = [int(n) for r in v.when["modalities"] for n in re.findall(r"\d+$", r)]
@@ -852,8 +848,8 @@ def cross_batches_sentence(key):
         raise SystemExit(f"{key}: the batches each method reads are {shape}: reword "
                          f"cross_batches_sentence")
     also = ""
-    if fewer:
-        few = sorted(reads[fewer[0]])
+    few = sorted(reads[fewer[0]] & set(TASKS[key]["methods"])) if fewer else []
+    if few:
         also = (f", and {and_list(few)} also read{'s' if len(few) == 1 else ''} "
                 f"{NUMBER[fewer[0]]}")
     return f"The methods of this task read {NUMBER[most]} batches{also}."
@@ -913,18 +909,15 @@ def own_cells(key):
     """Section 5 of a task tutorial as ``[(kind, source), ...]``: the heading
     with its collapsed block, then a sentence and a code cell each for the
     example files, the read and the export with its check, then the run and the
-    plot. The selector example of the collapsed block names the protein matrix
-    where the task has ADT, else the ATAC one."""
+    plot."""
     t, own = TASKS[key], OWN[key]
     cat, export = t["cat"], own["export"]
     one = own["n_files"] == 1
     multi_peak = [m for m, v in task_variants(key) if "atac_peak1" in v.when["modalities"]]
     multi_peak = and_list(multi_peak) + (" reads" if len(multi_peak) == 1 else " read") \
         if multi_peak else ""
-    has_adt = any(r.startswith("adt") for v in t["variants"] for r in v)
-    notes = [WHERE.replace("{obsm}", "protein" if has_adt else "atac")] + [
-        n.replace("{multi_peak}", multi_peak)
-         .replace("{name}", own["name"]) for n in own["notes"]]
+    notes = [n.replace("{multi_peak}", multi_peak)
+             .replace("{name}", own["name"]) for n in own["notes"]]
     # a paragraph of its own between the needs and the recipes: how many
     # batches the methods read, or what the batches' files must share
     also = ""
@@ -1171,6 +1164,7 @@ mtb.plot.bubble(stored)''')
     md(f"""## Next steps
 
 - [Run a method]({SITE}tutorials/run/), [Score an embedding]({SITE}tutorials/evaluate/), [Load and plot results]({SITE}tutorials/plot/) and [Discover methods]({SITE}tutorials/discover/).
+- [Look at an embedding]({SITE}tutorials/evaluate/#look-at-an-embedding) draws a method's embedding as a UMAP.
 - The [interactive explorer](https://shiny.maths.usyd.edu.au/scMultiBench/) has the full benchmark's rankings, with no install needed.""")
     return cells
 

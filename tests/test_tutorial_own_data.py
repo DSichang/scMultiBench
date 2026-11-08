@@ -671,10 +671,6 @@ WRITE_OBSM = " or `\"obsm:protein\"`"
 
 SMALL_DATASET_ROW = ("| a method fails on a small dataset | `mtb.scan` "
                      "names what the method needs from the data's size in its `caveat` column |")
-WRONG_NAME = ("A wrong name after `obsm:`, `layer:` or `obs:` raises an error that lists the "
-              "names the file has.")
-
-
 def _tenx_file(path, n_cells=30):
     """A file in the layout of Cell Ranger's ``filtered_feature_bc_matrix.h5``:
     features x barcodes, sparse, with a type per feature."""
@@ -864,13 +860,8 @@ def test_the_small_dataset_row_names_the_scan_that_has_the_column(tmp_path, monk
 
 
 def test_a_wrong_name_after_a_prefix_lists_the_names(tmp_path, monkeypatch):
-    """The collapsed block says that a wrong name after one of the three
-    prefixes raises an error that lists the names the file has. Each of the
-    three does, and the refused call writes nothing."""
-    for key in KEYS:
-        everything = "\n".join(s for _, s in _cells(key))
-        assert _collapsed(_sources(key)[0]).count(WRONG_NAME) == 1, key
-        assert everything.count("A wrong name") == 1, key
+    """A wrong name after one of the three prefixes raises an error that lists
+    the names the file has, and the refused call writes nothing."""
     key = "vertical_rna_adt"
     _on_disk(key)
     monkeypatch.chdir(tmp_path)
@@ -893,8 +884,8 @@ def test_a_wrong_name_after_a_prefix_lists_the_names(tmp_path, monkeypatch):
 
 # ------------------------------------------------------ the generator's checks
 CROSS_BATCHES = {
-    "cross_rna_adt": "The methods of this task read three batches, and UINMF also reads two.",
-    "cross_rna_atac": "The methods of this task read three batches, and UINMF also reads two.",
+    "cross_rna_adt": "The methods of this task read three batches.",
+    "cross_rna_atac": "The methods of this task read three batches.",
     "cross_adt_atac": "The methods of this task read two batches.",
     "cross_rna_adt_atac": "The methods of this task read two batches.",
 }
@@ -923,6 +914,12 @@ def test_the_cross_sentence_counts_the_batches_from_the_registry(monkeypatch):
         assert all(most in c for c in counts.values())
         assert ("three" in sentence) == (most == 3)
         assert all(c == {most} for m, c in counts.items() if m != "UINMF")
+    # UINMF's two-batch variants are named only where the tutorial runs UINMF
+    monkeypatch.setitem(GEN.TASKS["cross_rna_adt"], "methods",
+                        [*GEN.TASKS["cross_rna_adt"]["methods"], "UINMF"])
+    assert GEN.cross_batches_sentence("cross_rna_adt") == (
+        "The methods of this task read three batches, and UINMF also reads two.")
+    monkeypatch.undo()
     # a set of variants the sentence has no words for stops the generation
     variants = GEN.task_variants("cross_rna_adt")
     monkeypatch.setattr(GEN, "task_variants", lambda key: [
