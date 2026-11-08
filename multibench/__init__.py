@@ -25,7 +25,7 @@ from .eval.pipeline import evaluate
 from .discover import find_methods, method_info, params_for
 from .workflow import scan, run, RunResult, load_run
 
-__version__ = "0.5.2"
+__version__ = "0.6.0"
 
 __all__ = [
     # namespaces
