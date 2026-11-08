@@ -80,7 +80,7 @@ def test_rank_unknown_result_id_and_modalities(result_dir):
     sub = long[long.method.isin(["sciPENN", "scMSI"])]
     with pytest.raises(ValueError, match=r"^No scored method in vertical reads "):
         rank("vertical", long_df=sub, modalities=["rna", "atac"])
-    with pytest.raises(ValueError, match=r"Unknown metrics= token bogus\."):
+    with pytest.raises(ValueError, match=r"^long_df has no bogus\. Pick metrics= from ARI, "):
         rank("vertical", long_df=long, metrics="bogus")
 
 

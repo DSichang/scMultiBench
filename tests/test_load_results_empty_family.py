@@ -38,3 +38,10 @@ def test_the_four_functions_say_the_same_for_one_list():
             call()
         said.append(str(e.value).split(" have no ")[-1].split(" has no ")[-1])
     assert said == ["batch metrics. Pick metrics= from ARI, ASW, NMI, cLISI, iASW and iF1."] * 4
+
+
+def test_a_misspelt_metric_gets_the_same_sentence():
+    with pytest.raises(ValueError) as e:
+        mtb.load_results("vertical", metrics=["ARI", "NIM"])
+    assert str(e.value) == ("The stored results of vertical have no NIM. "
+                            "Pick metrics= from ARI, ASW, NMI, cLISI, iASW and iF1.")

@@ -91,14 +91,19 @@ class MetricSelection(NamedTuple):
     explicit: bool
 
 
-def _unknown_metrics(kw: str, what: str) -> str:
+def _unknown_metrics(what: str) -> str:
     """The one error text of a ``metrics=`` value that names no family or code."""
-    return (f"Unknown {kw}= {what}. Pass 'all', 'clustering', 'batch' or "
-            f"'classification', or metric codes such as {kw}=['ARI', 'NMI'].")
+    return (f"Unknown metrics= {what}. Pass 'all', 'clustering', 'batch' or "
+            f"'classification', or metric codes such as metrics=['ARI', 'NMI'].")
 
 
-def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelection:
-    """Resolve the ``metrics=`` knob shared by ``evaluate``, ``load_results`` and ``rank``.
+def _empty_metrics() -> ValueError:
+    return ValueError("metrics=[] selects nothing. Pass None for every metric, a family "
+                      "token, or a non-empty list of codes.")
+
+
+def metric_selection(metrics) -> MetricSelection:
+    """Resolve the ``metrics=`` of ``evaluate`` and ``run``: what to compute.
 
     Parameters
     ----------
@@ -107,12 +112,6 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
         ``"batch"``, ``"classification"``, ``"all"``), one metric code, or a list
         of codes and families (case/alias tolerant: ``["ari", "kbet"]`` -> ``ARI,
         kBET``; a family in a list adds its codes, kBET only when named).
-    extra : collection of str
-        Codes accepted on top of :func:`_known_metrics` - the metrics present
-        in a frame, so a user's own metric name in a long file can still be
-        selected; they are listed in the error too.
-    kw : str
-        The keyword the value arrived through, named in the errors.
 
     Returns
     -------
@@ -135,17 +134,13 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
         if metrics in FAMILY_METRICS:
             return MetricSelection(metrics, list(FAMILY_METRICS[metrics]), False)
         code = _canonical_metric(metrics)
-        if code in _known_metrics() or code in set(map(str, extra)):
-            metrics = [code]               # one code: a list of one
-        else:
-            raise ValueError(_unknown_metrics(kw, f"token {metrics}"))
+        if code not in _known_metrics():
+            raise ValueError(_unknown_metrics(f"token {metrics}"))
+        metrics = [code]                   # one code: a list of one
     wanted = list(metrics)
     if not wanted:
-        raise ValueError(
-            f"{kw}=[] selects nothing. Pass None for every metric, a family token, "
-            f"or a non-empty list of codes.")
+        raise _empty_metrics()
     valid = _known_metrics()
-    present = sorted(set(map(str, extra)))
     codes, unknown = [], []
     for m in wanted:
         if family_word(m):
@@ -154,14 +149,13 @@ def metric_selection(metrics, *, extra=(), kw: str = "metrics") -> MetricSelecti
             codes += [c for c in family if c != "kBET" and c not in codes]
             continue
         c = _canonical_metric(m)
-        if c is None or (c not in valid and c not in present):
+        if c is None or c not in valid:
             unknown.append(m)
         else:
             codes.append(c)
     if unknown:
-        raise ValueError(_unknown_metrics(kw, f"token{'s' if len(unknown) > 1 else ''} "
-                                              f"{', '.join(map(str, unknown))}")
-                         + (f" This frame also has {', '.join(present)}." if present else ""))
+        raise ValueError(_unknown_metrics(f"token{'s' if len(unknown) > 1 else ''} "
+                                          f"{', '.join(map(str, unknown))}"))
     codes = list(dict.fromkeys(codes))
     holding = [f for f, members in FAMILY_METRICS.items() if all(c in members for c in codes)]
     return MetricSelection(holding[0] if holding else "all", codes, True)
@@ -171,25 +165,29 @@ def metrics_in(metrics, names, *, table: str = "The table has") -> list | None:
     """The metric names of a table that ``metrics=`` selects, for
     ``load_results``, ``rank``, ``plot.bubble`` and ``plot.bar``.
 
-    :func:`metric_selection` reads the value (``names`` count as codes too);
-    a family selects the table's codes of it, a code the table's spelling of
-    it. ``None`` = every metric.
+    ``None`` or ``"all"`` = every metric. A family selects the table's codes of
+    it; any other name the table's spelling of it, in any case or scib's
+    spelling (``"isolated_label_f1"`` is ``iF1``).
 
     Raises
     ------
     ValueError
-        What :func:`metric_selection` raises, a family the table has no code
-        of, or a code it has no row of; ``table`` begins the message.
+        An empty list, a family the table has no code of, or a name it has no
+        row of; ``table`` begins the message.
     """
+    if metrics is None or (isinstance(metrics, str) and metrics.strip().lower() == "all"):
+        return None
+    asked = [metrics] if isinstance(metrics, str) else list(metrics)
+    if not asked:
+        raise _empty_metrics()
     names = list(dict.fromkeys(n for n in names if n is not None))
-    sel = metric_selection(metrics, extra=names)
-    if sel.codes is None or not names:
-        return sel.codes
+    if not names:
+        return None
     spelling: dict = {}
     for n in names:
         spelling.setdefault(_canonical_metric(n), n)
     out, absent = [], []
-    for r in [metrics] if isinstance(metrics, str) else list(metrics):
+    for r in asked:
         word = str(r).strip().lower()
         if word == "all":
             out += [spelling[c] for c in _known_metrics() if c in spelling]

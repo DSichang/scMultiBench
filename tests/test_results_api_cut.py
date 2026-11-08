@@ -12,7 +12,7 @@ import pytest
 
 import multibench as mtb
 from multibench._data import results
-from multibench._data.catalog import metric_selection
+from multibench._data.catalog import metric_selection, metrics_in
 
 
 def _quiet(fn, *a, **k):
@@ -34,9 +34,8 @@ def test_metric_selection_is_one_vocabulary():
     assert metric_selection(["gc"]).family == "batch"
     with pytest.raises(ValueError, match=r"^Unknown metrics= token nope\. Pass 'all'"):
         metric_selection(["ARI", "nope"])
-    with pytest.raises(ValueError, match="This frame also has MyScore"):
-        metric_selection(["MyScore", "nope"], extra=["MyScore"])
-    assert metric_selection(["MyScore"], extra=["MyScore"]).codes == ["MyScore"]
+    # a table's own metric name is selected by catalog.metrics_in, against the table
+    assert metrics_in(["MyScore"], ["ARI", "MyScore"]) == ["MyScore"]
     with pytest.raises(ValueError, match="metrics=\\[\\] selects nothing"):
         metric_selection([])
     assert metric_selection(["ARI", "ari"]).codes == ["ARI"]
@@ -57,8 +56,9 @@ def test_load_results_and_evaluate_share_the_vocabulary(result_dir):
     long = pd.DataFrame({"metric": ["ARI", "MyScore"], "value": [0.5, 0.7],
                          "method": ["M", "M"], "dataset": ["D", "D"],
                          "category": ["vertical", "vertical"]})
-    with pytest.raises(ValueError, match="Unknown metrics= token Nope"):
+    with pytest.raises(ValueError) as e:
         results.rank("vertical", long_df=long, metrics=["Nope"])
+    assert str(e.value) == "long_df has no Nope. Pick metrics= from ARI and MyScore."
 
 
 def test_load_results_positional_selectors_fail_loudly(result_dir):
