@@ -2921,7 +2921,7 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="1-install">1. Install<a class="anchor-link" href="#1-install">¶</a></h2><p>The pins keep the numpy and pandas already installed, so Colab needs no restart.</p>
+<h2 id="1-install">1. Install<a class="anchor-link" href="#1-install">¶</a></h2><p>pip may then print a note about restarting the kernel: no restart is needed, because the pins keep the numpy and pandas already installed.</p>
 </div>
 </div>
 </div>
@@ -2946,11 +2946,11 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="o">,</span><span class="w"> </span><span class="nn">pandas</span>
 <span class="n">pins</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"numpy==</span><span class="si">{</span><span class="n">numpy</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2"> pandas==</span><span class="si">{</span><span class="n">pandas</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2">"</span>
-<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.6.0"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
+<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.6.1"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-1">import numpy, pandas
 pins = f"numpy=={numpy.__version__} pandas=={pandas.__version__}"
-%pip install -q "multibench-sc&gt;=0.6.0" {pins}</div>
+%pip install -q "multibench-sc&gt;=0.6.1" {pins}</div>
 </div>
 </div>
 </div>
@@ -3080,9 +3080,9 @@ res.summary</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[run] Matilda (vertical/D22mini) ...
-[run]   -&gt; scored (12.1s) ARI 0.414
+[run]   -&gt; scored (12.5s) ARI 0.414
 [run] UINMF (vertical/D22mini) ...
-[run]   -&gt; scored (17.6s) ARI 0.338
+[run]   -&gt; scored (17.2s) ARI 0.338
 </pre>
 </div>
 </div>
@@ -3131,7 +3131,7 @@ res.summary</div>
 <td>0.5986</td>
 <td>0.6832</td>
 <td>0.9922</td>
-<td>12.1</td>
+<td>12.5</td>
 <td></td>
 <td></td>
 </tr>
@@ -3145,7 +3145,7 @@ res.summary</div>
 <td>0.5605</td>
 <td>0.5282</td>
 <td>0.9952</td>
-<td>17.6</td>
+<td>17.2</td>
 <td></td>
 <td></td>
 </tr>
@@ -3223,7 +3223,6 @@ res.summary</div>
 <p>Recipes cover <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-10x-h5">a 10x <code>.h5</code> file</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-labels-csv">labels in a CSV file</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-no-labels">no labels</a> and <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-donors">several donors or samples</a>.</p>
 <details>
 <summary>Details: export</summary>
-<p>The names in quotes say where your file holds each part. <code>"X"</code> is the main matrix, <code>"obsm:protein"</code> the matrix <code>obsm["protein"]</code>, <code>"layer:counts"</code> the layer <code>layers["counts"]</code>, and <code>"obs:celltype"</code> the column <code>obs["celltype"]</code>. A wrong name after <code>obsm:</code>, <code>layer:</code> or <code>obs:</code> raises an error that lists the names the file has.</p>
 <p>The example keeps the protein names in <code>adata.uns["protein_names"]</code>. A DataFrame in <code>adata.obsm["protein"]</code> brings its own names in its columns.</p>
 </details>
 </div>
@@ -3512,7 +3511,7 @@ mine.summary</div>
 <pre>[run] Matilda (vertical/MYTRI) ...
 [run]   -&gt; scored (8.5s) ARI 0.358
 [run] UINMF (vertical/MYTRI) ...
-[run]   -&gt; scored (15.7s) ARI 0.298
+[run]   -&gt; scored (15.4s) ARI 0.298
 </pre>
 </div>
 </div>
@@ -3575,7 +3574,7 @@ mine.summary</div>
 <td>0.5884</td>
 <td>0.5330</td>
 <td>0.9902</td>
-<td>15.7</td>
+<td>15.4</td>
 <td></td>
 <td></td>
 </tr>
@@ -3659,14 +3658,6 @@ mine.summary</div>
 <td>a method fails on a small dataset</td>
 <td><code>mtb.scan</code> names what the method needs from the data's size in its <code>caveat</code> column</td>
 </tr>
-<tr>
-<td>a method times out</td>
-<td>raise <code>timeout=</code> in <code>run</code></td>
-</tr>
-<tr>
-<td>batch metrics use the wrong batches</td>
-<td><code>res.rescore(batch=my_vector)</code> scores again without running the methods</td>
-</tr>
 </tbody>
 </table>
 </details>
@@ -3682,6 +3673,7 @@ mine.summary</div>
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <h2 id="next-steps">Next steps<a class="anchor-link" href="#next-steps">¶</a></h2><ul>
 <li><a href="https://dsichang.github.io/scMultiBench/tutorials/run/">Run a method</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/evaluate/">Score an embedding</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/plot/">Load and plot results</a> and <a href="https://dsichang.github.io/scMultiBench/tutorials/discover/">Discover methods</a>.</li>
+<li><a href="https://dsichang.github.io/scMultiBench/tutorials/evaluate/#look-at-an-embedding">Look at an embedding</a> draws a method's embedding as a UMAP.</li>
 <li>The <a href="https://shiny.maths.usyd.edu.au/scMultiBench/">interactive explorer</a> has the full benchmark's rankings, with no install needed.</li>
 </ul>
 </div>

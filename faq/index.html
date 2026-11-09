@@ -2107,8 +2107,8 @@ starts empty, because Colab deletes the disk with the runtime.</p>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">print</span><span class="p">(</span><span class="n">mtb</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">envs_dir</span><span class="p">)</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">install</span><span class="p">([</span><span class="s2">"scJoint"</span><span class="p">],</span> <span class="n">dry_run</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>   <span class="c1"># its environment, and "have" once installed</span>
 </span></code></pre></div>
-<p><code>envs_dir</code> is <code>$MULTIBENCH_ENVS_DIR</code> when set, else the writable envs folder
-of your conda, else <code>~/.cache/multibench/envs</code>.</p>
+<p><a href="../installation/#method-environments">Method environments</a> says which folder
+<code>envs_dir</code> is.</p>
 <h2 id="can-i-use-an-environment-outside-multibench">Can I use an environment outside multibench?<a class="headerlink" href="#can-i-use-an-environment-outside-multibench" title="Anchor link to this section">&para;</a></h2>
 <p>Yes. Each one is an ordinary conda environment. Activate it by its path,
 for example to run a method's own code or your own script with the same

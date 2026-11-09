@@ -679,10 +679,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#set-a-methods-hyperparameters" class="md-nav__link">
+  <a href="#set-a-methods-parameters" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Set a method's hyperparameters
+        Set a method's parameters
       
     </span>
   </a>
@@ -2121,10 +2121,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#set-a-methods-hyperparameters" class="md-nav__link">
+  <a href="#set-a-methods-parameters" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Set a method's hyperparameters
+        Set a method's parameters
       
     </span>
   </a>
@@ -2316,8 +2316,6 @@ is missing, with the download sizes.</p>
 <p>A missing environment marks the method not runnable in <code>mtb.scan</code>, and
 <code>run</code> skips it. Off Linux the reason says that methods run only on
 Linux.</p>
-<p><code>mtb.env.install</code> downloads a prebuilt environment. Installed ones are
-skipped.</p>
 <p>GLUE reads the GENCODE v43 human annotation, which its first run
 downloads, and MIRA a <code>logger.py</code>, which the package puts next to its
 script. GLUE runs its human script only, so mouse data does not run
@@ -2346,10 +2344,8 @@ label file, such as <code>cty2:AAACCTGAG...</code>.</p>
 the file by its name.</p>
 <details class="note">
 <summary>Details</summary>
-<p><code>res.records</code> holds one dict per method: its <code>status</code>, <code>params_used</code>,
-<code>run_sec</code>, <code>reused</code> (<code>True</code> when <code>skip_existing=True</code> reused a saved
-output), the label files its scores used (<code>labels_used</code>) and the run's
-provenance. Five methods put the cells in another order than <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> before <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> and
+<p><code>res.records</code> holds one dict per method, with the keys
+<a href="../../reference/run/#multibench.workflow.RunResult"><code>mtb.RunResult</code></a> lists. Five methods put the cells in another order than <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> before <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> and
 <code>cty1, cty2, ...</code>. uniPort and Seurat_v5 put the <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> cells first.
 StabMap puts its reference batch first, in <code>cross</code> and in the <code>mosaic</code>
 patterns that start with an <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>-only batch. SMILE and MultiVI in
@@ -2365,12 +2361,12 @@ outputs again and writes the new scores. <code>metrics=</code> replaces those sc
 and keeps the others. No method runs again.</p>
 </details>
 <hr />
-<h2 id="set-a-methods-hyperparameters">Set a method's hyperparameters<a class="headerlink" href="#set-a-methods-hyperparameters" title="Anchor link to this section">&para;</a></h2>
-<p>Every method takes hyperparameters.
+<h2 id="set-a-methods-parameters">Set a method's parameters<a class="headerlink" href="#set-a-methods-parameters" title="Anchor link to this section">&para;</a></h2>
+<p>Every method takes parameters.
 <code>mtb.params_for(method, category, modalities)</code> lists them with their
 defaults, which are the paper's values. A default of <code>None</code> leaves the
 setting to the method's library. <code>run(params={method: {name: value}})</code> sets
-them. For several values of one hyperparameter, loop over <code>run</code>, one
+them. For several values of one parameter, loop over <code>run</code>, one
 <code>out_dir</code> per value, and name each run's rows:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
@@ -2468,10 +2464,9 @@ same cells, and each method reads one of them or both:</p>
 <p>For several <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and several <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> batches in diagonal, scJoint, GLUE, iNMF
 and online_iNMF read exactly 3 of each. They are numbered <code>rna1.h5</code>,
 <code>atac_gas1.h5</code> or <code>atac_peak1.h5</code>, <code>rna_cty1.csv</code> and <code>atac_cty1.csv</code>, then 2
-and 3. For another number of batches, such as 2 donors, write one <code>rna.h5</code>
-and one <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file with every cell. Then pass the batches as <code>run(batch=...)</code>,
-one per <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> cell, as in <a href="#recipe-donors">Another number of donors</a>.</p>
-<p>Number your mosaic or cross batches to match one of these patterns:</p>
+and 3. For another number of batches, see <a href="#recipe-donors">Another number of donors</a>.</p>
+<p>Mosaic and cross methods read exactly the batches of one of these patterns.
+Number yours to match one:</p>
 <table>
 <thead>
 <tr>
@@ -2586,8 +2581,7 @@ writes the folder. Other layouts:</p>
 </span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>              <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"rna"</span><span class="p">,</span> <span class="s2">"atac_peak"</span><span class="p">],</span> <span class="n">batch</span><span class="o">=</span><span class="n">mdata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s2">"sample"</span><span class="p">])</span>
 </span></code></pre></div>
 <p>Keep all samples in one folder and pass each cell's sample as <code>batch=</code>.
-<code>atac_peak</code> keeps the methods that read <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> peaks. Every
-vertical method that reads <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> reads peaks.</p>
+<code>atac_peak</code> keeps the methods that read <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> peaks.</p>
 </div>
 <div class="tabbed-block">
 <div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">anndata</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ad</span>
@@ -2653,12 +2647,11 @@ missing, <code>scan</code> names the file it found instead.</p>
 </details>
 <details class="note">
 <summary>Details: <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr></summary>
-<p>The <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file name depends on the category. Vertical reads <code>atac.h5</code>,
-which holds peaks. <code>method_info(m)["atac"]</code> names the form a method
-reads. Diagonal reads
+<p>The <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> file name depends on the category. Vertical reads <code>atac.h5</code>.
+<code>method_info(m)["atac"]</code> names the form a method reads. Diagonal reads
 <code>atac_peak.h5</code> for peaks and <code>atac_gas.h5</code> for gene activity. Mosaic
-reads <code>atac&lt;i&gt;.h5</code>, which holds peaks. The older name <code>atac.h5</code> for
-gene activity still works.</p>
+reads <code>atac&lt;i&gt;.h5</code>. The older name <code>atac.h5</code> for gene activity still
+works.</p>
 <p>GLUE and Seurat_v3 read peak names such as <code>chr1:100-200</code>. <code>scan</code> and
 <code>run</code> also skip these two methods when the peak names cannot be
 rewritten in that form, such as <code>peak_0</code>. With such names, <code>scan</code>

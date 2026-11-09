@@ -2050,13 +2050,9 @@
 <code>multibench</code> package is its Python API.</p>
 <h2 id="what-scmultibench-covers">What scMultiBench covers<a class="headerlink" href="#what-scmultibench-covers" title="Anchor link to this section">&para;</a></h2>
 <p>The benchmark groups datasets into four categories (<code>category</code> in the API)
-by how the data were measured:</p>
-<ul>
-<li><a href="../tutorials/vertical_rna_adt/">Vertical</a>: several modalities measured in the same cells, for example <abbr title="Cellular Indexing of Transcriptomes and Epitopes by sequencing">CITE-seq</abbr> or 10x Multiome.</li>
-<li><a href="../tutorials/diagonal_rna_atac/">Diagonal</a>: modalities measured in different cells, for example <abbr title="Single-cell RNA sequencing">scRNA-seq</abbr> and scATAC-seq from separate experiments.</li>
-<li><a href="../tutorials/mosaic_rna_atac/">Mosaic</a>: several batches, only some sharing a modality, joined by a paired batch.</li>
-<li><a href="../tutorials/cross_rna_adt/">Cross</a>: several batches, each with every modality, for example one <abbr title="Cellular Indexing of Transcriptomes and Epitopes by sequencing">CITE-seq</abbr> assay from several donors.</li>
-</ul>
+by how the data were measured: vertical, diagonal, mosaic and cross.
+<a href="../tutorials/discover/#the-four-integration-categories">The four integration categories</a>
+defines each.</p>
 <details class="note">
 <summary>Details</summary>
 <p>Its datasets are real and simulated, and cover <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>, <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> and <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>.</p>
@@ -2086,7 +2082,7 @@ classification metrics for an embedding.</p>
 <ul>
 <li><strong>Install</strong>: <code>pip install multibench-sc</code>, then <code>import multibench</code>. See <a href="../installation/">Installation</a>.</li>
 <li><strong>First run</strong>: <a href="../quickstart/">Quickstart</a>.</li>
-<li><strong>Tutorials</strong>: <a href="../tutorials/vertical_rna_adt/">vertical</a>, <a href="../tutorials/diagonal_rna_atac/">diagonal</a>, <a href="../tutorials/mosaic_rna_atac/">mosaic</a>, and <a href="../tutorials/cross_rna_adt/">cross</a>.</li>
+<li><strong>Tutorials</strong>: <a href="../tutorials/vertical_rna_adt/">vertical</a>, <a href="../tutorials/diagonal_rna_atac/">diagonal</a>, <a href="../tutorials/mosaic_rna_adt/">mosaic</a>, and <a href="../tutorials/cross_rna_adt/">cross</a>.</li>
 <li><strong>Explore</strong>: <a href="../shiny/">interactive Shiny explorer</a>.</li>
 <li><strong>API</strong>: <a href="../api/"><code>multibench</code></a>.</li>
 </ul>

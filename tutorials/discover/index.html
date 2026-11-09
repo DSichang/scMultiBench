@@ -700,17 +700,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#before-running" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Before running
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -2109,17 +2098,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#before-running" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Before running
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -2153,19 +2131,6 @@
 <h1 id="discover-methods">Discover methods<a class="headerlink" href="#discover-methods" title="Anchor link to this section">&para;</a></h1>
 <p>These calls show which of the 36 methods fit your data and your task. They
 need no environments, <abbr title="Graphics Processing Unit">GPU</abbr> or data.</p>
-<div class="admonition tip">
-<p class="admonition-title">Summary</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">)</span>   <span class="c1"># every method in a category</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># filter by what your data has</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">"diagonal"</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"rna"</span><span class="p">,</span> <span class="s2">"atac"</span><span class="p">],</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>                 <span class="n">needs_labels</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="s2">"SCALEX"</span><span class="p">)</span>               <span class="c1"># everything known about one method</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="c1"># rank by the stored results</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="n">mtb</span><span class="o">.</span><span class="n">rank</span><span class="p">(</span><span class="s2">"vertical"</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"rna"</span><span class="p">,</span> <span class="s2">"adt"</span><span class="p">])</span>
-</span></code></pre></div>
-</div>
 <hr />
 <h2 id="the-four-integration-categories">The four integration categories<a class="headerlink" href="#the-four-integration-categories" title="Anchor link to this section">&para;</a></h2>
 <p>Pick the category that matches your experimental design and pass it as
@@ -2192,7 +2157,7 @@ another.</p>
 </tr>
 <tr>
 <td><strong>mosaic</strong></td>
-<td>Several batches, only some sharing a modality, joined by a paired batch</td>
+<td>Several batches with different modalities, linked by a batch that measures two of them</td>
 <td>mixed, partially paired</td>
 </tr>
 <tr>
@@ -2211,20 +2176,20 @@ to <code>run</code> or <code>evaluate</code>.</p>
 lists the methods, all 36 without a filter. Its filters are what your data
 has: the category, the modalities you measured, how your <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> is encoded,
 and whether you have cell-type labels.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">()</span>                       <span class="c1"># all 36 methods</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">)</span>    <span class="c1"># paired-design methods only</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">()</span>                       <span class="c1"># all 36 methods</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">)</span>    <span class="c1"># paired-design methods only</span>
 </span></code></pre></div>
 <p>Each method reads <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> either as peaks or as gene activity. Give each
 method the representation it reads: <code>atac_peak</code> or <code>atac_gas</code> in
 <code>modalities=</code> keeps the methods that read yours.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># unpaired RNA and ATAC batches, no cell-type labels</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">"diagonal"</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"rna"</span><span class="p">,</span> <span class="s2">"atac"</span><span class="p">],</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>                 <span class="n">needs_labels</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># ['SCALEX', 'Seurat_v5', 'VIPCCA', 'Portal', ...]</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">"diagonal"</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"atac_peak"</span><span class="p">])</span>   <span class="c1"># ATAC as peaks</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># unpaired RNA and ATAC batches, no cell-type labels</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">"diagonal"</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"rna"</span><span class="p">,</span> <span class="s2">"atac"</span><span class="p">],</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>                 <span class="n">needs_labels</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># ['SCALEX', 'Seurat_v5', 'VIPCCA', 'Portal', ...]</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">"diagonal"</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"atac_peak"</span><span class="p">])</span>   <span class="c1"># ATAC as peaks</span>
 </span></code></pre></div>
 <details class="note">
 <summary>Details</summary>
@@ -2246,8 +2211,7 @@ rna+adt+atac row is not kept for <code>["rna", "atac"]</code>. A representation
 token keeps every row whose method reads it, so <code>"atac_peak"</code> also
 keeps MultiMAP and Seurat_v3.</p>
 <p><code>needs_labels</code> is judged per variant. <code>method_info(m)["needs_labels"]</code>
-is <code>True</code> when any variant needs labels. <code>mtb.params_for(m, category,
-modalities)</code> lists the hyperparameters a variant exposes.</p>
+is <code>True</code> when any variant needs labels.</p>
 <p>An unknown token raises <code>ValueError</code> listing the valid values. A bare
 string such as <code>modalities="rna"</code> raises <code>TypeError</code>.</p>
 </details>
@@ -2283,11 +2247,11 @@ the file check. Barcodes that differ only in a suffix such as <code>-1</code> or
 <h2 id="inspect-a-single-method">Inspect a single method<a class="headerlink" href="#inspect-a-single-method" title="Anchor link to this section">&para;</a></h2>
 <p><a href="../../reference/discover/#multibench.discover.method_info"><code>method_info</code></a>
 returns what the package knows about one method.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">info</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="s2">"SCALEX"</span><span class="p">)</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">info</span><span class="p">[</span><span class="s2">"env"</span><span class="p">],</span> <span class="n">info</span><span class="p">[</span><span class="s2">"atac"</span><span class="p">],</span> <span class="n">info</span><span class="p">[</span><span class="s2">"needs_labels"</span><span class="p">]</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c1"># ('scmb_torch', 'gene_activity', False)</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">info</span><span class="p">[</span><span class="s2">"supports"</span><span class="p">]</span>    <span class="c1"># one entry per variant: category, modalities, labels, ...</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">info</span><span class="p">[</span><span class="s2">"runtime"</span><span class="p">]</span>     <span class="c1"># {'measured_sec': 301, 'tier': 'medium', 'worst_sec': 2233, ...}</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">info</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">method_info</span><span class="p">(</span><span class="s2">"SCALEX"</span><span class="p">)</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">info</span><span class="p">[</span><span class="s2">"env"</span><span class="p">],</span> <span class="n">info</span><span class="p">[</span><span class="s2">"atac"</span><span class="p">],</span> <span class="n">info</span><span class="p">[</span><span class="s2">"needs_labels"</span><span class="p">]</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1"># ('scmb_torch', 'gene_activity', False)</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">info</span><span class="p">[</span><span class="s2">"supports"</span><span class="p">]</span>    <span class="c1"># one entry per variant: category, modalities, labels, ...</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">info</span><span class="p">[</span><span class="s2">"runtime"</span><span class="p">]</span>     <span class="c1"># {'measured_sec': 301, 'tier': 'medium', 'worst_sec': 2233, ...}</span>
 </span></code></pre></div>
 <details class="note">
 <summary>Details</summary>
@@ -2297,7 +2261,7 @@ returns what the package knows about one method.</p>
 methods take much longer than these times.</p>
 <p><code>info["setup_hint"]</code> names what a method needs before its first run,
 such as GLUE's annotation file. <code>setup_hint</code> is empty for most methods.
-<code>mtb.params_for(method)</code> lists what <code>run(params=...)</code> can change
+<code>mtb.params_for(method, category, modalities)</code> lists what <code>run(params=...)</code> can change
 and what the script fixes.</p>
 <p>Unknown method ids raise <code>KeyError</code>. Every function takes a method id in
 any case, and the paper's spellings such as <code>MOFA+</code>.</p>
@@ -2312,15 +2276,15 @@ turn CUDA off, which a run adds on a computer without a <abbr title="Graphics Pr
 <p><a href="../../reference/compare/#multibench._data.results.rank"><code>rank</code></a>
 ranks a category's methods by their stored results, in the order of the
 figures.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">rank</span><span class="p">(</span><span class="s2">"vertical"</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"rna"</span><span class="p">,</span> <span class="s2">"adt"</span><span class="p">])</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="c1">#   method  grand_score  needs_labels  runtime_tier  worst_sec  env</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">rank</span><span class="p">(</span><span class="s2">"diagonal"</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"atac_peak"</span><span class="p">])</span>   <span class="c1"># only methods that read peaks</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">mtb</span><span class="o">.</span><span class="n">rank</span><span class="p">(</span><span class="s2">"vertical"</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="s2">"vertical"</span><span class="p">,</span> <span class="n">needs_labels</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">rank</span><span class="p">(</span><span class="s2">"vertical"</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"rna"</span><span class="p">,</span> <span class="s2">"adt"</span><span class="p">])</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1">#   method  grand_score  needs_labels  runtime_tier  worst_sec  env</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">rank</span><span class="p">(</span><span class="s2">"diagonal"</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"atac_peak"</span><span class="p">])</span>   <span class="c1"># only methods that read peaks</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">mtb</span><span class="o">.</span><span class="n">rank</span><span class="p">(</span><span class="s2">"vertical"</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="s2">"vertical"</span><span class="p">,</span> <span class="n">needs_labels</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
 </span></code></pre></div>
 <p><code>grand_score</code> compares a category's methods with each other: it is a rank,
 not a quality score. <a href="../../overview/#how-it-evaluates">How it evaluates</a> says
 how it is computed.</p>
-<p>The stored results cover one dataset per category: for vertical, D11. Read the
+<p>The stored results cover one dataset per category: for vertical, D11 (<abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr>). Read the
 ranking as a hint. The full benchmark ranking is in the
 <a href="../../shiny/">interactive explorer</a> and in
 <a href="https://doi.org/10.1038/s41592-025-02856-3">Fig. 6 of the paper</a>.
@@ -2344,21 +2308,14 @@ present, as the figures do. <code>needs_labels</code> follows the category's var
 <hr />
 <h2 id="the-full-benchmark-catalog">The full benchmark catalog<a class="headerlink" href="#the-full-benchmark-catalog" title="Anchor link to this section">&para;</a></h2>
 <p><code>mtb.catalog</code> returns the dataset and metric tables as DataFrames.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">datasets</span><span class="p">()</span>    <span class="c1"># the fetchable datasets: category, has_results</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">metrics</span><span class="p">()</span>     <span class="c1"># each metric with its family and what it measures</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">datasets</span><span class="p">()</span>    <span class="c1"># the fetchable datasets: category, has_results</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">catalog</span><span class="o">.</span><span class="n">metrics</span><span class="p">()</span>     <span class="c1"># each metric with its family and what it measures</span>
 </span></code></pre></div>
 <details class="note">
 <summary>Details</summary>
 <p>The rows are the demo datasets, which <code>mtb.data.fetch</code> downloads.
 <code>has_results</code> marks the datasets with stored results.</p>
 </details>
-<hr />
-<h2 id="before-running">Before running<a class="headerlink" href="#before-running" title="Anchor link to this section">&para;</a></h2>
-<p>Check your folder with <code>mtb.scan("MYDATA", category)</code>. It says, per
-method, whether it can run here and why not. <code>command=True</code> adds the
-command <code>run</code> would execute. Then run them with <code>mtb.run</code>.</p>
-<p>By default <code>scan</code> lists the methods that read the modalities the folder
-holds, and <code>modalities="all"</code> lists every method.</p>
 <hr />
 <p>Next: run a chosen method in <a href="../run/">Run a method</a>, score its output in
 <a href="../evaluate/">Score an embedding</a>, and compare methods in

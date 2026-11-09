@@ -2921,7 +2921,7 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="1-install">1. Install<a class="anchor-link" href="#1-install">¶</a></h2><p>The pins keep the numpy and pandas already installed, so Colab needs no restart.</p>
+<h2 id="1-install">1. Install<a class="anchor-link" href="#1-install">¶</a></h2><p>pip may then print a note about restarting the kernel: no restart is needed, because the pins keep the numpy and pandas already installed.</p>
 </div>
 </div>
 </div>
@@ -2946,11 +2946,11 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="o">,</span><span class="w"> </span><span class="nn">pandas</span>
 <span class="n">pins</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"numpy==</span><span class="si">{</span><span class="n">numpy</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2"> pandas==</span><span class="si">{</span><span class="n">pandas</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2">"</span>
-<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.6.0"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
+<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.6.1"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-1">import numpy, pandas
 pins = f"numpy=={numpy.__version__} pandas=={pandas.__version__}"
-%pip install -q "multibench-sc&gt;=0.6.0" {pins}</div>
+%pip install -q "multibench-sc&gt;=0.6.1" {pins}</div>
 </div>
 </div>
 </div>
@@ -3023,7 +3023,7 @@ envs = mtb.env.install(METHODS)</div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>downloading D27mini_vertical (24 MB) ...
 [env] downloading scmb_vimcca 725 MB ...
-[env]   725 MB of 725 MB (30 MB/s)
+[env]   725 MB of 725 MB (28 MB/s)
 [env] unpacking scmb_vimcca ...
 </pre>
 </div>
@@ -3085,9 +3085,9 @@ res.summary</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[run] VIMCCA (vertical/D27mini_vertical) ...
-[run]   -&gt; scored (18.5s) ARI 0.456
+[run]   -&gt; scored (18.8s) ARI 0.419
 [run] scMM (vertical/D27mini_vertical) ...
-[run]   -&gt; scored (55.5s) ARI 0.276
+[run]   -&gt; scored (56.2s) ARI 0.276
 </pre>
 </div>
 </div>
@@ -3130,13 +3130,13 @@ res.summary</div>
 <th>0</th>
 <td>VIMCCA</td>
 <td>scored</td>
-<td>0.4556</td>
-<td>0.5941</td>
-<td>0.6198</td>
-<td>0.6249</td>
-<td>0.5202</td>
-<td>0.9655</td>
-<td>18.5</td>
+<td>0.4188</td>
+<td>0.5737</td>
+<td>0.6290</td>
+<td>0.6266</td>
+<td>0.538</td>
+<td>0.9518</td>
+<td>18.8</td>
 <td></td>
 <td></td>
 </tr>
@@ -3148,9 +3148,9 @@ res.summary</div>
 <td>0.4837</td>
 <td>0.6001</td>
 <td>0.6045</td>
-<td>0.3890</td>
+<td>0.389</td>
 <td>0.8963</td>
-<td>55.5</td>
+<td>56.2</td>
 <td></td>
 <td></td>
 </tr>
@@ -3228,8 +3228,6 @@ res.summary</div>
 <p>Recipes cover <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-10x-h5">a 10x <code>.h5</code> file</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-labels-csv">labels in a CSV file</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-no-labels">no labels</a> and <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-donors">several donors or samples</a>.</p>
 <details>
 <summary>Details: export</summary>
-<p>The names in quotes say where your file holds each part. <code>"X"</code> is the main matrix, <code>"obsm:atac"</code> the matrix <code>obsm["atac"]</code>, <code>"layer:counts"</code> the layer <code>layers["counts"]</code>, and <code>"obs:celltype"</code> the column <code>obs["celltype"]</code>. A wrong name after <code>obsm:</code>, <code>layer:</code> or <code>obs:</code> raises an error that lists the names the file has.</p>
-<p>A 10x Multiome file read with scanpy and <code>gex_only=False</code> holds genes and peaks in one <code>X</code>. The recipe for a 10x <code>.h5</code> file splits it into the two objects of this section. Without a split or a filter, <code>export_dataset</code> raises rather than write genes and peaks into one file.</p>
 <p>A 10x Multiome MuData goes in with one call. Here the labels are in <code>mdata.obs</code>. For labels in <code>mdata["rna"].obs</code>, write <code>labels="rna:celltype"</code>.</p>
 <div class="highlight"><pre><span></span><span class="n">mtb</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">export_dataset</span><span class="p">(</span><span class="n">mdata</span><span class="p">,</span> <span class="s2">"mydata/"</span> <span class="o">+</span> <span class="n">NAME</span><span class="p">,</span> <span class="n">rna</span><span class="o">=</span><span class="s2">"rna"</span><span class="p">,</span> <span class="n">atac</span><span class="o">=</span><span class="s2">"atac"</span><span class="p">,</span>
                       <span class="n">atac_kind</span><span class="o">=</span><span class="s2">"peak"</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="s2">"obs:celltype"</span><span class="p">,</span>
@@ -3516,9 +3514,9 @@ mine.summary</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[run] VIMCCA (vertical/MYMULTIOME) ...
-[run]   -&gt; scored (12.8s) ARI 0.381
+[run]   -&gt; scored (12.9s) ARI 0.474
 [run] scMM (vertical/MYMULTIOME) ...
-[run]   -&gt; scored (34.9s) ARI 0.317
+[run]   -&gt; scored (35.7s) ARI 0.317
 </pre>
 </div>
 </div>
@@ -3561,13 +3559,13 @@ mine.summary</div>
 <th>0</th>
 <td>VIMCCA</td>
 <td>scored</td>
-<td>0.3812</td>
-<td>0.5328</td>
-<td>0.6172</td>
-<td>0.6146</td>
-<td>0.4632</td>
-<td>0.9601</td>
-<td>12.8</td>
+<td>0.4737</td>
+<td>0.5948</td>
+<td>0.6350</td>
+<td>0.6401</td>
+<td>0.4979</td>
+<td>0.9553</td>
+<td>12.9</td>
 <td></td>
 <td></td>
 </tr>
@@ -3581,7 +3579,7 @@ mine.summary</div>
 <td>0.5806</td>
 <td>0.3867</td>
 <td>0.8883</td>
-<td>34.9</td>
+<td>35.7</td>
 <td></td>
 <td></td>
 </tr>
@@ -3665,14 +3663,6 @@ mine.summary</div>
 <td>a method fails on a small dataset</td>
 <td><code>mtb.scan</code> names what the method needs from the data's size in its <code>caveat</code> column</td>
 </tr>
-<tr>
-<td>a method times out</td>
-<td>raise <code>timeout=</code> in <code>run</code></td>
-</tr>
-<tr>
-<td>batch metrics use the wrong batches</td>
-<td><code>res.rescore(batch=my_vector)</code> scores again without running the methods</td>
-</tr>
 </tbody>
 </table>
 </details>
@@ -3688,6 +3678,7 @@ mine.summary</div>
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <h2 id="next-steps">Next steps<a class="anchor-link" href="#next-steps">¶</a></h2><ul>
 <li><a href="https://dsichang.github.io/scMultiBench/tutorials/run/">Run a method</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/evaluate/">Score an embedding</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/plot/">Load and plot results</a> and <a href="https://dsichang.github.io/scMultiBench/tutorials/discover/">Discover methods</a>.</li>
+<li><a href="https://dsichang.github.io/scMultiBench/tutorials/evaluate/#look-at-an-embedding">Look at an embedding</a> draws a method's embedding as a UMAP.</li>
 <li>The <a href="https://shiny.maths.usyd.edu.au/scMultiBench/">interactive explorer</a> has the full benchmark's rankings, with no install needed.</li>
 </ul>
 </div>

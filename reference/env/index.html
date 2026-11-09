@@ -2031,8 +2031,6 @@ macOS and Windows only the dry run works.</p>
 
 <details class="note">
 <summary>Details</summary>
-<p>On macOS and Windows, <code>install</code> raises an error that is both an <code>OSError</code>
-and a <code>RuntimeError</code>.</p>
 <p>A run activates the installed environment folder, <code>&lt;envs_dir&gt;/&lt;env&gt;</code>,
 directly, so no conda binary is needed. When no folder exists but conda
 is installed, it uses <code>conda run -n &lt;env&gt;</code> instead.

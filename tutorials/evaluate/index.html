@@ -2239,7 +2239,15 @@ the accepted forms.</p>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">mtb</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">adata</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="s2">"celltype"</span><span class="p">,</span> <span class="n">obsm</span><span class="o">=</span><span class="s2">"X_pca"</span><span class="p">)</span>
 </span></code></pre></div>
 <p>A column is named with or without <code>obs:</code>, so <code>labels="obs:celltype"</code> is the
-same. The labels of a dataset folder, in its cell order:</p>
+same. To score a method's output, use <code>evaluate(dataset=, category=,
+method=)</code> and no <code>labels=</code>: the <code>embedding.h5</code> that <code>run</code> writes names its
+cells, and <code>evaluate</code> matches the label files to them.</p>
+<p>A missing label is not a cell type: <code>evaluate</code> raises when a label is
+missing, and so does a missing batch. Score the labelled cells, as
+<code>adata[adata.obs["celltype"].notna()]</code>.</p>
+<details class="note">
+<summary>Details</summary>
+<p>The labels of a dataset folder, in its cell order:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">folder</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">fetch</span><span class="p">(</span><span class="s2">"D52mini"</span><span class="p">)</span>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">order</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"rna"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">"adt"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"atac"</span><span class="p">:</span> <span class="mi">2</span><span class="p">}</span>
@@ -2247,16 +2255,8 @@ same. The labels of a dataset folder, in its cell order:</p>
 </span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>               <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">f</span><span class="p">:</span> <span class="p">(</span><span class="n">order</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">stem</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"_"</span><span class="p">)[</span><span class="mi">0</span><span class="p">],</span> <span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">stem</span><span class="p">),</span> <span class="n">f</span><span class="o">.</span><span class="n">stem</span><span class="p">))</span>
 </span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="n">labels</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">f</span><span class="p">)</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">files</span><span class="p">])</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span>
 </span></code></pre></div>
-<p>They follow the folder's cells as <code>mtb.io.read</code> reads them: <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr>
-before <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> before <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>, batches by number. A method's output may order its
-cells otherwise: score it with <code>evaluate(dataset=, category=, method=)</code> and
-no <code>labels=</code>. The <code>embedding.h5</code> that <code>run</code> writes names its cells, and
-<code>evaluate</code> matches the label files to them.</p>
-<p>A missing label is not a cell type: <code>evaluate</code> raises when a label is
-missing, and so does a missing batch. Score the labelled cells, as
-<code>adata[adata.obs["celltype"].notna()]</code>.</p>
-<details class="note">
-<summary>Details</summary>
+<p>They follow the folder's cells as <code>mtb.io.read</code> reads them: <abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> before
+<abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> before <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr>, batches by number.</p>
 <p><code>labels</code> takes a CSV path with a header row (column <code>x</code>, or the only
 column), a list of CSV paths stacked in that order, a 1-D array or
 Series, or the name of an <code>.obs</code> column. <code>batch</code> takes the same forms.</p>
@@ -2348,107 +2348,107 @@ metric that cannot run on your machine is <code>NaN</code>, with a warning.</p>
 <p><a href="../plot/#add-your-own-method">Add your own method</a> concatenates it with the
 stored results.</p>
 <h3 id="what-each-metric-measures">What each metric measures<a class="headerlink" href="#what-each-metric-measures" title="Anchor link to this section">&para;</a></h3>
-<p>All metrics are scaled so that higher is better. Most lie between 0 and 1.
-ARI can be slightly below 0, which means a random clustering.</p>
+<p><a href="../../reference/catalog/#multibench._data.catalog.metrics"><code>mtb.catalog.metrics()</code></a>
+returns this table. The details below give the exact computation.</p>
+<!-- metric-table: generated by tools/gen_reference_tables.py from mtb.catalog.metrics(). Do not edit by hand. -->
 <table>
 <thead>
 <tr>
 <th>Metric</th>
 <th>Family</th>
-<th>What it measures</th>
+<th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>ARI</td>
 <td>clustering</td>
-<td>How well the Leiden clusters match the cell types</td>
+<td>Adjusted Rand Index: how well the Leiden clusters, one per cell type, match the cell-type labels. About 0 = random, 1 = identical, higher = better.</td>
 </tr>
 <tr>
 <td>NMI</td>
 <td>clustering</td>
-<td>How much the Leiden clusters tell about the cell types</td>
+<td>Normalized Mutual Information: how much the Leiden clusters, one per cell type, tell about the cell-type labels. 0-1, higher = better.</td>
 </tr>
 <tr>
 <td>ASW</td>
 <td>clustering</td>
-<td>How well the Leiden clusters separate from each other</td>
+<td>Average silhouette width: how well the Leiden clusters, one per cell type, separate from each other on the embedding. Rescaled to 0-1, higher = better.</td>
 </tr>
 <tr>
 <td>iASW</td>
 <td>clustering</td>
-<td>ASW averaged per Leiden cluster, each cluster counted as isolated</td>
+<td>Isolated-label silhouette: each cell's silhouette (distance to the nearest other Leiden cluster), averaged per cluster and then over the clusters. Every cluster is treated as an isolated label, where scib's default counts only labels found in few batches. 0-1, higher = better.</td>
 </tr>
 <tr>
 <td>iF1</td>
 <td>clustering</td>
-<td>How well one Leiden cluster captures each cell type</td>
+<td>Isolated-label F1: how well one Leiden cluster captures each cell type, the best F1 of one cluster (one cluster per cell type), averaged over the cell types. Every cell type is treated as an isolated label, where scib's default counts only types found in few batches. 0-1, higher = better.</td>
 </tr>
 <tr>
 <td>cLISI</td>
 <td>clustering</td>
-<td>How much each cell's neighbours share its cell type</td>
+<td>Cell-type LISI: how much each cell's neighbours share its cell type on the embedding, the median over cells, scaled to 0-1, higher = better.</td>
 </tr>
 <tr>
 <td>ASW_batch</td>
 <td>batch</td>
-<td>How well the batches mix within each cell type</td>
+<td>Batch silhouette: how well the batches mix within each cell type, 1 minus the absolute batch silhouette within each cell type, averaged over the cell types. 0-1, higher = better.</td>
 </tr>
 <tr>
 <td>ARI_batch</td>
 <td>batch</td>
-<td>How little the batch clusters match the batches</td>
+<td>Batch ARI: how little the Leiden clusters, one per batch, match the batches, 1 minus their absolute Adjusted Rand Index. 0-1, higher = better.</td>
 </tr>
 <tr>
 <td>NMI_batch</td>
 <td>batch</td>
-<td>How little the batch clusters tell about the batches</td>
+<td>Batch NMI: how little the Leiden clusters, one per batch, tell about the batches, 1 minus their Normalized Mutual Information. 0-1, higher = better.</td>
 </tr>
 <tr>
 <td>GC</td>
 <td>batch</td>
-<td>How much of each cell type stays in one connected group of neighbours</td>
+<td>Graph connectivity: how much of each cell type stays in one connected group of neighbours, the share of its cells in the largest connected part of its neighbour graph, averaged over the cell types. 0-1, higher = better.</td>
 </tr>
 <tr>
 <td>iLISI</td>
 <td>batch</td>
-<td>How many batches appear among each cell's neighbours</td>
+<td>Integration LISI: how many batches appear among each cell's neighbours on the embedding, the median over cells, scaled to 0-1, higher = better.</td>
 </tr>
 <tr>
 <td>kBET</td>
 <td>batch</td>
-<td>How often a neighbourhood holds the overall batch mix</td>
+<td>k-nearest-neighbour batch effect test: how often a neighbourhood holds the overall batch mix, 1 minus the rate at which the test rejects that mix, averaged over the cell types. 0-1, higher = better.</td>
 </tr>
 <tr>
 <td>OCA</td>
 <td>classification</td>
-<td>The fraction of query cells predicted correctly</td>
+<td>Overall classification accuracy: the fraction of query cells predicted correctly. 0-1, higher = better.</td>
 </tr>
 <tr>
 <td>ACA</td>
 <td>classification</td>
-<td>The fraction of each cell type predicted correctly, averaged over cell types</td>
+<td>Average classification accuracy: the fraction of each cell type predicted correctly, averaged over the cell types. 0-1, higher = better.</td>
 </tr>
 <tr>
 <td>Spec</td>
 <td>classification</td>
-<td>Specificity, averaged over cell types</td>
+<td>Specificity, averaged over the cell types. 0-1, higher = better.</td>
 </tr>
 <tr>
 <td>Sens</td>
 <td>classification</td>
-<td>Sensitivity, averaged over cell types</td>
+<td>Sensitivity, averaged over the cell types. 0-1, higher = better.</td>
 </tr>
 <tr>
 <td>F1</td>
 <td>classification</td>
-<td>F1-score, averaged over cell types</td>
+<td>F1-score, averaged over the cell types. 0-1, higher = better.</td>
 </tr>
 </tbody>
 </table>
-<p><a href="../../reference/catalog/#multibench._data.catalog.metrics"><code>mtb.catalog.metrics()</code></a>
-describes each metric in one line.
-The details below give the exact computation.</p>
+<!-- /metric-table -->
+
 <details class="note">
 <summary>Details</summary>
 <p>cLISI and iLISI need scib's compiled LISI helper. Where the binary
@@ -2458,22 +2458,20 @@ the build command.</p>
 <p>kBET needs R through <code>rpy2</code>. Otherwise kBET is <code>NaN</code>.</p>
 <p>Each metric is a scib function on the embedding. The package needs
 scib 1.1 or newer, and <code>attrs["scib_version"]</code> records the version.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>code       scib function         arguments
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>ARI, NMI   ari, nmi              clusters, one per cell type
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>ASW        silhouette            those clusters, rescaled to 0-1
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>iASW       isolated_labels_asw   those clusters, every label isolated
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>iF1        isolated_labels_f1    cell types, best F1 of one cluster
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>code       scib function         settings the table above does not give
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>ARI, NMI   ari, nmi
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>ASW        silhouette
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>iASW       isolated_labels_asw   iso_threshold = number of batches + 1
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>iF1        isolated_labels_f1    iso_threshold = number of batches + 1
 </span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>cLISI      clisi_graph           90 nearest cells by path on the
-</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>                                 15-neighbour graph, scaled to 0-1
-</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>ASW_batch  silhouette_batch      1 - |batch silhouette| per cell type
-</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>ARI_batch  ari                   1 - |ARI| of clusters, one per batch
-</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>NMI_batch  nmi                   1 - |NMI|, the same way
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>                                 15-neighbour graph
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>ASW_batch  silhouette_batch
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>ARI_batch  ari
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>NMI_batch  nmi
 </span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>GC         graph_connectivity    the 15-neighbour graph
 </span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>iLISI      ilisi_graph           as cLISI, for the batches
-</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>kBET       kBET                  only when a list names it
+</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>kBET       kBET
 </span></code></pre></div>
-<p>Every label counts as isolated (<code>iso_threshold</code> = number of batches + 1).
-scib's default counts only labels found in few batches.</p>
 <p>cLISI and iLISI take the median m of the per-cell scores and scale it:
 cLISI = (L - m)/(L - 1) and iLISI = (m - 1)/(B - 1), with L cell types
 and B batches.</p>

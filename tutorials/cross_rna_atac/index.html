@@ -2921,7 +2921,7 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="1-install">1. Install<a class="anchor-link" href="#1-install">¶</a></h2><p>The pins keep the numpy and pandas already installed, so Colab needs no restart.</p>
+<h2 id="1-install">1. Install<a class="anchor-link" href="#1-install">¶</a></h2><p>pip may then print a note about restarting the kernel: no restart is needed, because the pins keep the numpy and pandas already installed.</p>
 </div>
 </div>
 </div>
@@ -2946,11 +2946,11 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="o">,</span><span class="w"> </span><span class="nn">pandas</span>
 <span class="n">pins</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"numpy==</span><span class="si">{</span><span class="n">numpy</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2"> pandas==</span><span class="si">{</span><span class="n">pandas</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2">"</span>
-<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.6.0"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
+<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.6.1"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-1">import numpy, pandas
 pins = f"numpy=={numpy.__version__} pandas=={pandas.__version__}"
-%pip install -q "multibench-sc&gt;=0.6.0" {pins}</div>
+%pip install -q "multibench-sc&gt;=0.6.1" {pins}</div>
 </div>
 </div>
 </div>
@@ -3029,7 +3029,7 @@ envs = mtb.env.install(METHODS)</div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>downloading D56mini (10 MB) ...
 [env] downloading scmb_scmm2 481 MB ...
-[env]   481 MB of 481 MB (30 MB/s)
+[env]   481 MB of 481 MB (29 MB/s)
 [env] unpacking scmb_scmm2 ...
 </pre>
 </div>
@@ -3089,9 +3089,9 @@ res.summary</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[run] StabMap (cross/D56mini) ...
-[run]   -&gt; scored (14.0s) ARI 0.291
+[run]   -&gt; scored (13.8s) ARI 0.291
 [run] scMM (cross/D56mini) ...
-[run]   -&gt; scored (22.9s) ARI 0.218
+[run]   -&gt; scored (22.8s) ARI 0.218
 </pre>
 </div>
 </div>
@@ -3160,7 +3160,7 @@ res.summary</div>
 <td>0.9726</td>
 <td>0.3967</td>
 <td>0.3656</td>
-<td>14.0</td>
+<td>13.8</td>
 <td></td>
 <td></td>
 </tr>
@@ -3184,7 +3184,7 @@ res.summary</div>
 <td>0.9678</td>
 <td>0.3430</td>
 <td>0.3231</td>
-<td>22.9</td>
+<td>22.8</td>
 <td></td>
 <td></td>
 </tr>
@@ -3259,11 +3259,10 @@ res.summary</div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <h2 id="5-your-own-data">5. Your own data<a class="anchor-link" href="#5-your-own-data">¶</a></h2><p>Your data needs raw RNA counts in one <code>.h5ad</code> file and an ATAC peak matrix of the same cells in another, with a cell type and a batch for each cell. Give the same peaks in every batch.</p>
-<p>The methods of this task read three batches, and UINMF also reads two.</p>
+<p>The methods of this task read three batches.</p>
 <p>Recipes cover <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-10x-h5">a 10x <code>.h5</code> file</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-labels-csv">labels in a CSV file</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-no-labels">no labels</a> and <a href="https://dsichang.github.io/scMultiBench/tutorials/run/#recipe-donors">another number of donors</a>.</p>
 <details>
 <summary>Details: export</summary>
-<p>The names in quotes say where your file holds each part. <code>"X"</code> is the main matrix, <code>"obsm:atac"</code> the matrix <code>obsm["atac"]</code>, <code>"layer:counts"</code> the layer <code>layers["counts"]</code>, and <code>"obs:celltype"</code> the column <code>obs["celltype"]</code>. A wrong name after <code>obsm:</code>, <code>layer:</code> or <code>obs:</code> raises an error that lists the names the file has.</p>
 <p>The batches are numbered in the sorted order of their names, read as text: donors <code>A</code>, <code>B</code> and <code>C</code> become batches 1, 2 and 3, and <code>10</code> comes before <code>2</code>.</p>
 <p>For one AnnData per batch, call <code>export_dataset</code> once per batch with <code>batch_index=N</code> instead of <code>batch=</code>.</p>
 </details>
@@ -3551,7 +3550,7 @@ mine.summary</div>
 <pre>[run] StabMap (cross/MYCROSS_RNA_ATAC) ...
 [run]   -&gt; scored (11.6s) ARI 0.296
 [run] scMM (cross/MYCROSS_RNA_ATAC) ...
-[run]   -&gt; scored (16.5s) ARI 0.132
+[run]   -&gt; scored (16.4s) ARI 0.132
 </pre>
 </div>
 </div>
@@ -3644,7 +3643,7 @@ mine.summary</div>
 <td>0.9659</td>
 <td>0.2585</td>
 <td>0.2287</td>
-<td>16.5</td>
+<td>16.4</td>
 <td></td>
 <td></td>
 </tr>
@@ -3729,12 +3728,8 @@ mine.summary</div>
 <td><code>mtb.scan</code> names what the method needs from the data's size in its <code>caveat</code> column</td>
 </tr>
 <tr>
-<td>a method times out</td>
-<td>raise <code>timeout=</code> in <code>run</code></td>
-</tr>
-<tr>
 <td>batch metrics use the wrong batches</td>
-<td><code>res.rescore(batch=my_vector)</code> scores again without running the methods</td>
+<td><code>res.rescore(batch=...)</code>, with one batch per cell, scores again without running the methods</td>
 </tr>
 </tbody>
 </table>
@@ -3751,6 +3746,7 @@ mine.summary</div>
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <h2 id="next-steps">Next steps<a class="anchor-link" href="#next-steps">¶</a></h2><ul>
 <li><a href="https://dsichang.github.io/scMultiBench/tutorials/run/">Run a method</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/evaluate/">Score an embedding</a>, <a href="https://dsichang.github.io/scMultiBench/tutorials/plot/">Load and plot results</a> and <a href="https://dsichang.github.io/scMultiBench/tutorials/discover/">Discover methods</a>.</li>
+<li><a href="https://dsichang.github.io/scMultiBench/tutorials/evaluate/#look-at-an-embedding">Look at an embedding</a> draws a method's embedding as a UMAP.</li>
 <li>The <a href="https://shiny.maths.usyd.edu.au/scMultiBench/">interactive explorer</a> has the full benchmark's rankings, with no install needed.</li>
 </ul>
 </div>
