@@ -864,6 +864,37 @@ body.has-section-numbers .md-typeset .lp {
   transform: scale(1.35);
 }
 
+/* Live card (animations.js adds .is-live once GSAP has drawn it): a framed
+   stage. The --tf-* colours are read by the script when it draws, so the
+   light and dark themes each get their own palette. */
+.md-typeset .taskflow {
+  --tf-accent: var(--brand-600);
+  --tf-bubble: #a9c4e8;
+  --tf-cell:   #94a3b8;
+  --tf-c1: #2563eb; --tf-c2: #0d9488; --tf-c3: #d97706;
+}
+[data-md-color-scheme="slate"] .md-typeset .taskflow {
+  --tf-accent: #6ea8fe;
+  --tf-bubble: #34507a;
+  --tf-cell:   #64748b;
+  --tf-c1: #60a5fa; --tf-c2: #2dd4bf; --tf-c3: #fbbf24;
+}
+.md-typeset .taskflow.is-live .tf-stage {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-md);
+  padding: 14px 14px 10px;
+}
+@media screen and (max-width: 480px) {
+  .md-typeset .taskflow.is-live .tf-stage { padding: 8px 6px 4px; border-radius: 10px; }
+}
+.md-typeset .taskflow .tf-stage svg text.tf-code {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+.md-typeset .taskflow .tf-stage svg text.tf-tnum { font-variant-numeric: tabular-nums; }
+
+
 /* ━━━━━━━━ Animated signal-flow diagram (looping) ━━━━━━━━ */
 @media (prefers-reduced-motion: no-preference) {
 
