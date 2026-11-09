@@ -2129,7 +2129,7 @@
 
 
 <h1 id="discover-methods">Discover methods<a class="headerlink" href="#discover-methods" title="Anchor link to this section">&para;</a></h1>
-<p>These calls show which of the 36 methods fit your data and your task. They
+<p>These calls show which methods fit your data and your task. They
 need no environments, <abbr title="Graphics Processing Unit">GPU</abbr> or data.</p>
 <hr />
 <h2 id="the-four-integration-categories">The four integration categories<a class="headerlink" href="#the-four-integration-categories" title="Anchor link to this section">&para;</a></h2>
@@ -2173,12 +2173,12 @@ to <code>run</code> or <code>evaluate</code>.</p>
 <hr />
 <h2 id="filter-by-what-your-data-has">Filter by what your data has<a class="headerlink" href="#filter-by-what-your-data-has" title="Anchor link to this section">&para;</a></h2>
 <p><a href="../../reference/discover/#multibench.discover.find_methods"><code>find_methods</code></a>
-lists the methods, all 36 without a filter. Its filters are what your data
+lists the methods, all of them without a filter. Its filters are what your data
 has: the category, the modalities you measured, how your <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> is encoded,
 and whether you have cell-type labels.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">()</span>                       <span class="c1"># all 36 methods</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">()</span>                       <span class="c1"># all methods</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">mtb</span><span class="o">.</span><span class="n">find_methods</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">)</span>    <span class="c1"># paired-design methods only</span>
 </span></code></pre></div>
 <p>Each method reads <abbr title="Assay for Transposase-Accessible Chromatin (sequencing)">ATAC</abbr> either as peaks or as gene activity. Give each
