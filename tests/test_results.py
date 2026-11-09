@@ -57,10 +57,12 @@ def test_metrics_filters_by_family(result_dir):
     k = results.load_results("diagonal", dataset="D28", metrics="classification")
     assert set(k.metric) <= fam["classification"] and len(k)
     assert len(b) + len(c) + len(k) == len(full)     # the families partition the frame
-    with pytest.raises(ValueError, match=r"Unknown metrics= token bogus\. Pass 'all', "
-                                         r"'clustering', 'batch' or 'classification'"):
+    # an unknown name gets the table's names, as an absent metric does
+    with pytest.raises(ValueError, match=r"^The stored results of diagonal, D28 have no bogus\. "
+                                         r"Pick metrics= from ACA, ARI, ARI_batch, "):
         results.load_results("diagonal", dataset="D28", metrics="bogus")
-    with pytest.raises(ValueError, match=r"Unknown metrics= token dimension_reduction\."):
+    with pytest.raises(ValueError, match=r"^The stored results of diagonal have no "
+                                         r"dimension_reduction\. Pick metrics= from "):
         results.load_results("diagonal", metrics="dimension_reduction")
     # everything after category is keyword-only: the positional slip is a TypeError
     with pytest.raises(TypeError):
