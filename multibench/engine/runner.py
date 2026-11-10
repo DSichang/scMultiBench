@@ -453,11 +453,14 @@ def _execute(method: str, cmd: list[str], cwd: str, run_env: dict | None,
     # a Jupyter kernel's MPLBACKEND (matplotlib_inline) does not exist in the env
     if "MPLBACKEND" not in (run_env or {}):
         env["MPLBACKEND"] = "Agg"
+    # on Windows a method's output need not be in the system code page (R writes
+    # UTF-8): a byte that does not decode must not lose the output or the error
+    decoding = {"errors": "replace"} if envs.on_windows() else {}
     # the method may be a grandchild (under conda run): its own session lets
     # one killpg end the whole tree
     popen = subprocess.Popen(cmd, cwd=cwd, stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE, text=True, env=env,
-                             start_new_session=True)
+                             start_new_session=True, **decoding)
     try:
         stdout, stderr = popen.communicate()
     except BaseException:            # TimeoutError from the deadline included

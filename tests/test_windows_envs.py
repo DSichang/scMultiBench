@@ -238,6 +238,16 @@ def test_execute_passes_the_activation_and_reports_a_failure(windows, tmp_path):
         runner._execute("M", [sys.executable, "-c", "import sys; sys.exit(3)"], str(tmp_path), None)
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="starts a Windows process")
+def test_output_outside_the_code_page_keeps_the_methods_error(windows, tmp_path):
+    # 0x81 is undefined in cp1252 and a lone lead byte in cp936 and UTF-8
+    code = ("import sys; sys.stdout.buffer.write(bytes([0x62, 0x81])); "
+            "sys.stderr.write('no package called x'); sys.exit(3)")
+    with pytest.raises(RuntimeError, match=r"M failed \(exit 3\)") as e:
+        runner._execute("M", [sys.executable, "-c", code], str(tmp_path), None)
+    assert "no package called x" in str(e.value)
+
+
 @pytest.mark.skipif(sys.platform != "win32", reason="ends a Windows process tree")
 def test_an_interrupted_run_ends_the_method_and_its_children(windows, tmp_path, monkeypatch):
     import subprocess
