@@ -210,7 +210,7 @@ _RUNTIMES_YAML = Path(__file__).resolve().parent / "engine" / "runtimes.yaml"
 def _runtimes() -> dict:
     """Observed per-method runtimes (engine/runtimes.yaml)."""
     import yaml
-    with open(_RUNTIMES_YAML) as fh:
+    with open(_RUNTIMES_YAML, encoding="utf-8") as fh:
         return yaml.safe_load(fh) or {}
 
 

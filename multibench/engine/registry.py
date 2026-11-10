@@ -33,7 +33,7 @@ _BASE_MODALITIES = ("rna", "adt", "atac")
 @functools.lru_cache(maxsize=1)
 def _tunable_map() -> dict:
     """{method_id: {"category:mods": {param: {default,type}}}} from params.yaml."""
-    return yaml.safe_load(_PARAMS_YAML.read_text()) or {}
+    return yaml.safe_load(_PARAMS_YAML.read_text(encoding="utf-8")) or {}
 
 
 def _variant_key(when: dict) -> str:
@@ -92,14 +92,14 @@ def _parse_method(d: dict) -> MethodSpec:
 @functools.lru_cache(maxsize=1)
 def _references() -> dict:
     """Parsed engine/references.yaml."""
-    return yaml.safe_load(_REFERENCES.read_text()) or {}
+    return yaml.safe_load(_REFERENCES.read_text(encoding="utf-8")) or {}
 
 
 @functools.lru_cache(maxsize=1)
 def load() -> list[MethodSpec]:
     """Every method of ``methods.yaml``, in file order, with its references;
     parsed once."""
-    data = yaml.safe_load(_YAML.read_text())
+    data = yaml.safe_load(_YAML.read_text(encoding="utf-8"))
     specs = [_parse_method(m) for m in data["methods"]]
     refs = _references()
     for s in specs:

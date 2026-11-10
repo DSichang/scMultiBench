@@ -19,7 +19,7 @@ _DATA = Path(__file__).parent / "upstream_knobs.yaml"
 
 @functools.lru_cache(maxsize=1)
 def _table() -> dict:
-    return yaml.safe_load(_DATA.read_text()) or {}
+    return yaml.safe_load(_DATA.read_text(encoding="utf-8")) or {}
 
 
 def knobs_for(method: str) -> dict:

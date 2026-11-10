@@ -66,7 +66,7 @@ def packed_sizes() -> dict:
         ``None`` means "not measured yet". An unpacked size below the archive
         size cannot be right and reads ``None``.
     """
-    data = _json.loads(_SIZES_JSON.read_text())
+    data = _json.loads(_SIZES_JSON.read_text(encoding="utf-8"))
     out = {}
     for k, v in data.items():
         if k.startswith("_"):                       # metadata
@@ -215,7 +215,7 @@ def own_env_name(method: str) -> str:
 def _env_groups() -> dict:
     """``env_groups.yaml``: ``groups`` (shared envs and their members) and
     ``method_env`` (``{method: env}`` overrides, which win over membership)."""
-    return yaml.safe_load(_GROUPS_YAML.read_text()) or {}
+    return yaml.safe_load(_GROUPS_YAML.read_text(encoding="utf-8")) or {}
 
 
 def group_for(method: str) -> str:
@@ -540,7 +540,7 @@ def packed_layers() -> dict:
     A layer holds files several env archives share (torch and CUDA
     libraries); it is downloaded once and hard-linked into each env.
     """
-    return _json.loads(_LAYERS_JSON.read_text())
+    return _json.loads(_LAYERS_JSON.read_text(encoding="utf-8"))
 
 
 def layers_for(keys, *, layers: dict | None = None, envs_dir=None,
@@ -948,7 +948,7 @@ _PACKED_MANIFEST = Path(__file__).resolve().parent / "packed_urls.json"
 def packed_manifest() -> dict:
     """``{archive key: URL or list of part URLs}`` of the published archives
     (``engine/packed_urls.json``)."""
-    return _json.loads(_PACKED_MANIFEST.read_text())
+    return _json.loads(_PACKED_MANIFEST.read_text(encoding="utf-8"))
 
 
 #: The columns of :func:`install`'s table; the rows hold more, for the package.

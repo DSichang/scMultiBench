@@ -29,7 +29,7 @@ ISSUES_URL = "https://github.com/DSichang/scMultiBench/issues"
 @functools.lru_cache(maxsize=1)
 def scripts_archive() -> dict:
     """``{"url", "sha256", "bytes"}`` of the archive of the package's method scripts."""
-    return json.loads(_ARCHIVE.read_text())
+    return json.loads(_ARCHIVE.read_text(encoding="utf-8"))
 
 
 def archive_id() -> str:
