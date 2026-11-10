@@ -1051,6 +1051,13 @@ def _print_reasons(reasons, per_batch: str) -> None:
     # a file's problem is the same for every method that reads it: said once
     for problem in dict.fromkeys(p for _, _, p in reasons if p):
         print(f"[scan] {problem}", flush=True)
+    if envs.on_windows():
+        # most methods have no Windows environment: one line for them, not one each
+        lacking = sorted(m for m, reason, _ in reasons
+                         if reason == envs.no_windows_env_text([m]))
+        if len(lacking) > 1:
+            print(f"[scan] {envs.no_windows_env_text(lacking)}", flush=True)
+            reasons = [r for r in reasons if r[0] not in lacking]
     for method, reason, problem in sorted(reasons):
         if per_batch:
             reason = reason.replace(per_batch, "").strip()
@@ -1073,6 +1080,11 @@ def _deadline(seconds):
         # signal.signal raises off the main thread
         _text.warn("timeout= is unavailable off the main thread; "
                    "running without a deadline")
+        yield
+        return
+    if not hasattr(signal, "SIGALRM"):
+        # Windows has no alarm signal
+        _text.warn("timeout= is unavailable on Windows; running without a deadline")
         yield
         return
 

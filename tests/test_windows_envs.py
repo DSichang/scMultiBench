@@ -205,6 +205,26 @@ def test_scan_blocks_a_method_its_env_was_not_built_for(windows):
     assert env_check("Matilda") == (False, envs.no_windows_env_text(["Matilda"]))
 
 
+def test_scan_says_once_that_methods_have_no_windows_environment(windows, capsys):
+    reasons = [(m, envs.no_windows_env_text([m]), "") for m in ("B", "A", "D", "C")]
+    reasons.append(("E", "E needs adt.h5.", ""))
+    workflow._print_reasons(reasons, "")
+    assert capsys.readouterr().out.splitlines() == [
+        "[scan] 4 of these methods have no Windows environment. Run them on a Linux machine, "
+        "such as Colab.",
+        "[scan] E: E needs adt.h5."]
+    workflow._print_reasons(reasons[:1], "")                # one method: its own line
+    assert capsys.readouterr().out.splitlines() == [f"[scan] B: {envs.no_windows_env_text(['B'])}"]
+
+
+def test_a_timeout_warns_where_there_is_no_alarm_signal(monkeypatch):
+    import signal
+    monkeypatch.delattr(signal, "SIGALRM", raising=False)
+    with pytest.warns(UserWarning, match="timeout= is unavailable on Windows"):
+        with workflow._deadline(5):
+            pass
+
+
 # ----------------------------------------------------------------- the subprocess (Windows hosts)
 @pytest.mark.skipif(sys.platform != "win32", reason="starts a Windows process")
 def test_execute_passes_the_activation_and_reports_a_failure(windows, tmp_path):
