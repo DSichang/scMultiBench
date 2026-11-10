@@ -40,9 +40,78 @@ def host_system() -> str | None:
 
 def linux_only_text() -> str | None:
     """``"Methods run only on Linux, and this computer runs macOS."``, or
-    ``None`` on Linux."""
+    ``None`` on Linux. Also ``None`` on Windows, where a method runs when an
+    environment for it was built on the computer (:func:`serves`)."""
     system = host_system()
+    if system == "Windows":
+        return None
     return system and f"Methods run only on Linux, and this computer runs {system}."
+
+
+# --- Windows ----------------------------------------------------------------
+# No archive is published for Windows: an env there is built on the computer,
+# as a conda prefix (``python.exe`` at its root) or an R installation
+# (``bin/Rscript.exe``), and marked with FLAVOR_FILE like every env.
+#: A file in an env built for some of its methods only: their ids, one per
+#: line. An env without it runs every method of its group.
+METHODS_FILE = ".multibench_methods"
+
+#: Where a Windows env keeps the interpreter a command names, under its prefix.
+_WINDOWS_INTERPRETERS = {
+    "python": ("python.exe",),
+    "Rscript": ("bin/Rscript.exe", "Scripts/Rscript.exe", "Lib/R/bin/Rscript.exe"),
+}
+
+
+#: The ``state`` of an install row on Windows whose env was not built there.
+NO_WINDOWS_ENV = "no Windows environment"
+
+
+def on_windows() -> bool:
+    """Whether this computer runs Windows (:func:`host_system`)."""
+    return host_system() == "Windows"
+
+
+def windows_interpreter(prefix: Path | str, name: str) -> Path | None:
+    """The path of interpreter ``name`` (``python`` or ``Rscript``) in the
+    Windows env at ``prefix``, or ``None``."""
+    for rel in _WINDOWS_INTERPRETERS.get(name, ()):
+        exe = Path(prefix) / rel
+        if exe.is_file():
+            return exe
+    return None
+
+
+def _holds_env(prefix: Path) -> bool:
+    """Whether the folder ``prefix`` is an env of this system: it has ``bin/``;
+    on Windows, an interpreter of :data:`_WINDOWS_INTERPRETERS`."""
+    if on_windows():
+        return any(windows_interpreter(prefix, name) for name in _WINDOWS_INTERPRETERS)
+    return (prefix / "bin").is_dir()
+
+
+def serves(env: str, method: str, conda: str | None = None) -> bool:
+    """Whether the installed ``env`` runs ``method``: ``False`` when
+    :func:`env_prefix` does not find it, or when its :data:`METHODS_FILE`
+    does not list the method."""
+    prefix = env_prefix(env, conda)
+    if prefix is None:
+        return False
+    try:
+        listed = (prefix / METHODS_FILE).read_text(encoding="utf-8").split()
+    except OSError:
+        return True
+    return method in listed
+
+
+def no_windows_env_text(methods) -> str:
+    """``"Matilda has no Windows environment. Run it on a Linux machine, such
+    as Colab."``; more than three methods are counted, not named."""
+    methods = list(methods)
+    one = len(methods) == 1
+    who = _text._and_list(methods) if len(methods) <= 3 else f"{len(methods)} of these methods"
+    return (f"{who} {'has' if one else 'have'} no Windows environment. "
+            f"Run {'it' if one else 'them'} on a Linux machine, such as Colab.")
 
 
 #: The first sentence of the install error without conda (the docs quote it).
@@ -295,10 +364,11 @@ def _conda_prefixes(conda: str) -> tuple:
 
 
 def _prefixes_on_disk(envs_dir: Path) -> dict[str, Path]:
-    """``{env: prefix}`` for every ``<envs_dir>/<env>`` that carries ``bin/``."""
+    """``{env: prefix}`` for every ``<envs_dir>/<env>`` that carries ``bin/``
+    (on Windows: an interpreter, :func:`_holds_env`)."""
     try:
         return {p.name: p for p in sorted(envs_dir.iterdir())
-                if (p / "bin").is_dir()}
+                if _holds_env(p)}
     except OSError:
         return {}
 
@@ -397,7 +467,7 @@ def _same_named(env: str, conda: str | None = None):
     seen = []
     for root in _search_roots():
         candidate = root / env
-        if (candidate / "bin").is_dir():
+        if _holds_env(candidate):
             seen.append(candidate)
             yield candidate
     conda_exe = conda or _find_conda()
@@ -935,6 +1005,8 @@ def create_all(category: str | None = None, methods: list[str] | None = None,
     out = []
     for env, ms in _envs_needed(category, methods):
         exists = env in have
+        if exists and on_windows():         # an env built for some of its methods
+            exists = all(serves(env, m, conda) for m in ms)
         cmds = [] if exists else create_env(env, conda=conda)
         if cmds and not dry_run:
             _build(env, cmds, conda)
@@ -1027,7 +1099,7 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
 def to_download(rows) -> list[dict]:
     """The rows of an install plan whose archive would be downloaded."""
     return [r for r in rows if not r["exists"] and r.get("packed_url")
-            and r["state"] != "name taken"]
+            and r["state"] not in ("name taken", NO_WINDOWS_ENV)]
 
 
 def _install_rows(methods: list[str] | None = None, *, category: str | None = None,
@@ -1073,6 +1145,13 @@ def _install_missing(category, methods, *, packed, manifest, sizes, conda,
     linux_only = linux_only_text()
     if linux_only:
         raise OSError(f"{linux_only} Run the install on a Linux machine, such as Colab.")
+    if on_windows():
+        # nothing to download or build: the envs built on this computer are used
+        lacking = [m for env, ms in _envs_needed(category, methods) for m in ms
+                   if not serves(env, m, conda)]
+        if lacking:
+            raise OSError(no_windows_env_text(lacking))
+        return set()
     have = set(installed_envs(conda))
     missing = [env for env, _ in _envs_needed(category, methods) if env not in have]
     for env in missing:
@@ -1094,6 +1173,8 @@ def _row_state(r: dict, *, unpacked, dry_run, packed, conda) -> str:
         return "PACKED"
     if r["exists"]:
         return "have"
+    if on_windows():
+        return NO_WINDOWS_ENV
     if dry_run and other_env_prefix(env, conda) is not None:
         return "name taken"
     if not dry_run:

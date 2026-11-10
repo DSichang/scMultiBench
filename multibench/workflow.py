@@ -225,6 +225,8 @@ def _env_hint(env: str, method: str, other=None) -> str:
     prefix of a same-named env multibench did not install."""
     if envs.linux_only_text():
         return f"Environment {env} runs only on Linux, not on this computer."
+    if envs.on_windows():
+        return envs.no_windows_env_text([method])
     if other is not None:
         return envs.other_env_text(env, other, f"run mtb.env.install([{method!r}]).")
     return f"Environment {env} is not installed. Run mtb.env.install([{method!r}])."
@@ -788,7 +790,10 @@ def _check_env(rec, spec, ctx) -> tuple[str, str]:
     """Check 2, the environment and the GPU: fills ``env_ok`` of ``rec`` (and the
     GPU-node caveat); ``(env hint, GPU hint)``."""
     env_hint = gpu_hint = ""
-    if rec["env"] and (ctx.off_linux or rec["env"] not in ctx.installed):
+    # on Windows an installed env may be built for some of its methods only
+    unserved = (envs.on_windows() and rec["env"] in ctx.installed
+                and not envs.serves(rec["env"], spec.id))
+    if rec["env"] and (ctx.off_linux or rec["env"] not in ctx.installed or unserved):
         rec["env_ok"] = False
         if not ctx.off_linux and rec["env"] not in ctx.others:
             ctx.others[rec["env"]] = _other_env(rec["env"])

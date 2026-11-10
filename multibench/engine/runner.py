@@ -62,6 +62,25 @@ def wrap_prefix(cmd: list[str], env: str, prefix: Path | str) -> list[str]:
     return ["bash", "-c", f"{prefix_activation(env, prefix)}; exec \"$@\"", "--", *cmd]
 
 
+def windows_prefix_argv(cmd: list[str], prefix: Path | str) -> list[str]:
+    """The prefix-mode argv on Windows: ``cmd`` with its interpreter
+    (``python``, ``Rscript``) replaced by the one in the env at ``prefix``.
+    There is no shell wrapper: :func:`windows_activation` is the activation."""
+    exe = envs.windows_interpreter(prefix, cmd[0])
+    return [str(exe), *cmd[1:]] if exe is not None else list(cmd)
+
+
+def windows_activation(env: str, prefix: Path | str) -> dict:
+    """The variables that activate the Windows env at ``prefix``, as ``conda
+    activate`` sets them: ``CONDA_PREFIX``, ``CONDA_DEFAULT_ENV`` and the env's
+    folders first on ``PATH``. ``activate.d`` scripts are not run."""
+    root = Path(prefix)
+    folders = [root, root / "Library" / "mingw-w64" / "bin", root / "Library" / "usr" / "bin",
+               root / "Library" / "bin", root / "Scripts", root / "bin"]
+    return {"CONDA_PREFIX": str(root), "CONDA_DEFAULT_ENV": env,
+            "PATH": os.pathsep.join([*map(str, folders), os.environ.get("PATH", "")])}
+
+
 #: The ``out_dir`` of scan's ``command`` column.
 OUT_DIR_PLACEHOLDER = "<out_dir>"
 
@@ -246,6 +265,8 @@ def _argv(variant, method: str, values: dict, out_str: str, repo: Path,
     if variant.pty:
         cmd = ["script", "-q", "-e", "-c",
                " ".join(shlex.quote(c) for c in cmd), "/dev/null"]
+    if mode == "prefix" and envs.on_windows():
+        return windows_prefix_argv(cmd, prefix)
     if mode == "prefix":
         return wrap_prefix(cmd, env_name, prefix)
     # CONDA_EXE: bare `conda` may not be on the subprocess's PATH
@@ -380,7 +401,13 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
         values[role] = step["value"]
     cmd = _argv(variant, method, values, out_str, repo, params)
     cwd = (repo / variant.entrypoint).parent if variant.cwd_at_script else out
-    _execute(method, cmd, str(cwd), variant.run_env)
+    if envs.on_windows():
+        # no shell wrapper on Windows: the activation is the subprocess's environment
+        prefix = run_mode(env_name)[1]
+        _execute(method, cmd, str(cwd), variant.run_env,
+                 activation=prefix and windows_activation(env_name, prefix))
+    else:
+        _execute(method, cmd, str(cwd), variant.run_env)
     missing = [o.file for o in variant.extra_outputs if not (out / o.file).is_file()]
     if missing:
         raise RuntimeError(f"{method} did not write {_text._and_list(missing)} in {out}.")
@@ -394,6 +421,11 @@ def _check_env(method: str, env_name: str) -> None:
     if linux_only:
         raise OSError(
             f"{linux_only} Run this call on a Linux machine, such as Colab.")
+    if envs.on_windows():
+        # no env can be installed on Windows: one built there for the method, or none
+        if envs.serves(env_name, method):
+            return
+        raise EnvironmentError(envs.no_windows_env_text([method]))
     if envs.env_prefix(env_name) is not None:
         return
     # conda's env list is cached per process: probe once more
@@ -409,13 +441,15 @@ def _check_env(method: str, env_name: str) -> None:
                            f"mtb.env.install([{method!r}]).")
 
 
-def _execute(method: str, cmd: list[str], cwd: str, run_env: dict | None) -> None:
+def _execute(method: str, cmd: list[str], cwd: str, run_env: dict | None,
+             activation: dict | None = None) -> None:
     """Run the method's ``cmd`` in ``cwd``; a non-zero exit raises
-    ``RuntimeError`` with the tails of stdout and stderr."""
+    ``RuntimeError`` with the tails of stdout and stderr. ``activation``:
+    the variables of :func:`windows_activation`, on Windows."""
     # user site-packages (~/.local) can shadow the env's packages, and so can
     # the user's personal R library: our env holds every package it needs
-    env = {**envs.without_user_r_library(os.environ), "PYTHONNOUSERSITE": "1",
-           **_host_run_env(run_env)}
+    env = {**envs.without_user_r_library(os.environ), **(activation or {}),
+           "PYTHONNOUSERSITE": "1", **_host_run_env(run_env)}
     # a Jupyter kernel's MPLBACKEND (matplotlib_inline) does not exist in the env
     if "MPLBACKEND" not in (run_env or {}):
         env["MPLBACKEND"] = "Agg"
@@ -427,10 +461,13 @@ def _execute(method: str, cmd: list[str], cwd: str, run_env: dict | None) -> Non
     try:
         stdout, stderr = popen.communicate()
     except BaseException:            # TimeoutError from the deadline included
-        try:
-            os.killpg(popen.pid, signal.SIGKILL)
-        except OSError:
-            popen.kill()
+        if envs.on_windows():
+            _kill_tree_windows(popen)
+        else:
+            try:
+                os.killpg(popen.pid, signal.SIGKILL)
+            except OSError:
+                popen.kill()
         popen.wait()
         raise
     if popen.returncode != 0:
@@ -440,6 +477,18 @@ def _execute(method: str, cmd: list[str], cwd: str, run_env: dict | None) -> Non
             f"stdout tail:\n{stdout[-1500:]}\n"
             f"stderr tail:\n{stderr[-2500:]}"
         )
+
+
+def _kill_tree_windows(popen) -> None:
+    """End the method's process and its children on Windows, which has no
+    process groups to signal: ``taskkill /T``, else the process alone."""
+    try:
+        done = subprocess.run(["taskkill", "/F", "/T", "/PID", str(popen.pid)],
+                              capture_output=True)
+    except OSError:
+        done = None
+    if done is None or done.returncode != 0:
+        popen.kill()
 
 
 def preview(method: str, category: str, *, inputs: dict, out_dir, params=None,
