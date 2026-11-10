@@ -173,7 +173,9 @@ def test_raw_counts_warning_of_a_mudata_selector(tmp_path):
 
 
 # ======================================================================= R7-10
-@pytest.mark.parametrize("name", ["macOS", "Windows", "freebsd14"])
+# Windows is not in the list: a method runs there when its environment was built on
+# the computer (tests/test_windows_envs.py)
+@pytest.mark.parametrize("name", ["macOS", "freebsd14"])
 def test_linux_only_sentences_name_the_system(monkeypatch, name):
     monkeypatch.setattr(envs, "host_system", lambda: name)
     assert envs.linux_only_text() == f"Methods run only on Linux, and this computer runs {name}."
