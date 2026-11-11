@@ -205,6 +205,24 @@ def test_scan_blocks_a_method_its_env_was_not_built_for(windows):
     assert env_check("Matilda") == (False, envs.no_windows_env_text(["Matilda"]))
 
 
+def test_an_input_link_is_a_hard_link_or_a_copy_on_windows(windows, tmp_path, monkeypatch):
+    src = tmp_path / "rna.h5"
+    src.write_bytes(b"data")
+    dest = tmp_path / "inputs" / "rna.h5"
+    dest.parent.mkdir()
+    monkeypatch.setattr(os, "symlink", lambda *a, **k: pytest.fail("a symbolic link was made on Windows"))
+    runner._link_input(src, dest)
+    assert dest.read_bytes() == b"data" and not dest.is_symlink()
+    runner._link_input(src, dest)                           # a second run replaces it
+    assert dest.read_bytes() == b"data"
+
+    def no_link(*a, **k):
+        raise OSError("another drive")
+    monkeypatch.setattr(os, "link", no_link)
+    runner._link_input(src, dest)                           # no hard link possible: a copy
+    assert dest.read_bytes() == b"data" and src.exists()
+
+
 def test_scan_says_once_that_methods_have_no_windows_environment(windows, capsys):
     reasons = [(m, envs.no_windows_env_text([m]), "") for m in ("B", "A", "D", "C")]
     reasons.append(("E", "E needs adt.h5.", ""))

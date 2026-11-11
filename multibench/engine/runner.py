@@ -217,9 +217,25 @@ def _plan_inputs(variant, inputs: dict, inputs_dir: Path) -> dict:
 def _link_input(src, dest) -> None:
     """Make ``dest`` a link to ``src`` (absolute), replacing a link an earlier
     run left there."""
+    if envs.on_windows():
+        _link_input_windows(src, dest)
+        return
     if os.path.islink(dest):
         os.unlink(dest)
     os.symlink(os.path.abspath(src), dest)
+
+
+def _link_input_windows(src, dest) -> None:
+    """:func:`_link_input` on Windows, where a symbolic link needs a privilege
+    an ordinary user does not have: a hard link, else (another drive) a copy."""
+    import shutil
+
+    if os.path.lexists(dest):
+        os.unlink(dest)
+    try:
+        os.link(os.path.abspath(src), dest)
+    except OSError:
+        shutil.copyfile(src, dest)
 
 
 def _host_run_env(run_env: dict | None) -> dict:
