@@ -72,6 +72,51 @@ def on_windows() -> bool:
     return host_system() == "Windows"
 
 
+#: The archives published for Windows (written by ``tools/pack_windows.py``).
+_WINDOWS_JSON = Path(__file__).resolve().parent / "packed_windows.json"
+
+#: Windows refuses a longer path of a file (a folder of an env is shorter).
+_WINDOWS_MAX_PATH = 259
+
+
+def windows_archives() -> dict:
+    """``engine/packed_windows.json``: ``{"base": the release's URL, "archives":
+    {key: {"files", "sha256", "archive_bytes", "unpacked_bytes", "longest_path",
+    "methods"}}}``, the key as in :func:`archive_key`; no archive when the file
+    is not there."""
+    try:
+        return _json.loads(_WINDOWS_JSON.read_text(encoding="utf-8"))
+    except OSError:
+        return {"base": "", "archives": {}}
+
+
+def _host_manifest() -> dict:
+    """:func:`packed_manifest` for this system: on Windows the archives of
+    :func:`windows_archives`, as ``{key: [the URL of each file]}``."""
+    if on_windows():
+        data = windows_archives()
+        return {key: [f"{data['base']}/{f}" for f in a["files"]]
+                for key, a in data["archives"].items()}
+    return packed_manifest()
+
+
+def _host_sizes() -> dict:
+    """:func:`packed_sizes` for this system."""
+    if on_windows():
+        return {key: {"archive_bytes": a.get("archive_bytes"),
+                      "unpacked_bytes": a.get("unpacked_bytes")}
+                for key, a in windows_archives()["archives"].items()}
+    return packed_sizes()
+
+
+def windows_archive_runs(method: str, flavor: str = "auto") -> bool:
+    """Whether the Windows archive this host would get for ``method``'s env
+    (:func:`archive_for`) was built for the method."""
+    key, _ = archive_for(group_for(method), flavor, manifest=_host_manifest(),
+                         sizes=_host_sizes())
+    return method in windows_archives()["archives"].get(key, {}).get("methods", ())
+
+
 def windows_interpreter(prefix: Path | str, name: str) -> Path | None:
     """The path of interpreter ``name`` (``python`` or ``Rscript``) in the
     Windows env at ``prefix``, or ``None``."""
@@ -264,7 +309,7 @@ def installed_flavor(env: str, conda: str | None = None) -> str | None:
         return None
     word = words[0] if words and words[0] in ("cpu", "gpu", "single") else None
     if word in ("gpu", "single"):
-        return "single" if _single_build(env) else "gpu"
+        return "single" if _single_build(env, manifest=_host_manifest()) else "gpu"
     return word
 
 
@@ -761,13 +806,18 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
             return True
         raise RuntimeError(other_env_text(env, dest, "install again."))
     key, urls, build, total = _pick_archive(env, flavor)
+    if on_windows():
+        _windows_path_fits(dest, key)
     envs_root.mkdir(parents=True, exist_ok=True)
     tgz = _own_name(envs_root / f".{key}.tar.gz.download")
     try:
         download_archive(urls, tgz, label=env if build == "single" else f"{env} ({build} build)",
                          total=total)
-    except urllib.error.HTTPError:
+    except urllib.error.HTTPError as e:
         tgz.unlink(missing_ok=True)
+        if on_windows():                # nothing is built on Windows: say what was not there
+            raise OSError(f"The environment {env} could not be downloaded: "
+                          f"{e.url} answered {e.code}.") from e
         return False
     except BaseException:
         tgz.unlink(missing_ok=True)
@@ -776,9 +826,14 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
     part = _own_name(dest.with_name(dest.name + ".partial"))
     moved = False
     try:
+        if on_windows():
+            _check_windows_archive(key, tgz)
         _unpack_archive(tgz, part, envs_root)
         # conda-unpack writes the final path into the env: move first
-        part.rename(dest)
+        if on_windows():
+            _rename_windows(part, dest)
+        else:
+            part.rename(dest)
         moved = True
         _conda_unpack(dest)
         # last, so a prefix that failed to unpack claims no flavour
@@ -794,6 +849,9 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
         if not moved and dest.exists() and _finished_by_another(dest, env):
             _remember_root(envs_root)
             return True
+        if on_windows():                # no lockfile build to fall back to
+            raise RuntimeError(f"The environment {env} could not be unpacked "
+                               f"({type(e).__name__}: {str(e)[:300]})") from e
         print(f"[env] prebuilt {env} failed ({type(e).__name__}: "
               f"{str(e)[:120]}); falling back to the lockfile build",
               flush=True)
@@ -825,7 +883,7 @@ def _pick_archive(env: str, flavor: str) -> tuple[str, list[str], str, int | Non
     ``flavor``: ``build`` is ``'single'`` (one archive for CPU and GPU hosts),
     ``'cpu'`` or ``'gpu'``; ``total`` is its size in bytes, ``None`` when not
     recorded. Warns when a CPU host gets the GPU build."""
-    manifest, sizes = packed_manifest(), packed_sizes()
+    manifest, sizes = _host_manifest(), _host_sizes()
     key, installed = archive_for(env, flavor, manifest=manifest, sizes=sizes)
     single = _single_build(env, manifest=manifest)
     if resolve_flavor(flavor) == "cpu" and installed == "gpu" and not single:
@@ -845,13 +903,52 @@ def _unpack_archive(tgz: Path, part: Path, envs_root: Path) -> None:
     part.mkdir(parents=True)
     with tarfile.open(tgz) as t:
         safe_extract(t, part)
-    if not (part / "bin").is_dir():
+    if not _holds_env(part):
         raise RuntimeError("archive did not contain bin/")
     # the files this env shares with others: one download, hard links
     marker = part / LAYER_MARKER
     if marker.is_file():
         for name, info in _json.loads(marker.read_text())["layers"].items():
             _link_layer(_ensure_layer(name, info, envs_root), part, info)
+
+
+def _windows_path_fits(dest: Path, key: str) -> None:
+    """``OSError`` when the longest file of the Windows archive ``key`` would get
+    a path Windows refuses under ``dest``."""
+    longest = windows_archives()["archives"].get(key, {}).get("longest_path") or 0
+    if len(str(dest)) + 1 + longest > _WINDOWS_MAX_PATH:
+        room = _WINDOWS_MAX_PATH - 1 - longest - len(dest.name) - 1
+        raise OSError(f"The folder {dest.parent} has too long a path for the environment "
+                      f"{dest.name}. Set mtb.config.envs_dir to a folder whose path has at "
+                      f"most {room} characters.")
+
+
+def _check_windows_archive(key: str, archive: Path) -> None:
+    """``RuntimeError`` when the downloaded ``archive`` is not the one
+    ``packed_windows.json`` records for ``key`` (its SHA-256)."""
+    import hashlib
+    want = windows_archives()["archives"].get(key, {}).get("sha256")
+    digest = hashlib.sha256()
+    with open(archive, "rb") as fh:
+        while block := fh.read(1 << 22):
+            digest.update(block)
+    if want and digest.hexdigest() != want:
+        raise RuntimeError(f"the download of {key} is damaged (its SHA-256 is not the "
+                           f"recorded one); run the install again")
+
+
+def _rename_windows(part: Path, dest: Path) -> None:
+    """``part.rename(dest)``; on Windows a virus scanner may still hold a file of
+    the folder just written, so a refusal is tried again for a minute."""
+    import time
+    for attempt in range(30):
+        try:
+            part.rename(dest)
+            return
+        except PermissionError:
+            if dest.exists() or attempt == 29:
+                raise
+            time.sleep(2)
 
 
 def _conda_unpack(prefix: Path) -> None:
@@ -1029,12 +1126,14 @@ INSTALL_COLUMNS = ("env", "methods", "state", "flavor", "archive_bytes", "unpack
 
 def install(methods: list[str] | None = None, *, category: str | None = None,
             dry_run: bool = False, flavor: str = "auto", build: bool = False):
-    """Install the environments a set of methods needs; Linux only.
+    """Install the environments a set of methods needs; Linux, and Windows
+    for the methods with a Windows environment.
 
     Each env is unpacked from its published archive, or built from its
-    lockfile where none is published. Installed envs are skipped. Then the
-    method scripts are downloaded to ``mtb.config.repo_path`` if they are
-    missing.
+    lockfile where none is published (on Windows nothing is built: a method
+    without a published Windows archive is refused). Installed envs are
+    skipped. Then the method scripts are downloaded to
+    ``mtb.config.repo_path`` if they are missing.
 
     Parameters
     ----------
@@ -1069,7 +1168,9 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
     KeyError
         Unknown method id.
     OSError
-        A real install on a host that is not Linux.
+        A real install on a host that is neither Linux nor Windows; on
+        Windows, a method without a Windows environment, ``build=True``, or
+        an archive that could not be downloaded.
     RuntimeError
         ``build=True`` without conda, a failed build, or a failed download of
         the method scripts.
@@ -1089,7 +1190,9 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
     plan = pd.DataFrame(rows, columns=list(INSTALL_COLUMNS))
     if dry_run and not build:
         todo = to_download(rows)
-        totals, line = plan_totals(todo)
+        # the Windows archives have their own sizes and share no layer
+        totals, line = (plan_totals(todo, _host_sizes(), layers={}) if on_windows()
+                        else plan_totals(todo))
         plan.attrs.update(totals)
         if todo:
             print(f"[env] {line}", flush=True)
@@ -1109,8 +1212,8 @@ def _install_rows(methods: list[str] | None = None, *, category: str | None = No
     check_flavor(flavor)
     registry.check_id_list(methods, "methods")
     methods = None if methods is None else [registry.check_method(m) for m in methods]
-    manifest = packed_manifest() if packed else {}
-    sizes = packed_sizes() if packed else {}
+    manifest = _host_manifest() if packed else {}
+    sizes = _host_sizes() if packed else {}
     unpacked = set() if dry_run else _install_missing(
         category, methods, packed=packed, manifest=manifest, sizes=sizes, conda=conda,
         flavor=flavor)
@@ -1118,12 +1221,16 @@ def _install_rows(methods: list[str] | None = None, *, category: str | None = No
     out = []
     for r in rows:
         env = r["env"]
-        state = _row_state(r, unpacked=unpacked, dry_run=dry_run, packed=packed, conda=conda)
         # URL and sizes of the archive this host would fetch
         if packed:
             key, would_install = archive_for(env, flavor, manifest=manifest, sizes=sizes)
         else:
             key, would_install = env, None
+        # on Windows an env is installed only from an archive built for its methods
+        published = not on_windows() or set(r["methods"]) <= set(
+            windows_archives()["archives"].get(key, {}).get("methods", ()))
+        state = _row_state(r, unpacked=unpacked, dry_run=dry_run, packed=packed, conda=conda,
+                           published=published)
         size = sizes.get(key) or {}
         flav = (installed_flavor(env, conda) if (r["exists"] or env in unpacked)
                 else would_install)
@@ -1146,12 +1253,32 @@ def _install_missing(category, methods, *, packed, manifest, sizes, conda,
     if linux_only:
         raise OSError(f"{linux_only} Run the install on a Linux machine, such as Colab.")
     if on_windows():
-        # nothing to download or build: the envs built on this computer are used
-        lacking = [m for env, ms in _envs_needed(category, methods) for m in ms
-                   if not serves(env, m, conda)]
+        # nothing is built on Windows: an env that is there (built on the computer,
+        # or installed earlier) is used; one that is not is unpacked from the
+        # archive published for Windows, when that archive was built for the methods
+        if not packed:
+            raise OSError("Environments are not built on Windows. Leave out build=True "
+                          "to unpack the published archives.")
+        archives = windows_archives()["archives"]
+        todo, lacking = [], []
+        for env, ms in _envs_needed(category, methods):
+            wanted = [m for m in ms if not serves(env, m, conda)]
+            if not wanted:
+                continue
+            key = archive_for(env, flavor, manifest=manifest, sizes=sizes)[0]
+            built_for = archives.get(key, {}).get("methods", ())
+            if not set(wanted) <= set(built_for):
+                lacking += [m for m in wanted if m not in built_for]
+                continue
+            here = env_prefix(env, conda) or other_env_prefix(env, conda)
+            if here is not None:        # another build of the env, or a folder of its name
+                raise OSError(f"The environment {env} in {here} was not made for "
+                              f"{_text._and_list(wanted)}. Delete that folder and run the "
+                              f"install again.")
+            todo.append(env)
         if lacking:
             raise OSError(no_windows_env_text(lacking))
-        return set()
+        return {env for env in todo if install_packed(env, conda=conda, flavor=flavor)}
     have = set(installed_envs(conda))
     missing = [env for env, _ in _envs_needed(category, methods) if env not in have]
     for env in missing:
@@ -1166,14 +1293,15 @@ def _install_missing(category, methods, *, packed, manifest, sizes, conda,
     return {env for env in missing if install_packed(env, conda=conda, flavor=flavor)}
 
 
-def _row_state(r: dict, *, unpacked, dry_run, packed, conda) -> str:
-    """The ``state`` of one row of :func:`install`'s table."""
+def _row_state(r: dict, *, unpacked, dry_run, packed, conda, published: bool = True) -> str:
+    """The ``state`` of one row of :func:`install`'s table; ``published``: on
+    Windows, whether an archive built for the row's methods is published."""
     env = r["env"]
     if env in unpacked:
         return "PACKED"
     if r["exists"]:
         return "have"
-    if on_windows():
+    if on_windows() and not (packed and published):
         return NO_WINDOWS_ENV
     if dry_run and other_env_prefix(env, conda) is not None:
         return "name taken"

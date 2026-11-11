@@ -1,10 +1,13 @@
-"""Windows: a method runs when an env for it was built on the computer.
+"""Windows: a method runs in an env built on the computer or unpacked from the
+archive published for Windows.
 
-No archive is published for Windows. An env there is a conda prefix
-(``python.exe`` at its root) or an R installation (``bin/Rscript.exe``), marked
-with ``FLAVOR_FILE`` like every env; ``METHODS_FILE`` lists the methods it was
-built for. Every test pins the platform through ``envs.host_system``, so it
-holds on any host; nothing here starts a method.
+An env there is a conda prefix (``python.exe`` at its root) or an R
+installation (``bin/Rscript.exe``), marked with ``FLAVOR_FILE`` like every
+env; ``METHODS_FILE`` lists the methods it was built for. The archives are
+listed in ``engine/packed_windows.json``, apart from the Linux ones. Every
+test pins the platform through ``envs.host_system``, so it holds on any host;
+nothing here starts a method, and an archive is a small file served from a
+folder.
 """
 from __future__ import annotations
 
@@ -20,9 +23,11 @@ from multibench.engine import envs, registry, runner
 
 @pytest.fixture
 def windows(monkeypatch, tmp_path):
-    """Windows, no conda, and ``config.envs_dir`` at a new folder (returned)."""
+    """Windows, no conda, no archive published, and ``config.envs_dir`` at a
+    new folder (returned)."""
     monkeypatch.setattr(envs, "host_system", lambda: "Windows")
     monkeypatch.setattr(envs, "_find_conda", lambda: None)
+    monkeypatch.setattr(envs, "_WINDOWS_JSON", tmp_path / "no_archives.json")
     monkeypatch.delenv(runner.RUN_MODE_VAR, raising=False)
     d = tmp_path / "envs"
     d.mkdir()
@@ -143,6 +148,129 @@ def test_the_dry_run_names_no_download_on_windows(windows, capsys):
     state = dict(zip(table["env"], table["state"]))
     assert state == {"matilda": "have", "scmb_r": envs.NO_WINDOWS_ENV}
     assert "to download" not in capsys.readouterr().out
+
+
+# ----------------------------------------------------------------- the archives for Windows
+def publish(tmp_path, monkeypatch, key, methods, *, r=False, sha256=None, longest=None):
+    """A small archive as ``tools/pack_windows.py`` writes one, in a folder that
+    ``file:`` URLs serve, and its entry in a ``packed_windows.json`` of the test."""
+    import hashlib
+    import io
+    import json
+    import tarfile
+
+    folder = tmp_path / "published"
+    folder.mkdir(exist_ok=True)
+    files = {"bin/Rscript.exe" if r else "python.exe": b"",
+             envs.METHODS_FILE: ("\n".join(methods) + "\n").encode(),
+             envs.FLAVOR_FILE: b"build\n", "Lib/site-packages/pkg/__init__.py": b"x = 1\n"}
+    name = f"{key}.tar.xz"
+    with tarfile.open(folder / name, "w:xz") as tar:
+        for rel, data in files.items():
+            info = tarfile.TarInfo(rel)
+            info.size = len(data)
+            tar.addfile(info, io.BytesIO(data))
+    blob = (folder / name).read_bytes()
+    listing = tmp_path / "packed_windows.json"
+    data = (json.loads(listing.read_text()) if listing.exists()
+            else {"base": folder.as_uri(), "archives": {}})
+    data["archives"][key] = {
+        "files": [name], "sha256": sha256 or hashlib.sha256(blob).hexdigest(),
+        "archive_bytes": len(blob), "unpacked_bytes": sum(map(len, files.values())),
+        "longest_path": longest or max(map(len, files)), "methods": list(methods)}
+    listing.write_text(json.dumps(data))
+    monkeypatch.setattr(envs, "_WINDOWS_JSON", listing)
+
+
+def test_install_unpacks_the_archive_published_for_windows(windows, tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
+    monkeypatch.setattr(envs, "_run_all", lambda cmds: pytest.fail("a build started on Windows"))
+    publish(tmp_path, monkeypatch, "matilda-cpu", ["Matilda"])
+    publish(tmp_path, monkeypatch, "matilda", ["Matilda"])
+    publish(tmp_path, monkeypatch, "scmb_r", ["StabMap"], r=True)
+    plan = envs.install(["Matilda", "StabMap"], dry_run=True)
+    assert dict(zip(plan["env"], plan["state"])) == {
+        "matilda": "packed archive published", "scmb_r": "packed archive published"}
+    assert dict(zip(plan["env"], plan["flavor"])) == {"matilda": "cpu", "scmb_r": "any"}
+    assert "2 envs: " in capsys.readouterr().out and not (windows / "matilda").exists()
+
+    table = envs.install(["Matilda", "StabMap"])
+    assert set(table["state"]) == {"PACKED"}
+    assert envs.env_prefix("matilda") == windows / "matilda"
+    assert (windows / "matilda" / "Lib" / "site-packages" / "pkg" / "__init__.py").is_file()
+    assert (windows / "matilda" / envs.FLAVOR_FILE).read_text() == "cpu\n"
+    assert envs.installed_flavor("matilda") == "cpu" and envs.installed_flavor("scmb_r") == "single"
+    assert envs.serves("matilda", "Matilda") and envs.serves("scmb_r", "StabMap")
+    assert not list(windows.glob(".*download*")) and not list(windows.glob("*.partial*"))
+    assert set(envs.install(["Matilda", "StabMap"])["state"]) == {"have"}        # nothing again
+
+
+def test_the_gpu_build_is_unpacked_on_a_host_with_a_gpu(windows, tmp_path, monkeypatch):
+    monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
+    publish(tmp_path, monkeypatch, "env_sciPENN-cpu", ["sciPENN"])
+    publish(tmp_path, monkeypatch, "env_sciPENN", ["sciPENN", "SMILE"])
+    assert envs.windows_archive_runs("SMILE") and envs.windows_archive_runs("sciPENN")
+    assert not envs.windows_archive_runs("SMILE", "cpu")       # the CPU build was not made for it
+    envs.install(["sciPENN", "SMILE"])
+    assert (windows / "env_sciPENN" / envs.FLAVOR_FILE).read_text() == "gpu\n"
+    assert envs.serves("env_sciPENN", "SMILE")
+
+
+def test_a_method_the_archive_was_not_built_for_is_refused_before_any_download(windows, tmp_path,
+                                                                                 monkeypatch):
+    import urllib.request
+    monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
+    publish(tmp_path, monkeypatch, "env_sciPENN-cpu", ["sciPENN"])
+    monkeypatch.setattr(urllib.request, "urlopen",
+                        lambda *a, **k: pytest.fail("a download started"))
+    with pytest.raises(OSError, match="^SMILE has no Windows environment."):
+        envs.install(["sciPENN", "SMILE"])
+    plan = envs.install(["SMILE"], dry_run=True)
+    assert list(plan["state"]) == [envs.NO_WINDOWS_ENV]
+    with pytest.raises(OSError, match="not built on Windows. Leave out build=True"):
+        envs.install(["sciPENN"], build=True)
+
+
+def test_a_damaged_download_is_refused_and_leaves_no_folder(windows, tmp_path, monkeypatch):
+    monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
+    publish(tmp_path, monkeypatch, "matilda-cpu", ["Matilda"], sha256="0" * 64)
+    with pytest.raises(RuntimeError, match="The environment matilda could not be unpacked .*damaged"):
+        envs.install(["Matilda"])
+    assert list(windows.iterdir()) == []
+
+
+def test_an_envs_folder_with_too_long_a_path_is_refused_before_the_download(windows, tmp_path,
+                                                                             monkeypatch):
+    import urllib.request
+    monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
+    publish(tmp_path, monkeypatch, "matilda-cpu", ["Matilda"], longest=250)
+    monkeypatch.setattr(urllib.request, "urlopen",
+                        lambda *a, **k: pytest.fail("a download started"))
+    with pytest.raises(OSError, match="has too long a path for the environment matilda"):
+        envs.install(["Matilda"])
+
+
+def test_an_env_that_is_not_installed_names_the_install_when_an_archive_is_published(
+        windows, tmp_path, monkeypatch):
+    monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
+    with pytest.raises(EnvironmentError, match="^Matilda has no Windows environment."):
+        runner._check_env("Matilda", "matilda")
+    publish(tmp_path, monkeypatch, "matilda-cpu", ["Matilda"])
+    with pytest.raises(EnvironmentError, match=r"is not installed. Run mtb.env.install\(\['Matilda'\]\)"):
+        runner._check_env("Matilda", "matilda")
+    assert workflow._env_hint("matilda", "Matilda").startswith("Environment matilda is not installed.")
+    conda_prefix(windows, "env_sciPENN", methods=["sciPENN"])       # there, and not built for SMILE
+    assert workflow._env_hint("env_sciPENN", "SMILE") == envs.no_windows_env_text(["SMILE"])
+
+
+def test_the_linux_archives_and_the_windows_archives_are_listed_apart(windows, tmp_path, monkeypatch):
+    publish(tmp_path, monkeypatch, "matilda-cpu", ["Matilda"])
+    assert list(envs._host_manifest()) == ["matilda-cpu"] == list(envs._host_sizes())
+    assert envs._host_manifest()["matilda-cpu"][0].startswith("file:")
+    monkeypatch.setattr(envs, "host_system", lambda: None)          # Linux: its own files, as before
+    assert envs._host_manifest() == envs.packed_manifest()
+    assert envs._host_sizes() == envs.packed_sizes()
+    assert "matilda-cpu" in envs.packed_manifest()
 
 
 # ----------------------------------------------------------------- the command

@@ -225,7 +225,9 @@ def _env_hint(env: str, method: str, other=None) -> str:
     prefix of a same-named env multibench did not install."""
     if envs.linux_only_text():
         return f"Environment {env} runs only on Linux, not on this computer."
-    if envs.on_windows():
+    if envs.on_windows() and (envs.env_prefix(env) is not None
+                              or not envs.windows_archive_runs(method)):
+        # an env that is there and was not built for the method, or no archive for it
         return envs.no_windows_env_text([method])
     if other is not None:
         return envs.other_env_text(env, other, f"run mtb.env.install([{method!r}]).")

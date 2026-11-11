@@ -456,11 +456,13 @@ def _check_env(method: str, env_name: str) -> None:
         raise OSError(
             f"{linux_only} Run this call on a Linux machine, such as Colab.")
     if envs.on_windows():
-        # no env can be installed on Windows: one built there for the method, or none
+        # an env on Windows runs the methods it was built for
         if envs.serves(env_name, method):
             return
-        raise EnvironmentError(envs.no_windows_env_text([method]))
-    if envs.env_prefix(env_name) is not None:
+        if envs.env_prefix(env_name) is not None or not envs.windows_archive_runs(method):
+            raise EnvironmentError(envs.no_windows_env_text([method]))
+        # not installed, and an archive for the method is published: as on Linux
+    elif envs.env_prefix(env_name) is not None:
         return
     # conda's env list is cached per process: probe once more
     envs._conda_prefixes.cache_clear()
