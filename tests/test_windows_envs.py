@@ -267,10 +267,13 @@ def test_scan_says_once_that_methods_have_no_windows_environment(windows, capsys
     assert capsys.readouterr().out.splitlines() == [f"[scan] B: {envs.no_windows_env_text(['B'])}"]
 
 
-def test_a_deadline_without_the_alarm_signal_raises_the_same_timeout(monkeypatch):
-    import signal
+@pytest.mark.skipif(sys.platform != "win32",
+                    reason="the timer's interrupt wakes the main thread's wait on Windows only")
+def test_a_deadline_without_the_alarm_signal_raises_the_same_timeout():
+    # On a POSIX system the deadline is the alarm signal and this path is never taken; forced there
+    # (by removing signal.SIGALRM), the interrupt raised in the timer thread does not end the main
+    # thread's time.sleep, and the TimeoutError comes when the sleep is over (seen on Linux and macOS).
     import time
-    monkeypatch.delattr(signal, "SIGALRM", raising=False)
     start = time.time()
     with pytest.raises(TimeoutError, match="exceeded timeout of 0.3s"):
         with workflow._deadline(0.3):
