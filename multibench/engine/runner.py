@@ -77,8 +77,14 @@ def windows_activation(env: str, prefix: Path | str) -> dict:
     root = Path(prefix)
     folders = [root, root / "Library" / "mingw-w64" / "bin", root / "Library" / "usr" / "bin",
                root / "Library" / "bin", root / "Scripts", root / "bin"]
-    return {"CONDA_PREFIX": str(root), "CONDA_DEFAULT_ENV": env,
-            "PATH": os.pathsep.join([*map(str, folders), os.environ.get("PATH", "")])}
+    out = {"CONDA_PREFIX": str(root), "CONDA_DEFAULT_ENV": env,
+           "PATH": os.pathsep.join([*map(str, folders), os.environ.get("PATH", "")])}
+    # an R method that calls Python through reticulate (MOFA2) must get the env's
+    # own Python: on Linux the env's activate.d script names it, here this does
+    python = envs.windows_interpreter(root, "python")
+    if python is not None:
+        out["RETICULATE_PYTHON"] = str(python)
+    return out
 
 
 #: The ``out_dir`` of scan's ``command`` column.
