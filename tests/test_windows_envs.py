@@ -169,6 +169,10 @@ def test_the_activation_puts_the_env_first_on_path(windows, monkeypatch):
     # an env with a Python names it for reticulate; an R installation alone names none
     assert act["RETICULATE_PYTHON"] == str(prefix / "python.exe")
     assert "RETICULATE_PYTHON" not in runner.windows_activation("scmb_r", r_installation(windows, "scmb_r"))
+    # an env that holds an R under its Python names it for rpy2
+    assert "R_HOME" not in act
+    (prefix / "Lib" / "R" / "bin").mkdir(parents=True)
+    assert runner.windows_activation("matilda", prefix)["R_HOME"] == str(prefix / "Lib" / "R")
 
 
 def test_on_linux_the_command_is_still_the_bash_wrapper(monkeypatch, tmp_path):

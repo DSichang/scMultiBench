@@ -84,6 +84,10 @@ def windows_activation(env: str, prefix: Path | str) -> dict:
     python = envs.windows_interpreter(root, "python")
     if python is not None:
         out["RETICULATE_PYTHON"] = str(python)
+    # a Python method that calls R through rpy2 (Portal) must get the env's own
+    # R, not one that is registered on the computer
+    if (root / "Lib" / "R" / "bin").is_dir():
+        out["R_HOME"] = str(root / "Lib" / "R")
     return out
 
 
