@@ -1,0 +1,383 @@
+{
+ "base": "https://github.com/DSichang/scMultiBench/releases/download/envs-win-v1",
+ "archives": {
+  "MOFA2_env": {
+   "files": [
+    "MOFA2_env.tar.xz"
+   ],
+   "sha256": "c26c8629fb67b782ed423ecf0a289e1d4043b14b84f9465df757d76bc16aa52e",
+   "archive_bytes": 241253236,
+   "unpacked_bytes": 872468426,
+   "file_count": 31454,
+   "longest_path": 131,
+   "methods": [
+    "MOFA2"
+   ]
+  },
+  "env_moETM": {
+   "files": [
+    "env_moETM.tar.xz"
+   ],
+   "sha256": "7a002ca9365e570fae16dd71691468919ff059623d1f705d74d3817b2a82aedf",
+   "archive_bytes": 1666240808,
+   "unpacked_bytes": 5361726870,
+   "file_count": 37256,
+   "longest_path": 135,
+   "methods": [
+    "moETM"
+   ]
+  },
+  "env_sciPENN": {
+   "files": [
+    "env_sciPENN.tar.xz"
+   ],
+   "sha256": "f2a1296d423078d73b34b498f07c9ebb324d37702b7f795c08f68a1262903f8d",
+   "archive_bytes": 1283752348,
+   "unpacked_bytes": 4121516154,
+   "file_count": 22289,
+   "longest_path": 135,
+   "methods": [
+    "sciPENN",
+    "SMILE"
+   ]
+  },
+  "env_sciPENN-cpu": {
+   "files": [
+    "env_sciPENN-cpu.tar.xz"
+   ],
+   "sha256": "6fa85ddbff3a2d919f6b180edefac465753895537d9131d38feb6283cf54a9fb",
+   "archive_bytes": 142679560,
+   "unpacked_bytes": 738215174,
+   "file_count": 22257,
+   "longest_path": 135,
+   "methods": [
+    "sciPENN"
+   ]
+  },
+  "matilda": {
+   "files": [
+    "matilda.tar.xz"
+   ],
+   "sha256": "8fa6dfa2a109de03d5d9cc5d489e8efba231c3416f3a991338d94ec6813fdb91",
+   "archive_bytes": 1471199676,
+   "unpacked_bytes": 4434365601,
+   "file_count": 31704,
+   "longest_path": 135,
+   "methods": [
+    "Matilda"
+   ]
+  },
+  "matilda-cpu": {
+   "files": [
+    "matilda-cpu.tar.xz"
+   ],
+   "sha256": "d9e5d5e68d08fc173601ca1f3cb5562ba37590a43a54a5e239037a19706b6240",
+   "archive_bytes": 182437136,
+   "unpacked_bytes": 955068682,
+   "file_count": 31669,
+   "longest_path": 135,
+   "methods": [
+    "Matilda"
+   ]
+  },
+  "scmb_cobolt3": {
+   "files": [
+    "scmb_cobolt3.tar.xz.001",
+    "scmb_cobolt3.tar.xz.002"
+   ],
+   "sha256": "773840f3d0ae7ab991693b42e4fa4a7ec7886bf1cd07c3841b378cb33187cc30",
+   "archive_bytes": 2143489444,
+   "unpacked_bytes": 5218551984,
+   "file_count": 26089,
+   "longest_path": 137,
+   "methods": [
+    "Cobolt"
+   ]
+  },
+  "scmb_cobolt3-cpu": {
+   "files": [
+    "scmb_cobolt3-cpu.tar.xz"
+   ],
+   "sha256": "1c752ae122ca685767c761f0025e355af08b91f63a6600fe4d9bde439c48c80b",
+   "archive_bytes": 234356520,
+   "unpacked_bytes": 1019813186,
+   "file_count": 26059,
+   "longest_path": 137,
+   "methods": [
+    "Cobolt"
+   ]
+  },
+  "scmb_ipolng2": {
+   "files": [
+    "scmb_ipolng2.tar.xz"
+   ],
+   "sha256": "033d6cf8b69e10223d2c9b9e8b7f6eee468f07424574e894c6e7e6df8cbd7b32",
+   "archive_bytes": 1301417924,
+   "unpacked_bytes": 4267771174,
+   "file_count": 25018,
+   "longest_path": 135,
+   "methods": [
+    "iPOLNG"
+   ]
+  },
+  "scmb_multigrate2": {
+   "files": [
+    "scmb_multigrate2.tar.xz.001",
+    "scmb_multigrate2.tar.xz.002"
+   ],
+   "sha256": "21f8672f65f7e9110b89a6b790e015e37393d2cb1e68881e85af2d968d761ca2",
+   "archive_bytes": 2148227436,
+   "unpacked_bytes": 5437061099,
+   "file_count": 36099,
+   "longest_path": 141,
+   "methods": [
+    "Multigrate"
+   ],
+   "left_out_for_path_length": {
+    "share/jupyter/labextensions/@jupyter-widgets": 8
+   }
+  },
+  "scmb_multigrate2-cpu": {
+   "files": [
+    "scmb_multigrate2-cpu.tar.xz"
+   ],
+   "sha256": "e6948e6d26bb1828800a0b03000dbcdab64c88439bfa99505c8a2d7c0ed03eec",
+   "archive_bytes": 239151264,
+   "unpacked_bytes": 1238322345,
+   "file_count": 36069,
+   "longest_path": 141,
+   "methods": [
+    "Multigrate"
+   ],
+   "left_out_for_path_length": {
+    "share/jupyter/labextensions/@jupyter-widgets": 8
+   }
+  },
+  "scmb_multivi": {
+   "files": [
+    "scmb_multivi.tar.xz.001",
+    "scmb_multivi.tar.xz.002"
+   ],
+   "sha256": "46c103f11d89f06dfde0d9792d8c8481f786f6aba0f5914511a19a92d6abd73f",
+   "archive_bytes": 2135888628,
+   "unpacked_bytes": 5394544416,
+   "file_count": 33213,
+   "longest_path": 137,
+   "methods": [
+    "MultiVI"
+   ]
+  },
+  "scmb_multivi-cpu": {
+   "files": [
+    "scmb_multivi-cpu.tar.xz"
+   ],
+   "sha256": "fed09b7c5f53fdd1c9719738ee2a3c9b2ae9826f0193d8f9009fe945682af720",
+   "archive_bytes": 226813932,
+   "unpacked_bytes": 1195779399,
+   "file_count": 33183,
+   "longest_path": 137,
+   "methods": [
+    "MultiVI"
+   ]
+  },
+  "scmb_r": {
+   "files": [
+    "scmb_r.tar.xz"
+   ],
+   "sha256": "338998352e0a1b7b58854e5010d4611207276463432fcb25364e93e9a2626e13",
+   "archive_bytes": 347052084,
+   "unpacked_bytes": 889652446,
+   "file_count": 30511,
+   "longest_path": 103,
+   "methods": [
+    "StabMap",
+    "iNMF",
+    "online_iNMF",
+    "Conos"
+   ]
+  },
+  "scmb_scmsi": {
+   "files": [
+    "scmb_scmsi.tar.xz"
+   ],
+   "sha256": "77371c5325dcb855b0994b9fc443cf5ab17b6507764a648ffa436a5cb3c479a7",
+   "archive_bytes": 165319368,
+   "unpacked_bytes": 859105080,
+   "file_count": 18949,
+   "longest_path": 146,
+   "methods": [
+    "scMSI"
+   ]
+  },
+  "scmb_scmvp4": {
+   "files": [
+    "scmb_scmvp4.tar.xz"
+   ],
+   "sha256": "77ad3f59fc2486ee480b1a7c66c9b07918cee6c53322d4d1c002faa997abb8c5",
+   "archive_bytes": 149565008,
+   "unpacked_bytes": 772721805,
+   "file_count": 15942,
+   "longest_path": 149,
+   "methods": [
+    "scMVP"
+   ]
+  },
+  "scmb_scvi": {
+   "files": [
+    "scmb_scvi.tar.xz"
+   ],
+   "sha256": "869d8829295091aafc5615adf5dd7d02e055f99ad44f3aadb32bac95a827752d",
+   "archive_bytes": 1832801512,
+   "unpacked_bytes": 3730103764,
+   "file_count": 34594,
+   "longest_path": 140,
+   "methods": [
+    "totalVI"
+   ],
+   "left_out_for_path_length": {
+    "Lib/site-packages/orbax/checkpoint": 449
+   }
+  },
+  "scmb_scvi-cpu": {
+   "files": [
+    "scmb_scvi-cpu.tar.xz"
+   ],
+   "sha256": "63211ce9d257900883c7f89da9ec3ab76bf298b656e817ce72ffcee686ff8c79",
+   "archive_bytes": 245863116,
+   "unpacked_bytes": 1322018306,
+   "file_count": 34562,
+   "longest_path": 140,
+   "methods": [
+    "totalVI"
+   ],
+   "left_out_for_path_length": {
+    "Lib/site-packages/orbax/checkpoint": 449
+   }
+  },
+  "scmb_seurat5": {
+   "files": [
+    "scmb_seurat5.tar.xz"
+   ],
+   "sha256": "b64bf56b45a4627f4fe5dc956f4ed577d870aeafd3828e11d4204220910772e6",
+   "archive_bytes": 315500220,
+   "unpacked_bytes": 788261663,
+   "file_count": 27652,
+   "longest_path": 103,
+   "methods": [
+    "Seurat_WNN",
+    "Seurat_v5"
+   ]
+  },
+  "scmb_torch": {
+   "files": [
+    "scmb_torch.tar.xz.001",
+    "scmb_torch.tar.xz.002"
+   ],
+   "sha256": "516a8b70cb9038720ffa14fb42d215c3b32bb055b9caf54238ec764cb1334fd5",
+   "archive_bytes": 2182484500,
+   "unpacked_bytes": 5450024555,
+   "file_count": 30410,
+   "longest_path": 137,
+   "methods": [
+    "scMoMaT",
+    "uniPort",
+    "MultiMAP",
+    "scMDC",
+    "scBridge",
+    "sciCAN"
+   ]
+  },
+  "scmb_torch-cpu": {
+   "files": [
+    "scmb_torch-cpu.tar.xz"
+   ],
+   "sha256": "22a8264568d079053dedf2265dcb0555487f289499027ed8ee74e55f85a26014",
+   "archive_bytes": 269718916,
+   "unpacked_bytes": 1236208401,
+   "file_count": 30358,
+   "longest_path": 137,
+   "methods": [
+    "scMDC",
+    "scMoMaT",
+    "MultiMAP",
+    "uniPort"
+   ]
+  },
+  "scmb_torch_v2": {
+   "files": [
+    "scmb_torch_v2.tar.xz.001",
+    "scmb_torch_v2.tar.xz.002"
+   ],
+   "sha256": "f081fb10723b59e5ecdf71628fb523bde7fef519219e8ebcf290eeaeb2d0b67f",
+   "archive_bytes": 2298417648,
+   "unpacked_bytes": 5752695103,
+   "file_count": 42072,
+   "longest_path": 137,
+   "methods": [
+    "Portal"
+   ]
+  },
+  "scmb_torch_v2-cpu": {
+   "files": [
+    "scmb_torch_v2-cpu.tar.xz"
+   ],
+   "sha256": "e3b67d7a595d1733758cea5089068d6676dfa76ccfa1815b23756493b51aaba3",
+   "archive_bytes": 389365140,
+   "unpacked_bytes": 1553997749,
+   "file_count": 42042,
+   "longest_path": 137,
+   "methods": [
+    "Portal"
+   ]
+  },
+  "scmb_vimcca": {
+   "files": [
+    "scmb_vimcca.tar.xz"
+   ],
+   "sha256": "276950eb403ada705cb75108adc63bb9574b5f3d2feb457d82a81e9161fc7b03",
+   "archive_bytes": 317377020,
+   "unpacked_bytes": 1604501613,
+   "file_count": 24533,
+   "longest_path": 158,
+   "methods": [
+    "VIMCCA"
+   ],
+   "left_out_for_path_length": {
+    "Lib/site-packages/tensorflow/include": 8
+   }
+  },
+  "scmb_vipcca27": {
+   "files": [
+    "scmb_vipcca27.tar.xz"
+   ],
+   "sha256": "f13f03cb3492a491cf7a491c89357bf7dd1110cbcfb9bcd4de9aca89a4486de5",
+   "archive_bytes": 316727352,
+   "unpacked_bytes": 1593398076,
+   "file_count": 24030,
+   "longest_path": 158,
+   "methods": [
+    "VIPCCA"
+   ],
+   "left_out_for_path_length": {
+    "Lib/site-packages/tensorflow/include": 8
+   }
+  },
+  "unitednet": {
+   "files": [
+    "unitednet.tar.xz"
+   ],
+   "sha256": "72e09e601271a11f2035e003049d57989057288c8cf64f2d2f83672e18772926",
+   "archive_bytes": 1466727768,
+   "unpacked_bytes": 4325407972,
+   "file_count": 27611,
+   "longest_path": 135,
+   "methods": [
+    "UnitedNet"
+   ]
+  }
+ },
+ "_meta": {
+  "written": "2026-11-11 23:48",
+  "note": "Written by tools/pack_windows.py. archive_bytes: the archive, all its files together; unpacked_bytes: the files in it."
+ }
+}

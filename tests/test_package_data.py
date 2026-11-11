@@ -22,6 +22,7 @@ RUNTIME_READ = [
     "engine/packed_urls.json",
     "engine/packed_sizes.json",
     "engine/packed_layers.json",
+    "engine/packed_windows.json",
     "engine/scripts_archive.json",
     "engine/drivers/run_matilda.py",
     "engine/drivers/run_stabmap.R",
