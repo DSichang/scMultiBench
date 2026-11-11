@@ -208,6 +208,20 @@ def test_scan_blocks_a_method_its_env_was_not_built_for(windows):
     assert env_check("Matilda") == (False, envs.no_windows_env_text(["Matilda"]))
 
 
+def test_the_cpu_build_of_an_env_gets_the_cpu_parameters_on_a_gpu_host(windows, monkeypatch):
+    monkeypatch.setattr(envs, "host_has_gpu", lambda: True)
+    spec = registry.get("scMDC")
+    assert spec.cpu_params == {"device": "cpu"}
+    prefix = conda_prefix(windows, envs.group_for("scMDC"), methods=["scMDC"])
+    (prefix / envs.FLAVOR_FILE).write_text("gpu\n")
+    assert runner.cpu_params_for(spec, None) == (None, {})              # the GPU build: the script's default
+    (prefix / envs.FLAVOR_FILE).write_text("cpu\n")
+    assert runner.cpu_params_for(spec, None) == ({"device": "cpu"}, {"device": "cpu"})
+    assert runner.cpu_params_for(spec, {"device": "cuda"}) == ({"device": "cuda"}, {})   # the caller's value stays
+    monkeypatch.setattr(envs, "host_system", lambda: None)              # Linux: the host alone decides, as before
+    assert runner.cpu_params_for(spec, None, gpu=True) == (None, {})
+
+
 def test_an_input_link_is_a_hard_link_or_a_copy_on_windows(windows, tmp_path, monkeypatch):
     src = tmp_path / "rna.h5"
     src.write_bytes(b"data")

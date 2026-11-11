@@ -367,7 +367,11 @@ def cpu_params_for(spec, params: dict | None, *,
     ``params``; ``applied`` is that subset. ``params`` is returned unchanged
     when nothing applies.
     """
-    if not spec.cpu_params or (envs.host_has_gpu() if gpu is None else gpu):
+    has_gpu = envs.host_has_gpu() if gpu is None else gpu
+    if has_gpu and envs.on_windows() and envs.installed_flavor(envs.group_for(spec.id)) == "cpu":
+        # the CPU build of an env cannot use the GPU of the host
+        has_gpu = False
+    if not spec.cpu_params or has_gpu:
         return params, {}
     given = dict(params or {})
     applied = {k: v for k, v in spec.cpu_params.items() if k not in given}
