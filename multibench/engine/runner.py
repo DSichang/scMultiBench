@@ -435,6 +435,7 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     cmd = _argv(variant, method, values, out_str, repo, params)
     cwd = (repo / variant.entrypoint).parent if variant.cwd_at_script else out
     if envs.on_windows():
+        _remove_old_outputs_windows(out)
         # no shell wrapper on Windows: the activation is the subprocess's environment
         prefix = run_mode(env_name)[1]
         _execute(method, cmd, str(cwd), variant.run_env,
@@ -513,6 +514,19 @@ def _execute(method: str, cmd: list[str], cwd: str, run_env: dict | None,
             f"stdout tail:\n{stdout[-1500:]}\n"
             f"stderr tail:\n{stderr[-2500:]}"
         )
+
+
+def _remove_old_outputs_windows(out: Path) -> None:
+    """Remove the ``.h5`` files an earlier run left in the method's output
+    folder. The R method scripts remove an existing output file with ``rm``
+    before they write it; Windows has no ``rm``, and the write then fails
+    ("Object with name 'data' already exists"). Input links are in ``inputs/``
+    and are not touched."""
+    for old in out.glob("*.h5"):
+        try:
+            old.unlink()
+        except OSError:
+            pass
 
 
 def _kill_tree_windows(popen) -> None:

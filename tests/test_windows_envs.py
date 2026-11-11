@@ -244,6 +244,17 @@ def test_an_input_link_is_a_hard_link_or_a_copy_on_windows(windows, tmp_path, mo
     assert dest.read_bytes() == b"data" and src.exists()
 
 
+def test_old_output_files_are_removed_before_a_run_on_windows(tmp_path):
+    out = tmp_path / "StabMap_D52"
+    (out / "inputs").mkdir(parents=True)
+    for name in ("embedding.h5", "dist.h5", "time.csv", "inputs/rna.h5"):
+        (out / name).write_bytes(b"old")
+    runner._remove_old_outputs_windows(out)
+    assert sorted(p.relative_to(out).as_posix() for p in out.rglob("*") if p.is_file()) == [
+        "inputs/rna.h5", "time.csv"]
+    runner._remove_old_outputs_windows(tmp_path / "absent")         # no folder yet: nothing to do
+
+
 def test_scan_says_once_that_methods_have_no_windows_environment(windows, capsys):
     reasons = [(m, envs.no_windows_env_text([m]), "") for m in ("B", "A", "D", "C")]
     reasons.append(("E", "E needs adt.h5.", ""))
