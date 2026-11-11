@@ -406,7 +406,10 @@ def run(method: str, category: str, *, inputs: dict, out_dir: str,
     params, applied = cpu_params_for(spec, params)
     check_gpu_requirement(spec)
     if applied:
-        print(f"[run] no GPU on this host: applying {method} cpu_params {applied}",
+        # on Windows also with a GPU, when the installed env is its CPU build
+        why = ("no GPU on this host" if not envs.host_has_gpu()
+               else f"{envs.group_for(method)} is the CPU build")
+        print(f"[run] {why}: applying {method} cpu_params {applied}",
               file=sys.stderr, flush=True)
     env_name = envs.group_for(method)
     _check_env(method, env_name)
