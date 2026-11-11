@@ -267,12 +267,35 @@ def test_scan_says_once_that_methods_have_no_windows_environment(windows, capsys
     assert capsys.readouterr().out.splitlines() == [f"[scan] B: {envs.no_windows_env_text(['B'])}"]
 
 
-def test_a_timeout_warns_where_there_is_no_alarm_signal(monkeypatch):
+def test_a_deadline_without_the_alarm_signal_raises_the_same_timeout(monkeypatch):
     import signal
+    import time
     monkeypatch.delattr(signal, "SIGALRM", raising=False)
-    with pytest.warns(UserWarning, match="timeout= is unavailable on Windows"):
-        with workflow._deadline(5):
-            pass
+    start = time.time()
+    with pytest.raises(TimeoutError, match="exceeded timeout of 0.3s"):
+        with workflow._deadline(0.3):
+            time.sleep(20)
+    assert time.time() - start < 10
+    with workflow._deadline(30):                # a step that ends in time: no error, the timer is gone
+        pass
+    time.sleep(0.4)
+
+
+def test_an_interrupt_the_deadline_did_not_send_passes_through():
+    with pytest.raises(KeyboardInterrupt):
+        with workflow._deadline_without_alarm(30):
+            raise KeyboardInterrupt
+
+
+def test_scan_reasons_show_the_last_part_of_a_windows_path(windows, monkeypatch):
+    text = r"scBridge needs atac_gas.h5, and C:\Users\me\data sets\x\LUNG_ids has no such file."
+    assert workflow._short_reason(r"scBridge needs atac_gas.h5, and C:\Users\me\data\LUNG_ids has no such file.",
+                                  "scBridge", "LUNG_ids") == (
+        "scBridge needs atac_gas.h5, and LUNG_ids has no such file.")
+    assert workflow._short_reason("rna.h5 of D:/data/D11/rna.h5 is not canonical", "M", "D11") == (
+        "rna.h5 of rna.h5 is not canonical")
+    monkeypatch.setattr(envs, "host_system", lambda: None)      # Linux: a Windows path is left as it is
+    assert "C:\\Users" in workflow._short_reason(text, "scBridge", "LUNG_ids")
 
 
 # ----------------------------------------------------------------- the subprocess (Windows hosts)
@@ -296,6 +319,23 @@ def test_output_outside_the_code_page_keeps_the_methods_error(windows, tmp_path)
     with pytest.raises(RuntimeError, match=r"M failed \(exit 3\)") as e:
         runner._execute("M", [sys.executable, "-c", code], str(tmp_path), None)
     assert "no package called x" in str(e.value)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="ends a Windows process tree")
+def test_the_deadline_ends_a_running_method_on_windows(windows, tmp_path):
+    import subprocess
+    import time
+
+    pid_file = tmp_path / "method.pid"
+    code = "import os, sys, time; open(sys.argv[1], 'w').write(str(os.getpid())); time.sleep(120)"
+    start = time.time()
+    with pytest.raises(TimeoutError):
+        with workflow._deadline_without_alarm(3):
+            runner._execute("M", [sys.executable, "-c", code, str(pid_file)], str(tmp_path), None)
+    assert time.time() - start < 30
+    pid = pid_file.read_text()
+    listed = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"], capture_output=True, text=True).stdout
+    assert pid not in listed
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="ends a Windows process tree")

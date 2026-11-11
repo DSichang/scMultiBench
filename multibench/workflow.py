@@ -312,6 +312,9 @@ def _missing_files_reason(spec, category: str, missing: dict) -> str:
 
 
 _ABS_PATH_RE = re.compile(r"(?<![\w./-])/(?:[^\s'\"\[\]{}(),:;]+/)+[^\s'\"\[\]{}(),:;]*")
+#: the same for a Windows path (``C:\data\D11\rna.h5``)
+_ABS_PATH_WINDOWS_RE = re.compile(
+    r"(?<![\w./\\-])[A-Za-z]:[\\/](?:[^\s'\"\[\]{}(),:;\\/]+[\\/])*[^\s'\"\[\]{}(),:;\\/]*")
 _EXC_PREFIX_RE = re.compile(r"^[A-Z]\w*(?:Error|Exception|Warning): ")
 
 
@@ -323,6 +326,10 @@ def _short_reason(text: str, method: str, dataset: str) -> str:
     part = _EXC_PREFIX_RE.sub("", text)
     part = re.sub(rf"^{re.escape(method)} reads (\S+) of {re.escape(str(dataset))}, which ",
                   r"\1 ", part)
+    if envs.on_windows():
+        # first, or the POSIX pattern takes the part after the drive letter
+        part = _ABS_PATH_WINDOWS_RE.sub(
+            lambda m: re.split(r"[\\/]", m.group(0).rstrip("\\/"))[-1], part)
     return _ABS_PATH_RE.sub(lambda m: m.group(0).rstrip("/").rsplit("/", 1)[-1], part)
 
 
@@ -1068,6 +1075,48 @@ def _print_reasons(reasons, per_batch: str) -> None:
 
 
 @contextlib.contextmanager
+def _deadline_without_alarm(seconds):
+    """The deadline of :func:`_deadline` where there is no alarm signal
+    (Windows): a timer thread ends the running method's processes (a wait for
+    a subprocess cannot be interrupted there) and interrupts the main thread
+    as Ctrl+C does; the step then raises the same ``TimeoutError``. An error or
+    an interrupt before the deadline (the user's Ctrl+C) passes through."""
+    import signal
+    import threading
+
+    fired = threading.Event()
+
+    def _fire():
+        fired.set()
+        _runner.end_running_methods()
+        signal.raise_signal(signal.SIGINT)
+
+    timer = threading.Timer(seconds, _fire)
+    timer.daemon = True
+    timer.start()
+    interrupted = False
+    try:
+        yield
+    except KeyboardInterrupt:
+        if not fired.is_set():
+            raise
+        interrupted = True
+    except Exception:
+        if not fired.is_set():
+            raise
+        # the method the deadline ended was reported as failed: it timed out
+    finally:
+        timer.cancel()
+    if fired.is_set():
+        if not interrupted:
+            try:                        # take the interrupt the timer sent
+                time.sleep(0.05)
+            except KeyboardInterrupt:
+                pass
+        raise TimeoutError(f"exceeded timeout of {seconds}s")
+
+
+@contextlib.contextmanager
 def _deadline(seconds):
     """A SIGALRM deadline over a whole per-method step (run and scoring)."""
     import math
@@ -1084,8 +1133,8 @@ def _deadline(seconds):
         return
     if not hasattr(signal, "SIGALRM"):
         # Windows has no alarm signal
-        _text.warn("timeout= is unavailable on Windows; running without a deadline")
-        yield
+        with _deadline_without_alarm(seconds):
+            yield
         return
 
     def _fire(signum, frame):

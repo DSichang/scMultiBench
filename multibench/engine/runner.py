@@ -495,9 +495,11 @@ def _execute(method: str, cmd: list[str], cwd: str, run_env: dict | None,
     popen = subprocess.Popen(cmd, cwd=cwd, stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE, text=True, env=env,
                              start_new_session=True, **decoding)
+    _RUNNING.add(popen)
     try:
         stdout, stderr = popen.communicate()
     except BaseException:            # TimeoutError from the deadline included
+        _RUNNING.discard(popen)
         if envs.on_windows():
             _kill_tree_windows(popen)
         else:
@@ -507,6 +509,7 @@ def _execute(method: str, cmd: list[str], cwd: str, run_env: dict | None,
                 popen.kill()
         popen.wait()
         raise
+    _RUNNING.discard(popen)
     if popen.returncode != 0:
         # stderr last: callers cut this message from the left
         raise RuntimeError(
@@ -527,6 +530,21 @@ def _remove_old_outputs_windows(out: Path) -> None:
             old.unlink()
         except OSError:
             pass
+
+
+#: The method processes that are running now (:func:`_execute`).
+_RUNNING: set = set()
+
+
+def end_running_methods() -> None:
+    """End the method processes that are running, with their children. The
+    Windows deadline calls it from its timer thread: a wait for a subprocess
+    cannot be interrupted there, so the process is ended instead."""
+    for popen in list(_RUNNING):
+        if envs.on_windows():
+            _kill_tree_windows(popen)
+        else:
+            popen.kill()
 
 
 def _kill_tree_windows(popen) -> None:
