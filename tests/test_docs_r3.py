@@ -124,6 +124,6 @@ def test_api_page_run_all_batch_and_off_linux_refusal():
     api = _flat("api.md")
     assert "The message names the install command. On macOS and Windows it first says" not in api
     assert "Methods run only on Linux: elsewhere `mtb.run` raises `OSError`." not in api
-    assert "## 2. Run (Linux)" in _read("api.md")
+    assert "## 2. Run (Linux or Windows)" in _read("api.md")
 
 
