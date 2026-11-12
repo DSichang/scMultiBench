@@ -2323,6 +2323,9 @@ environment. Run it on a Linux machine, such as Colab."</p>
 <li>A user name with a space can stop the R methods (StabMap, Seurat, iNMF
   and Conos). Set <code>TMPDIR</code> to a folder without a space before you start
   Python.</li>
+<li><code>cLISI</code> and <code>iLISI</code> need a C++ compiler on Windows, such as the <code>g++</code>
+  of Rtools. Without one they are <code>NaN</code>, with a warning
+  (<a href="#troubleshooting">Troubleshooting</a>).</li>
 </ul>
 </details>
 <h3 id="get-the-data">Get the data<a class="headerlink" href="#get-the-data" title="Anchor link to this section">&para;</a></h3>
@@ -2476,6 +2479,17 @@ point <code>MULTIBENCH_ENVS_DIR</code> at the folder that holds it, or unset
 <summary><code>ImportError: No module named scib</code> from <code>mtb.evaluate</code></summary>
 <p><code>multibench</code> was installed with <code>--no-deps</code> or into another interpreter.
 Run <code>pip install multibench-sc</code> in the environment you import from.</p>
+</details>
+<details class="note">
+<summary><code>TypingError: Failed in nopython mode pipeline ...</code>, naming <code>knn_dists</code></summary>
+<p>Scoring builds a neighbour graph with scanpy, and umap-learn 0.6.0
+fails there with scanpy 1.12.5 on 8,192 cells or more. <code>mtb.evaluate</code>
+raises the error, and a run ends with the status <code>ran</code> and the error in
+<code>reason</code>. Install another umap-learn release:</p>
+<div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"umap-learn!=0.6.0"</span>
+</span></code></pre></div>
+<p>Then call <code>evaluate</code> again, or score a finished run with
+<code>mtb.load_run(out_dir).rescore()</code>.</p>
 </details>
 <details class="note">
 <summary><code>cLISI</code> / <code>iLISI</code> are <code>NaN</code>, with a warning naming <code>knn_graph.o</code></summary>
