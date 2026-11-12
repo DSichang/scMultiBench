@@ -1126,8 +1126,7 @@ INSTALL_COLUMNS = ("env", "methods", "state", "flavor", "archive_bytes", "unpack
 
 def install(methods: list[str] | None = None, *, category: str | None = None,
             dry_run: bool = False, flavor: str = "auto", build: bool = False):
-    """Install the environments a set of methods needs; Linux, and Windows
-    for the methods with a Windows environment.
+    """Install the environments a set of methods needs, on Linux or Windows.
 
     Each env is unpacked from its published archive, or built from its
     lockfile where none is published (on Windows nothing is built: a method
