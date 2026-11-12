@@ -44,12 +44,13 @@ def _visible(text):
 # ---- get started: quickstart, installation, FAQ (R3-20 to R3-26) ---------
 @needs_docs
 def test_dry_run_line_is_on_the_run_guide():
-    """R3-25, then O36 (owner, 2026-11-09): the Quickstart runs SCALEX and links
-    the guides, tutorials/run carries the dry-run step, and Installation does
-    not repeat it."""
+    """R3-25, then O36 (owner, 2026-11-09): the Quickstart runs one method and
+    links the guides, tutorials/run carries the dry-run step, and Installation
+    does not repeat it. The method is StabMap on D52 (owner, 2026-11-12): it
+    runs on Linux and on Windows, which SCALEX on D28 did not."""
     quick, install = _read("quickstart.md"), _read("installation.md")
     assert "(tutorials/run.md#folder-layout)" in install
-    assert 'mtb.run("D28", "diagonal", methods=["SCALEX"]' in quick
+    assert 'mtb.run("D52", "cross", methods=["StabMap"]' in quick
     assert "(tutorials/run.md)" in quick
     assert "dry_run=True" in _read("tutorials/run.md")
     assert "**Preview a run.**" not in install and "**Custom launch.**" not in install
