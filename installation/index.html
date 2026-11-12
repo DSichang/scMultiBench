@@ -629,6 +629,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Windows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#get-the-data" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2094,6 +2105,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Windows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#get-the-data" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2151,10 +2173,10 @@
 
 
 <h1 id="installation">Installation<a class="headerlink" href="#installation" title="Anchor link to this section">&para;</a></h1>
-<p><code>pip install multibench-sc</code> installs the API on Python 3.9 or newer. On macOS
-and Windows you can use the stored results, check your data with <code>scan</code>,
-score embeddings and plot. Running a method needs Linux, such as
-<a href="#google-colab">Google Colab</a>. Windows is not tested.</p>
+<p><code>pip install multibench-sc</code> installs the API on Python 3.9 or newer. Methods
+run on Linux, such as <a href="#google-colab">Google Colab</a>, and on
+<a href="#windows">Windows</a> for the methods listed there. On macOS you can use the
+stored results, check your data with <code>scan</code>, score embeddings and plot.</p>
 <hr />
 <h2 id="step-1-create-an-isolated-environment">Step 1: Create an isolated environment<a class="headerlink" href="#step-1-create-an-isolated-environment" title="Anchor link to this section">&para;</a></h2>
 <p>Any fresh Python 3.9+ environment works. Conda is optional: the method
@@ -2205,14 +2227,14 @@ installed here. Each method's environment holds them.</p>
 your own dataset.</p>
 <hr />
 <h2 id="method-environments">Method environments<a class="headerlink" href="#method-environments" title="Anchor link to this section">&para;</a></h2>
-<p>Each method runs in its own Linux environment. Install only the ones you
+<p>Each method runs in its own environment. Install only the ones you
 need. <code>mtb.env.install</code> downloads prebuilt archives, with no conda needed.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
 </span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
 </span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="c1"># the environments a category needs: installed or not, with their sizes</span>
 </span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">install</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">,</span> <span class="n">dry_run</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="c1"># one method</span>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">install</span><span class="p">([</span><span class="s2">"SCALEX"</span><span class="p">])</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">install</span><span class="p">([</span><span class="s2">"StabMap"</span><span class="p">])</span>
 </span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="c1"># one category</span>
 </span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">install</span><span class="p">(</span><span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">)</span>
 </span></code></pre></div>
@@ -2256,6 +2278,52 @@ runs them, with no conda needed.</p>
 <summary>Details</summary>
 <p>On a <abbr title="Graphics Processing Unit">GPU</abbr> runtime, an environment that has a <abbr title="Graphics Processing Unit">GPU</abbr> build gets that build: a
 larger download, and faster training.</p>
+</details>
+<h3 id="windows">Windows<a class="headerlink" href="#windows" title="Anchor link to this section">&para;</a></h3>
+<p><code>mtb.env.install</code> and <code>mtb.run</code> also work on Windows, without conda, WSL or
+administrator rights, for these methods (tested on Windows 11):</p>
+<table>
+<thead>
+<tr>
+<th>Windows environment</th>
+<th>Methods</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A <abbr title="Central Processing Unit">CPU</abbr> build and a <abbr title="Graphics Processing Unit">GPU</abbr> build</td>
+<td>Matilda, sciPENN, Cobolt, Multigrate, MultiVI, totalVI, scMDC, scMoMaT, MultiMAP, uniPort, Portal</td>
+</tr>
+<tr>
+<td>A <abbr title="Graphics Processing Unit">GPU</abbr> build only: the method needs an NVIDIA <abbr title="Graphics Processing Unit">GPU</abbr>, as on Linux</td>
+<td>moETM, SMILE, iPOLNG, scBridge, sciCAN, UnitedNet</td>
+</tr>
+<tr>
+<td>One build, on the <abbr title="Central Processing Unit">CPU</abbr></td>
+<td>StabMap, iNMF, online_iNMF, Conos, Seurat_v5, Seurat_WNN, MOFA2, scMSI, scMVP, VIMCCA, VIPCCA</td>
+</tr>
+</tbody>
+</table>
+<p>UINMF, SCALEX, Concerto, scMM, GLUE, scJoint, Seurat_v3 and MIRA run on Linux
+only. Asked for on Windows, they are refused: "<code>&lt;method&gt;</code> has no Windows
+environment. Run it on a Linux machine, such as Colab."</p>
+<details class="note">
+<summary>Details</summary>
+<ul>
+<li>Name the methods to install. <code>mtb.env.install(category=...)</code> and the
+  call without methods are refused on Windows, because every category
+  has a method that runs on Linux only.</li>
+<li>Keep the path of <code>mtb.config.envs_dir</code> short. Windows limits a file
+  path to 259 characters, and <code>mtb.env.install</code> refuses a folder that
+  leaves too little room.</li>
+<li>Nothing is built on Windows: <code>build=True</code> is refused, and a download
+  that fails raises an error.</li>
+<li>PyTorch needs the Microsoft Visual C++ Redistributable. Install it if
+  a method stops because a DLL is missing.</li>
+<li>A user name with a space can stop the R methods (StabMap, Seurat, iNMF
+  and Conos). Set <code>TMPDIR</code> to a folder without a space before you start
+  Python.</li>
+</ul>
 </details>
 <h3 id="get-the-data">Get the data<a class="headerlink" href="#get-the-data" title="Anchor link to this section">&para;</a></h3>
 <p>Each tutorial downloads its dataset on first run. Datasets go to
@@ -2383,10 +2451,15 @@ or remove the folder the message names, then run
 </details>
 <details class="note">
 <summary><code>OSError: Methods run only on Linux ...</code></summary>
-<p>Methods cannot run on macOS or Windows. Run the call on a Linux machine.
+<p>Methods cannot run on macOS. Run the call on a Linux machine.
 Make the commands there: <code>mtb.scan(..., command=True)</code> writes this
 computer's paths into them.
 <code>mtb.env.install</code> raises the same error.</p>
+</details>
+<details class="note">
+<summary><code>OSError: &lt;method&gt; has no Windows environment ...</code></summary>
+<p>The method runs on Linux only. <a href="#windows">Windows</a> lists the methods
+that run on Windows.</p>
 </details>
 <details class="note">
 <summary><code>OSError</code> naming <code>envs_dir</code>, with <code>MULTIBENCH_RUN_MODE=prefix</code></summary>
@@ -2409,9 +2482,10 @@ Run <code>pip install multibench-sc</code> in the environment you import from.</
 <p>Both need scib's compiled LISI helper, which ships as a Linux x86-64
 binary. On other platforms <code>evaluate()</code> rebuilds it automatically when a
 C++ compiler (<code>g++</code>, <code>c++</code> or <code>clang++</code>) is on <code>PATH</code>.</p>
-<p>Without a compiler, install one (Xcode command-line tools on macOS) and
-rerun <code>evaluate</code> in a new Python session, or run the <code>g++</code> command the
-warning prints. The other metrics are computed either way.</p>
+<p>Without a compiler, install one (Xcode command-line tools on macOS, the
+<code>g++</code> of Rtools on Windows) and rerun <code>evaluate</code> in a new Python session,
+or run the <code>g++</code> command the warning prints. The other metrics are
+computed either way.</p>
 </details>
 <details class="note">
 <summary><code>unsupported input format</code></summary>

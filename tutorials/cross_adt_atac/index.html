@@ -2946,11 +2946,11 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="o">,</span><span class="w"> </span><span class="nn">pandas</span>
 <span class="n">pins</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"numpy==</span><span class="si">{</span><span class="n">numpy</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2"> pandas==</span><span class="si">{</span><span class="n">pandas</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2">"</span>
-<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.6.1"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
+<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.7.0"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-1">import numpy, pandas
 pins = f"numpy=={numpy.__version__} pandas=={pandas.__version__}"
-%pip install -q "multibench-sc&gt;=0.6.1" {pins}</div>
+%pip install -q "multibench-sc&gt;=0.7.0" {pins}</div>
 </div>
 </div>
 </div>
@@ -3029,7 +3029,7 @@ envs = mtb.env.install(METHODS)</div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>downloading D58mini (7 MB) ...
 [env] downloading scmb_r 917 MB ...
-[env]   917 MB of 917 MB (28 MB/s)
+[env]   917 MB of 917 MB (97 MB/s)
 [env] unpacking scmb_r ...
 </pre>
 </div>
@@ -3089,9 +3089,9 @@ res.summary</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[run] StabMap (cross/D58mini) ...
-[run]   -&gt; scored (11.9s) ARI 0.916
+[run]   -&gt; scored (16.2s) ARI 0.916
 [run] UINMF (cross/D58mini) ...
-[run]   -&gt; scored (16.6s) ARI 0.682
+[run]   -&gt; scored (21.3s) ARI 0.682
 </pre>
 </div>
 </div>
@@ -3160,7 +3160,7 @@ res.summary</div>
 <td>0.9823</td>
 <td>0.9550</td>
 <td>0.9556</td>
-<td>11.9</td>
+<td>16.2</td>
 <td></td>
 <td></td>
 </tr>
@@ -3184,7 +3184,7 @@ res.summary</div>
 <td>0.9679</td>
 <td>0.8857</td>
 <td>0.9043</td>
-<td>16.6</td>
+<td>21.3</td>
 <td></td>
 <td></td>
 </tr>
@@ -3549,9 +3549,9 @@ mine.summary</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[run] StabMap (cross/MYCROSS_ADT_ATAC) ...
-[run]   -&gt; scored (10.4s) ARI 0.451
+[run]   -&gt; scored (13.9s) ARI 0.451
 [run] UINMF (cross/MYCROSS_ADT_ATAC) ...
-[run]   -&gt; scored (14.3s) ARI 0.531
+[run]   -&gt; scored (18.1s) ARI 0.531
 </pre>
 </div>
 </div>
@@ -3620,7 +3620,7 @@ mine.summary</div>
 <td>0.9884</td>
 <td>0.9732</td>
 <td>0.9739</td>
-<td>10.4</td>
+<td>13.9</td>
 <td></td>
 <td></td>
 </tr>
@@ -3644,7 +3644,7 @@ mine.summary</div>
 <td>0.9508</td>
 <td>0.8318</td>
 <td>0.8583</td>
-<td>14.3</td>
+<td>18.1</td>
 <td></td>
 <td></td>
 </tr>

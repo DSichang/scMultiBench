@@ -2276,9 +2276,11 @@
 <p><a href="../../reference/run/#multibench.workflow.run"><code>mtb.run</code></a> runs the
 methods you name on a dataset folder, each in its own environment, scores
 each output and saves the results. <code>methods=["SCALEX"]</code> runs one method.</p>
-<p>Methods run only on Linux. On macOS and Windows,
+<p>Methods run on Linux, and on Windows for the
+<a href="../../installation/#windows">methods with a Windows environment</a>. SCALEX,
+the example of this page, runs on Linux only. On macOS,
 <code>mtb.scan(dataset, category, command=True)</code> returns the plan with each
-command. Run the call itself on the Linux machine.</p>
+command. Run the call itself on a Linux machine.</p>
 <div class="admonition tip">
 <p class="admonition-title">Summary</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">multibench</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mtb</span>
@@ -2314,7 +2316,7 @@ is missing, with the download sizes.</p>
 <details class="note">
 <summary>Details</summary>
 <p>A missing environment marks the method not runnable in <code>mtb.scan</code>, and
-<code>run</code> skips it. Off Linux the reason says that methods run only on
+<code>run</code> skips it. On macOS the reason says that methods run only on
 Linux.</p>
 <p>GLUE reads the GENCODE v43 human annotation, which its first run
 downloads, and MIRA a <code>logger.py</code>, which the package puts next to its
@@ -2576,7 +2578,7 @@ writes the folder. Other layouts:</p>
 </span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>                      <span class="n">atac_kind</span><span class="o">=</span><span class="s2">"peak"</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="s2">"obs:celltype"</span><span class="p">,</span>
 </span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>                      <span class="n">category</span><span class="o">=</span><span class="s2">"vertical"</span><span class="p">)</span>
 </span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="n">mtb</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="s2">"data/MYMULTIOME"</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"rna"</span><span class="p">,</span> <span class="s2">"atac"</span><span class="p">])</span>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="c1"># on Linux: the RNA + ATAC methods; batch = the sample of each cell</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="c1"># on Linux or Windows: the RNA + ATAC methods; batch = each cell's sample</span>
 </span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">"data/MYMULTIOME"</span><span class="p">,</span> <span class="s2">"vertical"</span><span class="p">,</span> <span class="n">out_dir</span><span class="o">=</span><span class="s2">"out/"</span><span class="p">,</span>
 </span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>              <span class="n">modalities</span><span class="o">=</span><span class="p">[</span><span class="s2">"rna"</span><span class="p">,</span> <span class="s2">"atac_peak"</span><span class="p">],</span> <span class="n">batch</span><span class="o">=</span><span class="n">mdata</span><span class="o">.</span><span class="n">obs</span><span class="p">[</span><span class="s2">"sample"</span><span class="p">])</span>
 </span></code></pre></div>
