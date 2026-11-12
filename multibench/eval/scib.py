@@ -233,12 +233,27 @@ def _resolve_flavor(flavor=None) -> str:
 
 def _neighbors(adata, rep: str) -> None:
     """``sc.pp.neighbors`` on ``adata.obsm[rep]``, silencing the
-    ``SparseEfficiencyWarning`` scipy raises on some embeddings."""
+    ``SparseEfficiencyWarning`` scipy raises on some embeddings. When numba
+    cannot type the distances scanpy hands to umap-learn (umap-learn 0.6.0 with
+    scanpy 1.12.5, on 8,192 cells or more), the error names the release and
+    what to install."""
     import scanpy as sc
     from scipy.sparse import SparseEfficiencyWarning
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", SparseEfficiencyWarning)
-        sc.pp.neighbors(adata, use_rep=rep)
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", SparseEfficiencyWarning)
+            sc.pp.neighbors(adata, use_rep=rep)
+    except Exception as e:
+        # known by numba's words, not by the release: another release with the
+        # same fault is named the same way
+        if type(e).__name__ != "TypingError" or "knn_dists" not in str(e):
+            raise
+        from importlib.metadata import version
+        here = version("umap-learn")
+        raise RuntimeError(
+            f"umap-learn {here} cannot build the neighbour graph of these "
+            f"{adata.n_obs:,} cells. Run pip install \"umap-learn!={here}\", then "
+            f"score again.") from e
 
 
 def _leiden(adata, resolution: float, key_added: str, flavor: str) -> None:
