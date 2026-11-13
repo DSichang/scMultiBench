@@ -2946,11 +2946,11 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="o">,</span><span class="w"> </span><span class="nn">pandas</span>
 <span class="n">pins</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"numpy==</span><span class="si">{</span><span class="n">numpy</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2"> pandas==</span><span class="si">{</span><span class="n">pandas</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2">"</span>
-<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.7.0"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
+<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.7.1"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-1">import numpy, pandas
 pins = f"numpy=={numpy.__version__} pandas=={pandas.__version__}"
-%pip install -q "multibench-sc&gt;=0.7.0" {pins}</div>
+%pip install -q "multibench-sc&gt;=0.7.1" {pins}</div>
 </div>
 </div>
 </div>
@@ -3086,9 +3086,9 @@ res.summary</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[run] StabMap (cross/D59mini) ...
-[run]   -&gt; scored (17.5s) ARI 0.256
+[run]   -&gt; scored (190.9s) ARI 0.256
 [run] UINMF (cross/D59mini) ...
-[run]   -&gt; scored (22.8s) ARI 0.407
+[run]   -&gt; scored (179.5s) ARI 0.407
 </pre>
 </div>
 </div>
@@ -3157,7 +3157,7 @@ res.summary</div>
 <td>0.9788</td>
 <td>0.5477</td>
 <td>0.4655</td>
-<td>17.5</td>
+<td>190.9</td>
 <td></td>
 <td></td>
 </tr>
@@ -3181,7 +3181,7 @@ res.summary</div>
 <td>0.9818</td>
 <td>0.5248</td>
 <td>0.4733</td>
-<td>22.8</td>
+<td>179.5</td>
 <td></td>
 <td></td>
 </tr>
@@ -3550,9 +3550,9 @@ mine.summary</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[run] StabMap (cross/MYCROSS_TRI) ...
-[run]   -&gt; scored (15.0s) ARI 0.215
+[run]   -&gt; scored (192.2s) ARI 0.215
 [run] UINMF (cross/MYCROSS_TRI) ...
-[run]   -&gt; scored (20.7s) ARI 0.280
+[run]   -&gt; scored (73.0s) ARI 0.280
 </pre>
 </div>
 </div>
@@ -3621,7 +3621,7 @@ mine.summary</div>
 <td>0.9777</td>
 <td>0.4812</td>
 <td>0.4073</td>
-<td>15.0</td>
+<td>192.2</td>
 <td></td>
 <td></td>
 </tr>
@@ -3645,7 +3645,7 @@ mine.summary</div>
 <td>0.9646</td>
 <td>0.3229</td>
 <td>0.3020</td>
-<td>20.7</td>
+<td>73.0</td>
 <td></td>
 <td></td>
 </tr>

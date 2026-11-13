@@ -2946,11 +2946,11 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="o">,</span><span class="w"> </span><span class="nn">pandas</span>
 <span class="n">pins</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"numpy==</span><span class="si">{</span><span class="n">numpy</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2"> pandas==</span><span class="si">{</span><span class="n">pandas</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2">"</span>
-<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.7.0"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
+<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.7.1"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-1">import numpy, pandas
 pins = f"numpy=={numpy.__version__} pandas=={pandas.__version__}"
-%pip install -q "multibench-sc&gt;=0.7.0" {pins}</div>
+%pip install -q "multibench-sc&gt;=0.7.1" {pins}</div>
 </div>
 </div>
 </div>
@@ -3086,9 +3086,9 @@ res.summary</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[run] StabMap (mosaic/D46mini) ...
-[run]   -&gt; scored (11.9s) ARI 0.240
+[run]   -&gt; scored (16.5s) ARI 0.240
 [run] UINMF (mosaic/D46mini) ...
-[run]   -&gt; scored (17.3s) ARI 0.295
+[run]   -&gt; scored (17.0s) ARI 0.295
 </pre>
 </div>
 </div>
@@ -3157,7 +3157,7 @@ res.summary</div>
 <td>0.9767</td>
 <td>0.4237</td>
 <td>0.3510</td>
-<td>11.9</td>
+<td>16.5</td>
 <td></td>
 <td></td>
 </tr>
@@ -3181,7 +3181,7 @@ res.summary</div>
 <td>0.9720</td>
 <td>0.3133</td>
 <td>0.2403</td>
-<td>17.3</td>
+<td>17.0</td>
 <td></td>
 <td></td>
 </tr>
@@ -3564,7 +3564,7 @@ mine.summary</div>
 <pre>[run] StabMap (mosaic/MYMOSAIC_SHARED) ...
 [run]   -&gt; scored (10.5s) ARI 0.258
 [run] UINMF (mosaic/MYMOSAIC_SHARED) ...
-[run]   -&gt; scored (15.3s) ARI 0.290
+[run]   -&gt; scored (15.1s) ARI 0.290
 </pre>
 </div>
 </div>
@@ -3657,7 +3657,7 @@ mine.summary</div>
 <td>0.9758</td>
 <td>0.3023</td>
 <td>0.2238</td>
-<td>15.3</td>
+<td>15.1</td>
 <td></td>
 <td></td>
 </tr>

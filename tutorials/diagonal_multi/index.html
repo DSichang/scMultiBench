@@ -2947,11 +2947,11 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="o">,</span><span class="w"> </span><span class="nn">pandas</span>
 <span class="n">pins</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"numpy==</span><span class="si">{</span><span class="n">numpy</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2"> pandas==</span><span class="si">{</span><span class="n">pandas</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2">"</span>
-<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.7.0"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
+<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.7.1"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-1">import numpy, pandas
 pins = f"numpy=={numpy.__version__} pandas=={pandas.__version__}"
-%pip install -q "multibench-sc&gt;=0.7.0" {pins}</div>
+%pip install -q "multibench-sc&gt;=0.7.1" {pins}</div>
 </div>
 </div>
 </div>
@@ -3087,9 +3087,9 @@ res.summary</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[run] iNMF (diagonal/D37mini) ...
-[run]   -&gt; scored (16.0s) ARI 0.492
+[run]   -&gt; scored (87.3s) ARI 0.492
 [run] online_iNMF (diagonal/D37mini) ...
-[run]   -&gt; scored (10.4s) ARI 0.422
+[run]   -&gt; scored (75.8s) ARI 0.422
 </pre>
 </div>
 </div>
@@ -3158,7 +3158,7 @@ res.summary</div>
 <td>0.9728</td>
 <td>0.5021</td>
 <td>0.4896</td>
-<td>16.0</td>
+<td>87.3</td>
 <td></td>
 <td></td>
 </tr>
@@ -3182,7 +3182,7 @@ res.summary</div>
 <td>0.9671</td>
 <td>0.5582</td>
 <td>0.5613</td>
-<td>10.4</td>
+<td>75.8</td>
 <td></td>
 <td></td>
 </tr>
@@ -3563,9 +3563,9 @@ mine.summary</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[run] iNMF (diagonal/MYDIAG_BATCHES) ...
-[run]   -&gt; scored (15.3s) ARI 0.506
+[run]   -&gt; scored (85.5s) ARI 0.506
 [run] online_iNMF (diagonal/MYDIAG_BATCHES) ...
-[run]   -&gt; scored (10.2s) ARI 0.462
+[run]   -&gt; scored (69.4s) ARI 0.462
 </pre>
 </div>
 </div>
@@ -3634,7 +3634,7 @@ mine.summary</div>
 <td>0.9696</td>
 <td>0.4793</td>
 <td>0.4638</td>
-<td>15.3</td>
+<td>85.5</td>
 <td></td>
 <td></td>
 </tr>
@@ -3658,7 +3658,7 @@ mine.summary</div>
 <td>0.9667</td>
 <td>0.5477</td>
 <td>0.5467</td>
-<td>10.2</td>
+<td>69.4</td>
 <td></td>
 <td></td>
 </tr>

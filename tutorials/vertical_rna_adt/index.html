@@ -2968,11 +2968,11 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="o">,</span><span class="w"> </span><span class="nn">pandas</span>
 <span class="n">pins</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"numpy==</span><span class="si">{</span><span class="n">numpy</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2"> pandas==</span><span class="si">{</span><span class="n">pandas</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2">"</span>
-<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.7.0"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
+<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.7.1"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-1">import numpy, pandas
 pins = f"numpy=={numpy.__version__} pandas=={pandas.__version__}"
-%pip install -q "multibench-sc&gt;=0.7.0" {pins}</div>
+%pip install -q "multibench-sc&gt;=0.7.1" {pins}</div>
 </div>
 </div>
 </div>
@@ -3045,10 +3045,10 @@ envs = mtb.env.install(METHODS)</div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>downloading D11 (11 MB) ...
 [env] downloading env_sciPENN (gpu build) 2.1 GB ...
-[env]   2.1 GB of 2.1 GB (94 MB/s)
+[env]   2.1 GB of 2.1 GB (21 MB/s)
 [env] unpacking env_sciPENN ...
 [env] downloading matilda (gpu build) 3.0 GB ...
-[env]   3.0 GB of 3.0 GB (101 MB/s)
+[env]   3.0 GB of 3.0 GB (20 MB/s)
 [env] unpacking matilda ...
 </pre>
 </div>
@@ -3108,9 +3108,9 @@ res.summary</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[run] Matilda (vertical/D11) ...
-[run]   -&gt; scored (15.5s) ARI 0.866
+[run]   -&gt; scored (91.1s) ARI 0.866
 [run] sciPENN (vertical/D11) ...
-[run]   -&gt; scored (10.0s) ARI 0.525
+[run]   -&gt; scored (35.7s) ARI 0.499
 </pre>
 </div>
 </div>
@@ -3159,7 +3159,7 @@ res.summary</div>
 <td>0.6807</td>
 <td>0.8247</td>
 <td>0.9989</td>
-<td>15.5</td>
+<td>91.1</td>
 <td></td>
 <td></td>
 </tr>
@@ -3167,13 +3167,13 @@ res.summary</div>
 <th>1</th>
 <td>sciPENN</td>
 <td>scored</td>
-<td>0.5255</td>
-<td>0.6518</td>
-<td>0.6443</td>
-<td>0.6912</td>
-<td>0.6077</td>
-<td>0.9843</td>
-<td>10.0</td>
+<td>0.4987</td>
+<td>0.6445</td>
+<td>0.6356</td>
+<td>0.6809</td>
+<td>0.5920</td>
+<td>0.9787</td>
+<td>35.7</td>
 <td></td>
 <td></td>
 </tr>
@@ -3524,9 +3524,9 @@ mine.summary</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[run] Matilda (vertical/MYCITE) ...
-[run]   -&gt; scored (9.9s) ARI 0.892
+[run]   -&gt; scored (9.8s) ARI 0.892
 [run] sciPENN (vertical/MYCITE) ...
-[run]   -&gt; scored (8.4s) ARI 0.452
+[run]   -&gt; scored (7.8s) ARI 0.428
 </pre>
 </div>
 </div>
@@ -3575,7 +3575,7 @@ mine.summary</div>
 <td>0.6760</td>
 <td>0.8868</td>
 <td>0.9993</td>
-<td>9.9</td>
+<td>9.8</td>
 <td></td>
 <td></td>
 </tr>
@@ -3583,13 +3583,13 @@ mine.summary</div>
 <th>1</th>
 <td>sciPENN</td>
 <td>scored</td>
-<td>0.4517</td>
-<td>0.6278</td>
-<td>0.6261</td>
-<td>0.6695</td>
-<td>0.5857</td>
-<td>0.9689</td>
-<td>8.4</td>
+<td>0.4284</td>
+<td>0.5975</td>
+<td>0.6021</td>
+<td>0.6321</td>
+<td>0.5092</td>
+<td>0.9685</td>
+<td>7.8</td>
 <td></td>
 <td></td>
 </tr>

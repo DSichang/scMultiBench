@@ -2946,11 +2946,11 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="o">,</span><span class="w"> </span><span class="nn">pandas</span>
 <span class="n">pins</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"numpy==</span><span class="si">{</span><span class="n">numpy</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2"> pandas==</span><span class="si">{</span><span class="n">pandas</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2">"</span>
-<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.7.0"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
+<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.7.1"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-1">import numpy, pandas
 pins = f"numpy=={numpy.__version__} pandas=={pandas.__version__}"
-%pip install -q "multibench-sc&gt;=0.7.0" {pins}</div>
+%pip install -q "multibench-sc&gt;=0.7.1" {pins}</div>
 </div>
 </div>
 </div>
@@ -3023,7 +3023,7 @@ envs = mtb.env.install(METHODS)</div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>downloading D27mini_vertical (24 MB) ...
 [env] downloading scmb_vimcca 725 MB ...
-[env]   725 MB of 725 MB (88 MB/s)
+[env]   725 MB of 725 MB (24 MB/s)
 [env] unpacking scmb_vimcca ...
 </pre>
 </div>
@@ -3085,9 +3085,9 @@ res.summary</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[run] VIMCCA (vertical/D27mini_vertical) ...
-[run]   -&gt; scored (18.3s) ARI 0.440
+[run]   -&gt; scored (20.2s) ARI 0.443
 [run] scMM (vertical/D27mini_vertical) ...
-[run]   -&gt; scored (56.0s) ARI 0.276
+[run]   -&gt; scored (93.0s) ARI 0.276
 </pre>
 </div>
 </div>
@@ -3130,13 +3130,13 @@ res.summary</div>
 <th>0</th>
 <td>VIMCCA</td>
 <td>scored</td>
-<td>0.4395</td>
-<td>0.5844</td>
-<td>0.6314</td>
-<td>0.6213</td>
-<td>0.5353</td>
-<td>0.9521</td>
-<td>18.3</td>
+<td>0.4431</td>
+<td>0.6157</td>
+<td>0.6385</td>
+<td>0.6450</td>
+<td>0.5833</td>
+<td>0.9650</td>
+<td>20.2</td>
 <td></td>
 <td></td>
 </tr>
@@ -3150,7 +3150,7 @@ res.summary</div>
 <td>0.6045</td>
 <td>0.3890</td>
 <td>0.8963</td>
-<td>56.0</td>
+<td>93.0</td>
 <td></td>
 <td></td>
 </tr>
@@ -3514,9 +3514,9 @@ mine.summary</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[run] VIMCCA (vertical/MYMULTIOME) ...
-[run]   -&gt; scored (13.1s) ARI 0.460
+[run]   -&gt; scored (101.0s) ARI 0.369
 [run] scMM (vertical/MYMULTIOME) ...
-[run]   -&gt; scored (35.5s) ARI 0.317
+[run]   -&gt; scored (123.7s) ARI 0.317
 </pre>
 </div>
 </div>
@@ -3559,13 +3559,13 @@ mine.summary</div>
 <th>0</th>
 <td>VIMCCA</td>
 <td>scored</td>
-<td>0.4601</td>
-<td>0.5800</td>
-<td>0.6292</td>
-<td>0.6407</td>
-<td>0.5541</td>
-<td>0.9496</td>
-<td>13.1</td>
+<td>0.3690</td>
+<td>0.5724</td>
+<td>0.6266</td>
+<td>0.6410</td>
+<td>0.4919</td>
+<td>0.9493</td>
+<td>101.0</td>
 <td></td>
 <td></td>
 </tr>
@@ -3579,7 +3579,7 @@ mine.summary</div>
 <td>0.5806</td>
 <td>0.3867</td>
 <td>0.8883</td>
-<td>35.5</td>
+<td>123.7</td>
 <td></td>
 <td></td>
 </tr>

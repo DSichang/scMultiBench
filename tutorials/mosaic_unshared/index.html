@@ -2946,11 +2946,11 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="o">,</span><span class="w"> </span><span class="nn">pandas</span>
 <span class="n">pins</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"numpy==</span><span class="si">{</span><span class="n">numpy</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2"> pandas==</span><span class="si">{</span><span class="n">pandas</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2">"</span>
-<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.7.0"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
+<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.7.1"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-1">import numpy, pandas
 pins = f"numpy=={numpy.__version__} pandas=={pandas.__version__}"
-%pip install -q "multibench-sc&gt;=0.7.0" {pins}</div>
+%pip install -q "multibench-sc&gt;=0.7.1" {pins}</div>
 </div>
 </div>
 </div>
@@ -3086,9 +3086,9 @@ res.summary</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[run] StabMap (mosaic/D49mini) ...
-[run]   -&gt; scored (11.3s) ARI 0.388
+[run]   -&gt; scored (11.2s) ARI 0.388
 [run] scMoMaT (mosaic/D49mini) ...
-[run]   -&gt; scored (83.6s) ARI 0.263
+[run]   -&gt; scored (84.6s) ARI 0.263
 </pre>
 </div>
 </div>
@@ -3157,7 +3157,7 @@ res.summary</div>
 <td>0.9751</td>
 <td>0.3431</td>
 <td>0.2985</td>
-<td>11.3</td>
+<td>11.2</td>
 <td></td>
 <td></td>
 </tr>
@@ -3181,7 +3181,7 @@ res.summary</div>
 <td>NaN</td>
 <td>NaN</td>
 <td>NaN</td>
-<td>83.6</td>
+<td>84.6</td>
 <td></td>
 <td></td>
 </tr>
@@ -3562,9 +3562,9 @@ mine.summary</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[run] StabMap (mosaic/MYMOSAIC_UNSHARED) ...
-[run]   -&gt; scored (11.1s) ARI 0.395
+[run]   -&gt; scored (11.2s) ARI 0.395
 [run] scMoMaT (mosaic/MYMOSAIC_UNSHARED) ...
-[run]   -&gt; scored (82.4s) ARI 0.262
+[run]   -&gt; scored (84.6s) ARI 0.262
 </pre>
 </div>
 </div>
@@ -3633,7 +3633,7 @@ mine.summary</div>
 <td>0.9739</td>
 <td>0.3813</td>
 <td>0.3211</td>
-<td>11.1</td>
+<td>11.2</td>
 <td></td>
 <td></td>
 </tr>
@@ -3657,7 +3657,7 @@ mine.summary</div>
 <td>NaN</td>
 <td>NaN</td>
 <td>NaN</td>
-<td>82.4</td>
+<td>84.6</td>
 <td></td>
 <td></td>
 </tr>
