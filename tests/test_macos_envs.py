@@ -176,3 +176,46 @@ def test_the_command_on_macos_is_the_bash_wrapper(mac, tmp_path):
     argv = runner.preview("Matilda", "vertical", inputs=inputs, out_dir=tmp_path / "o")[0]
     assert argv[:2] == ["bash", "-c"] and argv[4] == "python"
     assert str(mac / "matilda" / "bin") in argv[2]
+    # a Python script runs through the fork driver, then as on Linux
+    assert argv[5] == str(runner.MACOS_FORK_DRIVER) and argv[6].endswith(".py")
+    assert runner.MACOS_FORK_DRIVER.is_file()
+
+
+def test_an_r_method_on_macos_has_no_fork_driver(mac, tmp_path):
+    publish(tmp_path, "scmb_seurat4b", ["Seurat_v3"])
+    envs.install(["Seurat_v3"])
+    inputs = {"rna": "rna.h5", "atac_peak": "peak.h5", "atac_gas": "gas.h5",
+              "rna_cty": "c1.csv", "atac_cty": "c2.csv"}
+    argv = runner.preview("Seurat_v3", "diagonal", inputs=inputs, out_dir=tmp_path / "o")[0]
+    assert argv[:2] == ["bash", "-c"] and str(runner.MACOS_FORK_DRIVER) not in argv
+
+
+def test_the_fork_driver_runs_a_script_as_python_would(tmp_path):
+    import subprocess
+    script = tmp_path / "s.py"
+    (tmp_path / "beside.py").write_text("X = 7\n")
+    script.write_text("import multiprocessing, sys, beside\n"
+                      "print(multiprocessing.get_start_method(), sys.argv[1:], beside.X, __name__)\n")
+    out = subprocess.run([sys.executable, str(runner.MACOS_FORK_DRIVER), str(script), "--a", "1"],
+                         capture_output=True, text=True, cwd=tmp_path.parent)
+    if sys.platform == "win32":                 # no fork there; the driver is used on macOS only
+        assert out.returncode != 0
+    else:
+        assert out.stdout.split("\n")[0] == "fork ['--a', '1'] 7 __main__", out.stderr
+
+
+def test_a_method_that_needs_a_terminal_gets_the_bsd_form_of_script(mac, tmp_path, monkeypatch):
+    # scJoint reads the terminal size. Linux: `script -q -e -c "<command>" /dev/null`;
+    # the `script` of macOS takes the file first and the command as an argv
+    publish(tmp_path, "scmb_scjoint", ["scJoint"])
+    envs.install(["scJoint"])
+    inputs = {"rna": "rna.h5", "atac_gas": "atac.h5", "rna_cty": "c1.csv", "atac_cty": "c2.csv"}
+    argv = runner.preview("scJoint", "diagonal", inputs=inputs, out_dir=tmp_path / "o")[0]
+    assert argv[:2] == ["bash", "-c"]
+    assert argv[4:9] == ["script", "-q", "-e", "/dev/null", "python"] and "-c" not in argv[4:]
+    assert argv[9] == str(runner.MACOS_FORK_DRIVER)
+    monkeypatch.setattr(envs, "host_system", lambda: None)           # Linux: as before
+    monkeypatch.setattr(config, "envs_dir", tmp_path / "none")
+    monkeypatch.setenv(runner.RUN_MODE_VAR, "conda")
+    linux = runner.preview("scJoint", "diagonal", inputs=inputs, out_dir=tmp_path / "o")[0]
+    assert linux[linux.index("script"):][:4] == ["script", "-q", "-e", "-c"] and linux[-1] == "/dev/null"

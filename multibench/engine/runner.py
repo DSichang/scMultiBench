@@ -266,6 +266,10 @@ def _host_run_env(run_env: dict | None) -> dict:
     return out
 
 
+#: Runs a Python method script on macOS (:func:`_argv`).
+MACOS_FORK_DRIVER = Path(__file__).resolve().parent / "drivers" / "run_fork.py"
+
+
 def _argv(variant, method: str, values: dict, out_str: str, repo: Path,
           params: dict | None) -> list[str]:
     """The exact argv a method run executes (shared by the run and scan).
@@ -285,10 +289,16 @@ def _argv(variant, method: str, values: dict, out_str: str, repo: Path,
         cmd[1] = str(repo / cmd[1])
     env_name = envs.group_for(method)
     mode, prefix = run_mode(env_name)
+    if envs.on_macos() and cmd[0] == "python":
+        # worker processes by fork, as on Linux (drivers/run_fork.py says why)
+        cmd = [cmd[0], str(MACOS_FORK_DRIVER), *cmd[1:]]
     # `script` gives the method a pty (scJoint reads the terminal size) and
     # passes its exit code on (-e); it must be innermost, as conda run
     # redirects stdio
-    if variant.pty:
+    if variant.pty and envs.on_macos():
+        # the BSD `script` of macOS: the file first, then the command as an argv
+        cmd = ["script", "-q", "-e", "/dev/null", *cmd]
+    elif variant.pty:
         cmd = ["script", "-q", "-e", "-c",
                " ".join(shlex.quote(c) for c in cmd), "/dev/null"]
     if mode == "prefix" and envs.on_windows():
