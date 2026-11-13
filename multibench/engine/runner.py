@@ -455,8 +455,8 @@ def _check_env(method: str, env_name: str) -> None:
     if linux_only:
         raise OSError(
             f"{linux_only} Run this call on a Linux machine, such as Colab.")
-    if envs.on_windows():
-        # an env on Windows runs the methods it was built for
+    if envs.archive_only():
+        # an env on Windows (or macOS) runs the methods it was built for
         if envs.serves(env_name, method):
             return
         if envs.env_prefix(env_name) is not None or not envs.windows_archive_runs(method):
