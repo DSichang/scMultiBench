@@ -48,6 +48,16 @@ def _pin_linux_platform(request, monkeypatch):
     monkeypatch.setattr(envs, "host_system", lambda: None)
 
 
+# A Mac with Apple silicon gets the macOS archives the package lists; a test
+# that sets host_system to "macOS" means a Mac without them, as the processor of
+# the host running the tests must not decide. tests/test_macos_envs.py sets
+# "arm64" in its body, which overrides this.
+@_pytest.fixture(autouse=True)
+def _pin_processor(monkeypatch):
+    from multibench.engine import envs
+    monkeypatch.setattr(envs, "_machine", lambda: "x86_64")
+
+
 @pytest.fixture
 def as_gene_activity(monkeypatch):
     """``as_gene_activity(method)`` registers ``method`` as reading gene

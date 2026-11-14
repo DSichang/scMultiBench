@@ -90,14 +90,17 @@ def windows_archives() -> dict:
         return {"base": "", "archives": {}}
 
 
-# --- macOS on Apple silicon (pilot) -------------------------------------------
-# No archive is published for macOS. An env there is a conda prefix as on Linux
-# (``bin/``, run through the bash wrapper), packed with conda-pack on a Mac and
+# --- macOS on Apple silicon ---------------------------------------------------
+# An env there is a conda prefix as on Linux (``bin/``, run through the bash
+# wrapper), packed with conda-pack on a Mac (``tools/macos/build.py``) and
 # installed like a Windows archive: listed apart, checked by its SHA-256, never
 # built on the computer, and running the methods its METHODS_FILE names.
-#: Names a folder that holds the macOS archives and their ``packed_macos.json``
-#: (the shape of ``packed_windows.json``, without ``base``). Unset: a Mac is
-#: refused as before.
+#: The archives published for macOS (written by ``tools/macos/build.py listing``).
+_MACOS_JSON = Path(__file__).resolve().parent / "packed_macos.json"
+
+#: Names a folder of macOS archives and their ``packed_macos.json`` (without
+#: ``base``) to use instead of the published ones: archives checked before they
+#: are uploaded.
 MACOS_ARCHIVES_VAR = "MULTIBENCH_MACOS_ARCHIVES"
 
 #: The ``state`` of an install row on macOS whose env has no archive there.
@@ -112,19 +115,17 @@ def _machine() -> str:
 
 
 def macos_archives() -> dict:
-    """The archives for macOS on Apple silicon, in the shape of
-    :func:`windows_archives`: read from ``packed_macos.json`` in the folder
-    :data:`MACOS_ARCHIVES_VAR` names, with that folder as ``base``; no archive
-    when the variable is not set or the file is not there."""
+    """``engine/packed_macos.json``, in the shape of :func:`windows_archives`; or,
+    when :data:`MACOS_ARCHIVES_VAR` names a folder, the ``packed_macos.json`` in
+    it, with that folder as ``base``. No archive when the file is not there."""
     folder = os.environ.get(MACOS_ARCHIVES_VAR)
-    if not folder:
-        return {"base": "", "archives": {}}
-    root = Path(folder).expanduser().resolve()
+    listing = Path(folder).expanduser().resolve() / "packed_macos.json" if folder else _MACOS_JSON
     try:
-        data = _json.loads((root / "packed_macos.json").read_text(encoding="utf-8"))
+        data = _json.loads(listing.read_text(encoding="utf-8"))
     except OSError:
         return {"base": "", "archives": {}}
-    return {"base": root.as_uri(), "archives": data.get("archives", {})}
+    base = listing.parent.as_uri() if folder else data.get("base", "")
+    return {"base": base, "archives": data.get("archives", {})}
 
 
 def on_macos() -> bool:

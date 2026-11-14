@@ -34,6 +34,14 @@ def test_each_listed_method_is_served_by_that_env_on_linux_too():
             assert envs.group_for(m) == env, f"{m} runs in {envs.group_for(m)}, not {env}"
 
 
+def test_the_package_lists_the_archives_of_these_envs():
+    """engine/packed_macos.json (written by `build.py listing`) serves what envs.yaml says."""
+    import json
+    listing = json.loads((ROOT / "multibench" / "engine" / "packed_macos.json").read_text())
+    assert listing["base"] == _tool().BASE
+    assert {k: v["methods"] for k, v in listing["archives"].items()} == ENVS
+
+
 def test_a_method_is_listed_once():
     listed = [m for ms in ENVS.values() for m in ms]
     assert len(listed) == len(set(listed))

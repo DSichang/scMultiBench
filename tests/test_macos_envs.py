@@ -1,12 +1,13 @@
-"""macOS on Apple silicon (pilot): a method runs in an env unpacked from an
-archive packed on a Mac, when a folder of such archives is named.
+"""macOS on Apple silicon: a method runs in an env unpacked from an archive
+packed on a Mac.
 
 An env there is a conda prefix as on Linux (``bin/``), run through the bash
-wrapper; ``METHODS_FILE`` lists the methods it was built for. The archives and
-their ``packed_macos.json`` sit in the folder ``MULTIBENCH_MACOS_ARCHIVES``
-names; without it a Mac is refused as before. Every test pins the platform
-through ``envs.host_system`` and ``envs._machine``, so it holds on any host;
-nothing here starts a method.
+wrapper; ``METHODS_FILE`` lists the methods it was built for. The published
+archives are listed in ``engine/packed_macos.json``; a folder that
+``MULTIBENCH_MACOS_ARCHIVES`` names (archives and their ``packed_macos.json``)
+replaces them, and the tests below use such a folder. Every test pins the
+platform through ``envs.host_system`` and ``envs._machine``, so it holds on any
+host; nothing here starts a method or downloads anything.
 """
 from __future__ import annotations
 
@@ -66,17 +67,33 @@ def publish(tmp_path, key, methods, *, sha256=None, unpack_script=None):
 
 
 # ----------------------------------------------------------------- the gate
-def test_a_mac_without_an_archive_folder_is_refused_as_before(monkeypatch, tmp_path):
+def test_a_mac_reads_the_published_listing(monkeypatch):
     monkeypatch.setattr(envs, "host_system", lambda: "macOS")
     monkeypatch.setattr(envs, "_machine", lambda: "arm64")
     monkeypatch.delenv(envs.MACOS_ARCHIVES_VAR, raising=False)
+    assert envs.on_macos() and envs.archive_only() and envs.linux_only_text() is None
+    listing = envs.host_archives()
+    assert listing["base"].startswith("https://github.com/DSichang/scMultiBench/releases/download/")
+    for key, entry in listing["archives"].items():
+        assert len(entry["sha256"]) == 64 and entry["archive_bytes"] > 0 and entry["methods"], key
+        assert entry["files"] == [f"{key}.tar.gz"], key
+
+
+def test_a_mac_without_a_listing_is_refused_as_before(monkeypatch, tmp_path):
+    monkeypatch.setattr(envs, "host_system", lambda: "macOS")
+    monkeypatch.setattr(envs, "_machine", lambda: "arm64")
+    monkeypatch.delenv(envs.MACOS_ARCHIVES_VAR, raising=False)
+    monkeypatch.setattr(envs, "_MACOS_JSON", tmp_path / "no_listing.json")
     assert not envs.on_macos() and not envs.archive_only()
     assert envs.linux_only_text() == "Methods run only on Linux, and this computer runs macOS."
     with pytest.raises(OSError, match="^Methods run only on Linux"):
         envs.install(["Matilda"])
     with pytest.raises(OSError, match="^Methods run only on Linux"):
         runner._check_env("Matilda", "matilda")
-    # a folder that lists nothing changes nothing
+    # a folder that lists nothing lists nothing, whatever the package ships
+    monkeypatch.undo()
+    monkeypatch.setattr(envs, "host_system", lambda: "macOS")
+    monkeypatch.setattr(envs, "_machine", lambda: "arm64")
     monkeypatch.setenv(envs.MACOS_ARCHIVES_VAR, str(tmp_path))
     assert not envs.on_macos() and envs.linux_only_text()
 

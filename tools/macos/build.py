@@ -9,6 +9,7 @@ usage (on an Apple silicon Mac, with a Python that has this repository's ``multi
     python tools/macos/build.py pack   --work DIR ENV         DIR/archives/ENV.tar.gz + packed_macos.json
     python tools/macos/build.py wheels --work DIR [ENV]       the wheels of wheels.yaml (for ENV)
     python tools/macos/build.py scan   PREFIX                 minimum macOS and outside paths of the binaries
+    python tools/macos/build.py listing --work DIR            multibench/engine/packed_macos.json
 
 ``DIR`` holds everything the build writes: conda's package cache, pip's cache, a HOME of its own (so
 no ``.condarc`` or R profile of the user is read), the built envs, the wheels, logs and the archives.
@@ -46,8 +47,11 @@ Repairs, applied to every env where they are needed:
 ``pack`` writes ``.multibench_methods`` (from ``tools/macos/envs.yaml``), packs the env with
 conda-pack (which signs the binaries it rewrites, ad hoc), and adds its entry to
 ``DIR/archives/packed_macos.json``: files, SHA-256, sizes, file count and methods. ``mtb.env.install``
-reads that folder when ``MULTIBENCH_MACOS_ARCHIVES`` names it. Packages, versions and build records
-of each env land in ``DIR/build/<env>/``.
+reads that folder when ``MULTIBENCH_MACOS_ARCHIVES`` names it, so a new set can be checked before it
+is uploaded. After the archives and that file are uploaded to the release BASE names, ``listing``
+writes ``multibench/engine/packed_macos.json`` (the same entries, with ``base``), which the package
+ships and reads on a Mac. Packages, versions and build records of each env land in
+``DIR/build/<env>/``.
 """
 from __future__ import annotations
 
@@ -70,6 +74,8 @@ REPO = HERE.parent.parent
 LOCKS = REPO / "multibench" / "engine" / "env_locks"
 sys.path.insert(0, str(REPO))
 
+#: The release the archives are uploaded to: the ``base`` of the package's listing.
+BASE = "https://github.com/DSichang/scMultiBench/releases/download/envs-mac-v1"
 LINUX_ONLY_PIP = re.compile(r"^(nvidia-|triton==|cuda-bindings==)", re.I)
 SOFT_NUMERIC = ("hdf5", "gsl", "glpk", "armadillo", "arpack", "bedtools")
 KEEP_EXACT = ("python", "r-base")
@@ -488,6 +494,31 @@ def pack(w: Work, env: str):
           f"{size / 1e9:.2f} GB unpacked, {n} files, methods {', '.join(methods)}")
 
 
+def listing(w: Work):
+    """Write the package's ``engine/packed_macos.json`` from ``DIR/archives/packed_macos.json``, after
+    checking that every env of envs.yaml is there and every archive has its listed size and SHA-256."""
+    src = json.loads((w.root / "archives" / "packed_macos.json").read_text())["archives"]
+    missing = sorted(set(env_methods()) - set(src))
+    if missing:
+        raise SystemExit(f"not packed: {missing}")
+    for env, entry in src.items():
+        if entry["methods"] != env_methods().get(env):
+            raise SystemExit(f"{env}: its archive serves {entry['methods']}, envs.yaml says {env_methods().get(env)}")
+        for name in entry["files"]:
+            f, h = w.root / "archives" / name, hashlib.sha256()
+            with open(f, "rb") as fh:
+                while b := fh.read(1 << 22):
+                    h.update(b)
+            if h.hexdigest() != entry["sha256"] or f.stat().st_size != entry["archive_bytes"]:
+                raise SystemExit(f"{name} differs from its entry")
+    out = REPO / "multibench" / "engine" / "packed_macos.json"
+    out.write_text(json.dumps({"base": BASE, "archives": dict(sorted(src.items())), "_meta": {
+        "written": time.strftime("%Y-%m-%d %H:%M"),
+        "note": "Written by tools/macos/build.py listing. archive_bytes: the archive; unpacked_bytes: the "
+                "files in it."}}, indent=1) + "\n")
+    print(f"{out}: {len(src)} archives, {sum(len(e['methods']) for e in src.values())} methods, base {BASE}")
+
+
 def scan(prefix: str):
     """The minimum macOS each binary is built for, and the paths outside the env its load commands name."""
     root = os.path.abspath(prefix)
@@ -526,7 +557,7 @@ def build_all(w: Work, names: list[str], keep: bool):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("command", choices=["all", "recipe", "build", "resume", "pack", "wheels", "scan"])
+    ap.add_argument("command", choices=["all", "recipe", "build", "resume", "pack", "wheels", "scan", "listing"])
     ap.add_argument("names", nargs="*", help="env names (scan: one prefix)")
     ap.add_argument("--work", help="the build folder (all but scan)")
     ap.add_argument("--conda", help="conda to use (default: $CONDA_EXE, then conda on PATH)")
@@ -539,6 +570,8 @@ def main(argv=None):
     w = Work(a.work, a.conda)
     if a.command == "all":
         return build_all(w, a.names, a.keep)
+    if a.command == "listing":
+        return listing(w)
     if a.command == "wheels":
         return wheels(w, a.names[0] if a.names else None)
     if len(a.names) != 1:
