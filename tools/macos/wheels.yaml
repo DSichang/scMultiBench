@@ -1,0 +1,18 @@
+# Wheels built on the Mac for pins that have no Apple silicon wheel and no simple source build.
+# `build.py wheels` builds each in a throwaway conda env (`conda`: what the build needs), for macOS 11,
+# copies the libraries it links into the wheel (delocate), and puts it where every env build looks first.
+# `dirs`: variables the package's setup reads to find a library, set to the throwaway env.
+# `ignore_missing`: let delocate pass a library the wheel brings itself (the entry says which).
+scikit-misc==0.2.0:
+  python: "3.8"
+  for: [glue]
+  conda: [c-compiler, cxx-compiler, fortran-compiler, pkg-config, openblas]
+tables==3.9.2:
+  python: "3.9"
+  for: [scmb_torch, scmb_torch_v2]
+  # its own copy of c-blosc does not compile with the zlib of today's macOS SDK; conda's blosc is used
+  conda: [c-compiler, cxx-compiler, pkg-config, hdf5, lzo, bzip2, blosc]
+  dirs: [HDF5_DIR, BLOSC_DIR, LZO_DIR, BZIP2_DIR]
+  # the wheel carries its own tables/libblosc2.dylib, which tables loads before its extensions; delocate
+  # cannot see that and would stop on @rpath/libblosc2.2.dylib
+  ignore_missing: true

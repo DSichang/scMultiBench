@@ -1,0 +1,4 @@
+# Old source releases build with the setuptools of their time; pysam 0.22.1 built with Cython 3.1 or
+# later fails at import (CMATCH).
+setuptools<70
+Cython<3.1

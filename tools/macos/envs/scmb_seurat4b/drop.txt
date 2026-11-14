@@ -1,0 +1,25 @@
+# Bioconductor 3.16 (R 4.2) has no osx-arm64 builds on bioconda; post_macos.sh compiles these from
+# Bioconductor's source archives at the lock's versions, and Signac from CRAN's archive.
+bioconductor-biobase
+bioconductor-biocgenerics
+bioconductor-biocparallel
+bioconductor-biostrings
+bioconductor-data-packages
+bioconductor-delayedarray
+bioconductor-genomeinfodb
+bioconductor-genomeinfodbdata
+bioconductor-genomicranges
+bioconductor-hdf5array
+bioconductor-iranges
+bioconductor-matrixgenerics
+bioconductor-rhdf5
+bioconductor-rhdf5filters
+bioconductor-rhdf5lib
+bioconductor-rhtslib
+bioconductor-rsamtools
+bioconductor-s4vectors
+bioconductor-singlecellexperiment
+bioconductor-summarizedexperiment
+bioconductor-xvector
+bioconductor-zlibbioc
+r-signac

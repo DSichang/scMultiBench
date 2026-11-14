@@ -1,0 +1,2 @@
+# no arm64 wheel for Python 3.9 and the source build needs the igraph C library; 0.7.2 is the next release with a wheel
+louvain==0.7.1 louvain==0.7.2

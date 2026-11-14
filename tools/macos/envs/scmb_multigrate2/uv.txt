@@ -1,0 +1,3 @@
+# The metadata of pytorch-lightning 1.7.7 asks for `torch>=1.9.*`, which pip 24.1 and later refuse to read
+# (wheel and source alike); uv reads it, and with --no-deps installs the same files as pip did on Linux.
+pytorch-lightning==1.7.7
