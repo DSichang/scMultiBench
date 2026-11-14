@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import functools
+import inspect
 import io
 import warnings
 
@@ -231,18 +232,30 @@ def _resolve_flavor(flavor=None) -> str:
     return flavor
 
 
+def _representation(neighbors, rep: str) -> dict:
+    """The keyword that hands ``adata.obsm[rep]`` (``adata.X`` for ``"X"``) to
+    scanpy's ``neighbors``: ``use`` where the function has it (scanpy 1.13.0 on,
+    which deprecates ``use_rep``), else ``use_rep``. Asked of the function, so
+    no release number is written here."""
+    if "use" not in inspect.signature(neighbors).parameters:
+        return {"use_rep": rep}
+    from anndata.acc import A
+    # the entry itself: scanpy's text form "obsm.<name>" splits a name at its periods
+    return {"use": A.X if rep == "X" else A.obsm[rep]}
+
+
 def _neighbors(adata, rep: str) -> None:
-    """``sc.pp.neighbors`` on ``adata.obsm[rep]``, silencing the
-    ``SparseEfficiencyWarning`` scipy raises on some embeddings. When numba
-    cannot type the distances scanpy hands to umap-learn (umap-learn 0.6.0 with
-    scanpy 1.12.5, on 8,192 cells or more), the error names the release and
-    what to install."""
+    """``sc.pp.neighbors`` on ``adata.obsm[rep]`` (``adata.X`` for ``"X"``),
+    silencing the ``SparseEfficiencyWarning`` scipy raises on some embeddings.
+    When numba cannot type the distances scanpy hands to umap-learn (umap-learn
+    0.6.0 with scanpy 1.12.5, on 8,192 cells or more), the error names the
+    release and what to install."""
     import scanpy as sc
     from scipy.sparse import SparseEfficiencyWarning
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", SparseEfficiencyWarning)
-            sc.pp.neighbors(adata, use_rep=rep)
+            sc.pp.neighbors(adata, **_representation(sc.pp.neighbors, rep))
     except Exception as e:
         # known by numba's words, not by the release: another release with the
         # same fault is named the same way
