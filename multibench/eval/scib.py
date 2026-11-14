@@ -247,9 +247,11 @@ def _representation(neighbors, rep: str) -> dict:
 def _neighbors(adata, rep: str) -> None:
     """``sc.pp.neighbors`` on ``adata.obsm[rep]`` (``adata.X`` for ``"X"``),
     silencing the ``SparseEfficiencyWarning`` scipy raises on some embeddings.
-    When numba cannot type the distances scanpy hands to umap-learn (umap-learn
-    0.6.0 with scanpy 1.12.5, on 8,192 cells or more), the error names the
-    release and what to install."""
+    Two failures of the search scanpy runs on 8,192 cells or more name the
+    release and what to install: numba cannot type the distances scanpy hands
+    to umap-learn (umap-learn 0.6.0 with scanpy 1.12.5), and scanpy cannot
+    read the sparse arrays pynndescent returns from 0.7 on (scanpy up to
+    1.12.0). The package's dependencies leave both releases out."""
     import scanpy as sc
     from scipy.sparse import SparseEfficiencyWarning
     try:
@@ -257,16 +259,21 @@ def _neighbors(adata, rep: str) -> None:
             warnings.simplefilter("ignore", SparseEfficiencyWarning)
             sc.pp.neighbors(adata, **_representation(sc.pp.neighbors, rep))
     except Exception as e:
-        # known by numba's words, not by the release: another release with the
-        # same fault is named the same way
-        if type(e).__name__ != "TypingError" or "knn_dists" not in str(e):
-            raise
+        # known by the error's words, not by the release: another release with
+        # the same fault is named the same way
         from importlib.metadata import version
-        here = version("umap-learn")
-        raise RuntimeError(
-            f"umap-learn {here} cannot build the neighbour graph of these "
-            f"{adata.n_obs:,} cells. Run pip install \"umap-learn!={here}\", then "
-            f"score again.") from e
+        if type(e).__name__ == "TypingError" and "knn_dists" in str(e):
+            here = version("umap-learn")
+            raise RuntimeError(
+                f"umap-learn {here} cannot build the neighbour graph of these "
+                f"{adata.n_obs:,} cells. Run pip install \"umap-learn!={here}\", then "
+                f"score again.") from e
+        if isinstance(e, AttributeError) and "getnnz" in str(e):
+            raise RuntimeError(
+                f"scanpy {version('scanpy')} cannot read the neighbours pynndescent "
+                f"{version('pynndescent')} found for these {adata.n_obs:,} cells. Run pip "
+                f"install \"pynndescent<0.7\", then score again.") from e
+        raise
 
 
 def _leiden(adata, resolution: float, key_added: str, flavor: str) -> None:

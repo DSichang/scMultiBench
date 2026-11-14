@@ -7,10 +7,12 @@ non-contiguous ``knn_dists``. The package leaves that one release out of its
 dependencies, and a run that meets the failure all the same says what to
 install.
 
-pynndescent 0.7.0 (2026-10-27), with the scanpy that Python 3.9 to 3.11 get
-(1.10 and 1.11; scanpy 1.12 needs Python 3.12): it returns sparse arrays, which
-have no ``getnnz``. On those Pythons the package keeps the pynndescent line
-their scanpy was written for.
+pynndescent 0.7.0 (2026-10-27) returns sparse arrays, which have no ``getnnz``:
+scanpy 1.10, 1.11 and 1.12.0 cannot read them. Which scanpy pip installs does
+not follow from the Python version alone: on Python 3.13 with pandas held at
+2.2.3 (Colab, through the tutorials' install cell) it is scanpy 1.12.0. So
+the package keeps pynndescent below 0.7 on every Python, and a run that meets
+the failure all the same says what to install.
 """
 import re
 from importlib.metadata import version
@@ -46,13 +48,43 @@ def test_the_dependencies_leave_out_the_one_broken_umap_release():
     assert umap.specifier.contains("0.5.12") and umap.specifier.contains("0.6.1")
 
 
-def test_python_before_3_12_keeps_the_pynndescent_of_its_scanpy():
+def test_every_python_keeps_a_pynndescent_that_every_scanpy_reads():
     pynn = _declared()["pynndescent"]
-    old, new = {"python_version": "3.11"}, {"python_version": "3.12"}
-    assert pynn.marker.evaluate(old) and pynn.marker.evaluate({"python_version": "3.9"})
+    # no marker: scanpy 1.12.0, which Python 3.13 gets beside an older pandas,
+    # reads pynndescent 0.7 no better than the scanpy of Python 3.9
+    assert pynn.marker is None
     assert not pynn.specifier.contains("0.7.0") and pynn.specifier.contains("0.6.0")
-    # Python 3.12 and later take scanpy 1.12, which reads pynndescent 0.7: no bound there
-    assert not pynn.marker.evaluate(new)
+
+
+#: scanpy's failure on what pynndescent 0.7 returns (Python 3.10 and later)
+GETNNZ = "'csr_array' object has no attribute 'getnnz'"
+
+
+def test_the_pynndescent_failure_says_which_release_and_what_to_install(monkeypatch):
+    import scanpy as sc
+
+    def refuse(adata, **kwargs):
+        raise AttributeError(GETNNZ)
+
+    monkeypatch.setattr(sc.pp, "neighbors", refuse)
+    with pytest.raises(RuntimeError) as e:
+        escib._neighbors(_adata(), "X")
+    assert str(e.value) == (
+        f'scanpy {version("scanpy")} cannot read the neighbours pynndescent '
+        f'{version("pynndescent")} found for these 30 cells. Run pip install '
+        f'"pynndescent<0.7", then score again.')
+    assert isinstance(e.value.__cause__, AttributeError)
+
+
+def test_another_attribute_error_of_the_neighbour_graph_is_not_reworded(monkeypatch):
+    import scanpy as sc
+
+    def refuse(adata, **kwargs):
+        raise AttributeError("'NoneType' object has no attribute 'shape'")
+
+    monkeypatch.setattr(sc.pp, "neighbors", refuse)
+    with pytest.raises(AttributeError, match="has no attribute 'shape'"):
+        escib._neighbors(_adata(), "X")
 
 
 def _adata(n=30):
