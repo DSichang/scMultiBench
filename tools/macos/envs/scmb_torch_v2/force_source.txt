@@ -1,0 +1,3 @@
+# the macOS wheel of rpy2-rinterface carries the C runtime of another R version; with the R 4.6.0 of this
+# env, R stops at start-up ("Error in substring(x, m + 1L)"). Built here it links the env's own R, as on Linux.
+rpy2-rinterface==3.6.6

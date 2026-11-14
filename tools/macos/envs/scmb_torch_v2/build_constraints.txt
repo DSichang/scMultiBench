@@ -1,0 +1,1 @@
+# no constraint: rpy2-rinterface needs setuptools>=77, and the other source builds of this env do not need an old one

@@ -1,0 +1,3 @@
+# r-devtools 2.5.2 asks for r-testthat >= 3.3.2, which osx-arm64 has only for R 4.4 (this env has R 4.5):
+# with the pin conda finds no solution, so the version is left to the solver.
+r-devtools

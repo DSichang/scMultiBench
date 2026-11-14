@@ -58,10 +58,12 @@ def r_installation(envs_dir: Path, env: str, methods=None) -> Path:
 
 
 # ----------------------------------------------------------------- the platform
-def test_windows_is_not_refused_as_a_platform_and_macos_still_is(monkeypatch):
+def test_windows_is_not_refused_as_a_platform_and_an_intel_mac_still_is(monkeypatch):
+    """A Mac with Apple silicon has archives of its own (tests/test_macos_envs.py)."""
     monkeypatch.setattr(envs, "host_system", lambda: "Windows")
     assert envs.on_windows() and envs.linux_only_text() is None
     monkeypatch.setattr(envs, "host_system", lambda: "macOS")
+    monkeypatch.setattr(envs, "_machine", lambda: "x86_64")
     assert not envs.on_windows()
     assert envs.linux_only_text() == "Methods run only on Linux, and this computer runs macOS."
     monkeypatch.setattr(envs, "host_system", lambda: None)

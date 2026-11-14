@@ -43,7 +43,7 @@ def linux_only_text() -> str | None:
     ``None`` on Linux. Also ``None`` on Windows, where a method runs when an
     environment for it was built on the computer (:func:`serves`)."""
     system = host_system()
-    if system == "Windows":
+    if system == "Windows" or on_macos():
         return None
     return system and f"Methods run only on Linux, and this computer runs {system}."
 
@@ -90,11 +90,68 @@ def windows_archives() -> dict:
         return {"base": "", "archives": {}}
 
 
+# --- macOS on Apple silicon ---------------------------------------------------
+# An env there is a conda prefix as on Linux (``bin/``, run through the bash
+# wrapper), packed with conda-pack on a Mac (``tools/macos/build.py``) and
+# installed like a Windows archive: listed apart, checked by its SHA-256, never
+# built on the computer, and running the methods its METHODS_FILE names.
+#: The archives published for macOS (written by ``tools/macos/build.py listing``).
+_MACOS_JSON = Path(__file__).resolve().parent / "packed_macos.json"
+
+#: Names a folder of macOS archives and their ``packed_macos.json`` (without
+#: ``base``) to use instead of the published ones: archives checked before they
+#: are uploaded.
+MACOS_ARCHIVES_VAR = "MULTIBENCH_MACOS_ARCHIVES"
+
+#: The ``state`` of an install row on macOS whose env has no archive there.
+NO_MACOS_ENV = "no macOS environment"
+
+
+def _machine() -> str:
+    """The processor Python runs on: ``'arm64'`` on Apple silicon (``'x86_64'``
+    under Rosetta, where the arm64 envs do not run)."""
+    import platform
+    return platform.machine()
+
+
+def macos_archives() -> dict:
+    """``engine/packed_macos.json``, in the shape of :func:`windows_archives`; or,
+    when :data:`MACOS_ARCHIVES_VAR` names a folder, the ``packed_macos.json`` in
+    it, with that folder as ``base``. No archive when the file is not there."""
+    folder = os.environ.get(MACOS_ARCHIVES_VAR)
+    listing = Path(folder).expanduser().resolve() / "packed_macos.json" if folder else _MACOS_JSON
+    try:
+        data = _json.loads(listing.read_text(encoding="utf-8"))
+    except OSError:
+        return {"base": "", "archives": {}}
+    base = listing.parent.as_uri() if folder else data.get("base", "")
+    return {"base": base, "archives": data.get("archives", {})}
+
+
+def on_macos() -> bool:
+    """Whether this computer is a Mac with Apple silicon for which archives are
+    listed (:func:`macos_archives`). A Mac without them is refused as a platform
+    (:func:`linux_only_text`)."""
+    return (host_system() == "macOS" and _machine() == "arm64"
+            and bool(macos_archives()["archives"]))
+
+
+def archive_only() -> bool:
+    """Whether envs on this computer come only from the archives listed for its
+    system (:func:`host_archives`): Windows, and macOS when :func:`on_macos`."""
+    return on_windows() or on_macos()
+
+
+def host_archives() -> dict:
+    """:func:`macos_archives` on macOS, else :func:`windows_archives`."""
+    return macos_archives() if on_macos() else windows_archives()
+
+
 def _host_manifest() -> dict:
-    """:func:`packed_manifest` for this system: on Windows the archives of
-    :func:`windows_archives`, as ``{key: [the URL of each file]}``."""
-    if on_windows():
-        data = windows_archives()
+    """:func:`packed_manifest` for this system: on Windows and macOS the archives
+    of :func:`host_archives`, as ``{key: [the URL of each file]}``."""
+    if archive_only():
+        data = host_archives()
         return {key: [f"{data['base']}/{f}" for f in a["files"]]
                 for key, a in data["archives"].items()}
     return packed_manifest()
@@ -102,19 +159,19 @@ def _host_manifest() -> dict:
 
 def _host_sizes() -> dict:
     """:func:`packed_sizes` for this system."""
-    if on_windows():
+    if archive_only():
         return {key: {"archive_bytes": a.get("archive_bytes"),
                       "unpacked_bytes": a.get("unpacked_bytes")}
-                for key, a in windows_archives()["archives"].items()}
+                for key, a in host_archives()["archives"].items()}
     return packed_sizes()
 
 
 def windows_archive_runs(method: str, flavor: str = "auto") -> bool:
-    """Whether the Windows archive this host would get for ``method``'s env
-    (:func:`archive_for`) was built for the method."""
+    """Whether the Windows (or macOS) archive this host would get for
+    ``method``'s env (:func:`archive_for`) was built for the method."""
     key, _ = archive_for(group_for(method), flavor, manifest=_host_manifest(),
                          sizes=_host_sizes())
-    return method in windows_archives()["archives"].get(key, {}).get("methods", ())
+    return method in host_archives()["archives"].get(key, {}).get("methods", ())
 
 
 def windows_interpreter(prefix: Path | str, name: str) -> Path | None:
@@ -151,11 +208,13 @@ def serves(env: str, method: str, conda: str | None = None) -> bool:
 
 def no_windows_env_text(methods) -> str:
     """``"Matilda has no Windows environment. Run it on a Linux machine, such
-    as Colab."``; more than three methods are counted, not named."""
+    as Colab."``; more than three methods are counted, not named. On macOS
+    (:func:`on_macos`) the sentence says macOS."""
     methods = list(methods)
     one = len(methods) == 1
     who = _text._and_list(methods) if len(methods) <= 3 else f"{len(methods)} of these methods"
-    return (f"{who} {'has' if one else 'have'} no Windows environment. "
+    system = "macOS" if on_macos() else "Windows"
+    return (f"{who} {'has' if one else 'have'} no {system} environment. "
             f"Run {'it' if one else 'them'} on a Linux machine, such as Colab.")
 
 
@@ -815,7 +874,7 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
                          total=total)
     except urllib.error.HTTPError as e:
         tgz.unlink(missing_ok=True)
-        if on_windows():                # nothing is built on Windows: say what was not there
+        if archive_only():              # nothing is built on Windows: say what was not there
             raise OSError(f"The environment {env} could not be downloaded: "
                           f"{e.url} answered {e.code}.") from e
         return False
@@ -826,7 +885,7 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
     part = _own_name(dest.with_name(dest.name + ".partial"))
     moved = False
     try:
-        if on_windows():
+        if archive_only():
             _check_windows_archive(key, tgz)
         _unpack_archive(tgz, part, envs_root)
         # conda-unpack writes the final path into the env: move first
@@ -849,7 +908,7 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
         if not moved and dest.exists() and _finished_by_another(dest, env):
             _remember_root(envs_root)
             return True
-        if on_windows():                # no lockfile build to fall back to
+        if archive_only():              # no lockfile build to fall back to
             raise RuntimeError(f"The environment {env} could not be unpacked "
                                f"({type(e).__name__}: {str(e)[:300]})") from e
         print(f"[env] prebuilt {env} failed ({type(e).__name__}: "
@@ -925,9 +984,10 @@ def _windows_path_fits(dest: Path, key: str) -> None:
 
 def _check_windows_archive(key: str, archive: Path) -> None:
     """``RuntimeError`` when the downloaded ``archive`` is not the one
-    ``packed_windows.json`` records for ``key`` (its SHA-256)."""
+    ``packed_windows.json`` (``packed_macos.json``) records for ``key`` (its
+    SHA-256)."""
     import hashlib
-    want = windows_archives()["archives"].get(key, {}).get("sha256")
+    want = host_archives()["archives"].get(key, {}).get("sha256")
     digest = hashlib.sha256()
     with open(archive, "rb") as fh:
         while block := fh.read(1 << 22):
@@ -959,6 +1019,10 @@ def _conda_unpack(prefix: Path) -> None:
         return
     py = prefix / "bin" / "python"
     argv = [str(unpack)] if os.access(unpack, os.X_OK) else [str(py), str(unpack)]
+    if on_macos():
+        # an R env holds no python, and a Mac has no `python` on PATH: this
+        # process's own interpreter runs the script (standard library only)
+        argv = [str(py if py.exists() else sys.executable), str(unpack)]
     env = {**os.environ,
            "PATH": f"{prefix / 'bin'}{os.pathsep}{os.environ.get('PATH', '')}"}
     subprocess.run(argv, check=True, capture_output=True, env=env)
@@ -1102,7 +1166,7 @@ def create_all(category: str | None = None, methods: list[str] | None = None,
     out = []
     for env, ms in _envs_needed(category, methods):
         exists = env in have
-        if exists and on_windows():         # an env built for some of its methods
+        if exists and archive_only():       # an env built for some of its methods
             exists = all(serves(env, m, conda) for m in ms)
         cmds = [] if exists else create_env(env, conda=conda)
         if cmds and not dry_run:
@@ -1190,7 +1254,7 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
     if dry_run and not build:
         todo = to_download(rows)
         # the Windows archives have their own sizes and share no layer
-        totals, line = (plan_totals(todo, _host_sizes(), layers={}) if on_windows()
+        totals, line = (plan_totals(todo, _host_sizes(), layers={}) if archive_only()
                         else plan_totals(todo))
         plan.attrs.update(totals)
         if todo:
@@ -1201,7 +1265,7 @@ def install(methods: list[str] | None = None, *, category: str | None = None,
 def to_download(rows) -> list[dict]:
     """The rows of an install plan whose archive would be downloaded."""
     return [r for r in rows if not r["exists"] and r.get("packed_url")
-            and r["state"] not in ("name taken", NO_WINDOWS_ENV)]
+            and r["state"] not in ("name taken", NO_WINDOWS_ENV, NO_MACOS_ENV)]
 
 
 def _install_rows(methods: list[str] | None = None, *, category: str | None = None,
@@ -1226,8 +1290,8 @@ def _install_rows(methods: list[str] | None = None, *, category: str | None = No
         else:
             key, would_install = env, None
         # on Windows an env is installed only from an archive built for its methods
-        published = not on_windows() or set(r["methods"]) <= set(
-            windows_archives()["archives"].get(key, {}).get("methods", ()))
+        published = not archive_only() or set(r["methods"]) <= set(
+            host_archives()["archives"].get(key, {}).get("methods", ()))
         state = _row_state(r, unpacked=unpacked, dry_run=dry_run, packed=packed, conda=conda,
                            published=published)
         size = sizes.get(key) or {}
@@ -1251,14 +1315,16 @@ def _install_missing(category, methods, *, packed, manifest, sizes, conda,
     linux_only = linux_only_text()
     if linux_only:
         raise OSError(f"{linux_only} Run the install on a Linux machine, such as Colab.")
-    if on_windows():
+    if archive_only():
         # nothing is built on Windows: an env that is there (built on the computer,
         # or installed earlier) is used; one that is not is unpacked from the
         # archive published for Windows, when that archive was built for the methods
+        # (the same on macOS)
         if not packed:
-            raise OSError("Environments are not built on Windows. Leave out build=True "
+            system = "macOS" if on_macos() else "Windows"
+            raise OSError(f"Environments are not built on {system}. Leave out build=True "
                           "to unpack the published archives.")
-        archives = windows_archives()["archives"]
+        archives = host_archives()["archives"]
         todo, lacking = [], []
         for env, ms in _envs_needed(category, methods):
             wanted = [m for m in ms if not serves(env, m, conda)]
@@ -1300,8 +1366,8 @@ def _row_state(r: dict, *, unpacked, dry_run, packed, conda, published: bool = T
         return "PACKED"
     if r["exists"]:
         return "have"
-    if on_windows() and not (packed and published):
-        return NO_WINDOWS_ENV
+    if archive_only() and not (packed and published):
+        return NO_MACOS_ENV if on_macos() else NO_WINDOWS_ENV
     if dry_run and other_env_prefix(env, conda) is not None:
         return "name taken"
     if not dry_run:

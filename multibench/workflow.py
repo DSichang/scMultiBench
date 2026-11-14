@@ -225,8 +225,8 @@ def _env_hint(env: str, method: str, other=None) -> str:
     prefix of a same-named env multibench did not install."""
     if envs.linux_only_text():
         return f"Environment {env} runs only on Linux, not on this computer."
-    if envs.on_windows() and (envs.env_prefix(env) is not None
-                              or not envs.windows_archive_runs(method)):
+    if envs.archive_only() and (envs.env_prefix(env) is not None
+                                or not envs.windows_archive_runs(method)):
         # an env that is there and was not built for the method, or no archive for it
         return envs.no_windows_env_text([method])
     if other is not None:
@@ -800,7 +800,7 @@ def _check_env(rec, spec, ctx) -> tuple[str, str]:
     GPU-node caveat); ``(env hint, GPU hint)``."""
     env_hint = gpu_hint = ""
     # on Windows an installed env may be built for some of its methods only
-    unserved = (envs.on_windows() and rec["env"] in ctx.installed
+    unserved = (envs.archive_only() and rec["env"] in ctx.installed
                 and not envs.serves(rec["env"], spec.id))
     if rec["env"] and (ctx.off_linux or rec["env"] not in ctx.installed or unserved):
         rec["env_ok"] = False
@@ -1060,7 +1060,7 @@ def _print_reasons(reasons, per_batch: str) -> None:
     # a file's problem is the same for every method that reads it: said once
     for problem in dict.fromkeys(p for _, _, p in reasons if p):
         print(f"[scan] {problem}", flush=True)
-    if envs.on_windows():
+    if envs.archive_only():
         # most methods have no Windows environment: one line for them, not one each
         lacking = sorted(m for m, reason, _ in reasons
                          if reason == envs.no_windows_env_text([m]))

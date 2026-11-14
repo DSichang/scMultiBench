@@ -1,0 +1,173 @@
+{
+ "base": "https://github.com/DSichang/scMultiBench/releases/download/envs-mac-v1",
+ "archives": {
+  "glue": {
+   "files": [
+    "glue.tar.gz"
+   ],
+   "sha256": "5dcd380ab6b247ecd25737ad4acec276a607717ef27c7f65888574a7ca8e55b8",
+   "archive_bytes": 338884274,
+   "unpacked_bytes": 1088812515,
+   "file_count": 45028,
+   "methods": [
+    "GLUE"
+   ]
+  },
+  "matilda": {
+   "files": [
+    "matilda.tar.gz"
+   ],
+   "sha256": "330e8c4e5a8bf50942ebe857144a5d3166c19882ac4440b55472c29ee39db50b",
+   "archive_bytes": 304543459,
+   "unpacked_bytes": 1032805305,
+   "file_count": 46337,
+   "methods": [
+    "Matilda"
+   ]
+  },
+  "scmb_cobolt3": {
+   "files": [
+    "scmb_cobolt3.tar.gz"
+   ],
+   "sha256": "7fa7cf1d22cf6a3c5a5c6ae92db3f3debd5a5745562c05c1d3313e0a73131f43",
+   "archive_bytes": 268992077,
+   "unpacked_bytes": 924404773,
+   "file_count": 38378,
+   "methods": [
+    "Cobolt"
+   ]
+  },
+  "scmb_mira": {
+   "files": [
+    "scmb_mira.tar.gz"
+   ],
+   "sha256": "75237aeb4192412b0b3fcd78a102242c4682bd6a80fbfa9637b64607df1e465a",
+   "archive_bytes": 366625568,
+   "unpacked_bytes": 1173782150,
+   "file_count": 50006,
+   "methods": [
+    "MIRA"
+   ]
+  },
+  "scmb_multigrate2": {
+   "files": [
+    "scmb_multigrate2.tar.gz"
+   ],
+   "sha256": "bace120224bc179a104f67a05aa46da8a51447062e793c4d4d21b4f46aaec2d1",
+   "archive_bytes": 432291240,
+   "unpacked_bytes": 1489401289,
+   "file_count": 53633,
+   "methods": [
+    "Multigrate"
+   ]
+  },
+  "scmb_multivi": {
+   "files": [
+    "scmb_multivi.tar.gz"
+   ],
+   "sha256": "2c5940ee7e770385fb9822dbf8789d49d6160d650d8148a8fd337d924c5d1369",
+   "archive_bytes": 406295105,
+   "unpacked_bytes": 1412209732,
+   "file_count": 50113,
+   "methods": [
+    "MultiVI"
+   ]
+  },
+  "scmb_r": {
+   "files": [
+    "scmb_r.tar.gz"
+   ],
+   "sha256": "5a97a5c43a522e2caf6b6d1565939c40fc1f3dd471923fc596ffeb9a118e7b31",
+   "archive_bytes": 702164788,
+   "unpacked_bytes": 1834371162,
+   "file_count": 40080,
+   "methods": [
+    "StabMap",
+    "UINMF",
+    "iNMF",
+    "online_iNMF"
+   ]
+  },
+  "scmb_scjoint": {
+   "files": [
+    "scmb_scjoint.tar.gz"
+   ],
+   "sha256": "214fa68584cace230a6e891857c0f8bf52c0332b003ac5a58858810f7e2ec401",
+   "archive_bytes": 300559057,
+   "unpacked_bytes": 1023447031,
+   "file_count": 42147,
+   "methods": [
+    "scJoint"
+   ]
+  },
+  "scmb_scvi": {
+   "files": [
+    "scmb_scvi.tar.gz"
+   ],
+   "sha256": "6efbb782f762593f478786b9369ab7de31f869cb55bb4946e252a2978e35ea1f",
+   "archive_bytes": 421582234,
+   "unpacked_bytes": 1478826878,
+   "file_count": 53394,
+   "methods": [
+    "totalVI"
+   ]
+  },
+  "scmb_seurat4b": {
+   "files": [
+    "scmb_seurat4b.tar.gz"
+   ],
+   "sha256": "57dba9a5b7b3b57f677b31db4613bdb04892c3ad5eb43d96b1b38c0c13a720b2",
+   "archive_bytes": 537709449,
+   "unpacked_bytes": 1454570608,
+   "file_count": 35516,
+   "methods": [
+    "Seurat_v3"
+   ]
+  },
+  "scmb_seurat5": {
+   "files": [
+    "scmb_seurat5.tar.gz"
+   ],
+   "sha256": "573da756867623984174563333e6d7059e7caab96a8c68d1803a2362300ede0a",
+   "archive_bytes": 672705325,
+   "unpacked_bytes": 1803272376,
+   "file_count": 37526,
+   "methods": [
+    "Seurat_v5",
+    "Seurat_WNN"
+   ]
+  },
+  "scmb_torch": {
+   "files": [
+    "scmb_torch.tar.gz"
+   ],
+   "sha256": "0ffe0d532c544fd1776780845e85650ffe019d0cc588918bb78e3429cee327eb",
+   "archive_bytes": 345418387,
+   "unpacked_bytes": 1167902505,
+   "file_count": 47215,
+   "methods": [
+    "SCALEX",
+    "scMDC",
+    "scMoMaT",
+    "uniPort",
+    "MultiMAP"
+   ]
+  },
+  "scmb_torch_v2": {
+   "files": [
+    "scmb_torch_v2.tar.gz"
+   ],
+   "sha256": "71c0a731430f5ceed9b4ab7a537e732e8161b41510998ba372826c58161fbfd7",
+   "archive_bytes": 743240682,
+   "unpacked_bytes": 2329832231,
+   "file_count": 64272,
+   "methods": [
+    "Portal"
+   ]
+  }
+ },
+ "_meta": {
+  "written": "2026-11-14 12:59",
+  "note": "Written by tools/macos/build.py listing. archive_bytes: the archive; unpacked_bytes: the files in it."
+ }
+}

@@ -1,0 +1,4 @@
+# The Linux lock runs R on OpenBLAS; named here so that osx-arm64 uses it too (the solver may pick
+# another BLAS). Seurat_v5 scored the same with Apple's Accelerate on this Mac.
+libblas=3.11.0=*openblas
+libopenblas==0.3.34

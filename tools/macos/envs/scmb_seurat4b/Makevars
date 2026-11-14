@@ -1,0 +1,4 @@
+CXXFLAGS += -include locale
+CXX11FLAGS += -include locale
+CXX14FLAGS += -include locale
+CXX17FLAGS += -include locale
