@@ -107,10 +107,10 @@ def test_no_trailing_code_comment_runs_past_80_columns(name):
 # ------------------------------------------- facts that decide a correct result
 @pytest.mark.parametrize("key", KEYS)
 def test_correctness_facts_are_visible(key):
-    """Raw counts (section 5) and 'Methods run on Linux' (the title) are in
+    """Raw counts (section 5) and where the methods run (the title) are in
     the visible text, not only in a collapsed block."""
     cells = _cells(f"tutorial_{key}")
-    assert "Methods run on Linux." in _visible(cells[0][1])
+    assert re.search(r"\brun on Linux\b", _visible(cells[0][1]))
     own = next(s for kind, s in cells if kind == "markdown" and s.startswith("## 5. Your own data"))
     assert re.search(r"Your data needs raw [A-Za-z ]*counts", _visible(own)), own
 

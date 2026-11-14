@@ -301,9 +301,64 @@ def test_every_method_of_a_task_has_its_input_files_on_the_dataset(key):
         (key, sorted(set(everyone) - set(sc[sc.files_ok].method)))
 
 
-@pytest.mark.parametrize("name", RUNNING)
-def test_title_says_where_methods_run(name):
-    assert "Methods run on Linux." in _cells(name)[0][1]
+def _windows_methods():
+    """The methods a published Windows archive was built for, read from the
+    listing itself and not through the generator."""
+    import json
+    from pathlib import Path
+    import multibench
+    listing = Path(multibench.__file__).parent / "engine" / "packed_windows.json"
+    return {m for a in json.loads(listing.read_text())["archives"].values() for m in a["methods"]}
+
+
+def _not_on_windows(methods):
+    return [m for m in methods if m not in _windows_methods()]
+
+
+def test_the_two_kinds_of_tutorial_both_exist():
+    """Some tutorials run as written on Windows and some do not: the tests below
+    are about both sentences."""
+    kinds = {bool(_not_on_windows(GEN.TASKS[k]["methods"])) for k in KEYS}
+    assert kinds == {True, False}
+
+
+@pytest.mark.parametrize("key", KEYS)
+def test_title_says_where_the_default_methods_run(key):
+    """A tutorial whose default methods all have a Windows environment says they
+    run on Linux and Windows, and sends only macOS to Colab. Another one
+    names the method without a Windows environment and sends Windows to Colab."""
+    methods = GEN.TASKS[key]["methods"]
+    first = _cells(f"tutorial_{key}")[0][1]
+    colab = f"[open this notebook in Colab]({GEN.COLAB}tutorial_{key}.ipynb)"
+    lacking = _not_on_windows(methods)
+    if lacking:
+        has = "has" if len(lacking) == 1 else "have"
+        assert (f"Methods run on Linux, and {GEN.and_list(lacking)} {has} no Windows "
+                f"environment. On macOS or Windows, {colab}") in first
+    else:
+        assert f"{GEN.and_list(methods)} run on Linux and Windows. On macOS, {colab}" in first
+        assert "On macOS or Windows" not in first
+
+
+def test_a_windows_tutorial_gives_the_download_of_each_system():
+    """cross RNA+ADT, StabMap and sciPENN. Windows, by hand from packed_windows.json:
+    scmb_r 347,052,084 bytes + env_sciPENN-cpu 142,679,560 = 0.5 GB, + env_sciPENN
+    1,283,752,348 = 1.6 GB (a Windows computer with a GPU downloaded 1.3 GB + 347 MB
+    on 2026-11-14)."""
+    two = next(s for kind, s in _cells("tutorial_cross_rna_adt")
+               if kind == "markdown" and s.startswith("## 2. "))
+    assert ("On Linux the download is 1.4 GB on a computer without a GPU and 3.0 GB on one "
+            "with a GPU. On Windows it is 0.5 GB and 1.6 GB.") in two
+
+
+@pytest.mark.parametrize("key", KEYS)
+def test_a_linux_only_tutorial_gives_one_download(key):
+    two = next(s for kind, s in _cells(f"tutorial_{key}")
+               if kind == "markdown" and s.startswith("## 2. "))
+    if _not_on_windows(GEN.TASKS[key]["methods"]):
+        assert "The download is " in two and "Windows" not in two
+    else:
+        assert "On Linux the download is " in two and "On Windows it is " in two
 
 
 @pytest.mark.parametrize("name", TUTORIALS)
@@ -322,6 +377,7 @@ def test_all_methods_title_names_the_methods_and_links_the_tutorial(key):
     assert f"on `{t['ds']}`: {GEN.and_list(everyone)}." in first
     assert f"[tutorial]({GEN.SITE}tutorials/{key}/)" in first
     assert f"runs {GEN.and_list(t['methods'])} only." in first
+    # nobody ran an every-method notebook on Windows: it says Linux
     assert f"Methods run on Linux. The {GEN.env_size_text(everyone)}." in first
 
 

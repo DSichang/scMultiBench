@@ -15,7 +15,15 @@ the reader's own format, and draw the benchmark's stored results where the
 package ships them. There are no flags or fallbacks. No notebook defines a
 function. The example files of section 5 come from ``mtb.data.write_example``.
 A step that cannot work on the reader's computer fails with the package's own
-error: the environment install refuses off Linux.
+error: the environment install refuses a method that has no environment for
+the computer's system.
+
+A tutorial also runs on Windows when every default method has a Windows
+environment. Its title says so and section 2 gives the Windows download; the
+title of another tutorial names the method without one (``without_env``, read
+from ``engine/packed_windows.json``). The every-method notebooks say Linux:
+none was run on Windows. No notebook mentions the macOS environments the
+package has from 0.7.2 (owner, 2026-11-14: not in the public text yet).
 
 Every method of a task runs on the task's one dataset. The defaults are two
 methods of the task (one where it has one) that are fast and need no GPU,
@@ -24,7 +32,8 @@ the methods and the output folder, and no other argument: where the dataset
 also holds the files of a smaller variant of a method, ``run`` runs the
 variant with the most modalities. ``check_task`` and ``check_own`` stop the
 generation when a notebook would not run as written. Every size quoted comes
-from the dry-run plans at generation time, never a hand-written figure.
+from the package's archive listings at generation time, never a hand-written
+figure, and is the size on the system named, whatever computer generates.
 
 Prose has two layers. Visible: 1-3 short sentences per section - what the
 step does and what the reader must do or decide - then the code. A fact
@@ -101,38 +110,103 @@ def stored_method_count(cat, dataset):
     return mtb.load_results(cat, dataset=dataset).method.nunique()
 
 
-def _gb(rows):
-    rows = rows.to_dict("records") if hasattr(rows, "to_dict") else rows
-    known = [r["archive_bytes"] for r in rows if r["archive_bytes"]]
+def _archives(system):
+    """``(manifest, sizes, layers, built_for)`` of the archives published for
+    ``system``: the first three as ``envs.archive_for`` and ``envs.layers_for``
+    read them, and ``built_for`` = ``{archive key: the methods it runs}``, or
+    ``None`` on Linux, where an archive runs every method of its env. The
+    Windows and macOS archives share no layer. Read from the package's
+    listings, so a notebook says the same whatever computer generates it."""
+    if system == "Linux":
+        return envs.packed_manifest(), envs.packed_sizes(), envs.packed_layers(), None
+    listed = {"Windows": envs.windows_archives, "macOS": envs.macos_archives}[system]()["archives"]
+    return ({k: a["files"] for k, a in listed.items()},
+            {k: {"archive_bytes": a.get("archive_bytes")} for k, a in listed.items()}, {},
+            {k: set(a["methods"]) for k, a in listed.items()})
+
+
+def _plan(methods, system, flavor):
+    """``{env: (archive key, the methods of ``methods`` it serves)}``: the
+    archive ``mtb.env.install(methods, flavor=flavor)`` takes for each env on
+    ``system``."""
+    manifest, sizes, _, _ = _archives(system)
+    by_env = {}
+    for m in methods:
+        by_env.setdefault(envs.group_for(m), []).append(m)
+    return {env: (envs.archive_for(env, flavor, manifest=manifest, sizes=sizes)[0], ms)
+            for env, ms in by_env.items()}
+
+
+def without_env(methods, system):
+    """The methods of ``methods`` that no archive published for ``system`` runs,
+    in their order: the ones ``mtb.env.install`` refuses there. The generator
+    stops at a method that only the GPU build of its env runs: no sentence of
+    the notebooks says that case."""
+    built_for = _archives(system)[3]
+    if built_for is None:
+        return []
+    lacking = {flavor: {m for key, ms in _plan(methods, system, flavor).values()
+                        for m in ms if m not in built_for.get(key, ())}
+               for flavor in ("cpu", "gpu")}
+    if lacking["cpu"] != lacking["gpu"]:
+        raise SystemExit(f"{and_list(sorted(lacking['cpu'] ^ lacking['gpu']))}: an environment on "
+                         f"{system} for one of a computer without and with a GPU only. Write "
+                         f"the sentence for that.")
+    return [m for m in methods if m in lacking["cpu"]]
+
+
+def _gb(methods, system, flavor):
+    _, sizes, layers, _ = _archives(system)
+    keys = [key for key, _ in _plan(methods, system, flavor).values()]
+    known = [b for b in ((sizes.get(k) or {}).get("archive_bytes") for k in keys) if b]
     # a layer several of the envs share is downloaded once
-    shared = envs.layers_for([envs.archive_key(r["env"], r["flavor"]) for r in rows],
-                                missing_only=False)
+    shared = envs.layers_for(keys, layers=layers, missing_only=False)
     total = sum(known) + sum(e["archive_bytes"] for e in shared.values())
-    return ("" if len(known) == len(rows) else "at least ") + f"{total / 1e9:.1f} GB"
+    return ("" if len(known) == len(keys) else "at least ") + f"{total / 1e9:.1f} GB"
 
 
-def _sizes(methods):
+def _sizes(methods, system="Linux"):
     """``"<x> GB on a computer without a GPU and <y> GB on one with a GPU"``,
-    or one size where both flavours download the same, from the dry-run plans
-    ``mtb.env.install(...)`` returns at generation time (nothing is built).
-    The GPU builds carry the CUDA libraries, so the two flavours differ unless
-    every env has one archive only."""
-    cpu = _gb(mtb.env.install(methods, flavor="cpu", dry_run=True))
-    gpu = _gb(mtb.env.install(methods, flavor="gpu", dry_run=True))
+    or one size where both flavours download the same, from the archives
+    published for ``system`` (nothing is built). The GPU builds carry the CUDA
+    libraries, so the two flavours differ unless every env has one archive only."""
+    cpu, gpu = _gb(methods, system, "cpu"), _gb(methods, system, "gpu")
     return cpu if cpu == gpu else f"{cpu} on a computer without a GPU and {gpu} on one with a GPU"
 
 
 def env_size_text(methods):
     """``"<n> environments download <sizes>"`` for a method set, in the words
     of :func:`env_download_sentence`."""
-    n = len(mtb.env.install(methods, flavor="cpu", dry_run=True))
+    n = len(_plan(methods, "Linux", "cpu"))
     verb = "environments download" if n != 1 else "environment downloads"
     return f"{n} {verb} {_sizes(methods)}"
 
 
+def _windows_sizes(methods):
+    """The Windows sizes as they follow the Linux ones in a sentence: ``"<x> GB
+    and <y> GB"`` after a Linux pair (the words "without a GPU" and "with a
+    GPU" were just read), else in full."""
+    cpu, gpu = _gb(methods, "Windows", "cpu"), _gb(methods, "Windows", "gpu")
+    pair_before = _gb(methods, "Linux", "cpu") != _gb(methods, "Linux", "gpu")
+    return f"{cpu} and {gpu}" if cpu != gpu and pair_before else _sizes(methods, "Windows")
+
+
+def no_windows_env(methods):
+    """``"scMM has no Windows environment"``, in the package's own words
+    (``envs.NO_WINDOWS_ENV``), or ``""`` when every method has one."""
+    lacking = without_env(methods, "Windows")
+    return lacking and (f"{and_list(lacking)} {'has' if len(lacking) == 1 else 'have'} "
+                        f"{envs.NO_WINDOWS_ENV}")
+
+
 def env_download_sentence(methods):
-    """The visible download-size sentence of section 2."""
-    return f"The download is {_sizes(methods)}."
+    """The visible download size of section 2: one size where a method has no
+    Windows environment (the notebook runs on Linux), else the size on Linux
+    and the size on Windows."""
+    if without_env(methods, "Windows"):
+        return f"The download is {_sizes(methods)}."
+    return (f"On Linux the download is {_sizes(methods)}. "
+            f"On Windows it is {_windows_sizes(methods)}.")
 
 
 def download_size(datasets):
@@ -1081,9 +1155,14 @@ def build_tutorial(key):
     if timed is None or timed[1:] != (ds, methods):
         raise SystemExit(f"{key}: sections 1-4 were not timed on Colab with {ds} and "
                          f"{names}: time them and update COLAB_SECONDS")
-    title += (f"\n\nMethods run on Linux. On macOS or Windows, "
-              f"[open this notebook in Colab]({COLAB}tutorial_{key}.ipynb): sections 1 "
-              f"to 4 take about {round(timed[0] / 60)} minutes there.")
+    colab = (f"[open this notebook in Colab]({COLAB}tutorial_{key}.ipynb): sections 1 "
+             f"to 4 take about {round(timed[0] / 60)} minutes there.")
+    # the notebook runs as written where every default method has an environment
+    lacking = no_windows_env(methods)
+    title += (f"\n\nMethods run on Linux, and {lacking}. On macOS or Windows, {colab}"
+              if lacking else
+              f"\n\n{names} run{'s' if len(methods) == 1 else ''} on Linux and Windows. "
+              f"On macOS, {colab}")
     md(title)
     _install(md, code, methods)
 
