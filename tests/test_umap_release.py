@@ -61,18 +61,19 @@ GETNNZ = "'csr_array' object has no attribute 'getnnz'"
 
 
 def test_the_pynndescent_failure_says_which_release_and_what_to_install(monkeypatch):
+    import pynndescent
     import scanpy as sc
 
     def refuse(adata, **kwargs):
         raise AttributeError(GETNNZ)
 
     monkeypatch.setattr(sc.pp, "neighbors", refuse)
+    monkeypatch.setattr(pynndescent, "__version__", "0.7.0")      # the one loaded
     with pytest.raises(RuntimeError) as e:
         escib._neighbors(_adata(), "X")
     assert str(e.value) == (
-        f'scanpy {version("scanpy")} cannot read the neighbours pynndescent '
-        f'{version("pynndescent")} found for these 30 cells. Run pip install '
-        f'"pynndescent<0.7", then score again.')
+        f'scanpy {version("scanpy")} cannot read the neighbours pynndescent 0.7.0 found for '
+        f'these 30 cells. Run pip install "pynndescent<0.7", restart Python, then score again.')
     assert isinstance(e.value.__cause__, AttributeError)
 
 
@@ -93,18 +94,22 @@ def _adata(n=30):
 
 def test_the_umap_failure_says_which_release_and_what_to_install(monkeypatch):
     import scanpy as sc
+    import umap
     from numba.core.errors import TypingError
 
     def refuse(adata, **kwargs):
         raise TypingError(KNN_DISTS)
 
     monkeypatch.setattr(sc.pp, "neighbors", refuse)
+    # the release named is the one this Python has loaded. After a pip install in
+    # the same session the files on disk are another release, and the old one
+    # still fails until Python is restarted.
+    monkeypatch.setattr(umap, "__version__", "0.6.0")
     with pytest.raises(RuntimeError) as e:
         escib._neighbors(_adata(), "X")
-    # the release named is the one installed: the failure is known by numba's words
-    here = version("umap-learn")
-    assert str(e.value) == (f'umap-learn {here} cannot build the neighbour graph of these 30 '
-                            f'cells. Run pip install "umap-learn!={here}", then score again.')
+    assert str(e.value) == ('umap-learn 0.6.0 cannot build the neighbour graph of these 30 '
+                            'cells. Run pip install "umap-learn!=0.6.0", restart Python, then '
+                            'score again.')
     assert isinstance(e.value.__cause__, TypingError)
 
 

@@ -261,19 +261,29 @@ def _neighbors(adata, rep: str) -> None:
     except Exception as e:
         # known by the error's words, not by the release: another release with
         # the same fault is named the same way
-        from importlib.metadata import version
         if type(e).__name__ == "TypingError" and "knn_dists" in str(e):
-            here = version("umap-learn")
+            here = _loaded("umap", "umap-learn")
             raise RuntimeError(
                 f"umap-learn {here} cannot build the neighbour graph of these "
-                f"{adata.n_obs:,} cells. Run pip install \"umap-learn!={here}\", then "
-                f"score again.") from e
+                f"{adata.n_obs:,} cells. Run pip install \"umap-learn!={here}\", restart "
+                f"Python, then score again.") from e
         if isinstance(e, AttributeError) and "getnnz" in str(e):
+            from importlib.metadata import version
             raise RuntimeError(
                 f"scanpy {version('scanpy')} cannot read the neighbours pynndescent "
-                f"{version('pynndescent')} found for these {adata.n_obs:,} cells. Run pip "
-                f"install \"pynndescent<0.7\", then score again.") from e
+                f"{_loaded('pynndescent', 'pynndescent')} found for these {adata.n_obs:,} "
+                f"cells. Run pip install \"pynndescent<0.7\", restart Python, then score "
+                f"again.") from e
         raise
+
+
+def _loaded(module: str, distribution: str) -> str:
+    """The release of ``module`` this Python has loaded. After a ``pip install``
+    in the same session the installed files are another release, while the one
+    loaded keeps failing until Python is restarted."""
+    import sys
+    from importlib.metadata import version
+    return getattr(sys.modules.get(module), "__version__", None) or version(distribution)
 
 
 def _leiden(adata, resolution: float, key_added: str, flavor: str) -> None:
