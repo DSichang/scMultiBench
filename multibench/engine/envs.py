@@ -611,16 +611,34 @@ def _unpack_root(envs_dir: Path | str | None = None, conda: str | None = None) -
     return Path(config.envs_dir)
 
 
+def _not_ours(dest: Path, env: str) -> bool:
+    """Whether ``dest`` is there and multibench did not make it."""
+    return dest.exists() and not made_by_multibench(dest, env)
+
+
+def _archive_root(env: str, conda: str | None = None) -> Path:
+    """The folder an install from archives only (:func:`archive_only`) unpacks
+    ``env`` into: :func:`_unpack_root`; the package's cache folder
+    (``_settings._ENVS_FALLBACK``) when ``envs_dir`` was not set and the
+    folder it resolved to holds ``<env>`` that multibench did not make (a
+    user's own conda env of that name). An ``envs_dir`` the user set is kept."""
+    root = _unpack_root(conda=conda)
+    if _not_ours(root / env, env) and not config._envs_dir_given():
+        return _settings._ENVS_FALLBACK
+    return root
+
+
 def name_taken(env: str, conda: str | None = None) -> Path | None:
     """The folder multibench did not make that is in the way of installing
     ``env``, or ``None``. Where envs come only from archives
-    (:func:`archive_only`) that is the folder the archive is unpacked into,
-    when it is there: nothing is built, so a user's env of the same name in
-    another folder is left alone. Elsewhere: :func:`other_env_prefix`."""
+    (:func:`archive_only`) that is the folder the archive is unpacked into
+    (:func:`_archive_root`), when it is there: nothing is built, so a user's
+    env of the same name in another folder is left alone. Elsewhere:
+    :func:`other_env_prefix`."""
     if not archive_only():
         return other_env_prefix(env, conda)
-    dest = _unpack_root(conda=conda) / env
-    return dest if dest.exists() and not made_by_multibench(dest, env) else None
+    dest = _archive_root(env, conda) / env
+    return dest if _not_ours(dest, env) else None
 
 
 def _mark_built(env: str, conda: str | None, before: set) -> None:
@@ -1365,7 +1383,15 @@ def _install_missing(category, methods, *, packed, manifest, sizes, conda,
             todo.append(env)
         if lacking:
             raise OSError(no_windows_env_text(lacking))
-        return {env for env in todo if install_packed(env, conda=conda, flavor=flavor)}
+        done = set()
+        for env in todo:
+            root, usual = _archive_root(env, conda), _unpack_root(conda=conda)
+            if root != usual:
+                print(f"[env] {usual / env} is another environment, so {env} goes to {root}",
+                      flush=True)
+            if install_packed(env, envs_dir=root, conda=conda, flavor=flavor):
+                done.add(env)
+        return done
     have = set(installed_envs(conda))
     missing = [env for env, _ in _envs_needed(category, methods) if env not in have]
     for env in missing:

@@ -142,6 +142,11 @@ class Settings:
     def envs_dir(self, value):
         self._envs_dir = _path(value)
 
+    def _envs_dir_given(self) -> bool:
+        """Whether ``envs_dir`` was set, in Python or by the environment
+        variable, and did not resolve by itself."""
+        return bool(self._envs_dir or _from_env(ENVS_DIR_VAR))
+
     @property
     def leiden_flavor(self) -> str:
         return self._leiden_flavor or "leidenalg"
