@@ -159,9 +159,9 @@ def _installed_envs() -> frozenset:
 
 
 def _other_env(env: str):
-    """:func:`envs.other_env_prefix`, ``None`` when the probe fails."""
+    """:func:`envs.name_taken`, ``None`` when the probe fails."""
     try:
-        return envs.other_env_prefix(env)
+        return envs.name_taken(env)
     except Exception:      # an env probe must not break discovery
         return None
 

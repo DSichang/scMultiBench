@@ -601,6 +601,28 @@ def other_env_text(env: str, prefix, then: str) -> str:
             f"it is not used. Rename or remove {prefix}, then {then}")
 
 
+def _unpack_root(envs_dir: Path | str | None = None, conda: str | None = None) -> Path:
+    """The folder :func:`install_packed` unpacks into: ``envs_dir``, else that
+    of ``conda`` when it is given, else ``mtb.config.envs_dir``."""
+    if envs_dir is not None:
+        return Path(envs_dir)
+    if conda is not None and shutil.which(conda):
+        return _envs_dir(conda) or Path(config.envs_dir)
+    return Path(config.envs_dir)
+
+
+def name_taken(env: str, conda: str | None = None) -> Path | None:
+    """The folder multibench did not make that is in the way of installing
+    ``env``, or ``None``. Where envs come only from archives
+    (:func:`archive_only`) that is the folder the archive is unpacked into,
+    when it is there: nothing is built, so a user's env of the same name in
+    another folder is left alone. Elsewhere: :func:`other_env_prefix`."""
+    if not archive_only():
+        return other_env_prefix(env, conda)
+    dest = _unpack_root(conda=conda) / env
+    return dest if dest.exists() and not made_by_multibench(dest, env) else None
+
+
 def _mark_built(env: str, conda: str | None, before: set) -> None:
     """Write ``build`` to :data:`FLAVOR_FILE` in the env a lockfile build just
     created under the name ``env``: a prefix of that name that was not there
@@ -853,12 +875,7 @@ def install_packed(env: str, *, envs_dir: Path | str | None = None,
     """
     import urllib.error
 
-    if envs_dir is not None:
-        envs_root = Path(envs_dir)
-    elif conda is not None and shutil.which(conda):
-        envs_root = _envs_dir(conda) or Path(config.envs_dir)
-    else:
-        envs_root = Path(config.envs_dir)
+    envs_root = _unpack_root(envs_dir, conda)
     dest = envs_root / env
     if dest.exists():
         if made_by_multibench(dest, env):
@@ -1335,11 +1352,16 @@ def _install_missing(category, methods, *, packed, manifest, sizes, conda,
             if not set(wanted) <= set(built_for):
                 lacking += [m for m in wanted if m not in built_for]
                 continue
-            here = env_prefix(env, conda) or other_env_prefix(env, conda)
-            if here is not None:        # another build of the env, or a folder of its name
+            here = env_prefix(env, conda)
+            if here is not None:        # another build of the env
                 raise OSError(f"The environment {env} in {here} was not made for "
                               f"{_text._and_list(wanted)}. Delete that folder and run the "
                               f"install again.")
+            taken = name_taken(env, conda)
+            if taken is not None:       # the user's own folder, where the archive goes
+                raise OSError(f"{taken} is not an environment multibench made, so {env} "
+                              f"is not unpacked there. Set mtb.config.envs_dir to another "
+                              f"folder and run the install again.")
             todo.append(env)
         if lacking:
             raise OSError(no_windows_env_text(lacking))
@@ -1368,7 +1390,7 @@ def _row_state(r: dict, *, unpacked, dry_run, packed, conda, published: bool = T
         return "have"
     if archive_only() and not (packed and published):
         return NO_MACOS_ENV if on_macos() else NO_WINDOWS_ENV
-    if dry_run and other_env_prefix(env, conda) is not None:
+    if dry_run and name_taken(env, conda) is not None:
         return "name taken"
     if not dry_run:
         return "BUILD"

@@ -478,7 +478,7 @@ def _check_env(method: str, env_name: str) -> None:
     envs._conda_prefixes.cache_clear()
     if envs.env_prefix(env_name) is not None:
         return
-    other = envs.other_env_prefix(env_name)
+    other = envs.name_taken(env_name)
     if other is not None:
         raise EnvironmentError(envs.other_env_text(
             env_name, other,

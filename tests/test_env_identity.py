@@ -197,3 +197,87 @@ def test_a_lockfile_build_marks_its_env_and_refuses_a_users_env(fake_root):
         envs._install_rows(["Matilda"], packed=False, conda=conda)
 
 
+
+
+# ------------------------------------------------- installs from archives only
+# On Windows and macOS an env is unpacked into ``<mtb.config.envs_dir>/<env>``
+# and nothing is built, so a user's env of the same name in another folder is
+# not in the way.
+@pytest.fixture
+def mac_root(fake_root, tmp_path, monkeypatch):
+    """``fake_root`` on a Mac with Apple silicon: conda lists the user's own
+    ``matilda``, and ``config.envs_dir`` is another, empty folder (returned)."""
+    from multibench.engine import runner
+    monkeypatch.setattr(envs, "host_system", lambda: "macOS")
+    monkeypatch.setattr(envs, "_machine", lambda: "arm64")
+    monkeypatch.setattr(envs, "host_has_gpu", lambda: False)
+    monkeypatch.setenv(envs.MACOS_ARCHIVES_VAR, str(tmp_path / "archives"))
+    monkeypatch.delenv(runner.RUN_MODE_VAR, raising=False)
+    own = tmp_path / "own"
+    own.mkdir()
+    monkeypatch.setattr(config, "envs_dir", own)
+    return own
+
+
+def _files(folder: Path) -> list[str]:
+    return sorted(str(p.relative_to(folder)) for p in folder.rglob("*"))
+
+
+def test_a_users_env_in_another_folder_does_not_stop_an_archive_install(
+        mac_root, fake_root, tmp_path):
+    from multibench import workflow
+    from multibench.engine import runner
+    from tests.test_macos_envs import publish
+    theirs = fake_root / "envs" / "matilda"
+    before = _files(theirs)
+    publish(tmp_path, "matilda", ["Matilda"])
+    assert envs.other_env_prefix("matilda") == theirs          # conda lists it
+
+    # before the install: nothing says the name is taken
+    assert list(mtb.env.install(["Matilda"], dry_run=True)["state"]) == [
+        "packed archive published"]
+    not_installed = ("Environment matilda of Matilda is not installed. Run "
+                     "mtb.env.install(['Matilda']).")
+    with pytest.raises(EnvironmentError) as e:
+        runner._check_env("Matilda", "matilda")
+    assert str(e.value) == not_installed
+    assert workflow._env_hint("matilda", "Matilda", workflow._other_env("matilda")) == (
+        "Environment matilda is not installed. Run mtb.env.install(['Matilda']).")
+
+    assert list(mtb.env.install(["Matilda"])["state"]) == ["PACKED"]
+    # the env used afterwards is the one unpacked, and theirs is as it was
+    assert envs.env_prefix("matilda") == mac_root / "matilda"
+    assert runner.run_mode("matilda") == ("prefix", mac_root / "matilda")
+    runner._check_env("Matilda", "matilda")
+    assert _files(theirs) == before
+    assert list(mtb.env.install(["Matilda"])["state"]) == ["have"]
+
+
+def test_an_archive_install_refuses_a_users_env_at_its_destination(
+        mac_root, fake_root, tmp_path, monkeypatch):
+    from tests.test_macos_envs import publish
+    theirs = fake_root / "envs" / "matilda"
+    before = _files(theirs)
+    monkeypatch.setattr(config, "envs_dir", fake_root / "envs")
+    publish(tmp_path, "matilda", ["Matilda"])
+    monkeypatch.setattr(envs, "download_archive",
+                        lambda *a, **k: pytest.fail("downloaded despite the env in the way"))
+    assert list(mtb.env.install(["Matilda"], dry_run=True)["state"]) == ["name taken"]
+    with pytest.raises(OSError) as e:
+        mtb.env.install(["Matilda"])
+    assert str(e.value) == (
+        f"{theirs} is not an environment multibench made, so matilda is not unpacked "
+        f"there. Set mtb.config.envs_dir to another folder and run the install again.")
+    assert _files(theirs) == before
+
+
+def test_an_archive_install_refuses_an_env_made_for_other_methods(mac_root, tmp_path):
+    from tests.test_macos_envs import publish
+    publish(tmp_path, "scmb_r", ["StabMap"])
+    mtb.env.install(["StabMap"])
+    publish(tmp_path, "scmb_r", ["StabMap", "UINMF"])          # a later listing
+    with pytest.raises(OSError) as e:
+        mtb.env.install(["UINMF"])
+    assert str(e.value) == (
+        f"The environment scmb_r in {mac_root / 'scmb_r'} was not made for UINMF. "
+        f"Delete that folder and run the install again.")
