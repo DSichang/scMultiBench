@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parent.parent
 MAC = ROOT / "tools" / "macos"
 LOCKS = ROOT / "multibench" / "engine" / "env_locks"
 HAND_FILES = {"unpin.txt", "drop.txt", "extra.txt", "soft.txt", "pip_overrides.txt", "force_source.txt",
-              "build_constraints.txt", "post_macos.sh", "Makevars", "uv.txt"}
+              "build_constraints.txt", "post_macos.sh", "Makevars", "uv.txt", "python.txt", "requirements.txt"}
 
 
 def _tool():
@@ -67,6 +67,23 @@ def test_hand_files_name_what_the_lock_has():
             pins = [ln.split()[0] for ln in tool.lines(hand / f)]
             missing = set(pins) - set(pips)
             assert not missing, f"{env}/{f}: not a pin of the lock: {missing}"
+
+
+def test_an_env_with_its_own_python_has_its_own_exact_pins():
+    """python.txt and requirements.txt replace the lock's Python and pip part together; pip_overrides.txt
+    would have nothing to replace."""
+    tool = _tool()
+    own = [env for env in ENVS if (MAC / "envs" / env / "python.txt").exists()]
+    for env in ENVS:
+        hand = MAC / "envs" / env
+        assert (hand / "python.txt").exists() == (hand / "requirements.txt").exists(), env
+    for env in own:
+        hand = MAC / "envs" / env
+        assert len(tool.lines(hand / "python.txt")) == 1
+        assert not (hand / "pip_overrides.txt").exists()
+        pins = tool.lines(hand / "requirements.txt")
+        assert pins and all(re.fullmatch(r"[A-Za-z0-9_.\-]+==[0-9][A-Za-z0-9.]*", p) for p in pins), pins
+        assert len({p.split("==")[0] for p in pins}) == len(pins)
 
 
 def test_wheels_are_for_listed_envs_and_pins_of_their_locks():

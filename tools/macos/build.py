@@ -32,6 +32,8 @@ file says why):
   for those builds), ``force_source.txt`` builds one from source although a wheel exists,
   ``pip_overrides.txt`` replaces a pin (``<pin> <other pin>``) or leaves it out (``<pin> -``), and
   ``uv.txt`` names pins whose metadata pip refuses to read; ``uv`` installs those (it must be on PATH).
+- a lock whose Python has no osx-arm64 build (3.7): ``python.txt`` names the Python to use and
+  ``requirements.txt`` holds the env's own pins, which replace the lock's pip part whole.
 - then: the repairs below, the lock's post script (``env_locks/<env>.post.sh``), and
   ``post_macos.sh`` for what conda does not have for osx-arm64.
 
@@ -198,12 +200,18 @@ def recipe(w: Work, env: str):
     r_ver = next((v for n, v in pins if n == "r-base"), None)
     soft = lines(H / "soft.txt") if (H / "soft.txt").exists() else list(SOFT_NUMERIC)
     unpin, drop = set(lines(H / "unpin.txt")), set(lines(H / "drop.txt"))
+    python, own = lines(H / "python.txt"), H / "requirements.txt"
+    if bool(python) != own.exists():
+        raise SystemExit(f"{env}: python.txt and requirements.txt go together")
     spec, rep = [], {"kept": [], "unpinned": [], "absent": [], "left_to_solver": [], "soft_kept": []}
     for n, v in pins:
         is_r = n.startswith(("r-", "bioconductor-")) and n != "r-base"
         recs = have.get(n, [])
         if n in drop:
             rep["absent"].append(f"{n}={v} (drop.txt)")
+        elif n == "python" and python:
+            spec.append(f"python={python[0]}")
+            rep["unpinned"].append(f"python={v} -> {python[0]} (python.txt)")
         elif n in KEEP_EXACT or is_r:
             if not recs:
                 rep["absent"].append(f"{n}={v}")
@@ -231,6 +239,10 @@ def recipe(w: Work, env: str):
                                  % (env, "\n".join(f"  - {s}" for s in spec)))
     over = dict(ln.split()[:2] for ln in lines(H / "pip_overrides.txt"))
     keep, left, changed = pip_part(pips, over)
+    if own.exists():
+        if over:
+            raise SystemExit(f"{env}: requirements.txt replaces the lock's pins; pip_overrides.txt has no use")
+        keep, left, changed = lines(own), [], [f"the lock's {len(pips)} pins -> requirements.txt (by hand)"]
     unknown = sorted(set(over) - set(pips))
     if unknown:
         raise SystemExit(f"{env}: pip_overrides.txt names pins the lock does not have: {unknown}")
