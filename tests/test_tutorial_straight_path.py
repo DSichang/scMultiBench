@@ -301,64 +301,113 @@ def test_every_method_of_a_task_has_its_input_files_on_the_dataset(key):
         (key, sorted(set(everyone) - set(sc[sc.files_ok].method)))
 
 
-def _windows_methods():
-    """The methods a published Windows archive was built for, read from the
-    listing itself and not through the generator."""
+SYSTEMS = {"Windows": "packed_windows.json", "macOS": "packed_macos.json"}
+
+
+def _methods_on(system):
+    """The methods an archive published for ``system`` was built for, read from
+    the listing itself and not through the generator."""
     import json
     from pathlib import Path
     import multibench
-    listing = Path(multibench.__file__).parent / "engine" / "packed_windows.json"
+    listing = Path(multibench.__file__).parent / "engine" / SYSTEMS[system]
     return {m for a in json.loads(listing.read_text())["archives"].values() for m in a["methods"]}
 
 
-def _not_on_windows(methods):
-    return [m for m in methods if m not in _windows_methods()]
+def _not_on(system, methods):
+    return [m for m in methods if m not in _methods_on(system)]
 
 
-def test_the_two_kinds_of_tutorial_both_exist():
-    """Some tutorials run as written on Windows and some do not: the tests below
-    are about both sentences."""
-    kinds = {bool(_not_on_windows(GEN.TASKS[k]["methods"])) for k in KEYS}
-    assert kinds == {True, False}
+def _runs_on(key):
+    """The systems of ``SYSTEMS`` on which every default method of the task has
+    an environment."""
+    return [s for s in SYSTEMS if not _not_on(s, GEN.TASKS[key]["methods"])]
+
+
+def test_the_kinds_of_tutorial_exist():
+    """Tutorials that run on every system, on Linux and macOS, and on Linux
+    only: the tests below are about each sentence."""
+    kinds = {tuple(_runs_on(k)) for k in KEYS}
+    assert kinds == {("Windows", "macOS"), ("macOS",), ()}
+    # with the sciPENN environment for macOS (envs-mac-v1)
+    assert sorted(k for k in KEYS if "macOS" not in _runs_on(k)) == [
+        "cross_rna_atac", "vertical_rna_atac"]
 
 
 @pytest.mark.parametrize("key", KEYS)
 def test_title_says_where_the_default_methods_run(key):
-    """A tutorial whose default methods all have a Windows environment says they
-    run on Linux and Windows, and sends only macOS to Colab. Another one
-    names the method without a Windows environment and sends Windows to Colab."""
+    """A system is named as one the default methods run on when each of them has
+    an environment in the system's listing. A title that names every system
+    offers Colab; another one names the methods without an environment and
+    sends the users of that system to Colab."""
     methods = GEN.TASKS[key]["methods"]
-    first = _cells(f"tutorial_{key}")[0][1]
-    colab = f"[open this notebook in Colab]({GEN.COLAB}tutorial_{key}.ipynb)"
-    lacking = _not_on_windows(methods)
-    if lacking:
-        has = "has" if len(lacking) == 1 else "have"
-        assert (f"Methods run on Linux, and {GEN.and_list(lacking)} {has} no Windows "
-                f"environment. On macOS or Windows, {colab}") in first
+    names = GEN.and_list(methods)
+    last = _cells(f"tutorial_{key}")[0][1].split("\n\n")[-1]
+    url = f"({GEN.COLAB}tutorial_{key}.ipynb)"
+    minutes = round(GEN.COLAB_SECONDS[key][0] / 60)
+    there = f"sections 1 to 4 take about {minutes} minutes there."
+    colab = f"[open this notebook in Colab]{url}: {there}"
+    runs = _runs_on(key)
+
+    def no_env(system):
+        lacking = _not_on(system, methods)
+        return f"{GEN.and_list(lacking)} {'has' if len(lacking) == 1 else 'have'}"
+
+    if runs == ["Windows", "macOS"]:
+        assert last == (f"{names} run on Linux, Windows and macOS (Apple silicon). "
+                        f"Or [open in Colab]{url}: {there}")
+    elif runs == ["macOS"]:
+        assert last == (f"{names} run on Linux and macOS (Apple silicon), and "
+                        f"{no_env('Windows')} no Windows environment. On Windows, {colab}")
+    elif _not_on("Windows", methods) == _not_on("macOS", methods):
+        assert last == (f"Methods run on Linux, and {no_env('Windows')} no Windows or macOS "
+                        f"environment. On Windows or macOS, {colab}")
     else:
-        assert f"{GEN.and_list(methods)} run on Linux and Windows. On macOS, {colab}" in first
-        assert "On macOS or Windows" not in first
+        assert last == (f"Methods run on Linux. {no_env('Windows')} no Windows environment, "
+                        f"and {no_env('macOS')} no macOS environment. "
+                        f"On Windows or macOS, {colab}")
+    assert last.count("Apple silicon") == (1 if "macOS" in runs else 0)
 
 
-def test_a_windows_tutorial_gives_the_download_of_each_system():
+def test_a_title_for_windows_and_not_macos(monkeypatch):
+    """No tutorial is of this kind today: the sentence the generator would write."""
+    monkeypatch.setattr(GEN, "without_env",
+                        lambda methods, system: ["B"] if system == "macOS" else [])
+    assert GEN.where_it_runs(["A", "B"], "<colab>") == (
+        "A and B run on Linux and Windows, and B has no macOS environment. "
+        "On macOS, [open this notebook in Colab]<colab>")
+    assert GEN.env_download_sentence(["StabMap", "sciPENN"]) == (
+        "On Linux the download is 1.4 GB on a computer without a GPU and 3.0 GB on one "
+        "with a GPU. On Windows it is 0.5 GB and 1.6 GB.")
+
+
+def test_a_tutorial_gives_the_download_of_each_system_it_runs_on():
     """cross RNA+ADT, StabMap and sciPENN. Windows, by hand from packed_windows.json:
     scmb_r 347,052,084 bytes + env_sciPENN-cpu 142,679,560 = 0.5 GB, + env_sciPENN
     1,283,752,348 = 1.6 GB (a Windows computer with a GPU downloaded 1.3 GB + 347 MB
-    on 2026-11-14)."""
+    on 2026-11-14). macOS, by hand from packed_macos.json: scmb_r 702,164,788 +
+    env_sciPENN 354,824,497 = 1.1 GB. vertical RNA+ADT, Matilda and sciPENN, on
+    macOS: matilda 304,543,459 + env_sciPENN 354,824,497 = 0.7 GB."""
     two = next(s for kind, s in _cells("tutorial_cross_rna_adt")
                if kind == "markdown" and s.startswith("## 2. "))
-    assert ("On Linux the download is 1.4 GB on a computer without a GPU and 3.0 GB on one "
-            "with a GPU. On Windows it is 0.5 GB and 1.6 GB.") in two
+    assert two.endswith(
+        " On Linux the download is 1.4 GB on a computer without a GPU and 3.0 GB on one "
+        "with a GPU. On Windows it is 0.5 GB and 1.6 GB. On macOS it is 1.1 GB.")
+    two = next(s for kind, s in _cells("tutorial_vertical_rna_adt")
+               if kind == "markdown" and s.startswith("## 2. "))
+    assert two.endswith(" On Windows it is 0.3 GB and 2.8 GB. On macOS it is 0.7 GB.")
 
 
 @pytest.mark.parametrize("key", KEYS)
-def test_a_linux_only_tutorial_gives_one_download(key):
+def test_section_2_gives_a_download_for_the_systems_the_methods_run_on(key):
     two = next(s for kind, s in _cells(f"tutorial_{key}")
                if kind == "markdown" and s.startswith("## 2. "))
-    if _not_on_windows(GEN.TASKS[key]["methods"]):
-        assert "The download is " in two and "Windows" not in two
-    else:
-        assert "On Linux the download is " in two and "On Windows it is " in two
+    runs = _runs_on(key)
+    for system in SYSTEMS:
+        assert (f"On {system} it is " in two) == (system in runs), system
+    assert ("On Linux the download is " if runs else "The download is ") in two
+    if not runs:
+        assert "Windows" not in two and "macOS" not in two
 
 
 @pytest.mark.parametrize("name", TUTORIALS)

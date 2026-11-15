@@ -18,12 +18,16 @@ A step that cannot work on the reader's computer fails with the package's own
 error: the environment install refuses a method that has no environment for
 the computer's system.
 
-A tutorial also runs on Windows when every default method has a Windows
-environment. Its title says so and section 2 gives the Windows download; the
-title of another tutorial names the method without one (``without_env``, read
-from ``engine/packed_windows.json``). The every-method notebooks say Linux:
-none was run on Windows. No notebook mentions the macOS environments the
-package has from 0.7.2 (owner, 2026-11-14: not in the public text yet).
+A tutorial also runs on Windows, and on a Mac with Apple silicon, when every
+default method has an environment in that system's listing
+(``engine/packed_windows.json``, ``engine/packed_macos.json``). Its title
+names the systems it runs on and section 2 gives the download on each
+(owner, 2026-11-16: the tutorials tell Mac users they can run on their own
+computer where that is true; this replaces the decision of 2026-11-14 to keep
+the macOS environments out of the public text). For a system without an
+environment for a default method the title names the method
+(``without_env``) and sends that system's users to Colab. The every-method
+notebooks say Linux: none was run on another system.
 
 Every method of a task runs on the task's one dataset. The defaults are two
 methods of the task (one where it has one) that are fast and need no GPU,
@@ -182,31 +186,68 @@ def env_size_text(methods):
     return f"{n} {verb} {_sizes(methods)}"
 
 
-def _windows_sizes(methods):
-    """The Windows sizes as they follow the Linux ones in a sentence: ``"<x> GB
-    and <y> GB"`` after a Linux pair (the words "without a GPU" and "with a
-    GPU" were just read), else in full."""
-    cpu, gpu = _gb(methods, "Windows", "cpu"), _gb(methods, "Windows", "gpu")
+#: The systems besides Linux that have archive listings, in the order the
+#: notebooks name them, and each as a title names it among the systems the
+#: methods run on (the macOS archives are for Apple silicon).
+OTHER_SYSTEMS = {"Windows": "Windows", "macOS": "macOS (Apple silicon)"}
+
+
+def _sizes_after_linux(methods, system):
+    """The sizes on ``system`` as they follow the Linux ones in a sentence:
+    ``"<x> GB and <y> GB"`` after a Linux pair (the words "without a GPU" and
+    "with a GPU" were just read), else in full."""
+    cpu, gpu = _gb(methods, system, "cpu"), _gb(methods, system, "gpu")
     pair_before = _gb(methods, "Linux", "cpu") != _gb(methods, "Linux", "gpu")
-    return f"{cpu} and {gpu}" if cpu != gpu and pair_before else _sizes(methods, "Windows")
+    return f"{cpu} and {gpu}" if cpu != gpu and pair_before else _sizes(methods, system)
 
 
-def no_windows_env(methods):
-    """``"scMM has no Windows environment"``, in the package's own words
-    (``envs.NO_WINDOWS_ENV``), or ``""`` when every method has one."""
-    lacking = without_env(methods, "Windows")
-    return lacking and (f"{and_list(lacking)} {'has' if len(lacking) == 1 else 'have'} "
-                        f"{envs.NO_WINDOWS_ENV}")
+def no_env(methods, systems):
+    """``"scMM has no Windows or macOS environment"`` for the methods that
+    have no environment on ``systems`` (the same methods on each)."""
+    for system in systems:
+        # the package's own words for one system
+        assert f"no {system} environment" in (envs.NO_WINDOWS_ENV, envs.NO_MACOS_ENV)
+    return (f"{and_list(methods)} {'has' if len(methods) == 1 else 'have'} no "
+            f"{' or '.join(systems)} environment")
+
+
+def where_it_runs(methods, colab):
+    """The title's last paragraph. The default methods "run on" Linux and on
+    each system of ``OTHER_SYSTEMS`` whose listing has an environment for every
+    one of them. With every system named, Colab (``colab``: the link target in
+    parentheses, then the sentence on its time) is offered; else the methods
+    without an environment are named and those systems' users are sent there."""
+    lacking = {system: without_env(methods, system) for system in OTHER_SYSTEMS}
+    runs = ["Linux"] + [name for system, name in OTHER_SYSTEMS.items() if not lacking[system]]
+    names = f"{and_list(methods)} run{'s' if len(methods) == 1 else ''}"
+    elsewhere = [system for system in OTHER_SYSTEMS if lacking[system]]
+    if not elsewhere:
+        return f"{names} on {and_list(runs)}. Or [open in Colab]{colab}"
+    send = f"On {' or '.join(elsewhere)}, [open this notebook in Colab]{colab}"
+    if len(runs) > 1:
+        who = f"{names} on {and_list(runs)}"
+    else:
+        who = "Methods run on Linux"
+    # the systems that lack the same methods share one clause
+    groups = {}
+    for system in elsewhere:
+        groups.setdefault(tuple(lacking[system]), []).append(system)
+    clauses = [no_env(ms, systems) for ms, systems in groups.items()]
+    if len(clauses) == 1:
+        return f"{who}, and {clauses[0]}. {send}"
+    return f"{who}. {', and '.join(clauses)}. {send}"
 
 
 def env_download_sentence(methods):
-    """The visible download size of section 2: one size where a method has no
-    Windows environment (the notebook runs on Linux), else the size on Linux
-    and the size on Windows."""
-    if without_env(methods, "Windows"):
+    """The visible download size of section 2: the size on Linux, then on each
+    system of ``OTHER_SYSTEMS`` where every method has an environment; one
+    size when that is no other system."""
+    others = [system for system in OTHER_SYSTEMS if not without_env(methods, system)]
+    if not others:
         return f"The download is {_sizes(methods)}."
-    return (f"On Linux the download is {_sizes(methods)}. "
-            f"On Windows it is {_windows_sizes(methods)}.")
+    return " ".join([f"On Linux the download is {_sizes(methods)}."]
+                    + [f"On {system} it is {_sizes_after_linux(methods, system)}."
+                       for system in others])
 
 
 def download_size(datasets):
@@ -1155,14 +1196,9 @@ def build_tutorial(key):
     if timed is None or timed[1:] != (ds, methods):
         raise SystemExit(f"{key}: sections 1-4 were not timed on Colab with {ds} and "
                          f"{names}: time them and update COLAB_SECONDS")
-    colab = (f"[open this notebook in Colab]({COLAB}tutorial_{key}.ipynb): sections 1 "
+    colab = (f"({COLAB}tutorial_{key}.ipynb): sections 1 "
              f"to 4 take about {round(timed[0] / 60)} minutes there.")
-    # the notebook runs as written where every default method has an environment
-    lacking = no_windows_env(methods)
-    title += (f"\n\nMethods run on Linux, and {lacking}. On macOS or Windows, {colab}"
-              if lacking else
-              f"\n\n{names} run{'s' if len(methods) == 1 else ''} on Linux and Windows. "
-              f"On macOS, {colab}")
+    title += "\n\n" + where_it_runs(methods, colab)
     md(title)
     _install(md, code, methods)
 
