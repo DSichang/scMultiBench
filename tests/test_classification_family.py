@@ -381,4 +381,76 @@ def test_evaluate_on_a_graph_output_gives_no_asw_and_iasw(three, tmp_path):
 def test_the_stored_results_of_a_graph_method_have_no_asw_and_iasw(category, dataset):
     stored = mtb.load_results(category, dataset=dataset)
     have = set(stored[stored.method == "scMoMaT"].metric)
-    assert set(GRAPH_CLUSTERING) <= have and not {"ASW", "iASW"} & have
+    assert set(GRAPH_CLUSTERING) <= have and not {"ASW", "iASW", "ASW_batch"} & have
+    if dataset == "D52":       # three batches: the batch metrics of the graph
+        assert {"ARI_batch", "NMI_batch", "GC", "iLISI"} <= have
+
+
+# ---- a method's neighbour graph is scored on the graph, as the article scores
+# scMoMaT (SINFONIA_graph.py, scib_metrics_graph.py)
+def _neighbours(emb, k=20):
+    """``(indices, dists)`` of the ``k`` nearest cells of each cell, itself first."""
+    d = np.linalg.norm(emb[:, None] - emb[None], axis=2)
+    idx = np.argsort(d, axis=1)[:, :k]
+    return idx, np.take_along_axis(d, idx, axis=1)
+
+
+def _graph_folder(folder, emb, shuffle_umap=True):
+    """scMoMaT's three files: the neighbours of ``emb``, and a UMAP file that
+    holds noise, so a score read from it is told from one read from the graph."""
+    folder.mkdir(parents=True, exist_ok=True)
+    idx, dist = _neighbours(emb)
+    noise = np.random.default_rng(0).normal(size=(len(emb), 2))
+    for name, a in (("knn_indices.h5", idx), ("knn_dists.h5", dist),
+                    ("umap_embedding.h5", noise if shuffle_umap else emb[:, :2])):
+        with h5py.File(folder / name, "w") as f:
+            f["data"] = a
+    return folder
+
+
+SCMOMAT = SimpleNamespace(
+    output=SimpleNamespace(kind="graph", file="knn_indices.h5"),
+    extra_outputs=[SimpleNamespace(kind="graph", file="knn_dists.h5"),
+                   SimpleNamespace(kind="embedding", file="umap_embedding.h5")])
+
+
+def test_evaluate_scores_a_neighbour_graph_on_the_graph(three, tmp_path):
+    emb, paths = three
+    folder = _graph_folder(tmp_path / "out", emb)
+    df, said = _caught(mtb.evaluate, folder / "knn_indices.h5", labels=paths,
+                       metrics="all", category="cross", verbose=False)
+    v = _values(df)
+    # three separate cell types: the clusters of the graph are the cell types
+    assert v["ARI"] == 1.0 and v["NMI"] == 1.0 and v["iF1"] == 1.0
+    assert v[["ASW", "iASW", "ASW_batch"]].isna().all()
+    assert v[["ARI_batch", "NMI_batch", "GC"]].notna().all()
+    assert [m for m in said if "ASW" in m] == [
+        "ASW, iASW and ASW_batch are NaN: scMoMaT writes a graph, not an embedding."]
+    # the same graph as an object, and with the cells x neighbours axes swapped
+    idx, dist = _neighbours(emb)
+    for knn in (mtb.eval.scib.KnnGraph(idx, dist), mtb.eval.scib.KnnGraph(idx.T, dist.T)):
+        again = _values(_quiet(mtb.evaluate, knn, labels=paths, metrics="clustering",
+                               verbose=False))
+        assert again["ARI"] == 1.0 and np.isnan(again["ASW"])
+    with pytest.raises(ValueError, match="must be 0 to 89"):
+        mtb.eval.scib.KnnGraph(idx + 1, dist)
+
+
+def test_run_scores_a_graph_method_on_its_graph(three, tmp_path):
+    emb, paths = three
+    rec = _record(tmp_path, emb)
+    folder = _graph_folder(tmp_path / "scMoMaT_MB", emb)
+    knn = W._load_scored(folder, SCMOMAT)
+    assert isinstance(knn, mtb.eval.scib.KnnGraph) and knn.shape == (90, 20)
+    g = dict(rec)
+    _quiet(W._score_record, g, knn, "MB", "cross", tmp_path, SCMOMAT)
+    assert g["status"] == "scored", g.get("error")
+    # the UMAP file holds noise: these scores are the graph's
+    assert g["metrics"]["ARI"] == 1.0 and g["metrics"]["NMI"] == 1.0
+    assert not {"ASW", "iASW", "ASW_batch", *CODES} & set(g["metrics"])
+    assert {"iF1", "ARI_batch", "NMI_batch", "GC"} <= set(g["metrics"])
+    # without the distances there is no graph to score: the UMAP, as before
+    (folder / "knn_dists.h5").unlink()
+    assert isinstance(W._load_scored(folder, SCMOMAT), np.ndarray)
+    # the embedding of the record stays the UMAP (it is what a plot draws)
+    assert W._load_embedding(folder, SCMOMAT).shape == (90, 2)

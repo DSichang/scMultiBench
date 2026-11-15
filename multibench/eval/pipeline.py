@@ -514,8 +514,9 @@ def _classification_error(metrics, why: str, what: str = "output") -> str:
 
 
 def _no_graph_silhouettes(out, who: str) -> None:
-    """ASW and iASW of a graph output become NaN in ``out``, with one warning: a
-    silhouette needs the embedding, which a graph method does not write."""
+    """The silhouettes (ASW, iASW, ASW_batch) of a graph output become NaN in
+    ``out``, with one warning: they need the embedding, which a graph method
+    does not write."""
     from .classify import _graph_what
     rows = [c for c in catalog.GRAPH_UNSCORED if c in out.index]
     if rows:
@@ -597,7 +598,11 @@ def evaluate(embedding, labels=None, *, dataset: str | None = None,
     embedding
         Cells x dims: an array, DataFrame, AnnData or MuData (``.obsm[obsm]``),
         or a file: ``.h5`` (the benchmark's ``embedding.h5``), ``.h5ad``,
-        ``.npy``, ``.csv`` / ``.tsv``.
+        ``.npy``, ``.csv`` / ``.tsv``. The ``knn_indices.h5`` of a graph method
+        (scMoMaT), with its ``knn_dists.h5`` in the same folder, is scored on
+        that neighbour graph as the paper scores it: ARI, NMI and iF1 on
+        Leiden clusters of the graph, cLISI, GC and iLISI on the graph; ASW,
+        iASW and ASW_batch need an embedding and are NaN.
     labels
         One cell type per cell: CSV path(s), a 1-D array-like, or an ``.obs``
         column name (``"celltype"``, ``"rna:celltype"`` for a MuData
@@ -895,7 +900,14 @@ def _scores(
     group, only, slow, want_cls = _plan_metrics(
         metrics, has_batch=batch is not None or batch_from_files)
     from .classify import _graph_writer, _is_neighbour_index
+    from .scib import KNN_FILES, KnnGraph
     graph = _graph_writer(embedding)               # a file only graph methods write
+    # a method's neighbour graph: scored on the graph, as the article scores it
+    knn = embedding if isinstance(embedding, KnnGraph) else None
+    if isinstance(embedding, (str, Path)) and Path(embedding).name == KNN_FILES[0]:
+        knn = KnnGraph.read(Path(embedding).parent)
+    if knn is not None:
+        embedding = knn.indices                    # its rows are the cells
     emb, ids, adata = _read_output(embedding, obsm, "embedding")
     if cells is not None and cells.moved and not _follows_cells(labels, adata, cells):
         stems = ", ".join(cells.moved)
@@ -914,7 +926,8 @@ def _scores(
     emb, ct, origin = _cell_labels(labels, emb, adata, lab_ids, read, others)
     _check_finite(emb)
     # a graph for ASW and iASW: that file, or a kNN index
-    no_silhouette = graph or ("output" if _is_neighbour_index(emb) else None)
+    no_silhouette = graph or ("output" if knn is not None or _is_neighbour_index(emb)
+                              else None)
     if want_cls and not graph:
         if emb.ndim == 2 and (emb.shape[0] == emb.shape[1] or no_silhouette):
             graph = "output"                       # cells x cells, or a kNN index
@@ -941,9 +954,10 @@ def _scores(
     if group is None:           # classification only: no scIB metric
         out = pd.DataFrame(columns=["Value"], dtype=float)
     else:
-        from .scib import compute
-        out = compute(emb, ct, cl, ba, group=group, slow_metrics=slow, only=only,
-                      verbose=None if verbose else False)
+        from .scib import compute, compute_graph
+        score = compute if knn is None else compute_graph
+        out = score(emb if knn is None else knn, ct, cl, ba, group=group, slow_metrics=slow,
+                    only=only, verbose=None if verbose else False)
     attrs = {k: out.attrs.get(k) for k in PROVENANCE_ATTRS[:-1]}
     if no_silhouette:
         _no_graph_silhouettes(out, no_silhouette)
