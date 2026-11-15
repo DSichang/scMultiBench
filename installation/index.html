@@ -2646,20 +2646,21 @@ raises the error, and a run ends with the status <code>ran</code> and the error 
 <code>reason</code>. Install another umap-learn release:</p>
 <div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"umap-learn!=0.6.0"</span>
 </span></code></pre></div>
-<p>Then call <code>evaluate</code> again, or score a finished run with
-<code>mtb.load_run(out_dir).rescore()</code>.</p>
+<p>Then restart Python and call <code>evaluate</code> again, or score a finished run
+with <code>mtb.load_run(out_dir).rescore()</code>.</p>
 </details>
 <details class="note">
-<summary><code>AttributeError: 'csr_array' object has no attribute 'getnnz'</code></summary>
-<p>On Python 3.9 to 3.11, pynndescent 0.7.0 fails with the scanpy those
-Pythons get, on 8,192 cells or more. Python 3.9 reports it as
-<code>ValueError: Cannot add edge ...</code>. Install the pynndescent line before
-it:</p>
+<summary><code>scanpy ... cannot read the neighbours pynndescent ... found</code></summary>
+<p>Scoring builds a neighbour graph with scanpy, and scanpy 1.12.0 and
+earlier cannot read what pynndescent 0.7 returns on 8,192 cells or more.
+multibench-sc 0.7.2 installs the pynndescent line before it. Earlier
+releases can meet the failure, and report it as
+<code>AttributeError: 'csr_array' object has no attribute 'getnnz'</code>. Install
+the earlier pynndescent line:</p>
 <div class="language-bash highlight"><span class="filename">terminal</span><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"pynndescent&lt;0.7"</span>
 </span></code></pre></div>
-<p>Then call <code>evaluate</code> again, or score a finished run with
-<code>mtb.load_run(out_dir).rescore()</code>. An environment with Python 3.12 or
-newer is not affected.</p>
+<p>Then restart Python and call <code>evaluate</code> again, or score a finished run
+with <code>mtb.load_run(out_dir).rescore()</code>.</p>
 </details>
 <details class="note">
 <summary><code>cLISI</code> / <code>iLISI</code> are <code>NaN</code>, with a warning naming <code>knn_graph.o</code></summary>
