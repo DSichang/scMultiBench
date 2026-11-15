@@ -54,6 +54,11 @@ FAMILY_METRICS = {
     "classification": ["OCA", "ACA", "Spec", "Sens", "F1"],
 }
 
+#: the clustering codes a graph method has no score for: a silhouette needs the
+#: embedding, and the article's pipeline for graph outputs (scib_metrics_graph.py)
+#: writes neither
+GRAPH_UNSCORED = ["ASW", "iASW"]
+
 #: metric names in lower case -> code: each code, and the spellings of some
 #: published metric.csv (scIB's long names)
 _METRIC_CANON = {c.lower(): c for codes in FAMILY_METRICS.values() for c in codes} | {

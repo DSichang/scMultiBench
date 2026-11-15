@@ -325,3 +325,60 @@ def test_stored_tables_have_no_classification():
         "Pick metrics= from ARI, ASW, NMI, cLISI, iASW and iF1.")
 
 
+
+
+# ---- a graph method has no ASW and no iASW: the article's graph pipeline
+# (scib_metrics_graph.py) writes ARI, NMI, iF1 and cLISI of the clustering family
+GRAPH_CLUSTERING = ["ARI", "NMI", "iF1", "cLISI"]
+
+
+def test_a_graph_method_is_scored_without_asw_and_iasw(three, tmp_path):
+    emb, paths = three
+    rec = _record(tmp_path, emb)
+    graph = SimpleNamespace(output=SimpleNamespace(kind="graph"))
+    g = dict(rec)
+    _quiet(W._score_record, g, emb, "MB", "cross", tmp_path, graph)
+    assert g["status"] == "scored"
+    assert [c for c in g["metrics"] if c in SCIB[:6]] == GRAPH_CLUSTERING
+    g = dict(rec)
+    _quiet(W._score_record, g, emb, "MB", "cross", tmp_path, graph, metrics="clustering")
+    assert list(g["metrics"]) == GRAPH_CLUSTERING
+    g = dict(rec)
+    _quiet(W._score_record, g, emb, "MB", "cross", tmp_path, graph, metrics=["ASW", "ARI"])
+    assert list(g["metrics"]) == ["ARI"]
+    for asked in (["ASW"], ["iASW", "OCA"]):
+        with pytest.raises(ValueError) as e:
+            W._score_record(dict(rec), emb, "MB", "cross", tmp_path, graph, metrics=asked)
+        assert str(e.value) == ("StabMap writes a graph, not an embedding, so it has no ASW, "
+                                "iASW or classification scores. Pass metrics='clustering'.")
+    # an embedding method keeps them
+    e = dict(rec)
+    _quiet(W._score_record, e, emb, "MB", "cross", tmp_path,
+           SimpleNamespace(output=SimpleNamespace(kind="embedding")), metrics="clustering")
+    assert list(e["metrics"]) == SCIB[:6]
+
+
+def test_evaluate_on_a_graph_output_gives_no_asw_and_iasw(three, tmp_path):
+    emb, paths = three
+    umap = tmp_path / "umap_embedding.h5"
+    with h5py.File(umap, "w") as f:
+        f["data"] = emb[:, :2].T
+    for output, who in ((umap, "scMoMaT writes a graph"), (_knn(), "output is a graph")):
+        df, said = _caught(mtb.evaluate, output, labels=paths, metrics="clustering",
+                           verbose=False)
+        v = _values(df)
+        assert v[["ASW", "iASW"]].isna().all() and v[GRAPH_CLUSTERING].notna().all()
+        assert [m for m in said if "ASW" in m] == [
+            f"ASW and iASW are NaN: {who}, not an embedding."]
+    # nothing is said when neither is asked for, and an embedding keeps both
+    _, said = _caught(mtb.evaluate, umap, labels=paths, metrics=["ARI"], verbose=False)
+    assert not [m for m in said if "ASW" in m]
+    df, said = _caught(mtb.evaluate, emb, labels=paths, metrics="clustering", verbose=False)
+    assert _values(df)[["ASW", "iASW"]].notna().all() and not [m for m in said if "ASW" in m]
+
+
+@pytest.mark.parametrize("category, dataset", [("vertical", "D11"), ("cross", "D52")])
+def test_the_stored_results_of_a_graph_method_have_no_asw_and_iasw(category, dataset):
+    stored = mtb.load_results(category, dataset=dataset)
+    have = set(stored[stored.method == "scMoMaT"].metric)
+    assert set(GRAPH_CLUSTERING) <= have and not {"ASW", "iASW"} & have

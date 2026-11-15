@@ -513,6 +513,17 @@ def _classification_error(metrics, why: str, what: str = "output") -> str:
         f"{_metrics_spelling(metrics)} cannot be computed: {reason}"
 
 
+def _no_graph_silhouettes(out, who: str) -> None:
+    """ASW and iASW of a graph output become NaN in ``out``, with one warning: a
+    silhouette needs the embedding, which a graph method does not write."""
+    from .classify import _graph_what
+    rows = [c for c in catalog.GRAPH_UNSCORED if c in out.index]
+    if rows:
+        out.loc[rows, "Value"] = float("nan")
+        _text.warn(f"{_and_list(rows)} {'are' if len(rows) > 1 else 'is'} NaN: "
+                   f"{_graph_what(who)}.", UserWarning)
+
+
 def _classification_scores(request, emb, ct, cb, *, category, graph, metrics):
     """``{code: value}`` of the classification rows, ``{}`` when left out: the
     ``mean`` row of ``classification_metrics(classify(...))`` with seed 0.
@@ -883,9 +894,8 @@ def _scores(
     batch_from_files = batch is None and io._is_label_path_list(labels) and len(labels) > 1
     group, only, slow, want_cls = _plan_metrics(
         metrics, has_batch=batch is not None or batch_from_files)
-    if want_cls:
-        from .classify import _graph_writer
-        graph = _graph_writer(embedding)           # a file only graph methods write
+    from .classify import _graph_writer, _is_neighbour_index
+    graph = _graph_writer(embedding)               # a file only graph methods write
     emb, ids, adata = _read_output(embedding, obsm, "embedding")
     if cells is not None and cells.moved and not _follows_cells(labels, adata, cells):
         stems = ", ".join(cells.moved)
@@ -903,9 +913,10 @@ def _scores(
                            for x in (labels, batch))
     emb, ct, origin = _cell_labels(labels, emb, adata, lab_ids, read, others)
     _check_finite(emb)
+    # a graph for ASW and iASW: that file, or a kNN index
+    no_silhouette = graph or ("output" if _is_neighbour_index(emb) else None)
     if want_cls and not graph:
-        from .classify import _is_neighbour_index
-        if emb.ndim == 2 and (emb.shape[0] == emb.shape[1] or _is_neighbour_index(emb)):
+        if emb.ndim == 2 and (emb.shape[0] == emb.shape[1] or no_silhouette):
             graph = "output"                       # cells x cells, or a kNN index
     # the clusters of run's label-order screening, an array in the embedding's rows
     cl = None if clusters is None else np.asarray(clusters)
@@ -934,6 +945,8 @@ def _scores(
         out = compute(emb, ct, cl, ba, group=group, slow_metrics=slow, only=only,
                       verbose=None if verbose else False)
     attrs = {k: out.attrs.get(k) for k in PROVENANCE_ATTRS[:-1]}
+    if no_silhouette:
+        _no_graph_silhouettes(out, no_silhouette)
     if want_cls:
         rows = _classification_scores(want_cls, emb, ct, cb, category=category,
                                       graph=graph,

@@ -102,7 +102,8 @@ def test_the_family_bars_of_stored_methods_do_not_move():
         alone = _build_table(st).blocks[0].overall
         mixed = _build_table(tables["+run"]).blocks[0].overall
     assert np.allclose(mixed[alone.index], alone)
-    assert round(alone["Multigrate"], 3) == 0.909
+    # 0.909 while scMoMaT (a graph method) had ASW and iASW rows
+    assert round(alone["Multigrate"], 3) == 0.894
 
 
 def test_a_row_better_than_every_stored_row_scores_above_one():

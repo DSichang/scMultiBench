@@ -179,6 +179,8 @@ def test_several_datasets_warning_is_plain():
     _, msgs = _messages(_build_table, df)
     assert msgs == [
         "This figure averages each method over 2 datasets, D11 and D11b. Plot one "
-        "dataset, or use mtb.plot.bar."]
+        "dataset, or use mtb.plot.bar.",
+        "scMoMaT has no ASW or iASW. Pass metrics= without ASW and iASW to compare on "
+        "the same metrics."]
 
 

@@ -1234,18 +1234,20 @@ def _names_batch_metric(metrics) -> bool:
     return codes is None or any(c in fam["batch"] + fam["classification"] for c in codes)
 
 
-def _without_classification(metrics, multi_batch: bool):
-    """``metrics=`` without the classification family, for the UMAP a graph method
-    writes; ``None`` when nothing else is left."""
-    from ._data.catalog import FAMILY_METRICS as fam
+def _graph_selection(metrics, multi_batch: bool):
+    """``metrics=`` for the UMAP a graph method writes: without the classification
+    family, ASW and iASW; ``None`` when nothing else is left."""
+    from ._data.catalog import FAMILY_METRICS as fam, GRAPH_UNSCORED
+    no = fam["classification"] + GRAPH_UNSCORED
     if metrics is None or metrics == "all":
+        clustering = [c for c in fam["clustering"] if c not in no]
         if multi_batch:
-            return fam["clustering"] + [c for c in fam["batch"] if c != "kBET"]
-        return "clustering" if metrics is None else metrics
+            return clustering + [c for c in fam["batch"] if c != "kBET"]
+        return clustering if metrics is None else metrics   # 'all' on one batch: refused
     codes = _metric_codes(metrics)
     if codes is None:
         return metrics                     # evaluate rejects it with its message
-    left = [c for c in codes if c not in fam["classification"]]
+    left = [c for c in codes if c not in no]
     if len(left) == len(codes):
         return metrics
     return left or None
@@ -1262,7 +1264,7 @@ def _evaluate_best_order(emb, category, cands, *, metrics=None, user_batch=False
     def _full(lab, batch, clusters=None):
         several = len(set(np.asarray(batch).tolist())) > 1
         multi = use_batch and several
-        chosen = metrics if embedding else _without_classification(metrics, multi)
+        chosen = metrics if embedding else _graph_selection(metrics, multi)
         if not embedding:
             # the batches go only with a selection that still uses them
             multi = several and ((user_batch and batch_given)
@@ -2712,9 +2714,12 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
     _drop_scores(rec)
     rec["emb_shape"] = list(emb.shape)
     embedding = variant.output.kind == "embedding"
-    if not embedding and _without_classification(metrics, True) is None:
-        from .eval.pipeline import _classification_error
-        raise ValueError(_classification_error(metrics, "graph", rec.get("method")))
+    if not embedding and _graph_selection(metrics, True) is None:
+        from ._data.catalog import GRAPH_UNSCORED
+        from .eval.classify import _graph_text
+        asked = set(_metric_codes(metrics) or ()) & set(GRAPH_UNSCORED)
+        raise ValueError(_graph_text(rec.get("method"), silhouettes=bool(asked))
+                         + " Pass metrics='clustering'.")
     n = emb.shape[0]
     rows = labels is not None and not labels_by_cell      # labels in embedding row order
     segments = None
