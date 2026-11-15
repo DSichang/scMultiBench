@@ -1,6 +1,18 @@
 {
  "base": "https://github.com/DSichang/scMultiBench/releases/download/envs-mac-v1",
  "archives": {
+  "env_sciPENN": {
+   "files": [
+    "env_sciPENN.tar.gz"
+   ],
+   "sha256": "1ba081d10f744dfe6b269cf11c06e6831b42397554caf3a47f6d89c1b80da013",
+   "archive_bytes": 354824497,
+   "unpacked_bytes": 1197360686,
+   "file_count": 42789,
+   "methods": [
+    "sciPENN"
+   ]
+  },
   "glue": {
    "files": [
     "glue.tar.gz"
@@ -167,7 +179,7 @@
   }
  },
  "_meta": {
-  "written": "2026-11-14 12:59",
+  "written": "2026-11-15 23:08",
   "note": "Written by tools/macos/build.py listing. archive_bytes: the archive; unpacked_bytes: the files in it."
  }
 }

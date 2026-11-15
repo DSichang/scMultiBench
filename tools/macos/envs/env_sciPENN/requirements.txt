@@ -1,0 +1,58 @@
+# The env's own pins for macOS: the lock's are for Python 3.7. Resolved for Python 3.11 on 2026-11-15
+# from the lines marked "needed"; the rest is what those ask for. Installed with --no-deps, as the
+# lock is: sciPENN's metadata asks for numba<=0.50.0, which has no arm64 build.
+# needed: scipenn (the lock's version), numba, tqdm, h5py, and
+#   anndata==0.8.0   the lock's; sciPENN relies on AnnData casting a float64 X to float32 (0.9 stopped)
+#   scanpy==1.9.3    the lock's
+#   pandas<2         anndata 0.8.0 fails with pandas 2
+#   numpy<2          pandas 1.5.3 is built for numpy 1
+#   matplotlib<3.9   scanpy 1.9.3 imports matplotlib.cm.get_cmap, removed in 3.9
+#   torch==2.8.0     as in scmb_torch; the lock's 1.13.1 has no arm64 wheel for Python 3.11
+#   scipy==1.13.1    as in scmb_torch; later releases have a wheel built for macOS 14, which pip takes on a
+#                    newer Mac
+anndata==0.8.0
+cloudpickle==3.1.2
+contourpy==1.3.3
+cycler==0.12.1
+filelock==4.2.10
+fonttools==4.68.0
+formulaic==1.2.2
+fsspec==2026.9.0
+h5py==3.16.0
+interface-meta==2.0.1
+jinja2==3.1.6
+joblib==1.6.0
+kiwisolver==1.5.1
+llvmlite==0.50.0
+markupsafe==3.0.4
+matplotlib==3.8.4
+mpmath==1.3.0
+narwhals==2.28.0
+natsort==8.4.0
+networkx==3.6.1
+numba==0.68.1
+numpy==1.26.4
+packaging==26.3
+pandas==1.5.3
+patsy==1.0.3
+pillow==13.0.0
+pynndescent==0.7.0
+pyparsing==3.3.3
+python-dateutil==4.0.0
+pytz==2026.6
+scanpy==1.9.3
+scikit-learn==1.9.1
+scipenn==0.9.6
+scipy==1.13.1
+seaborn==0.13.2
+session-info==1.0.1
+statsmodels==0.15.0
+stdlib-list==0.12.0
+sympy==1.14.0
+threadpoolctl==3.8.0
+torch==2.8.0
+tqdm==4.70.1
+typing-extensions==4.16.0
+tzdata==2026.6
+umap-learn==0.5.12
+wrapt==2.5.2

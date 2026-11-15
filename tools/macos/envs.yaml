@@ -3,7 +3,8 @@
 # and the hand files in tools/macos/envs/<env>/; tests/test_macos_build_tool.py checks this list against
 # the package. Left out of an env here because a dependency has no Apple silicon build: Conos (scmb_r:
 # r-conos, r-pagoda2). Not built for macOS at all: the envs of methods that need an NVIDIA GPU, of the
-# methods on Python 3.7, on torch 1.7/1.9 or TensorFlow 2.4/2.8, and MOFA2 (no osx-arm64 build).
+# methods on Python 3.7 (but env_sciPENN, below), on torch 1.7/1.9 or TensorFlow 2.4/2.8, and MOFA2 (no
+# osx-arm64 build).
 matilda: [Matilda]
 scmb_r: [StabMap, UINMF, iNMF, online_iNMF]
 scmb_seurat5: [Seurat_v5, Seurat_WNN]
@@ -17,3 +18,6 @@ scmb_mira: [MIRA]
 glue: [GLUE]
 scmb_torch: [SCALEX, scMDC, scMoMaT, uniPort, MultiMAP]
 scmb_torch_v2: [Portal]
+# Python 3.11 with its own pins (envs/env_sciPENN/). SMILE, which shares this env on Linux, is not covered:
+# it was not run on macOS.
+env_sciPENN: [sciPENN]
