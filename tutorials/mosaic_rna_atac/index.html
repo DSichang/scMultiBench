@@ -2932,7 +2932,7 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <h1 id="mosaic-integration-rna-rna-atac-atac">Mosaic integration: [RNA, RNA + ATAC, ATAC]<a class="anchor-link" href="#mosaic-integration-rna-rna-atac-atac">¶</a></h1><p>Mosaic integration combines batches that share only some modalities, and every mosaic method reads ATAC as peaks. This tutorial is for an RNA batch, an RNA + ATAC batch and an ATAC batch. It runs StabMap and scMoMaT on <code>D45mini</code>, 6,000 cells of the benchmark dataset <code>D45</code>, and then on data in your own format.</p>
-<p>StabMap and scMoMaT run on Linux and Windows. On macOS, <a href="https://colab.research.google.com/github/DSichang/scMultiBench/blob/main/notebooks/tutorial_mosaic_rna_atac.ipynb">open this notebook in Colab</a>: sections 1 to 4 take about 12 minutes there.</p>
+<p>StabMap and scMoMaT run on Linux, Windows and macOS (Apple silicon). Or <a href="https://colab.research.google.com/github/DSichang/scMultiBench/blob/main/notebooks/tutorial_mosaic_rna_atac.ipynb">open in Colab</a>: sections 1 to 4 take about 12 minutes there.</p>
 </div>
 </div>
 </div>
@@ -2968,11 +2968,11 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="o">,</span><span class="w"> </span><span class="nn">pandas</span>
 <span class="n">pins</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"numpy==</span><span class="si">{</span><span class="n">numpy</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2"> pandas==</span><span class="si">{</span><span class="n">pandas</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2">"</span>
-<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.7.2"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
+<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.7.3"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-1">import numpy, pandas
 pins = f"numpy=={numpy.__version__} pandas=={pandas.__version__}"
-%pip install -q "multibench-sc&gt;=0.7.2" {pins}</div>
+%pip install -q "multibench-sc&gt;=0.7.3" {pins}</div>
 </div>
 </div>
 </div>
@@ -2998,7 +2998,7 @@ pins = f"numpy=={numpy.__version__} pandas=={pandas.__version__}"
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="2-download-the-data-and-the-environments">2. Download the data and the environments<a class="anchor-link" href="#2-download-the-data-and-the-environments">¶</a></h2><p><code>mtb.data.fetch</code> downloads <code>D45mini</code> (11 MB) once. <code>mtb.env.install</code> downloads the environments for StabMap and scMoMaT. On Linux the download is 1.8 GB on a computer without a GPU and 5.4 GB on one with a GPU. On Windows it is 0.6 GB and 2.5 GB.</p>
+<h2 id="2-download-the-data-and-the-environments">2. Download the data and the environments<a class="anchor-link" href="#2-download-the-data-and-the-environments">¶</a></h2><p><code>mtb.data.fetch</code> downloads <code>D45mini</code> (11 MB) once. <code>mtb.env.install</code> downloads the environments for StabMap and scMoMaT. On Linux the download is 1.8 GB on a computer without a GPU and 5.4 GB on one with a GPU. On Windows it is 0.6 GB and 2.5 GB. On macOS it is 1.0 GB.</p>
 </div>
 </div>
 </div>
@@ -3108,9 +3108,9 @@ res.summary</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[run] StabMap (mosaic/D45mini) ...
-[run]   -&gt; scored (45.7s) ARI 0.526
+[run]   -&gt; scored (13.8s) ARI 0.526
 [run] scMoMaT (mosaic/D45mini) ...
-[run]   -&gt; scored (134.2s) ARI 0.314
+[run]   -&gt; scored (176.6s) ARI 0.314
 </pre>
 </div>
 </div>
@@ -3179,7 +3179,7 @@ res.summary</div>
 <td>0.9875</td>
 <td>0.7882</td>
 <td>0.8103</td>
-<td>45.7</td>
+<td>13.8</td>
 <td></td>
 <td></td>
 </tr>
@@ -3203,7 +3203,7 @@ res.summary</div>
 <td>NaN</td>
 <td>NaN</td>
 <td>NaN</td>
-<td>134.2</td>
+<td>176.6</td>
 <td></td>
 <td></td>
 </tr>
@@ -3582,9 +3582,9 @@ mine.summary</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[run] StabMap (mosaic/MYMOSAIC_RNA_ATAC) ...
-[run]   -&gt; scored (61.8s) ARI 0.463
+[run]   -&gt; scored (12.7s) ARI 0.463
 [run] scMoMaT (mosaic/MYMOSAIC_RNA_ATAC) ...
-[run]   -&gt; scored (113.4s) ARI 0.370
+[run]   -&gt; scored (135.6s) ARI 0.370
 </pre>
 </div>
 </div>
@@ -3653,7 +3653,7 @@ mine.summary</div>
 <td>0.9867</td>
 <td>0.7645</td>
 <td>0.7851</td>
-<td>61.8</td>
+<td>12.7</td>
 <td></td>
 <td></td>
 </tr>
@@ -3677,7 +3677,7 @@ mine.summary</div>
 <td>NaN</td>
 <td>NaN</td>
 <td>NaN</td>
-<td>113.4</td>
+<td>135.6</td>
 <td></td>
 <td></td>
 </tr>

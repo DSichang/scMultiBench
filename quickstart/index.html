@@ -2013,10 +2013,11 @@
 
 <h1 id="quickstart">Quickstart<a class="headerlink" href="#quickstart" title="Anchor link to this section">&para;</a></h1>
 <p>Five steps take you from finding methods to plotting your run next to the
-stored results. Only step 3 runs a method. It needs Linux or
-<a href="../installation/#windows">Windows</a> and a
+stored results. Only step 3 runs a method. It needs Linux,
+<a href="../installation/#windows">Windows</a> or
+<a href="../installation/#macos">macOS</a> with Apple silicon, and a
 <a href="../installation/#method-environments">method environment</a>. The other steps
-also work on macOS.</p>
+also work on an Intel Mac.</p>
 <p>For your own data:</p>
 <ul>
 <li><abbr title="Cellular Indexing of Transcriptomes and Epitopes by sequencing">CITE-seq</abbr>: the <a href="../tutorials/vertical_rna_adt/"><abbr title="Ribonucleic Acid, here, scRNA-seq counts">RNA</abbr> + <abbr title="Antibody-Derived Tags, CITE-seq surface protein readout">ADT</abbr> tutorial</a>, which runs in Colab.</li>
@@ -2057,7 +2058,7 @@ also work on macOS.</p>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">df</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">load_results</span><span class="p">(</span><span class="s2">"cross"</span><span class="p">,</span> <span class="n">dataset</span><span class="o">=</span><span class="s2">"D52"</span><span class="p">)</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">mtb</span><span class="o">.</span><span class="n">plot</span><span class="o">.</span><span class="n">bubble</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s2">"ARI"</span><span class="p">,</span> <span class="s2">"NMI"</span><span class="p">,</span> <span class="s2">"cLISI"</span><span class="p">],</span> <span class="n">save</span><span class="o">=</span><span class="s2">"fig.pdf"</span><span class="p">)</span>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1"># 3. run and score a method on D52 (Linux or Windows)</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1"># 3. run and score a method on D52 (Linux, Windows or macOS)</span>
 </span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="n">mtb</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">fetch</span><span class="p">(</span><span class="s2">"D52"</span><span class="p">)</span>
 </span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="n">mtb</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">install</span><span class="p">([</span><span class="s2">"StabMap"</span><span class="p">])</span>
 </span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="n">res</span> <span class="o">=</span> <span class="n">mtb</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">"D52"</span><span class="p">,</span> <span class="s2">"cross"</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s2">"StabMap"</span><span class="p">],</span> <span class="n">out_dir</span><span class="o">=</span><span class="s2">"out/"</span><span class="p">)</span>

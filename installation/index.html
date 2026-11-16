@@ -668,6 +668,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#macos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        macOS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#get-the-data" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2172,6 +2183,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#macos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        macOS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#get-the-data" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2231,8 +2253,9 @@
 <h1 id="installation">Installation<a class="headerlink" href="#installation" title="Anchor link to this section">&para;</a></h1>
 <p><code>pip install multibench-sc</code> installs the API on Python 3.9 or newer. Methods
 run on Linux, such as <a href="#google-colab">Google Colab</a>, and on
-<a href="#windows">Windows</a> for the methods listed there. On macOS you can use the
-stored results, check your data with <code>scan</code>, score embeddings and plot.</p>
+<a href="#windows">Windows</a> and <a href="#macos">macOS</a> (Apple silicon) for the methods
+listed there. On an Intel Mac you can use the stored results, check your
+data with <code>scan</code>, score embeddings and plot.</p>
 <hr />
 <h2 id="quick-setup">Quick setup<a class="headerlink" href="#quick-setup" title="Anchor link to this section">&para;</a></h2>
 <p>One block creates an environment, installs multibench with JupyterLab and
@@ -2284,56 +2307,60 @@ for you. Give it this prompt:</p>
 </span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>  Python 3.9 or newer.
 </span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>- Docs: https://dsichang.github.io/scMultiBench/installation/
 </span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>- multibench runs single-cell integration methods. Methods run on Linux and,
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>  for the methods the docs list, on Windows. On macOS no method runs; stored
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>  results, data checks, scoring and plots work.
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>- Each method runs in its own environment. mtb.env.install(["&lt;method&gt;"])
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>  downloads it as a prebuilt archive: no conda, compiler or administrator
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>  rights needed. print(mtb.config) shows where it goes (envs_dir: conda's
-</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>  envs folder when conda is on PATH, else ~/.cache/multibench/envs).
-</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>
-</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>Rules
-</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>- Make one new environment named multibench. With conda installed:
-</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>  conda create -n multibench python=3.12. Without conda: a venv in
-</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>  ~/multibench-env from a Python that is already installed, 3.12 or newer
-</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>  if there is one, else 3.9 or newer. If there is none, stop and ask me to
-</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>  install Python.
-</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>- Install nothing else on the computer: no Python, no package manager,
-</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>  nothing into the base or system Python. No sudo, no administrator rights.
-</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>  If a conda environment named multibench, the folder ~/multibench-env or a
-</span><span id="__span-3-24"><a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a>  Jupyter kernel named multibench already exists, stop and ask me.
-</span><span id="__span-3-25"><a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a>- In every command, call the environment's python by its full path instead
-</span><span id="__span-3-26"><a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a>  of relying on activation. On Windows that is Scripts\python.exe in a venv
-</span><span id="__span-3-27"><a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a>  and python.exe in a conda environment's own folder.
-</span><span id="__span-3-28"><a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a>- Ask me before you install a method environment, and tell me its size:
-</span><span id="__span-3-29"><a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a>  mtb.env.install([...], dry_run=True) shows it. Ask me before you fetch a
-</span><span id="__span-3-30"><a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a>  dataset larger than 100 MB.
-</span><span id="__span-3-31"><a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a>- Steps 2 and 5 take several minutes each. Wait for them, and do not start
-</span><span id="__span-3-32"><a id="__codelineno-3-32" name="__codelineno-3-32" href="#__codelineno-3-32"></a>  them again.
-</span><span id="__span-3-33"><a id="__codelineno-3-33" name="__codelineno-3-33" href="#__codelineno-3-33"></a>- When a command fails, show me the error and what you would try next. Do
-</span><span id="__span-3-34"><a id="__codelineno-3-34" name="__codelineno-3-34" href="#__codelineno-3-34"></a>  not skip a check to get past a failure.
-</span><span id="__span-3-35"><a id="__codelineno-3-35" name="__codelineno-3-35" href="#__codelineno-3-35"></a>
-</span><span id="__span-3-36"><a id="__codelineno-3-36" name="__codelineno-3-36" href="#__codelineno-3-36"></a>Steps
-</span><span id="__span-3-37"><a id="__codelineno-3-37" name="__codelineno-3-37" href="#__codelineno-3-37"></a>1. Tell me the operating system and whether conda is installed.
-</span><span id="__span-3-38"><a id="__codelineno-3-38" name="__codelineno-3-38" href="#__codelineno-3-38"></a>2. Create the environment and install into it:
-</span><span id="__span-3-39"><a id="__codelineno-3-39" name="__codelineno-3-39" href="#__codelineno-3-39"></a>   python -m pip install multibench-sc jupyterlab
-</span><span id="__span-3-40"><a id="__codelineno-3-40" name="__codelineno-3-40" href="#__codelineno-3-40"></a>3. Add the Jupyter kernel: python -m ipykernel install --user --name multibench
-</span><span id="__span-3-41"><a id="__codelineno-3-41" name="__codelineno-3-41" href="#__codelineno-3-41"></a>4. Check, on any system:
-</span><span id="__span-3-42"><a id="__codelineno-3-42" name="__codelineno-3-42" href="#__codelineno-3-42"></a>   python -c "import multibench as mtb; print(mtb.__version__); print(mtb.config); print(len(mtb.load_results('cross', dataset='D52')), 'stored result rows')"
-</span><span id="__span-3-43"><a id="__codelineno-3-43" name="__codelineno-3-43" href="#__codelineno-3-43"></a>   It prints the version, the folders multibench uses and a row count above 0.
-</span><span id="__span-3-44"><a id="__codelineno-3-44" name="__codelineno-3-44" href="#__codelineno-3-44"></a>5. On Linux or Windows, after my yes, run one method on a 2 MB demo dataset.
-</span><span id="__span-3-45"><a id="__codelineno-3-45" name="__codelineno-3-45" href="#__codelineno-3-45"></a>   Save these lines as multibench_check.py and run the file with the
-</span><span id="__span-3-46"><a id="__codelineno-3-46" name="__codelineno-3-46" href="#__codelineno-3-46"></a>   environment's python:
-</span><span id="__span-3-47"><a id="__codelineno-3-47" name="__codelineno-3-47" href="#__codelineno-3-47"></a>     import multibench as mtb
-</span><span id="__span-3-48"><a id="__codelineno-3-48" name="__codelineno-3-48" href="#__codelineno-3-48"></a>     mtb.data.fetch("D52mini")
-</span><span id="__span-3-49"><a id="__codelineno-3-49" name="__codelineno-3-49" href="#__codelineno-3-49"></a>     mtb.env.install(["StabMap"])
-</span><span id="__span-3-50"><a id="__codelineno-3-50" name="__codelineno-3-50" href="#__codelineno-3-50"></a>     res = mtb.run("D52mini", "cross", methods=["StabMap"], out_dir="multibench_check")
-</span><span id="__span-3-51"><a id="__codelineno-3-51" name="__codelineno-3-51" href="#__codelineno-3-51"></a>     print(res.summary.T.to_string())
-</span><span id="__span-3-52"><a id="__codelineno-3-52" name="__codelineno-3-52" href="#__codelineno-3-52"></a>   The status must be "scored". On Windows, cLISI and iLISI are empty without
-</span><span id="__span-3-53"><a id="__codelineno-3-53" name="__codelineno-3-53" href="#__codelineno-3-53"></a>   a C++ compiler: that is expected. On macOS, skip this step and say why.
-</span><span id="__span-3-54"><a id="__codelineno-3-54" name="__codelineno-3-54" href="#__codelineno-3-54"></a>
-</span><span id="__span-3-55"><a id="__codelineno-3-55" name="__codelineno-3-55" href="#__codelineno-3-55"></a>Then report: the environment's location, the multibench version, the kernel
-</span><span id="__span-3-56"><a id="__codelineno-3-56" name="__codelineno-3-56" href="#__codelineno-3-56"></a>name, the outcome of step 5, and the commands that remove the environment,
-</span><span id="__span-3-57"><a id="__codelineno-3-57" name="__codelineno-3-57" href="#__codelineno-3-57"></a>the kernel, the folders that print(mtb.config) names and the files of step 5.
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>  for the methods the docs list, on Windows and on a Mac with Apple silicon.
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>  On an Intel Mac no method runs; stored results, data checks, scoring and
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>  plots work.
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>- Each method runs in its own environment. mtb.env.install(["&lt;method&gt;"])
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>  downloads it as a prebuilt archive: no conda, compiler or administrator
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>  rights needed. print(mtb.config) shows where it goes (envs_dir: conda's
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>  envs folder when conda is on PATH, else ~/.cache/multibench/envs).
+</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>
+</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>Rules
+</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>- Make one new environment named multibench. With conda installed:
+</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>  conda create -n multibench python=3.12. Without conda: a venv in
+</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>  ~/multibench-env from a Python that is already installed, 3.12 or newer
+</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>  if there is one, else 3.9 or newer. If there is none, stop and ask me to
+</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>  install Python.
+</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>- Install nothing else on the computer: no Python, no package manager,
+</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>  nothing into the base or system Python. No sudo, no administrator rights.
+</span><span id="__span-3-24"><a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a>  If a conda environment named multibench, the folder ~/multibench-env or a
+</span><span id="__span-3-25"><a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a>  Jupyter kernel named multibench already exists, stop and ask me.
+</span><span id="__span-3-26"><a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a>- In every command, call the environment's python by its full path instead
+</span><span id="__span-3-27"><a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a>  of relying on activation. On Windows that is Scripts\python.exe in a venv
+</span><span id="__span-3-28"><a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a>  and python.exe in a conda environment's own folder.
+</span><span id="__span-3-29"><a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a>- Ask me before you install a method environment, and tell me its size:
+</span><span id="__span-3-30"><a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a>  mtb.env.install([...], dry_run=True) shows it. Ask me before you fetch a
+</span><span id="__span-3-31"><a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a>  dataset larger than 100 MB.
+</span><span id="__span-3-32"><a id="__codelineno-3-32" name="__codelineno-3-32" href="#__codelineno-3-32"></a>- Steps 2 and 5 take several minutes each. Wait for them, and do not start
+</span><span id="__span-3-33"><a id="__codelineno-3-33" name="__codelineno-3-33" href="#__codelineno-3-33"></a>  them again.
+</span><span id="__span-3-34"><a id="__codelineno-3-34" name="__codelineno-3-34" href="#__codelineno-3-34"></a>- When a command fails, show me the error and what you would try next. Do
+</span><span id="__span-3-35"><a id="__codelineno-3-35" name="__codelineno-3-35" href="#__codelineno-3-35"></a>  not skip a check to get past a failure.
+</span><span id="__span-3-36"><a id="__codelineno-3-36" name="__codelineno-3-36" href="#__codelineno-3-36"></a>
+</span><span id="__span-3-37"><a id="__codelineno-3-37" name="__codelineno-3-37" href="#__codelineno-3-37"></a>Steps
+</span><span id="__span-3-38"><a id="__codelineno-3-38" name="__codelineno-3-38" href="#__codelineno-3-38"></a>1. Tell me the operating system, on a Mac whether it has Apple silicon or
+</span><span id="__span-3-39"><a id="__codelineno-3-39" name="__codelineno-3-39" href="#__codelineno-3-39"></a>   an Intel processor, and whether conda is installed.
+</span><span id="__span-3-40"><a id="__codelineno-3-40" name="__codelineno-3-40" href="#__codelineno-3-40"></a>2. Create the environment and install into it:
+</span><span id="__span-3-41"><a id="__codelineno-3-41" name="__codelineno-3-41" href="#__codelineno-3-41"></a>   python -m pip install multibench-sc jupyterlab
+</span><span id="__span-3-42"><a id="__codelineno-3-42" name="__codelineno-3-42" href="#__codelineno-3-42"></a>3. Add the Jupyter kernel: python -m ipykernel install --user --name multibench
+</span><span id="__span-3-43"><a id="__codelineno-3-43" name="__codelineno-3-43" href="#__codelineno-3-43"></a>4. Check, on any system:
+</span><span id="__span-3-44"><a id="__codelineno-3-44" name="__codelineno-3-44" href="#__codelineno-3-44"></a>   python -c "import multibench as mtb; print(mtb.__version__); print(mtb.config); print(len(mtb.load_results('cross', dataset='D52')), 'stored result rows')"
+</span><span id="__span-3-45"><a id="__codelineno-3-45" name="__codelineno-3-45" href="#__codelineno-3-45"></a>   It prints the version, the folders multibench uses and a row count above 0.
+</span><span id="__span-3-46"><a id="__codelineno-3-46" name="__codelineno-3-46" href="#__codelineno-3-46"></a>5. On Linux, Windows or a Mac with Apple silicon, after my yes, run one
+</span><span id="__span-3-47"><a id="__codelineno-3-47" name="__codelineno-3-47" href="#__codelineno-3-47"></a>   method on a 2 MB demo dataset.
+</span><span id="__span-3-48"><a id="__codelineno-3-48" name="__codelineno-3-48" href="#__codelineno-3-48"></a>   Save these lines as multibench_check.py and run the file with the
+</span><span id="__span-3-49"><a id="__codelineno-3-49" name="__codelineno-3-49" href="#__codelineno-3-49"></a>   environment's python:
+</span><span id="__span-3-50"><a id="__codelineno-3-50" name="__codelineno-3-50" href="#__codelineno-3-50"></a>     import multibench as mtb
+</span><span id="__span-3-51"><a id="__codelineno-3-51" name="__codelineno-3-51" href="#__codelineno-3-51"></a>     mtb.data.fetch("D52mini")
+</span><span id="__span-3-52"><a id="__codelineno-3-52" name="__codelineno-3-52" href="#__codelineno-3-52"></a>     mtb.env.install(["StabMap"])
+</span><span id="__span-3-53"><a id="__codelineno-3-53" name="__codelineno-3-53" href="#__codelineno-3-53"></a>     res = mtb.run("D52mini", "cross", methods=["StabMap"], out_dir="multibench_check")
+</span><span id="__span-3-54"><a id="__codelineno-3-54" name="__codelineno-3-54" href="#__codelineno-3-54"></a>     print(res.summary.T.to_string())
+</span><span id="__span-3-55"><a id="__codelineno-3-55" name="__codelineno-3-55" href="#__codelineno-3-55"></a>   The status must be "scored". On Windows and macOS, cLISI and iLISI are
+</span><span id="__span-3-56"><a id="__codelineno-3-56" name="__codelineno-3-56" href="#__codelineno-3-56"></a>   empty without a C++ compiler: that is expected. On an Intel Mac, skip this
+</span><span id="__span-3-57"><a id="__codelineno-3-57" name="__codelineno-3-57" href="#__codelineno-3-57"></a>   step and say why.
+</span><span id="__span-3-58"><a id="__codelineno-3-58" name="__codelineno-3-58" href="#__codelineno-3-58"></a>
+</span><span id="__span-3-59"><a id="__codelineno-3-59" name="__codelineno-3-59" href="#__codelineno-3-59"></a>Then report: the environment's location, the multibench version, the kernel
+</span><span id="__span-3-60"><a id="__codelineno-3-60" name="__codelineno-3-60" href="#__codelineno-3-60"></a>name, the outcome of step 5, and the commands that remove the environment,
+</span><span id="__span-3-61"><a id="__codelineno-3-61" name="__codelineno-3-61" href="#__codelineno-3-61"></a>the kernel, the folders that print(mtb.config) names and the files of step 5.
 </span></code></pre></div>
 <hr />
 <h2 id="step-1-create-an-isolated-environment">Step 1: Create an isolated environment<a class="headerlink" href="#step-1-create-an-isolated-environment" title="Anchor link to this section">&para;</a></h2>
@@ -2462,15 +2489,15 @@ administrator rights, for these methods (tested on Windows 11):</p>
 </tr>
 </tbody>
 </table>
-<p>UINMF, SCALEX, Concerto, scMM, GLUE, scJoint, Seurat_v3 and MIRA run on Linux
-only. Asked for on Windows, they are refused: "<code>&lt;method&gt;</code> has no Windows
-environment. Run it on a Linux machine, such as Colab."</p>
+<p>UINMF, SCALEX, Concerto, scMM, GLUE, scJoint, Seurat_v3 and MIRA have no
+Windows environment. Asked for on Windows, they are refused: "<code>&lt;method&gt;</code> has
+no Windows environment. Run it on a Linux machine, such as Colab."</p>
 <details class="note">
 <summary>Details</summary>
 <ul>
 <li>Name the methods to install. <code>mtb.env.install(category=...)</code> and the
   call without methods are refused on Windows, because every category
-  has a method that runs on Linux only.</li>
+  has a method without a Windows environment.</li>
 <li>Keep the path of <code>mtb.config.envs_dir</code> short. Windows limits a file
   path to 259 characters, and <code>mtb.env.install</code> refuses a folder that
   leaves too little room.</li>
@@ -2484,6 +2511,29 @@ environment. Run it on a Linux machine, such as Colab."</p>
 <li><code>cLISI</code> and <code>iLISI</code> need a C++ compiler on Windows, such as the <code>g++</code>
   of Rtools. Without one they are <code>NaN</code>, with a warning
   (<a href="#troubleshooting">Troubleshooting</a>).</li>
+</ul>
+</details>
+<h3 id="macos">macOS<a class="headerlink" href="#macos" title="Anchor link to this section">&para;</a></h3>
+<p><code>mtb.env.install</code> and <code>mtb.run</code> also work on a Mac with Apple silicon,
+without conda, for these methods: Matilda, sciPENN, Cobolt, Multigrate,
+MultiVI, totalVI, scMDC, scMoMaT, MultiMAP, uniPort, Portal, StabMap, iNMF,
+online_iNMF, Seurat_v5, Seurat_WNN, UINMF, SCALEX, GLUE, scJoint, Seurat_v3
+and MIRA. Each environment has one build, on the <abbr title="Central Processing Unit">CPU</abbr>.</p>
+<p>moETM, SMILE, iPOLNG, scBridge, sciCAN, UnitedNet, Conos, MOFA2, scMSI,
+scMVP, VIMCCA, VIPCCA, Concerto and scMM have no macOS environment. Asked
+for on macOS, they are refused: "<code>&lt;method&gt;</code> has no macOS environment. Run it
+on a Linux machine, such as Colab."</p>
+<p>No method runs on an Intel Mac.</p>
+<details class="note">
+<summary>Details</summary>
+<ul>
+<li>Name the methods to install. <code>mtb.env.install(category=...)</code> and the
+  call without methods are refused on macOS, because every category has
+  a method without a macOS environment.</li>
+<li>Nothing is built on macOS: <code>build=True</code> is refused.</li>
+<li><code>cLISI</code> and <code>iLISI</code> need a C++ compiler on macOS, such as the one in
+  the Xcode command-line tools. Without one they are <code>NaN</code>, with a
+  warning (<a href="#troubleshooting">Troubleshooting</a>).</li>
 </ul>
 </details>
 <h3 id="get-the-data">Get the data<a class="headerlink" href="#get-the-data" title="Anchor link to this section">&para;</a></h3>
@@ -2606,21 +2656,28 @@ names, for example <code>mtb.env.install(["&lt;method&gt;"])</code>.
 <p>A conda environment has the name of a method's environment, but this
 version of multibench did not install it, so it is not used: an
 environment you made yourself, or one that multibench 0.3.9 or older
-built from a recipe, or 0.3.0 or older unpacked from an archive. Rename
-or remove the folder the message names, then run
-<code>mtb.env.install(["&lt;method&gt;"])</code>.</p>
+built from a recipe, or 0.3.0 or older unpacked from an archive. On
+Linux, rename or remove the folder the message names, then run
+<code>mtb.env.install(["&lt;method&gt;"])</code>. On Windows and macOS, run it as it is:
+when that folder is in conda's envs folder, 0.7.3 leaves it alone,
+unpacks into <code>~/.cache/multibench/envs</code> and prints
+<code>[env] &lt;folder&gt;/&lt;env&gt; is another environment, so &lt;env&gt; goes to &lt;folder&gt;</code>.</p>
 </details>
 <details class="note">
 <summary><code>OSError: Methods run only on Linux ...</code></summary>
-<p>Methods cannot run on macOS. Run the call on a Linux machine.
+<p>The message names this computer's system. Methods do not run on an
+Intel Mac or on a
+system other than Linux, Windows and macOS. Run the call on a Linux
+machine, such as Colab.
 Make the commands there: <code>mtb.scan(..., command=True)</code> writes this
 computer's paths into them.
 <code>mtb.env.install</code> raises the same error.</p>
 </details>
 <details class="note">
-<summary><code>OSError: &lt;method&gt; has no Windows environment ...</code></summary>
-<p>The method runs on Linux only. <a href="#windows">Windows</a> lists the methods
-that run on Windows.</p>
+<summary><code>OSError: &lt;method&gt; has no Windows environment ...</code>, or <code>no macOS environment</code></summary>
+<p>The method has no environment for this system. <a href="#windows">Windows</a> and
+<a href="#macos">macOS</a> list the methods that run there. Run the others on a
+Linux machine, such as Colab.</p>
 </details>
 <details class="note">
 <summary><code>OSError</code> naming <code>envs_dir</code>, with <code>MULTIBENCH_RUN_MODE=prefix</code></summary>

@@ -2910,7 +2910,7 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <h1 id="mosaic-integration-mixed-with-shared-modality">Mosaic integration: Mixed, with shared modality<a class="anchor-link" href="#mosaic-integration-mixed-with-shared-modality">¶</a></h1><p>Mosaic integration combines batches that share only some modalities, and every mosaic method reads ATAC as peaks. This tutorial is for an RNA + ADT batch, an RNA + ATAC batch and an RNA batch, so every batch holds RNA. It runs StabMap and UINMF on <code>D46mini</code>, 4,500 cells of the benchmark dataset <code>D46</code>, and then on data in your own format.</p>
-<p>Methods run on Linux, and UINMF has no Windows environment. On macOS or Windows, <a href="https://colab.research.google.com/github/DSichang/scMultiBench/blob/main/notebooks/tutorial_mosaic_shared.ipynb">open this notebook in Colab</a>: sections 1 to 4 take about 8 minutes there.</p>
+<p>StabMap and UINMF run on Linux and macOS (Apple silicon), and UINMF has no Windows environment. On Windows, <a href="https://colab.research.google.com/github/DSichang/scMultiBench/blob/main/notebooks/tutorial_mosaic_shared.ipynb">open this notebook in Colab</a>: sections 1 to 4 take about 8 minutes there.</p>
 </div>
 </div>
 </div>
@@ -2946,11 +2946,11 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 <div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="o">,</span><span class="w"> </span><span class="nn">pandas</span>
 <span class="n">pins</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"numpy==</span><span class="si">{</span><span class="n">numpy</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2"> pandas==</span><span class="si">{</span><span class="n">pandas</span><span class="o">.</span><span class="n">__version__</span><span class="si">}</span><span class="s2">"</span>
-<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.7.2"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
+<span class="o">%</span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">q</span> <span class="s2">"multibench-sc&gt;=0.7.3"</span> <span class="p">{</span><span class="n">pins</span><span class="p">}</span>
 </pre></div>
 <div class="clipboard-copy-txt" id="cell-1">import numpy, pandas
 pins = f"numpy=={numpy.__version__} pandas=={pandas.__version__}"
-%pip install -q "multibench-sc&gt;=0.7.2" {pins}</div>
+%pip install -q "multibench-sc&gt;=0.7.3" {pins}</div>
 </div>
 </div>
 </div>
@@ -2976,7 +2976,7 @@ pins = f"numpy=={numpy.__version__} pandas=={pandas.__version__}"
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="2-download-the-data-and-the-environments">2. Download the data and the environments<a class="anchor-link" href="#2-download-the-data-and-the-environments">¶</a></h2><p><code>mtb.data.fetch</code> downloads <code>D46mini</code> (4 MB) once. <code>mtb.env.install</code> downloads the environments for StabMap and UINMF. The download is 0.9 GB.</p>
+<h2 id="2-download-the-data-and-the-environments">2. Download the data and the environments<a class="anchor-link" href="#2-download-the-data-and-the-environments">¶</a></h2><p><code>mtb.data.fetch</code> downloads <code>D46mini</code> (4 MB) once. <code>mtb.env.install</code> downloads the environments for StabMap and UINMF. On Linux the download is 0.9 GB. On macOS it is 0.7 GB.</p>
 </div>
 </div>
 </div>
@@ -3086,9 +3086,9 @@ res.summary</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[run] StabMap (mosaic/D46mini) ...
-[run]   -&gt; scored (34.7s) ARI 0.240
+[run]   -&gt; scored (11.8s) ARI 0.240
 [run] UINMF (mosaic/D46mini) ...
-[run]   -&gt; scored (52.2s) ARI 0.295
+[run]   -&gt; scored (17.1s) ARI 0.295
 </pre>
 </div>
 </div>
@@ -3157,7 +3157,7 @@ res.summary</div>
 <td>0.9767</td>
 <td>0.4237</td>
 <td>0.3510</td>
-<td>34.7</td>
+<td>11.8</td>
 <td></td>
 <td></td>
 </tr>
@@ -3181,7 +3181,7 @@ res.summary</div>
 <td>0.9720</td>
 <td>0.3133</td>
 <td>0.2403</td>
-<td>52.2</td>
+<td>17.1</td>
 <td></td>
 <td></td>
 </tr>
@@ -3562,9 +3562,9 @@ mine.summary</div>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[run] StabMap (mosaic/MYMOSAIC_SHARED) ...
-[run]   -&gt; scored (47.3s) ARI 0.258
+[run]   -&gt; scored (10.8s) ARI 0.258
 [run] UINMF (mosaic/MYMOSAIC_SHARED) ...
-[run]   -&gt; scored (68.2s) ARI 0.290
+[run]   -&gt; scored (15.4s) ARI 0.290
 </pre>
 </div>
 </div>
@@ -3633,7 +3633,7 @@ mine.summary</div>
 <td>0.9783</td>
 <td>0.4573</td>
 <td>0.3566</td>
-<td>47.3</td>
+<td>10.8</td>
 <td></td>
 <td></td>
 </tr>
@@ -3657,7 +3657,7 @@ mine.summary</div>
 <td>0.9758</td>
 <td>0.3023</td>
 <td>0.2238</td>
-<td>68.2</td>
+<td>15.4</td>
 <td></td>
 <td></td>
 </tr>
