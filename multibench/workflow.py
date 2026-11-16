@@ -1234,18 +1234,20 @@ def _names_batch_metric(metrics) -> bool:
     return codes is None or any(c in fam["batch"] + fam["classification"] for c in codes)
 
 
-def _without_classification(metrics, multi_batch: bool):
-    """``metrics=`` without the classification family, for the UMAP a graph method
-    writes; ``None`` when nothing else is left."""
-    from ._data.catalog import FAMILY_METRICS as fam
+def _graph_selection(metrics, multi_batch: bool):
+    """``metrics=`` for a graph method: without the classification family and the
+    silhouettes (ASW, iASW, ASW_batch); ``None`` when nothing else is left."""
+    from ._data.catalog import FAMILY_METRICS as fam, GRAPH_UNSCORED
+    no = fam["classification"] + GRAPH_UNSCORED
     if metrics is None or metrics == "all":
+        clustering = [c for c in fam["clustering"] if c not in no]
         if multi_batch:
-            return fam["clustering"] + [c for c in fam["batch"] if c != "kBET"]
-        return "clustering" if metrics is None else metrics
+            return clustering + [c for c in fam["batch"] if c not in no + ["kBET"]]
+        return clustering if metrics is None else metrics   # 'all' on one batch: refused
     codes = _metric_codes(metrics)
     if codes is None:
         return metrics                     # evaluate rejects it with its message
-    left = [c for c in codes if c not in fam["classification"]]
+    left = [c for c in codes if c not in no]
     if len(left) == len(codes):
         return metrics
     return left or None
@@ -1262,7 +1264,7 @@ def _evaluate_best_order(emb, category, cands, *, metrics=None, user_batch=False
     def _full(lab, batch, clusters=None):
         several = len(set(np.asarray(batch).tolist())) > 1
         multi = use_batch and several
-        chosen = metrics if embedding else _without_classification(metrics, multi)
+        chosen = metrics if embedding else _graph_selection(metrics, multi)
         if not embedding:
             # the batches go only with a selection that still uses them
             multi = several and ((user_batch and batch_given)
@@ -1842,7 +1844,7 @@ class RunResult:
             variant = registry.get(method).select(self.category, set(mods))
             try:
                 # a record without out_dir: the folder run names
-                emb = _load_embedding(Path(rec.get("out_dir") or Path(self.out_dir or ".")
+                emb = _load_scored(Path(rec.get("out_dir") or Path(self.out_dir or ".")
                                            / f"{method}_{self.dataset}"), variant)
             except FileNotFoundError:
                 no_output.append(method)
@@ -2271,7 +2273,8 @@ def _check_param_keys(plan_df: pd.DataFrame, params: dict) -> None:
 
 def _load_embedding(mdir: Path, variant):
     """The embedding a finished run left in ``mdir`` as cells x dims, or ``None``: the
-    output, or a graph method's extra embedding output (scMoMaT's UMAP)."""
+    output, or a graph method's extra embedding output (scMoMaT's UMAP, which is
+    drawn; the scores come from :func:`_load_scored`)."""
     import h5py
 
     def read(path, key=None):
@@ -2286,6 +2289,18 @@ def _load_embedding(mdir: Path, variant):
     extra = [mdir / o.file for o in variant.extra_outputs if o.kind == "embedding"]
     found = next((p for p in extra if p.exists()), None)
     return None if found is None else _cells_first(read(found))
+
+
+def _load_scored(mdir: Path, variant):
+    """What a finished run in ``mdir`` is scored on: the neighbour graph a graph
+    method wrote, when both its files are there; else :func:`_load_embedding`."""
+    if variant.output.kind == "graph":
+        files = {o.file for o in [variant.output, *variant.extra_outputs] if o.kind == "graph"}
+        if set(_escib.KNN_FILES) <= files:
+            knn = _escib.KnnGraph.read(mdir)
+            if knn is not None:
+                return knn
+    return _load_embedding(mdir, variant)
 
 
 def _cells_first(emb):
@@ -2712,9 +2727,12 @@ def _score_record(rec, emb, dataset, category, data_path, variant, *,
     _drop_scores(rec)
     rec["emb_shape"] = list(emb.shape)
     embedding = variant.output.kind == "embedding"
-    if not embedding and _without_classification(metrics, True) is None:
-        from .eval.pipeline import _classification_error
-        raise ValueError(_classification_error(metrics, "graph", rec.get("method")))
+    if not embedding and _graph_selection(metrics, True) is None:
+        from ._data.catalog import GRAPH_UNSCORED
+        from .eval.classify import _graph_text
+        asked = set(_metric_codes(metrics) or ()) & set(GRAPH_UNSCORED)
+        raise ValueError(_graph_text(rec.get("method"), silhouettes=bool(asked))
+                         + " Pass metrics='clustering'.")
     n = emb.shape[0]
     rows = labels is not None and not labels_by_cell      # labels in embedding row order
     segments = None
@@ -3038,7 +3056,7 @@ def _run_one(rec, env, variant, *, data_path, params, batch_vec, batch_file, eva
             rec["run_sec"] = round(time.time() - start, 1)
             emb = (_cells_first(np.asarray(res))
                    if variant.output.kind == "embedding" and res is not None
-                   else _load_embedding(method_dir, variant))
+                   else _load_scored(method_dir, variant))
             _score_output(rec, emb, variant, output, data_path=data_path,
                           batch_vec=batch_vec, batch_file=batch_file, evaluate=evaluate)
     except TimeoutError as e:

@@ -12,6 +12,7 @@ import functools
 import inspect
 import io
 import warnings
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -374,6 +375,148 @@ def _n_clusters(graph, n: int, flavor: str, seen: dict | None = None) -> np.ndar
     return out
 
 
+#: the files of a neighbour graph a method writes (scMoMaT)
+KNN_FILES = ("knn_indices.h5", "knn_dists.h5")
+#: ``n_neighbors`` of umap's ``fuzzy_simplicial_set`` on a method's neighbour
+#: graph, as the article's scripts set it: SINFONIA_graph.py for the clusters,
+#: scib_metrics_graph.py for cLISI, GC, iLISI and kBET
+_GRAPH_CLUSTER_NEIGHBORS = 30
+_GRAPH_METRIC_NEIGHBORS = 100
+#: the metrics scored on the clusters of a neighbour graph
+_GRAPH_CLUSTER_METRICS = ("ARI", "NMI", "iF1")
+
+
+class KnnGraph:
+    """The neighbour graph a method writes: ``indices`` and ``dists``, cells x
+    neighbours (a matrix wider than tall is transposed, as the article's scripts do)."""
+
+    def __init__(self, indices, dists):
+        i, d = np.asarray(indices), np.asarray(dists)
+        if i.ndim != 2 or i.shape != d.shape:
+            raise ValueError(f"the neighbour indices {i.shape} and distances {d.shape} "
+                             f"must be two matrices of one shape.")
+        if i.shape[0] < i.shape[1]:
+            i, d = i.T, d.T
+        if i.min() < 0 or i.max() >= i.shape[0]:
+            raise ValueError(f"the neighbour indices must be 0 to {i.shape[0] - 1}, the "
+                             f"rows of the {i.shape[0]:,} cells.")
+        self.indices, self.dists = i.astype(np.int64), d.astype(float)
+        self.shape, self.ndim = self.indices.shape, 2
+
+    @classmethod
+    def read(cls, folder) -> "KnnGraph | None":
+        """The graph in ``folder``, or ``None`` when one of its two files is missing."""
+        import h5py
+        paths = [Path(folder) / f for f in KNN_FILES]
+        if not all(p.is_file() for p in paths):
+            return None
+        arrays = []
+        for p in paths:
+            with h5py.File(p) as h:
+                arrays.append(np.array(h["data" if "data" in h else list(h.keys())[0]]))
+        return cls(*arrays)
+
+
+def _graph_adata(knn: KnnGraph, n_neighbors: int):
+    """An AnnData holding ``knn`` as scanpy's neighbours: the connectivities are
+    umap's ``fuzzy_simplicial_set`` of the method's own neighbours, as
+    ``compute_connectivities_umap`` of the article's SINFONIA_graph.py."""
+    import anndata as ad
+    from scipy.sparse import coo_matrix, csr_matrix
+    from umap.umap_ import fuzzy_simplicial_set
+    n, k = knn.shape
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        conn = fuzzy_simplicial_set(
+            coo_matrix(([], ([], [])), shape=(n, 1)), n_neighbors, None, None,
+            knn_indices=knn.indices, knn_dists=knn.dists,
+            set_op_mix_ratio=1.0, local_connectivity=1.0)
+    conn = conn[0] if isinstance(conn, tuple) else conn      # umap-learn 0.4 on: a tuple
+    adata = ad.AnnData(obs=pd.DataFrame(index=np.arange(n).astype(str)))
+    adata.obsp["connectivities"] = conn.tocsr()
+    adata.obsp["distances"] = csr_matrix(
+        (knn.dists.ravel(), (np.repeat(np.arange(n), k), knn.indices.ravel())), shape=(n, n))
+    adata.uns["neighbors"] = {
+        "connectivities_key": "connectivities", "distances_key": "distances",
+        "params": {"n_neighbors": n_neighbors, "method": "umap", "metric": "euclidean"}}
+    return adata
+
+
+def compute_graph(knn: KnnGraph, celltype, cluster, batch, group: str = "clustering",
+                  slow_metrics: bool = False, only=None, *,
+                  verbose: bool | None = None) -> pd.DataFrame:
+    """The scIB metrics of a neighbour graph, as the article scores a graph method
+    (SINFONIA_graph.py, scib_metrics_graph.py): ARI, NMI and iF1 on Leiden
+    clusters of the method's own graph, cLISI, GC, iLISI and kBET on that graph.
+    ASW, iASW and ASW_batch need an embedding: NaN. Arguments and the returned
+    frame as :func:`compute`."""
+    me = import_scib().metrics
+    only = None if only is None else set(only)
+    adata = _graph_adata(knn, _GRAPH_METRIC_NEIGHBORS)
+    adata.obs["celltype"] = pd.Categorical(np.asarray(celltype).astype(str))
+    adata.obs["batch"] = pd.Categorical(np.asarray(batch).astype(str))
+    if cluster is not None:
+        adata.obs["cluster"] = pd.Categorical(np.asarray(cluster))
+    want_clu, want_bat = group in ("clustering", "all"), group in ("batch", "all")
+
+    def wanted(names):
+        return [m for m in names if only is None or m in only]
+
+    n_batches = int(adata.obs["batch"].nunique())
+    ct_metrics = wanted(_GRAPH_CLUSTER_METRICS) if want_clu and cluster is None else []
+    batch_metrics = wanted(_BATCH_CLUSTER_METRICS) if want_bat and n_batches >= 2 else []
+    flavor = None
+    if ct_metrics or batch_metrics:
+        flavor = _resolve_flavor()
+        if verbose or (verbose is None and adata.n_obs > _SWEEP_NOTICE_CELLS):
+            import sys
+            print(f"Clustering {adata.n_obs:,} cells for "
+                  f"{_text._and_list(ct_metrics + batch_metrics)} with the {flavor} Leiden "
+                  f"backend.", file=sys.stderr, flush=True)
+        graph, seen = _graph_adata(knn, _GRAPH_CLUSTER_NEIGHBORS), {}
+        if ct_metrics:
+            adata.obs["cluster"] = pd.Categorical(_n_clusters(
+                graph, adata.obs["celltype"].nunique(), flavor, seen))
+        if batch_metrics:
+            adata.obs["batch_cluster"] = pd.Categorical(_n_clusters(
+                graph, n_batches, flavor, seen))
+
+    out: dict[str, float] = {}
+    score = functools.partial(_score, out, only)
+
+    def no_embedding(name):
+        if only is None or name in only:
+            out[name] = float("nan")
+
+    if want_clu:
+        score("ARI", lambda: me.ari(adata, cluster_key="cluster", label_key="celltype"))
+        score("NMI", lambda: me.nmi(adata, cluster_key="cluster", label_key="celltype"))
+        no_embedding("ASW")
+        no_embedding("iASW")
+        score("iF1", lambda: _isolated_labels_f1(
+            adata, label_key="celltype", batch_key="batch", cluster_key="cluster",
+            iso_threshold=n_batches + 1))
+        score("cLISI", lambda: me.clisi_graph(adata, label_key="celltype", type_="knn"))
+    if want_bat:
+        no_embedding("ASW_batch")
+        if n_batches >= 2:
+            score("ARI_batch", lambda: 1 - abs(me.ari(
+                adata, cluster_key="batch_cluster", label_key="batch")))
+            score("NMI_batch", lambda: 1 - abs(me.nmi(
+                adata, cluster_key="batch_cluster", label_key="batch")))
+        score("GC", lambda: me.graph_connectivity(adata, label_key="celltype"))
+        score("iLISI", lambda: me.ilisi_graph(adata, batch_key="batch", type_="knn"))
+        if slow_metrics:
+            score("kBET", lambda: me.kBET(adata, batch_key="batch", label_key="celltype",
+                                          type_="knn"))
+    frame = pd.DataFrame.from_dict(out, orient="index", columns=["Value"])
+    scored_clusters = want_clu and any(m in out for m in _GRAPH_CLUSTER_METRICS)
+    frame.attrs["leiden_flavor"] = flavor
+    frame.attrs["clustering"] = (None if not scored_clusters
+                                 else "user" if cluster is not None else "search")
+    return frame
+
+
 def leiden_n_clusters(emb, n: int) -> np.ndarray:
     """Cluster an embedding with Leiden at the resolution that gives ``n`` clusters.
 
@@ -397,6 +540,9 @@ def leiden_n_clusters(emb, n: int) -> np.ndarray:
 
     The Leiden backend is ``config.leiden_flavor``.
     """
+    if isinstance(emb, KnnGraph):       # a method's own neighbour graph
+        return _n_clusters(_graph_adata(emb, _GRAPH_CLUSTER_NEIGHBORS), int(n),
+                           _resolve_flavor())
     return _n_clusters(_clustering_graph(emb), int(n), _resolve_flavor())
 
 

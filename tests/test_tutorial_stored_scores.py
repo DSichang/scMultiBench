@@ -128,7 +128,8 @@ def test_the_package_rerun_tables_match_the_results_folder(ds):
     both = summary_here.merge(summary_pkg, on="method", how="outer", indicator=True)
     assert (both._merge == "both").all(), ds
     for m in ("ARI", "NMI", "ASW"):
-        assert np.allclose(both[f"{m}_x"], both[f"{m}_y"], atol=1e-4), (ds, m)
+        # a graph method has no ASW in either copy
+        assert np.allclose(both[f"{m}_x"], both[f"{m}_y"], atol=1e-4, equal_nan=True), (ds, m)
 
 
 def test_stored_summaries_record_the_order_labels_for_returns():

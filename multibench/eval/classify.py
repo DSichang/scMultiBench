@@ -59,11 +59,18 @@ def classify(emb, labels, batch, seed: int = 0) -> pd.DataFrame:
     return out
 
 
-def _graph_text(who: str) -> str:
-    """What is wrong with the output of a graph method: ``who`` is the method,
-    or ``"output"`` when the method is not known."""
+def _graph_what(who: str) -> str:
+    """``"<method> writes a graph, not an embedding"``: ``who`` is the method, or
+    ``"output"`` when the method is not known."""
     who = "output is" if who == "output" else f"{who} writes"
-    return f"{who} a graph, not an embedding, so it has no classification scores."
+    return f"{who} a graph, not an embedding"
+
+
+def _graph_text(who: str, silhouettes: bool = False) -> str:
+    """What is wrong with the output of a graph method; ``silhouettes``: ASW or
+    iASW was asked for too."""
+    none = "ASW, iASW or classification scores" if silhouettes else "classification scores"
+    return f"{_graph_what(who)}, so it has no {none}."
 
 
 def _graph_writer(output) -> str | None:

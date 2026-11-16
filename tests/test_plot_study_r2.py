@@ -116,9 +116,12 @@ def _pair():
 
 def test_dataset_mode_rerun_pair_suggests_plot_bar():
     _, msgs = _messages(_build_table, _pair())
+    # scMoMaT writes a graph: its stored rows have no ASW and no iASW
     assert msgs == [
         "This figure averages each method over 2 datasets, D11 and D11b. Plot one "
-        "dataset, or use mtb.plot.bar."]
+        "dataset, or use mtb.plot.bar.",
+        "scMoMaT has no ASW or iASW. Pass metrics= without ASW and iASW to compare on "
+        "the same metrics."]
 
 
 @pytest.mark.parametrize("fn", [_build_table, mtb.plot.bubble, mtb.plot.bar])
