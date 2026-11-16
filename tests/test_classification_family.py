@@ -454,3 +454,21 @@ def test_run_scores_a_graph_method_on_its_graph(three, tmp_path):
     assert isinstance(W._load_scored(folder, SCMOMAT), np.ndarray)
     # the embedding of the record stays the UMAP (it is what a plot draws)
     assert W._load_embedding(folder, SCMOMAT).shape == (90, 2)
+
+
+def test_the_plot_says_nothing_of_the_scores_a_graph_method_cannot_have():
+    """scMoMaT's dashes under ASW, iASW and ASW_batch are what a graph method
+    has; a score any method could have and a row lacks is still named."""
+    for category, dataset in (("vertical", "D11"), ("cross", "D52")):
+        stored = _quiet(mtb.load_results, category, dataset=dataset)
+        for draw in (mtb.plot.bubble, mtb.plot.bar):
+            _, said = _caught(draw, stored)
+            assert not [m for m in said if "has no" in m], said
+    stored = _quiet(mtb.load_results, "vertical", dataset="D11")
+    # an embedding method without ASW, and scMoMaT without NMI
+    for method, metric in (("Matilda", "ASW"), ("scMoMaT", "NMI")):
+        cut = stored[~((stored.method == method) & (stored.metric == metric))]
+        _, said = _caught(mtb.plot.bubble, cut)
+        assert [m for m in said if "has no" in m] == [
+            f"{method} has no {metric}. Pass metrics= without {metric} to compare on the "
+            f"same metrics."], said

@@ -229,12 +229,23 @@ def _no_comparison_message(methods, constant: dict) -> str | None:
             f"grey. Leave {'it' if one else 'them'} out with metrics=.")
 
 
+def _graph_methods() -> set:
+    """The methods whose every variant writes a graph (scMoMaT)."""
+    from ..engine import registry
+    return {spec.id for spec in registry.load()
+            if spec.variants and all(v.output.kind == "graph" for v in spec.variants)}
+
+
 def _na_missing(blocks) -> list:
     """The n/a cells per row, in row order, as ``[(method, codes)]``; codes in
-    column order."""
+    column order. The silhouettes of a graph method are left out: it cannot
+    have them, and its dashes say so."""
+    from .._data.catalog import GRAPH_UNSCORED
+    graphs = _graph_methods()
     out = []
     for m in blocks[0].raw.index:
-        codes = [c for b in blocks for c in b.raw.columns if pd.isna(b.raw.loc[m, c])]
+        codes = [c for b in blocks for c in b.raw.columns if pd.isna(b.raw.loc[m, c])
+                 and not (m in graphs and c in GRAPH_UNSCORED)]
         if codes:
             out.append((m, codes))
     return out
