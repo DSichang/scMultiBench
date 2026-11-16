@@ -1146,8 +1146,8 @@ SCORED_TOO_PAIR = (" The batch metrics measure how well the RNA and ATAC cells m
 
 def no_classification_sentence(key, methods):
     """The sentence after ``SCORED_TOO`` for a tutorial that runs a method
-    whose output is a graph: run scores the UMAP it writes next to the graph
-    (scMoMaT's script fixes ``n_components = 2``), with no classification."""
+    whose output is a graph: run scores the graph as the paper does, which has
+    no silhouette (ASW, iASW, ASW_batch) and no classification."""
     graphs = sorted({m for m, v in task_variants(key)
                      if m in methods and v.output.kind == "graph"})
     if not graphs:
@@ -1155,8 +1155,8 @@ def no_classification_sentence(key, methods):
     if graphs != ["scMoMaT"]:
         raise SystemExit(f"{key}: {and_list(graphs)} write a graph: reword "
                          f"no_classification_sentence")
-    return (" scMoMaT writes a graph: `run` scores its 2-D UMAP, with no "
-            "classification scores.")
+    return (" scMoMaT writes a graph: `run` scores that graph, which has no ASW, iASW "
+            "or ASW_batch and no classification scores.")
 
 PLOT_TEXT = ("`res.plot()` draws the scores as a bubble table. Circle size ranks the rows "
              "within each column and colour shows the value scaled per column, so a small gap "
