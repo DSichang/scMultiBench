@@ -1316,7 +1316,6 @@ body.has-section-numbers .md-typeset .lp {
 .md-typeset .choose-m3 {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--brand-600);
   border-radius: 0.5rem;
   padding: 1.1rem 1.4rem 1rem;
   margin: 1.2rem 0 2rem;
@@ -1681,9 +1680,8 @@ body.has-section-numbers .md-typeset .lp {
 .md-typeset .admonition {
   border-radius: 0.5rem;
   /* Force grey on all four sides (!important beats Material's per-type colour,
-     e.g. the green `tip` box border); only the LEFT edge carries the accent. */
+     e.g. the green `tip` box border); only warning/danger boxes add a coloured left edge. */
   border: 1px solid var(--border) !important;
-  border-left-width: 3px !important;
   font-size: 14px;            /* was 0.88rem (~19px) — bigger than body; tighten */
   box-shadow: var(--shadow-xs);
   background: var(--bg-card);
@@ -1696,16 +1694,9 @@ body.has-section-numbers .md-typeset .lp {
 }
 /* Admonition icon: neutral grey, never Material's per-type colour (e.g. the green flame) */
 .md-typeset .admonition-title::before { background-color: var(--text-muted) !important; }
-/* Left accent: blue for info types (b/w/grey + blue palette), amber/red kept only
-   for genuine warning/danger semantics. */
-.md-typeset .admonition.abstract,
-.md-typeset .admonition.tip,
-.md-typeset .admonition.note,
-.md-typeset .admonition.info,
-.md-typeset .admonition.question { border-left-color: var(--brand-600) !important; }
-.md-typeset .admonition.warning  { border-left-color: var(--amber) !important; }
+.md-typeset .admonition.warning  { border-left-color: var(--amber) !important; border-left-width: 3px !important; }
 .md-typeset .admonition.danger,
-.md-typeset .admonition.failure  { border-left-color: var(--rose, #e11d48) !important; }
+.md-typeset .admonition.failure  { border-left-color: var(--rose, #e11d48) !important; border-left-width: 3px !important; }
 
 /* FAQ "question" admonitions: a light-blue icon (#00AEEF) instead of Material's
    default green, on normal pages and in rendered notebooks. */
@@ -1713,7 +1704,6 @@ body.has-section-numbers .md-typeset .lp {
 .jupyter-wrapper .admonition.question .admonition-title::before {
   background-color: #00AEEF !important;
 }
-.jupyter-wrapper .admonition.question { border-left-color: #00AEEF !important; }
 
 
 /* ---------- 10.1 Collapsible blocks (<details>) ----------
@@ -1923,9 +1913,13 @@ html .jupyter-wrapper details > :last-child:not(summary) { margin-bottom: 0.9em;
 }
 .md-tabs__link--active::after { content: none; }
 
+/* The header title is hidden, so nothing grows between the logo and the
+   controls: the first control takes the free space and sits at the right. */
+.md-header .md-header__option { margin-left: auto; }
+
 /* ---------- 11.5 Single-row header (desktop): one flex row, no overlap ---------- */
 /* On wide screens (≥100em) the whole header is one flex row, like M3's:
-     logo · Multi-Task Omics ·· Home · M3 · scMultiBench · Matilda ·· search · GitHub · ☾/☀
+     logo · Multi-Task Omics ·· Home · M3 · scMultiBench · Matilda ·· GitHub · ☾/☀
    We flatten the .md-header__inner <nav> with display:contents so its children
    join the .md-tabs <nav> as direct flex items of .md-header, place each with
    `order`, and absolutely-centre the tabs at the true header midpoint (the M3 look).
@@ -1946,7 +1940,7 @@ html .jupyter-wrapper details > :last-child:not(summary) { margin-bottom: 0.9em;
 
   /* Placement: logo + M3 hug the left (nudged in), the nav is absolutely
      centered in the header (true viewport centre, independent of side widths),
-     and the controls (search · GitHub · ☾) are pushed to the far right. */
+     and the controls (GitHub · ☾) are pushed to the far right. */
   .md-header .md-logo           { order: 0; flex: 0 0 auto; margin-left: 0.85rem; }
   .md-header .md-header__title  { order: 1; flex: 0 0 auto; margin: 0 6px 0 8px; }
   .md-header .md-tabs           {
@@ -1962,27 +1956,19 @@ html .jupyter-wrapper details > :last-child:not(summary) { margin-bottom: 0.9em;
     justify-content: center;
     margin: 0;
   }
-  .md-header .md-search         { order: 3; flex: 0 0 auto; margin-left: auto; }
   /* Repo keeps its full natural width ("PYangLab/multi-task-omics"); the 100em
      breakpoint guarantees the inline row has room for it. The ellipsis rule below
      is a harmless safety net (and matches M3's "your-org/m3" → "your-or…"). */
-  .md-header .md-header__source { order: 4; flex: 0 0 auto; width: auto; margin: 0 2px; }
+  .md-header .md-header__source { order: 4; flex: 0 0 auto; width: auto; margin: 0 2px 0 auto; }
   .md-header .md-header__source .md-source__repository {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .md-header .md-header__option { order: 5; flex: 0 0 auto; }
+  .md-header .md-header__option { order: 5; flex: 0 0 auto; margin-left: 0; }
 
-  /* Drop the mobile-only icon buttons (hamburger + search-open) on desktop.
-     IMPORTANT: scope the search rule to the *toggle button* only. There are
-     three label[for="__search"] in the DOM — the open button, the click-away
-     .md-search__overlay (unchecks #__search so the dropdown closes), and the
-     magnifier .md-search__icon inside the field. Hiding all three left the
-     overlay dead, so clicking away never closed the "Type to start searching"
-     dropdown. Keep the overlay + magnifier alive. */
-  .md-header label[for="__drawer"],
-  .md-header label.md-header__button[for="__search"] { display: none; }
+  /* Drop the mobile-only hamburger on desktop. */
+  .md-header label[for="__drawer"] { display: none; }
 
   /* Tabs sit inline: kill the band, the sticky offset, and the underline */
   .md-tabs {
@@ -2716,7 +2702,6 @@ html .jupyter-wrapper details > :last-child:not(summary) { margin-bottom: 0.9em;
 .you-will-learn {
   background: var(--brand-50);
   border: 1px solid var(--brand-200);
-  border-left: 3px solid var(--brand-600);
   padding: 1rem 1.3rem;
   margin: 1.2rem 0 1.8rem;
   font-size: 14px;          /* was 0.92rem (~20px) — bigger than body; match admonition body */
@@ -2725,7 +2710,6 @@ html .jupyter-wrapper details > :last-child:not(summary) { margin-bottom: 0.9em;
 [data-md-color-scheme="slate"] .you-will-learn {
   background: rgba(0, 174, 239, 0.08);
   border-color: var(--border-strong);
-  border-left-color: var(--brand-600);
 }
 .you-will-learn::before {
   content: "You will learn";
@@ -2766,55 +2750,11 @@ html .jupyter-wrapper details > :last-child:not(summary) { margin-bottom: 0.9em;
 /* ---------- 21. Blockquote ---------- */
 
 .md-typeset blockquote {
-  border-left: 3px solid var(--brand-600);
+  border-left: none;
   background: var(--bg-subtle);
   color: var(--text);
   padding: 0.7rem 1.1rem;
-  border-radius: 0 0.4rem 0.4rem 0;
-}
-
-
-/* ---------- 22. Search ---------- */
-
-.md-search__form {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
   border-radius: 0.4rem;
-  transition: border-color var(--dur-fast) var(--ease-out);
-  height: 2rem;
-}
-.md-search__form:hover { border-color: var(--border-strong); }
-.md-search.md-search--active .md-search__form,
-.md-search__form:focus-within {
-  border-color: var(--text);   /* black active border, not violet */
-}
-/* The focused input draws a violet :focus-visible halo by default — make it black */
-.md-search__input:focus-visible {
-  outline-color: var(--text) !important;
-}
-.md-search__input {
-  font-family: 'Inter', sans-serif;
-  font-size: 14px;            /* match the nav links (Home / Get started / …) */
-  color: var(--text);
-}
-.md-search__input::placeholder { color: var(--text-faint); font-size: 14px; }
-
-/* Narrower search box on desktop (the single-row header is tight on space).
-   Use .md-header specificity to beat Material's default .md-search__inner width. */
-@media screen and (min-width: 76.25em) {
-  .md-header .md-search__inner { width: 8rem; }
-  .md-header .md-search.md-search--active .md-search__inner,
-  .md-header .md-search__inner:focus-within { width: 17rem; }
-  /* The centred nav (.md-tabs) is position:absolute with z-index:3, so it
-     paints ON TOP of the (opaque white) search form (z-index:2) — when the box
-     expands leftward over "Tutorials"/"API" the nav text showed through.
-     Lift the whole search subtree above the tabs so the opaque field covers
-     them. Collapsed, the search sits far right and never overlaps the nav. */
-  .md-header .md-search { z-index: 4; }
-  .md-search__form { height: 1.9rem; }
-  .md-search__input { padding-left: 1.9rem; font-size: 14px; }
-  /* magnifier icon (restored) sits left, sized to the smaller field */
-  .md-search__icon[for="__search"] { width: 1.1rem; height: 1.1rem; }
 }
 
 
@@ -3015,29 +2955,6 @@ input:focus-visible,
   border-radius: 4px;
 }
 
-/* — Search results: compact + scannable. The result title was rendering in the
-     large page-title serif, which pushed real info off-screen. Pin everything to
-     small sans so many results stay visible at once. — */
-.md-search-result__title {
-  font-family: 'Inter', sans-serif !important;
-  font-size: 13px !important;
-  font-weight: 600 !important;
-  line-height: 1.5 !important;
-  letter-spacing: 0 !important;
-  margin: 0 !important;
-}
-.md-search-result__teaser {
-  font-family: 'Inter', sans-serif !important;
-  font-size: 12px !important;
-  line-height: 1.55 !important;
-  color: var(--text-muted) !important;
-}
-.md-search-result__meta {
-  font-family: 'Inter', sans-serif !important;
-  font-size: 11.5px !important;
-}
-.md-search-result mark { color: var(--brand-600); background: transparent; font-weight: 600; }
-
 /* — Glossary A–Z jump bar (monochrome, matches the restrained nav language) — */
 .md-typeset .g-nav {
   display: flex;
@@ -3208,7 +3125,6 @@ input:focus-visible,
 .md-typeset .doc-signature.highlight {
   margin: 0 0 1.1em;
   border: 1px solid var(--api-sig-border);
-  border-left: 2px solid var(--brand-600);
   border-radius: 6px;
   background: var(--api-sig-bg);
 }
